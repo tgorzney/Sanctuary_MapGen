@@ -1,0 +1,38 @@
+# CMake Build Outputs
+out/
+build/
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install/
+compile_commands.json
+ctest.xml
+
+# Visual Studio
+.vs/
+*.sln
+*.suo
+*.user
+*.db
+*.ipch
+*.opendb
+*.VC.db
+
+# Executables and Libs
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+*.ilk
+
+# Dependencies (FetchContent/vcpkg downloads)
+_deps/
+vcpkg_installed/
+
+# OS generated files
+.DS_Store
+Thumbs.db
