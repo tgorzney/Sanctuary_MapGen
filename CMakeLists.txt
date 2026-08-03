@@ -55,6 +55,9 @@ set(CORE_SOURCES
     core/Mask2D.cpp
     core/TerrainGenerator.h
     core/TerrainGenerator.cpp
+    core/ErosionSimulator.cpp
+    core/ErosionCompute.cpp
+    core/TerrainCompute.cpp
 )
 
 # Download FastNoiseLite header if it doesn't exist

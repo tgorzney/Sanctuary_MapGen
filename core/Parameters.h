@@ -18,7 +18,9 @@ namespace SanmapGen {
         Add,
         Subtract,
         Multiply,
-        Overlay
+        Overlay,
+        Max,
+        Min
     };
 
     enum class NoiseType {
@@ -37,14 +39,50 @@ namespace SanmapGen {
         PingPong
     };
 
+    enum class StratumType {
+        Bedrock, // Bottom-most layer, high hardness, zero drainage
+        Sand,    // Low cohesion, high drainage
+        Silt,    // Medium cohesion, medium drainage
+        Clay,    // High cohesion, low drainage
+        Loam,    // Balanced soil
+        Snow     // Melts into water
+    };
+
+    struct GlobalErosionSettings {
+        bool Enabled = false;
+        bool UseGPU = false;
+        int DropletCount = 50000;
+        int MaxLifetime = 30;
+        float Gravity = 4.0f;
+        float EvaporationRate = 0.02f;
+
+        // Precipitation
+        bool UseRainNoise = true;
+        float RainNoiseFreq = 0.01f;
+        int RainNoiseOctaves = 4;
+        float RainNoiseThreshold = 0.5f;
+
+        // Orographic
+        bool UseOrographicRain = true;
+        float WindAngle = 45.0f; // degrees
+    };
+
     struct NoiseLayer {
         std::string Name = "New Layer";
         bool Enabled = true;
         
+        StratumType Stratum = StratumType::Sand; // Stratum type dictates physics
+        BlendMode Blend = BlendMode::Add; // Used for pre-masking thickness
+
         NoiseType Type = NoiseType::OpenSimplex2;
         FractalType Fractal = FractalType::FBm;
-        int SymmetryMask = Symmetry_None;
-        BlendMode Blend = BlendMode::Add;
+        int SymmetryMask = Symmetry_Point;
+        
+        // Soil Physics Settings
+        float Hardness = 0.2f; // Sand defaults
+        float Friction = 0.8f;
+        float Cohesion = 0.5f;
+        float CapacityMult = 2.0f;
         
         float Frequency = 0.01f;
         int Octaves = 4;
@@ -57,7 +95,7 @@ namespace SanmapGen {
         float LandDensity = 0.5f;
         float PlateauDensity = 0.0f;
         float MountainDensity = 0.0f;
-        float RampDensity = 0.0f;
+        float RampDensity = 0.5f;
     };
 
     enum class SymmetryAlgorithm {
@@ -66,16 +104,19 @@ namespace SanmapGen {
         CrossFade,
         Cylinder3D,
         Torus3D,
-        NativeHash
+        NativeHash,
+        Superposition
     };
 
     struct GenerationParams {
         // --- General ---
+        bool UseGPUTerrain = false;
         int Seed = 12345;
         int MapSize = 512;
         
         // --- Symmetry Globals ---
-        SymmetryAlgorithm SymAlgorithm = SymmetryAlgorithm::Fold;
+        SymmetryAlgorithm SymAlgorithm = SymmetryAlgorithm::Superposition;
+        BlendMode SymSuperpositionBlend = BlendMode::Max;
         float SymmetryBlurRadius = 10.0f;
         float CrossFadeWidth = 0.2f; // Radians to crossfade
         float CylinderZScale = 1.0f; // Stretch the cylinder length
@@ -83,7 +124,9 @@ namespace SanmapGen {
         float TorusMinorRadius = 64.0f; // Donut tube size
         
         // --- The Dynamic Layer Stack ---
+        // Geology
         std::vector<NoiseLayer> Layers;
+        GlobalErosionSettings Erosion;
         
         // --- Gameplay ---
         int SpawnPointCount = 2;

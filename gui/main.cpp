@@ -20,10 +20,10 @@ int main(int, char**)
     if (!glfwInit())
         return 1;
 
-    // GL 3.0 + GLSL 130
-    const char* glsl_version = "#version 130";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    // GL 4.3 + GLSL 430 (Required for Compute Shaders)
+    const char* glsl_version = "#version 430";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 
     // Create window with graphics context
     GLFWwindow* window = glfwCreateWindow(1280, 720, "Sanctuary Map Generator", nullptr, nullptr);
@@ -80,6 +80,7 @@ int main(int, char**)
         
         ImGui::Text("Global Settings");
         ImGui::Separator();
+        if (ImGui::Checkbox("Use GPU Terrain Generation (GLSL)", &params.UseGPUTerrain)) bNeedsPreviewUpdate = true;
         if (ImGui::InputInt("Map Seed", &params.Seed)) bNeedsPreviewUpdate = true;
         
         const int sizes[] = { 256, 512, 1024, 2048, 4096 };
@@ -102,7 +103,7 @@ int main(int, char**)
         ImGui::Text("Symmetry Blending Mode");
         ImGui::Separator();
         
-        const char* alg_labels[] = { "2D Fold (Hardlines)", "2D Blur (Post-Process)", "2D Cross-Fade", "3D Cylinder", "3D Torus", "Native Hash (X/Z/Point)" };
+        const char* alg_labels[] = { "2D Fold (Hardlines)", "2D Blur (Post-Process)", "2D Cross-Fade", "3D Cylinder", "3D Torus", "Native Hash (X/Z/Point)", "Superposition (Multipass)" };
         int current_alg = static_cast<int>(params.SymAlgorithm);
         if (ImGui::Combo("Algorithm", &current_alg, alg_labels, IM_ARRAYSIZE(alg_labels))) {
             params.SymAlgorithm = static_cast<SanmapGen::SymmetryAlgorithm>(current_alg);
@@ -114,6 +115,13 @@ int main(int, char**)
             if (ImGui::SliderFloat("Blur Radius", &params.SymmetryBlurRadius, 1.0f, 50.0f)) bNeedsPreviewUpdate = true;
         } else if (params.SymAlgorithm == SanmapGen::SymmetryAlgorithm::CrossFade) {
             if (ImGui::SliderFloat("Blend Width (Radians)", &params.CrossFadeWidth, 0.01f, 1.0f)) bNeedsPreviewUpdate = true;
+        } else if (params.SymAlgorithm == SanmapGen::SymmetryAlgorithm::Superposition) {
+            const char* blend_labels[] = { "Add", "Subtract", "Multiply", "Overlay", "Max", "Min" };
+            int current_blend = static_cast<int>(params.SymSuperpositionBlend);
+            if (ImGui::Combo("Superposition Blend", &current_blend, blend_labels, IM_ARRAYSIZE(blend_labels))) {
+                params.SymSuperpositionBlend = static_cast<SanmapGen::BlendMode>(current_blend);
+                bNeedsPreviewUpdate = true;
+            }
         } else if (params.SymAlgorithm == SanmapGen::SymmetryAlgorithm::Cylinder3D) {
             if (ImGui::SliderFloat("Cylinder Stretch", &params.CylinderZScale, 0.1f, 10.0f)) bNeedsPreviewUpdate = true;
         } else if (params.SymAlgorithm == SanmapGen::SymmetryAlgorithm::Torus3D) {
@@ -137,8 +145,37 @@ int main(int, char**)
         if (ImGui::SliderFloat("Hydro Multiplier", &params.HydroMultiplier, 0.0f, 3.0f)) bNeedsPreviewUpdate = true;
         
         ImGui::Spacing();
+        ImGui::Text("Global Hydraulic Erosion");
         ImGui::Separator();
-        ImGui::Text("Dynamic Terrain Layers");
+        if (ImGui::Checkbox("Enable Stratified Erosion", &params.Erosion.Enabled)) bNeedsPreviewUpdate = true;
+        if (params.Erosion.Enabled) {
+            ImGui::Checkbox("Use GPU Compute (GLSL)", &params.Erosion.UseGPU);
+            if (ImGui::DragInt("Droplet Count", &params.Erosion.DropletCount, 1000.0f, 1000, 1000000)) bNeedsPreviewUpdate = true;
+            if (ImGui::SliderInt("Max Lifetime", &params.Erosion.MaxLifetime, 10, 100)) bNeedsPreviewUpdate = true;
+            if (ImGui::SliderFloat("Evaporation Rate", &params.Erosion.EvaporationRate, 0.001f, 0.1f)) bNeedsPreviewUpdate = true;
+            if (ImGui::SliderFloat("Gravity", &params.Erosion.Gravity, 1.0f, 10.0f)) bNeedsPreviewUpdate = true;
+
+            ImGui::Spacing();
+            if (ImGui::TreeNodeEx("Precipitation (Rain Clouds)", ImGuiTreeNodeFlags_None)) {
+                if (ImGui::Checkbox("Enable Rain Noise", &params.Erosion.UseRainNoise)) bNeedsPreviewUpdate = true;
+                if (params.Erosion.UseRainNoise) {
+                    if (ImGui::SliderFloat("Cloud Frequency", &params.Erosion.RainNoiseFreq, 0.001f, 0.1f)) bNeedsPreviewUpdate = true;
+                    if (ImGui::SliderInt("Cloud Octaves", &params.Erosion.RainNoiseOctaves, 1, 8)) bNeedsPreviewUpdate = true;
+                    if (ImGui::SliderFloat("Cloud Density (Threshold)", &params.Erosion.RainNoiseThreshold, 0.0f, 1.0f)) bNeedsPreviewUpdate = true;
+                }
+                
+                ImGui::Spacing();
+                if (ImGui::Checkbox("Enable Orographic Rain (Rain Shadows)", &params.Erosion.UseOrographicRain)) bNeedsPreviewUpdate = true;
+                if (params.Erosion.UseOrographicRain) {
+                    if (ImGui::SliderFloat("Wind Angle (Degrees)", &params.Erosion.WindAngle, 0.0f, 360.0f)) bNeedsPreviewUpdate = true;
+                }
+                ImGui::TreePop();
+            }
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Text("Geological Stratum Layers (Bottom to Top)");
         ImGui::SameLine(ImGui::GetWindowWidth() - 100);
         if (ImGui::Button("Add Layer")) {
             SanmapGen::NoiseLayer newLayer;
@@ -167,10 +204,40 @@ int main(int, char**)
                     layer.Name = nameBuf;
                 }
                 
+                // Stratum Type
+                const char* stratum_labels[] = { "Bedrock", "Sand", "Silt", "Clay", "Loam", "Snow" };
+                if (ImGui::BeginCombo("Stratum Type", stratum_labels[(int)layer.Stratum])) {
+                    for (int n = 0; n < IM_ARRAYSIZE(stratum_labels); n++) {
+                        if (ImGui::Selectable(stratum_labels[n], ((int)layer.Stratum == n))) {
+                            layer.Stratum = (SanmapGen::StratumType)n;
+                            
+                            // Apply presets
+                            switch (layer.Stratum) {
+                                case SanmapGen::StratumType::Bedrock: layer.Hardness=1.0f; layer.Friction=0.1f; layer.Cohesion=1.0f; layer.CapacityMult=0.1f; break;
+                                case SanmapGen::StratumType::Sand:    layer.Hardness=0.2f; layer.Friction=0.8f; layer.Cohesion=0.5f; layer.CapacityMult=2.0f; break;
+                                case SanmapGen::StratumType::Silt:    layer.Hardness=0.4f; layer.Friction=0.7f; layer.Cohesion=0.7f; layer.CapacityMult=1.5f; break;
+                                case SanmapGen::StratumType::Clay:    layer.Hardness=0.6f; layer.Friction=0.9f; layer.Cohesion=0.9f; layer.CapacityMult=1.0f; break;
+                                case SanmapGen::StratumType::Loam:    layer.Hardness=0.3f; layer.Friction=0.8f; layer.Cohesion=0.6f; layer.CapacityMult=1.8f; break;
+                                case SanmapGen::StratumType::Snow:    layer.Hardness=0.05f; layer.Friction=0.2f; layer.Cohesion=0.4f; layer.CapacityMult=3.0f; break;
+                            }
+                            bNeedsPreviewUpdate = true;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
+                if (ImGui::TreeNodeEx("Soil Physics Overrides", ImGuiTreeNodeFlags_None)) {
+                    if (ImGui::SliderFloat("Hardness", &layer.Hardness, 0.01f, 1.0f)) bNeedsPreviewUpdate = true;
+                    if (ImGui::SliderFloat("Friction", &layer.Friction, 0.01f, 1.0f)) bNeedsPreviewUpdate = true;
+                    if (ImGui::SliderFloat("Cohesion (Talus Angle)", &layer.Cohesion, 0.01f, 1.0f)) bNeedsPreviewUpdate = true;
+                    if (ImGui::SliderFloat("Capacity Multiplier", &layer.CapacityMult, 0.1f, 5.0f)) bNeedsPreviewUpdate = true;
+                    ImGui::TreePop();
+                }
+
                 // Blend Mode
-                const char* blend_labels[] = { "Add", "Subtract", "Multiply", "Overlay" };
+                const char* blend_labels[] = { "Add", "Subtract", "Multiply", "Overlay", "Max", "Min" };
                 if (ImGui::BeginCombo("Blend Mode", blend_labels[(int)layer.Blend])) {
-                    for (int n = 0; n < 4; n++) {
+                    for (int n = 0; n < IM_ARRAYSIZE(blend_labels); n++) {
                         if (ImGui::Selectable(blend_labels[n], ((int)layer.Blend == n))) {
                             layer.Blend = (SanmapGen::BlendMode)n;
                             bNeedsPreviewUpdate = true;
@@ -245,7 +312,17 @@ int main(int, char**)
                 if (ImGui::SliderFloat("Mountain Density", &layer.MountainDensity, 0.0f, 1.0f)) bNeedsPreviewUpdate = true;
                 if (ImGui::SliderFloat("Ramp Density", &layer.RampDensity, 0.0f, 1.0f)) bNeedsPreviewUpdate = true;
                 
-                ImGui::Spacing();
+
+                if (ImGui::Button("Duplicate Layer")) {
+                    SanmapGen::NoiseLayer copiedLayer = layer;
+                    copiedLayer.Name = copiedLayer.Name + " (Copy)";
+                    // Insert immediately after this one
+                    params.Layers.insert(params.Layers.begin() + i + 1, copiedLayer);
+                    bNeedsPreviewUpdate = true;
+                    ImGui::PopID();
+                    break;
+                }
+                ImGui::SameLine();
                 if (ImGui::Button("Delete Layer")) {
                     params.Layers.erase(params.Layers.begin() + i);
                     bNeedsPreviewUpdate = true;
