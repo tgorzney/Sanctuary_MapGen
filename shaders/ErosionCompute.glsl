@@ -163,6 +163,7 @@ void main() {
                 // Subtract sequentially
                 float rem00 = e00;
                 for(int l = layerCount - 1; l >= 0 && rem00 > 0.0; --l) {
+                    if (physics[l].x < 0.0) continue; // Not Erodable
                     float th = getThickness(l, nodeX, nodeY);
                     float sub = min(th, rem00);
                     if (sub > 0.0) { setThickness(l, nodeX, nodeY, th - sub); rem00 -= sub; }
@@ -170,6 +171,7 @@ void main() {
                 
                 float rem10 = e10;
                 for(int l = layerCount - 1; l >= 0 && rem10 > 0.0; --l) {
+                    if (physics[l].x < 0.0) continue; // Not Erodable
                     float th = getThickness(l, nodeX+1, nodeY);
                     float sub = min(th, rem10);
                     if (sub > 0.0) { setThickness(l, nodeX+1, nodeY, th - sub); rem10 -= sub; }
@@ -177,6 +179,7 @@ void main() {
                 
                 float rem01 = e01;
                 for(int l = layerCount - 1; l >= 0 && rem01 > 0.0; --l) {
+                    if (physics[l].x < 0.0) continue; // Not Erodable
                     float th = getThickness(l, nodeX, nodeY+1);
                     float sub = min(th, rem01);
                     if (sub > 0.0) { setThickness(l, nodeX, nodeY+1, th - sub); rem01 -= sub; }
@@ -184,6 +187,7 @@ void main() {
                 
                 float rem11 = e11;
                 for(int l = layerCount - 1; l >= 0 && rem11 > 0.0; --l) {
+                    if (physics[l].x < 0.0) continue; // Not Erodable
                     float th = getThickness(l, nodeX+1, nodeY+1);
                     float sub = min(th, rem11);
                     if (sub > 0.0) { setThickness(l, nodeX+1, nodeY+1, th - sub); rem11 -= sub; }

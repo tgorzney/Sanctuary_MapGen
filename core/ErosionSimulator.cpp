@@ -172,6 +172,8 @@ namespace SanmapGen {
                                 float rem = amount;
                                 for (int l = (int)activeLayers.size() - 1; l >= 0 && rem > 0; --l) {
                                     int idx = activeLayers[l];
+                                    if (!params.Layers[idx].Erodable) continue;
+                                    
                                     float th = threadStratums[idx].Get(nx, ny);
                                     if (th > 0) {
                                         float sub = std::min(th, rem);
@@ -200,6 +202,8 @@ namespace SanmapGen {
                     for (int x = 1; x < mapSize - 1; ++x) {
                         for (int l = (int)activeLayers.size() - 1; l >= 0; --l) {
                             int idx = activeLayers[l];
+                            if (!params.Layers[idx].Erodable) continue;
+                            
                             float thickness = threadStratums[idx].Get(x, y);
                             if (thickness > 0.001f) {
                                 const auto& layer = params.Layers[idx];

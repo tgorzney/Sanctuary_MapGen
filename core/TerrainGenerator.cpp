@@ -306,8 +306,8 @@ namespace SanmapGen {
         return h00 * (1.0f - u) * (1.0f - v) + h10 * u * (1.0f - v) + h01 * (1.0f - u) * v + h11 * u * v;
     }
 
-    FloatMask TerrainGenerator::SymmetrizeDeltaMap(const FloatMask& deltaMap, const NoiseLayer& layer, const GenerationParams& params) {
-        int mapSize = deltaMap.GetWidth();
+    FloatMask TerrainGenerator::SymmetrizeErodedTerrain(const FloatMask& terrainMap, const NoiseLayer& layer, const GenerationParams& params) {
+        int mapSize = terrainMap.GetWidth();
         int halfSize = mapSize / 2;
         int spawnCount = params.SpawnPointCount;
         int symMask = layer.SymmetryMask;
@@ -360,21 +360,13 @@ namespace SanmapGen {
                     for (int i = 0; i < oldCount; ++i) { coordsX[count] = -coordsX[i]; coordsY[count] = -coordsY[i]; count++; }
                 }
                 
-                float finalVal = BilinearGet(deltaMap, coordsX[0] + halfSize, coordsY[0] + halfSize);
+                float finalVal = BilinearGet(terrainMap, coordsX[0] + halfSize, coordsY[0] + halfSize);
                 for (int i = 1; i < count; ++i) {
-                    float val = BilinearGet(deltaMap, coordsX[i] + halfSize, coordsY[i] + halfSize);
-                    switch (params.SymSuperpositionBlend) {
-                        case BlendMode::Add: finalVal += val; break;
-                        case BlendMode::Subtract: finalVal -= std::abs(val); break;
-                        case BlendMode::Multiply: finalVal *= val; break;
-                        case BlendMode::Max: finalVal = std::max(finalVal, val); break;
-                        case BlendMode::Min: finalVal = std::min(finalVal, val); break;
-                        case BlendMode::Overlay: break; // Unused for delta
-                    }
+                    finalVal += BilinearGet(terrainMap, coordsX[i] + halfSize, coordsY[i] + halfSize);
                 }
                 
-                if (params.SymSuperpositionBlend == BlendMode::Add && count > 1) {
-                    finalVal /= static_cast<float>(count); // pure average for erosion delta
+                if (count > 1) {
+                    finalVal /= static_cast<float>(count); // Pure average for erosion synchronization
                 }
                 
                 outMap.Set(px, py, finalVal);
@@ -392,8 +384,36 @@ namespace SanmapGen {
             DecodeMorton2D(z, px, py);
             
             if (px >= (uint32_t)mapSize || py >= (uint32_t)mapSize) continue;
-
-            float noiseVal = (EvaluateSymmetricNoise(px, py, mapSize, *task.Noise, layer, task.Params) + 1.0f) * 0.5f;
+            
+            float noiseVal = 0.0f;
+            
+            if (layer.UseImage && !layer.ImageData.empty() && layer.ImageWidth > 0 && layer.ImageHeight > 0) {
+                // Map the current pixel (px, py) to the image space (0 to ImageWidth-1)
+                float u = static_cast<float>(px) / static_cast<float>(mapSize);
+                float v = static_cast<float>(py) / static_cast<float>(mapSize);
+                float imgX = u * static_cast<float>(layer.ImageWidth - 1);
+                float imgY = v * static_cast<float>(layer.ImageHeight - 1);
+                
+                int x0 = std::clamp(static_cast<int>(imgX), 0, layer.ImageWidth - 1);
+                int y0 = std::clamp(static_cast<int>(imgY), 0, layer.ImageHeight - 1);
+                int x1 = std::clamp(x0 + 1, 0, layer.ImageWidth - 1);
+                int y1 = std::clamp(y0 + 1, 0, layer.ImageHeight - 1);
+                
+                float fracX = imgX - static_cast<float>(x0);
+                float fracY = imgY - static_cast<float>(y0);
+                
+                float h00 = layer.ImageData[y0 * layer.ImageWidth + x0];
+                float h10 = layer.ImageData[y0 * layer.ImageWidth + x1];
+                float h01 = layer.ImageData[y1 * layer.ImageWidth + x0];
+                float h11 = layer.ImageData[y1 * layer.ImageWidth + x1];
+                
+                noiseVal = h00 * (1.0f - fracX) * (1.0f - fracY) + 
+                           h10 * fracX * (1.0f - fracY) + 
+                           h01 * (1.0f - fracX) * fracY + 
+                           h11 * fracX * fracY;
+            } else {
+                noiseVal = (EvaluateSymmetricNoise(px, py, mapSize, *task.Noise, layer, task.Params) + 1.0f) * 0.5f;
+            }
             
             noiseVal = noiseVal * (layer.LandDensity * 2.0f);
             float origNoise = noiseVal;
@@ -620,6 +640,13 @@ namespace SanmapGen {
                 ErosionCompute::DispatchStratified(Stratums, spawns, params.Erosion, params, mapSize);
             } else {
                 ErosionSimulator::SimulateStratifiedErosionDelta(Stratums, spawns, params.Erosion, params, mapSize);
+            }
+            
+            // Symmetrize the eroded stratums to fix divergent erosion paths!
+            for (size_t i = 0; i < params.Layers.size(); ++i) {
+                if (params.Layers[i].Enabled && params.Layers[i].SymmetryMask != 0) {
+                    Stratums[i] = SymmetrizeErodedTerrain(Stratums[i], params.Layers[i], params);
+                }
             }
         }
         

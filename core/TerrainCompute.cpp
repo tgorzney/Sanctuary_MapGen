@@ -157,13 +157,14 @@ namespace SanmapGen {
         glDeleteShaderT(computeShader);
 
         std::vector<LayerConfigGLSL> activeLayers;
-        for (const auto& layer : params.Layers) {
+        for (size_t i = 0; i < params.Layers.size(); ++i) {
+            const auto& layer = params.Layers[i];
             if (layer.Enabled) {
                 LayerConfigGLSL cfg;
                 cfg.freq = layer.Frequency;
                 cfg.octaves = layer.Octaves;
                 cfg.gain = layer.Gain;
-                cfg.stratumIdx = (int)layer.Stratum;
+                cfg.stratumIdx = static_cast<int>(i);
                 cfg.opacity = layer.Opacity;
                 activeLayers.push_back(cfg);
             }
@@ -172,7 +173,7 @@ namespace SanmapGen {
         if (activeLayers.empty()) return;
         int layerCount = (int)activeLayers.size();
         
-        int totalStrataTypes = 8;
+        int totalStrataTypes = (int)params.Layers.size();
         size_t mapPixels = params.MapSize * params.MapSize;
         std::vector<float> flattenedStrata(mapPixels * totalStrataTypes, 0.0f);
 

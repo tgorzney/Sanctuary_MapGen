@@ -49,10 +49,10 @@ namespace SanmapGen {
     };
 
     struct GlobalErosionSettings {
-        bool Enabled = false;
-        bool UseGPU = false;
-        int DropletCount = 50000;
-        int MaxLifetime = 30;
+        bool Enabled = true;
+        bool UseGPU = true;
+        int DropletCount = 1000000;
+        int MaxLifetime = 15;
         float Gravity = 4.0f;
         float EvaporationRate = 0.02f;
 
@@ -71,6 +71,15 @@ namespace SanmapGen {
         std::string Name = "New Layer";
         bool Enabled = true;
         
+        // Image / Freeze support
+        bool UseImage = false;
+        std::string ImagePath = "";
+        std::vector<float> ImageData; // Cached heightmap (normalized 0.0 to 1.0)
+        int ImageWidth = 0;
+        int ImageHeight = 0;
+        
+        bool Erodable = true;
+        
         StratumType Stratum = StratumType::Sand; // Stratum type dictates physics
         BlendMode Blend = BlendMode::Add; // Used for pre-masking thickness
 
@@ -84,18 +93,18 @@ namespace SanmapGen {
         float Cohesion = 0.5f;
         float CapacityMult = 2.0f;
         
-        float Frequency = 0.01f;
-        int Octaves = 4;
+        float Frequency = 0.005f;
+        int Octaves = 5;
         float Gain = 0.5f;
         float PingPongStrength = 2.0f;
         float Opacity = 1.0f; // Multiplier/Weight for this layer
         float CellularJitter = 1.0f;
         
         // Terrain Density Shaping
-        float LandDensity = 0.5f;
+        float LandDensity = 0.514f;
         float PlateauDensity = 0.0f;
-        float MountainDensity = 0.0f;
-        float RampDensity = 0.5f;
+        float MountainDensity = 0.243f;
+        float RampDensity = 0.500f;
     };
 
     enum class SymmetryAlgorithm {
@@ -106,6 +115,35 @@ namespace SanmapGen {
         Torus3D,
         NativeHash,
         Superposition
+    };
+
+    struct WaterSettings {
+        float WaterLevelMin = 20.0f;
+        float WaterLevelMax = 40.0f;
+        float DeepWaterDepthMin = 10.0f;
+        float DeepWaterDepthMax = 30.0f;
+        std::string WaveGeneratorBlueprint = "";
+    };
+
+    struct StratumSettings {
+        float BaseColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
+        std::string AlbedoPath = "";
+        std::string NormalPath = "";
+        std::string CompositePath = "";
+    };
+
+    struct MarkerRule {
+        std::string Name = "New Marker";
+        bool Enabled = true;
+        
+        // Filtering thresholds
+        float MinSlope = 0.0f;
+        float MaxSlope = 90.0f;
+        float MinHeight = 0.0f;
+        float MaxHeight = 128.0f;
+        
+        // Density/Spawning
+        float Density = 1.0f;
     };
 
     struct GenerationParams {
@@ -133,13 +171,23 @@ namespace SanmapGen {
         float AlloyMultiplier = 1.0f;
         float HydroMultiplier = 1.0f;
         
-        // --- Water (Sanmap Settings) ---
-        float WaterLevelMin = 20.0f;
-        float WaterLevelMax = 40.0f;
-        float DeepWaterDepthMin = 10.0f;
-        float DeepWaterDepthMax = 30.0f;
+        // --- New Tabs Data ---
+        WaterSettings Water;
+        std::vector<StratumSettings> Stratums;
+        std::vector<MarkerRule> Markers;
         
-        std::string WaveGeneratorBlueprint = "";
+        // Tab Visibility Flags (for minimap composite)
+        bool ShowHeightmap = true;
+        bool ShowStratums = false;
+        bool ShowDetailNormal = false;
+        bool ShowTint = false;
+        bool ShowHoles = false;
+        bool ShowSmoothness = false;
+        bool ShowWater = false;
+        bool ShowMarkers = false;
+        bool ShowReclaim = false;
+        bool ShowProps = false;
+        bool ShowDecals = false;
         
         // Default constructor to push one base layer
         GenerationParams() {
@@ -150,7 +198,18 @@ namespace SanmapGen {
             baseLayer.Gain = 0.5f;
             baseLayer.PingPongStrength = 2.0f;
             baseLayer.Opacity = 1.0f;
+            
+            baseLayer.LandDensity = 0.514f;
+            baseLayer.PlateauDensity = 0.0f;
+            baseLayer.MountainDensity = 0.243f;
+            baseLayer.RampDensity = 0.500f;
+            
             Layers.push_back(baseLayer);
+
+            // Initialize 9 blank stratums to match the Sanctuary format
+            for (int i = 0; i < 9; ++i) {
+                Stratums.push_back(StratumSettings());
+            }
         }
     };
 

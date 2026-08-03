@@ -58,16 +58,36 @@ set(CORE_SOURCES
     core/ErosionSimulator.cpp
     core/ErosionCompute.cpp
     core/TerrainCompute.cpp
+    core/MapExporter.cpp
+    core/FileDialog.cpp
+    core/ImageUtils.cpp
 )
 
 # Download FastNoiseLite header if it doesn't exist
-set(FASTNOISE_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/core/FastNoiseLite.h")
-if(NOT EXISTS "${FASTNOISE_HEADER}")
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/core/FastNoiseLite.h")
+    message(STATUS "Downloading FastNoiseLite.h...")
     file(DOWNLOAD 
         "https://raw.githubusercontent.com/Auburn/FastNoiseLite/master/Cpp/FastNoiseLite.h" 
-        "${FASTNOISE_HEADER}"
-        STATUS download_status
-    )
+        "${CMAKE_CURRENT_SOURCE_DIR}/core/FastNoiseLite.h"
+        SHOW_PROGRESS)
+endif()
+
+# Download stb_image.h if it doesn't exist
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/core/stb_image.h")
+    message(STATUS "Downloading stb_image.h...")
+    file(DOWNLOAD 
+        "https://raw.githubusercontent.com/nothings/stb/master/stb_image.h" 
+        "${CMAKE_CURRENT_SOURCE_DIR}/core/stb_image.h"
+        SHOW_PROGRESS)
+endif()
+
+# Download stb_image_write.h if it doesn't exist
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/core/stb_image_write.h")
+    message(STATUS "Downloading stb_image_write.h...")
+    file(DOWNLOAD 
+        "https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h" 
+        "${CMAKE_CURRENT_SOURCE_DIR}/core/stb_image_write.h"
+        SHOW_PROGRESS)
 endif()
 
 # Add our application executable

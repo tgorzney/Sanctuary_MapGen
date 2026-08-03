@@ -213,7 +213,8 @@ namespace SanmapGen {
             
             // Flatten physics
             const auto& layer = params.Layers[srcIdx];
-            physicsArray[l] = { layer.Hardness, layer.Friction, layer.Cohesion, layer.CapacityMult };
+            float encodedHardness = layer.Erodable ? layer.Hardness : -1.0f;
+            physicsArray[l] = { encodedHardness, layer.Friction, layer.Cohesion, layer.CapacityMult };
         }
 
         // Setup SSBOs

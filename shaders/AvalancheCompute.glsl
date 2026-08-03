@@ -35,6 +35,7 @@ void main() {
     
     // Check top-down through layers for active stratums to slide
     for (int l = layerCount - 1; l >= 0; --l) {
+        if (physics[l].x < 0.0) continue; // Not erodable
         float thickness = getThickness(l, pos.x, pos.y);
         if (thickness > 0.001) {
             float maxSlope = physics[l].z; // Cohesion is z
