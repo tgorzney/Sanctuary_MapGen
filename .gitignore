@@ -36,3 +36,8 @@ vcpkg_installed/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Excluded Directories
+/Sanctuary-Map-Generation-develop/
+/Sanctuary_MapGen-master (Broken)/
+/Sanctuary_MapGen-master (Old)/

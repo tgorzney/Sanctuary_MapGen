@@ -116,11 +116,17 @@ namespace SanmapGen {
         float gain;
         int stratumIdx;
         float opacity;
+        float landDensity;
+        float mountainDensity;
+        float plateauDensity;
+        
+        float rampDensity;
         float padding[3]; // Align to vec4 layout
     };
 
     void TerrainCompute::DispatchTerrain(std::vector<FloatMask>& stratums, const GenerationParams& params) {
-        if(params.Layers.empty()) return;
+        auto flatLayers = params.GetFlatLayers();
+        if(flatLayers.empty()) return;
 
         LoadGLExtensionsT();
         if(!glCreateShaderT) {
@@ -157,15 +163,20 @@ namespace SanmapGen {
         glDeleteShaderT(computeShader);
 
         std::vector<LayerConfigGLSL> activeLayers;
-        for (size_t i = 0; i < params.Layers.size(); ++i) {
-            const auto& layer = params.Layers[i];
-            if (layer.Enabled) {
+        // flatLayers already declared above
+    for (size_t i = 0; i < flatLayers.size(); ++i) {
+            const auto& layer = *flatLayers[i];
+            if (layer.Enabled && layer.Type != NoiseType::None) {
                 LayerConfigGLSL cfg;
                 cfg.freq = layer.Frequency;
                 cfg.octaves = layer.Octaves;
                 cfg.gain = layer.Gain;
                 cfg.stratumIdx = static_cast<int>(i);
                 cfg.opacity = layer.Opacity;
+                cfg.landDensity = layer.LandDensity;
+                cfg.mountainDensity = layer.MountainDensity;
+                cfg.plateauDensity = layer.PlateauDensity;
+                cfg.rampDensity = layer.RampDensity;
                 activeLayers.push_back(cfg);
             }
         }
@@ -173,8 +184,9 @@ namespace SanmapGen {
         if (activeLayers.empty()) return;
         int layerCount = (int)activeLayers.size();
         
-        int totalStrataTypes = (int)params.Layers.size();
-        size_t mapPixels = params.MapSize * params.MapSize;
+        int vertSize = params.MapSize + 1;
+        int totalStrataTypes = (int)flatLayers.size();
+        size_t mapPixels = vertSize * vertSize;
         std::vector<float> flattenedStrata(mapPixels * totalStrataTypes, 0.0f);
 
         GLuint ssbo[2];
@@ -189,12 +201,12 @@ namespace SanmapGen {
         glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 1, ssbo[1]);
 
         glUseProgramT(computeProgram);
-        glUniform1iT(glGetUniformLocationT(computeProgram, "mapSize"), params.MapSize);
+        glUniform1iT(glGetUniformLocationT(computeProgram, "mapSize"), vertSize);
         glUniform1iT(glGetUniformLocationT(computeProgram, "layerCount"), layerCount);
         glUniform1iT(glGetUniformLocationT(computeProgram, "seed"), params.Seed);
 
-        int workgroupX = (params.MapSize + 15) / 16;
-        int workgroupY = (params.MapSize + 15) / 16;
+        int workgroupX = (vertSize + 15) / 16;
+        int workgroupY = (vertSize + 15) / 16;
         glDispatchComputeT(workgroupX, workgroupY, 1);
         glMemoryBarrierT(GL_SHADER_STORAGE_BARRIER_BIT);
 

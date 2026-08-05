@@ -39,7 +39,8 @@ namespace SanmapGen {
     }
 
     void ErosionSimulator::SimulateStratifiedErosionDelta(std::vector<FloatMask>& stratums, const std::vector<DropletSpawn>& spawns, const ErosionSettings& settings, const GenerationParams& params, int mapSize, int currentLayerIdx) {
-        if (!settings.Enabled || stratums.empty() || spawns.empty() || currentLayerIdx < 0 || currentLayerIdx >= params.Layers.size()) return;
+        auto flatLayers = params.GetFlatLayers();
+        if (!settings.Enabled || stratums.empty() || spawns.empty() || currentLayerIdx < 0 || currentLayerIdx >= flatLayers.size()) return;
 
         unsigned int numThreads = std::thread::hardware_concurrency();
         if (numThreads == 0) numThreads = 4;
@@ -56,7 +57,7 @@ namespace SanmapGen {
             for (int x = 0; x < mapSize; ++x) {
                 float th = 0.0f;
                 for (size_t i = 0; i <= (size_t)currentLayerIdx; ++i) {
-                    if (params.Layers[i].Enabled) th += stratums[i].Get(x, y);
+                    if (flatLayers[i]->Enabled) th += stratums[i].Get(x, y);
                 }
                 initialTotalHeight.Set(x, y, th);
             }
@@ -69,10 +70,10 @@ namespace SanmapGen {
 
             // Determine which layers can be carved into
             std::vector<size_t> activeLayers;
-            const auto& currentLayer = params.Layers[currentLayerIdx];
+            const auto& currentLayer = *flatLayers[currentLayerIdx];
             if (currentLayer.ErodeBeneath) {
                 for (size_t i = 0; i <= (size_t)currentLayerIdx; ++i) {
-                    if (params.Layers[i].Enabled) activeLayers.push_back(i);
+                    if (flatLayers[i]->Enabled) activeLayers.push_back(i);
                 }
             } else {
                 if (currentLayer.Enabled) activeLayers.push_back(currentLayerIdx);
@@ -104,7 +105,7 @@ namespace SanmapGen {
                     for (int l = (int)activeLayers.size() - 1; l >= 0; --l) {
                         if (threadStratums[activeLayers[l]].Get(nodeX, nodeY) > 0.0001f) {
                             topLayerIdx = activeLayers[l];
-                            const auto& layer = params.Layers[topLayerIdx];
+                            const auto& layer = (*flatLayers[topLayerIdx]);
                             topHardness = layer.Hardness;
                             topFriction = layer.Friction;
                             topCohesion = layer.Cohesion;
@@ -135,6 +136,9 @@ namespace SanmapGen {
                     
                     // Capacity driven by global setting * stratum mult
                     float capacity = std::max(-deltaHeight * speed * water * 4.0f * topCapacityMult, 0.01f);
+                    if (settings.DepositionMode) {
+                        capacity = std::max(capacity, sediment * std::clamp(-deltaHeight * 100.0f, 0.0f, 1.0f));
+                    }
 
                     if (sediment > capacity || deltaHeight > 0.0f) {
                         // DEPOSIT
@@ -183,7 +187,7 @@ namespace SanmapGen {
                                 // Dig down through active layers until erosion is spent or we hit a non-erodable floor
                                 for (int l = (int)activeLayers.size() - 1; l >= 0 && rem > 0; --l) {
                                     int idx = activeLayers[l];
-                                    if (!params.Layers[idx].Erodable) continue;
+                                    if (!(*flatLayers[idx]).Erodable) continue;
                                     
                                     float th = threadStratums[idx].Get(nx, ny);
                                     if (th > 0) {
@@ -211,7 +215,7 @@ namespace SanmapGen {
             std::vector<size_t> cohesionLayers;
             if (currentLayer.ErodeBeneath) {
                 for (size_t i = 0; i <= (size_t)currentLayerIdx; ++i) {
-                    if (params.Layers[i].Enabled) cohesionLayers.push_back(i);
+                    if (flatLayers[i]->Enabled) cohesionLayers.push_back(i);
                 }
             } else {
                 if (currentLayer.Enabled) cohesionLayers.push_back(currentLayerIdx);
@@ -222,11 +226,11 @@ namespace SanmapGen {
                     for (int x = 1; x < mapSize - 1; ++x) {
                         for (int l = (int)cohesionLayers.size() - 1; l >= 0; --l) {
                             int idx = cohesionLayers[l];
-                            if (!params.Layers[idx].Erodable) continue;
+                            if (!(*flatLayers[idx]).Erodable) continue;
                             
                             float thickness = threadStratums[idx].Get(x, y);
                             if (thickness > 0.001f) {
-                                const auto& layer = params.Layers[idx];
+                                const auto& layer = (*flatLayers[idx]);
                                 float maxSlope = layer.Cohesion;
                                 
                                 float h = threadTotalHeight.Get(x, y);

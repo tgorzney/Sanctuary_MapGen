@@ -61,6 +61,8 @@ set(CORE_SOURCES
     core/MapExporter.cpp
     core/FileDialog.cpp
     core/ImageUtils.cpp
+    core/PlacementRules.h
+    core/PlacementRules.cpp
 )
 
 # Download FastNoiseLite header if it doesn't exist
@@ -105,6 +107,10 @@ file(COPY "${miniz_SOURCE_DIR}/miniz.c" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}
 add_executable(SanmapGenerator
     gui/main.cpp
     gui/PreviewRenderer.cpp
+    gui/TerrainTabs.cpp
+    gui/MaterialTabs.cpp
+    gui/EnvironmentTabs.cpp
+    gui/SystemTabs.cpp
     ${CORE_SOURCES}
     core/miniz.c
 )

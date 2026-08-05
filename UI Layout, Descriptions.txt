@@ -1,11 +1,15 @@
 Every Tab Should have the Name and an eye icon for enabling and disabling the preview of layer on composite preview (composite preview will be where it colors the map and textures it and renders lighting calculations for a final minimap preview)
 
-Tabs: Heightmap; Flow Map; Stratums; Detail Normal; Tint, Holes, Smoothness; Water; Markers; Reclaim; Props; Save/Export; Performance
+Tabs: Heightmap; Flow Map; Stratums; Detail Normal; Tint, Holes, Water; Markers; Reclaim; Props; Save/Export; Performance
+Preview: Need a tab bar at top of preveiw window that does not scale with preview window (UI Alway stay same screen space) Need a tab for Preview (Displays Result of Tab) and Composite which does the math (method) to output a commposite rending of all tabs - will only render tabs that Eye is turned on (eye button on tab after tab name)
+
+Category Drop Down = what the layer is right now in code
+Drop Down = what the soil physics is right noe in code
 
 --- Heightmap Tab
-Use GPR Terrain Generation -> Move to Performance Tab (we are also missing a GPU checkbox sopmewhere in setting☼, there were mutliple places where the calculation could be changed to GPU (Erosion?))
+Use GPR Terrain Generation -> Duplicate to Performance Tab (we are also missing a GPU checkbox sopmewhere in setting☼, there were mutliple places where the calculation could be changed to GPU (Erosion?))
 
-Scale features to Map Size (This is used to quickly render a low-resolution, for fast erosion for iterating, and then can be scaled up to a largeer map size maintaining exactly how it look☼ by properly scaling the frequency of every layer and other settings that can be affected by changing map size (we need a way to mark these settings in code and viually in UI subtly))
+Scale features to Map Size  (Default = True) (This is used to quickly render a low-resolution, for fast erosion for iterating, and then can be scaled up to a largeer map size maintaining exactly how it look☼ by properly scaling the frequency of every layer and other settings that can be affected by changing map size (we need a way to mark these settings in code and viually in UI subtly))
 
 Map Size
 Gravity (Input + Checkbox to use Global labeled "Global"-  default to global)
@@ -15,10 +19,16 @@ Symmetry Blending Mode (Global)
 	Algorithm
 	Algortithm Settings
 
-GeoLayer (This acts as grouping for Stratum layers (S)) (Add Layer Button)
-		Layer Name (Drop Down) Buttons (Checkbox Before Bake to Enable/Diable Current Bake, Enable reads image, Diable Uses settings and calculates); Bake (Bakes the current Layer, alo allows choosing a 16bit Grayscale Image to Use) - if selected image will be rescaled when chosen to match the map size. Duplicate (Duplicates Layer and Settings to a new Layer above current), Delete (Delete Layer)
-		Layer can be drag and drop to move to any GeoLayer and retain all settings
-			Layer Stratum Index (This tells us what color and textures to render)
+GeoLayer (Collapsable) (This acts as grouping for Stratum layers (S)) (Add Layer Button)
+
+		Layer Name (Collapsable) Buttons:
+			(Checkbox Before Bake to Enable/Diable Current Bake, Enable reads image, Diable Uses settings and calculates)
+			Bake (Bakes the current Layer, alo allows choosing a 16bit Grayscale Image to Use) - if selected image will be rescaled when chosen to match the map size.
+			Duplicate (Duplicates Layer and Settings to a new Layer above current),
+			Delete (Delete Layer)
+			Layer can be drag and drop to move to any GeoLayer and retain all settings
+
+			Layer Stratum Index (This tells us what color and textures to render, it is the map layer (0-8)
 
 			Erodable - Determines if layer is immune to other layers Eroding it, if Enabled, if another layer erodes away revealing this layer, this layer will be eroded by the other layers in that simulation step for what is visible of this layer
 
@@ -28,9 +38,7 @@ GeoLayer (This acts as grouping for Stratum layers (S)) (Add Layer Button)
 				Algortithm Settings
 
 			Mode
-
 			Noise Type
-
 			Fractal
 
 			Noise Properties (Drop Down)
@@ -39,24 +47,22 @@ GeoLayer (This acts as grouping for Stratum layers (S)) (Add Layer Button)
 				Gain
 				Opacity
 
-			Density Shaping
+			Density Shaping (Drop Down)
 				Land
 				Plateau
 				Mountain
 				Ramp
 
-			Blend Mode
+			Blend Mode (Drop Down)
 				(Add Height Blend with Options for changing heighblend variables to control the blend, like COntrast and Min/Max values - This would be akin to defining how "deep" the layer is on top of the layer below it (ubtracting the height of the terrain below to create the Mask for the current layer (at least I think I have that correct)))
 
-			Soil Physics Dropdown (These are single source values also settable on the Stratuims Tab)
+			Soil Physics (Dropdown) (These are single source values also settable on the Stratuims Tab)
 				(This needs a button after "Physics", that is a down arrow icon (alt+code), and when clicked shows options for soil types and when selected loads the last settings set for that type (so designers can go back and forth and tweak), but there needs to be a default button to reset thAT selected soil type back to default
 
-			Hydraulic Erosion Drop Down
+			Hydraulic Erosion (Drop Down)
 				Enable Erosion
-
 				Erode Layers Beneath
-
-				Use GPU for Hydraulic
+				Use GPU for Hydraulic (Duplicate on Performace Tab, Performance Tab will need the collapsable heirarchy of the layers to know what setting it belongs to)
 
 				Precipitation (Drop Down)
 					Droplet Count
@@ -72,12 +78,13 @@ GeoLayer (This acts as grouping for Stratum layers (S)) (Add Layer Button)
 				Enable
 				Initial Sentiment Load
 				Spawn Height Range (0=Bottom 1=Top)
+				Use GPU for Deposition (Duplicate on Performace Tab, Performance Tab will need the collapsable heirarchy of the layers to know what setting it belongs to)
 
---- Flow Map (shows calculated flow map, in composite view, can set color of flow map and flow map color multiplied by heightmap in composite)
+--- Flow Map (shows calculated flow map, in composite view, can set color of flow map and flow map color multiplied by flow map velocities is result in composite Preview), in Preview it is a black and white image of Flowmap)
 
 --- Stratums
 Stratums are layered, with 0 being the lowest and having no mask, and the rest are on top of one another and have a height blend Mas
-Need ability to drag and reorder Stratums (Index Order Always same - need to move teh settings etc. to toher Stratum and push others up or down stack (settings))
+Need ability to drag and reorder Stratums (Index Order Always same - need to move teh settings etc. to to her Stratum and push others up or down stack (settings))
 
 Environment (Button to select Environment.sanpack file)
 
@@ -100,4 +107,55 @@ Stratum Name Stratum id (Drop Down)
 
 	Blending (Drop Down)
 
-	Soil Physics Dropdown
+	Soil Physics (Dropdown)
+
+	Stratum Masks are determined by Heighmap Blending
+
+	For Composite preview, Stratums are rendered either by the Stratum color (Stratum Mask multiplied the Mask and Height map), rendered full using proper tiling of the Stratum textures multiplied by mask and multiplied byheightmap
+
+	Each Geolayer is calculated seperately, then they are blended in order. 0 to 1, 0+1 to 2 0+1+2 to 3 etc. This way, a Geolayer can have multiple Stratums, and multple layers of a stratum. For example:
+		We create Geolayer 0
+			We create a Stratum Layer 0 (Bedrock) - apply erosion to it, and bake it
+			We create a Stratum Layer (clay) - apply deposition, apply rain and erosion
+			We create a Stratum Layer (soil) - apply deposition, apply Rain and Errosion - this needs to be properly simulated, so that as simulation progresses, if and ONLY if (All layer☼ ect.) top layer reveals lower level, errosion will be calculated on that lower level, but that errosion of that lower level reveals the next layer down
+		We Create Geo Layer 1
+			We create Stratum Layer (Bed Rock) - apply Errosion and bake it (This would be the mountains and peaks or plateaus)
+			We create Stratum Layer (Soil) - apply deposition, apply Rain and Errosion
+			We create Stratum Layer (Sand) - apply deposition, apply Rain and Errosion
+		We create Geo Layer 2
+			We create Stratum Layer (Soil) - Apply Mask filter calculation for determinig slow velocity on flow map where water would pool and soil would soak up water to determine where to place Grass texture
+
+	The Stratum Layers need to be properly ma☼ked, then added to together to get a proper flatten mask for determining where the Stratum Layer will show
+	tratums need have settings for every possible setting in a ☼anmap file
+
+--- Detail Normal
+This is setup like heightmap tab to be able to create layers, but no geolayers, just stratum layers for creating delta transforms (small/shallow) of the final heightmap that will be used to create a delta nomal map to output the detail normal map
+
+This needs a normal map size (settable in same manner as heightmap and also needs to bake an image of the heightmap using the proper scaling to increase the heightmap to the Normal size without changing appearance of the heightmap)
+
+-- Smoothness
+This tab will be for making the Map Smoothness, for example, detectign water and then blurrig to make the land near water (shoreline ect, river beds etc.) shinier (dry dirt vs mud ect)
+
+This will eb filled with as many methods, techniquess and settings as possible for manipulating selection
+It will need a layer system as well like the Heightmap layer suystem (might wanna consider a global layer framework mimicing Heightmapo layer system for easy reuse)
+
+-- Tint
+ANother layer system, able to choose Stratum mask to use per layer
+For adding color procedual noise to a stratum
+Needs all the noise generation (and include erro☼ion settings) as heightmaps
+needs a setting to control adding colors for color bands (example would be making complex selections on a bedrock Stratum, to creat color banding based on height to create multi colored layers in the rock according to height)
+
+-- Holes
+ANother layer system for masking, creating and manipulating noise ect to get creative in making holes in map (to open map procedurally to the sun below under the dyson sphere)
+
+-- Water
+All the settings for a sanmap file watter
+Preview is heightmap with water color multiplied by the heightmap and masked with a color gradient using the deep and shallpow water settings (would create 3 layers of water depth color blending? Or just 2?)
+
+-- Markers (right now only Spawn and Alloy)
+Preview needs a checkbox lit at top to select what markers to show
+Each Market type is a collapsable section
+
+Spawns arebased on symetry and player count and should have settings for adjusting player spawn locations and also for manual placement of spawns
+
+Alloy - Need lots of option☼ and settings for determining where to place and detect where alloy can be and random placement pending variables

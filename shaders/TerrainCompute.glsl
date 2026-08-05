@@ -11,6 +11,12 @@ struct LayerConfig {
     float gain;
     int stratumIdx;
     float opacity;
+    float landDensity;
+    float mountainDensity;
+    float plateauDensity;
+    
+    float rampDensity;
+    vec3 padding;
 };
 
 layout(std430, binding = 1) buffer LayerData {
@@ -122,6 +128,25 @@ void main() {
         
         // Normalize -1..1 to 0..1
         n = (n + 1.0) * 0.5;
+        
+        // Shaping Math
+        n = n * (cfg.landDensity * 2.0);
+        float origNoise = n;
+        
+        if (cfg.mountainDensity > 0.0) {
+            float smoothN = n * n * (3.0 - 2.0 * n);
+            n = (n * (1.0 - cfg.mountainDensity)) + (smoothN * cfg.mountainDensity);
+            if (n > 0.5) n += (n - 0.5) * cfg.mountainDensity;
+            n = clamp(n, 0.0, 1.0);
+        }
+        if (cfg.plateauDensity > 0.0) {
+            float terraces = 3.0 + (cfg.plateauDensity * 27.0); 
+            float terraceHeight = 1.0 / terraces;
+            n = floor(n / terraceHeight) * terraceHeight;
+        }
+        if (cfg.rampDensity > 0.0) {
+            n = (n * (1.0 - cfg.rampDensity)) + (origNoise * cfg.rampDensity);
+        }
         
         // Output to flattened array
         int idx = cfg.stratumIdx * mapSize * mapSize + pos.y * mapSize + pos.x;

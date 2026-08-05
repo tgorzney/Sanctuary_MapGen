@@ -24,41 +24,88 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     mapdef["length"] = params.MapSize;
     mapdef["height"] = 128; // Standard height
     
-    mapdef["hasWater"] = true; // Maybe dynamically check based on water level
-    mapdef["waterLevel"] = params.Water.WaterLevelMax; // or something
-    mapdef["waterDepth"] = params.Water.DeepWaterDepthMax;
-    mapdef["waterShoreGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
+    mapdef["hasWater"] = true;
+    
+    json waterObj;
+    waterObj["waterLevelMin"] = params.Water.WaterLevelMin;
+    waterObj["waterLevelMax"] = params.Water.WaterLevelMax;
+    waterObj["deepWaterDepthMin"] = params.Water.DeepWaterDepthMin;
+    waterObj["deepWaterDepthMax"] = params.Water.DeepWaterDepthMax;
+    waterObj["waterWindSpeed"] = params.Water.WaterWindSpeed;
+    waterObj["waterWindDirection"] = params.Water.WaterWindDirection;
+    waterObj["waterShoreDepthOffset"] = params.Water.WaterShoreDepthOffset;
+    waterObj["waterShoreDepthStrength"] = params.Water.WaterShoreDepthStrength;
+    waterObj["waterShoreDistanceOffset"] = params.Water.WaterShoreDistanceOffset;
+    waterObj["waterShoreDistanceStrength"] = params.Water.WaterShoreDistanceStrength;
+    waterObj["waveGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
+    mapdef["water"] = waterObj;
 
     mapdef["shader"] = "RTS/TerrainLit";
+
+    // Atmosphere
+    json atmosObj;
+    atmosObj["sunRA"] = params.Atmosphere.SunRA;
+    atmosObj["sunDA"] = params.Atmosphere.SunDA;
+    atmosObj["sunIntensity"] = params.Atmosphere.SunIntensity;
+    atmosObj["sunTint"] = { {"r", params.Atmosphere.SunTint[0]}, {"g", params.Atmosphere.SunTint[1]}, {"b", params.Atmosphere.SunTint[2]}, {"a", params.Atmosphere.SunTint[3]} };
+    atmosObj["sunTemperature"] = params.Atmosphere.SunTemperature;
+    atmosObj["sunAngularDiameter"] = params.Atmosphere.SunAngularDiameter;
+    atmosObj["sunVolumetricsMultiplier"] = params.Atmosphere.SunVolumetricsMultiplier;
+    atmosObj["sunVolumetricsShadowDimer"] = params.Atmosphere.SunVolumetricsShadowDimer;
+    
+    atmosObj["skylightIntensity"] = params.Atmosphere.SkylightIntensity;
+    atmosObj["skylightTint"] = { {"r", params.Atmosphere.SkylightTint[0]}, {"g", params.Atmosphere.SkylightTint[1]}, {"b", params.Atmosphere.SkylightTint[2]}, {"a", params.Atmosphere.SkylightTint[3]} };
+    atmosObj["skylightTemperature"] = params.Atmosphere.SkylightTemperature;
+    
+    atmosObj["exposure"] = params.Atmosphere.Exposure;
+    atmosObj["exposureCompensation"] = params.Atmosphere.ExposureCompensation;
+    atmosObj["skyboxExposure"] = params.Atmosphere.SkyboxExposure;
+    
+    atmosObj["fogAttenuationDistance"] = params.Atmosphere.FogAttenuationDistance;
+    atmosObj["fogBaseHeight"] = params.Atmosphere.FogBaseHeight;
+    atmosObj["fogMaximumHeight"] = params.Atmosphere.FogMaximumHeight;
+    atmosObj["fogMaximumDistance"] = params.Atmosphere.FogMaximumDistance;
+    atmosObj["fogAnisotropy"] = params.Atmosphere.FogAnisotropy;
+    
+    atmosObj["skyboxPath"] = params.Atmosphere.SkyboxPath;
+    
+    atmosObj["globalWindSpeed"] = params.Atmosphere.GlobalWindSpeed;
+    atmosObj["globalWindDirection"] = params.Atmosphere.GlobalWindDirection;
+    mapdef["atmosphere"] = atmosObj;
 
     // Stratum Layers
     json strata = json::array();
     for (const auto& stratum : params.Stratums) {
         json s;
-        // Output base color and textures as part of the JSON, matching SanMap.cs properties if possible
-        s["baseColor"] = { 
-            {"r", stratum.BaseColor[0]},
-            {"g", stratum.BaseColor[1]},
-            {"b", stratum.BaseColor[2]},
-            {"a", stratum.BaseColor[3]}
-        };
         s["albedo"] = stratum.AlbedoPath;
         s["normal"] = stratum.NormalPath;
-        s["composite"] = stratum.CompositePath;
+        s["mask"] = stratum.MaskPath;
+        
+        s["tileSize"] = { {"x", stratum.TileSize[0]}, {"y", stratum.TileSize[1]} };
+        s["tileSizeFar"] = { {"x", stratum.TileSizeFar[0]}, {"y", stratum.TileSizeFar[1]} };
+        s["tileSizeTriplanar"] = stratum.TileSizeTriplanar;
+        s["tileSizeFarTriplanar"] = stratum.TileSizeFarTriplanar;
+        
+        s["normalScale"] = stratum.NormalScale;
+        s["normalScaleFar"] = stratum.NormalScaleFar;
+        s["normalFarNearBlend"] = stratum.NormalFarNearBlend;
+        s["heightFarNearBlend"] = stratum.HeightFarNearBlend;
+        
+        s["diffuseRemap"] = { {"x", stratum.DiffuseRemap[0]}, {"y", stratum.DiffuseRemap[1]}, {"z", stratum.DiffuseRemap[2]}, {"w", stratum.DiffuseRemap[3]} };
+        s["farColorRemap"] = { {"x", stratum.FarColorRemap[0]}, {"y", stratum.FarColorRemap[1]}, {"z", stratum.FarColorRemap[2]}, {"w", stratum.FarColorRemap[3]} };
+        
+        s["maskRemapMin"] = { {"x", stratum.MaskRemapMin[0]}, {"y", stratum.MaskRemapMin[1]}, {"z", stratum.MaskRemapMin[2]}, {"w", stratum.MaskRemapMin[3]} };
+        s["maskRemapMax"] = { {"x", stratum.MaskRemapMax[0]}, {"y", stratum.MaskRemapMax[1]}, {"z", stratum.MaskRemapMax[2]}, {"w", stratum.MaskRemapMax[3]} };
+        
         strata.push_back(s);
     }
     mapdef["stratumLayers"] = strata;
-
-    // We can populate default values for other properties (lighting, fog, background) to match SanMap.cs
-    mapdef["backgroundFogIntensity"] = 1.0f;
-    mapdef["skyboxIntensityMode"] = "Exposure";
     
     // Areas, armies, chains
     mapdef["areas"] = json::object();
     mapdef["armies"] = json::object();
     
     json markersObj = json::object();
-    // Populate markers based on MarkerRules
     for (const auto& rule : params.Markers) {
         if (!rule.Enabled) continue;
         json markerType;
@@ -72,8 +119,26 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     }
     mapdef["markers"] = markersObj;
 
-    mapdef["decals"] = json::array();
-    mapdef["props"] = json::array();
+    json propsObj = json::object();
+    for (const auto& rule : params.Props) {
+        if (!rule.Enabled) continue;
+        json propType;
+        propType["blueprintPath"] = rule.BlueprintPath;
+        propType["transforms"] = json::array(); // Placeholder for actual transforms generated
+        propsObj[rule.Name] = propType;
+    }
+    mapdef["props"] = propsObj;
+
+    json decalsObj = json::object();
+    for (const auto& rule : params.Decals) {
+        if (!rule.Enabled) continue;
+        json decalType;
+        decalType["albedoPath"] = rule.AlbedoPath;
+        decalType["normalPath"] = rule.NormalPath;
+        decalType["transforms"] = json::array(); // Placeholder for actual transforms generated
+        decalsObj[rule.Name] = decalType;
+    }
+    mapdef["decals"] = decalsObj;
 
     // Export JSON
     std::string filePath = folderPath + "/mapdef.sanmap";
@@ -101,36 +166,60 @@ void MapExporter::SaveSettings(const std::string& filePath, const GenerationPara
     for (const auto& s : params.Stratums) {
         json sj;
         sj["Name"] = s.Name;
-        sj["EnvironmentTheme"] = s.EnvironmentTheme;
-        sj["MaterialName"] = s.MaterialName;
-        sj["BaseColor"] = {s.BaseColor[0], s.BaseColor[1], s.BaseColor[2], s.BaseColor[3]};
         sj["AlbedoPath"] = s.AlbedoPath;
         sj["NormalPath"] = s.NormalPath;
-        sj["CompositePath"] = s.CompositePath;
+        sj["MaskPath"] = s.MaskPath;
         
-        sj["MaskRemapMax"] = {s.MaskRemapMax[0], s.MaskRemapMax[1], s.MaskRemapMax[2], s.MaskRemapMax[3]};
+        sj["TileSize"] = {s.TileSize[0], s.TileSize[1]};
+        sj["TileSizeFar"] = {s.TileSizeFar[0], s.TileSizeFar[1]};
+        sj["TileSizeTriplanar"] = s.TileSizeTriplanar;
+        sj["TileSizeFarTriplanar"] = s.TileSizeFarTriplanar;
+        
+        sj["NormalScale"] = s.NormalScale;
+        sj["NormalScaleFar"] = s.NormalScaleFar;
+        sj["NormalFarNearBlend"] = s.NormalFarNearBlend;
+        sj["HeightFarNearBlend"] = s.HeightFarNearBlend;
+        
+        sj["DiffuseRemap"] = {s.DiffuseRemap[0], s.DiffuseRemap[1], s.DiffuseRemap[2], s.DiffuseRemap[3]};
+        sj["FarColorRemap"] = {s.FarColorRemap[0], s.FarColorRemap[1], s.FarColorRemap[2], s.FarColorRemap[3]};
+        
         sj["MaskRemapMin"] = {s.MaskRemapMin[0], s.MaskRemapMin[1], s.MaskRemapMin[2], s.MaskRemapMin[3]};
-        sj["Tint"] = {s.Tint[0], s.Tint[1], s.Tint[2], s.Tint[3]};
-        sj["NearTiling"] = {s.NearTiling[0], s.NearTiling[1]};
-        sj["NearNormalScale"] = s.NearNormalScale;
-        sj["FarTiling"] = {s.FarTiling[0], s.FarTiling[1]};
-        sj["FarNormalScale"] = s.FarNormalScale;
-        sj["TintBlend"] = s.TintBlend;
-        sj["NormalNearBlend"] = s.NormalNearBlend;
-        sj["HeightNearBlend"] = s.HeightNearBlend;
-        sj["ColorOverride"] = {s.ColorOverride[0], s.ColorOverride[1], s.ColorOverride[2], s.ColorOverride[3]};
-        sj["HeightBlendContrast"] = s.HeightBlendContrast;
-        sj["HeightBlendDepth"] = s.HeightBlendDepth;
-        sj["UseDarkerAreaFill"] = s.UseDarkerAreaFill;
-        sj["FadeBegin"] = s.FadeBegin;
-        sj["FadeDistance"] = s.FadeDistance;
+        sj["MaskRemapMax"] = {s.MaskRemapMax[0], s.MaskRemapMax[1], s.MaskRemapMax[2], s.MaskRemapMax[3]};
+        
+        sj["Hardness"] = s.Hardness;
+        sj["Friction"] = s.Friction;
+        sj["Cohesion"] = s.Cohesion;
+        sj["CapacityMult"] = s.CapacityMult;
+        
         stratums.push_back(sj);
     }
     j["Stratums"] = stratums;
+    
+    // Save Props & Decals
+    json props = json::array();
+    for (const auto& p : params.Props) {
+        json pj; pj["Name"] = p.Name; pj["Enabled"] = p.Enabled; pj["BlueprintPath"] = p.BlueprintPath;
+        pj["Density"] = p.Density; pj["MinSlope"] = p.MinSlope; pj["MaxSlope"] = p.MaxSlope;
+        pj["MinHeight"] = p.MinHeight; pj["MaxHeight"] = p.MaxHeight;
+        pj["AvoidWater"] = p.AvoidWater; pj["NearCliffs"] = p.NearCliffs;
+        props.push_back(pj);
+    }
+    j["Props"] = props;
+    
+    json decals = json::array();
+    for (const auto& d : params.Decals) {
+        json dj; dj["Name"] = d.Name; dj["Enabled"] = d.Enabled; dj["AlbedoPath"] = d.AlbedoPath; dj["NormalPath"] = d.NormalPath;
+        dj["Density"] = d.Density; dj["MinSlope"] = d.MinSlope; dj["MaxSlope"] = d.MaxSlope;
+        dj["MinHeight"] = d.MinHeight; dj["MaxHeight"] = d.MaxHeight;
+        decals.push_back(dj);
+    }
+    j["Decals"] = decals;
 
     // Save Layers
     json layers = json::array();
-    for (const auto& layer : params.Layers) {
+    for (const auto* layerPtr : params.GetFlatLayers()) {
+        const auto& layer = *layerPtr;
+        if (!layer.Enabled) continue;
         json l;
         l["Name"] = layer.Name;
         l["Enabled"] = layer.Enabled;
@@ -163,7 +252,7 @@ void MapExporter::SaveSettings(const std::string& filePath, const GenerationPara
 
         json e;
         e["Enabled"] = layer.Erosion.Enabled;
-        e["UseGPU"] = layer.Erosion.UseGPU;
+        e["UseGPU"] = params.UseGPUHydraulic;
         e["DropletCount"] = layer.Erosion.DropletCount;
         e["MaxLifetime"] = layer.Erosion.MaxLifetime;
         e["Gravity"] = layer.Erosion.Gravity;
@@ -213,44 +302,76 @@ bool MapExporter::LoadSettings(const std::string& filePath, GenerationParams& ou
         for (const auto& sj : j["Stratums"]) {
             StratumSettings s;
             if (sj.contains("Name")) s.Name = sj["Name"];
-            if (sj.contains("EnvironmentTheme")) s.EnvironmentTheme = sj["EnvironmentTheme"];
-            if (sj.contains("MaterialName")) s.MaterialName = sj["MaterialName"];
-            
-            if (sj.contains("BaseColor")) { s.BaseColor[0] = sj["BaseColor"][0]; s.BaseColor[1] = sj["BaseColor"][1]; s.BaseColor[2] = sj["BaseColor"][2]; s.BaseColor[3] = sj["BaseColor"][3]; }
             if (sj.contains("AlbedoPath")) s.AlbedoPath = sj["AlbedoPath"];
             if (sj.contains("NormalPath")) s.NormalPath = sj["NormalPath"];
-            if (sj.contains("CompositePath")) s.CompositePath = sj["CompositePath"];
+            if (sj.contains("MaskPath")) s.MaskPath = sj["MaskPath"];
             
-            if (sj.contains("MaskRemapMax")) { s.MaskRemapMax[0] = sj["MaskRemapMax"][0]; s.MaskRemapMax[1] = sj["MaskRemapMax"][1]; s.MaskRemapMax[2] = sj["MaskRemapMax"][2]; s.MaskRemapMax[3] = sj["MaskRemapMax"][3]; }
+            if (sj.contains("TileSize")) { s.TileSize[0] = sj["TileSize"][0]; s.TileSize[1] = sj["TileSize"][1]; }
+            if (sj.contains("TileSizeFar")) { s.TileSizeFar[0] = sj["TileSizeFar"][0]; s.TileSizeFar[1] = sj["TileSizeFar"][1]; }
+            if (sj.contains("TileSizeTriplanar")) s.TileSizeTriplanar = sj["TileSizeTriplanar"];
+            if (sj.contains("TileSizeFarTriplanar")) s.TileSizeFarTriplanar = sj["TileSizeFarTriplanar"];
+            
+            if (sj.contains("NormalScale")) s.NormalScale = sj["NormalScale"];
+            if (sj.contains("NormalScaleFar")) s.NormalScaleFar = sj["NormalScaleFar"];
+            if (sj.contains("NormalFarNearBlend")) s.NormalFarNearBlend = sj["NormalFarNearBlend"];
+            if (sj.contains("HeightFarNearBlend")) s.HeightFarNearBlend = sj["HeightFarNearBlend"];
+            
+            if (sj.contains("DiffuseRemap")) { s.DiffuseRemap[0] = sj["DiffuseRemap"][0]; s.DiffuseRemap[1] = sj["DiffuseRemap"][1]; s.DiffuseRemap[2] = sj["DiffuseRemap"][2]; s.DiffuseRemap[3] = sj["DiffuseRemap"][3]; }
+            if (sj.contains("FarColorRemap")) { s.FarColorRemap[0] = sj["FarColorRemap"][0]; s.FarColorRemap[1] = sj["FarColorRemap"][1]; s.FarColorRemap[2] = sj["FarColorRemap"][2]; s.FarColorRemap[3] = sj["FarColorRemap"][3]; }
+            
             if (sj.contains("MaskRemapMin")) { s.MaskRemapMin[0] = sj["MaskRemapMin"][0]; s.MaskRemapMin[1] = sj["MaskRemapMin"][1]; s.MaskRemapMin[2] = sj["MaskRemapMin"][2]; s.MaskRemapMin[3] = sj["MaskRemapMin"][3]; }
-            if (sj.contains("Tint")) { s.Tint[0] = sj["Tint"][0]; s.Tint[1] = sj["Tint"][1]; s.Tint[2] = sj["Tint"][2]; s.Tint[3] = sj["Tint"][3]; }
+            if (sj.contains("MaskRemapMax")) { s.MaskRemapMax[0] = sj["MaskRemapMax"][0]; s.MaskRemapMax[1] = sj["MaskRemapMax"][1]; s.MaskRemapMax[2] = sj["MaskRemapMax"][2]; s.MaskRemapMax[3] = sj["MaskRemapMax"][3]; }
             
-            if (sj.contains("NearTiling")) { s.NearTiling[0] = sj["NearTiling"][0]; s.NearTiling[1] = sj["NearTiling"][1]; }
-            if (sj.contains("NearNormalScale")) s.NearNormalScale = sj["NearNormalScale"];
-            if (sj.contains("FarTiling")) { s.FarTiling[0] = sj["FarTiling"][0]; s.FarTiling[1] = sj["FarTiling"][1]; }
-            if (sj.contains("FarNormalScale")) s.FarNormalScale = sj["FarNormalScale"];
-            
-            if (sj.contains("TintBlend")) s.TintBlend = sj["TintBlend"];
-            if (sj.contains("NormalNearBlend")) s.NormalNearBlend = sj["NormalNearBlend"];
-            if (sj.contains("HeightNearBlend")) s.HeightNearBlend = sj["HeightNearBlend"];
-            
-            if (sj.contains("ColorOverride")) { s.ColorOverride[0] = sj["ColorOverride"][0]; s.ColorOverride[1] = sj["ColorOverride"][1]; s.ColorOverride[2] = sj["ColorOverride"][2]; s.ColorOverride[3] = sj["ColorOverride"][3]; }
-            
-            if (sj.contains("HeightBlendContrast")) s.HeightBlendContrast = sj["HeightBlendContrast"];
-            if (sj.contains("HeightBlendDepth")) s.HeightBlendDepth = sj["HeightBlendDepth"];
-            if (sj.contains("UseDarkerAreaFill")) s.UseDarkerAreaFill = sj["UseDarkerAreaFill"];
-            if (sj.contains("FadeBegin")) s.FadeBegin = sj["FadeBegin"];
-            if (sj.contains("FadeDistance")) s.FadeDistance = sj["FadeDistance"];
+            if (sj.contains("Hardness")) s.Hardness = sj["Hardness"];
+            if (sj.contains("Friction")) s.Friction = sj["Friction"];
+            if (sj.contains("Cohesion")) s.Cohesion = sj["Cohesion"];
+            if (sj.contains("CapacityMult")) s.CapacityMult = sj["CapacityMult"];
             
             outParams.Stratums.push_back(s);
         }
     } else if (version == 0) {
         // Migration: If no stratums were saved, outParams.Stratums already has the 9 default stratums.
-        // We will just keep those.
+    }
+    
+    if (j.contains("Props")) {
+        outParams.Props.clear();
+        for (const auto& pj : j["Props"]) {
+            PropRule p;
+            if (pj.contains("Name")) p.Name = pj["Name"];
+            if (pj.contains("Enabled")) p.Enabled = pj["Enabled"];
+            if (pj.contains("BlueprintPath")) p.BlueprintPath = pj["BlueprintPath"];
+            if (pj.contains("Density")) p.Density = pj["Density"];
+            if (pj.contains("MinSlope")) p.MinSlope = pj["MinSlope"];
+            if (pj.contains("MaxSlope")) p.MaxSlope = pj["MaxSlope"];
+            if (pj.contains("MinHeight")) p.MinHeight = pj["MinHeight"];
+            if (pj.contains("MaxHeight")) p.MaxHeight = pj["MaxHeight"];
+            if (pj.contains("AvoidWater")) p.AvoidWater = pj["AvoidWater"];
+            if (pj.contains("NearCliffs")) p.NearCliffs = pj["NearCliffs"];
+            outParams.Props.push_back(p);
+        }
+    }
+    
+    if (j.contains("Decals")) {
+        outParams.Decals.clear();
+        for (const auto& dj : j["Decals"]) {
+            DecalRule d;
+            if (dj.contains("Name")) d.Name = dj["Name"];
+            if (dj.contains("Enabled")) d.Enabled = dj["Enabled"];
+            if (dj.contains("AlbedoPath")) d.AlbedoPath = dj["AlbedoPath"];
+            if (dj.contains("NormalPath")) d.NormalPath = dj["NormalPath"];
+            if (dj.contains("Density")) d.Density = dj["Density"];
+            if (dj.contains("MinSlope")) d.MinSlope = dj["MinSlope"];
+            if (dj.contains("MaxSlope")) d.MaxSlope = dj["MaxSlope"];
+            if (dj.contains("MinHeight")) d.MinHeight = dj["MinHeight"];
+            if (dj.contains("MaxHeight")) d.MaxHeight = dj["MaxHeight"];
+            outParams.Decals.push_back(d);
+        }
     }
 
     if (j.contains("Layers")) {
-        outParams.Layers.clear();
+        outParams.GeoLayers.clear();
+        outParams.GeoLayers.push_back(GeoLayerDef());
+        outParams.GeoLayers[0].Name = "Migrated GeoLayer";
         for (const auto& l : j["Layers"]) {
             NoiseLayer layer;
             if (l.contains("Name")) layer.Name = l["Name"];
@@ -315,7 +436,7 @@ bool MapExporter::LoadSettings(const std::string& filePath, GenerationParams& ou
             if (l.contains("Erosion")) {
                 const auto& e = l["Erosion"];
                 if (e.contains("Enabled")) layer.Erosion.Enabled = e["Enabled"];
-                if (e.contains("UseGPU")) layer.Erosion.UseGPU = e["UseGPU"];
+                if (e.contains("UseGPU")) outParams.UseGPUHydraulic = e["UseGPU"];
                 if (e.contains("DropletCount")) layer.Erosion.DropletCount = e["DropletCount"];
                 if (e.contains("MaxLifetime")) layer.Erosion.MaxLifetime = e["MaxLifetime"];
                 if (e.contains("Gravity")) layer.Erosion.Gravity = e["Gravity"];
@@ -333,7 +454,7 @@ bool MapExporter::LoadSettings(const std::string& filePath, GenerationParams& ou
             }
             if (l.contains("ErodeBeneath")) layer.ErodeBeneath = l["ErodeBeneath"];
 
-            outParams.Layers.push_back(layer);
+            outParams.GeoLayers[0].Layers.push_back(layer);
         }
     }
     

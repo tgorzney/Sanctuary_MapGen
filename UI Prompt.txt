@@ -1,0 +1,27 @@
+"D:\Projects\Sanctuary\Map Generator\Sanctuary_MapGen-master (Broken)"
+
+"D:\Projects\Sanctuary\Map Generator\Sanctuary_MapGen-master (Old)"
+The old is most recent backup, Broken is the Broken updated version
+I copied the old to the Map Generator Root Folder (Edit and Modify/Create Files here only - the other 2 old and brokn folders are read only for reference
+"D:\Projects\Sanctuary\Map Generator\UI Layout, Descriptions.txt" This explains what I wanted to do to the UI
+Calculations need to be properly (and mostlikely already are) done to maximize hardware acceleration (Code should be already optimized but double check)
+Use these references for physics variables and simulatiokns
+"D:\Projects\UE5 Projects\TGUE\sys_docs\ARCH.md"
+
+"D:\Projects\UE5 Projects\TGUE\sys_docs\ARCH_Fluid_Erosion.md"
+
+"D:\Projects\UE5 Projects\TGUE\sys_docs\ARCH_Planetary_Data_Storage.md"
+
+"D:\Projects\UE5 Projects\TGUE\sys_docs\ARCH_Planetary_Landscape.md"
+
+"D:\Projects\UE5 Projects\TGUE\sys_docs\ARCH_Planetary_Landscape_Math.md"
+
+"D:\Projects\UE5 Projects\TGUE\sys_docs\Climate_Table.html"
+
+"D:\Projects\UE5 Projects\TGUE\sys_docs\Terrain Defining Attribute.txt"
+For calculations remember, this app is not runtime, it is for BAKING maps data
+Do not make any Assumptiopns - ask if you are making one
+
+Error file when tryng to compile
+"D:\Projects\Sanctuary\Map Generator\Debug_Error.txt"
+

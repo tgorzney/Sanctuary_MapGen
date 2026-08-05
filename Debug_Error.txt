@@ -1,0 +1,66 @@
+>------ Build started: Project: CMakeLists, Configuration: Debug ------
+  [1/42] Building C object CMakeFiles\SanmapGenerator.dir\core\miniz.c.obj
+  [2/42] Building CXX object CMakeFiles\imgui.dir\_deps\imgui-src\imgui_demo.cpp.obj
+  [3/42] Building CXX object CMakeFiles\SanmapGenerator.dir\core\ImageUtils.cpp.obj
+  [4/42] Building CXX object CMakeFiles\imgui.dir\_deps\imgui-src\imgui_tables.cpp.obj
+  [5/42] Building CXX object CMakeFiles\imgui.dir\_deps\imgui-src\imgui_draw.cpp.obj
+  [6/42] Building CXX object CMakeFiles\imgui.dir\_deps\imgui-src\imgui_widgets.cpp.obj
+  [7/42] Building CXX object CMakeFiles\SanmapGenerator.dir\gui\main.cpp.obj
+  FAILED: CMakeFiles/SanmapGenerator.dir/gui/main.cpp.obj 
+  E:\VISUAL~1\2022\VC\Tools\MSVC\1439~1.335\bin\Hostx64\x64\cl.exe  /nologo /TP  -I"D:\Projects\Sanctuary\Map Generator\core" -I"D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\imgui-src" -I"D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\imgui-src\backends" -I"D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\miniz-src" -I"D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\stb-src" -I"D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\glfw-src\include" -I"D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\json-src\include" /DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\SanmapGenerator.dir\gui\main.cpp.obj /FdCMakeFiles\SanmapGenerator.dir\ /FS -c "D:\Projects\Sanctuary\Map Generator\gui\main.cpp"
+D:\Projects\Sanctuary\Map Generator\gui\main.cpp(127): error C2039: 'WaterLevelMin': is not a member of 'SanmapGen::GenerationParams'
+  D:\Projects\Sanctuary\Map Generator\core\Parameters.h(185): note: see declaration of 'SanmapGen::GenerationParams'
+D:\Projects\Sanctuary\Map Generator\gui\main.cpp(127): error C2660: 'ImGui::SliderFloat': function does not take 3 arguments
+  D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\imgui-src\imgui.h(707): note: see declaration of 'ImGui::SliderFloat'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(127): note: while trying to match the argument list '(const char [16], float, float)'
+D:\Projects\Sanctuary\Map Generator\gui\main.cpp(128): error C2039: 'WaterLevelMax': is not a member of 'SanmapGen::GenerationParams'
+  D:\Projects\Sanctuary\Map Generator\core\Parameters.h(185): note: see declaration of 'SanmapGen::GenerationParams'
+D:\Projects\Sanctuary\Map Generator\gui\main.cpp(128): error C2660: 'ImGui::SliderFloat': function does not take 3 arguments
+  D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\imgui-src\imgui.h(707): note: see declaration of 'ImGui::SliderFloat'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(128): note: while trying to match the argument list '(const char [16], float, float)'
+D:\Projects\Sanctuary\Map Generator\gui\main.cpp(129): error C2039: 'DeepWaterDepthMin': is not a member of 'SanmapGen::GenerationParams'
+  D:\Projects\Sanctuary\Map Generator\core\Parameters.h(185): note: see declaration of 'SanmapGen::GenerationParams'
+D:\Projects\Sanctuary\Map Generator\gui\main.cpp(129): error C2660: 'ImGui::SliderFloat': function does not take 3 arguments
+  D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\imgui-src\imgui.h(707): note: see declaration of 'ImGui::SliderFloat'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(129): note: while trying to match the argument list '(const char [15], float, float)'
+D:\Projects\Sanctuary\Map Generator\gui\main.cpp(130): error C2039: 'DeepWaterDepthMax': is not a member of 'SanmapGen::GenerationParams'
+  D:\Projects\Sanctuary\Map Generator\core\Parameters.h(185): note: see declaration of 'SanmapGen::GenerationParams'
+D:\Projects\Sanctuary\Map Generator\gui\main.cpp(130): error C2660: 'ImGui::SliderFloat': function does not take 3 arguments
+  D:\Projects\Sanctuary\Map Generator\out\build\x64-Debug\_deps\imgui-src\imgui.h(707): note: see declaration of 'ImGui::SliderFloat'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(130): note: while trying to match the argument list '(const char [15], float, float)'
+D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): error C2664: 'GLuint SanmapGen::PreviewRenderer::UpdatePreviewTexture(const SanmapGen::FloatMask &,const SanmapGen::GenerationParams &,GLuint)': cannot convert argument 2 from 'GLuint' to 'const SanmapGen::GenerationParams &'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: Reason: cannot convert from 'GLuint' to 'const SanmapGen::GenerationParams'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: 'SanmapGen::GenerationParams::GenerationParams': no overloaded function could convert all the argument types
+  D:\Projects\Sanctuary\Map Generator\core\Parameters.h(258): note: could be 'SanmapGen::GenerationParams::GenerationParams(SanmapGen::GenerationParams &&)'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: 'SanmapGen::GenerationParams::GenerationParams(SanmapGen::GenerationParams &&)': cannot convert argument 1 from 'GLuint' to 'SanmapGen::GenerationParams &&'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: Reason: cannot convert from 'GLuint' to 'SanmapGen::GenerationParams'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: Conversion requires a second user-defined-conversion operator or constructor
+  D:\Projects\Sanctuary\Map Generator\core\Parameters.h(258): note: or       'SanmapGen::GenerationParams::GenerationParams(const SanmapGen::GenerationParams &)'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: 'SanmapGen::GenerationParams::GenerationParams(const SanmapGen::GenerationParams &)': cannot convert argument 1 from 'GLuint' to 'const SanmapGen::GenerationParams &'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: Reason: cannot convert from 'GLuint' to 'const SanmapGen::GenerationParams'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: Conversion requires a second user-defined-conversion operator or constructor
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: while trying to match the argument list '(GLuint)'
+  D:\Projects\Sanctuary\Map Generator\gui\PreviewRenderer.h(13): note: see declaration of 'SanmapGen::PreviewRenderer::UpdatePreviewTexture'
+  D:\Projects\Sanctuary\Map Generator\gui\main.cpp(271): note: while trying to match the argument list '(SanmapGen::FloatMask, GLuint)'
+  [8/42] Building CXX object CMakeFiles\SanmapGenerator.dir\core\Mask2D.cpp.obj
+  [9/42] Building CXX object CMakeFiles\SanmapGenerator.dir\gui\PreviewRenderer.cpp.obj
+  [10/42] Building CXX object CMakeFiles\imgui.dir\_deps\imgui-src\backends\imgui_impl_opengl3.cpp.obj
+  [11/42] Building CXX object CMakeFiles\imgui.dir\_deps\imgui-src\imgui.cpp.obj
+  [12/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\null_init.c.obj
+  [13/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\vulkan.c.obj
+  [14/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\osmesa_context.c.obj
+  [15/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\monitor.c.obj
+  [16/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\platform.c.obj
+  [17/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\context.c.obj
+  [18/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\egl_context.c.obj
+  [19/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\window.c.obj
+  [20/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\init.c.obj
+  [21/42] Building CXX object CMakeFiles\SanmapGenerator.dir\core\ErosionSimulator.cpp.obj
+  [22/42] Building C object _deps\glfw-build\src\CMakeFiles\glfw.dir\input.c.obj
+  [23/42] Building CXX object CMakeFiles\SanmapGenerator.dir\core\TerrainGenerator.cpp.obj
+  [24/42] Building CXX object CMakeFiles\imgui.dir\_deps\imgui-src\backends\imgui_impl_glfw.cpp.obj
+  [25/42] Building CXX object CMakeFiles\SanmapGenerator.dir\core\TerrainCompute.cpp.obj
+  [26/42] Building CXX object CMakeFiles\SanmapGenerator.dir\core\ErosionCompute.cpp.obj
+  [27/42] Building CXX object CMakeFiles\SanmapGenerator.dir\core\FileDialog.cpp.obj
+  [28/42] Building CXX object CMakeFiles\SanmapGenerator.dir\core\MapExporter.cpp.obj
+  ninja: build stopped: subcommand failed.

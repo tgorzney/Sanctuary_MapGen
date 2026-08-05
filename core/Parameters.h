@@ -1,8 +1,13 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <algorithm>
 
 namespace SanmapGen {
+
+    struct Point2D {
+        int x, y;
+    };
 
     // Bitmask for Symmetry Mixing
     enum SymmetryFlags {
@@ -29,7 +34,8 @@ namespace SanmapGen {
         Cellular,
         Perlin,
         ValueCubic,
-        Value
+        Value,
+        None
     };
 
     enum class FractalType {
@@ -40,11 +46,12 @@ namespace SanmapGen {
     };
 
     struct ErosionSettings {
-        bool Enabled = true;
-        bool UseGPU = true;
+        bool Enabled = false;
+        
         int DropletCount = 1000000;
         int MaxLifetime = 15;
-        float Gravity = 4.0f;
+        bool GravityUseGlobal = true; // If true, use GenerationParams::GlobalGravity
+        float Gravity = 4.0f;         // Per-erosion gravity override
         float EvaporationRate = 0.02f;
 
         // Precipitation
@@ -68,7 +75,7 @@ namespace SanmapGen {
         std::string Name = "New Layer";
         bool Enabled = true;
         
-        // Image / Freeze support
+        // Image / Freeze support (Baking)
         bool UseImage = false;
         std::string ImagePath = "";
         std::string OriginPresetPath = ""; // To track original procedural settings
@@ -78,18 +85,26 @@ namespace SanmapGen {
         
         bool Erodable = true;
         
-        int StratumIndex = 1; // 0 to 8 mapping to the 9 Stratums
-        BlendMode Blend = BlendMode::Add; // Used for pre-masking thickness
+        int StratumIndex = 1; // 0 to 8 mapping to the 9 Stratums (also selects GeoLayer group)
+        BlendMode Blend = BlendMode::Add;
+
+        // Height Blend (controls how deep this layer sits on top of the one below)
+        float HeightBlendContrast = 1.0f;
+        float HeightBlendMin = 0.0f;
+        float HeightBlendMax = 1.0f;
 
         NoiseType Type = NoiseType::OpenSimplex2;
         FractalType Fractal = FractalType::FBm;
+        
+        // Per-layer symmetry (defaults to global)
+        bool SymmetryUseGlobal = true;
         int SymmetryMask = Symmetry_Point;
         
         float Frequency = 0.005f;
         int Octaves = 5;
         float Gain = 0.5f;
         float PingPongStrength = 2.0f;
-        float Opacity = 1.0f; // Multiplier/Weight for this layer
+        float Opacity = 1.0f;
         float CellularJitter = 1.0f;
         
         // Terrain Density Shaping
@@ -98,7 +113,7 @@ namespace SanmapGen {
         float MountainDensity = 0.243f;
         float RampDensity = 0.500f;
 
-        // Soil Physics
+        // Soil Physics (single source — also editable on Stratums tab)
         float Hardness = 0.2f; 
         float Friction = 0.8f;
         float Cohesion = 0.5f;
@@ -119,44 +134,120 @@ namespace SanmapGen {
         Superposition
     };
 
+    struct GradientStop {
+        float Location = 0.0f; // 0.0 to 100.0 (or mapped to degrees 0-90)
+        float Color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        
+        bool operator<(const GradientStop& other) const {
+            return Location < other.Location;
+        }
+    };
+
+    struct GradientSettings {
+        bool SmoothInterpolation = true;
+        std::vector<GradientStop> Stops;
+    };
+    
+    struct FlowSettings {
+        float Precipitation = 1.0f;
+        int Iterations = 50;
+        bool UseGPU = false; // Toggle CPU vs GPU
+        GradientSettings Gradient = {
+            true, 
+            {
+                {0.0f, {0.0f, 0.0f, 0.2f, 1.0f}}, 
+                {50.0f, {0.0f, 0.4f, 0.8f, 1.0f}}, 
+                {100.0f, {0.0f, 1.0f, 1.0f, 1.0f}}
+            }
+        };
+    };
+
+    struct SlopeSettings {
+        GradientSettings Gradient = {
+            true, 
+            {
+                {0.0f, {0.2f, 0.6f, 0.2f, 1.0f}},   // Green (Flat)
+                {30.0f, {0.6f, 0.6f, 0.2f, 1.0f}},  // Yellow (Moderate)
+                {45.0f, {0.6f, 0.4f, 0.2f, 1.0f}},  // Brown (Steep)
+                {90.0f, {0.4f, 0.4f, 0.4f, 1.0f}}   // Gray (Cliff)
+            }
+        };
+    };
+
     struct WaterSettings {
         float WaterLevelMin = 20.0f;
         float WaterLevelMax = 40.0f;
         float DeepWaterDepthMin = 10.0f;
         float DeepWaterDepthMax = 30.0f;
+        float WaterWindSpeed = 0.06f;
+        float WaterWindDirection = 160.0f;
+        float WaterShoreDepthOffset = 8.0f;
+        float WaterShoreDepthStrength = 0.7f;
+        float WaterShoreDistanceOffset = 0.0f;
+        float WaterShoreDistanceStrength = 2.0f;
         std::string WaveGeneratorBlueprint = "";
+    };
+
+    struct AtmosphereSettings {
+        float SunRA = 87.0f;
+        float SunDA = 42.0f;
+        float SunIntensity = 45000.0f;
+        float SunTint[4] = { 1.0f, 0.938f, 0.9f, 1.0f };
+        float SunTemperature = 5600.0f;
+        float SunAngularDiameter = 0.5f;
+        float SunVolumetricsMultiplier = 6.7f;
+        float SunVolumetricsShadowDimer = 0.5f;
+        
+        float SkylightIntensity = 4000.0f;
+        float SkylightTint[4] = { 0.921f, 0.925f, 0.98f, 1.0f };
+        float SkylightTemperature = 5600.0f;
+        
+        float Exposure = 12.08f;
+        float ExposureCompensation = 0.2f;
+        float SkyboxExposure = 11.73f;
+        
+        float FogAttenuationDistance = 2.0f;
+        float FogBaseHeight = -20.0f;
+        float FogMaximumHeight = 110.0f;
+        float FogMaximumDistance = 1500.0f;
+        float FogAnisotropy = 1.0f;
+        
+        std::string SkyboxPath = "empty";
+        
+        float GlobalWindSpeed = 0.0f;
+        float GlobalWindDirection = 0.0f;
     };
 
     struct StratumSettings {
         std::string Name = "Stratum";
-        std::string EnvironmentTheme = ""; // e.g. "01_Highlands"
-        std::string MaterialName = ""; // e.g. "highlands_100m_grass01"
         
-        float BaseColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
         std::string AlbedoPath = "";
         std::string NormalPath = "";
-        std::string CompositePath = "";
+        std::string MaskPath = "";
         
-        float MaskRemapMax[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        float TileSize[2] = { 10.0f, 10.0f };
+        float TileSizeFar[2] = { 64.0f, 64.0f };
+        float TileSizeTriplanar = 12.0f;
+        float TileSizeFarTriplanar = 36.0f;
+        
+        float NormalScale = 1.0f;
+        float NormalScaleFar = 1.0f;
+        float NormalFarNearBlend = 0.5f;
+        float HeightFarNearBlend = 0.5f;
+        
+        float DiffuseRemap[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        float FarColorRemap[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        
+        float PreviewColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f }; // Debug tint for Map Preview only
+        
         float MaskRemapMin[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        float Tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        float MaskRemapMax[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
         
-        float NearTiling[2] = { 8.0f, 8.0f };
-        float NearNormalScale = 1.0f;
-        
-        float FarTiling[2] = { 32.0f, 32.0f };
-        float FarNormalScale = 0.7f;
-        float TintBlend = 1.0f;
-        float NormalNearBlend = 0.28f;
-        float HeightNearBlend = 0.50f;
-        float ColorOverride[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-        float HeightBlendContrast = 1.50f;
-        float HeightBlendDepth = 0.50f;
-        bool UseDarkerAreaFill = false;
-        
-        float FadeBegin = 1.0f;
-        float FadeDistance = 250.0f;
+        // Default Soil Physics for this Stratum
+        float Hardness = 0.2f;
+        float Friction = 0.8f;
+        float Cohesion = 0.5f;
+        float CapacityMult = 2.0f;
     };
 
     struct MarkerRule {
@@ -173,50 +264,142 @@ namespace SanmapGen {
         float Density = 1.0f;
     };
 
+    struct PropRule {
+        std::string Name = "New Prop Layer";
+        bool Enabled = true;
+        std::string BlueprintPath = "";
+        
+        float Density = 0.5f;
+        float MinSlope = 0.0f;
+        float MaxSlope = 45.0f;
+        float MinHeight = 0.0f;
+        float MaxHeight = 128.0f;
+        
+        bool AvoidWater = true;
+        bool NearCliffs = false;
+    };
+    
+    struct DecalRule {
+        std::string Name = "New Decal Layer";
+        bool Enabled = true;
+        std::string AlbedoPath = "";
+        std::string NormalPath = "";
+        
+        float Density = 0.1f;
+        float MinSlope = 0.0f;
+        float MaxSlope = 30.0f;
+        float MinHeight = 0.0f;
+        float MaxHeight = 128.0f;
+    };
+
+    struct GeoLayerDef {
+        bool Enabled = true;
+        std::string Name = "New GeoLayer";
+        std::vector<NoiseLayer> Layers;
+    };
+
     struct GenerationParams {
         int PresetVersion = 1; // Used for backwards compatibility
         std::string GlobalEnvironmentPath = ""; // Path to the .sanpack or folder
         
         // --- General ---
-        bool UseGPUTerrain = false;
         int Seed = 12345;
         int MapSize = 512;
+        bool ScaleFeaturesToMapSize = true;
+        float GlobalGravity = 9.81f; // Global gravity used by erosion unless overridden
+        
+        float FlowMapColor[4] = { 0.0f, 0.5f, 1.0f, 1.0f };
+
         
         // --- Symmetry Globals ---
+        int GlobalSymmetryMask = Symmetry_Point; // Global default symmetry flags
         SymmetryAlgorithm SymAlgorithm = SymmetryAlgorithm::Superposition;
         BlendMode SymSuperpositionBlend = BlendMode::Max;
         float SymmetryBlurRadius = 10.0f;
-        float CrossFadeWidth = 0.2f; // Radians to crossfade
-        float CylinderZScale = 1.0f; // Stretch the cylinder length
-        float TorusMajorRadius = 128.0f; // Donut ring size
-        float TorusMinorRadius = 64.0f; // Donut tube size
+        float CrossFadeWidth = 0.2f;
+        float CylinderZScale = 1.0f;
+        float TorusMajorRadius = 128.0f;
+        float TorusMinorRadius = 64.0f;
         
-        // --- The Dynamic Layer Stack ---
-        // Geology
-        std::vector<NoiseLayer> Layers;
+        // --- The Dynamic Layer Stacks ---
+        std::vector<GeoLayerDef> GeoLayers; // Main heightmap generation
+        // Helper to get a flat list of all layers across all GeoLayers in calculation order
+        std::vector<const NoiseLayer*> GetFlatLayers() const {
+            std::vector<const NoiseLayer*> flat;
+            for (const auto& gl : GeoLayers) {
+                if (!gl.Enabled) continue;
+                for (const auto& l : gl.Layers) {
+                    flat.push_back(&l);
+                }
+            }
+            return flat;
+        }
+        std::vector<NoiseLayer*> GetFlatLayersMutable() {
+            std::vector<NoiseLayer*> flat;
+            for (auto& gl : GeoLayers) {
+                if (!gl.Enabled) continue;
+                for (auto& l : gl.Layers) {
+                    flat.push_back(&l);
+                }
+            }
+            return flat;
+        }
+
+        
+        // --- Visual / Post-Process Mask Layers ---
+        std::vector<NoiseLayer> DetailNormalLayers;
+        std::vector<NoiseLayer> SmoothnessLayers;
+        std::vector<NoiseLayer> TintLayers;
+        std::vector<NoiseLayer> HoleLayers;
+        
+        int DetailNormalMapSize = 1024;
         
         // --- Gameplay ---
         int SpawnPointCount = 2;
         float AlloyMultiplier = 1.0f;
         float HydroMultiplier = 1.0f;
+        float ReclaimDensity = 1.0f;
+        float MexDensity = 1.0f;
         
-        // --- New Tabs Data ---
+        // --- Tab Data ---
         WaterSettings Water;
+        AtmosphereSettings Atmosphere;
         std::vector<StratumSettings> Stratums;
         std::vector<MarkerRule> Markers;
+        std::vector<PropRule> Props;
+        std::vector<DecalRule> Decals;
         
-        // Tab Visibility Flags (for minimap composite)
+        // --- Performance ---
+        bool UseGPUTerrain = false;
+        bool UseGPUHydraulic = true;
+        bool UseGPUDeposition = true;
+        
+        // Preview settings (not saved to file, UI only)
+        int ActivePreviewMode = 4; // 0=Height, 1=Slope, 2=Flow, 3=Accumulation, 4=Composite
+        bool ShowWater = true;
+        bool ShowMarkers = true;
+        bool ShowStratums = true;
+        bool ShowFlowMap = true;
+        bool ShowSlopeMap = true;
+        bool ShowAccumulationMap = true;
+        
         bool ShowHeightmap = true;
-        bool ShowStratums = false;
         bool ShowDetailNormal = false;
         bool ShowTint = false;
         bool ShowHoles = false;
         bool ShowSmoothness = false;
-        bool ShowWater = false;
-        bool ShowMarkers = false;
         bool ShowReclaim = false;
         bool ShowProps = false;
-        bool ShowDecals = false;
+        bool ShowAtmosphere = false;
+        
+        SlopeSettings SlopeSettingsParams;
+        FlowSettings FlowSettingsParams;
+
+        // --- Generated Output Data ---
+        std::vector<Point2D> GeneratedSpawns;
+        std::vector<Point2D> GeneratedMexes;
+        std::vector<Point2D> GeneratedHydros;
+        std::vector<Point2D> GeneratedTrees;
         
         // Default constructor to push one base layer
         GenerationParams() {
@@ -233,7 +416,10 @@ namespace SanmapGen {
             baseLayer.MountainDensity = 0.243f;
             baseLayer.RampDensity = 0.500f;
             
-            Layers.push_back(baseLayer);
+            GeoLayerDef baseGeoLayer;
+            baseGeoLayer.Name = "GeoLayer 0";
+            baseGeoLayer.Layers.push_back(baseLayer);
+            GeoLayers.push_back(baseGeoLayer);
 
             // Initialize 9 blank stratums to match the Sanctuary format
             for (int i = 0; i < 9; ++i) {
