@@ -90,11 +90,23 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/core/stb_image_write.h")
         SHOW_PROGRESS)
 endif()
 
+# Fetch miniz (amalgamated version via release zip)
+FetchContent_Declare(
+    miniz
+    URL https://github.com/richgel999/miniz/releases/download/2.2.0/miniz-2.2.0.zip
+)
+FetchContent_MakeAvailable(miniz)
+
+# Copy the amalgamated miniz files over the empty core/miniz files to fix the include shadows
+file(COPY "${miniz_SOURCE_DIR}/miniz.h" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/core/")
+file(COPY "${miniz_SOURCE_DIR}/miniz.c" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/core/")
+
 # Add our application executable
 add_executable(SanmapGenerator
     gui/main.cpp
     gui/PreviewRenderer.cpp
     ${CORE_SOURCES}
+    core/miniz.c
 )
 
 # Include directories
@@ -102,6 +114,7 @@ target_include_directories(SanmapGenerator PRIVATE
     core
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
+    ${miniz_SOURCE_DIR}
 )
 
 # Link libraries

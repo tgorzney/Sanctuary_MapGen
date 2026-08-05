@@ -38,8 +38,8 @@ namespace SanmapGen {
         height = h00 * (1.0f - u) * (1.0f - v) + h10 * u * (1.0f - v) + h01 * (1.0f - u) * v + h11 * u * v;
     }
 
-    void ErosionSimulator::SimulateStratifiedErosionDelta(std::vector<FloatMask>& stratums, const std::vector<DropletSpawn>& spawns, const GlobalErosionSettings& settings, const GenerationParams& params, int mapSize) {
-        if (!settings.Enabled || stratums.empty() || spawns.empty()) return;
+    void ErosionSimulator::SimulateStratifiedErosionDelta(std::vector<FloatMask>& stratums, const std::vector<DropletSpawn>& spawns, const ErosionSettings& settings, const GenerationParams& params, int mapSize, int currentLayerIdx) {
+        if (!settings.Enabled || stratums.empty() || spawns.empty() || currentLayerIdx < 0 || currentLayerIdx >= params.Layers.size()) return;
 
         unsigned int numThreads = std::thread::hardware_concurrency();
         if (numThreads == 0) numThreads = 4;
@@ -50,12 +50,12 @@ namespace SanmapGen {
             numThreads = 1;
         }
 
-        // Pre-calculate TotalHeight
+        // Pre-calculate TotalHeight of layers up to currentLayerIdx
         FloatMask initialTotalHeight(mapSize, mapSize, 0.0f);
         for (int y = 0; y < mapSize; ++y) {
             for (int x = 0; x < mapSize; ++x) {
                 float th = 0.0f;
-                for (size_t i = 0; i < stratums.size(); ++i) {
+                for (size_t i = 0; i <= (size_t)currentLayerIdx; ++i) {
                     if (params.Layers[i].Enabled) th += stratums[i].Get(x, y);
                 }
                 initialTotalHeight.Set(x, y, th);
@@ -63,13 +63,19 @@ namespace SanmapGen {
         }
 
         auto erosionWorker = [&](int threadIdx, int dropStart, int dropCount) -> std::vector<FloatMask> {
-            // Thread-Local copy of all thicknesses (stratums)
+            // Thread-Local copy of all thicknesses (stratums) up to currentLayerIdx
             std::vector<FloatMask> threadStratums = stratums;
             FloatMask threadTotalHeight = initialTotalHeight;
 
+            // Determine which layers can be carved into
             std::vector<size_t> activeLayers;
-            for (size_t i = 0; i < params.Layers.size(); ++i) {
-                if (params.Layers[i].Enabled) activeLayers.push_back(i);
+            const auto& currentLayer = params.Layers[currentLayerIdx];
+            if (currentLayer.ErodeBeneath) {
+                for (size_t i = 0; i <= (size_t)currentLayerIdx; ++i) {
+                    if (params.Layers[i].Enabled) activeLayers.push_back(i);
+                }
+            } else {
+                if (currentLayer.Enabled) activeLayers.push_back(currentLayerIdx);
             }
 
             for (int i = 0; i < dropCount; ++i) {
@@ -79,9 +85,7 @@ namespace SanmapGen {
                 float dirY = 0.0f;
                 float speed = 1.0f;
                 float water = 1.0f;
-                float sediment = 0.0f;
-                
-                StratumType carriedType = StratumType::Sand; // Default
+                float sediment = settings.DepositionMode ? settings.InitialSedimentLoad : 0.0f;
                 
                 for (int life = 0; life < settings.MaxLifetime; ++life) {
                     int nodeX = static_cast<int>(posX);
@@ -90,21 +94,27 @@ namespace SanmapGen {
                     float h, gradX, gradY;
                     CalculateGradient(threadTotalHeight, posX, posY, h, gradX, gradY);
 
-                    // Physics based on the top-most stratum at this node
-                    StratumPhysics topPhysics = { 0.2f, 0.8f, 0.5f, 2.0f }; // Sand default
+                    // If DepositionMode has height limits, check if we've fallen below them?
+                    // Actually, height limits apply to SPAWN, not flowing. The DropletSpawn array is already filtered.
+
+                    // Physics based on the top-most ACTIVE stratum at this node
+                    float topHardness = 0.2f, topFriction = 0.8f, topCohesion = 0.5f, topCapacityMult = 2.0f;
                     int topLayerIdx = -1;
                     
                     for (int l = (int)activeLayers.size() - 1; l >= 0; --l) {
                         if (threadStratums[activeLayers[l]].Get(nodeX, nodeY) > 0.0001f) {
                             topLayerIdx = activeLayers[l];
                             const auto& layer = params.Layers[topLayerIdx];
-                            topPhysics = { layer.Hardness, layer.Friction, layer.Cohesion, layer.CapacityMult };
+                            topHardness = layer.Hardness;
+                            topFriction = layer.Friction;
+                            topCohesion = layer.Cohesion;
+                            topCapacityMult = layer.CapacityMult;
                             break;
                         }
                     }
 
                     // Inertia modified by friction
-                    float inertia = 0.05f + (1.0f - topPhysics.Friction) * 0.1f;
+                    float inertia = 0.05f + (1.0f - topFriction) * 0.1f;
                     
                     dirX = (dirX * inertia) - (gradX * (1.0f - inertia));
                     dirY = (dirY * inertia) - (gradY * (1.0f - inertia));
@@ -124,14 +134,15 @@ namespace SanmapGen {
                     float deltaHeight = newH - h;
                     
                     // Capacity driven by global setting * stratum mult
-                    float capacity = std::max(-deltaHeight * speed * water * 4.0f * topPhysics.CapacityMult, 0.01f);
+                    float capacity = std::max(-deltaHeight * speed * water * 4.0f * topCapacityMult, 0.01f);
 
                     if (sediment > capacity || deltaHeight > 0.0f) {
                         // DEPOSIT
                         float amountToDeposit = (deltaHeight > 0.0f) ? std::min(deltaHeight, sediment) : (sediment - capacity) * 0.3f;
                         sediment -= amountToDeposit;
                         
-                        int depIdx = topLayerIdx != -1 ? topLayerIdx : (activeLayers.empty() ? 0 : activeLayers[0]);
+                        // Always deposit into the current layer being generated, regardless of what's beneath it!
+                        int depIdx = currentLayerIdx;
                         
                         float u = posX - static_cast<int>(posX);
                         float v = posY - static_cast<int>(posY);
@@ -151,14 +162,13 @@ namespace SanmapGen {
                         threadTotalHeight.Set(nodeX, nodeY+1, threadTotalHeight.Get(nodeX, nodeY+1) + d01);
                         threadTotalHeight.Set(nodeX+1, nodeY+1, threadTotalHeight.Get(nodeX+1, nodeY+1) + d11);
 
-                    } else {
-                        // ERODE
-                        float erosionRate = 0.3f * (1.0f - topPhysics.Hardness); // Harder soil erodes slower
+                    } else if (!settings.DepositionMode) {
+                        // ERODE (Only if not in Deposition Mode)
+                        float erosionRate = 0.3f * (1.0f - topHardness); // Harder soil erodes slower
                         float amountToErode = std::min((capacity - sediment) * erosionRate, -deltaHeight);
                         
                         if (amountToErode > 0.0f && topLayerIdx != -1) {
                             sediment += amountToErode;
-                            carriedType = params.Layers[topLayerIdx].Stratum;
                             
                             float u = posX - static_cast<int>(posX);
                             float v = posY - static_cast<int>(posY);
@@ -170,6 +180,7 @@ namespace SanmapGen {
                             
                             auto erodePixel = [&](int nx, int ny, float amount) {
                                 float rem = amount;
+                                // Dig down through active layers until erosion is spent or we hit a non-erodable floor
                                 for (int l = (int)activeLayers.size() - 1; l >= 0 && rem > 0; --l) {
                                     int idx = activeLayers[l];
                                     if (!params.Layers[idx].Erodable) continue;
@@ -197,18 +208,26 @@ namespace SanmapGen {
             }
 
             // Cohesion Pass (Talus Angle slippage)
+            std::vector<size_t> cohesionLayers;
+            if (currentLayer.ErodeBeneath) {
+                for (size_t i = 0; i <= (size_t)currentLayerIdx; ++i) {
+                    if (params.Layers[i].Enabled) cohesionLayers.push_back(i);
+                }
+            } else {
+                if (currentLayer.Enabled) cohesionLayers.push_back(currentLayerIdx);
+            }
+
             for (int p = 0; p < 2; ++p) { // 2 passes
                 for (int y = 1; y < mapSize - 1; ++y) {
                     for (int x = 1; x < mapSize - 1; ++x) {
-                        for (int l = (int)activeLayers.size() - 1; l >= 0; --l) {
-                            int idx = activeLayers[l];
+                        for (int l = (int)cohesionLayers.size() - 1; l >= 0; --l) {
+                            int idx = cohesionLayers[l];
                             if (!params.Layers[idx].Erodable) continue;
                             
                             float thickness = threadStratums[idx].Get(x, y);
                             if (thickness > 0.001f) {
                                 const auto& layer = params.Layers[idx];
-                                StratumPhysics phys = { layer.Hardness, layer.Friction, layer.Cohesion, layer.CapacityMult };
-                                float maxSlope = phys.Cohesion;
+                                float maxSlope = layer.Cohesion;
                                 
                                 float h = threadTotalHeight.Get(x, y);
                                 int bestNX = x, bestNY = y;
@@ -244,7 +263,7 @@ namespace SanmapGen {
 
             // Delta
             std::vector<FloatMask> threadDelta = threadStratums;
-            for (size_t i = 0; i < stratums.size(); ++i) {
+            for (size_t i = 0; i <= (size_t)currentLayerIdx; ++i) {
                 for (int y = 0; y < mapSize; ++y) {
                     for (int x = 0; x < mapSize; ++x) {
                         threadDelta[i].Set(x, y, threadStratums[i].Get(x, y) - stratums[i].Get(x, y));
@@ -264,7 +283,7 @@ namespace SanmapGen {
 
         for (auto& f : futures) {
             std::vector<FloatMask> threadDelta = f.get();
-            for (size_t i = 0; i < stratums.size(); ++i) {
+            for (size_t i = 0; i <= (size_t)currentLayerIdx; ++i) {
                 for (int y = 0; y < mapSize; ++y) {
                     for (int x = 0; x < mapSize; ++x) {
                         float oldVal = stratums[i].Get(x, y);

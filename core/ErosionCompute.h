@@ -9,6 +9,6 @@ namespace SanmapGen {
     class ErosionCompute {
     public:
         // Run GPU Compute for Stratified Erosion directly on the stratums array
-        static void DispatchStratified(std::vector<FloatMask>& stratums, const std::vector<DropletSpawn>& spawns, const GlobalErosionSettings& settings, const GenerationParams& params, int mapSize);
+        static void DispatchStratified(std::vector<FloatMask>& stratums, const std::vector<DropletSpawn>& spawns, const ErosionSettings& settings, const GenerationParams& params, int mapSize, int currentLayerIdx);
     };
 }

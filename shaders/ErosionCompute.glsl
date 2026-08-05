@@ -1,24 +1,200 @@
 #version 430 core
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
+// Binding 0: thicknesses for layers [0..currentLayerIdx], flattened as [layer][y][x]
 layout(std430, binding = 0) buffer StratumData {
     float thicknesses[];
 };
 
+// Binding 1: Physics per layer slot (Hardness, Friction, Cohesion, CapacityMult)
+//   Hardness < 0 means NOT erodable (encoded sentinel)
 layout(std430, binding = 1) buffer PhysicsData {
-    vec4 physics[]; // x=Hardness, y=Friction, z=Cohesion, w=CapacityMult
+    vec4 physics[]; // x=Hardness(sentinel if <0), y=Friction, z=Cohesion, w=CapacityMult
 };
 
+// Binding 2: Droplet spawn positions
 layout(std430, binding = 2) buffer SpawnPoints {
     vec2 spawns[];
 };
 
 uniform int mapSize;
-uniform int layerCount;
+uniform int layerCount;       // number of layers uploaded (= currentLayerIdx + 1)
+uniform int currentLayerSlot; // index within the flattened array that is the "current" layer
 uniform int maxLifetime;
 uniform float gravity;
 uniform float evaporationRate;
 uniform int totalDroplets;
+uniform int depositionMode;       // 1 = deposition only (no erosion), 0 = normal erosion
+uniform int erodeBeneath;         // 1 = can dig into all layers below, 0 = only current layer
+uniform float initialSedimentLoad; // starting sediment for deposition droplets
+
+float getThickness(int layer, int x, int y) {
+    return thicknesses[layer * mapSize * mapSize + y * mapSize + x];
+}
+
+void setThickness(int layer, int x, int y, float val) {
+    thicknesses[layer * mapSize * mapSize + y * mapSize + x] = val;
+}
+
+void addThickness(int layer, int x, int y, float amount) {
+    // Stochastic approximation (no atomics for floats on std430)
+    thicknesses[layer * mapSize * mapSize + y * mapSize + x] += amount;
+}
+
+// Sum height of active layers up to currentLayerSlot for gradient computation
+float getTotalHeight(float x, float y, out float gradX, out float gradY) {
+    int coordX = int(x);
+    int coordY = int(y);
+    float u = x - float(coordX);
+    float v = y - float(coordY);
+
+    int x0 = clamp(coordX, 0, mapSize - 1);
+    int y0 = clamp(coordY, 0, mapSize - 1);
+    int x1 = clamp(coordX + 1, 0, mapSize - 1);
+    int y1 = clamp(coordY + 1, 0, mapSize - 1);
+
+    float h00 = 0.0, h10 = 0.0, h01 = 0.0, h11 = 0.0;
+    for (int l = 0; l < layerCount; ++l) {
+        h00 += getThickness(l, x0, y0);
+        h10 += getThickness(l, x1, y0);
+        h01 += getThickness(l, x0, y1);
+        h11 += getThickness(l, x1, y1);
+    }
+
+    gradX = (h10 - h00) * (1.0 - v) + (h11 - h01) * v;
+    gradY = (h01 - h00) * (1.0 - u) + (h11 - h10) * u;
+    return h00 * (1.0 - u) * (1.0 - v) + h10 * u * (1.0 - v) + h01 * (1.0 - u) * v + h11 * u * v;
+}
+
+void main() {
+    uint gid = gl_GlobalInvocationID.x;
+    if (gid >= uint(totalDroplets)) return;
+
+    float posX = spawns[gid].x;
+    float posY = spawns[gid].y;
+
+    float dirX = 0.0;
+    float dirY = 0.0;
+    float speed = 1.0;
+    float water = 1.0;
+    float sediment = (depositionMode != 0) ? initialSedimentLoad : 0.0;
+
+    for (int life = 0; life < maxLifetime; ++life) {
+        int nodeX = int(posX);
+        int nodeY = int(posY);
+
+        float h, gradX, gradY;
+        h = getTotalHeight(posX, posY, gradX, gradY);
+
+        // Find top-most active layer for physics
+        int topLayerSlot = currentLayerSlot; // default to current layer
+        vec4 topPhysics = physics[currentLayerSlot];
+
+        // If erodeBeneath is enabled, scan all layers top-down
+        int scanTop = (erodeBeneath != 0) ? layerCount - 1 : currentLayerSlot;
+        for (int l = scanTop; l >= 0; --l) {
+            if (getThickness(l, nodeX, nodeY) > 0.0001) {
+                topLayerSlot = l;
+                topPhysics = physics[l];
+                break;
+            }
+        }
+
+        float pHardness     = topPhysics.x;
+        float pFriction     = topPhysics.y;
+        float pCapacityMult = topPhysics.w;
+
+        float inertia = 0.05 + (1.0 - pFriction) * 0.1;
+
+        dirX = (dirX * inertia) - (gradX * (1.0 - inertia));
+        dirY = (dirY * inertia) - (gradY * (1.0 - inertia));
+
+        float len = sqrt(dirX * dirX + dirY * dirY);
+        if (len != 0.0) { dirX /= len; dirY /= len; }
+
+        posX += dirX;
+        posY += dirY;
+
+        if ((dirX == 0.0 && dirY == 0.0) || posX < 1.0 || posX >= float(mapSize - 2) || posY < 1.0 || posY >= float(mapSize - 2)) {
+            break;
+        }
+
+        float newH, dX2, dY2;
+        newH = getTotalHeight(posX, posY, dX2, dY2);
+        float deltaHeight = newH - h;
+
+        float capacity = max(-deltaHeight * speed * water * 4.0 * pCapacityMult, 0.01);
+
+        if (sediment > capacity || deltaHeight > 0.0) {
+            // DEPOSIT — always into the current layer slot
+            float amountToDeposit = (deltaHeight > 0.0) ? min(deltaHeight, sediment) : (sediment - capacity) * 0.3;
+            sediment -= amountToDeposit;
+
+            float u = posX - float(int(posX));
+            float v = posY - float(int(posY));
+            addThickness(currentLayerSlot, nodeX,   nodeY,   amountToDeposit * (1.0 - u) * (1.0 - v));
+            addThickness(currentLayerSlot, nodeX+1, nodeY,   amountToDeposit * u          * (1.0 - v));
+            addThickness(currentLayerSlot, nodeX,   nodeY+1, amountToDeposit * (1.0 - u) * v);
+            addThickness(currentLayerSlot, nodeX+1, nodeY+1, amountToDeposit * u          * v);
+
+        } else if (depositionMode == 0) {
+            // ERODE — only in normal (non-deposition) mode
+            float erosionRate   = 0.3 * (1.0 - pHardness);
+            float amountToErode = min((capacity - sediment) * erosionRate, -deltaHeight);
+
+            if (amountToErode > 0.0) {
+                sediment += amountToErode;
+
+                float u = posX - float(int(posX));
+                float v = posY - float(int(posY));
+
+                float e00 = amountToErode * (1.0 - u) * (1.0 - v);
+                float e10 = amountToErode * u          * (1.0 - v);
+                float e01 = amountToErode * (1.0 - u) * v;
+                float e11 = amountToErode * u          * v;
+
+                int scanLimit = (erodeBeneath != 0) ? layerCount - 1 : currentLayerSlot;
+
+                // Erode nodeX, nodeY
+                float rem = e00;
+                for (int l = scanLimit; l >= 0 && rem > 0.0; --l) {
+                    if (physics[l].x < 0.0) continue; // not erodable
+                    float th = getThickness(l, nodeX, nodeY);
+                    float sub = min(th, rem);
+                    if (sub > 0.0) { setThickness(l, nodeX, nodeY, th - sub); rem -= sub; }
+                }
+                // Erode nodeX+1, nodeY
+                rem = e10;
+                for (int l = scanLimit; l >= 0 && rem > 0.0; --l) {
+                    if (physics[l].x < 0.0) continue;
+                    float th = getThickness(l, nodeX+1, nodeY);
+                    float sub = min(th, rem);
+                    if (sub > 0.0) { setThickness(l, nodeX+1, nodeY, th - sub); rem -= sub; }
+                }
+                // Erode nodeX, nodeY+1
+                rem = e01;
+                for (int l = scanLimit; l >= 0 && rem > 0.0; --l) {
+                    if (physics[l].x < 0.0) continue;
+                    float th = getThickness(l, nodeX, nodeY+1);
+                    float sub = min(th, rem);
+                    if (sub > 0.0) { setThickness(l, nodeX, nodeY+1, th - sub); rem -= sub; }
+                }
+                // Erode nodeX+1, nodeY+1
+                rem = e11;
+                for (int l = scanLimit; l >= 0 && rem > 0.0; --l) {
+                    if (physics[l].x < 0.0) continue;
+                    float th = getThickness(l, nodeX+1, nodeY+1);
+                    float sub = min(th, rem);
+                    if (sub > 0.0) { setThickness(l, nodeX+1, nodeY+1, th - sub); rem -= sub; }
+                }
+            }
+        }
+
+        speed  = sqrt(max(0.0, speed * speed + deltaHeight * gravity));
+        water *= (1.0 - evaporationRate);
+    }
+}
+
 
 
 

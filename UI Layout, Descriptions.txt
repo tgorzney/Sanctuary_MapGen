@@ -1,0 +1,103 @@
+Every Tab Should have the Name and an eye icon for enabling and disabling the preview of layer on composite preview (composite preview will be where it colors the map and textures it and renders lighting calculations for a final minimap preview)
+
+Tabs: Heightmap; Flow Map; Stratums; Detail Normal; Tint, Holes, Smoothness; Water; Markers; Reclaim; Props; Save/Export; Performance
+
+--- Heightmap Tab
+Use GPR Terrain Generation -> Move to Performance Tab (we are also missing a GPU checkbox sopmewhere in setting☼, there were mutliple places where the calculation could be changed to GPU (Erosion?))
+
+Scale features to Map Size (This is used to quickly render a low-resolution, for fast erosion for iterating, and then can be scaled up to a largeer map size maintaining exactly how it look☼ by properly scaling the frequency of every layer and other settings that can be affected by changing map size (we need a way to mark these settings in code and viually in UI subtly))
+
+Map Size
+Gravity (Input + Checkbox to use Global labeled "Global"-  default to global)
+
+Symetry: Point, X, Z, XY, Radial(Global) (Each Layer will have this same setting but will default to Global and be unset)
+Symmetry Blending Mode (Global)
+	Algorithm
+	Algortithm Settings
+
+GeoLayer (This acts as grouping for Stratum layers (S)) (Add Layer Button)
+		Layer Name (Drop Down) Buttons (Checkbox Before Bake to Enable/Diable Current Bake, Enable reads image, Diable Uses settings and calculates); Bake (Bakes the current Layer, alo allows choosing a 16bit Grayscale Image to Use) - if selected image will be rescaled when chosen to match the map size. Duplicate (Duplicates Layer and Settings to a new Layer above current), Delete (Delete Layer)
+		Layer can be drag and drop to move to any GeoLayer and retain all settings
+			Layer Stratum Index (This tells us what color and textures to render)
+
+			Erodable - Determines if layer is immune to other layers Eroding it, if Enabled, if another layer erodes away revealing this layer, this layer will be eroded by the other layers in that simulation step for what is visible of this layer
+
+			Symetry: Point, X, Z, XY, Radial(Global) (Each Layer will have this same setting but will default to Global and be unset)
+			Symmetry Blending Mode (Global)
+				Algorithm
+				Algortithm Settings
+
+			Mode
+
+			Noise Type
+
+			Fractal
+
+			Noise Properties (Drop Down)
+				Frequency
+				Octaves
+				Gain
+				Opacity
+
+			Density Shaping
+				Land
+				Plateau
+				Mountain
+				Ramp
+
+			Blend Mode
+				(Add Height Blend with Options for changing heighblend variables to control the blend, like COntrast and Min/Max values - This would be akin to defining how "deep" the layer is on top of the layer below it (ubtracting the height of the terrain below to create the Mask for the current layer (at least I think I have that correct)))
+
+			Soil Physics Dropdown (These are single source values also settable on the Stratuims Tab)
+				(This needs a button after "Physics", that is a down arrow icon (alt+code), and when clicked shows options for soil types and when selected loads the last settings set for that type (so designers can go back and forth and tweak), but there needs to be a default button to reset thAT selected soil type back to default
+
+			Hydraulic Erosion Drop Down
+				Enable Erosion
+
+				Erode Layers Beneath
+
+				Use GPU for Hydraulic
+
+				Precipitation (Drop Down)
+					Droplet Count
+					Max Lifetime
+					Evaporation
+					Gravity Override (Input with Checkbox for Global (default to global and do not how input when global selected))
+					Rain Noise (Drop Down)
+						Settings
+					Orographic Rain (Drop Down)
+						Wind Angle (Symetry needs to be applied to Wind Before Claculating the Erosion)
+
+			Deposition (Soil Drop) (Drop Down)
+				Enable
+				Initial Sentiment Load
+				Spawn Height Range (0=Bottom 1=Top)
+
+--- Flow Map (shows calculated flow map, in composite view, can set color of flow map and flow map color multiplied by heightmap in composite)
+
+--- Stratums
+Stratums are layered, with 0 being the lowest and having no mask, and the rest are on top of one another and have a height blend Mas
+Need ability to drag and reorder Stratums (Index Order Always same - need to move teh settings etc. to toher Stratum and push others up or down stack (settings))
+
+Environment (Button to select Environment.sanpack file)
+
+Stratum Name Stratum id (Drop Down)
+	Environment (Drop Down)
+		Colors (color input, not individual RGB Inputs ince color picker has): Base Color ; Tint Color; Color Override; Tint Blend
+
+		Environment Stratum (Autoscans Environment.sanpack to get the possible choices)
+			Albedo (Autoselect or click to select)
+			Normal
+			Composite
+	Mask Remapping (I forget what effect this has, we need to look at code, or ask devs)
+		1: Min Max
+		2: Min Max
+		3: Min Max
+		4: Min Max
+
+
+	Tiling and ⌂caling (Drop Down)
+
+	Blending (Drop Down)
+
+	Soil Physics Dropdown

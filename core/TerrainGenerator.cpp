@@ -525,53 +525,52 @@ namespace SanmapGen {
         }
         } // End CPU/GPU split
         
-        // Post-Process Global Stratified Erosion
-        if (params.Erosion.Enabled) {
+        // --- Process Erosion Sequentially Layer-by-Layer ---
+        for (size_t currentLayerIdx = 0; currentLayerIdx < params.Layers.size(); ++currentLayerIdx) {
+            const auto& layer = params.Layers[currentLayerIdx];
+            if (!layer.Enabled || !layer.Erosion.Enabled) continue;
             
-            // Generate Rain/Precipitation Map
+            // Generate Rain/Precipitation Map based on this layer's settings
             FloatMask rainMap(mapSize, mapSize, 1.0f); // Default to uniform
             
-            if (params.Erosion.UseRainNoise) {
+            if (layer.Erosion.UseRainNoise) {
                 FastNoiseLite rainNoise;
-                rainNoise.SetSeed(params.Seed + 9999);
+                rainNoise.SetSeed(params.Seed + 9999 + currentLayerIdx);
                 rainNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
                 rainNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
-                rainNoise.SetFractalOctaves(params.Erosion.RainNoiseOctaves);
-                rainNoise.SetFrequency(params.Erosion.RainNoiseFreq);
+                rainNoise.SetFractalOctaves(layer.Erosion.RainNoiseOctaves);
+                rainNoise.SetFrequency(layer.Erosion.RainNoiseFreq);
                 
-                // Use a dummy layer to route the noise through EvaluateSymmetricNoise
-                NoiseLayer dummyLayer;
-                dummyLayer.SymmetryMask = params.Layers.empty() ? 0 : params.Layers[0].SymmetryMask;
-                
+                // Use the layer itself to route the noise through EvaluateSymmetricNoise
                 for(int y=0; y<mapSize; ++y) {
                     for(int x=0; x<mapSize; ++x) {
-                        float n = (EvaluateSymmetricNoise(x, y, mapSize, rainNoise, dummyLayer, &params) + 1.0f) * 0.5f;
+                        float n = (EvaluateSymmetricNoise(x, y, mapSize, rainNoise, layer, &params) + 1.0f) * 0.5f;
                         // Threshold mask
-                        if (n < params.Erosion.RainNoiseThreshold) {
+                        if (n < layer.Erosion.RainNoiseThreshold) {
                             rainMap.Set(x, y, 0.0f);
                         } else {
-                            float val = (n - params.Erosion.RainNoiseThreshold) / (1.0f - params.Erosion.RainNoiseThreshold);
+                            float val = (n - layer.Erosion.RainNoiseThreshold) / (1.0f - layer.Erosion.RainNoiseThreshold);
                             rainMap.Set(x, y, val);
                         }
                     }
                 }
             }
             
-            // Apply Orographic Rain (Rain Shadows)
-            if (params.Erosion.UseOrographicRain) {
-                // Calculate TotalHeight for slope detection
-                FloatMask totalHeight(mapSize, mapSize, 0.0f);
-                for(int y=0; y<mapSize; ++y) {
-                    for(int x=0; x<mapSize; ++x) {
-                        float th = 0.0f;
-                        for(size_t i=0; i<params.Layers.size(); ++i) {
-                            if(params.Layers[i].Enabled) th += Stratums[i].Get(x, y);
-                        }
-                        totalHeight.Set(x, y, th);
+            // Calculate TotalHeight for slope detection and spawn height filtering
+            FloatMask totalHeight(mapSize, mapSize, 0.0f);
+            for(int y=0; y<mapSize; ++y) {
+                for(int x=0; x<mapSize; ++x) {
+                    float th = 0.0f;
+                    for(size_t i=0; i<=currentLayerIdx; ++i) {
+                        if(params.Layers[i].Enabled) th += Stratums[i].Get(x, y);
                     }
+                    totalHeight.Set(x, y, th);
                 }
-                
-                float windAngleRad = params.Erosion.WindAngle * (3.14159265f / 180.0f);
+            }
+            
+            // Apply Orographic Rain (Rain Shadows)
+            if (layer.Erosion.UseOrographicRain) {
+                float windAngleRad = layer.Erosion.WindAngle * (3.14159265f / 180.0f);
                 float windX = std::cos(windAngleRad);
                 float windY = std::sin(windAngleRad);
                 
@@ -593,7 +592,6 @@ namespace SanmapGen {
                         float heightMult = std::clamp(h * 2.0f, 0.5f, 1.5f);
                         
                         // If slope opposes wind (windward), slopeTowardsWind > 0
-                        // If slope flows with wind (leeward), slopeTowardsWind < 0
                         float orographicMult = 1.0f + (slopeTowardsWind * 100.0f); // Arbitrary tuning
                         orographicMult = std::clamp(orographicMult, 0.1f, 2.0f);
                         
@@ -602,11 +600,23 @@ namespace SanmapGen {
                 }
             }
             
+            // Filter rain map by Spawn Height for Deposition mode
+            if (layer.Erosion.DepositionMode) {
+                for(int y=0; y<mapSize; ++y) {
+                    for(int x=0; x<mapSize; ++x) {
+                        float h = totalHeight.Get(x, y);
+                        if (h < layer.Erosion.SpawnMinHeight || h > layer.Erosion.SpawnMaxHeight) {
+                            rainMap.Set(x, y, 0.0f); // Cannot spawn outside height range
+                        }
+                    }
+                }
+            }
+            
             // Rejection Sampling to fill EXACTLY DropletCount drops
             std::vector<DropletSpawn> spawns;
-            spawns.reserve(params.Erosion.DropletCount);
+            spawns.reserve(layer.Erosion.DropletCount);
             
-            std::mt19937 spawnGen(params.Seed);
+            std::mt19937 spawnGen(params.Seed + currentLayerIdx);
             std::uniform_real_distribution<float> distCoord(1.0f, static_cast<float>(mapSize - 2));
             std::uniform_real_distribution<float> distProb(0.0f, 1.0f);
             
@@ -619,7 +629,7 @@ namespace SanmapGen {
             }
             
             int safetyCounter = 0;
-            while(spawns.size() < (size_t)params.Erosion.DropletCount) {
+            while(spawns.size() < (size_t)layer.Erosion.DropletCount) {
                 float px = distCoord(spawnGen);
                 float py = distCoord(spawnGen);
                 float prob = rainMap.Get((int)px, (int)py) / maxRain;
@@ -630,20 +640,20 @@ namespace SanmapGen {
                 } else {
                     safetyCounter++;
                     if (safetyCounter > 1000000) {
-                        // Failsafe: if map is completely dry, just force uniform drops to fill quota
+                        // Failsafe: if map is completely dry, force uniform drops to fill quota
                         spawns.push_back({px, py});
                     }
                 }
             }
             
-            if (params.Erosion.UseGPU) {
-                ErosionCompute::DispatchStratified(Stratums, spawns, params.Erosion, params, mapSize);
+            if (layer.Erosion.UseGPU) {
+                ErosionCompute::DispatchStratified(Stratums, spawns, layer.Erosion, params, mapSize, currentLayerIdx);
             } else {
-                ErosionSimulator::SimulateStratifiedErosionDelta(Stratums, spawns, params.Erosion, params, mapSize);
+                ErosionSimulator::SimulateStratifiedErosionDelta(Stratums, spawns, layer.Erosion, params, mapSize, currentLayerIdx);
             }
             
-            // Symmetrize the eroded stratums to fix divergent erosion paths!
-            for (size_t i = 0; i < params.Layers.size(); ++i) {
+            // Symmetrize the eroded stratums to fix divergent erosion paths for layers we touched
+            for (size_t i = 0; i <= currentLayerIdx; ++i) {
                 if (params.Layers[i].Enabled && params.Layers[i].SymmetryMask != 0) {
                     Stratums[i] = SymmetrizeErodedTerrain(Stratums[i], params.Layers[i], params);
                 }

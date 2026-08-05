@@ -127,8 +127,8 @@ namespace SanmapGen {
         float CapacityMult;
     };
 
-    void ErosionCompute::DispatchStratified(std::vector<FloatMask>& stratums, const std::vector<DropletSpawn>& spawns, const GlobalErosionSettings& settings, const GenerationParams& params, int mapSize) {
-        if(!settings.Enabled || stratums.empty() || spawns.empty()) return;
+    void ErosionCompute::DispatchStratified(std::vector<FloatMask>& stratums, const std::vector<DropletSpawn>& spawns, const ErosionSettings& settings, const GenerationParams& params, int mapSize, int currentLayerIdx) {
+        if(!settings.Enabled || stratums.empty() || spawns.empty() || currentLayerIdx < 0 || currentLayerIdx >= (int)params.Layers.size()) return;
 
         LoadGLExtensions();
         if(!glCreateShader) {
@@ -192,14 +192,20 @@ namespace SanmapGen {
         glLinkProgram(avaProgram);
         glDeleteShader(avaShader);
 
-        // Gather active layers and flatten data
+        // Gather active layers up to and including currentLayerIdx
         std::vector<size_t> activeIndices;
-        for (size_t i = 0; i < params.Layers.size(); ++i) {
+        for (size_t i = 0; i <= (size_t)currentLayerIdx; ++i) {
             if (params.Layers[i].Enabled) activeIndices.push_back(i);
         }
 
         if(activeIndices.empty()) return;
         int layerCount = (int)activeIndices.size();
+
+        // currentLayerSlot is the local index of currentLayerIdx inside activeIndices
+        int currentLayerSlot = layerCount - 1; // it's always the last one since we scan up to it
+        for (int l = 0; l < layerCount; ++l) {
+            if (activeIndices[l] == (size_t)currentLayerIdx) { currentLayerSlot = l; break; }
+        }
 
         size_t mapPixels = mapSize * mapSize;
         std::vector<float> flattenedStrata(mapPixels * layerCount, 0.0f);
@@ -207,13 +213,13 @@ namespace SanmapGen {
 
         for (int l = 0; l < layerCount; ++l) {
             size_t srcIdx = activeIndices[l];
-            
+
             // Flatten thickness
             std::copy(stratums[srcIdx].GetDataPtr(), stratums[srcIdx].GetDataPtr() + mapPixels, flattenedStrata.begin() + (l * mapPixels));
-            
-            // Flatten physics
+
+            // Flatten physics — now read directly from the layer, not the stratum
             const auto& layer = params.Layers[srcIdx];
-            float encodedHardness = layer.Erodable ? layer.Hardness : -1.0f;
+            float encodedHardness = layer.Erodable ? layer.Hardness : -1.0f; // sentinel < 0 = not erodable
             physicsArray[l] = { encodedHardness, layer.Friction, layer.Cohesion, layer.CapacityMult };
         }
 
@@ -241,10 +247,14 @@ namespace SanmapGen {
         // Uniforms
         glUniform1i(glGetUniformLocation(computeProgram, "mapSize"), mapSize);
         glUniform1i(glGetUniformLocation(computeProgram, "layerCount"), layerCount);
+        glUniform1i(glGetUniformLocation(computeProgram, "currentLayerSlot"), currentLayerSlot);
         glUniform1i(glGetUniformLocation(computeProgram, "maxLifetime"), settings.MaxLifetime);
         glUniform1f(glGetUniformLocation(computeProgram, "gravity"), settings.Gravity);
         glUniform1f(glGetUniformLocation(computeProgram, "evaporationRate"), settings.EvaporationRate);
         glUniform1i(glGetUniformLocation(computeProgram, "totalDroplets"), settings.DropletCount);
+        glUniform1i(glGetUniformLocation(computeProgram, "depositionMode"), settings.DepositionMode ? 1 : 0);
+        glUniform1i(glGetUniformLocation(computeProgram, "erodeBeneath"), params.Layers[currentLayerIdx].ErodeBeneath ? 1 : 0);
+        glUniform1f(glGetUniformLocation(computeProgram, "initialSedimentLoad"), settings.InitialSedimentLoad);
 
         int workgroupSizeX = 256;
         int numWorkgroups = (settings.DropletCount + workgroupSizeX - 1) / workgroupSizeX;
@@ -256,6 +266,8 @@ namespace SanmapGen {
         glUseProgram(avaProgram);
         glUniform1i(glGetUniformLocation(avaProgram, "mapSize"), mapSize);
         glUniform1i(glGetUniformLocation(avaProgram, "layerCount"), layerCount);
+        glUniform1i(glGetUniformLocation(avaProgram, "currentLayerSlot"), currentLayerSlot);
+        glUniform1i(glGetUniformLocation(avaProgram, "erodeBeneath"), params.Layers[currentLayerIdx].ErodeBeneath ? 1 : 0);
         
         int avaWorkgroupX = (mapSize + 15) / 16;
         int avaWorkgroupY = (mapSize + 15) / 16;
@@ -265,14 +277,14 @@ namespace SanmapGen {
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
 
-        // Readback
+        // Readback — only the layers we uploaded
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo[0]);
         float* ptr = (float*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
         if (ptr) {
             for (int l = 0; l < layerCount; ++l) {
                 size_t destIdx = activeIndices[l];
                 std::copy(ptr + (l * mapPixels), ptr + ((l + 1) * mapPixels), stratums[destIdx].GetMutableDataPtr());
-                
+
                 // Clamp to prevent negative thicknesses from GPU races
                 for (size_t p = 0; p < mapPixels; ++p) {
                     if (stratums[destIdx].GetMutableDataPtr()[p] < 0.0f) {
