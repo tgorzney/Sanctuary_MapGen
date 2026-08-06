@@ -442,6 +442,24 @@ namespace SanmapGen {
                 noiseVal = (noiseVal * (1.0f - layer.RampDensity)) + (origNoise * layer.RampDensity);
             }
             
+            // Photoshop-Style Levels Adjustment
+            float s = layer.LevelsShadows;
+            float h = layer.LevelsHighlights;
+            float m = layer.LevelsMidtones;
+            
+            if (h > s) {
+                noiseVal = std::clamp((noiseVal - s) / (h - s), 0.0f, 1.0f);
+            } else {
+                noiseVal = (noiseVal >= s) ? 1.0f : 0.0f;
+            }
+            
+            if (m != 1.0f && m > 0.0f) {
+                noiseVal = std::pow(noiseVal, 1.0f / m);
+            }
+            
+            noiseVal = layer.LevelsOutputBlack + noiseVal * (layer.LevelsOutputWhite - layer.LevelsOutputBlack);
+            noiseVal = std::clamp(noiseVal, 0.0f, 1.0f);
+            
             task.OutputMap->Set(px, py, noiseVal);
         }
     }
@@ -547,10 +565,27 @@ namespace SanmapGen {
                         
                         // Final added height for this layer is its masked thickness
                         float finalThickness = thickness * mask * layer.Opacity;
-                        Stratums[i].Set(x, y, finalThickness);
+                        
+                        if (i < params.Stratums.size() && params.Stratums[i].UseImportedMask && !params.Stratums[i].ImportedMaskData.empty()) {
+                            int texSize = params.MapSize;
+                            int sx = std::min(x, texSize - 1);
+                            int sy = std::min(y, texSize - 1);
+                            float importedVal = params.Stratums[i].ImportedMaskData[sy * texSize + sx];
+                            Stratums[i].Set(x, y, importedVal);
+                        } else {
+                            Stratums[i].Set(x, y, finalThickness);
+                        }
                     } else {
                         // This layer is buried under the terrain or non-existent here
-                        Stratums[i].Set(x, y, 0.0f);
+                        if (i < params.Stratums.size() && params.Stratums[i].UseImportedMask && !params.Stratums[i].ImportedMaskData.empty()) {
+                            int texSize = params.MapSize;
+                            int sx = std::min(x, texSize - 1);
+                            int sy = std::min(y, texSize - 1);
+                            float importedVal = params.Stratums[i].ImportedMaskData[sy * texSize + sx];
+                            Stratums[i].Set(x, y, importedVal);
+                        } else {
+                            Stratums[i].Set(x, y, 0.0f);
+                        }
                     }
                 }
             }

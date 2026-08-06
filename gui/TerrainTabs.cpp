@@ -1,7 +1,10 @@
 #include "UITabs.h"
 #include "imgui.h"
+#include "FileDialog.h"
 #include <string>
 #include <algorithm>
+#include <fstream>
+#include <cmath>
 
 namespace SanmapGen {
 namespace UI {
@@ -51,7 +54,34 @@ namespace UI {
         float buttonsWidth = btnWidth * 3.0f + btnGap * 2.0f;
         ImGui::SameLine(headerWidth - buttonsWidth);
 
-        if (ImGui::Button("Bake", ImVec2(btnWidth, 0))) {} // Placeholder
+        if (ImGui::Button("Import RAW...", ImVec2(btnWidth, 0))) {
+            std::string path;
+            if (FileDialog::OpenFile("RAW Heightmaps\0*.raw\0", path)) {
+                std::ifstream inFile(path, std::ios::binary | std::ios::ate);
+                if (inFile) {
+                    std::streamsize size = inFile.tellg();
+                    inFile.seekg(0, std::ios::beg);
+                    
+                    // We assume 16-bit uint raw maps that match MapSize+1.
+                    // If the user selects a random raw file, we still just read floats.
+                    std::vector<uint16_t> rawData(size / sizeof(uint16_t));
+                    if (inFile.read(reinterpret_cast<char*>(rawData.data()), size)) {
+                        layer.ImageData.resize(rawData.size());
+                        for (size_t k = 0; k < rawData.size(); ++k) {
+                            layer.ImageData[k] = static_cast<float>(rawData[k]) / 65535.0f;
+                        }
+                        
+                        // Guess dimensions (assume square)
+                        int dim = static_cast<int>(std::sqrt(rawData.size()));
+                        layer.ImageWidth = dim;
+                        layer.ImageHeight = dim;
+                        layer.UseImage = true;
+                        
+                        bNeedsMapUpdate = true;
+                    }
+                }
+            }
+        }
         ImGui::SameLine(0, btnGap);
 
         if (ImGui::Button("Duplicate", ImVec2(btnWidth, 0))) {
@@ -83,6 +113,39 @@ namespace UI {
             
             if (ImGui::SliderInt("Stratum Material Index", &layer.StratumIndex, 0, 8)) bNeedsMapUpdate = true;
             if (ImGui::SliderFloat("Opacity", &layer.Opacity, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+
+            if (ImGui::Button("Levels Adjustment...", ImVec2(-1, 24))) {
+                ImGui::OpenPopup("LevelsPopup");
+            }
+            if (ImGui::BeginPopup("LevelsPopup")) {
+                ImGui::Text("Input Levels");
+                
+                static float dummyHist[64] = {0};
+                ImGui::PlotHistogram("##hist", dummyHist, 64, 0, NULL, 0.0f, 1.0f, ImVec2(256, 80));
+                
+                ImGui::SetNextItemWidth(80);
+                if (ImGui::DragFloat("##Shadows", &layer.LevelsShadows, 0.01f, 0.0f, layer.LevelsHighlights)) bNeedsMapUpdate = true;
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(80);
+                if (ImGui::DragFloat("##Midtones", &layer.LevelsMidtones, 0.01f, 0.01f, 9.99f)) bNeedsMapUpdate = true;
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(80);
+                if (ImGui::DragFloat("##Highlights", &layer.LevelsHighlights, 0.01f, layer.LevelsShadows, 1.0f)) bNeedsMapUpdate = true;
+                
+                ImGui::Spacing();
+                ImGui::Text("Output Levels");
+                ImVec2 p = ImGui::GetCursorScreenPos();
+                ImGui::GetWindowDrawList()->AddRectFilledMultiColor(p, ImVec2(p.x + 256, p.y + 20), IM_COL32(0,0,0,255), IM_COL32(255,255,255,255), IM_COL32(255,255,255,255), IM_COL32(0,0,0,255));
+                ImGui::Dummy(ImVec2(256, 20));
+                
+                ImGui::SetNextItemWidth(80);
+                if (ImGui::DragFloat("##OutBlack", &layer.LevelsOutputBlack, 0.01f, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+                ImGui::SameLine(184); 
+                ImGui::SetNextItemWidth(80);
+                if (ImGui::DragFloat("##OutWhite", &layer.LevelsOutputWhite, 0.01f, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+                
+                ImGui::EndPopup();
+            }
 
             if (ImGui::TreeNodeEx("Height Blending", ImGuiTreeNodeFlags_DefaultOpen)) {
                 const char* blend_labels[] = { "Add", "Subtract", "Multiply", "Overlay", "Max", "Min" };
@@ -310,7 +373,7 @@ namespace UI {
         ImGui::Text("Global Symmetry");
         
         int current_alg = static_cast<int>(params.SymAlgorithm);
-        const char* alg_names[] = { "Native Hash", "Blur", "Cross Fade", "Superposition", "Cylinder3D", "Torus3D" };
+        const char* alg_names[] = { "Fold", "Blur", "Cross Fade", "Cylinder3D", "Torus3D", "Native Hash", "Superposition" };
         if (ImGui::Combo("Symmetry Algorithm", &current_alg, alg_names, IM_ARRAYSIZE(alg_names))) {
             params.SymAlgorithm = static_cast<SanmapGen::SymmetryAlgorithm>(current_alg);
             bNeedsMapUpdate = true;
@@ -473,8 +536,8 @@ namespace UI {
     }
 
     void RenderSlopeMapTab(GenerationParams& params, bool& bNeedsPreviewRender) {
-        ImGui::Checkbox("##showSlopeMap", &params.ShowSlopeMap); ImGui::SameLine();
         ImGui::Text("Slope Settings");
+        if (ImGui::Checkbox("Show Slope Map Overlay", &params.ShowSlopeMap)) bNeedsPreviewRender = true;
         ImGui::Separator();
         
         ImGui::TextDisabled("Degrees (0 - 90)");
@@ -483,21 +546,16 @@ namespace UI {
         }
     }
 
-    void RenderFlowMapTab(GenerationParams& params, bool& bNeedsPreviewRender) {
-        ImGui::Checkbox("##showFlowMap", &params.ShowFlowMap); ImGui::SameLine();
+    void RenderFlowMapTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender) {
         ImGui::Text("Flow (Velocity) Settings");
+        if (ImGui::Checkbox("Show Flow Map Overlay", &params.ShowFlowMap)) bNeedsPreviewRender = true;
         ImGui::Separator();
         
         ImGui::TextDisabled("Flow Simulation affects both Flow & Accumulation Maps.");
         ImGui::Spacing();
-        // Changing Flow Simulation requires a full Map Update because it runs during generation
-        // Wait, I only have bNeedsPreviewRender passed to this function. I will add MapUpdate locally just for the UI since I can't change signature without cascade.
-        // Actually, main.cpp passes bNeedsPreviewRender to this, but let's change signature to allow MapUpdate if needed.
-        // Since I only have PreviewRender, I'll just prompt user to "Force Generate" manually for simulation changes.
-        ImGui::DragFloat("Precipitation Rate", &params.FlowSettingsParams.Precipitation, 0.01f, 0.0f, 10.0f);
-        ImGui::SliderInt("Iterations (Time)", &params.FlowSettingsParams.Iterations, 1, 100);
-        ImGui::Checkbox("Use GPU Compute (Flow)", &params.FlowSettingsParams.UseGPU);
-        ImGui::TextDisabled("Click 'Force Generate' to apply Simulation changes.");
+        if (ImGui::DragFloat("Precipitation Rate", &params.FlowSettingsParams.Precipitation, 0.01f, 0.0f, 10.0f)) bNeedsMapUpdate = true;
+        if (ImGui::SliderInt("Iterations (Time)", &params.FlowSettingsParams.Iterations, 1, 100)) bNeedsMapUpdate = true;
+        if (ImGui::Checkbox("Use GPU Compute (Flow)", &params.FlowSettingsParams.UseGPU)) bNeedsMapUpdate = true;
         
         ImGui::Spacing();
         ImGui::Separator();
@@ -508,8 +566,8 @@ namespace UI {
     }
 
     void RenderAccumulationMapTab(GenerationParams& params, bool& bNeedsPreviewRender) {
-        ImGui::Checkbox("##showAccMap", &params.ShowAccumulationMap); ImGui::SameLine();
         ImGui::Text("Accumulation Map Settings");
+        if (ImGui::Checkbox("Show Accumulation Overlay", &params.ShowAccumulationMap)) bNeedsPreviewRender = true;
         ImGui::Separator();
         
         ImGui::Text("Accumulation Gradient");

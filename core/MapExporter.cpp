@@ -4,12 +4,15 @@
 #include <iostream>
 #include <filesystem>
 
+#include "stb_image_write.h"
+#include <algorithm>
+
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 namespace SanmapGen {
 
-void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationParams& params) {
+void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData) {
     if (!fs::exists(folderPath)) {
         fs::create_directories(folderPath);
     }
@@ -26,52 +29,57 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     
     mapdef["hasWater"] = true;
     
-    json waterObj;
-    waterObj["waterLevelMin"] = params.Water.WaterLevelMin;
-    waterObj["waterLevelMax"] = params.Water.WaterLevelMax;
-    waterObj["deepWaterDepthMin"] = params.Water.DeepWaterDepthMin;
-    waterObj["deepWaterDepthMax"] = params.Water.DeepWaterDepthMax;
-    waterObj["waterWindSpeed"] = params.Water.WaterWindSpeed;
-    waterObj["waterWindDirection"] = params.Water.WaterWindDirection;
-    waterObj["waterShoreDepthOffset"] = params.Water.WaterShoreDepthOffset;
-    waterObj["waterShoreDepthStrength"] = params.Water.WaterShoreDepthStrength;
-    waterObj["waterShoreDistanceOffset"] = params.Water.WaterShoreDistanceOffset;
-    waterObj["waterShoreDistanceStrength"] = params.Water.WaterShoreDistanceStrength;
-    waterObj["waveGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
-    mapdef["water"] = waterObj;
+    mapdef["waterLevel"] = params.Water.WaterLevelMin;
+    mapdef["waterDepth"] = params.Water.DeepWaterDepthMin;
+    
+    mapdef["waterWindSpeed"] = params.Water.WaterWindSpeed;
+    mapdef["waterWindDirection"] = params.Water.WaterWindDirection;
+    mapdef["waterShoreDepthOffset"] = params.Water.WaterShoreDepthOffset;
+    mapdef["waterShoreDepthStrength"] = params.Water.WaterShoreDepthStrength;
+    mapdef["waterShoreDistanceOffset"] = params.Water.WaterShoreDistanceOffset;
+    mapdef["waterShoreDistanceStrength"] = params.Water.WaterShoreDistanceStrength;
+    mapdef["waveGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
 
     mapdef["shader"] = "RTS/TerrainLit";
 
     // Atmosphere
-    json atmosObj;
-    atmosObj["sunRA"] = params.Atmosphere.SunRA;
-    atmosObj["sunDA"] = params.Atmosphere.SunDA;
-    atmosObj["sunIntensity"] = params.Atmosphere.SunIntensity;
-    atmosObj["sunTint"] = { {"r", params.Atmosphere.SunTint[0]}, {"g", params.Atmosphere.SunTint[1]}, {"b", params.Atmosphere.SunTint[2]}, {"a", params.Atmosphere.SunTint[3]} };
-    atmosObj["sunTemperature"] = params.Atmosphere.SunTemperature;
-    atmosObj["sunAngularDiameter"] = params.Atmosphere.SunAngularDiameter;
-    atmosObj["sunVolumetricsMultiplier"] = params.Atmosphere.SunVolumetricsMultiplier;
-    atmosObj["sunVolumetricsShadowDimer"] = params.Atmosphere.SunVolumetricsShadowDimer;
+    mapdef["sunRA"] = params.Atmosphere.SunRA;
+    mapdef["sunDA"] = params.Atmosphere.SunDA;
+    mapdef["sunIntensity"] = params.Atmosphere.SunIntensity;
+    mapdef["sunTint"] = {
+        {"r", params.Atmosphere.SunTint[0]},
+        {"g", params.Atmosphere.SunTint[1]},
+        {"b", params.Atmosphere.SunTint[2]},
+        {"a", params.Atmosphere.SunTint[3]}
+    };
+    mapdef["sunTemperature"] = params.Atmosphere.SunTemperature;
+    mapdef["sunAngularDiameter"] = params.Atmosphere.SunAngularDiameter;
+    mapdef["sunVolumetricsMultiplier"] = params.Atmosphere.SunVolumetricsMultiplier;
+    mapdef["sunVolumetricsShadowDimer"] = params.Atmosphere.SunVolumetricsShadowDimer;
     
-    atmosObj["skylightIntensity"] = params.Atmosphere.SkylightIntensity;
-    atmosObj["skylightTint"] = { {"r", params.Atmosphere.SkylightTint[0]}, {"g", params.Atmosphere.SkylightTint[1]}, {"b", params.Atmosphere.SkylightTint[2]}, {"a", params.Atmosphere.SkylightTint[3]} };
-    atmosObj["skylightTemperature"] = params.Atmosphere.SkylightTemperature;
+    mapdef["skylightIntensity"] = params.Atmosphere.SkylightIntensity;
+    mapdef["skylightTint"] = {
+        {"r", params.Atmosphere.SkylightTint[0]},
+        {"g", params.Atmosphere.SkylightTint[1]},
+        {"b", params.Atmosphere.SkylightTint[2]},
+        {"a", params.Atmosphere.SkylightTint[3]}
+    };
+    mapdef["skylightTemperature"] = params.Atmosphere.SkylightTemperature;
     
-    atmosObj["exposure"] = params.Atmosphere.Exposure;
-    atmosObj["exposureCompensation"] = params.Atmosphere.ExposureCompensation;
-    atmosObj["skyboxExposure"] = params.Atmosphere.SkyboxExposure;
+    mapdef["exposure"] = params.Atmosphere.Exposure;
+    mapdef["exposureCompensation"] = params.Atmosphere.ExposureCompensation;
+    mapdef["skyboxExposure"] = params.Atmosphere.SkyboxExposure;
     
-    atmosObj["fogAttenuationDistance"] = params.Atmosphere.FogAttenuationDistance;
-    atmosObj["fogBaseHeight"] = params.Atmosphere.FogBaseHeight;
-    atmosObj["fogMaximumHeight"] = params.Atmosphere.FogMaximumHeight;
-    atmosObj["fogMaximumDistance"] = params.Atmosphere.FogMaximumDistance;
-    atmosObj["fogAnisotropy"] = params.Atmosphere.FogAnisotropy;
+    mapdef["fogAttenuationDistance"] = params.Atmosphere.FogAttenuationDistance;
+    mapdef["fogBaseHeight"] = params.Atmosphere.FogBaseHeight;
+    mapdef["fogMaximumHeight"] = params.Atmosphere.FogMaximumHeight;
+    mapdef["fogMaximumDistance"] = params.Atmosphere.FogMaximumDistance;
+    mapdef["fogAnisotropy"] = params.Atmosphere.FogAnisotropy;
     
-    atmosObj["skyboxPath"] = params.Atmosphere.SkyboxPath;
+    mapdef["skyboxPath"] = params.Atmosphere.SkyboxPath;
     
-    atmosObj["globalWindSpeed"] = params.Atmosphere.GlobalWindSpeed;
-    atmosObj["globalWindDirection"] = params.Atmosphere.GlobalWindDirection;
-    mapdef["atmosphere"] = atmosObj;
+    mapdef["globalWindSpeed"] = params.Atmosphere.GlobalWindSpeed;
+    mapdef["globalWindDirection"] = params.Atmosphere.GlobalWindDirection;
 
     // Stratum Layers
     json strata = json::array();
@@ -99,7 +107,7 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
         
         strata.push_back(s);
     }
-    mapdef["stratumLayers"] = strata;
+    mapdef["stratums"] = strata;
     
     // Areas, armies, chains
     mapdef["areas"] = json::object();
@@ -146,8 +154,139 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     out << mapdef.dump(4);
     out.close();
 
-    // TODO: Write textures to folderPath + "/Textures"
+    // Export Heightmap
+    std::string hmPath = folderPath + "/heightmap.raw";
+    ExportHeightmap(hmPath, params, heightmap);
+    
+    // Export Stratums
+    ExportStratums(folderPath, params, genData);
+
+    auto exportTGA = [&](const std::string& name, const std::vector<uint8_t>& data, int w, int h, int comps) {
+        std::string p = folderPath + "/" + name;
+        stbi_write_tga(p.c_str(), w, h, comps, data.data());
+    };
+
+    int texSize = params.MapSize; // Assuming textures are MapSize x MapSize
+    int pixelCount = texSize * texSize;
+
+    // Export stratums
+    ExportStratums(folderPath, params, genData);
+
+    // 4. Export tint_colors.tga (RGB = 128 for no tint, A = Smoothness 148 default)
+    std::vector<uint8_t> tintColors(pixelCount * 4, 0);
+    for (int i = 0; i < pixelCount * 4; i += 4) {
+        tintColors[i + 0] = 128; // R
+        tintColors[i + 1] = 128; // G
+        tintColors[i + 2] = 128; // B
+        tintColors[i + 3] = 148; // A
+    }
+    // TODO: Actually fill Tint/Smoothness based on layers if applicable in future
+    exportTGA("tint_colors.tga", tintColors, texSize, texSize, 4);
+
+    // 5. Export tint_geometry.tga (RG = Normals (128), B = Holes (255 for no hole))
+    std::vector<uint8_t> tintGeom(pixelCount * 3, 0);
+    for (int i = 0; i < pixelCount * 3; i += 3) {
+        tintGeom[i + 0] = 128; // R
+        tintGeom[i + 1] = 128; // G
+        tintGeom[i + 2] = 255; // B
+    }
+    // TODO: Calculate real normals or holes from data
+    exportTGA("tint_geometry.tga", tintGeom, texSize, texSize, 3);
 }
+
+void MapExporter::ExportHeightmap(const std::string& filePath, const GenerationParams& params, const FloatMask& heightmap) {
+    int dim = params.MapSize + 1;
+    int hWidth = heightmap.GetWidth();
+    std::vector<uint16_t> rawHeightmap(dim * dim);
+    for (int y = 0; y < dim; ++y) {
+        for (int x = 0; x < dim; ++x) {
+            float val = 0.0f;
+            if (x < hWidth && y < hWidth) val = heightmap.Get(x, y);
+            val = std::clamp(val, 0.0f, 1.0f);
+            rawHeightmap[y * dim + x] = static_cast<uint16_t>(val * 65535.0f);
+        }
+    }
+    std::ofstream hmOut(filePath, std::ios::binary);
+    if (hmOut) {
+        hmOut.write(reinterpret_cast<const char*>(rawHeightmap.data()), rawHeightmap.size() * sizeof(uint16_t));
+        hmOut.close();
+    }
+}
+
+void MapExporter::ExportStratums(const std::string& folderPath, const GenerationParams& params, const GenerationResult& genData) {
+    int texSize = params.MapSize;
+    int pixelCount = texSize * texSize;
+    std::vector<uint8_t> s1_4(pixelCount * 4, 0);
+    std::vector<uint8_t> s5_8(pixelCount * 4, 0);
+
+    for (int y = 0; y < texSize; ++y) {
+        for (int x = 0; x < texSize; ++x) {
+            int idx = (y * texSize + x) * 4;
+            for (int i = 0; i < 4; ++i) {
+                float val = (i < genData.Stratums.size()) ? genData.Stratums[i].Get(x, y) : 0.0f;
+                s1_4[idx + i] = static_cast<uint8_t>(std::clamp(val, 0.0f, 1.0f) * 255.0f);
+            }
+            for (int i = 0; i < 4; ++i) {
+                float val = ((i + 4) < genData.Stratums.size()) ? genData.Stratums[i + 4].Get(x, y) : 0.0f;
+                s5_8[idx + i] = static_cast<uint8_t>(std::clamp(val, 0.0f, 1.0f) * 255.0f);
+            }
+        }
+    }
+    std::string p1 = folderPath + "/stratums_1_4.tga";
+    std::string p2 = folderPath + "/stratums_5_8.tga";
+    stbi_write_tga(p1.c_str(), texSize, texSize, 4, s1_4.data());
+    stbi_write_tga(p2.c_str(), texSize, texSize, 4, s5_8.data());
+}
+
+void MapExporter::ExportFlowMap(const std::string& filePath, const GenerationParams& params, const GenerationResult& genData) {
+    int texSize = params.MapSize;
+    std::vector<uint8_t> pixels(texSize * texSize * 4, 0);
+    for (int y = 0; y < texSize; ++y) {
+        for (int x = 0; x < texSize; ++x) {
+            float val = genData.FlowMap.Get(x, y) * 100.0f; // Scale it a bit for visibility
+            uint8_t intensity = static_cast<uint8_t>(std::clamp(val, 0.0f, 1.0f) * 255.0f);
+            int idx = (y * texSize + x) * 4;
+            pixels[idx] = intensity; // R
+            pixels[idx+1] = intensity; // G
+            pixels[idx+2] = intensity; // B
+            pixels[idx+3] = 255;
+        }
+    }
+    stbi_write_png(filePath.c_str(), texSize, texSize, 4, pixels.data(), texSize * 4);
+}
+
+void MapExporter::ExportSlopeMap(const std::string& filePath, const GenerationParams& params, const FloatMask& heightmap) {
+    int texSize = params.MapSize;
+    std::vector<uint8_t> pixels(texSize * texSize * 4, 0);
+    float quadWidth = 1024.0f;
+    float cellSize = static_cast<float>(params.MapSize) / quadWidth;
+    if (cellSize < 1.0f) cellSize = 1.0f;
+
+    for (int y = 0; y < texSize; ++y) {
+        for (int x = 0; x < texSize; ++x) {
+            float v00 = heightmap.Get(x, y);
+            float v10 = heightmap.Get(std::min(x + 1, texSize - 1), y);
+            float v01 = heightmap.Get(x, std::min(y + 1, texSize - 1));
+            float v11 = heightmap.Get(std::min(x + 1, texSize - 1), std::min(y + 1, texSize - 1));
+
+            float dx = (((v10 + v11) - (v00 + v01)) * 0.5f * 128.0f) / cellSize;
+            float dy = (((v01 + v11) - (v00 + v10)) * 0.5f * 128.0f) / cellSize;
+            float slopeDegrees = atan(sqrt(dx*dx + dy*dy)) * (180.0f / 3.14159265f);
+
+            // Normalize slope to 0-90 degrees for export visualization
+            float val = slopeDegrees / 90.0f; 
+            uint8_t intensity = static_cast<uint8_t>(std::clamp(val, 0.0f, 1.0f) * 255.0f);
+            
+            int idx = (y * texSize + x) * 4;
+            pixels[idx] = intensity;
+            pixels[idx+1] = intensity;
+            pixels[idx+2] = intensity;
+            pixels[idx+3] = 255;
+        }
+    }
+    stbi_write_png(filePath.c_str(), texSize, texSize, 4, pixels.data(), texSize * 4);
+}
+
 
 void MapExporter::SaveSettings(const std::string& filePath, const GenerationParams& params) {
     json j;

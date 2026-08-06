@@ -1,5 +1,6 @@
 #include "UITabs.h"
 #include "imgui.h"
+#include "FileDialog.h"
 
 namespace SanmapGen {
 namespace UI {
@@ -71,7 +72,18 @@ namespace UI {
     }
 
     void RenderMarkersTab(GenerationParams& params, bool& bNeedsMapUpdate) {
-        ImGui::Text("Spawns & Alloys");
+        ImGui::Text("Main Settings");
+        ImGui::Separator();
+        
+        if (ImGui::SliderInt("Spawn Count", &params.SpawnPointCount, 2, 16)) bNeedsMapUpdate = true;
+        if (ImGui::SliderFloat("Alloy Mult", &params.AlloyMultiplier, 0.0f, 3.0f)) bNeedsMapUpdate = true;
+        if (ImGui::SliderFloat("Hydro Mult", &params.HydroMultiplier, 0.0f, 3.0f)) bNeedsMapUpdate = true;
+        if (ImGui::SliderFloat("Mex Density", &params.MexDensity, 0.0f, 3.0f)) bNeedsMapUpdate = true;
+        // Also move reclaim density here since it belongs with markers
+        if (ImGui::SliderFloat("Reclaim Density", &params.ReclaimDensity, 0.0f, 5.0f)) bNeedsMapUpdate = true;
+        
+        ImGui::Spacing();
+        ImGui::Text("Custom Marker Rules");
         ImGui::Separator();
         
         if (ImGui::Button("Add Marker Rule", ImVec2(-1, 30))) {
@@ -91,6 +103,20 @@ namespace UI {
                 char nameBuf[128]; strncpy(nameBuf, params.Markers[i].Name.c_str(), sizeof(nameBuf));
                 if (ImGui::InputText("Name", nameBuf, IM_ARRAYSIZE(nameBuf))) params.Markers[i].Name = nameBuf;
                 
+                ImGui::Spacing();
+                ImGui::Text("Icon Selection");
+                char iconBuf[256]; strncpy(iconBuf, params.Markers[i].IconPath.c_str(), sizeof(iconBuf));
+                if (ImGui::InputText("Icon Path", iconBuf, IM_ARRAYSIZE(iconBuf))) params.Markers[i].IconPath = iconBuf;
+                ImGui::SameLine();
+                if (ImGui::Button("...##Icon")) {
+                    std::string path;
+                    if (FileDialog::OpenFile("Images\0*.png;*.dds;*.tga\0All Files\0*.*\0", path)) {
+                        params.Markers[i].IconPath = path;
+                        bNeedsMapUpdate = true;
+                    }
+                }
+                ImGui::Spacing();
+                
                 if (ImGui::SliderFloat("Density", &params.Markers[i].Density, 0.0f, 10.0f)) bNeedsMapUpdate = true;
                 if (ImGui::SliderFloat("Min Slope", &params.Markers[i].MinSlope, 0.0f, 90.0f)) bNeedsMapUpdate = true;
                 if (ImGui::SliderFloat("Max Slope", &params.Markers[i].MaxSlope, 0.0f, 90.0f)) bNeedsMapUpdate = true;
@@ -106,12 +132,6 @@ namespace UI {
             }
             ImGui::PopID();
         }
-        
-        ImGui::Separator();
-        if (ImGui::SliderInt("Spawn Count", &params.SpawnPointCount, 2, 16)) bNeedsMapUpdate = true;
-        if (ImGui::SliderFloat("Alloy Mult", &params.AlloyMultiplier, 0.0f, 3.0f)) bNeedsMapUpdate = true;
-        if (ImGui::SliderFloat("Hydro Mult", &params.HydroMultiplier, 0.0f, 3.0f)) bNeedsMapUpdate = true;
-        if (ImGui::SliderFloat("Mex Density", &params.MexDensity, 0.0f, 3.0f)) bNeedsMapUpdate = true;
     }
 
     void RenderPropsTab(GenerationParams& params, bool& bNeedsMapUpdate) {
@@ -197,8 +217,7 @@ namespace UI {
             ImGui::PopID();
         }
         
-        ImGui::Separator();
-        if (ImGui::SliderFloat("Reclaim Density", &params.ReclaimDensity, 0.0f, 5.0f)) bNeedsMapUpdate = true;
+        // Reclaim density moved to markers tab
     }
 
 } // namespace UI

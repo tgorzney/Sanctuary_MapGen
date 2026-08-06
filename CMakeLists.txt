@@ -59,6 +59,7 @@ set(CORE_SOURCES
     core/ErosionCompute.cpp
     core/TerrainCompute.cpp
     core/MapExporter.cpp
+    core/MapImporter.cpp
     core/FileDialog.cpp
     core/ImageUtils.cpp
     core/PlacementRules.h

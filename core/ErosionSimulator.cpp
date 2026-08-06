@@ -89,8 +89,10 @@ namespace SanmapGen {
                 float sediment = settings.DepositionMode ? settings.InitialSedimentLoad : 0.0f;
                 
                 for (int life = 0; life < settings.MaxLifetime; ++life) {
-                    int nodeX = static_cast<int>(posX);
-                    int nodeY = static_cast<int>(posY);
+                    float oldPosX = posX;
+                    float oldPosY = posY;
+                    int nodeX = static_cast<int>(oldPosX);
+                    int nodeY = static_cast<int>(oldPosY);
                     
                     float h, gradX, gradY;
                     CalculateGradient(threadTotalHeight, posX, posY, h, gradX, gradY);
@@ -148,8 +150,8 @@ namespace SanmapGen {
                         // Always deposit into the current layer being generated, regardless of what's beneath it!
                         int depIdx = currentLayerIdx;
                         
-                        float u = posX - static_cast<int>(posX);
-                        float v = posY - static_cast<int>(posY);
+                        float u = oldPosX - static_cast<int>(oldPosX);
+                        float v = oldPosY - static_cast<int>(oldPosY);
                         
                         float d00 = amountToDeposit * (1-u)*(1-v);
                         float d10 = amountToDeposit * u*(1-v);
@@ -174,8 +176,8 @@ namespace SanmapGen {
                         if (amountToErode > 0.0f && topLayerIdx != -1) {
                             sediment += amountToErode;
                             
-                            float u = posX - static_cast<int>(posX);
-                            float v = posY - static_cast<int>(posY);
+                            float u = oldPosX - static_cast<int>(oldPosX);
+                            float v = oldPosY - static_cast<int>(oldPosY);
                             
                             float e00 = amountToErode * (1-u)*(1-v);
                             float e10 = amountToErode * u*(1-v);

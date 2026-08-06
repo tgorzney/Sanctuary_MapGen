@@ -1,5 +1,6 @@
 #pragma once
 #include "Parameters.h"
+#include "TerrainGenerator.h"
 
 namespace SanmapGen {
 namespace UI {
@@ -13,19 +14,19 @@ namespace UI {
     
     void RenderHeightmapTab(GenerationParams& params, bool& bNeedsMapUpdate);
     void RenderSlopeMapTab(GenerationParams& params, bool& bNeedsPreviewRender);
-    void RenderFlowMapTab(GenerationParams& params, bool& bNeedsPreviewRender);
+    void RenderFlowMapTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderAccumulationMapTab(GenerationParams& params, bool& bNeedsPreviewRender);
-    void RenderStratumsTab(GenerationParams& params, bool& bNeedsMapUpdate);
-    void RenderDetailNormalTab(GenerationParams& params, bool& bNeedsMapUpdate);
-    void RenderSmoothnessTab(GenerationParams& params, bool& bNeedsMapUpdate);
-    void RenderTintTab(GenerationParams& params, bool& bNeedsMapUpdate);
+    void RenderStratumsTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
+    void RenderDetailNormalTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
+    void RenderSmoothnessTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
+    void RenderTintTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderWaterTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderAtmosphereTab(GenerationParams& params, bool& bNeedsMapUpdate);
-    void RenderHolesTab(GenerationParams& params, bool& bNeedsMapUpdate);
+    void RenderHolesTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderMarkersTab(GenerationParams& params, bool& bNeedsMapUpdate);
     void RenderPropsTab(GenerationParams& params, bool& bNeedsMapUpdate);
     void RenderPerformanceTab(GenerationParams& params, bool& bNeedsMapUpdate);
-    void RenderSaveExportTab(GenerationParams& params, bool& bNeedsMapUpdate);
+    void RenderSaveExportTab(GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool& bNeedsMapUpdate);
 
 } // namespace UI
 } // namespace SanmapGen

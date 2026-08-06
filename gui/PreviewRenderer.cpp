@@ -4,7 +4,7 @@
 
 namespace SanmapGen {
 
-    GLuint PreviewRenderer::UpdatePreviewTexture(const FloatMask& heightmap, const GenerationResult& genResult, const GenerationParams& params, GLuint existingTexture) {
+    GLuint PreviewRenderer::UpdatePreviewTexture(const FloatMask& heightmap, const GenerationResult& genResult, const GenerationParams& params, GLuint existingTexture, bool bGeometryChanged) {
         int width = heightmap.GetWidth();
         int height = heightmap.GetHeight();
 
@@ -13,6 +13,49 @@ namespace SanmapGen {
 
         int quadWidth = width - 1;
         int quadHeight = height - 1;
+        
+        static std::vector<float> cachedSlopes;
+        static std::vector<float> cachedHeights;
+        if (bGeometryChanged || cachedSlopes.size() != static_cast<size_t>(width * height)) {
+            cachedSlopes.resize(width * height);
+            cachedHeights.resize(width * height);
+            
+            float cellSize = static_cast<float>(params.MapSize) / quadWidth;
+            if (cellSize < 1.0f) cellSize = 1.0f;
+            
+            for (int y = 0; y < height; ++y) {
+                for (int x = 0; x < width; ++x) {
+                    float v00 = heightmap.Get(x, y);
+                    float v10 = heightmap.Get(std::min(x + 1, width - 1), y);
+                    float v01 = heightmap.Get(x, std::min(y + 1, height - 1));
+                    float v11 = heightmap.Get(std::min(x + 1, width - 1), std::min(y + 1, height - 1));
+                    
+                    float dx = (((v10 + v11) - (v00 + v01)) * 0.5f * 128.0f) / cellSize;
+                    float dy = (((v01 + v11) - (v00 + v10)) * 0.5f * 128.0f) / cellSize;
+                    
+                    int idx = y * width + x;
+                    cachedSlopes[idx] = atan(sqrt(dx*dx + dy*dy)) * (180.0f / 3.14159265f);
+                    cachedHeights[idx] = v00 * 128.0f;
+                }
+            }
+        }
+        
+        float minHeight = 0.0f;
+        float maxHeight = 1.0f;
+        
+        if (params.AutoLevelPreview) {
+            minHeight = 1e10f;
+            maxHeight = -1e10f;
+            for (int i = 0; i < width * height; ++i) {
+                float h = heightmap.GetDataPtr()[i];
+                if (h < minHeight) minHeight = h;
+                if (h > maxHeight) maxHeight = h;
+            }
+            if (maxHeight - minHeight < 0.0001f) {
+                minHeight = 0.0f;
+                maxHeight = 1.0f;
+            }
+        }
 
         std::vector<uint8_t> pixels(quadWidth * quadHeight * 4);
         
@@ -25,7 +68,11 @@ namespace SanmapGen {
                 float v11 = heightmap.Get(x + 1, y + 1);
 
                 // Quad Mean Height
-                float val = (v00 + v10 + v01 + v11) * 0.25f;
+                float val = heightmap.GetDataPtr()[y * width + x];
+                
+                if (params.AutoLevelPreview) {
+                    val = (val - minHeight) / (maxHeight - minHeight);
+                }
                 
                 if (val < 0.0f) val = 0.0f;
                 if (val > 1.0f) val = 1.0f;
@@ -35,22 +82,13 @@ namespace SanmapGen {
                 uint8_t g = r;
                 uint8_t b = r;
                 
-                // Real height calculation
-                float realHeight = val * 128.0f; // Assuming 128 max height for now
+                // Fetch cached geometry values
+                int idx = y * width + x;
+                float realHeight = cachedHeights[idx];
+                float slopeDegrees = cachedSlopes[idx];
                 
-                // ActivePreviewMode: 0 = Heightmap, 1 = Flow Map, 2 = Water, 3 = Composite
-                
-                // Compute slope if needed for Flow/Composite (using 4 vertices)
-                float slopeDegrees = 0.0f;
-                if (params.ActivePreviewMode == 1 || params.ActivePreviewMode == 3 || params.ShowMarkers) {
-                    float dx = ((v10 + v11) - (v00 + v01)) * 0.5f * 128.0f;
-                    float dy = ((v01 + v11) - (v00 + v10)) * 0.5f * 128.0f;
-                    slopeDegrees = atan(sqrt(dx*dx + dy*dy)) * (180.0f / 3.14159265f);
-                }
-                
-                float finalR = r / 255.0f;
-                float finalG = g / 255.0f;
-                float finalB = b / 255.0f;
+                // Initialize background canvas
+                float finalR = 0.0f, finalG = 0.0f, finalB = 0.0f;
                 
                 auto EvalGradientColor = [&](float val, const GradientSettings& settings, float& outR, float& outG, float& outB, float& outA) {
                     const auto& stops = settings.Stops;
@@ -66,7 +104,6 @@ namespace SanmapGen {
                         outR = stops.back().Color[0]; outG = stops.back().Color[1]; outB = stops.back().Color[2]; outA = stops.back().Color[3];
                         return;
                     }
-                    
                     for (size_t i = 0; i < stops.size() - 1; ++i) {
                         if (val >= stops[i].Location && val <= stops[i+1].Location) {
                             if (settings.SmoothInterpolation) {
@@ -85,29 +122,35 @@ namespace SanmapGen {
                     outR = stops.back().Color[0]; outG = stops.back().Color[1]; outB = stops.back().Color[2]; outA = stops.back().Color[3];
                 };
 
-                if (params.ActivePreviewMode == 1) { // Slope
-                    float sR, sG, sB, sA;
-                    EvalGradientColor(slopeDegrees, params.SlopeSettingsParams.Gradient, sR, sG, sB, sA);
-                    finalR = finalR * (1.0f - sA) + sR * sA;
-                    finalG = finalG * (1.0f - sA) + sG * sA;
-                    finalB = finalB * (1.0f - sA) + sB * sA;
-                } else if (params.ActivePreviewMode == 2) { // Flow (Velocity)
-                    float flowVal = genResult.FlowMap.Get(x, y) * 100.0f; // Scale 0-1 to 0-100 for gradient
-                    float sR, sG, sB, sA;
-                    EvalGradientColor(flowVal, params.FlowSettingsParams.Gradient, sR, sG, sB, sA);
-                    finalR = finalR * (1.0f - sA) + sR * sA;
-                    finalG = finalG * (1.0f - sA) + sG * sA;
-                    finalB = finalB * (1.0f - sA) + sB * sA;
-                } else if (params.ActivePreviewMode == 3) { // Accumulation
-                    float accVal = genResult.AccumulationMap.Get(x, y) * 100.0f; 
-                    float sR, sG, sB, sA;
-                    EvalGradientColor(accVal, params.FlowSettingsParams.Gradient, sR, sG, sB, sA);
-                    finalR = finalR * (1.0f - sA) + sR * sA;
-                    finalG = finalG * (1.0f - sA) + sG * sA;
-                    finalB = finalB * (1.0f - sA) + sB * sA;
-                } else if (params.ActivePreviewMode == 4) { // Composite
-                    if (params.ShowStratums) {
-                        float compR = 0.0f, compG = 0.0f, compB = 0.0f;
+                // Unified Compositor: Bottom to Top
+                for (const auto& layer : params.PreviewLayers) {
+                    if (layer.Blend == GenerationParams::LayerBlendMode::None) continue;
+                    
+                    float sR = 0.0f, sG = 0.0f, sB = 0.0f, sA = 0.0f;
+                    bool hasColor = false;
+                    
+                    if (layer.Type == GenerationParams::PreviewLayerType::Heightmap) {
+                        sR = val; sG = val; sB = val; sA = 1.0f;
+                        hasColor = true;
+                    }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::DetailNormal) {
+                        sR = 0.5f; sG = 0.5f; sB = 1.0f; sA = 1.0f; // Placeholder flat normal
+                        hasColor = true;
+                    }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Holes) {
+                        sA = 0.0f; // Placeholder, assuming no holes in generator yet
+                        hasColor = true;
+                    }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Tint) {
+                        sR = 1.0f; sG = 1.0f; sB = 1.0f; sA = 1.0f; // Placeholder white tint
+                        hasColor = true;
+                    }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Smoothness) {
+                        sR = 0.5f; sG = 0.5f; sB = 0.5f; sA = 1.0f; // Placeholder 0.5 smoothness
+                        hasColor = true;
+                    }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Stratums) {
+                        float totalMask = 0.0f;
                         for (size_t i = 0; i < genResult.Stratums.size(); ++i) {
                             float m00 = genResult.Stratums[i].Get(x, y);
                             float m10 = genResult.Stratums[i].Get(x + 1, y);
@@ -115,125 +158,172 @@ namespace SanmapGen {
                             float m11 = genResult.Stratums[i].Get(x + 1, y + 1);
                             float maskVal = (m00 + m10 + m01 + m11) * 0.25f;
                             
-                            float strength = val * maskVal;
-                            compR += params.Stratums[i].PreviewColor[0] * strength;
-                            compG += params.Stratums[i].PreviewColor[1] * strength;
-                            compB += params.Stratums[i].PreviewColor[2] * strength;
+                            float remapMin = params.Stratums[i].MaskRemapMin[0];
+                            float remapMax = params.Stratums[i].MaskRemapMax[0];
+                            if (remapMax - remapMin > 0.0001f) {
+                                maskVal = (maskVal - remapMin) / (remapMax - remapMin);
+                            }
+                            maskVal = std::clamp(maskVal, 0.0f, 1.0f);
+                            
+                            sR += params.Stratums[i].PreviewColor[0] * maskVal;
+                            sG += params.Stratums[i].PreviewColor[1] * maskVal;
+                            sB += params.Stratums[i].PreviewColor[2] * maskVal;
+                            totalMask += maskVal;
                         }
-                        if (compR > 0 || compG > 0 || compB > 0) {
-                            finalR = std::min(compR, 1.0f);
-                            finalG = std::min(compG, 1.0f);
-                            finalB = std::min(compB, 1.0f);
+                        if (totalMask > 0.0001f) {
+                            sR /= totalMask;
+                            sG /= totalMask;
+                            sB /= totalMask;
                         }
+                        sA = std::min(totalMask, 1.0f);
+                        if (sA > 0) hasColor = true;
                     }
-                    
-                    if (params.ShowSlopeMap) {
-                        float sR, sG, sB, sA;
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Slope) {
                         EvalGradientColor(slopeDegrees, params.SlopeSettingsParams.Gradient, sR, sG, sB, sA);
-                        finalR = finalR * (1.0f - sA) + sR * sA;
-                        finalG = finalG * (1.0f - sA) + sG * sA;
-                        finalB = finalB * (1.0f - sA) + sB * sA;
+                        hasColor = true;
                     }
-                    
-                    if (params.ShowFlowMap) {
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Flow) {
                         float flowVal = genResult.FlowMap.Get(x, y) * 100.0f;
-                        float sR, sG, sB, sA;
                         EvalGradientColor(flowVal, params.FlowSettingsParams.Gradient, sR, sG, sB, sA);
-                        finalR = finalR * (1.0f - sA) + sR * sA;
-                        finalG = finalG * (1.0f - sA) + sG * sA;
-                        finalB = finalB * (1.0f - sA) + sB * sA;
+                        hasColor = true;
+                    }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Accumulation) {
+                        float accVal = genResult.AccumulationMap.Get(x, y) * 100.0f;
+                        EvalGradientColor(accVal, params.FlowSettingsParams.Gradient, sR, sG, sB, sA);
+                        hasColor = true;
+                    }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Water) {
+                        if (realHeight <= params.Water.WaterLevelMax) {
+                            float depth = params.Water.WaterLevelMax - realHeight;
+                            float deepRatio = std::clamp((depth - params.Water.DeepWaterDepthMin) / 
+                                              std::max(0.1f, (params.Water.DeepWaterDepthMax - params.Water.DeepWaterDepthMin)), 0.0f, 1.0f);
+                            float shallowR = 0.2f, shallowG = 0.6f, shallowB = 0.8f;
+                            float deepR = 0.05f, deepG = 0.1f, deepB = 0.3f;
+                            sR = shallowR * (1.0f - deepRatio) + deepR * deepRatio;
+                            sG = shallowG * (1.0f - deepRatio) + deepG * deepRatio;
+                            sB = shallowB * (1.0f - deepRatio) + deepB * deepRatio;
+                            sA = std::min(depth * 0.1f, 0.85f);
+                            hasColor = true;
+                        }
+                    }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Markers) {
+                        for (const auto& rule : params.Markers) {
+                            if (!rule.Enabled) continue;
+                            if (slopeDegrees >= rule.MinSlope && slopeDegrees <= rule.MaxSlope &&
+                                realHeight >= rule.MinHeight && realHeight <= rule.MaxHeight) {
+                                float hash = fmod(sin(x * 12.9898f + y * 78.233f) * 43758.5453f, 1.0f);
+                                if (hash < 0.0f) hash += 1.0f;
+                                if (hash < rule.Density * 0.01f) { 
+                                    sR = 1.0f; sG = 0.2f; sB = 0.2f; sA = 1.0f; 
+                                    hasColor = true; break; 
+                                }
+                            }
+                        }
+                    }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Props) {
+                        for (const auto& rule : params.Props) {
+                            if (!rule.Enabled) continue;
+                            if (rule.AvoidWater && realHeight <= params.Water.WaterLevelMax) continue;
+                            if (slopeDegrees >= rule.MinSlope && slopeDegrees <= rule.MaxSlope &&
+                                realHeight >= rule.MinHeight && realHeight <= rule.MaxHeight) {
+                                float hash = fmod(sin(x * 9.123f + y * 83.456f) * 43758.5453f, 1.0f);
+                                if (hash < 0.0f) hash += 1.0f;
+                                if (hash < rule.Density * 0.01f) { 
+                                    sR = 0.2f; sG = 1.0f; sB = 0.2f; sA = 1.0f; 
+                                    hasColor = true; break; 
+                                }
+                            }
+                        }
                     }
                     
-                    if (params.ShowAccumulationMap) {
-                        float accVal = genResult.AccumulationMap.Get(x, y) * 100.0f;
-                        float sR, sG, sB, sA;
-                        EvalGradientColor(accVal, params.FlowSettingsParams.Gradient, sR, sG, sB, sA);
-                        finalR = finalR * (1.0f - sA) + sR * sA;
-                        finalG = finalG * (1.0f - sA) + sG * sA;
-                        finalB = finalB * (1.0f - sA) + sB * sA;
+                    if (!hasColor || sA <= 0.0f) continue;
+                    
+                    // TG_UE Branchless Blend Math Integration
+                    float B_r = finalR, B_g = finalG, B_b = finalB;
+                    float S_r = sR, S_g = sG, S_b = sB;
+                    float A = sA;
+                    float invA = 1.0f - A;
+                    
+                    if (layer.Blend == GenerationParams::LayerBlendMode::Normal) {
+                        finalR = B_r * invA + S_r * A;
+                        finalG = B_g * invA + S_g * A;
+                        finalB = B_b * invA + S_b * A;
+                    } 
+                    else if (layer.Blend == GenerationParams::LayerBlendMode::Add) {
+                        finalR = std::min(B_r + S_r * A, 1.0f);
+                        finalG = std::min(B_g + S_g * A, 1.0f);
+                        finalB = std::min(B_b + S_b * A, 1.0f);
+                    }
+                    else if (layer.Blend == GenerationParams::LayerBlendMode::Subtract) {
+                        finalR = std::max(B_r - S_r * A, 0.0f);
+                        finalG = std::max(B_g - S_g * A, 0.0f);
+                        finalB = std::max(B_b - S_b * A, 0.0f);
+                    }
+                    else if (layer.Blend == GenerationParams::LayerBlendMode::Multiply) {
+                        finalR = B_r * (S_r * A + invA);
+                        finalG = B_g * (S_g * A + invA);
+                        finalB = B_b * (S_b * A + invA);
+                    }
+                    else if (layer.Blend == GenerationParams::LayerBlendMode::Divide) {
+                        finalR = std::min(B_r / std::max(S_r * A + invA, 0.001f), 1.0f);
+                        finalG = std::min(B_g / std::max(S_g * A + invA, 0.001f), 1.0f);
+                        finalB = std::min(B_b / std::max(S_b * A + invA, 0.001f), 1.0f);
+                    }
+                    else if (layer.Blend == GenerationParams::LayerBlendMode::Screen) {
+                        finalR = 1.0f - (1.0f - B_r) * (1.0f - S_r * A);
+                        finalG = 1.0f - (1.0f - B_g) * (1.0f - S_g * A);
+                        finalB = 1.0f - (1.0f - B_b) * (1.0f - S_b * A);
+                    }
+                    else if (layer.Blend == GenerationParams::LayerBlendMode::Overlay) {
+                        // Branchless overlay
+                        float stepR = (B_r < 0.5f) ? 1.0f : 0.0f;
+                        float stepG = (B_g < 0.5f) ? 1.0f : 0.0f;
+                        float stepB = (B_b < 0.5f) ? 1.0f : 0.0f;
+                        
+                        float overR = stepR * (2.0f * B_r * S_r) + (1.0f - stepR) * (1.0f - 2.0f * (1.0f - B_r) * (1.0f - S_r));
+                        float overG = stepG * (2.0f * B_g * S_g) + (1.0f - stepG) * (1.0f - 2.0f * (1.0f - B_g) * (1.0f - S_g));
+                        float overB = stepB * (2.0f * B_b * S_b) + (1.0f - stepB) * (1.0f - 2.0f * (1.0f - B_b) * (1.0f - S_b));
+                        
+                        finalR = B_r * invA + overR * A;
+                        finalG = B_g * invA + overG * A;
+                        finalB = B_b * invA + overB * A;
+                    }
+                    else if (layer.Blend == GenerationParams::LayerBlendMode::HardLight) {
+                        // Branchless hard light (same as overlay but inputs swapped)
+                        float stepR = (S_r < 0.5f) ? 1.0f : 0.0f;
+                        float stepG = (S_g < 0.5f) ? 1.0f : 0.0f;
+                        float stepB = (S_b < 0.5f) ? 1.0f : 0.0f;
+                        
+                        float hardR = stepR * (2.0f * B_r * S_r) + (1.0f - stepR) * (1.0f - 2.0f * (1.0f - B_r) * (1.0f - S_r));
+                        float hardG = stepG * (2.0f * B_g * S_g) + (1.0f - stepG) * (1.0f - 2.0f * (1.0f - B_g) * (1.0f - S_g));
+                        float hardB = stepB * (2.0f * B_b * S_b) + (1.0f - stepB) * (1.0f - 2.0f * (1.0f - B_b) * (1.0f - S_b));
+                        
+                        finalR = B_r * invA + hardR * A;
+                        finalG = B_g * invA + hardG * A;
+                        finalB = B_b * invA + hardB * A;
+                    }
+                    else if (layer.Blend == GenerationParams::LayerBlendMode::SoftLight) {
+                        // Branchless soft light
+                        auto softBlend = [](float b, float s) {
+                            float step = (s < 0.5f) ? 1.0f : 0.0f;
+                            float lower = b - (1.0f - 2.0f * s) * b * (1.0f - b);
+                            float upper = b + (2.0f * s - 1.0f) * (sqrt(b) - b);
+                            return step * lower + (1.0f - step) * upper;
+                        };
+                        finalR = B_r * invA + softBlend(B_r, S_r) * A;
+                        finalG = B_g * invA + softBlend(B_g, S_g) * A;
+                        finalB = B_b * invA + softBlend(B_b, S_b) * A;
                     }
                 }
-                
-                // Water Overlay (Modes 2, 3, 4)
-                if ((params.ActivePreviewMode == 2 || params.ActivePreviewMode == 3 || params.ActivePreviewMode == 4) && params.ShowWater) {
-                    if (realHeight <= params.Water.WaterLevelMax) {
-                        float depth = params.Water.WaterLevelMax - realHeight;
-                        // Shallow vs Deep water mix
-                        float deepRatio = std::clamp((depth - params.Water.DeepWaterDepthMin) / 
-                                          std::max(0.1f, (params.Water.DeepWaterDepthMax - params.Water.DeepWaterDepthMin)), 0.0f, 1.0f);
-                        
-                        // Default water colors (could be moved to params)
-                        float shallowR = 0.2f, shallowG = 0.6f, shallowB = 0.8f;
-                        float deepR = 0.05f, deepG = 0.1f, deepB = 0.3f;
-                        
-                        float wR = shallowR * (1.0f - deepRatio) + deepR * deepRatio;
-                        float wG = shallowG * (1.0f - deepRatio) + deepG * deepRatio;
-                        float wB = shallowB * (1.0f - deepRatio) + deepB * deepRatio;
-                        
-                        // Blend water over terrain (alpha based on depth)
-                        float waterAlpha = std::min(depth * 0.1f, 0.85f);
-                        finalR = finalR * (1.0f - waterAlpha) + wR * waterAlpha;
-                        finalG = finalG * (1.0f - waterAlpha) + wG * waterAlpha;
-                        finalB = finalB * (1.0f - waterAlpha) + wB * waterAlpha;
-                    }
-                }
-                
                 r = static_cast<uint8_t>(std::clamp(finalR * 255.0f, 0.0f, 255.0f));
                 g = static_cast<uint8_t>(std::clamp(finalG * 255.0f, 0.0f, 255.0f));
                 b = static_cast<uint8_t>(std::clamp(finalB * 255.0f, 0.0f, 255.0f));
-                
-                // Optional Markers Overlay (Composite only)
-                if (params.ActivePreviewMode == 3 && params.ShowMarkers) {
-                    bool hasMarker = false;
-                    for (const auto& rule : params.Markers) {
-                        if (!rule.Enabled) continue;
-                        if (slopeDegrees >= rule.MinSlope && slopeDegrees <= rule.MaxSlope &&
-                            realHeight >= rule.MinHeight && realHeight <= rule.MaxHeight) {
-                            
-                            // Cheap deterministic "density" check using a hash
-                            float hash = fmod(sin(x * 12.9898f + y * 78.233f) * 43758.5453f, 1.0f);
-                            if (hash < 0.0f) hash += 1.0f;
-                            
-                            if (hash < rule.Density * 0.01f) {
-                                hasMarker = true;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (hasMarker) {
-                        r = 255; g = 50; b = 50; // Red dot for marker
-                    }
-                }
-                
-                // Optional Props Overlay (Composite only)
-                if (params.ActivePreviewMode == 3 && params.ShowProps) {
-                    bool hasProp = false;
-                    for (const auto& rule : params.Props) {
-                        if (!rule.Enabled) continue;
-                        if (rule.AvoidWater && realHeight <= params.Water.WaterLevelMax) continue;
-                        
-                        if (slopeDegrees >= rule.MinSlope && slopeDegrees <= rule.MaxSlope &&
-                            realHeight >= rule.MinHeight && realHeight <= rule.MaxHeight) {
-                            
-                            float hash = fmod(sin(x * 9.123f + y * 83.456f) * 43758.5453f, 1.0f);
-                            if (hash < 0.0f) hash += 1.0f;
-                            if (hash < rule.Density * 0.01f) {
-                                hasProp = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (hasProp) {
-                        r = 50; g = 255; b = 50; // Green dot for Prop
-                    }
-                }
-                
-                int idx = (y * quadWidth + x) * 4;
-                pixels[idx + 0] = r;
-                pixels[idx + 1] = g;
-                pixels[idx + 2] = b;
-                pixels[idx + 3] = 255;
+
+                int pxIdx = (y * quadWidth + x) * 4;
+                pixels[pxIdx + 0] = r;
+                pixels[pxIdx + 1] = g;
+                pixels[pxIdx + 2] = b;
+                pixels[pxIdx + 3] = 255;
             }
         }
         GLuint textureID = existingTexture;

@@ -11,7 +11,7 @@ namespace SanmapGen {
     class PreviewRenderer {
     public:
         // Converts a FloatMask into an OpenGL Texture and returns the Texture ID
-        static GLuint UpdatePreviewTexture(const FloatMask& heightmap, const GenerationResult& genResult, const GenerationParams& params, GLuint existingTexture = 0);
+        static GLuint UpdatePreviewTexture(const FloatMask& heightmap, const GenerationResult& genResult, const GenerationParams& params, GLuint existingTexture = 0, bool bGeometryChanged = true);
     };
 
 } // namespace SanmapGen

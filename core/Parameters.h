@@ -113,6 +113,13 @@ namespace SanmapGen {
         float MountainDensity = 0.243f;
         float RampDensity = 0.500f;
 
+        // Levels Adjustment (Photoshop-style)
+        float LevelsShadows = 0.0f;       // 0 to 255 (or 0.0 to 1.0)
+        float LevelsMidtones = 1.0f;      // 0.01 to 9.99
+        float LevelsHighlights = 1.0f;    // 0 to 255 (or 0.0 to 1.0)
+        float LevelsOutputBlack = 0.0f;   // 0.0 to 1.0
+        float LevelsOutputWhite = 1.0f;   // 0.0 to 1.0
+
         // Soil Physics (single source — also editable on Stratums tab)
         float Hardness = 0.2f; 
         float Friction = 0.8f;
@@ -243,6 +250,14 @@ namespace SanmapGen {
         float MaskRemapMin[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         float MaskRemapMax[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
         
+        unsigned int PreviewAlbedoTex = 0;
+        unsigned int PreviewNormalTex = 0;
+        unsigned int PreviewMaskTex = 0;
+        unsigned int PreviewActualMaskTex = 0; // UI Thumbnail for the extracted uncompressed mask
+        
+        bool UseImportedMask = false;
+        std::vector<float> ImportedMaskData;
+        
         // Default Soil Physics for this Stratum
         float Hardness = 0.2f;
         float Friction = 0.8f;
@@ -253,6 +268,7 @@ namespace SanmapGen {
     struct MarkerRule {
         std::string Name = "New Marker";
         bool Enabled = true;
+        std::string IconPath = "";
         
         // Filtering thresholds
         float MinSlope = 0.0f;
@@ -374,14 +390,36 @@ namespace SanmapGen {
         bool UseGPUHydraulic = true;
         bool UseGPUDeposition = true;
         
+        // --- Preview Layers (Z-Order Compositing) ---
+        enum class LayerBlendMode {
+            None, Normal, Add, Subtract, Multiply, Divide, Overlay, Screen, SoftLight, HardLight
+        };
+
+        enum class PreviewLayerType {
+            Heightmap,
+            DetailNormal,
+            Holes,
+            Stratums,
+            Tint,
+            Water,
+            Smoothness,
+            Slope,
+            Flow,
+            Accumulation,
+            Markers,
+            Props
+        };
+
+        struct PreviewLayer {
+            PreviewLayerType Type;
+            std::string Name;
+            bool Enabled;
+            LayerBlendMode Blend = LayerBlendMode::None;
+        };
+        
+        std::vector<PreviewLayer> PreviewLayers;
+        
         // Preview settings (not saved to file, UI only)
-        int ActivePreviewMode = 4; // 0=Height, 1=Slope, 2=Flow, 3=Accumulation, 4=Composite
-        bool ShowWater = true;
-        bool ShowMarkers = true;
-        bool ShowStratums = true;
-        bool ShowFlowMap = true;
-        bool ShowSlopeMap = true;
-        bool ShowAccumulationMap = true;
         
         bool ShowHeightmap = true;
         bool ShowDetailNormal = false;
@@ -391,6 +429,15 @@ namespace SanmapGen {
         bool ShowReclaim = false;
         bool ShowProps = false;
         bool ShowAtmosphere = false;
+        
+        bool AutoLevelPreview = true;
+        
+        bool ShowSlopeMap = true;
+        bool ShowFlowMap = true;
+        bool ShowAccumulationMap = true;
+        bool ShowStratums = true;
+        bool ShowWater = true;
+        bool ShowMarkers = true;
         
         SlopeSettings SlopeSettingsParams;
         FlowSettings FlowSettingsParams;
@@ -427,6 +474,20 @@ namespace SanmapGen {
                 s.Name = "Stratum " + std::to_string(i);
                 Stratums.push_back(s);
             }
+
+            // Initialize default preview layers in bottom-to-top Z-order
+            PreviewLayers.push_back({ PreviewLayerType::Heightmap, "Heightmap", true, LayerBlendMode::Normal });
+            PreviewLayers.push_back({ PreviewLayerType::DetailNormal, "Detail Normal", false, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Holes, "Holes", false, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Stratums, "Stratum Colors", true, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Tint, "Tint", false, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Water, "Water", true, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Smoothness, "Smoothness", false, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Slope, "Slope Map", true, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Flow, "Flow Map", true, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Accumulation, "Accumulation Map", true, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Markers, "Markers", true, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Props, "Props", false, LayerBlendMode::None });
         }
     };
 

@@ -63,11 +63,17 @@ std::vector<std::string> GetEnvironmentsFromSanpack(const std::string& zipPath) 
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
         std::string fname = file_stat.m_filename;
-        size_t firstSlash = fname.find('/');
-        if (firstSlash != std::string::npos && firstSlash > 0) {
-            std::string rootFolder = fname.substr(0, firstSlash);
-            if (std::find(envs.begin(), envs.end(), rootFolder) == envs.end()) {
-                envs.push_back(rootFolder);
+        
+        size_t stratumPos = fname.find("/Stratum/");
+        if (stratumPos != std::string::npos) {
+            std::string envFolder = fname.substr(0, stratumPos);
+            if (std::find(envs.begin(), envs.end(), envFolder) == envs.end()) {
+                envs.push_back(envFolder);
+            }
+        } else if (fname.find("Stratum/") == 0) {
+            std::string envFolder = "Root";
+            if (std::find(envs.begin(), envs.end(), envFolder) == envs.end()) {
+                envs.push_back(envFolder);
             }
         }
     }
@@ -143,6 +149,7 @@ int main(int, char**)
     GLuint previewTexture = 0;
     bool bNeedsMapUpdate = true;
     bool bNeedsPreviewRender = true;
+    bool bGeometryChanged = true;
     int initVertSize = params.MapSize + 1;
     SanmapGen::FloatMask dummyMap(initVertSize, initVertSize, 0.0f);
     std::vector<SanmapGen::FloatMask> stratums;
@@ -170,6 +177,12 @@ int main(int, char**)
             ImGui::PushID(tabIndex);
             if (ImGui::Button(showVar ? "[O]" : "[ ]")) { showVar = !showVar; bNeedsMapUpdate = true; }
             ImGui::SameLine();
+            if (ImGui::Selectable(label, activeTab == tabIndex)) { activeTab = tabIndex; }
+            ImGui::PopID();
+        };
+
+        auto TabButtonNoToggle = [&](const char* label, int tabIndex) {
+            ImGui::PushID(tabIndex);
             if (ImGui::Selectable(label, activeTab == tabIndex)) { activeTab = tabIndex; }
             ImGui::PopID();
         };
@@ -203,6 +216,7 @@ int main(int, char**)
         ImGui::Spacing(); ImGui::Spacing();
         if (ImGui::Button("Force Generate", ImVec2(-1, 40)) || bNeedsMapUpdate) {
             bNeedsMapUpdate = false;
+            bGeometryChanged = true;
             
             int vertSize = params.MapSize + 1;
             if (dummyMap.GetWidth() != vertSize || dummyMap.GetHeight() != vertSize) {
@@ -216,7 +230,8 @@ int main(int, char**)
         
         if (bNeedsPreviewRender) {
             bNeedsPreviewRender = false;
-            previewTexture = SanmapGen::PreviewRenderer::UpdatePreviewTexture(dummyMap, genResult, params, previewTexture);
+            previewTexture = SanmapGen::PreviewRenderer::UpdatePreviewTexture(dummyMap, genResult, params, previewTexture, bGeometryChanged);
+            bGeometryChanged = false;
         }
         ImGui::EndChild();
         
@@ -230,19 +245,19 @@ int main(int, char**)
         switch (activeTab) {
             case 0: SanmapGen::UI::RenderHeightmapTab(params, bNeedsMapUpdate); break;
             case 1: SanmapGen::UI::RenderSlopeMapTab(params, bNeedsPreviewRender); break;
-            case 13: SanmapGen::UI::RenderFlowMapTab(params, bNeedsPreviewRender); break;
+            case 13: SanmapGen::UI::RenderFlowMapTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 14: SanmapGen::UI::RenderAccumulationMapTab(params, bNeedsPreviewRender); break;
-            case 2: SanmapGen::UI::RenderStratumsTab(params, bNeedsMapUpdate); break;
-            case 3: SanmapGen::UI::RenderDetailNormalTab(params, bNeedsMapUpdate); break;
-            case 4: SanmapGen::UI::RenderTintTab(params, bNeedsMapUpdate); break;
-            case 5: SanmapGen::UI::RenderHolesTab(params, bNeedsMapUpdate); break;
-            case 6: SanmapGen::UI::RenderSmoothnessTab(params, bNeedsMapUpdate); break;
+            case 2: SanmapGen::UI::RenderStratumsTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
+            case 3: SanmapGen::UI::RenderDetailNormalTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
+            case 4: SanmapGen::UI::RenderTintTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
+            case 5: SanmapGen::UI::RenderHolesTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
+            case 6: SanmapGen::UI::RenderSmoothnessTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 7: SanmapGen::UI::RenderWaterTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 8: SanmapGen::UI::RenderAtmosphereTab(params, bNeedsMapUpdate); break;
             case 9: SanmapGen::UI::RenderMarkersTab(params, bNeedsMapUpdate); break;
             case 10: SanmapGen::UI::RenderPropsTab(params, bNeedsMapUpdate); break;
             case 11: SanmapGen::UI::RenderPerformanceTab(params, bNeedsMapUpdate); break;
-            case 12: SanmapGen::UI::RenderSaveExportTab(params, bNeedsMapUpdate); break;
+            case 12: SanmapGen::UI::RenderSaveExportTab(params, dummyMap, genResult, bNeedsMapUpdate); break;
         }
         ImGui::EndChild(); // SettingsPane
         
@@ -252,13 +267,91 @@ int main(int, char**)
         // --- MAP PREVIEW WINDOW ---
         ImGui::SetNextWindowSize(ImVec2(600, 600), ImGuiCond_FirstUseEver);
         ImGui::Begin("Map Preview");
-        static int current_preview_mode = 4;
-        const char* preview_modes[] = { "Heightmap", "Slope Map", "Flow (Velocity)", "Accumulation", "Composite" };
-        if (ImGui::Combo("Preview Mode", &current_preview_mode, preview_modes, IM_ARRAYSIZE(preview_modes))) {
-            params.ActivePreviewMode = current_preview_mode;
+        static bool showCompositeSettings = false;
+        
+        if (ImGui::Button("[ View ]")) {
+            ImGui::OpenPopup("ViewPopup");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("[ Order ]")) showCompositeSettings = true;
+        
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Auto-Level", &params.AutoLevelPreview)) {
             bNeedsPreviewRender = true;
         }
+        
+        const char* blendModeNames[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Divide", "Overlay", "Screen", "Soft Light", "Hard Light" };
+        
+        if (ImGui::BeginPopup("ViewPopup")) {
+            ImGui::Text("Map Layers");
+            ImGui::Separator();
+            for (int i = (int)params.PreviewLayers.size() - 1; i >= 0; --i) {
+                auto& layer = params.PreviewLayers[i];
+                ImGui::PushID(i);
+                
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("%-15s", layer.Name.c_str());
+                ImGui::SameLine(120);
+                
+                ImGui::SetNextItemWidth(100);
+                int current_blend = (int)layer.Blend;
+                if (ImGui::Combo("##blend", &current_blend, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
+                    layer.Blend = (SanmapGen::GenerationParams::LayerBlendMode)current_blend;
+                    
+                    bool enabled = (layer.Blend != SanmapGen::GenerationParams::LayerBlendMode::None);
+                    switch (layer.Type) {
+                        case SanmapGen::GenerationParams::PreviewLayerType::Heightmap: params.ShowHeightmap = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Slope: params.ShowSlopeMap = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Flow: params.ShowFlowMap = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Accumulation: params.ShowAccumulationMap = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Stratums: params.ShowStratums = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Water: params.ShowWater = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Markers: params.ShowMarkers = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Props: params.ShowProps = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::DetailNormal: params.ShowDetailNormal = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Tint: params.ShowTint = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Holes: params.ShowHoles = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Smoothness: params.ShowSmoothness = enabled; break;
+                    }
+                    bNeedsPreviewRender = true;
+                }
+                
+                ImGui::PopID();
+            }
+            ImGui::EndPopup();
+        }
         ImGui::Separator();
+        
+        if (showCompositeSettings) {
+            ImGui::Begin("Composite Layer Settings", &showCompositeSettings);
+            ImGui::Text("Composite Layers (Drag to Reorder, Top-to-Bottom)");
+            for (int i = (int)params.PreviewLayers.size() - 1; i >= 0; --i) {
+                ImGui::PushID(i);
+                ImGui::Selectable(params.PreviewLayers[i].Name.c_str(), false, 0, ImVec2(0, 20));
+                
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+                    ImGui::SetDragDropPayload("PREVIEW_LAYER_DRAG", &i, sizeof(int));
+                    ImGui::Text("Moving %s", params.PreviewLayers[i].Name.c_str());
+                    ImGui::EndDragDropSource();
+                }
+                if (ImGui::BeginDragDropTarget()) {
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PREVIEW_LAYER_DRAG")) {
+                        int source_i = *(const int*)payload->Data;
+                        if (source_i != i) {
+                            auto movingLayer = params.PreviewLayers[source_i];
+                            params.PreviewLayers.erase(params.PreviewLayers.begin() + source_i);
+                            int insert_i = (source_i < i) ? i - 1 : i;
+                            params.PreviewLayers.insert(params.PreviewLayers.begin() + insert_i, movingLayer);
+                            bNeedsPreviewRender = true;
+                        }
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+                ImGui::PopID();
+            }
+            ImGui::End();
+        }
+        
         if (previewTexture == 0) {
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Preview texture not generated yet.");
         } else {
