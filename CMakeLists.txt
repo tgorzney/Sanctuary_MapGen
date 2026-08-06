@@ -104,6 +104,9 @@ FetchContent_MakeAvailable(miniz)
 file(COPY "${miniz_SOURCE_DIR}/miniz.h" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/core/")
 file(COPY "${miniz_SOURCE_DIR}/miniz.c" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/core/")
 
+# Find OpenMP
+find_package(OpenMP REQUIRED)
+
 # Add our application executable
 add_executable(SanmapGenerator
     gui/main.cpp
@@ -129,6 +132,7 @@ target_link_libraries(SanmapGenerator PRIVATE
     imgui
     glfw
     nlohmann_json::nlohmann_json
+    OpenMP::OpenMP_CXX
 )
 
 # On Windows, we need to link OpenGL32

@@ -26,6 +26,7 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     mapdef["width"] = params.MapSize;
     mapdef["length"] = params.MapSize;
     mapdef["height"] = 128; // Standard height
+    mapdef["heightmapResolution"] = params.MapSize + 1;
     
     mapdef["hasWater"] = true;
     
@@ -41,6 +42,9 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     mapdef["waveGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
 
     mapdef["shader"] = "RTS/TerrainLit";
+    mapdef["heightTransition"] = 0.5;
+    mapdef["fadeDistance"] = 128.0;
+    mapdef["fadeStartDistance"] = 1.0;
 
     // Atmosphere
     mapdef["sunRA"] = params.Atmosphere.SunRA;
@@ -85,9 +89,9 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     json strata = json::array();
     for (const auto& stratum : params.Stratums) {
         json s;
-        s["albedo"] = stratum.AlbedoPath;
-        s["normal"] = stratum.NormalPath;
-        s["mask"] = stratum.MaskPath;
+        s["albedo"] = { {"path", stratum.AlbedoPath} };
+        s["normal"] = { {"path", stratum.NormalPath} };
+        s["mask"] = { {"path", stratum.MaskPath} };
         
         s["tileSize"] = { {"x", stratum.TileSize[0]}, {"y", stratum.TileSize[1]} };
         s["tileSizeFar"] = { {"x", stratum.TileSizeFar[0]}, {"y", stratum.TileSizeFar[1]} };
@@ -99,15 +103,15 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
         s["normalFarNearBlend"] = stratum.NormalFarNearBlend;
         s["heightFarNearBlend"] = stratum.HeightFarNearBlend;
         
-        s["diffuseRemap"] = { {"x", stratum.DiffuseRemap[0]}, {"y", stratum.DiffuseRemap[1]}, {"z", stratum.DiffuseRemap[2]}, {"w", stratum.DiffuseRemap[3]} };
-        s["farColorRemap"] = { {"x", stratum.FarColorRemap[0]}, {"y", stratum.FarColorRemap[1]}, {"z", stratum.FarColorRemap[2]}, {"w", stratum.FarColorRemap[3]} };
+        s["diffuseRemap"] = { {"r", stratum.DiffuseRemap[0]}, {"g", stratum.DiffuseRemap[1]}, {"b", stratum.DiffuseRemap[2]}, {"a", stratum.DiffuseRemap[3]} };
+        s["farColorRemap"] = { {"r", stratum.FarColorRemap[0]}, {"g", stratum.FarColorRemap[1]}, {"b", stratum.FarColorRemap[2]}, {"a", stratum.FarColorRemap[3]} };
         
         s["maskRemapMin"] = { {"x", stratum.MaskRemapMin[0]}, {"y", stratum.MaskRemapMin[1]}, {"z", stratum.MaskRemapMin[2]}, {"w", stratum.MaskRemapMin[3]} };
         s["maskRemapMax"] = { {"x", stratum.MaskRemapMax[0]}, {"y", stratum.MaskRemapMax[1]}, {"z", stratum.MaskRemapMax[2]}, {"w", stratum.MaskRemapMax[3]} };
         
         strata.push_back(s);
     }
-    mapdef["stratums"] = strata;
+    mapdef["stratumLayers"] = strata;
     
     // Areas, armies, chains
     mapdef["areas"] = json::object();
@@ -127,50 +131,64 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     }
     mapdef["markers"] = markersObj;
 
-    json propsObj = json::object();
+    json propsArr = json::array();
     for (const auto& rule : params.Props) {
         if (!rule.Enabled) continue;
         json propType;
         propType["blueprintPath"] = rule.BlueprintPath;
         propType["transforms"] = json::array(); // Placeholder for actual transforms generated
-        propsObj[rule.Name] = propType;
+        propsArr.push_back(propType);
     }
-    mapdef["props"] = propsObj;
+    mapdef["props"] = propsArr;
 
-    json decalsObj = json::object();
+    json decalsArr = json::array();
     for (const auto& rule : params.Decals) {
         if (!rule.Enabled) continue;
         json decalType;
-        decalType["albedoPath"] = rule.AlbedoPath;
+        decalType["albedoPath"] = rule.AlbedoPath; // Note: native uses blueprintPath for decals, but keeping this for now
         decalType["normalPath"] = rule.NormalPath;
         decalType["transforms"] = json::array(); // Placeholder for actual transforms generated
-        decalsObj[rule.Name] = decalType;
+        decalsArr.push_back(decalType);
     }
-    mapdef["decals"] = decalsObj;
+    mapdef["decals"] = decalsArr;
+    mapdef["chains"] = json::object();
 
-    // Export JSON
-    std::string filePath = folderPath + "/mapdef.sanmap";
+    // Determine the map name from the folder path
+    std::string mapName = "mapdef";
+    size_t lastSlash = folderPath.find_last_of("/\\");
+    if (lastSlash != std::string::npos && lastSlash + 1 < folderPath.length()) {
+        mapName = folderPath.substr(lastSlash + 1);
+    }
+    
+    // Set map name in JSON
+    mapdef["name"] = mapName;
+
+    // Export JSON matching the folder name
+    std::string filePath = folderPath + "/" + mapName + ".sanmap";
     std::ofstream out(filePath);
     out << mapdef.dump(4);
     out.close();
 
+    // Create Textures subfolder required by Native Editor
+    std::string texFolder = folderPath + "/Textures";
+    if (!fs::exists(texFolder)) {
+        fs::create_directories(texFolder);
+    }
+
     // Export Heightmap
-    std::string hmPath = folderPath + "/heightmap.raw";
+    std::string hmPath = texFolder + "/heightmap.raw";
     ExportHeightmap(hmPath, params, heightmap);
     
     // Export Stratums
-    ExportStratums(folderPath, params, genData);
+    ExportStratums(texFolder, params, genData);
 
     auto exportTGA = [&](const std::string& name, const std::vector<uint8_t>& data, int w, int h, int comps) {
-        std::string p = folderPath + "/" + name;
+        std::string p = texFolder + "/" + name;
         stbi_write_tga(p.c_str(), w, h, comps, data.data());
     };
 
     int texSize = params.MapSize; // Assuming textures are MapSize x MapSize
     int pixelCount = texSize * texSize;
-
-    // Export stratums
-    ExportStratums(folderPath, params, genData);
 
     // 4. Export tint_colors.tga (RGB = 128 for no tint, A = Smoothness 148 default)
     std::vector<uint8_t> tintColors(pixelCount * 4, 0);
@@ -223,11 +241,11 @@ void MapExporter::ExportStratums(const std::string& folderPath, const Generation
         for (int x = 0; x < texSize; ++x) {
             int idx = (y * texSize + x) * 4;
             for (int i = 0; i < 4; ++i) {
-                float val = (i < genData.Stratums.size()) ? genData.Stratums[i].Get(x, y) : 0.0f;
+                float val = (i < genData.MaterialMasks.size()) ? genData.MaterialMasks[i].Get(x, y) : 0.0f;
                 s1_4[idx + i] = static_cast<uint8_t>(std::clamp(val, 0.0f, 1.0f) * 255.0f);
             }
             for (int i = 0; i < 4; ++i) {
-                float val = ((i + 4) < genData.Stratums.size()) ? genData.Stratums[i + 4].Get(x, y) : 0.0f;
+                float val = ((i + 4) < genData.MaterialMasks.size()) ? genData.MaterialMasks[i + 4].Get(x, y) : 0.0f;
                 s5_8[idx + i] = static_cast<uint8_t>(std::clamp(val, 0.0f, 1.0f) * 255.0f);
             }
         }

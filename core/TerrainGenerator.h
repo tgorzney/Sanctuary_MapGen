@@ -9,9 +9,13 @@ class FastNoiseLite;
 namespace SanmapGen {
 
     struct GenerationResult {
-        std::vector<FloatMask> Stratums;
+        std::vector<FloatMask> Stratums; // Per-layer geometry deltas (for Erosion)
+        std::vector<FloatMask> MaterialMasks; // 9 Texture blending weights
         FloatMask FlowMap;
         FloatMask AccumulationMap;
+        
+        std::vector<FloatMask> CachedRawNoise;
+        std::vector<size_t> CachedNoiseHashes;
         
         GenerationResult() : FlowMap(0, 0), AccumulationMap(0, 0) {}
     };
@@ -19,7 +23,7 @@ namespace SanmapGen {
     class TerrainGenerator {
     public:
         // Main entry point for generating the terrain heightmap. Returns individual stratum masks and flow data.
-        static GenerationResult GenerateMap(FloatMask& outMap, const GenerationParams& params);
+        static void GenerateMap(FloatMask& outMap, const GenerationParams& params, GenerationResult& inOutResult);
 
     private:
         // Converts X,Y into a Morton Z-Curve index for cache locality

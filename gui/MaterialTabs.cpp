@@ -254,7 +254,7 @@ namespace UI {
                                         params.Stratums[i].AlbedoPath = selectedEnv + "/" + mat + "_Albedo.png";
                                         params.Stratums[i].NormalPath = selectedEnv + "/" + mat + "_Normal.png";
                                         params.Stratums[i].MaskPath = selectedEnv + "/" + mat + "_Mask.png";
-                                        bNeedsMapUpdate = true;
+                                        bNeedsPreviewRender = true;
                                         
                                         if (params.Stratums[i].PreviewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].PreviewAlbedoTex);
                                         params.Stratums[i].PreviewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].AlbedoPath, params.Stratums[i].PreviewColor);
@@ -314,7 +314,7 @@ namespace UI {
                             if (params.Stratums[i].PreviewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].PreviewAlbedoTex);
                             params.Stratums[i].PreviewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].AlbedoPath, params.Stratums[i].PreviewColor);
                         }
-                        bNeedsMapUpdate = true; 
+                        bNeedsPreviewRender = true; 
                     }
                     
                     char normalBuf[256]; strncpy(normalBuf, params.Stratums[i].NormalPath.c_str(), sizeof(normalBuf));
@@ -324,7 +324,7 @@ namespace UI {
                         if (!params.Stratums[i].NormalPath.empty()) {
                             params.Stratums[i].PreviewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].NormalPath, nullptr);
                         } else params.Stratums[i].PreviewNormalTex = 0;
-                        bNeedsMapUpdate = true; 
+                        bNeedsPreviewRender = true; 
                     }
                     
                     char maskBuf[256]; strncpy(maskBuf, params.Stratums[i].MaskPath.c_str(), sizeof(maskBuf));
@@ -334,7 +334,7 @@ namespace UI {
                         if (!params.Stratums[i].MaskPath.empty()) {
                             params.Stratums[i].PreviewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].MaskPath, nullptr);
                         } else params.Stratums[i].PreviewMaskTex = 0;
-                        bNeedsMapUpdate = true; 
+                        bNeedsPreviewRender = true; 
                     }
                     ImGui::PopItemWidth();
                     
@@ -441,34 +441,34 @@ namespace UI {
             for (int n = 0; n < IM_ARRAYSIZE(sizes); n++) {
                 if (ImGui::Selectable(size_labels[n], size_idx == n)) {
                     params.DetailNormalMapSize = sizes[n];
-                    bNeedsMapUpdate = true;
+                    bNeedsPreviewRender = true;
                 }
             }
             ImGui::EndCombo();
         }
         ImGui::Spacing();
-        RenderLayerStack(params, params.DetailNormalLayers, nullptr, false, bNeedsMapUpdate);
+        RenderLayerStack(params, params.DetailNormalLayers, nullptr, false, bNeedsPreviewRender);
     }
 
     void RenderSmoothnessTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender) {
         if (ImGui::Checkbox("##showSmoothness", &params.ShowSmoothness)) bNeedsPreviewRender = true; ImGui::SameLine();
         ImGui::Text("Smoothness Masking");
         ImGui::Separator();
-        RenderLayerStack(params, params.SmoothnessLayers, nullptr, false, bNeedsMapUpdate);
+        RenderLayerStack(params, params.SmoothnessLayers, nullptr, false, bNeedsPreviewRender);
     }
 
     void RenderTintTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender) {
         if (ImGui::Checkbox("##showTint", &params.ShowTint)) bNeedsPreviewRender = true; ImGui::SameLine();
         ImGui::Text("Procedural Tinting");
         ImGui::Separator();
-        RenderLayerStack(params, params.TintLayers, nullptr, false, bNeedsMapUpdate);
+        RenderLayerStack(params, params.TintLayers, nullptr, false, bNeedsPreviewRender);
     }
 
     void RenderHolesTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender) {
         if (ImGui::Checkbox("##showHoles", &params.ShowHoles)) bNeedsPreviewRender = true; ImGui::SameLine();
         ImGui::Text("Dyson Sphere Holes");
         ImGui::Separator();
-        RenderLayerStack(params, params.HoleLayers, nullptr, false, bNeedsMapUpdate);
+        RenderLayerStack(params, params.HoleLayers, nullptr, false, bNeedsPreviewRender);
     }
 
 } // namespace UI

@@ -214,6 +214,16 @@ int main(int, char**)
         if (ImGui::Selectable("Files / Save", activeTab == 12)) activeTab = 12;
         
         ImGui::Spacing(); ImGui::Spacing();
+        
+        bool isInteracting = ImGui::IsAnyItemActive();
+        params.FastPreviewMode = isInteracting;
+        
+        static bool wasInteracting = false;
+        if (wasInteracting && !isInteracting) {
+            bNeedsMapUpdate = true; // Trigger final full update to calculate Flow/Placements when drag finishes
+        }
+        wasInteracting = isInteracting;
+        
         if (ImGui::Button("Force Generate", ImVec2(-1, 40)) || bNeedsMapUpdate) {
             bNeedsMapUpdate = false;
             bGeometryChanged = true;
@@ -223,7 +233,7 @@ int main(int, char**)
                 dummyMap = SanmapGen::FloatMask(vertSize, vertSize, 0.0f);
             }
             
-            genResult = SanmapGen::TerrainGenerator::GenerateMap(dummyMap, params);
+            SanmapGen::TerrainGenerator::GenerateMap(dummyMap, params, genResult);
             stratums = genResult.Stratums;
             bNeedsPreviewRender = true;
         }
@@ -253,9 +263,9 @@ int main(int, char**)
             case 5: SanmapGen::UI::RenderHolesTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 6: SanmapGen::UI::RenderSmoothnessTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 7: SanmapGen::UI::RenderWaterTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
-            case 8: SanmapGen::UI::RenderAtmosphereTab(params, bNeedsMapUpdate); break;
-            case 9: SanmapGen::UI::RenderMarkersTab(params, bNeedsMapUpdate); break;
-            case 10: SanmapGen::UI::RenderPropsTab(params, bNeedsMapUpdate); break;
+            case 8: SanmapGen::UI::RenderAtmosphereTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
+            case 9: SanmapGen::UI::RenderMarkersTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
+            case 10: SanmapGen::UI::RenderPropsTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 11: SanmapGen::UI::RenderPerformanceTab(params, bNeedsMapUpdate); break;
             case 12: SanmapGen::UI::RenderSaveExportTab(params, dummyMap, genResult, bNeedsMapUpdate); break;
         }

@@ -21,10 +21,10 @@ namespace UI {
     void RenderSmoothnessTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderTintTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderWaterTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
-    void RenderAtmosphereTab(GenerationParams& params, bool& bNeedsMapUpdate);
+    void RenderAtmosphereTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderHolesTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
-    void RenderMarkersTab(GenerationParams& params, bool& bNeedsMapUpdate);
-    void RenderPropsTab(GenerationParams& params, bool& bNeedsMapUpdate);
+    void RenderMarkersTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
+    void RenderPropsTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderPerformanceTab(GenerationParams& params, bool& bNeedsMapUpdate);
     void RenderSaveExportTab(GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool& bNeedsMapUpdate);
 

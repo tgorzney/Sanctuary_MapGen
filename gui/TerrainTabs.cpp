@@ -154,7 +154,9 @@ namespace UI {
                     layer.Blend = (BlendMode)current_blend;
                     bNeedsMapUpdate = true;
                 }
-                if (ImGui::SliderFloat("Contrast", &layer.HeightBlendContrast, 0.1f, 5.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Blend Sharpness", &layer.HeightBlendContrast, 0.1f, 5.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Image Contrast", &layer.ImageContrast, 0.0f, 3.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Image Brightness", &layer.ImageBrightness, -1.0f, 1.0f)) bNeedsMapUpdate = true;
                 if (ImGui::SliderFloat("Mask Min", &layer.HeightBlendMin, 0.0f, 1.0f)) {
                     if (layer.HeightBlendMin >= layer.HeightBlendMax) layer.HeightBlendMax = layer.HeightBlendMin + 0.001f;
                     if (layer.HeightBlendMax > 1.0f) { layer.HeightBlendMax = 1.0f; layer.HeightBlendMin = 0.999f; }

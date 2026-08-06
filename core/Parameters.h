@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <functional>
 
 namespace SanmapGen {
 
@@ -105,6 +106,8 @@ namespace SanmapGen {
         float Gain = 0.5f;
         float PingPongStrength = 2.0f;
         float Opacity = 1.0f;
+        float ImageContrast = 1.0f;
+        float ImageBrightness = 0.0f;
         float CellularJitter = 1.0f;
         
         // Terrain Density Shaping
@@ -129,6 +132,30 @@ namespace SanmapGen {
         // Layer-specific Erosion
         ErosionSettings Erosion;
         bool ErodeBeneath = false; // If true, droplets can dig into layers underneath
+        
+        // Hash for caching raw structural noise (excludes Photoshop Levels and Density Shaping)
+        size_t GetNoiseHash(int globalSeed, int globalSymmetryMask, int symAlg) const {
+            size_t hash = 0;
+            auto combine = [&hash](auto val) {
+                std::hash<decltype(val)> hasher;
+                hash ^= hasher(val) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+            };
+            
+            combine(globalSeed);
+            combine(Type);
+            combine(Fractal);
+            combine(SymmetryUseGlobal ? globalSymmetryMask : SymmetryMask);
+            combine(symAlg);
+            combine(Frequency);
+            combine(Octaves);
+            combine(Gain);
+            combine(PingPongStrength);
+            combine(CellularJitter);
+            combine(UseImage);
+            combine(ImagePath);
+            
+            return hash;
+        }
     };
 
     enum class SymmetryAlgorithm {
@@ -389,6 +416,9 @@ namespace SanmapGen {
         bool UseGPUTerrain = false;
         bool UseGPUHydraulic = true;
         bool UseGPUDeposition = true;
+        bool UseGPUFlowMap = false;
+        
+        bool FastPreviewMode = false; // If true, defers Flow/Placement calculations to maintain high FPS while dragging sliders
         
         // --- Preview Layers (Z-Order Compositing) ---
         enum class LayerBlendMode {
@@ -457,6 +487,8 @@ namespace SanmapGen {
             baseLayer.Gain = 0.5f;
             baseLayer.PingPongStrength = 2.0f;
             baseLayer.Opacity = 1.0f;
+            baseLayer.ImageContrast = 1.0f;
+            baseLayer.ImageBrightness = 0.0f;
             
             baseLayer.LandDensity = 0.514f;
             baseLayer.PlateauDensity = 0.0f;

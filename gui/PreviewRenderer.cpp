@@ -59,6 +59,7 @@ namespace SanmapGen {
 
         std::vector<uint8_t> pixels(quadWidth * quadHeight * 4);
         
+        #pragma omp parallel for
         for (int y = 0; y < quadHeight; ++y) {
             for (int x = 0; x < quadWidth; ++x) {
                 // Get the 4 vertices of the quad
@@ -151,11 +152,11 @@ namespace SanmapGen {
                     }
                     else if (layer.Type == GenerationParams::PreviewLayerType::Stratums) {
                         float totalMask = 0.0f;
-                        for (size_t i = 0; i < genResult.Stratums.size(); ++i) {
-                            float m00 = genResult.Stratums[i].Get(x, y);
-                            float m10 = genResult.Stratums[i].Get(x + 1, y);
-                            float m01 = genResult.Stratums[i].Get(x, y + 1);
-                            float m11 = genResult.Stratums[i].Get(x + 1, y + 1);
+                        for (size_t i = 0; i < genResult.MaterialMasks.size(); ++i) {
+                            float m00 = genResult.MaterialMasks[i].Get(x, y);
+                            float m10 = genResult.MaterialMasks[i].Get(x + 1, y);
+                            float m01 = genResult.MaterialMasks[i].Get(x, y + 1);
+                            float m11 = genResult.MaterialMasks[i].Get(x + 1, y + 1);
                             float maskVal = (m00 + m10 + m01 + m11) * 0.25f;
                             
                             float remapMin = params.Stratums[i].MaskRemapMin[0];

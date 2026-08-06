@@ -380,9 +380,10 @@ namespace SanmapGen {
         int vertSize = task.Params->MapSize + 1;
         const NoiseLayer& layer = *task.Layer;
         
-        for (uint32_t z = task.StartZ; z < task.EndZ; ++z) {
+        #pragma omp parallel for
+        for (long long z = task.StartZ; z < task.EndZ; ++z) {
             uint32_t px, py;
-            DecodeMorton2D(z, px, py);
+            DecodeMorton2D(static_cast<uint32_t>(z), px, py);
             
             if (px >= (uint32_t)vertSize || py >= (uint32_t)vertSize) continue;
             
@@ -420,51 +421,11 @@ namespace SanmapGen {
                 }
             }
             
-            noiseVal = noiseVal * (layer.LandDensity * 2.0f);
-            float origNoise = noiseVal;
-            
-            if (layer.MountainDensity > 0.0f) {
-                float smooth = noiseVal * noiseVal * (3.0f - 2.0f * noiseVal);
-                noiseVal = (noiseVal * (1.0f - layer.MountainDensity)) + (smooth * layer.MountainDensity);
-                if (noiseVal > 0.5f) {
-                    noiseVal += (noiseVal - 0.5f) * layer.MountainDensity;
-                }
-                noiseVal = std::clamp(noiseVal, 0.0f, 1.0f);
-            }
-            
-            if (layer.PlateauDensity > 0.0f) {
-                float terraces = 3.0f + (layer.PlateauDensity * 27.0f); 
-                float terraceHeight = 1.0f / terraces;
-                noiseVal = std::floor(noiseVal / terraceHeight) * terraceHeight;
-            }
-            
-            if (layer.RampDensity > 0.0f) {
-                noiseVal = (noiseVal * (1.0f - layer.RampDensity)) + (origNoise * layer.RampDensity);
-            }
-            
-            // Photoshop-Style Levels Adjustment
-            float s = layer.LevelsShadows;
-            float h = layer.LevelsHighlights;
-            float m = layer.LevelsMidtones;
-            
-            if (h > s) {
-                noiseVal = std::clamp((noiseVal - s) / (h - s), 0.0f, 1.0f);
-            } else {
-                noiseVal = (noiseVal >= s) ? 1.0f : 0.0f;
-            }
-            
-            if (m != 1.0f && m > 0.0f) {
-                noiseVal = std::pow(noiseVal, 1.0f / m);
-            }
-            
-            noiseVal = layer.LevelsOutputBlack + noiseVal * (layer.LevelsOutputWhite - layer.LevelsOutputBlack);
-            noiseVal = std::clamp(noiseVal, 0.0f, 1.0f);
-            
             task.OutputMap->Set(px, py, noiseVal);
         }
     }
 
-    GenerationResult TerrainGenerator::GenerateMap(FloatMask& outMap, const GenerationParams& params) {
+    void TerrainGenerator::GenerateMap(FloatMask& outMap, const GenerationParams& params, GenerationResult& inOutResult) {
         int vertSize = params.MapSize + 1;
         
         for (int y = 0; y < vertSize; ++y)
@@ -475,14 +436,24 @@ namespace SanmapGen {
         while (pow2Size < (uint32_t)vertSize) pow2Size <<= 1;
         uint32_t totalMortonCells = pow2Size * pow2Size;
         
-        unsigned int numThreads = std::thread::hardware_concurrency();
-        if (numThreads == 0) numThreads = 4;
-        uint32_t cellsPerThread = totalMortonCells / numThreads;
-        
         std::vector<FloatMask> Stratums;
         auto flatLayers = params.GetFlatLayers();
         for (size_t i = 0; i < flatLayers.size(); ++i) {
             Stratums.push_back(FloatMask(vertSize, vertSize, 0.0f));
+        }
+        
+        inOutResult.MaterialMasks.clear();
+        for (size_t i = 0; i < 9; ++i) {
+            inOutResult.MaterialMasks.push_back(FloatMask(vertSize, vertSize, 0.0f));
+        }
+        
+        if (inOutResult.CachedRawNoise.size() != flatLayers.size()) {
+            inOutResult.CachedRawNoise.clear();
+            inOutResult.CachedNoiseHashes.clear();
+            for (size_t i = 0; i < flatLayers.size(); ++i) {
+                inOutResult.CachedRawNoise.push_back(FloatMask(vertSize, vertSize, 0.0f));
+                inOutResult.CachedNoiseHashes.push_back(0);
+            }
         }
         
         if (params.UseGPUTerrain) {
@@ -493,56 +464,92 @@ namespace SanmapGen {
             const auto& layer = *flatLayers[i];
             if (!layer.Enabled) continue;
             
-            FastNoiseLite noise;
-            noise.SetSeed(params.Seed + i); // Distinct seed per layer gives better variation
-            switch (layer.Type) {
-                case NoiseType::OpenSimplex2: noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2); break;
-                case NoiseType::OpenSimplex2S: noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S); break;
-                case NoiseType::Cellular: noise.SetNoiseType(FastNoiseLite::NoiseType_Cellular); break;
-                case NoiseType::Perlin: noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin); break;
-                case NoiseType::ValueCubic: noise.SetNoiseType(FastNoiseLite::NoiseType_ValueCubic); break;
-                case NoiseType::Value: noise.SetNoiseType(FastNoiseLite::NoiseType_Value); break;
-                case NoiseType::None: break;
-            }
-            switch (layer.Fractal) {
-                case FractalType::None: noise.SetFractalType(FastNoiseLite::FractalType_None); break;
-                case FractalType::FBm: noise.SetFractalType(FastNoiseLite::FractalType_FBm); break;
-                case FractalType::Ridged: noise.SetFractalType(FastNoiseLite::FractalType_Ridged); break;
-                case FractalType::PingPong: noise.SetFractalType(FastNoiseLite::FractalType_PingPong); break;
-            }
-            noise.SetFractalOctaves(layer.Octaves);
-            noise.SetFractalGain(layer.Gain);
-            noise.SetFractalPingPongStrength(layer.PingPongStrength);
-            noise.SetFrequency(layer.Frequency);
-            noise.SetCellularJitter(layer.CellularJitter);
+            size_t layerHash = layer.GetNoiseHash(params.Seed + (int)i, params.GlobalSymmetryMask, (int)params.SymAlgorithm);
+            FloatMask& layerMap = inOutResult.CachedRawNoise[i];
             
-            if (params.SymAlgorithm == SymmetryAlgorithm::NativeHash) {
-                bool symX = (layer.SymmetryMask & Symmetry_X) != 0;
-                bool symZ = (layer.SymmetryMask & Symmetry_Z) != 0;
-                bool symPoint = (layer.SymmetryMask & Symmetry_Point) != 0;
-                noise.SetNativeSymmetry(symX, symZ, symPoint);
-            }
-            
-            FloatMask layerMap(vertSize, vertSize, 0.0f);
-            
-            std::vector<std::future<void>> futures;
-            for (unsigned int t = 0; t < numThreads; ++t) {
+            if (inOutResult.CachedNoiseHashes[i] != layerHash) {
+                FastNoiseLite noise;
+                noise.SetSeed(params.Seed + i); // Distinct seed per layer gives better variation
+                switch (layer.Type) {
+                    case NoiseType::OpenSimplex2: noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2); break;
+                    case NoiseType::OpenSimplex2S: noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S); break;
+                    case NoiseType::Cellular: noise.SetNoiseType(FastNoiseLite::NoiseType_Cellular); break;
+                    case NoiseType::Perlin: noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin); break;
+                    case NoiseType::ValueCubic: noise.SetNoiseType(FastNoiseLite::NoiseType_ValueCubic); break;
+                    case NoiseType::Value: noise.SetNoiseType(FastNoiseLite::NoiseType_Value); break;
+                    case NoiseType::None: break;
+                }
+                switch (layer.Fractal) {
+                    case FractalType::None: noise.SetFractalType(FastNoiseLite::FractalType_None); break;
+                    case FractalType::FBm: noise.SetFractalType(FastNoiseLite::FractalType_FBm); break;
+                    case FractalType::Ridged: noise.SetFractalType(FastNoiseLite::FractalType_Ridged); break;
+                    case FractalType::PingPong: noise.SetFractalType(FastNoiseLite::FractalType_PingPong); break;
+                }
+                noise.SetFractalOctaves(layer.Octaves);
+                noise.SetFractalGain(layer.Gain);
+                noise.SetFractalPingPongStrength(layer.PingPongStrength);
+                noise.SetFrequency(layer.Frequency);
+                noise.SetCellularJitter(layer.CellularJitter);
+                
+                if (params.SymAlgorithm == SymmetryAlgorithm::NativeHash) {
+                    bool symX = (layer.SymmetryMask & Symmetry_X) != 0;
+                    bool symZ = (layer.SymmetryMask & Symmetry_Z) != 0;
+                    bool symPoint = (layer.SymmetryMask & Symmetry_Point) != 0;
+                    noise.SetNativeSymmetry(symX, symZ, symPoint);
+                }
+                
                 ChunkTask task;
-                task.StartZ = t * cellsPerThread;
-                task.EndZ = (t == numThreads - 1) ? totalMortonCells : (t + 1) * cellsPerThread;
+                task.StartZ = 0;
+                task.EndZ = totalMortonCells;
                 task.Params = &params;
                 task.Layer = &layer;
                 task.Noise = &noise;
                 task.OutputMap = &layerMap;
-                futures.push_back(std::async(std::launch::async, ProcessLayerChunk, task));
+                ProcessLayerChunk(task);
+                
+                inOutResult.CachedNoiseHashes[i] = layerHash;
             }
-            for (auto& f : futures) f.get();
             
             // Calculate Height Blend (Thickness Mask) against underlying terrain
+            #pragma omp parallel for
             for(int y=0; y<vertSize; ++y) {
                 for(int x=0; x<vertSize; ++x) {
                     // Raw height generated by noise for this layer
-                    float rawHeight = layerMap.Get(x, y);
+                    float noiseVal = layerMap.Get(x, y);
+                    
+                    // Legacy Image Contrast and Brightness (Linear addition/subtraction and pivot)
+                    noiseVal = (noiseVal - 0.5f) * layer.ImageContrast + 0.5f + layer.ImageBrightness;
+                    noiseVal = std::clamp(noiseVal, 0.0f, 1.0f);
+                    
+                    // Post-process Shaping
+                    noiseVal = noiseVal * (layer.LandDensity * 2.0f);
+                    float origNoise = noiseVal;
+                    if (layer.MountainDensity > 0.0f) {
+                        float smooth = noiseVal * noiseVal * (3.0f - 2.0f * noiseVal);
+                        noiseVal = (noiseVal * (1.0f - layer.MountainDensity)) + (smooth * layer.MountainDensity);
+                        if (noiseVal > 0.5f) noiseVal += (noiseVal - 0.5f) * layer.MountainDensity;
+                        noiseVal = std::clamp(noiseVal, 0.0f, 1.0f);
+                    }
+                    if (layer.PlateauDensity > 0.0f) {
+                        float terraces = 3.0f + (layer.PlateauDensity * 27.0f); 
+                        float terraceHeight = 1.0f / terraces;
+                        noiseVal = std::floor(noiseVal / terraceHeight) * terraceHeight;
+                    }
+                    if (layer.RampDensity > 0.0f) {
+                        noiseVal = (noiseVal * (1.0f - layer.RampDensity)) + (origNoise * layer.RampDensity);
+                    }
+                    
+                    // Levels
+                    float s = layer.LevelsShadows;
+                    float h = layer.LevelsHighlights;
+                    float m = layer.LevelsMidtones;
+                    if (h > s) noiseVal = std::clamp((noiseVal - s) / (h - s), 0.0f, 1.0f);
+                    else noiseVal = (noiseVal >= s) ? 1.0f : 0.0f;
+                    if (m != 1.0f && m > 0.0f) noiseVal = std::pow(noiseVal, m);
+                    noiseVal = layer.LevelsOutputBlack + noiseVal * (layer.LevelsOutputWhite - layer.LevelsOutputBlack);
+                    noiseVal = std::clamp(noiseVal, 0.0f, 1.0f);
+                    
+                    float rawHeight = noiseVal;
                     
                     // Sum underlying terrain height
                     float currentTerrainHeight = 0.0f;
@@ -556,35 +563,39 @@ namespace SanmapGen {
                     float thickness = rawHeight - currentTerrainHeight;
                     
                     if (thickness > 0.0f) {
-                        // Apply contrast/clamping to create a strict Mask (0.0 to 1.0)
                         float mask = thickness * layer.HeightBlendContrast;
                         float safeMin = std::min(layer.HeightBlendMin, layer.HeightBlendMax);
                         float safeMax = std::max(layer.HeightBlendMin, layer.HeightBlendMax);
                         if (safeMin == safeMax) safeMax = safeMin + 0.001f; // Prevent completely identical bounds if other code relies on it
                         mask = std::clamp(mask, safeMin, safeMax);
+                        // Pure linear geometry addition
+                        float heightDelta = thickness * layer.Opacity;
+                        Stratums[i].Set(x, y, heightDelta);
                         
-                        // Final added height for this layer is its masked thickness
-                        float finalThickness = thickness * mask * layer.Opacity;
-                        
-                        if (i < params.Stratums.size() && params.Stratums[i].UseImportedMask && !params.Stratums[i].ImportedMaskData.empty()) {
+                        // Material texturing blend mask
+                        float finalMask = mask * layer.Opacity;
+                        if (layer.StratumIndex < params.Stratums.size() && params.Stratums[layer.StratumIndex].UseImportedMask && !params.Stratums[layer.StratumIndex].ImportedMaskData.empty()) {
                             int texSize = params.MapSize;
                             int sx = std::min(x, texSize - 1);
                             int sy = std::min(y, texSize - 1);
-                            float importedVal = params.Stratums[i].ImportedMaskData[sy * texSize + sx];
-                            Stratums[i].Set(x, y, importedVal);
-                        } else {
-                            Stratums[i].Set(x, y, finalThickness);
+                            finalMask = params.Stratums[layer.StratumIndex].ImportedMaskData[sy * texSize + sx];
                         }
+                        
+                        int sIdx = std::clamp(layer.StratumIndex, 0, 8);
+                        float currentMask = inOutResult.MaterialMasks[sIdx].Get(x, y);
+                        inOutResult.MaterialMasks[sIdx].Set(x, y, std::clamp(currentMask + finalMask, 0.0f, 1.0f));
                     } else {
-                        // This layer is buried under the terrain or non-existent here
-                        if (i < params.Stratums.size() && params.Stratums[i].UseImportedMask && !params.Stratums[i].ImportedMaskData.empty()) {
+                        Stratums[i].Set(x, y, 0.0f);
+                        
+                        if (layer.StratumIndex < params.Stratums.size() && params.Stratums[layer.StratumIndex].UseImportedMask && !params.Stratums[layer.StratumIndex].ImportedMaskData.empty()) {
                             int texSize = params.MapSize;
                             int sx = std::min(x, texSize - 1);
                             int sy = std::min(y, texSize - 1);
-                            float importedVal = params.Stratums[i].ImportedMaskData[sy * texSize + sx];
-                            Stratums[i].Set(x, y, importedVal);
-                        } else {
-                            Stratums[i].Set(x, y, 0.0f);
+                            float finalMask = params.Stratums[layer.StratumIndex].ImportedMaskData[sy * texSize + sx];
+                            
+                            int sIdx = std::clamp(layer.StratumIndex, 0, 8);
+                            float currentMask = inOutResult.MaterialMasks[sIdx].Get(x, y);
+                            inOutResult.MaterialMasks[sIdx].Set(x, y, std::clamp(currentMask + finalMask, 0.0f, 1.0f));
                         }
                     }
                 }
@@ -593,176 +604,179 @@ namespace SanmapGen {
         } // End CPU/GPU split
         
         // --- Process Erosion Sequentially Layer-by-Layer ---
-        for (size_t currentLayerIdx = 0; currentLayerIdx < flatLayers.size(); ++currentLayerIdx) {
-            const auto& layer = *flatLayers[currentLayerIdx];
-            if (!layer.Enabled || !flatLayers[currentLayerIdx]->Erosion.Enabled) continue;
-            
-            // Generate Rain/Precipitation Map based on this layer's settings
-            FloatMask rainMap(vertSize, vertSize, 1.0f); // Default to uniform
-            
-            if (flatLayers[currentLayerIdx]->Erosion.UseRainNoise) {
-                FastNoiseLite rainNoise;
-                rainNoise.SetSeed(params.Seed + 9999 + currentLayerIdx);
-                rainNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-                rainNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
-                rainNoise.SetFractalOctaves(flatLayers[currentLayerIdx]->Erosion.RainNoiseOctaves);
-                rainNoise.SetFrequency(flatLayers[currentLayerIdx]->Erosion.RainNoiseFreq);
+        if (!params.FastPreviewMode) {
+            for (size_t currentLayerIdx = 0; currentLayerIdx < flatLayers.size(); ++currentLayerIdx) {
+                const auto& layer = *flatLayers[currentLayerIdx];
+                if (!layer.Enabled || !flatLayers[currentLayerIdx]->Erosion.Enabled) continue;
                 
-                // Use the layer itself to route the noise through EvaluateSymmetricNoise
+                // Generate Rain/Precipitation Map based on this layer's settings
+                FloatMask rainMap(vertSize, vertSize, 1.0f); // Default to uniform
+                
+                if (flatLayers[currentLayerIdx]->Erosion.UseRainNoise) {
+                    FastNoiseLite rainNoise;
+                    rainNoise.SetSeed(params.Seed + 9999 + currentLayerIdx);
+                    rainNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+                    rainNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
+                    rainNoise.SetFractalOctaves(flatLayers[currentLayerIdx]->Erosion.RainNoiseOctaves);
+                    rainNoise.SetFrequency(flatLayers[currentLayerIdx]->Erosion.RainNoiseFreq);
+                    
+                    // Use the layer itself to route the noise through EvaluateSymmetricNoise
+                    for(int y=0; y<vertSize; ++y) {
+                        for(int x=0; x<vertSize; ++x) {
+                            float n = (EvaluateSymmetricNoise(x, y, vertSize, rainNoise, layer, &params) + 1.0f) * 0.5f;
+                            // Threshold mask
+                            if (n < flatLayers[currentLayerIdx]->Erosion.RainNoiseThreshold) {
+                                rainMap.Set(x, y, 0.0f);
+                            } else {
+                                float val = (n - flatLayers[currentLayerIdx]->Erosion.RainNoiseThreshold) / (1.0f - flatLayers[currentLayerIdx]->Erosion.RainNoiseThreshold);
+                                rainMap.Set(x, y, val);
+                            }
+                        }
+                    }
+                }
+                
+                // Calculate TotalHeight for slope detection and spawn height filtering
+                FloatMask totalHeight(vertSize, vertSize, 0.0f);
                 for(int y=0; y<vertSize; ++y) {
                     for(int x=0; x<vertSize; ++x) {
-                        float n = (EvaluateSymmetricNoise(x, y, vertSize, rainNoise, layer, &params) + 1.0f) * 0.5f;
-                        // Threshold mask
-                        if (n < flatLayers[currentLayerIdx]->Erosion.RainNoiseThreshold) {
-                            rainMap.Set(x, y, 0.0f);
-                        } else {
-                            float val = (n - flatLayers[currentLayerIdx]->Erosion.RainNoiseThreshold) / (1.0f - flatLayers[currentLayerIdx]->Erosion.RainNoiseThreshold);
-                            rainMap.Set(x, y, val);
+                        float h = 0.0f;
+                        for (size_t i = 0; i < flatLayers.size(); ++i) {
+                            if (flatLayers[i]->Enabled) h += Stratums[i].Get(x, y);
+                        }
+                        totalHeight.Set(x, y, h);
+                    }
+                }
+                
+                // Apply Orographic Rain (Rain Shadows)
+                if (flatLayers[currentLayerIdx]->Erosion.UseOrographicRain) {
+                    float baseWindAngleRad = flatLayers[currentLayerIdx]->Erosion.WindAngle * (3.14159265f / 180.0f);
+                    float baseWindX = std::cos(baseWindAngleRad);
+                    float baseWindY = std::sin(baseWindAngleRad);
+                    
+                    int halfSize = vertSize / 2;
+                    
+                    for(int y=1; y<vertSize-1; ++y) {
+                        for(int x=1; x<vertSize-1; ++x) {
+                            float hX1 = totalHeight.Get(x-1, y);
+                            float hX2 = totalHeight.Get(x+1, y);
+                            float hY1 = totalHeight.Get(x, y-1);
+                            float hY2 = totalHeight.Get(x, y+1);
+                            
+                            float normalX = (hX1 - hX2) * 0.5f;
+                            float normalY = (hY1 - hY2) * 0.5f;
+                            
+                            // Calculate symmetry-aligned wind vector for this pixel
+                            float localWindX = baseWindX;
+                            float localWindY = baseWindY;
+                            
+                            // Apply legacy folding math for wind vectors to match terrain folding
+                            int mx = x, my = y;
+                            int effectiveSymMask = layer.SymmetryUseGlobal ? params.GlobalSymmetryMask : layer.SymmetryMask;
+                            if (effectiveSymMask & Symmetry_X) { if (mx > halfSize) { mx = vertSize - mx - 1; localWindX = -localWindX; } }
+                            if (effectiveSymMask & Symmetry_Z) { if (my > halfSize) { my = vertSize - my - 1; localWindY = -localWindY; } }
+                            if (effectiveSymMask & Symmetry_XY) { if (mx > my) { std::swap(localWindX, localWindY); } }
+                            if (effectiveSymMask & Symmetry_Point) { if (my > halfSize) { localWindX = -localWindX; localWindY = -localWindY; } }
+                            
+                            if (effectiveSymMask & Symmetry_Radial && params.SpawnPointCount > 1) {
+                                float dx = static_cast<float>(x - halfSize);
+                                float dy = static_cast<float>(y - halfSize);
+                                float angle = std::atan2(dy, dx);
+                                if (angle < 0.0f) angle += 2.0f * 3.14159265f;
+                                float wedgeAngle = (2.0f * 3.14159265f) / static_cast<float>(params.SpawnPointCount);
+                                
+                                // Determine which wedge we are in
+                                float wedgeIndex = std::floor(angle / wedgeAngle);
+                                
+                                // Rotate the wind vector backwards by (wedgeIndex * wedgeAngle) to align it
+                                float rotAngle = -wedgeIndex * wedgeAngle;
+                                float cosRot = std::cos(rotAngle);
+                                float sinRot = std::sin(rotAngle);
+                                float wx = localWindX * cosRot - localWindY * sinRot;
+                                float wy = localWindX * sinRot + localWindY * cosRot;
+                                localWindX = wx;
+                                localWindY = wy;
+                            }
+                            
+                            // Dot product with local wind
+                            float slopeTowardsWind = (normalX * localWindX + normalY * localWindY);
+                            
+                            // Height multiplier: clouds drop more rain up high
+                            float h = totalHeight.Get(x, y);
+                            float heightMult = std::clamp(h * 2.0f, 0.5f, 1.5f);
+                            
+                            // If slope opposes wind (windward), slopeTowardsWind > 0
+                            float orographicMult = 1.0f + (slopeTowardsWind * 100.0f); // Arbitrary tuning
+                            orographicMult = std::clamp(orographicMult, 0.1f, 2.0f);
+                            
+                            rainMap.Set(x, y, rainMap.Get(x, y) * orographicMult * heightMult);
                         }
                     }
                 }
-            }
-            
-            // Calculate TotalHeight for slope detection and spawn height filtering
-            FloatMask totalHeight(vertSize, vertSize, 0.0f);
-            for(int y=0; y<vertSize; ++y) {
-                for(int x=0; x<vertSize; ++x) {
-                    float th = 0.0f;
-                    for(size_t i=0; i<=currentLayerIdx; ++i) {
-                        if(flatLayers[i]->Enabled) th += Stratums[i].Get(x, y);
-                    }
-                    totalHeight.Set(x, y, th);
-                }
-            }
-            
-            // Apply Orographic Rain (Rain Shadows)
-            if (flatLayers[currentLayerIdx]->Erosion.UseOrographicRain) {
-                float baseWindAngleRad = flatLayers[currentLayerIdx]->Erosion.WindAngle * (3.14159265f / 180.0f);
-                float baseWindX = std::cos(baseWindAngleRad);
-                float baseWindY = std::sin(baseWindAngleRad);
                 
-                int halfSize = vertSize / 2;
-                
-                for(int y=1; y<vertSize-1; ++y) {
-                    for(int x=1; x<vertSize-1; ++x) {
-                        float hX1 = totalHeight.Get(x-1, y);
-                        float hX2 = totalHeight.Get(x+1, y);
-                        float hY1 = totalHeight.Get(x, y-1);
-                        float hY2 = totalHeight.Get(x, y+1);
-                        
-                        float gradX = (hX2 - hX1) * 0.5f;
-                        float gradY = (hY2 - hY1) * 0.5f;
-                        
-                        // Calculate symmetry-aligned wind vector for this pixel
-                        float localWindX = baseWindX;
-                        float localWindY = baseWindY;
-                        
-                        // Apply legacy folding math for wind vectors to match terrain folding
-                        int mx = x, my = y;
-                        int effectiveSymMask = layer.SymmetryUseGlobal ? params.GlobalSymmetryMask : layer.SymmetryMask;
-                        if (effectiveSymMask & Symmetry_X) { if (mx > halfSize) { mx = vertSize - mx - 1; localWindX = -localWindX; } }
-                        if (effectiveSymMask & Symmetry_Z) { if (my > halfSize) { my = vertSize - my - 1; localWindY = -localWindY; } }
-                        if (effectiveSymMask & Symmetry_XY) { if (mx > my) { std::swap(localWindX, localWindY); } }
-                        if (effectiveSymMask & Symmetry_Point) { if (my > halfSize) { localWindX = -localWindX; localWindY = -localWindY; } }
-                        
-                        if (effectiveSymMask & Symmetry_Radial && params.SpawnPointCount > 1) {
-                            float dx = static_cast<float>(x - halfSize);
-                            float dy = static_cast<float>(y - halfSize);
-                            float angle = std::atan2(dy, dx);
-                            if (angle < 0.0f) angle += 2.0f * 3.14159265f;
-                            float wedgeAngle = (2.0f * 3.14159265f) / static_cast<float>(params.SpawnPointCount);
-                            
-                            // Determine which wedge we are in
-                            float wedgeIndex = std::floor(angle / wedgeAngle);
-                            
-                            // Rotate the wind vector backwards by (wedgeIndex * wedgeAngle) to align it
-                            float rotAngle = -wedgeIndex * wedgeAngle;
-                            float cosRot = std::cos(rotAngle);
-                            float sinRot = std::sin(rotAngle);
-                            float wx = localWindX * cosRot - localWindY * sinRot;
-                            float wy = localWindX * sinRot + localWindY * cosRot;
-                            localWindX = wx;
-                            localWindY = wy;
+                // Filter rain map by Spawn Height for Deposition mode
+                if (flatLayers[currentLayerIdx]->Erosion.DepositionMode) {
+                    for(int y=0; y<vertSize; ++y) {
+                        for(int x=0; x<vertSize; ++x) {
+                            float h = totalHeight.Get(x, y);
+                            if (h < flatLayers[currentLayerIdx]->Erosion.SpawnMinHeight || h > flatLayers[currentLayerIdx]->Erosion.SpawnMaxHeight) {
+                                rainMap.Set(x, y, 0.0f); // Cannot spawn outside height range
+                            }
                         }
-                        
-                        // Dot product with local wind
-                        float slopeTowardsWind = (gradX * localWindX + gradY * localWindY);
-                        
-                        // Height multiplier: clouds drop more rain up high
-                        float h = totalHeight.Get(x, y);
-                        float heightMult = std::clamp(h * 2.0f, 0.5f, 1.5f);
-                        
-                        // If slope opposes wind (windward), slopeTowardsWind > 0
-                        float orographicMult = 1.0f + (slopeTowardsWind * 100.0f); // Arbitrary tuning
-                        orographicMult = std::clamp(orographicMult, 0.1f, 2.0f);
-                        
-                        rainMap.Set(x, y, rainMap.Get(x, y) * orographicMult * heightMult);
                     }
                 }
-            }
-            
-            // Filter rain map by Spawn Height for Deposition mode
-            if (flatLayers[currentLayerIdx]->Erosion.DepositionMode) {
+                
+                // Rejection Sampling to fill EXACTLY DropletCount drops
+                std::vector<DropletSpawn> spawns;
+                spawns.reserve(flatLayers[currentLayerIdx]->Erosion.DropletCount);
+                
+                std::mt19937 spawnGen(params.Seed + currentLayerIdx);
+                std::uniform_real_distribution<float> distCoord(1.0f, static_cast<float>(vertSize - 2));
+                std::uniform_real_distribution<float> distProb(0.0f, 1.0f);
+                
+                // Find max rain value to normalize rejection sampling
+                float maxRain = 0.001f;
                 for(int y=0; y<vertSize; ++y) {
                     for(int x=0; x<vertSize; ++x) {
-                        float h = totalHeight.Get(x, y);
-                        if (h < flatLayers[currentLayerIdx]->Erosion.SpawnMinHeight || h > flatLayers[currentLayerIdx]->Erosion.SpawnMaxHeight) {
-                            rainMap.Set(x, y, 0.0f); // Cannot spawn outside height range
-                        }
+                        maxRain = std::max(maxRain, rainMap.Get(x, y));
                     }
                 }
-            }
-            
-            // Rejection Sampling to fill EXACTLY DropletCount drops
-            std::vector<DropletSpawn> spawns;
-            spawns.reserve(flatLayers[currentLayerIdx]->Erosion.DropletCount);
-            
-            std::mt19937 spawnGen(params.Seed + currentLayerIdx);
-            std::uniform_real_distribution<float> distCoord(1.0f, static_cast<float>(vertSize - 2));
-            std::uniform_real_distribution<float> distProb(0.0f, 1.0f);
-            
-            // Find max rain value to normalize rejection sampling
-            float maxRain = 0.001f;
-            for(int y=0; y<vertSize; ++y) {
-                for(int x=0; x<vertSize; ++x) {
-                    maxRain = std::max(maxRain, rainMap.Get(x, y));
-                }
-            }
-            
-            int safetyCounter = 0;
-            while(spawns.size() < (size_t)flatLayers[currentLayerIdx]->Erosion.DropletCount) {
-                float px = distCoord(spawnGen);
-                float py = distCoord(spawnGen);
-                float prob = rainMap.Get((int)px, (int)py) / maxRain;
                 
-                if (distProb(spawnGen) <= prob) {
-                    spawns.push_back({px, py});
-                    safetyCounter = 0;
-                } else {
-                    safetyCounter++;
-                    if (safetyCounter > 1000000) {
-                        // Failsafe: if map is completely dry, force uniform drops to fill quota
+                int safetyCounter = 0;
+                while(spawns.size() < (size_t)flatLayers[currentLayerIdx]->Erosion.DropletCount) {
+                    float px = distCoord(spawnGen);
+                    float py = distCoord(spawnGen);
+                    float prob = rainMap.Get((int)px, (int)py) / maxRain;
+                    
+                    if (distProb(spawnGen) <= prob) {
                         spawns.push_back({px, py});
+                        safetyCounter = 0;
+                    } else {
+                        safetyCounter++;
+                        if (safetyCounter > 1000000) {
+                            // Rain map is completely empty, fallback to uniform
+                            spawns.push_back({px, py});
+                        }
                     }
                 }
-            }
-            
-            if (params.UseGPUHydraulic) {
-                ErosionCompute::DispatchStratified(Stratums, spawns, flatLayers[currentLayerIdx]->Erosion, params, vertSize, currentLayerIdx);
-            } else {
-                ErosionSimulator::SimulateStratifiedErosionDelta(Stratums, spawns, flatLayers[currentLayerIdx]->Erosion, params, vertSize, currentLayerIdx);
-            }
-            
-            // Symmetrize the eroded stratums to fix divergent erosion paths for layers we touched
-            for (size_t i = 0; i <= currentLayerIdx; ++i) {
-                int effectiveSymMask = (*flatLayers[i]).SymmetryUseGlobal ? params.GlobalSymmetryMask : (*flatLayers[i]).SymmetryMask;
-                if (flatLayers[i]->Enabled && effectiveSymMask != 0) {
-                    Stratums[i] = SymmetrizeErodedTerrain(Stratums[i], (*flatLayers[i]), params);
+                
+                if (params.UseGPUHydraulic) {
+                    ErosionCompute::DispatchStratified(Stratums, spawns, flatLayers[currentLayerIdx]->Erosion, params, vertSize, currentLayerIdx);
+                } else {
+                    ErosionSimulator::SimulateStratifiedErosionDelta(Stratums, spawns, flatLayers[currentLayerIdx]->Erosion, params, vertSize, currentLayerIdx);
+                }
+                
+                // Symmetrize the eroded stratums to fix divergent erosion paths for layers we touched
+                for (size_t i = 0; i <= currentLayerIdx; ++i) {
+                    int effectiveSymMask = (*flatLayers[i]).SymmetryUseGlobal ? params.GlobalSymmetryMask : (*flatLayers[i]).SymmetryMask;
+                    if (flatLayers[i]->Enabled && effectiveSymMask != 0) {
+                        Stratums[i] = SymmetrizeErodedTerrain(Stratums[i], (*flatLayers[i]), params);
+                    }
                 }
             }
         }
         
         // Sum the final eroded stratums to output the final heightmap
+        #pragma omp parallel for
         for (int y = 0; y < vertSize; ++y) {
             for (int x = 0; x < vertSize; ++x) {
                 float totalHeight = 0.0f;
@@ -782,74 +796,103 @@ namespace SanmapGen {
             if (combinedMask != 0) ApplySymmetryBlur(outMap, vertSize, params.SymmetryBlurRadius, combinedMask, params.SpawnPointCount);
         }
         
+        // If we are in FastPreviewMode (user is dragging a slider), skip all heavy topology and placement logic
+        if (params.FastPreviewMode) {
+            inOutResult.Stratums = Stratums;
+            return;
+        }
+
         // Execute placement rules for Spawns, Resources, and Props
         // We const_cast params here because GenerateMap traditionally took a const reference,
         // but we need to populate the generated entity vectors.
         PlacementRules::ExecutePlacement(outMap, const_cast<GenerationParams&>(params));
         
-        GenerationResult result;
-        result.Stratums = Stratums;
-        result.FlowMap = FloatMask(vertSize, vertSize, 0.0f);
-        result.AccumulationMap = FloatMask(vertSize, vertSize, params.FlowSettingsParams.Precipitation);
+        inOutResult.Stratums = Stratums;
+        inOutResult.FlowMap = FloatMask(vertSize, vertSize, 0.0f);
+        inOutResult.AccumulationMap = FloatMask(vertSize, vertSize, params.FlowSettingsParams.Precipitation);
         
         // --- TOPOLOGICAL SORT DOWNHILL FLOW ACCUMULATION ---
-        // 1. Sort indices by height (O(N log N) or O(N) depending on sort)
-        std::vector<uint32_t> sortedIndices(vertSize * vertSize);
-        for (uint32_t i = 0; i < sortedIndices.size(); ++i) sortedIndices[i] = i;
-        
-        std::sort(sortedIndices.begin(), sortedIndices.end(), [&](uint32_t a, uint32_t b) {
-            return outMap.GetDataPtr()[a] > outMap.GetDataPtr()[b];
-        });
+        if (!params.UseGPUFlowMap) {
+            // 1. O(N) Bucket Sort (God-Tier Topology)
+            const int numBuckets = 65536; // 16-bit precision bucket sort
+            std::vector<int> bucketCounts(numBuckets, 0);
+            std::vector<uint32_t> sortedIndices(vertSize * vertSize);
+            
+            size_t numPixels = vertSize * vertSize;
+            float* mapData = outMap.GetMutableDataPtr();
+            
+            for (size_t i = 0; i < numPixels; ++i) {
+                int b = static_cast<int>(mapData[i] * (numBuckets - 1));
+                if (b < 0) b = 0;
+                if (b >= numBuckets) b = numBuckets - 1;
+                bucketCounts[b]++;
+            }
+            
+            std::vector<int> bucketOffsets(numBuckets, 0);
+            int currentOffset = 0;
+            // Reverse order to go highest to lowest elevation
+            for (int b = numBuckets - 1; b >= 0; --b) {
+                bucketOffsets[b] = currentOffset;
+                currentOffset += bucketCounts[b];
+            }
+            
+            for (size_t i = 0; i < numPixels; ++i) {
+                int b = static_cast<int>(mapData[i] * (numBuckets - 1));
+                if (b < 0) b = 0;
+                if (b >= numBuckets) b = numBuckets - 1;
+                sortedIndices[bucketOffsets[b]++] = static_cast<uint32_t>(i);
+            }
         
         // 2. Linearly process DAG topological sequence
-        for (uint32_t idx : sortedIndices) {
-            int x = idx % vertSize;
-            int y = idx / vertSize;
-            
-            float h = outMap.Get(x, y);
-            float currentAcc = result.AccumulationMap.Get(x, y);
-            float currentVel = result.FlowMap.Get(x, y); 
-            
-            float maxDrop = 0.0f;
-            int lowestX = -1, lowestY = -1;
-            
-            // D8 flow evaluation
-            for (int dy = -1; dy <= 1; ++dy) {
-                for (int dx = -1; dx <= 1; ++dx) {
-                    if (dx == 0 && dy == 0) continue;
-                    int nx = x + dx;
-                    int ny = y + dy;
-                    if (nx >= 0 && nx < vertSize && ny >= 0 && ny < vertSize) {
-                        float nh = outMap.Get(nx, ny);
-                        float drop = h - nh;
-                        if (drop > maxDrop) {
-                            maxDrop = drop;
-                            lowestX = nx;
-                            lowestY = ny;
+            for (uint32_t idx : sortedIndices) {
+                int x = idx % vertSize;
+                int y = idx / vertSize;
+                
+                float h = outMap.Get(x, y);
+                float currentAcc = inOutResult.AccumulationMap.Get(x, y);
+                float currentVel = inOutResult.FlowMap.Get(x, y); 
+                
+                float maxDrop = 0.0f;
+                int lowestX = -1, lowestY = -1;
+                
+                // D8 flow evaluation
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        if (dx == 0 && dy == 0) continue;
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        if (nx >= 0 && nx < vertSize && ny >= 0 && ny < vertSize) {
+                            float nh = outMap.Get(nx, ny);
+                            float drop = h - nh;
+                            if (drop > maxDrop) {
+                                maxDrop = drop;
+                                lowestX = nx;
+                                lowestY = ny;
+                            }
                         }
                     }
                 }
-            }
-            
-            if (maxDrop > 0.0f && lowestX != -1) {
-                // Accumulation logic (volume pooling)
-                // We add our accumulation to the lowest neighbor
-                float nextAcc = result.AccumulationMap.Get(lowestX, lowestY) + currentAcc;
-                result.AccumulationMap.Set(lowestX, lowestY, nextAcc);
                 
-                // Velocity logic (acceleration over distance)
-                // Add our velocity to neighbor, plus gravitational acceleration from the drop
-                float nextVel = result.FlowMap.Get(lowestX, lowestY) + currentVel + (maxDrop * 100.0f);
-                result.FlowMap.Set(lowestX, lowestY, nextVel);
-            }
-        }
-        
+                if (maxDrop > 0.0f && lowestX != -1) {
+                    // Accumulation logic (volume pooling)
+                    // We add our accumulation to the lowest neighbor
+                    float nextAcc = inOutResult.AccumulationMap.Get(lowestX, lowestY) + currentAcc;
+                    inOutResult.AccumulationMap.Set(lowestX, lowestY, nextAcc);
+                    
+                    // Velocity logic (acceleration over distance)
+                    // Add our velocity to neighbor, plus gravitational acceleration from the drop
+                    float nextVel = inOutResult.FlowMap.Get(lowestX, lowestY) + currentVel + (maxDrop * 100.0f);
+                    inOutResult.FlowMap.Set(lowestX, lowestY, nextVel);
+                }
+            } // End sortedIndices loop
+        } // End CPU FlowMap
+
         // Normalize Velocity and Accumulation maps for rendering
         float maxVel = 0.001f;
         float maxAcc = 0.001f;
         size_t numPixels = vertSize * vertSize;
-        float* flowPtr = result.FlowMap.GetMutableDataPtr();
-        float* accPtr = result.AccumulationMap.GetMutableDataPtr();
+        float* flowPtr = inOutResult.FlowMap.GetMutableDataPtr();
+        float* accPtr = inOutResult.AccumulationMap.GetMutableDataPtr();
         
         for (size_t i = 0; i < numPixels; ++i) {
             if (flowPtr[i] > maxVel) maxVel = flowPtr[i];
@@ -859,8 +902,6 @@ namespace SanmapGen {
             flowPtr[i] /= maxVel;
             accPtr[i] /= maxAcc;
         }
-
-        return result;
     }
 
     void TerrainGenerator::ApplySymmetryBlur(FloatMask& map, int mapSize, float blurRadius, int symmetryMask, int spawnPointCount) {
