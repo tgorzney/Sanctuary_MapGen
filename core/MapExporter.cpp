@@ -12,7 +12,7 @@ namespace fs = std::filesystem;
 
 namespace SanmapGen {
 
-void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData) {
+void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool exportTextures) {
     if (!fs::exists(folderPath)) {
         fs::create_directories(folderPath);
     }
@@ -118,17 +118,47 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     mapdef["armies"] = json::object();
     
     json markersObj = json::object();
-    for (const auto& rule : params.Markers) {
-        if (!rule.Enabled) continue;
-        json markerType;
-        markerType["name"] = rule.Name;
-        markerType["minSlope"] = rule.MinSlope;
-        markerType["maxSlope"] = rule.MaxSlope;
-        markerType["minHeight"] = rule.MinHeight;
-        markerType["maxHeight"] = rule.MaxHeight;
-        markerType["density"] = rule.Density;
-        markersObj[rule.Name] = markerType;
+    
+    // We want to group markers by Type (e.g. "Spawn", "Alloy", "Plasma")
+    std::map<std::string, json> groupedTransforms;
+    std::map<std::string, int> typeCounters;
+    
+    for (const auto& [key, marker] : params.MarkersList) {
+        if (marker.IsHidden) continue;
+        
+        json tfObj;
+        tfObj["position"] = {{"x", marker.Position[0]}, {"y", marker.Position[1]}, {"z", marker.Position[2]}};
+        tfObj["rotation"] = {{"x", marker.Rotation[0]}, {"y", marker.Rotation[1]}, {"z", marker.Rotation[2]}, {"w", marker.Rotation[3]}};
+        tfObj["scale"] = {{"x", marker.Scale[0]}, {"y", marker.Scale[1]}, {"z", marker.Scale[2]}};
+        
+        std::string transformKey = marker.CustomName;
+        if (transformKey.empty()) {
+            if (marker.Type == "Spawn") {
+                transformKey = "ARMY_" + std::to_string(++typeCounters["Spawn"]);
+            } else if (marker.Type == "Alloy") {
+                transformKey = "Mex " + std::to_string(typeCounters["Alloy"]++);
+            } else {
+                transformKey = marker.Type + "_" + std::to_string(++typeCounters[marker.Type]);
+            }
+        }
+        
+        groupedTransforms[marker.Type][transformKey] = tfObj;
     }
+    
+    // Create the structured markers object
+    for (const auto& [type, transforms] : groupedTransforms) {
+        json typeObj = json::object();
+        typeObj["resource"] = (type == "Alloy" || type == "Plasma" || type == "Hydro");
+        typeObj["transforms"] = transforms;
+        
+        // Native expects "Alloys", "Plasmas", "Spawn"
+        std::string outType = type;
+        if (outType == "Alloy") outType = "Alloys";
+        else if (outType == "Plasma") outType = "Plasmas";
+        
+        markersObj[outType] = typeObj;
+    }
+    
     mapdef["markers"] = markersObj;
 
     json propsArr = json::array();
@@ -169,47 +199,49 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     out << mapdef.dump(4);
     out.close();
 
-    // Create Textures subfolder required by Native Editor
-    std::string texFolder = folderPath + "/Textures";
-    if (!fs::exists(texFolder)) {
-        fs::create_directories(texFolder);
+    if (exportTextures) {
+        // Create Textures subfolder required by Native Editor
+        std::string texFolder = folderPath + "/Textures";
+        if (!fs::exists(texFolder)) {
+            fs::create_directories(texFolder);
+        }
+
+        // Export Heightmap
+        std::string hmPath = texFolder + "/heightmap.raw";
+        ExportHeightmap(hmPath, params, heightmap);
+        
+        // Export Stratums
+        ExportStratums(texFolder, params, genData);
+
+        auto exportTGA = [&](const std::string& name, const std::vector<uint8_t>& data, int w, int h, int comps) {
+            std::string p = texFolder + "/" + name;
+            stbi_write_tga(p.c_str(), w, h, comps, data.data());
+        };
+
+        int texSize = params.MapSize; // Assuming textures are MapSize x MapSize
+        int pixelCount = texSize * texSize;
+
+        // 4. Export tint_colors.tga (RGB = 128 for no tint, A = Smoothness 148 default)
+        std::vector<uint8_t> tintColors(pixelCount * 4, 0);
+        for (int i = 0; i < pixelCount * 4; i += 4) {
+            tintColors[i + 0] = 128; // R
+            tintColors[i + 1] = 128; // G
+            tintColors[i + 2] = 128; // B
+            tintColors[i + 3] = 148; // A
+        }
+        // TODO: Actually fill Tint/Smoothness based on layers if applicable in future
+        exportTGA("tint_colors.tga", tintColors, texSize, texSize, 4);
+
+        // 5. Export tint_geometry.tga (RG = Normals (128), B = Holes (255 for no hole))
+        std::vector<uint8_t> tintGeom(pixelCount * 3, 0);
+        for (int i = 0; i < pixelCount * 3; i += 3) {
+            tintGeom[i + 0] = 128; // R
+            tintGeom[i + 1] = 128; // G
+            tintGeom[i + 2] = 255; // B
+        }
+        // TODO: Calculate real normals or holes from data
+        exportTGA("tint_geometry.tga", tintGeom, texSize, texSize, 3);
     }
-
-    // Export Heightmap
-    std::string hmPath = texFolder + "/heightmap.raw";
-    ExportHeightmap(hmPath, params, heightmap);
-    
-    // Export Stratums
-    ExportStratums(texFolder, params, genData);
-
-    auto exportTGA = [&](const std::string& name, const std::vector<uint8_t>& data, int w, int h, int comps) {
-        std::string p = texFolder + "/" + name;
-        stbi_write_tga(p.c_str(), w, h, comps, data.data());
-    };
-
-    int texSize = params.MapSize; // Assuming textures are MapSize x MapSize
-    int pixelCount = texSize * texSize;
-
-    // 4. Export tint_colors.tga (RGB = 128 for no tint, A = Smoothness 148 default)
-    std::vector<uint8_t> tintColors(pixelCount * 4, 0);
-    for (int i = 0; i < pixelCount * 4; i += 4) {
-        tintColors[i + 0] = 128; // R
-        tintColors[i + 1] = 128; // G
-        tintColors[i + 2] = 128; // B
-        tintColors[i + 3] = 148; // A
-    }
-    // TODO: Actually fill Tint/Smoothness based on layers if applicable in future
-    exportTGA("tint_colors.tga", tintColors, texSize, texSize, 4);
-
-    // 5. Export tint_geometry.tga (RG = Normals (128), B = Holes (255 for no hole))
-    std::vector<uint8_t> tintGeom(pixelCount * 3, 0);
-    for (int i = 0; i < pixelCount * 3; i += 3) {
-        tintGeom[i + 0] = 128; // R
-        tintGeom[i + 1] = 128; // G
-        tintGeom[i + 2] = 255; // B
-    }
-    // TODO: Calculate real normals or holes from data
-    exportTGA("tint_geometry.tga", tintGeom, texSize, texSize, 3);
 }
 
 void MapExporter::ExportHeightmap(const std::string& filePath, const GenerationParams& params, const FloatMask& heightmap) {

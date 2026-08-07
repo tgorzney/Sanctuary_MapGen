@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <map>
 #include <algorithm>
 #include <functional>
 
@@ -178,8 +179,9 @@ namespace SanmapGen {
     };
 
     struct GradientSettings {
-        bool SmoothInterpolation = true;
+        std::string Name = "New Setting";
         std::vector<GradientStop> Stops;
+        bool SmoothInterpolation = true;
     };
     
     struct FlowSettings {
@@ -187,34 +189,37 @@ namespace SanmapGen {
         int Iterations = 50;
         bool UseGPU = false; // Toggle CPU vs GPU
         GradientSettings Gradient = {
-            true, 
+            "Default", 
             {
                 {0.0f, {0.0f, 0.0f, 0.2f, 1.0f}}, 
                 {50.0f, {0.0f, 0.4f, 0.8f, 1.0f}}, 
                 {100.0f, {0.0f, 1.0f, 1.0f, 1.0f}}
-            }
+            },
+            true
         };
     };
 
     struct SlopeSettings {
         GradientSettings Gradient = {
-            true, 
+            "Slope", 
             {
                 {0.0f, {0.2f, 0.6f, 0.2f, 1.0f}},   // Green (Flat)
                 {30.0f, {0.6f, 0.6f, 0.2f, 1.0f}},  // Yellow (Moderate)
                 {45.0f, {0.6f, 0.4f, 0.2f, 1.0f}},  // Brown (Steep)
                 {90.0f, {0.4f, 0.4f, 0.4f, 1.0f}}   // Gray (Cliff)
-            }
+            },
+            true
         };
     };
 
     struct WaterSettings {
-        float WaterLevelMin = 20.0f;
-        float WaterLevelMax = 40.0f;
-        float DeepWaterDepthMin = 10.0f;
-        float DeepWaterDepthMax = 30.0f;
-        float WaterWindSpeed = 0.06f;
+        float WaterLevelMin = 0.0f;
+        float WaterLevelMax = 0.0f;
+        float DeepWaterDepthMin = 8.0f;
+        float DeepWaterDepthMax = 8.0f;
+        float WaterWindSpeed = 0.25f;
         float WaterWindDirection = 160.0f;
+        float WaterWindShoreWavesRemap = 0.5f;
         float WaterShoreDepthOffset = 8.0f;
         float WaterShoreDepthStrength = 0.7f;
         float WaterShoreDistanceOffset = 0.0f;
@@ -223,33 +228,73 @@ namespace SanmapGen {
     };
 
     struct AtmosphereSettings {
-        float SunRA = 87.0f;
-        float SunDA = 42.0f;
-        float SunIntensity = 45000.0f;
-        float SunTint[4] = { 1.0f, 0.938f, 0.9f, 1.0f };
-        float SunTemperature = 5600.0f;
+        // --- Lighting ---
+        float SunRA = 0.0f;
+        float SunDA = 0.0f;
+        float SunIntensity = 15000.0f;
+        float SunTint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        float SunTemperature = 6300.0f;
         float SunAngularDiameter = 0.5f;
         float SunVolumetricsMultiplier = 6.7f;
         float SunVolumetricsShadowDimer = 0.5f;
+        float SunPosition[3] = { 512.0f, 10.0f, 256.0f };
         
-        float SkylightIntensity = 4000.0f;
-        float SkylightTint[4] = { 0.921f, 0.925f, 0.98f, 1.0f };
-        float SkylightTemperature = 5600.0f;
+        float SkylightIntensity = 0.0f;
+        float SkylightTint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        float SkylightTemperature = 9000.0f;
         
-        float Exposure = 12.08f;
-        float ExposureCompensation = 0.2f;
-        float SkyboxExposure = 11.73f;
+        float Exposure = 12.0f;
+        float ExposureCompensation = 2.5f;
         
-        float FogAttenuationDistance = 2.0f;
-        float FogBaseHeight = -20.0f;
-        float FogMaximumHeight = 110.0f;
+        std::string SkyboxPath = "";
+        float SkyboxRotation = 0.0f;
+        float SkyboxExposure = 12.0f;
+        float SkyboxMultiplier = 1.0f;
+        float SkyboxLuxValue = 10000.0f;
+        
+        // --- Background Fog ---
+        float BackgroundFogIntensity = 1.0f;
+        float BackgroundFogRange = 1024.0f;
+        float BackgroundFogMinimum = 0.1f;
+        float BackgroundSkyColorIntensity = 1.0f;
+        float BackgroundColorIntensity = 0.0f;
+        float BackgroundColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+        float BackgroundColorFadeoutRange = 150000.0f;
+        float BackgroundColorFadeoutPower = 0.3f;
+        
+        // --- Height Fog ---
+        float HeightFogIntensity = 1.0f;
+        float HeightFogRange[2] = { -10.0f, 100.0f };
+        float HeightFogStart = -10.0f;
+        float HeightFogEnd = 500.0f;
+        float HeightFogPower = 6.0f;
+        
+        // --- Linear Fog ---
+        float LinearFogIntensity = 0.24f;
+        float LinearFogStart = 100.0f;
+        float LinearFogEnd = 5000.0f;
+        float LinearFogPower = 1.0f;
+        float LinearFogCameraIntensity = 0.0f;
+        float LinearFogCameraStart = 500.0f;
+        float LinearFogCameraEnd = 5000.0f;
+        
+        // --- Legacy Fog (Kept for backwards compatibility if needed) ---
+        float FogAttenuationDistance = 200.0f;
+        float FogBaseHeight = 15.0f;
+        float FogMaximumHeight = 100.0f;
         float FogMaximumDistance = 1500.0f;
-        float FogAnisotropy = 1.0f;
+        float FogAnisotropy = 0.5f;
         
-        std::string SkyboxPath = "empty";
-        
-        float GlobalWindSpeed = 0.0f;
-        float GlobalWindDirection = 0.0f;
+        // --- Global Wind ---
+        float GlobalWindSpeed = 0.25f;
+        float GlobalWindDirection = 160.0f;
+    };
+    
+    struct GlobalTexturingSettings {
+        std::string Shader = "RTS/TerrainLit";
+        float HeightTransition = 0.5f;
+        float FadeDistance = 128.0f;
+        float FadeStartDistance = 1.0f;
     };
 
     struct StratumSettings {
@@ -292,10 +337,49 @@ namespace SanmapGen {
         float CapacityMult = 2.0f;
     };
 
+    struct MarkerTransform {
+        float Position[3] = {0.0f, 0.0f, 0.0f};
+        float Rotation[4] = {0.0f, 0.0f, 0.0f, 1.0f}; // x,y,z,w quaternion
+        float Scale[3] = {1.0f, 1.0f, 1.0f};
+        float Color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        int SymmetryId = 0; // The ID of the symmetry group if it's a mirrored clone
+        
+        bool SymmetryUseGlobal = true;
+        int SymmetryMask = Symmetry_Point;
+        
+        // Keep track of what type this is (Spawn, Alloy, Plasma, etc.)
+        std::string Type;
+        // Allows customizing the JSON key for Spawn (e.g., "ARMY_1") or Alloys (e.g. "Mex 0")
+        std::string CustomName = ""; 
+        std::string IconOverride = ""; // Used to override the global visual icon for this specific marker
+        
+        // Differentiates procedurally generated markers from manual ones
+        bool IsManual = false;
+        // Used to highlight symmetrically forced invalid placements
+        bool IsValid = true;
+        // If the generating rule is disabled, keep it hidden but generate for clearance
+        bool IsHidden = false;
+    };
+
+    enum MarkerPriority {
+        Priority_LargestArea = 0,
+        Priority_SmallestArea = 1,
+        Priority_LeastVariance = 2
+    };
+    
+    enum MarkerGradientType {
+        Gradient_None = 0,
+        Gradient_CenterFocus = 1,
+        Gradient_EdgeFocus = 2,
+        Gradient_Torus = 3
+    };
+
     struct MarkerRule {
         std::string Name = "New Marker";
         bool Enabled = true;
-        std::string IconPath = "";
+        std::string Type = "Alloy";
+        std::string IconOverride = ""; // Leave empty to use Type default
+        float Color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
         
         // Filtering thresholds
         float MinSlope = 0.0f;
@@ -303,8 +387,30 @@ namespace SanmapGen {
         float MinHeight = 0.0f;
         float MaxHeight = 128.0f;
         
-        // Density/Spawning
-        float Density = 1.0f;
+        // Advanced Deterministic Placement
+        bool RandomSelection = false;
+        int Priority = Priority_LeastVariance;
+        
+        float AreaHeightRange = 0.5f; // Tolerance for height variance
+        float AreaRadiusMin = 5.0f;
+        bool CheckMaxRadius = false;
+        float AreaRadiusMax = 50.0f;
+        
+        float ClearanceSpacing = 10.0f; // Minimum distance to other markers
+        float MapEdgePadding = 0.0f;    // Distance from the edge of the map
+        
+        int FocusGradient = Gradient_None;
+        float FocusGradientRadius = 250.0f;
+        float FocusGradientStrength = 1.0f;
+        float FocusGradientContrast = 1.0f;
+        
+        bool UseDensity = true;
+        bool UseAllPositions = false;
+        float Density = 0.5f;
+        int Count = 10;
+        
+        bool SymmetryUseGlobal = true;
+        int SymmetryMask = Symmetry_Point;
     };
 
     struct PropRule {
@@ -345,11 +451,36 @@ namespace SanmapGen {
         int PresetVersion = 1; // Used for backwards compatibility
         std::string GlobalEnvironmentPath = ""; // Path to the .sanpack or folder
         
+        int ShowFocusGradientDebugRuleIndex = -1; // -1 means off, otherwise the index of the MarkerRule being adjusted
+        
+        std::string DebugInfo = "";
+        std::string IconScanDebugInfo = "";
+        
         // --- General ---
         int Seed = 12345;
         int MapSize = 512;
+        float TerrainMinHeight = 0.0f;
+        float TerrainMaxHeight = 128.0f;
         bool ScaleFeaturesToMapSize = true;
         float GlobalGravity = 9.81f; // Global gravity used by erosion unless overridden
+        
+        // --- Markers & Gamedata ---
+        std::string GamedataPath = ""; // Path to the Sanctuary Gamedata folder containing UI.zip / UI.sanpack
+        float MarkerScaleAlloy = 1.0f;
+        float MarkerScalePlasma = 1.0f;
+        float MarkerScaleSpawn = 1.0f;
+        float MarkerColorAlloy[4] = {0.8f, 0.8f, 0.2f, 1.0f};
+        float MarkerColorPlasma[4] = {0.2f, 0.8f, 0.8f, 1.0f};
+        float MarkerColorSpawn[4] = {0.8f, 0.2f, 0.2f, 1.0f};
+        std::string GlobalIconAlloy = "Alloy";
+        std::string GlobalIconPlasma = "Plasma";
+        std::string GlobalIconSpawn = "Spawn";
+        
+        // Placed Markers (Key is map name e.g. "Alloys_037")
+        std::map<std::string, MarkerTransform> MarkersList;
+        std::vector<std::string> KnownMarkerTypes = {"Alloy", "Plasma", "Spawn"};
+        std::vector<std::string> AvailableIcons; // Populated from .sanpack
+        std::map<std::string, unsigned int> IconCache; // name -> GLuint texture ID
         
         float FlowMapColor[4] = { 0.0f, 0.5f, 1.0f, 1.0f };
 
@@ -407,6 +538,8 @@ namespace SanmapGen {
         // --- Tab Data ---
         WaterSettings Water;
         AtmosphereSettings Atmosphere;
+        GlobalTexturingSettings TexturingGlobals;
+        
         std::vector<StratumSettings> Stratums;
         std::vector<MarkerRule> Markers;
         std::vector<PropRule> Props;
@@ -459,6 +592,7 @@ namespace SanmapGen {
         bool ShowReclaim = false;
         bool ShowProps = false;
         bool ShowAtmosphere = false;
+        bool ShowSymmetry = false;
         
         bool AutoLevelPreview = true;
         
@@ -520,6 +654,103 @@ namespace SanmapGen {
             PreviewLayers.push_back({ PreviewLayerType::Accumulation, "Accumulation Map", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Markers, "Markers", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Props, "Props", false, LayerBlendMode::None });
+        }
+        
+        // --- Dependency Graph Hashing for Dirty Flags ---
+        size_t GetBlendHash() const {
+            size_t hash = 0;
+            auto combine = [&hash](auto val) {
+                std::hash<decltype(val)> hasher;
+                hash ^= hasher(val) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+            };
+            
+            auto flat = GetFlatLayers();
+            combine(flat.size());
+            for (const auto* layer : flat) {
+                combine(layer->Enabled);
+                combine(layer->Opacity);
+                combine(layer->Blend);
+                combine(layer->ImageContrast);
+                combine(layer->ImageBrightness);
+                combine(layer->LandDensity);
+                combine(layer->MountainDensity);
+                combine(layer->PlateauDensity);
+                combine(layer->RampDensity);
+                combine(layer->HeightBlendContrast);
+                combine(layer->HeightBlendMin);
+                combine(layer->HeightBlendMax);
+                combine(layer->LevelsShadows);
+                combine(layer->LevelsHighlights);
+                combine(layer->LevelsMidtones);
+                combine(layer->LevelsOutputBlack);
+                combine(layer->LevelsOutputWhite);
+                combine(layer->StratumIndex);
+                combine(layer->GetNoiseHash(Seed, GlobalSymmetryMask, (int)SymAlgorithm)); // Re-blend if noise changes
+            }
+            
+            for (const auto& stratum : Stratums) {
+                combine(stratum.UseImportedMask);
+            }
+            return hash;
+        }
+        
+        size_t GetErosionHash(size_t blendHash) const {
+            size_t hash = blendHash; // Erosion strictly depends on the blended heightmap
+            auto combine = [&hash](auto val) {
+                std::hash<decltype(val)> hasher;
+                hash ^= hasher(val) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+            };
+            
+            auto flat = GetFlatLayers();
+            for (const auto* layer : flat) {
+                if (!layer->Enabled || !layer->Erosion.Enabled) continue;
+                combine(layer->Erosion.DropletCount);
+                combine(layer->Erosion.MaxLifetime);
+                combine(layer->Erosion.GravityUseGlobal);
+                combine(layer->Erosion.Gravity);
+                combine(layer->Erosion.EvaporationRate);
+                combine(layer->Erosion.UseRainNoise);
+                combine(layer->Erosion.RainNoiseFreq);
+                combine(layer->Erosion.RainNoiseOctaves);
+                combine(layer->Erosion.RainNoiseThreshold);
+                combine(layer->Erosion.UseOrographicRain);
+                combine(layer->Erosion.WindAngle);
+                combine(layer->Erosion.DepositionMode);
+                combine(layer->Erosion.SpawnMinHeight);
+                combine(layer->Erosion.SpawnMaxHeight);
+                combine(layer->Erosion.InitialSedimentLoad);
+            }
+            return hash;
+        }
+        
+        size_t GetPlacementHash(size_t erosionHash) const {
+            size_t hash = erosionHash; // Placements depend on the final eroded heightmap
+            auto combine = [&hash](auto val) {
+                std::hash<decltype(val)> hasher;
+                hash ^= hasher(val) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+            };
+            
+            for (const auto& rule : Markers) {
+                combine(rule.Enabled);
+                combine(rule.Count);
+                combine(rule.Density);
+                combine(rule.Priority);
+                combine(rule.MinSlope);
+                combine(rule.MaxSlope);
+                combine(rule.MinHeight);
+                combine(rule.MaxHeight);
+                combine(rule.ClearanceSpacing);
+                combine(rule.MapEdgePadding);
+            }
+            
+            for (const auto& kvp : MarkersList) {
+                combine(kvp.first); // hash explicit markers
+                combine(kvp.second.Position[0]);
+                combine(kvp.second.Position[1]);
+                combine(kvp.second.Position[2]);
+            }
+            
+            return hash;
         }
     };
 

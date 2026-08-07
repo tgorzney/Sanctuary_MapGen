@@ -316,6 +316,45 @@ namespace SanmapGen {
                         finalB = B_b * invA + softBlend(B_b, S_b) * A;
                     }
                 }
+                
+                // --- FOCUS GRADIENT DEBUG OVERLAY ---
+                if (params.ShowFocusGradientDebugRuleIndex >= 0 && params.ShowFocusGradientDebugRuleIndex < (int)params.Markers.size()) {
+                    const auto& rule = params.Markers[params.ShowFocusGradientDebugRuleIndex];
+                    if (rule.FocusGradient != Gradient_None) {
+                        float dx = (float)(x - (width / 2));
+                        float dy = (float)(y - (height / 2));
+                        float dist = std::sqrt(dx*dx + dy*dy);
+                        
+                        float prob = 1.0f;
+                        if (rule.FocusGradient == Gradient_CenterFocus) {
+                            float norm = dist / rule.FocusGradientRadius;
+                            if (norm > 1.0f) norm = 1.0f;
+                            norm = std::pow(norm, rule.FocusGradientContrast);
+                            prob = 1.0f - (norm * rule.FocusGradientStrength);
+                        } else if (rule.FocusGradient == Gradient_EdgeFocus) {
+                            float norm = dist / rule.FocusGradientRadius;
+                            if (norm > 1.0f) norm = 1.0f;
+                            norm = std::pow(norm, rule.FocusGradientContrast);
+                            float baseProb = 1.0f - norm;
+                            prob = 1.0f - (baseProb * rule.FocusGradientStrength);
+                        } else if (rule.FocusGradient == Gradient_Torus) {
+                            float norm = std::abs(dist - rule.FocusGradientRadius) / rule.FocusGradientRadius;
+                            if (norm > 1.0f) norm = 1.0f;
+                            norm = std::pow(norm, rule.FocusGradientContrast);
+                            prob = 1.0f - (norm * rule.FocusGradientStrength);
+                        }
+                        
+                        prob = std::clamp(prob, 0.0f, 1.0f);
+                        
+                        float debugAlpha = (1.0f - prob) * 0.6f;
+                        if (debugAlpha > 0.0f) {
+                            finalR = finalR * (1.0f - debugAlpha) + 1.0f * debugAlpha;
+                            finalG = finalG * (1.0f - debugAlpha) + 0.0f * debugAlpha;
+                            finalB = finalB * (1.0f - debugAlpha) + 0.0f * debugAlpha;
+                        }
+                    }
+                }
+                
                 r = static_cast<uint8_t>(std::clamp(finalR * 255.0f, 0.0f, 255.0f));
                 g = static_cast<uint8_t>(std::clamp(finalG * 255.0f, 0.0f, 255.0f));
                 b = static_cast<uint8_t>(std::clamp(finalB * 255.0f, 0.0f, 255.0f));

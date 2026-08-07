@@ -51,10 +51,18 @@ namespace UI {
             }
         }
         
-        if (ImGui::Button("Export Sanmap (.sanmap / Full Project)", ImVec2(-1, 30))) {
+        if (ImGui::Button("Export Sanmap File Only (.sanmap)", ImVec2(-1, 30))) {
             std::string path;
             if (FileDialog::SelectFolder(path)) {
-                MapExporter::ExportSanmap(path, params, heightmap, genData);
+                MapExporter::ExportSanmap(path, params, heightmap, genData, false);
+            }
+        }
+        
+        ImGui::Spacing();
+        if (ImGui::Button("Export All (Project + Textures)", ImVec2(-1, 30))) {
+            std::string path;
+            if (FileDialog::SelectFolder(path)) {
+                MapExporter::ExportSanmap(path, params, heightmap, genData, true);
             }
         }
         

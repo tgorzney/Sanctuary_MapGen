@@ -35,6 +35,13 @@ namespace SanmapGen {
         // Expose raw data pointer for fast encoding (e.g. stb_image)
         const T* GetDataPtr() const { return data.data(); }
         T* GetMutableDataPtr() { return data.data(); }
+        
+        void Resize(int w, int h, T defaultValue = T()) {
+            if (width == w && height == h) return;
+            width = w;
+            height = h;
+            data.assign(w * h, defaultValue);
+        }
     };
 
     // FloatMask used for Heightmaps and Probability calculations

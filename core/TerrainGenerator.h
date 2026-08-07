@@ -14,10 +14,28 @@ namespace SanmapGen {
         FloatMask FlowMap;
         FloatMask AccumulationMap;
         
+        float TerrainMinHeight = 0.0f;
+        float TerrainMaxHeight = 128.0f;
+        
         std::vector<FloatMask> CachedRawNoise;
         std::vector<size_t> CachedNoiseHashes;
         
-        GenerationResult() : FlowMap(0, 0), AccumulationMap(0, 0) {}
+        // --- NEW CACHE PIPELINE ---
+        size_t CachedBlendHash = 0;
+        FloatMask CachedBlendedMap;
+        std::vector<FloatMask> CachedBlendedStratums;
+        std::vector<FloatMask> CachedBlendedMaterialMasks;
+        
+        size_t CachedErosionHash = 0;
+        FloatMask CachedErodedMap;
+        std::vector<FloatMask> CachedErodedStratums;
+        
+        size_t CachedPlacementHash = 0;
+        // --------------------------
+        
+        std::map<std::string, MarkerTransform> GeneratedMarkers;
+        
+        GenerationResult() : FlowMap(0, 0), AccumulationMap(0, 0), CachedBlendedMap(0, 0), CachedErodedMap(0, 0) {}
     };
 
     class TerrainGenerator {
@@ -53,6 +71,9 @@ namespace SanmapGen {
         
         // 2-Pass Blur for Legacy Symmetry Hardlines
         static void ApplySymmetryBlur(FloatMask& map, int mapSize, float blurRadius, int symmetryMask, int spawnPointCount);
+        
+        // Procedurally places markers based on MarkerRules using radial checks and cloning for symmetry
+        static void GenerateProceduralMarkers(const GenerationParams& params, const FloatMask& heightmap, const FloatMask& slopeMap, GenerationResult& inOutResult);
     };
 
 } // namespace SanmapGen

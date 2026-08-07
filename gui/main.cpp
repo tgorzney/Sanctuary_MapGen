@@ -6,6 +6,8 @@
 #include <math.h>
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <nlohmann/json.hpp>
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 #include "Parameters.h"
 #include "PreviewRenderer.h"
@@ -16,10 +18,212 @@
 #include "stb_image_write.h"
 #include "miniz.h"
 #include "UITabs.h"
+#include "../core/TextureLoader.h"
+
+using json = nlohmann::json;
 
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+}
+
+static bool bHasLoadedIcons = false;
+
+// Global helper to load and cache marker icons dynamically
+GLuint GetMarkerIcon(const std::string& typeName, SanmapGen::GenerationParams& params, void* openZipArchive = nullptr) {
+    if (typeName.empty()) return 0;
+    auto it = params.IconCache.find(typeName);
+    if (it != params.IconCache.end()) return it->second;
+
+    std::string typeLower = typeName;
+    std::transform(typeLower.begin(), typeLower.end(), typeLower.begin(), ::tolower);
+    std::string exactNameIconLower = "UI/Sprites/Icons/Resources/" + typeLower + "_icon";
+    std::string exactNameLower = "UI/Sprites/Icons/Resources/" + typeLower;
+    
+    std::string uiPack = params.GamedataPath + "/UI.sanpack";
+    std::string localDebug = "";
+    
+    GLuint t = 0;
+    
+    // First try loose folder (only search inside UI/Sprites/Icons, searching all Gamedata takes multiple seconds on Windows)
+    std::string looseIconsDir = params.GamedataPath + "/UI/Sprites/Icons";
+    if (std::filesystem::exists(looseIconsDir) && std::filesystem::is_directory(looseIconsDir)) {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(looseIconsDir)) {
+            if (!entry.is_regular_file()) continue;
+            std::string filename = entry.path().filename().string();
+            std::string lower = filename;
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+            std::string search1 = typeLower + "_icon";
+            std::string search2 = typeLower;
+            std::string search3 = "icon_" + typeLower;
+            
+            if (lower.find(search1) != std::string::npos || lower.find(search3) != std::string::npos || (lower.find(search2) != std::string::npos && lower.find(".dds") != std::string::npos)) {
+                auto ends_with = [](const std::string& str, const std::string& suffix) {
+                    return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+                };
+                if (ends_with(lower, ".png") || ends_with(lower, ".jpg") || ends_with(lower, ".tga")) {
+                    t = SanmapGen::TextureLoader::LoadImageFromFile(entry.path().string());
+                } else if (ends_with(lower, ".dds")) {
+                    t = SanmapGen::TextureLoader::LoadDDSFromFile(entry.path().string(), &localDebug);
+                }
+                if (t != 0) break;
+            }
+        }
+    }
+    
+    // Then try sanpack
+    if (t == 0 && std::filesystem::exists(uiPack)) {
+        if (std::filesystem::is_directory(uiPack)) {
+            std::string iconsPath = uiPack + "/UI/Sprites/Icons";
+            if (std::filesystem::exists(iconsPath)) {
+                for (const auto& entry : std::filesystem::recursive_directory_iterator(iconsPath)) {
+                    if (!entry.is_regular_file()) continue;
+                    std::string basename = entry.path().filename().string();
+                    std::string lower = basename;
+                    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                    
+                    std::string lowerNoExt = lower.substr(0, lower.find_last_of('.'));
+                    if (lowerNoExt == "icon_" + typeLower || lowerNoExt == typeLower + "_icon") {
+                        auto ends_with = [](const std::string& str, const std::string& suffix) {
+                            return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+                        };
+                        if (ends_with(lower, ".png") || ends_with(lower, ".jpg")) {
+                            t = SanmapGen::TextureLoader::LoadImageFromFile(entry.path().string());
+                        } else if (ends_with(lower, ".dds")) {
+                            t = SanmapGen::TextureLoader::LoadDDSFromFile(entry.path().string(), &localDebug);
+                        }
+                        if (t != 0) break;
+                    }
+                }
+            }
+        } else {
+            // It's a zip archive
+            static bool s_ZipScanned = false;
+            static std::unordered_map<std::string, std::string> s_IconToZipPath;
+            static std::unordered_map<std::string, int> s_IconToZipIndex;
+            
+            if (!s_ZipScanned) {
+                mz_zip_archive local_zip = {};
+                mz_zip_archive* local_zip_ptr = nullptr;
+                bool needsClose = false;
+                
+                if (openZipArchive) {
+                    local_zip_ptr = static_cast<mz_zip_archive*>(openZipArchive);
+                } else {
+                    if (mz_zip_reader_init_file(&local_zip, uiPack.c_str(), 0)) {
+                        local_zip_ptr = &local_zip;
+                        needsClose = true;
+                    }
+                }
+                
+                if (local_zip_ptr) {
+                    for (int i = 0; i < (int)mz_zip_reader_get_num_files(local_zip_ptr); ++i) {
+                        mz_zip_archive_file_stat file_stat;
+                        if (!mz_zip_reader_file_stat(local_zip_ptr, i, &file_stat)) continue;
+                        
+                        std::string originalName = file_stat.m_filename;
+                        std::string name = originalName;
+                        for (char& c : name) { if (c == '\\') c = '/'; }
+                        std::string lowerName = name;
+                        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+                        
+                        if (lowerName.find("ui/sprites/icons/") != std::string::npos) {
+                            std::string basename = name.substr(name.find_last_of('/') + 1);
+                            std::string lowerBase = basename;
+                            std::transform(lowerBase.begin(), lowerBase.end(), lowerBase.begin(), ::tolower);
+                            if (lowerBase.find("icon_") != std::string::npos || lowerBase.find("_icon") != std::string::npos || lowerBase.find("_symbol") != std::string::npos) {
+                                auto ends_with = [](const std::string& str, const std::string& suffix) {
+                                    return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+                                };
+                                if (ends_with(lowerBase, ".dds") || ends_with(lowerBase, ".png") || ends_with(lowerBase, ".jpg")) {
+                                    std::string typeName = basename;
+                                    size_t dotPos = typeName.find_last_of('.');
+                                    if (dotPos != std::string::npos) typeName = typeName.substr(0, dotPos);
+                                    
+                                    std::string lowerType = typeName;
+                                    std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), ::tolower);
+                                    size_t idx = lowerType.find("icon");
+                                    if (idx != std::string::npos) { typeName.erase(idx, 4); lowerType.erase(idx, 4); }
+                                    idx = lowerType.find("_");
+                                    if (idx != std::string::npos) { typeName.erase(idx, 1); lowerType.erase(idx, 1); }
+                                    
+                                    lowerType = typeName;
+                                    std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), ::tolower);
+                                    
+                                    s_IconToZipPath[lowerType] = originalName;
+                                    s_IconToZipIndex[lowerType] = i;
+                                }
+                            }
+                        }
+                    }
+                    if (needsClose) mz_zip_reader_end(local_zip_ptr);
+                }
+                s_ZipScanned = true;
+            }
+            
+            std::string targetPath = "";
+            int targetIndex = -1;
+            
+            std::ofstream debugFile("C:\\Users\\Tylre Gorzney\\.gemini\\antigravity\\brain\\0469c144-23c5-4280-9921-07d2b4449c2b\\scratch\\ScannerDebug.txt", std::ios::app);
+            debugFile << "Looking up: '" << typeName << "' (lower: '" << typeLower << "')\n";
+            debugFile << "  Zip cache size: " << s_IconToZipPath.size() << "\n";
+            
+            if (s_IconToZipPath.find(typeLower) != s_IconToZipPath.end()) {
+                targetPath = s_IconToZipPath[typeLower];
+                targetIndex = s_IconToZipIndex[typeLower];
+            }
+            
+            debugFile << "  Resolved targetPath: '" << targetPath << "' (Index: " << targetIndex << ")\n";
+            
+            if (!targetPath.empty()) {
+                auto ends_with = [](const std::string& str, const std::string& suffix) {
+                    return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+                };
+                std::string lowerPath = targetPath;
+                std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
+                
+                if (ends_with(lowerPath, ".dds")) {
+                    t = SanmapGen::TextureLoader::LoadDDSFromArchive(uiPack, targetPath, &localDebug, openZipArchive, targetIndex);
+                } else if (ends_with(lowerPath, ".png") || ends_with(lowerPath, ".jpg")) {
+                    t = SanmapGen::TextureLoader::LoadImageFromArchive(uiPack, targetPath, &localDebug, openZipArchive, targetIndex);
+                }
+            } else {
+                localDebug += "Could not resolve '" + typeName + "' in zip cache.\n";
+            }
+            if (!localDebug.empty()) debugFile << localDebug << "\n";
+            debugFile.close();
+        }
+    }
+    if (t == 0 && !localDebug.empty()) {
+        params.DebugInfo += localDebug + "\n";
+    }
+    
+    params.IconCache[typeName] = t; // Cache it even if it's 0 so we don't spam load attempts
+    return t;
+}
+
+void ForceScanIcons(SanmapGen::GenerationParams& params) {
+    if (params.GamedataPath.empty()) return;
+    std::string uiPack = params.GamedataPath + "/UI.sanpack";
+    params.IconScanDebugInfo = ""; // Clear old debug info
+    if (std::filesystem::exists(uiPack)) {
+        std::vector<std::string> scanned = SanmapGen::TextureLoader::ScanSanpackForMarkers(uiPack, &params.IconScanDebugInfo);
+        if (!scanned.empty()) {
+            params.KnownMarkerTypes = scanned;
+            std::string cacheFile = params.GamedataPath + "/icons_cache.json";
+            try {
+                json j; j["KnownMarkerTypes"] = params.KnownMarkerTypes;
+                std::ofstream o(cacheFile); o << j.dump(4);
+                params.IconScanDebugInfo += "Successfully saved " + std::to_string(scanned.size()) + " markers to icons_cache.json\n";
+            } catch(...) {
+                params.IconScanDebugInfo += "Failed to save icons_cache.json\n";
+            }
+        } else {
+            params.IconScanDebugInfo += "Warning: Scan returned empty list. Using defaults.\n";
+        }
+    } else {
+        params.IconScanDebugInfo += "UI.sanpack does not exist at " + uiPack + "\n";
+    }
 }
 
 // Scans the .sanpack for a given material and sets the Albedo/Normal/Composite paths
@@ -163,6 +367,59 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        static std::string lastGamedataPath = "";
+        if (lastGamedataPath != params.GamedataPath) {
+            bHasLoadedIcons = false;
+            lastGamedataPath = params.GamedataPath;
+        }
+
+        if (!bHasLoadedIcons && !params.GamedataPath.empty()) {
+            params.DebugInfo = "";
+            std::string uiPack = params.GamedataPath + "/UI.sanpack";
+            std::string cacheFile = params.GamedataPath + "/icons_cache.json";
+            
+            if (std::filesystem::exists(cacheFile)) {
+                try {
+                    std::ifstream i(cacheFile);
+                    json j; i >> j;
+                    if (j.contains("AvailableIcons")) {
+                        params.AvailableIcons = j["AvailableIcons"].get<std::vector<std::string>>();
+                    }
+                } catch (...) {}
+            }
+            
+            if (params.AvailableIcons.empty()) {
+                if (std::filesystem::exists(uiPack)) {
+                    std::vector<std::string> scanned = SanmapGen::TextureLoader::ScanSanpackForMarkers(uiPack);
+                    if (!scanned.empty()) {
+                        params.AvailableIcons = scanned;
+                        try {
+                            json j; j["AvailableIcons"] = params.AvailableIcons;
+                            std::ofstream o(cacheFile); o << j.dump(4);
+                        } catch(...) {}
+                    }
+                }
+            }
+            // Clear old cache when gamedata path changes
+            for (auto& kv : params.IconCache) {
+                if (kv.second) glDeleteTextures(1, &kv.second);
+            }
+            params.IconCache.clear();
+            
+            // PRELOAD ALL ICONS SO THE SELECTOR IS INSTANT
+            if (std::filesystem::exists(uiPack) && !params.AvailableIcons.empty()) {
+                mz_zip_archive zip_archive = {};
+                if (mz_zip_reader_init_file(&zip_archive, uiPack.c_str(), 0)) {
+                    for (const auto& tName : params.AvailableIcons) {
+                        GetMarkerIcon(tName, params, &zip_archive);
+                    }
+                    mz_zip_reader_end(&zip_archive);
+                }
+            }
+            
+            bHasLoadedIcons = true;
+        }
+
         static float leftPaneWidth = 180.0f;
         
         // --- GENERATOR SETTINGS WINDOW ---
@@ -172,6 +429,7 @@ int main(int, char**)
         // LEFT PANE - TABS
         ImGui::BeginChild("LeftPane", ImVec2(leftPaneWidth, 0), true);
         static int activeTab = 0;
+        static std::string selectedMarkerKey = "";
         
         auto TabButton = [&](const char* label, bool& showVar, int tabIndex) {
             ImGui::PushID(tabIndex);
@@ -189,6 +447,7 @@ int main(int, char**)
 
         ImGui::Text("TERRAIN & LAYERS");
         ImGui::Separator();
+        TabButton("Symmetry", params.ShowSymmetry, 15);
         TabButton("Heightmap", params.ShowHeightmap, 0);
         TabButton("Slope Map", params.ShowSlopeMap, 1);
         TabButton("Flow Map", params.ShowFlowMap, 13);
@@ -235,6 +494,21 @@ int main(int, char**)
             
             SanmapGen::TerrainGenerator::GenerateMap(dummyMap, params, genResult);
             stratums = genResult.Stratums;
+            params.TerrainMinHeight = genResult.TerrainMinHeight;
+            params.TerrainMaxHeight = genResult.TerrainMaxHeight;
+            
+            // Merge procedural markers (delete old procedural ones first)
+            for (auto it = params.MarkersList.begin(); it != params.MarkersList.end(); ) {
+                if (!it->second.IsManual) {
+                    it = params.MarkersList.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+            for (const auto& kvp : genResult.GeneratedMarkers) {
+                params.MarkersList[kvp.first] = kvp.second;
+            }
+            
             bNeedsPreviewRender = true;
         }
         
@@ -253,6 +527,7 @@ int main(int, char**)
         // RIGHT PANE - SETTINGS
         ImGui::BeginChild("SettingsPane", ImVec2(0, 0), true);
         switch (activeTab) {
+            case 15: SanmapGen::UI::RenderSymmetryTab(params, bNeedsMapUpdate); break;
             case 0: SanmapGen::UI::RenderHeightmapTab(params, bNeedsMapUpdate); break;
             case 1: SanmapGen::UI::RenderSlopeMapTab(params, bNeedsPreviewRender); break;
             case 13: SanmapGen::UI::RenderFlowMapTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
@@ -264,7 +539,7 @@ int main(int, char**)
             case 6: SanmapGen::UI::RenderSmoothnessTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 7: SanmapGen::UI::RenderWaterTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 8: SanmapGen::UI::RenderAtmosphereTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
-            case 9: SanmapGen::UI::RenderMarkersTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
+            case 9: SanmapGen::UI::RenderMarkersTab(params, selectedMarkerKey, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 10: SanmapGen::UI::RenderPropsTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 11: SanmapGen::UI::RenderPerformanceTab(params, bNeedsMapUpdate); break;
             case 12: SanmapGen::UI::RenderSaveExportTab(params, dummyMap, genResult, bNeedsMapUpdate); break;
@@ -413,6 +688,207 @@ int main(int, char**)
             ImVec2 uv1 = ImVec2(0.5f + 0.5f / mapZoom + mapOffset.x, 0.5f + 0.5f / mapZoom + mapOffset.y);
             
             ImGui::GetWindowDrawList()->AddImage((void*)(intptr_t)previewTexture, p0, p1, uv0, uv1);
+
+            static std::string draggingMarker = "";
+            static bool isDraggingMarker = false;
+            static ImVec2 dragOffset(0, 0);
+            ImVec2 mousePos = ImGui::GetIO().MousePos;
+            bool isHoveringPreview = isHovered;
+
+            if (params.ShowMarkers) {
+                int spawnIndex = 0;
+                ImU32 spawnColors[] = {
+                    IM_COL32(255, 0, 0, 255),    // Red
+                    IM_COL32(255, 255, 0, 255),  // Yellow
+                    IM_COL32(255, 128, 0, 255),  // Orange
+                    IM_COL32(0, 0, 255, 255),    // Blue
+                    IM_COL32(0, 255, 0, 255),    // Green
+                    IM_COL32(128, 0, 128, 255),  // Purple
+                    IM_COL32(255, 192, 203, 255),// Pink
+                    IM_COL32(255, 0, 255, 255),  // Magenta
+                    IM_COL32(0, 128, 128, 255)   // Teal
+                };
+                int numSpawnColors = sizeof(spawnColors) / sizeof(spawnColors[0]);
+                
+                // Determine screen position for each marker
+                for (auto& [key, marker] : params.MarkersList) {
+                    if (marker.IsHidden) continue;
+                    
+                    float worldU = marker.Position[0] / (float)params.MapSize;
+                    float worldV = marker.Position[2] / (float)params.MapSize;
+                    
+                    float screenU = (worldU - uv0.x) / (uv1.x - uv0.x);
+                    float screenV = (worldV - uv0.y) / (uv1.y - uv0.y);
+                    
+                    ImVec2 screenPos;
+                    screenPos.x = p0.x + screenU * renderSize;
+                    screenPos.y = p0.y + screenV * renderSize;
+                    
+                    // Base size is ~32 pixels for zoom 1
+                    float baseScale = 32.0f;
+                    if (marker.Type == "Alloy" || marker.Type == "Alloys") baseScale *= params.MarkerScaleAlloy;
+                    else if (marker.Type == "Spawn" || marker.Type == "Spawns") baseScale *= params.MarkerScaleSpawn;
+                    else if (marker.Type == "Plasma" || marker.Type == "Plasmas") baseScale *= params.MarkerScalePlasma;
+                    
+                    ImVec2 iconP0(screenPos.x - baseScale/2.0f, screenPos.y - baseScale/2.0f);
+                    ImVec2 iconP1(screenPos.x + baseScale/2.0f, screenPos.y + baseScale/2.0f);
+                    
+                    float globalColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+                    std::string iconName = marker.Type;
+                    
+                    if (marker.Type == "Alloy" || marker.Type == "Alloys") {
+                        iconName = params.GlobalIconAlloy;
+                        globalColor[0] = params.MarkerColorAlloy[0]; globalColor[1] = params.MarkerColorAlloy[1]; globalColor[2] = params.MarkerColorAlloy[2]; globalColor[3] = params.MarkerColorAlloy[3];
+                    } else if (marker.Type == "Spawn" || marker.Type == "Spawns") {
+                        iconName = params.GlobalIconSpawn;
+                        globalColor[0] = params.MarkerColorSpawn[0]; globalColor[1] = params.MarkerColorSpawn[1]; globalColor[2] = params.MarkerColorSpawn[2]; globalColor[3] = params.MarkerColorSpawn[3];
+                        
+                        // Tint by army color
+                        ImU32 sc = spawnColors[spawnIndex % numSpawnColors];
+                        globalColor[0] *= ((sc >> 0) & 0xFF) / 255.0f;
+                        globalColor[1] *= ((sc >> 8) & 0xFF) / 255.0f;
+                        globalColor[2] *= ((sc >> 16) & 0xFF) / 255.0f;
+                        globalColor[3] *= ((sc >> 24) & 0xFF) / 255.0f;
+                        spawnIndex++;
+                    } else if (marker.Type == "Plasma" || marker.Type == "Plasmas") {
+                        iconName = params.GlobalIconPlasma;
+                        globalColor[0] = params.MarkerColorPlasma[0]; globalColor[1] = params.MarkerColorPlasma[1]; globalColor[2] = params.MarkerColorPlasma[2]; globalColor[3] = params.MarkerColorPlasma[3];
+                    }
+                    
+                    if (!marker.IconOverride.empty()) {
+                        iconName = marker.IconOverride;
+                    }
+                    
+                    GLuint tex = GetMarkerIcon(iconName, params);
+                    if (tex == 0) tex = GetMarkerIcon(marker.Type, params); // Fallback to base type name
+                    if (tex == 0 && !params.IconCache.empty()) tex = params.IconCache.begin()->second; // Ultimate fallback
+                    ImU32 tintCol = IM_COL32(
+                        std::clamp((int)(globalColor[0] * marker.Color[0] * 255.0f), 0, 255),
+                        std::clamp((int)(globalColor[1] * marker.Color[1] * 255.0f), 0, 255),
+                        std::clamp((int)(globalColor[2] * marker.Color[2] * 255.0f), 0, 255),
+                        std::clamp((int)(globalColor[3] * marker.Color[3] * 255.0f), 0, 255)
+                    );
+                    
+                    // Is the mouse over this marker?
+                    bool hit = (mousePos.x >= iconP0.x && mousePos.x <= iconP1.x &&
+                                mousePos.y >= iconP0.y && mousePos.y <= iconP1.y);
+                                
+                    if (hit && isHoveringPreview) {
+                        if (ImGui::IsMouseClicked(0) && !isDraggingMarker) {
+                            draggingMarker = key;
+                            selectedMarkerKey = key;
+                            activeTab = 9; // Switch to Markers tab
+                            isDraggingMarker = true;
+                            // Record relative offset to icon center
+                            dragOffset.x = mousePos.x - screenPos.x;
+                            dragOffset.y = mousePos.y - screenPos.y;
+                        }
+                        if (ImGui::IsMouseClicked(1)) {
+                            ImGui::OpenPopup(("MarkerContext_" + key).c_str());
+                        }
+                    }
+                    
+                    if (tex != 0) {
+                        if (!marker.IsValid) {
+                            ImGui::GetWindowDrawList()->AddRectFilled(iconP0, iconP1, IM_COL32(255, 0, 0, 150));
+                        }
+                        ImGui::GetWindowDrawList()->AddImage((void*)(intptr_t)tex, iconP0, iconP1, ImVec2(0,0), ImVec2(1,1), tintCol);
+                    } else {
+                        ImU32 col = IM_COL32(255, 255, 0, 255);
+                        if (!marker.IsValid) col = IM_COL32(255, 0, 0, 255);
+                        else if (marker.Type == "Spawn") col = tintCol;
+                        else if (marker.Type == "Plasma") col = IM_COL32(255, 0, 255, 255);
+                        
+                        if (marker.Type == "Alloy") {
+                            ImVec2 p1(screenPos.x, iconP0.y);
+                            ImVec2 p2(iconP1.x, iconP1.y);
+                            ImVec2 p3(iconP0.x, iconP1.y);
+                            ImGui::GetWindowDrawList()->AddTriangleFilled(p1, p2, p3, col);
+                        } else {
+                            ImGui::GetWindowDrawList()->AddRectFilled(iconP0, iconP1, col);
+                        }
+                    }
+                    
+                    if (ImGui::BeginPopup(("MarkerContext_" + key).c_str())) {
+                        if (ImGui::MenuItem("Delete Marker")) {
+                            params.MarkersList.erase(key);
+                            ImGui::EndPopup();
+                            break; // Stop iteration as map was modified
+                        }
+                        ImGui::EndPopup();
+                    }
+                }
+                
+                // Handle dragging
+                if (isDraggingMarker) {
+                    if (ImGui::IsMouseDragging(0, 0.0f)) {
+                        auto it = params.MarkersList.find(draggingMarker);
+                        if (it != params.MarkersList.end()) {
+                            float screenU_drag = (mousePos.x - dragOffset.x - p0.x) / renderSize;
+                            float screenV_drag = (mousePos.y - dragOffset.y - p0.y) / renderSize;
+                            
+                            float worldU_drag = uv0.x + screenU_drag * (uv1.x - uv0.x);
+                            float worldV_drag = uv0.y + screenV_drag * (uv1.y - uv0.y);
+                            
+                            it->second.Position[0] = std::clamp(worldU_drag * params.MapSize, 0.0f, (float)params.MapSize);
+                            it->second.Position[2] = std::clamp(worldV_drag * params.MapSize, 0.0f, (float)params.MapSize);
+                        }
+                    }
+                    if (ImGui::IsMouseReleased(0)) {
+                        bNeedsMapUpdate = true; // Trigger JSON save update or logic if necessary upon drop
+                        isDraggingMarker = false;
+                        draggingMarker = "";
+                    }
+                }
+                
+                // Context Menu on the map itself
+                if (isHoveringPreview && ImGui::IsMouseClicked(1) && !isDraggingMarker) {
+                    ImGui::OpenPopup("AddMarkerMenu");
+                }
+                
+                if (ImGui::BeginPopup("AddMarkerMenu")) {
+                    if (ImGui::BeginMenu("Add Marker")) {
+                        if (ImGui::MenuItem("Alloy")) {
+                            std::string newKey = "Alloys_" + std::to_string(params.MarkersList.size() + 1);
+                            SanmapGen::MarkerTransform m;
+                            m.Type = "Alloy";
+                            m.IsManual = true;
+                            float screenU_clk = (mousePos.x - p0.x) / renderSize;
+                            float screenV_clk = (mousePos.y - p0.y) / renderSize;
+                            m.Position[0] = (uv0.x + screenU_clk * (uv1.x - uv0.x)) * params.MapSize;
+                            m.Position[2] = (uv0.y + screenV_clk * (uv1.y - uv0.y)) * params.MapSize;
+                            m.Scale[0] = 1.0f; m.Scale[1] = 1.0f; m.Scale[2] = 1.0f;
+                            params.MarkersList[newKey] = m;
+                        }
+                        if (ImGui::MenuItem("Plasma")) {
+                            std::string newKey = "Plasmas_" + std::to_string(params.MarkersList.size() + 1);
+                            SanmapGen::MarkerTransform m;
+                            m.Type = "Plasma";
+                            m.IsManual = true;
+                            float screenU_clk = (mousePos.x - p0.x) / renderSize;
+                            float screenV_clk = (mousePos.y - p0.y) / renderSize;
+                            m.Position[0] = (uv0.x + screenU_clk * (uv1.x - uv0.x)) * params.MapSize;
+                            m.Position[2] = (uv0.y + screenV_clk * (uv1.y - uv0.y)) * params.MapSize;
+                            m.Scale[0] = 1.0f; m.Scale[1] = 1.0f; m.Scale[2] = 1.0f;
+                            params.MarkersList[newKey] = m;
+                        }
+                        if (ImGui::MenuItem("Spawn")) {
+                            std::string newKey = "Spawns_" + std::to_string(params.MarkersList.size() + 1);
+                            SanmapGen::MarkerTransform m;
+                            m.Type = "Spawn";
+                            m.IsManual = true;
+                            float screenU_clk = (mousePos.x - p0.x) / renderSize;
+                            float screenV_clk = (mousePos.y - p0.y) / renderSize;
+                            m.Position[0] = (uv0.x + screenU_clk * (uv1.x - uv0.x)) * params.MapSize;
+                            m.Position[2] = (uv0.y + screenV_clk * (uv1.y - uv0.y)) * params.MapSize;
+                            m.Scale[0] = 1.0f; m.Scale[1] = 1.0f; m.Scale[2] = 1.0f;
+                            params.MarkersList[newKey] = m;
+                        }
+                        ImGui::EndMenu();
+                    }
+                    ImGui::EndPopup();
+                }
+            }
         }
         ImGui::End(); // Map Preview Window
 

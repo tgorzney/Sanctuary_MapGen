@@ -9,7 +9,7 @@ namespace SanmapGen {
 class MapExporter {
 public:
     // Export the final playable map format to the specified folder
-    static void ExportSanmap(const std::string& folderPath, const GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData);
+    static void ExportSanmap(const std::string& folderPath, const GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool exportTextures = true);
 
     // Individual File Exporters
     static void ExportHeightmap(const std::string& filePath, const GenerationParams& params, const FloatMask& heightmap);

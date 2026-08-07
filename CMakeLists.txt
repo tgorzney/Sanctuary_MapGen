@@ -109,6 +109,7 @@ find_package(OpenMP REQUIRED)
 
 # Add our application executable
 add_executable(SanmapGenerator
+    core/TextureLoader.cpp
     gui/main.cpp
     gui/PreviewRenderer.cpp
     gui/TerrainTabs.cpp

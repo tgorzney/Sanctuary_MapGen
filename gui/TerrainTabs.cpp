@@ -372,7 +372,16 @@ namespace UI {
         if (ImGui::SliderFloat("Global Gravity", &params.GlobalGravity, 1.0f, 20.0f)) bNeedsMapUpdate = true;
 
         ImGui::Spacing();
+        ImGui::Text("GeoLayers Hierarchy");
+        ImGui::Separator();
+        
+        std::vector<NoiseLayer> dummy;
+        RenderLayerStack(params, dummy, &params.GeoLayers, true, bNeedsMapUpdate);
+    }
+    
+    void RenderSymmetryTab(GenerationParams& params, bool& bNeedsMapUpdate) {
         ImGui::Text("Global Symmetry");
+        ImGui::Separator();
         
         int current_alg = static_cast<int>(params.SymAlgorithm);
         const char* alg_names[] = { "Fold", "Blur", "Cross Fade", "Cylinder3D", "Torus3D", "Native Hash", "Superposition" };
@@ -409,14 +418,6 @@ namespace UI {
         if (ImGui::Checkbox("Z",      &symZ))      { params.GlobalSymmetryMask ^= Symmetry_Z;      bNeedsMapUpdate = true; } ImGui::SameLine();
         if (ImGui::Checkbox("XY",     &symXY))     { params.GlobalSymmetryMask ^= Symmetry_XY;     bNeedsMapUpdate = true; } ImGui::SameLine();
         if (ImGui::Checkbox("Radial", &symRadial)) { params.GlobalSymmetryMask ^= Symmetry_Radial; bNeedsMapUpdate = true; }
-        
-
-        ImGui::Spacing();
-        ImGui::Text("GeoLayers Hierarchy");
-        ImGui::Separator();
-        
-        std::vector<NoiseLayer> dummy;
-        RenderLayerStack(params, dummy, &params.GeoLayers, true, bNeedsMapUpdate);
     }
 
     bool GradientEditor(const char* label, GradientSettings& gradient, float maxLocation) {

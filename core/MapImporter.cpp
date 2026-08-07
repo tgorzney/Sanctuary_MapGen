@@ -257,6 +257,39 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
         log("stratums_1_4.tga does not exist.\n");
     }
 
+    // Load explicitly placed markers (and wipe procedural rules)
+    outParams.Markers.clear(); // User explicitly asked to disable procedural markers on map load
+    if (mapdef.contains("markers") && mapdef["markers"].is_object()) {
+        auto markers = mapdef["markers"];
+        for (auto it = markers.begin(); it != markers.end(); ++it) {
+            std::string markerType = it.key();
+            auto typeObj = it.value();
+            if (typeObj.contains("transforms") && typeObj["transforms"].is_object()) {
+                auto transforms = typeObj["transforms"];
+                for (auto tIt = transforms.begin(); tIt != transforms.end(); ++tIt) {
+                    std::string transformName = tIt.key();
+                    auto tVal = tIt.value();
+                    
+                    MarkerTransform mt;
+                    mt.Type = markerType;
+                    
+                    if (tVal.is_array() && tVal.size() >= 3) {
+                        mt.Position[0] = tVal[0];
+                        mt.Position[1] = tVal[1];
+                        mt.Position[2] = tVal[2];
+                    } else if (tVal.is_object() && tVal.contains("position") && tVal["position"].is_object()) {
+                        auto pos = tVal["position"];
+                        if (pos.contains("x")) mt.Position[0] = pos["x"];
+                        if (pos.contains("y")) mt.Position[1] = pos["y"];
+                        if (pos.contains("z")) mt.Position[2] = pos["z"];
+                    }
+                    
+                    outParams.MarkersList[transformName] = mt;
+                }
+            }
+        }
+    }
+
     log("--- End LoadSanmap (SUCCESS) ---\n");
     return true;
 }
