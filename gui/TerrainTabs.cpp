@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <fstream>
 #include <cmath>
+#include <execution>
+#include <vector>
 
 namespace SanmapGen {
 namespace UI {
@@ -25,7 +27,7 @@ namespace UI {
         ImGui::PushStyleColor(ImGuiCol_Header,        ImVec4(0.18f, 0.18f, 0.19f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered,  ImVec4(0.25f, 0.25f, 0.27f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_HeaderActive,   ImVec4(0.30f, 0.30f, 0.33f, 1.0f));
-        bool expanded = ImGui::CollapsingHeader(layer.Name.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanFullWidth);
+        bool expanded = ImGui::CollapsingHeader(layer.Name.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_AllowOverlap);
         ImGui::PopStyleColor(3);
 
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
@@ -358,9 +360,36 @@ namespace UI {
                         params.MapSize = sizes[size_idx];
                         bNeedsMapUpdate = true;
                         if (params.ScaleFeaturesToMapSize) {
-                            float scale = static_cast<float>(oldS) / sizes[n];
+                            float scale = static_cast<float>(sizes[n]) / oldS; // Corrected scaling math: new / old
                             for (auto& gl : params.GeoLayers) {
-                                for (auto& l : gl.Layers) l.Frequency *= scale;
+                                for (auto& l : gl.Layers) l.Frequency /= scale; // Frequency gets smaller to stretch
+                            }
+                            
+                            // Hardware-optimized SIMD scaling for manual markers
+                            std::vector<MarkerTransform*> markerPtrs;
+                            markerPtrs.reserve(params.MarkersList.size());
+                            for (auto& [k, m] : params.MarkersList) markerPtrs.push_back(&m);
+                            
+                            std::for_each(std::execution::par_unseq, markerPtrs.begin(), markerPtrs.end(), [scale](MarkerTransform* m) {
+                                m->Position[0] *= scale;
+                                m->Position[2] *= scale;
+                            });
+                            
+                            // Hardware-optimized SIMD scaling for static props
+                            std::for_each(std::execution::par_unseq, params.StaticPropsList.begin(), params.StaticPropsList.end(), [scale](GenerationParams::PropInstance& p) {
+                                p.X *= scale;
+                                p.Z *= scale;
+                            });
+                            
+                            // Rebuild Spatial Grid
+                            int chunks = params.SpatialGridResolution;
+                            params.MarkerSpatialGrid.assign(chunks * chunks, GenerationParams::MarkerChunk());
+                            for (const auto& [key, marker] : params.MarkersList) {
+                                float normX = marker.Position[0] / params.MapSize;
+                                float normY = marker.Position[2] / params.MapSize;
+                                int cx = std::clamp(static_cast<int>(normX * chunks), 0, chunks - 1);
+                                int cy = std::clamp(static_cast<int>(normY * chunks), 0, chunks - 1);
+                                params.MarkerSpatialGrid[cy * chunks + cx].MarkerKeys.push_back(key);
                             }
                         }
                     }

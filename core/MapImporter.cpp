@@ -18,6 +18,10 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     };
     log("--- Start LoadSanmap ---\n");
     log("Input path: " + pathOrFolder + "\n");
+    
+    // Clear old markers before loading
+    outParams.MarkersList.clear();
+    outParams.StaticPropsList.clear();
 
     std::string mapdefPath = pathOrFolder;
     std::string folderPath = pathOrFolder;
@@ -276,6 +280,21 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
 
     // Load explicitly placed markers (and wipe procedural rules)
     outParams.Markers.clear(); // User explicitly asked to disable procedural markers on map load
+    
+    // Auto-scale markers if Playable Area width is smaller than MapSize
+    float markerScaleFactor = 1.0f;
+    if (mapdef.contains("areas") && mapdef["areas"].is_object() && 
+        mapdef["areas"].contains("Playable") && mapdef["areas"]["Playable"].is_object() &&
+        mapdef["areas"]["Playable"].contains("width")) {
+        float playableWidth = mapdef["areas"]["Playable"]["width"];
+        if (playableWidth > 0 && playableWidth != outParams.MapSize) {
+            markerScaleFactor = static_cast<float>(outParams.MapSize) / playableWidth;
+            log("Detected Playable Area mismatch (Playable: " + std::to_string(playableWidth) + 
+                ", MapSize: " + std::to_string(outParams.MapSize) + "). Applying scale factor: " + 
+                std::to_string(markerScaleFactor) + "\n");
+        }
+    }
+    
     if (mapdef.contains("markers") && mapdef["markers"].is_object()) {
         auto markers = mapdef["markers"];
         for (auto it = markers.begin(); it != markers.end(); ++it) {
@@ -284,26 +303,58 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             if (typeObj.contains("transforms") && typeObj["transforms"].is_object()) {
                 auto transforms = typeObj["transforms"];
                 for (auto tIt = transforms.begin(); tIt != transforms.end(); ++tIt) {
-                    std::string transformName = tIt.key();
+                    std::string originalKey = tIt.key();
+                    std::string transformName = markerType + "_" + originalKey;
                     auto tVal = tIt.value();
                     
                     MarkerTransform mt;
                     mt.Type = markerType;
+                    mt.CustomName = transformName; // The unique internal key
+                    mt.IsManual = true; // Essential: prevents Generator from deleting it
                     
                     if (tVal.is_array() && tVal.size() >= 3) {
-                        mt.Position[0] = tVal[0];
+                        mt.Position[0] = static_cast<float>(tVal[0]) * markerScaleFactor;
                         mt.Position[1] = tVal[1];
-                        mt.Position[2] = tVal[2];
+                        mt.Position[2] = static_cast<float>(tVal[2]) * markerScaleFactor;
                     } else if (tVal.is_object() && tVal.contains("position") && tVal["position"].is_object()) {
                         auto pos = tVal["position"];
-                        if (pos.contains("x")) mt.Position[0] = pos["x"];
+                        if (pos.contains("x")) mt.Position[0] = static_cast<float>(pos["x"]) * markerScaleFactor;
                         if (pos.contains("y")) mt.Position[1] = pos["y"];
-                        if (pos.contains("z")) mt.Position[2] = pos["z"];
+                        if (pos.contains("z")) mt.Position[2] = static_cast<float>(pos["z"]) * markerScaleFactor;
                     }
                     
-                    outParams.MarkersList[transformName] = mt;
+                    bool isGameplay = false;
+                    for (const auto& kt : outParams.KnownMarkerTypes) {
+                        if (markerType == kt) {
+                            isGameplay = true;
+                            break;
+                        }
+                    }
+                    
+                    if (isGameplay) {
+                        outParams.MarkersList[transformName] = mt;
+                    } else {
+                        GenerationParams::PropInstance pi;
+                        pi.X = mt.Position[0];
+                        pi.Y = mt.Position[1];
+                        pi.Z = mt.Position[2];
+                        pi.TintColor = 0xFF00FF00; // Default green for props
+                        outParams.StaticPropsList.push_back(pi);
+                    }
                 }
             }
+        }
+        
+        // Build Spatial Chunk Grid for O(1) click detection
+        int chunks = outParams.SpatialGridResolution;
+        outParams.MarkerSpatialGrid.assign(chunks * chunks, GenerationParams::MarkerChunk());
+        
+        for (const auto& [key, marker] : outParams.MarkersList) {
+            float normX = marker.Position[0] / outParams.MapSize;
+            float normY = marker.Position[2] / outParams.MapSize;
+            int cx = std::clamp(static_cast<int>(normX * chunks), 0, chunks - 1);
+            int cy = std::clamp(static_cast<int>(normY * chunks), 0, chunks - 1);
+            outParams.MarkerSpatialGrid[cy * chunks + cx].MarkerKeys.push_back(key);
         }
     }
 

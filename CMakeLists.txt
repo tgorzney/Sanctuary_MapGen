@@ -60,6 +60,7 @@ set(CORE_SOURCES
     core/TerrainCompute.cpp
     core/MapExporter.cpp
     core/MapImporter.cpp
+    core/SupComImporter.cpp
     core/FileDialog.cpp
     core/ImageUtils.cpp
     core/PlacementRules.h

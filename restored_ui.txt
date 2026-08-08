@@ -1,0 +1,282 @@
+Created At: 2026-08-07T13:51:43-05:00
+Completed At: 2026-08-07T13:51:44-05:00
+The following changes were made by the multi_replace_file_content tool to: D:\Projects\Sanctuary\Map Generator\gui\EnvironmentTabs.cpp. If relevant, proactively run terminal commands to execute this code for the USER. Don't ask for permission.
+[diff_block_start]
+@@ -193,34 +193,29 @@
+         ImGui::PopItemWidth();
+ 
+         ImGui::Spacing();
+-        ImGui::Text("Random Generation Settings");
+-        ImGui::Separator();
+-        
+-        if (ImGui::SliderInt("Spawn Count", &params.SpawnPointCount, 2, 16)) bNeedsMapUpdate = true;
+-        if (ImGui::SliderFloat("Alloy Mult", &params.AlloyMultiplier, 0.0f, 3.0f)) bNeedsPreviewRender = true;
+-        if (ImGui::SliderFloat("Hydro Mult", &params.HydroMultiplier, 0.0f, 3.0f)) bNeedsPreviewRender = true;
+-        if (ImGui::SliderFloat("Mex Density", &params.MexDensity, 0.0f, 3.0f)) bNeedsPreviewRender = true;
+-        // Also move reclaim density here since it belongs with markers
+-        if (ImGui::SliderFloat("Reclaim Density", &params.ReclaimDensity, 0.0f, 5.0f)) bNeedsPreviewRender = true;
+-        
+-        ImGui::Spacing();
+-        if (!selectedMarkerKey.empty()) {
+-            ImGui::Text("Selected Marker Properties");
+-            ImGui::Separator();
+-            
+-            auto it = params.MarkersList.find(selectedMarkerKey);
+-            if (it != params.MarkersList.end()) {
+-                SanmapGen::MarkerTransform& marker = it->second;
+-                
+-                std::string iconToDisplay = marker.IconOverride.empty() ? marker.Type : marker.IconOverride;
+-                RenderIconPicker("SelectedMarkerIcon", iconToDisplay, params, bNeedsPreviewRender);
+-                if (iconToDisplay != marker.Type) marker.IconOverride = iconToDisplay;
+-                else marker.IconOverride = ""; // if they picked the default type name, clear the override
+-                
+-                ImGui::SameLine();
+-                ImGui::Text("Type: %s", marker.Type.c_str());
+-                ImGui::Text("Position: X: %.1f, Y: %.1f, Z: %.1f", marker.Position[0], marker.Position[1], marker.Position[2]);
+-                
++        ImGui::Text("Placed Markers");
++        ImGui::Separator();
++        
++        if (ImGui::Button("Add Marker", ImVec2(-1, 30))) {
++            SanmapGen::MarkerTransform newMarker;
++            newMarker.Type = "Spawn";
++            newMarker.CustomName = "New_Marker_" + std::to_string(params.MarkersList.size());
++            params.MarkersList[newMarker.CustomName] = newMarker;
++            bNeedsMapUpdate = true;
++            bNeedsPreviewRender = true;
++        }
++        ImGui::Spacing();
++        
++        std::string keyToDelete = "";
++        for (auto& kvp : params.MarkersList) {
++            auto& key = kvp.first;
++            auto& marker = kvp.second;
++            
++            ImGui::PushID(key.c_str());
++            char label[128];
++            snprintf(label, sizeof(label), "%s (%s)", marker.CustomName.empty() ? key.c_str() : marker.CustomName.c_str(), marker.Type.c_str());
++            
++            if (ImGui::CollapsingHeader(label)) {
+                 char nameBuf[128]; 
+                 strncpy(nameBuf, marker.CustomName.c_str(), sizeof(nameBuf));
+                 if (ImGui::InputText("Name/ID", nameBuf, sizeof(nameBuf))) {
+@@ -227,62 +227,13 @@
+                     bNeedsMapUpdate = true;
+                 }
+-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Examples: 'ARMY_1' for Spawns, 'Mex 0' for Alloys");
+-                
+-                if (ImGui::ColorEdit4("Color", marker.Color, ImGuiColorEditFlags_NoInputs)) bNeedsPreviewRender = true;
+-                
+-                ImGui::Spacing();
+-                ImGui::Text("Symmetry Settings");
+-                if (ImGui::Checkbox("Use Global Symmetry", &marker.SymmetryUseGlobal)) bNeedsMapUpdate = true;
+-                if (!marker.SymmetryUseGlobal) {
+-                    bool symPoint  = (marker.SymmetryMask & Symmetry_Point);
+-                    bool symX      = (marker.SymmetryMask & Symmetry_X);
+-                    bool symZ      = (marker.SymmetryMask & Symmetry_Z);
+-                    bool symXY     = (marker.SymmetryMask & Symmetry_XY);
+-                    bool symRadial = (marker.SymmetryMask & Symmetry_Radial);
+-
+-                    if (ImGui::Checkbox("Point (Origin)", &symPoint)) bNeedsMapUpdate = true;
+-                    if (ImGui::Checkbox("X-Axis (Left/Right)", &symX)) bNeedsMapUpdate = true;
+-                    if (ImGui::Checkbox("Z-Axis (Top/Bottom)", &symZ)) bNeedsMapUpdate = true;
+-                    if (ImGui::Checkbox("XY-Axis (Diagonal)", &symXY)) bNeedsMapUpdate = true;
+-                    if (ImGui::Checkbox("Radial", &symRadial)) bNeedsMapUpdate = true;
+-
+-                    int newMask = 0;
+-                    if (symPoint)  newMask |= Symmetry_Point;
+-                    if (symX)      newMask |= Symmetry_X;
+-                    if (symZ)      newMask |= Symmetry_Z;
+-                    if (symXY)     newMask |= Symmetry_XY;
+-                    if (symRadial) newMask |= Symmetry_Radial;
+-                    marker.SymmetryMask = newMask;
+-                }
+-                
+-            } else {
+-                selectedMarkerKey = ""; // Deselect if not found
+-            }
+-            ImGui::Spacing();
+-        }
+-        
+-        ImGui::Text("Custom Marker Rules");
+-        ImGui::Separator();
+-        
+-        if (ImGui::Button("Add Marker Rule", ImVec2(-1, 30))) {
+-            SanmapGen::MarkerRule rule;
+-            rule.Name = "Marker " + std::to_string(params.Markers.size());
+-            params.Markers.push_back(rule);
+-            bNeedsMapUpdate = true;
+-        }
+-        ImGui::Spacing();
+-        
+-        for (int i = 0; i < (int)params.Markers.size(); ++i) {
+-            ImGui::PushID(i);
+-            char label[64]; snprintf(label, sizeof(label), "Marker %d - %s", i, params.Markers[i].Name.c_str());
+-            if (ImGui::CollapsingHeader(label)) {
+-                if (ImGui::Checkbox("Enabled", &params.Markers[i].Enabled)) bNeedsMapUpdate = true;
+-                
+-                char nameBuf[128]; strncpy(nameBuf, params.Markers[i].Name.c_str(), sizeof(nameBuf));
+-                if (ImGui::InputText("Name", nameBuf, IM_ARRAYSIZE(nameBuf))) params.Markers[i].Name = nameBuf;
+-                
+-                ImGui::Spacing();
+-                ImGui::Text("Placement Settings");
++                
++                if (ImGui::DragFloat3("Position (X,Y,Z)", marker.Position, 1.0f, 0.0f, 4096.0f)) bNeedsMapUpdate = true;
++                if (ImGui::ColorEdit4("Color Override", marker.Color)) bNeedsMapUpdate = true;
++                
++                std::string iconToDisplay = marker.IconOverride.empty() ? marker.Type : marker.IconOverride;
++                RenderIconPicker("MarkerIcon", iconToDisplay, params, bNeedsPreviewRender);
++                if (iconToDisplay != marker.Type) marker.IconOverride = iconToDisplay;
++                else marker.IconOverride = "";
+                 
+                 // Select Marker Type using params.KnownMarkerTypes
+                 if (!params.KnownMarkerTypes.empty()) {
+@@ -289,5 +289,5 @@
+                     for (int j = 0; j < (int)params.KnownMarkerTypes.size(); ++j) {
+-                        if (params.KnownMarkerTypes[j] == params.Markers[i].Type) {
++                        if (params.KnownMarkerTypes[j] == marker.Type) {
+                             currentType = j;
+                             break;
+                         }
+@@ -294,122 +294,26 @@
+                     std::vector<const char*> types;
+                     for (const auto& t : params.KnownMarkerTypes) types.push_back(t.c_str());
+                     
+-                    std::string iconToDisplay = params.Markers[i].IconOverride.empty() ? params.Markers[i].Type : params.Markers[i].IconOverride;
+-                    RenderIconPicker("RuleIconPicker", iconToDisplay, params, bNeedsPreviewRender);
+-                    if (iconToDisplay != params.Markers[i].Type) params.Markers[i].IconOverride = iconToDisplay;
+-                    else params.Markers[i].IconOverride = "";
+-                    
+-                    ImGui::SameLine();
+-                    
+-                    if (ImGui::Combo("Marker Type", &currentType, types.data(), (int)types.size())) {
++                    if (ImGui::Combo("Type", &currentType, types.data(), (int)types.size())) {
+                         if (currentType >= 0 && currentType < (int)params.KnownMarkerTypes.size()) {
+-                            std::string oldType = params.Markers[i].Type;
+-                            params.Markers[i].Type = params.KnownMarkerTypes[currentType];
+-                            if (oldType != "Spawn" && params.Markers[i].Type == "Spawn") {
+-                                params.Markers[i].UseDensity = false;
+-                                params.Markers[i].Count = params.SpawnPointCount;
+-                            }
++                            marker.Type = params.KnownMarkerTypes[currentType];
+                             bNeedsMapUpdate = true;
+                         }
+                     }
+-                    ImGui::SameLine();
+-                    if (ImGui::ColorEdit4("##ColorRule", params.Markers[i].Color, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel)) bNeedsPreviewRender = true;
+-                }
+-                
+-                if (params.Markers[i].UseAllPositions) {
+-                    ImGui::Text("All Pos");
+-                } else if (params.Markers[i].UseDensity) {
+-                    if (ImGui::DragFloat("##Density", &params.Markers[i].Density, 0.01f, 0.0f, 10.0f)) bNeedsMapUpdate = true;
+-                } else {
+-                    if (ImGui::DragInt("##Count", &params.Markers[i].Count, 1.0f, 1, 1000)) bNeedsMapUpdate = true;
+-                }
+-                ImGui::SameLine();
+-                const char* modeLabel = params.Markers[i].UseAllPositions ? "All" : (params.Markers[i].UseDensity ? "Density" : "Count");
+-                if (ImGui::Button(modeLabel, ImVec2(60, 0))) {
+-                    if (params.Markers[i].UseAllPositions) {
+-                        params.Markers[i].UseAllPositions = false;
+-                        params.Markers[i].UseDensity = true;
+-                    } else if (params.Markers[i].UseDensity) {
+-                        params.Markers[i].UseDensity = false;
+-                    } else {
+-                        params.Markers[i].UseAllPositions = true;
+-                    }
+-                    bNeedsMapUpdate = true;
+-                }
+-                
+-                if (ImGui::Checkbox("Random Selection", &params.Markers[i].RandomSelection)) bNeedsMapUpdate = true;
+-                
+-                if (!params.Markers[i].RandomSelection) {
+-                    const char* priorities[] = { "Highest Radius", "Smallest Radius", "Least Variance" };
+-                    if (ImGui::Combo("Priority", &params.Markers[i].Priority, priorities, 3)) bNeedsMapUpdate = true;
+-                }
+-                
+-                if (ImGui::DragFloat2("Slope Range", &params.Markers[i].MinSlope, 0.01f, 0.0f, 90.0f, "%.2f")) {
+-                    params.Markers[i].MinSlope = std::min(params.Markers[i].MinSlope, params.Markers[i].MaxSlope - 0.01f);
+-                    params.Markers[i].MaxSlope = std::max(params.Markers[i].MaxSlope, params.Markers[i].MinSlope + 0.01f);
+-                    params.Markers[i].MinSlope = std::max(0.0f, params.Markers[i].MinSlope);
+-                    params.Markers[i].MaxSlope = std::min(90.0f, params.Markers[i].MaxSlope);
+-                    bNeedsMapUpdate = true;
+-                }
+-                
+-                float minH = params.TerrainMinHeight;
+-                float maxH = params.TerrainMaxHeight;
+-                if (minH == maxH) maxH = minH + 1.0f; // safety
+-                if (ImGui::DragFloat2("Height Range", &params.Markers[i].MinHeight, 0.001f, minH, maxH, "%.4f")) {
+-                    params.Markers[i].MinHeight = std::min(params.Markers[i].MinHeight, params.Markers[i].MaxHeight - 0.001f);
+-                    params.Markers[i].MaxHeight = std::max(params.Markers[i].MaxHeight, params.Markers[i].MinHeight + 0.001f);
+-                    params.Markers[i].MinHeight = std::max(minH, params.Markers[i].MinHeight);
+-                    params.Markers[i].MaxHeight = std::min(maxH, params.Markers[i].MaxHeight);
+-                    bNeedsMapUpdate = true;
+-                }
+-                
+-                if (ImGui::DragFloat("Area Height Variance", &params.Markers[i].AreaHeightRange, 0.001f, 0.0f, 10.0f, "%.4f")) bNeedsMapUpdate = true;
+-                if (ImGui::DragFloat("Min Flat Radius", &params.Markers[i].AreaRadiusMin, 0.5f, 1.0f, 100.0f)) bNeedsMapUpdate = true;
+-                
+-                if (ImGui::Checkbox("Require Max Radius", &params.Markers[i].CheckMaxRadius)) bNeedsMapUpdate = true;
+-                if (params.Markers[i].CheckMaxRadius) {
+-                    if (ImGui::DragFloat("Max Flat Radius", &params.Markers[i].AreaRadiusMax, 0.5f, 1.0f, 100.0f)) bNeedsMapUpdate = true;
+-                }
+-                
+-                if (ImGui::DragFloat("Clearance Spacing", &params.Markers[i].ClearanceSpacing, 1.0f, 0.0f, 200.0f)) bNeedsMapUpdate = true;
+-                if (ImGui::DragFloat("Map Edge Padding", &params.Markers[i].MapEdgePadding, 1.0f, 0.0f, 500.0f)) bNeedsMapUpdate = true;
+-                
+-                const char* gradientTypes[] = { "None", "Center Focus", "Edge Focus", "Torus" };
+-                if (ImGui::Combo("Focus Gradient", &params.Markers[i].FocusGradient, gradientTypes, 4)) bNeedsMapUpdate = true;
+-                if (params.Markers[i].FocusGradient != SanmapGen::Gradient_None) {
+-                    if (ImGui::DragFloat("Gradient Radius", &params.Markers[i].FocusGradientRadius, 1.0f, 10.0f, 1000.0f)) bNeedsMapUpdate = true;
+-                    if (ImGui::IsItemActive()) { params.ShowFocusGradientDebugRuleIndex = i; bNeedsPreviewRender = true; }
+-                    if (ImGui::SliderFloat("Gradient Strength", &params.Markers[i].FocusGradientStrength, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+-                    if (ImGui::IsItemActive()) { params.ShowFocusGradientDebugRuleIndex = i; bNeedsPreviewRender = true; }
+-                    if (ImGui::SliderFloat("Gradient Contrast", &params.Markers[i].FocusGradientContrast, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic)) bNeedsMapUpdate = true;
+-                    if (ImGui::IsItemActive()) { params.ShowFocusGradientDebugRuleIndex = i; bNeedsPreviewRender = true; }
+-                }
+-                
+-                ImGui::Spacing();
+-                ImGui::Text("Rule Symmetry");
+-                if (ImGui::Checkbox("Use Global Symmetry", &params.Markers[i].SymmetryUseGlobal)) bNeedsMapUpdate = true;
+-                if (!params.Markers[i].SymmetryUseGlobal) {
+-                    bool symPoint  = (params.Markers[i].SymmetryMask & Symmetry_Point);
+-                    bool symX      = (params.Markers[i].SymmetryMask & Symmetry_X);
+-                    bool symZ      = (params.Markers[i].SymmetryMask & Symmetry_Z);
+-                    bool symXY     = (params.Markers[i].SymmetryMask & Symmetry_XY);
+-                    bool symRadial = (params.Markers[i].SymmetryMask & Symmetry_Radial);
+-                    if (ImGui::Checkbox("Point",  &symPoint))  { params.Markers[i].SymmetryMask ^= Symmetry_Point;  bNeedsMapUpdate = true; } ImGui::SameLine();
+-                    if (ImGui::Checkbox("X",      &symX))      { params.Markers[i].SymmetryMask ^= Symmetry_X;      bNeedsMapUpdate = true; } ImGui::SameLine();
+-                    if (ImGui::Checkbox("Z",      &symZ))      { params.Markers[i].SymmetryMask ^= Symmetry_Z;      bNeedsMapUpdate = true; } ImGui::SameLine();
+-                    if (ImGui::Checkbox("XY",     &symXY))     { params.Markers[i].SymmetryMask ^= Symmetry_XY;     bNeedsMapUpdate = true; } ImGui::SameLine();
+-                    if (ImGui::Checkbox("Radial", &symRadial)) { params.Markers[i].SymmetryMask ^= Symmetry_Radial; bNeedsMapUpdate = true; }
+-                }
+-                
+-                ImGui::Spacing();
+-                if (ImGui::Button("Delete Rule", ImVec2(-1, 0))) {
+-                    params.Markers.erase(params.Markers.begin() + i);
+-                    bNeedsMapUpdate = true;
+-                    ImGui::PopID();
+-                    break;
+-                }
+-            }
+-            ImGui::PopID();
++                }
++                
++                if (ImGui::Button("Delete Marker", ImVec2(-1, 20))) {
++                    keyToDelete = key;
++                }
++            }
++            ImGui::PopID();
++        }
++        
++        if (!keyToDelete.empty()) {
++            if (selectedMarkerKey == keyToDelete) selectedMarkerKey = "";
++            params.MarkersList.erase(keyToDelete);
++            bNeedsMapUpdate = true;
++            bNeedsPreviewRender = true;
+         }
+     }
+ 
+[diff_block_end]
+
+Please note that the above snippet only shows the MODIFIED lines from the last change. It shows up to 3 lines of unchanged lines before and after the modified lines. The actual file contents may have many more lines not shown.

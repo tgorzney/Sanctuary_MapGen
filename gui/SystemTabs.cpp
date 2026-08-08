@@ -3,6 +3,7 @@
 #include "FileDialog.h"
 #include "MapExporter.h"
 #include "MapImporter.h"
+#include "SupComImporter.h"
 #include <filesystem>
 
 namespace SanmapGen {
@@ -40,6 +41,19 @@ namespace UI {
                     bResetPreviewTransform = true; // Snap preview camera back to default on new map load
                 } else {
                     importDebugLog += "\nFailed to load Sanmap.\n";
+                }
+            }
+        }
+        
+        if (ImGui::Button("Import SupCom Lua", ImVec2(-1, 30))) {
+            std::string path;
+            if (FileDialog::OpenFile("Supreme Commander Lua\0*.lua\0All Files\0*.*\0", path)) {
+                importDebugLog.clear();
+                if (SupComImporter::LoadLua(path, params, importDebugLog)) {
+                    bNeedsMapUpdate = true;
+                    bResetPreviewTransform = true; // Snap preview camera back to default on new map load
+                } else {
+                    importDebugLog += "\nFailed to load SupCom Lua.\n";
                 }
             }
         }

@@ -4,6 +4,7 @@
 #include <map>
 #include <algorithm>
 #include <functional>
+#include <cstdint>
 
 namespace SanmapGen {
 
@@ -478,7 +479,24 @@ namespace SanmapGen {
         
         // Placed Markers (Key is map name e.g. "Alloys_037")
         std::map<std::string, MarkerTransform> MarkersList;
-        std::vector<std::string> KnownMarkerTypes = {"Alloy", "Plasma", "Spawn"};
+        std::vector<std::string> KnownMarkerTypes = {"Alloy", "Plasma", "Spawn", "Alloys", "Plasmas", "Spawns"};
+        
+        // --- DOP Optimizations ---
+        // Props (Trees, Rocks) are segregated from interactive markers to prevent UI loops from processing 100,000+ items.
+        // We use a flat Struct-of-Arrays (SoA) style flat buffer for maximum cache coherence.
+        struct PropInstance {
+            float X, Y, Z;
+            uint32_t TintColor;
+        };
+        std::vector<PropInstance> StaticPropsList;
+        
+        // Spatial Partitioning Grid for O(1) click detection on interactive markers
+        struct MarkerChunk {
+            std::vector<std::string> MarkerKeys;
+        };
+        std::vector<MarkerChunk> MarkerSpatialGrid;
+        int SpatialGridResolution = 32; // 32x32 chunks
+        
         std::vector<std::string> AvailableIcons; // Populated from .sanpack
         std::map<std::string, unsigned int> IconCache; // name -> GLuint texture ID
         
@@ -542,6 +560,7 @@ namespace SanmapGen {
         
         std::vector<StratumSettings> Stratums;
         std::vector<MarkerRule> Markers;
+        bool EnableProceduralMarkers = false;
         std::vector<PropRule> Props;
         std::vector<DecalRule> Decals;
         
@@ -751,6 +770,10 @@ namespace SanmapGen {
             }
             
             return hash;
+        }
+        
+        size_t GetHash() const {
+            return GetPlacementHash(GetErosionHash(GetBlendHash()));
         }
     };
 

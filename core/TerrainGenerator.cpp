@@ -867,7 +867,10 @@ namespace SanmapGen {
             }
             
             // 2. Generate Procedural Markers
-            GenerateProceduralMarkers(params, outMap, slopeMap, inOutResult);
+            inOutResult.GeneratedMarkers.clear();
+            if (params.EnableProceduralMarkers) {
+                GenerateProceduralMarkers(params, outMap, slopeMap, inOutResult);
+            }
             
             inOutResult.CachedPlacementHash = currentPlacementHash;
         }

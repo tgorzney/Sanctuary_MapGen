@@ -144,6 +144,10 @@ namespace UI {
         params.ShowFocusGradientDebugRuleIndex = -1; // Reset each frame
         
         ImGui::Text("Marker Gamedata");
+        ImGui::SameLine(ImGui::GetWindowWidth() - 250);
+        if (ImGui::Checkbox("Enable Procedural Markers", &params.EnableProceduralMarkers)) {
+            bNeedsMapUpdate = true;
+        }
         ImGui::Separator();
 
         if (ImGui::Button("Browse Gamedata...")) {
@@ -199,6 +203,121 @@ namespace UI {
         ImGui::SameLine();
         if (ImGui::ColorEdit4("##ColorSpawn", params.MarkerColorSpawn, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel)) bNeedsPreviewRender = true;
         ImGui::PopItemWidth();
+
+        ImGui::Spacing();
+        ImGui::Text("Procedural Marker Generation (Masks & Rules)");
+        ImGui::Separator();
+        if (params.EnableProceduralMarkers) {
+            if (ImGui::Button("Add Procedural Rule", ImVec2(-1, 30))) {
+                MarkerRule rule;
+                rule.Name = "New Rule " + std::to_string(params.Markers.size());
+                params.Markers.push_back(rule);
+                bNeedsPreviewRender = true;
+                bNeedsMapUpdate = true;
+            }
+            ImGui::Spacing();
+
+            int ruleToDelete = -1;
+            for (int i = 0; i < (int)params.Markers.size(); ++i) {
+                ImGui::PushID(i + 5000);
+                auto& rule = params.Markers[i];
+                char label[128];
+                snprintf(label, sizeof(label), "Rule: %s", rule.Name.c_str());
+                if (ImGui::CollapsingHeader(label)) {
+                    char nameBuf[128];
+                    strncpy(nameBuf, rule.Name.c_str(), sizeof(nameBuf));
+                    if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf))) {
+                        rule.Name = nameBuf;
+                    }
+                    if (ImGui::Checkbox("Enabled", &rule.Enabled)) {
+                        bNeedsMapUpdate = true;
+                        bNeedsPreviewRender = true;
+                    }
+                    
+                    // Type Selection
+                    if (!params.KnownMarkerTypes.empty()) {
+                        int currentType = -1;
+                        for (int j = 0; j < (int)params.KnownMarkerTypes.size(); ++j) {
+                            if (params.KnownMarkerTypes[j] == rule.Type) {
+                                currentType = j;
+                                break;
+                            }
+                        }
+                        std::vector<const char*> types;
+                        for (const auto& t : params.KnownMarkerTypes) types.push_back(t.c_str());
+                        if (ImGui::Combo("Marker Type", &currentType, types.data(), (int)types.size())) {
+                            if (currentType >= 0 && currentType < (int)params.KnownMarkerTypes.size()) {
+                                rule.Type = params.KnownMarkerTypes[currentType];
+                                bNeedsMapUpdate = true;
+                            }
+                        }
+                    }
+
+                    if (ImGui::ColorEdit4("Base Color Override", rule.Color)) bNeedsPreviewRender = true;
+                    
+                    ImGui::Text("Placement Logic");
+                    ImGui::Separator();
+                    if (ImGui::SliderInt("Count", &rule.Count, 1, 1000)) bNeedsMapUpdate = true;
+                    if (ImGui::Checkbox("Use All Positions", &rule.UseAllPositions)) bNeedsMapUpdate = true;
+                    if (ImGui::Checkbox("Use Density", &rule.UseDensity)) bNeedsMapUpdate = true;
+                    if (rule.UseDensity) {
+                        if (ImGui::SliderFloat("Density", &rule.Density, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+                    }
+                    if (ImGui::Checkbox("Random Selection", &rule.RandomSelection)) bNeedsMapUpdate = true;
+                    
+                    ImGui::Text("Spatial & Tolerance");
+                    if (ImGui::SliderFloat("Min Height", &rule.MinHeight, 0.0f, 128.0f)) bNeedsPreviewRender = true;
+                    if (ImGui::SliderFloat("Max Height", &rule.MaxHeight, 0.0f, 128.0f)) bNeedsPreviewRender = true;
+                    if (ImGui::SliderFloat("Min Slope", &rule.MinSlope, 0.0f, 90.0f)) bNeedsPreviewRender = true;
+                    if (ImGui::SliderFloat("Max Slope", &rule.MaxSlope, 0.0f, 90.0f)) bNeedsPreviewRender = true;
+                    
+                    if (ImGui::SliderFloat("Area Radius Min", &rule.AreaRadiusMin, 1.0f, 200.0f)) bNeedsMapUpdate = true;
+                    if (ImGui::Checkbox("Check Max Radius", &rule.CheckMaxRadius)) bNeedsMapUpdate = true;
+                    if (rule.CheckMaxRadius) {
+                        if (ImGui::SliderFloat("Area Radius Max", &rule.AreaRadiusMax, 1.0f, 500.0f)) bNeedsMapUpdate = true;
+                    }
+                    if (ImGui::SliderFloat("Area Height Range", &rule.AreaHeightRange, 0.1f, 10.0f)) bNeedsMapUpdate = true;
+                    if (ImGui::SliderFloat("Clearance Spacing", &rule.ClearanceSpacing, 0.0f, 500.0f)) bNeedsMapUpdate = true;
+                    
+                    ImGui::Text("Avoidance & Gradients");
+                    if (ImGui::SliderFloat("Map Edge Padding", &rule.MapEdgePadding, 0.0f, 200.0f)) bNeedsMapUpdate = true;
+                    
+                    const char* gradTypes[] = { "None", "Center Focus", "Edge Focus", "Torus" };
+                    int gradIdx = rule.FocusGradient;
+                    if (ImGui::Combo("Focus Gradient", &gradIdx, gradTypes, 4)) {
+                        rule.FocusGradient = gradIdx;
+                        bNeedsMapUpdate = true;
+                    }
+                    if (rule.FocusGradient != Gradient_None) {
+                        if (ImGui::SliderFloat("Gradient Radius", &rule.FocusGradientRadius, 0.1f, 1000.0f)) bNeedsMapUpdate = true;
+                        if (ImGui::SliderFloat("Gradient Strength", &rule.FocusGradientStrength, 0.1f, 5.0f)) bNeedsMapUpdate = true;
+                        if (ImGui::SliderFloat("Gradient Contrast", &rule.FocusGradientContrast, 0.1f, 5.0f)) bNeedsMapUpdate = true;
+                        
+                        bool debugGrad = (params.ShowFocusGradientDebugRuleIndex == i);
+                        if (ImGui::Checkbox("Debug Mask Over Map", &debugGrad)) {
+                            params.ShowFocusGradientDebugRuleIndex = debugGrad ? i : -1;
+                            bNeedsPreviewRender = true;
+                        }
+                    }
+                    
+                    if (ImGui::Button("Delete Rule", ImVec2(-1, 25))) {
+                        ruleToDelete = i;
+                    }
+                }
+                ImGui::PopID();
+            }
+            if (ruleToDelete >= 0) {
+                params.Markers.erase(params.Markers.begin() + ruleToDelete);
+                if (params.ShowFocusGradientDebugRuleIndex == ruleToDelete) {
+                    params.ShowFocusGradientDebugRuleIndex = -1;
+                }
+                bNeedsMapUpdate = true;
+                bNeedsPreviewRender = true;
+            }
+        } else {
+            ImGui::TextDisabled("Procedural marker generation is globally disabled.");
+            ImGui::TextDisabled("Check 'Enable Procedural Markers' at the top to edit rules.");
+        }
 
         ImGui::Spacing();
         ImGui::Text("Placed Markers");

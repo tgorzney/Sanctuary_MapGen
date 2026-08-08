@@ -470,11 +470,27 @@ int main(int, char**)
         bool isInteracting = ImGui::IsAnyItemActive();
         params.FastPreviewMode = isInteracting;
         
+        static size_t lastHash = params.GetHash();
+        size_t currentHash = params.GetHash();
+        
         static bool wasInteracting = false;
-        if (wasInteracting && !isInteracting) {
-            bNeedsMapUpdate = true; // Trigger final full update to calculate Flow/Placements when drag finishes
+        static bool changedDuringInteraction = false;
+        
+        if (isInteracting) {
+            if (currentHash != lastHash || bNeedsMapUpdate) changedDuringInteraction = true;
+        } else if (wasInteracting) {
+            if (changedDuringInteraction) {
+                bNeedsMapUpdate = true;
+                changedDuringInteraction = false;
+            }
+        } else {
+            if (currentHash != lastHash) {
+                bNeedsMapUpdate = true;
+            }
         }
+        
         wasInteracting = isInteracting;
+        lastHash = currentHash;
         
         if (ImGui::Button("Force Generate", ImVec2(-1, 40)) || bNeedsMapUpdate) {
             bNeedsMapUpdate = false;
@@ -695,7 +711,7 @@ int main(int, char**)
             ImVec2 mousePos = ImGui::GetIO().MousePos;
             bool isHoveringPreview = isHovered;
 
-            if (params.ShowMarkers) {
+            if (params.ShowMarkers && dummyMap.GetWidth() == params.MapSize + 1) {
                 int spawnIndex = 0;
                 ImU32 spawnColors[] = {
                     IM_COL32(255, 0, 0, 255),    // Red
@@ -716,6 +732,12 @@ int main(int, char**)
                     
                     float worldU = marker.Position[0] / (float)params.MapSize;
                     float worldV = marker.Position[2] / (float)params.MapSize;
+                    
+                    if (spawnIndex == 0) { // Debug first marker
+                        char dbg[128];
+                        snprintf(dbg, sizeof(dbg), "Pos(%.1f, %.1f) U(%.2f) V(%.2f) MapSz(%d)", marker.Position[0], marker.Position[2], worldU, worldV, params.MapSize);
+                        ImGui::GetWindowDrawList()->AddText(ImVec2(p0.x + 10, p0.y + 10), IM_COL32(255,255,255,255), dbg);
+                    }
                     
                     float screenU = (worldU - uv0.x) / (uv1.x - uv0.x);
                     float screenV = (worldV - uv0.y) / (uv1.y - uv0.y);

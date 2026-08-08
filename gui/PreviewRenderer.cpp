@@ -372,6 +372,32 @@ namespace SanmapGen {
                 pixels[pxIdx + 3] = 255;
             }
         }
+        
+        // --- BAKE STATIC PROPS (Flattened Image Layer) ---
+        // Instead of processing 100,000+ items every frame in ImGui, we bake them into the texture once!
+        if (!params.StaticPropsList.empty()) {
+            for (const auto& prop : params.StaticPropsList) {
+                float normX = prop.X / static_cast<float>(params.MapSize);
+                float normY = prop.Z / static_cast<float>(params.MapSize);
+                
+                int px = static_cast<int>(normX * quadWidth);
+                int py = static_cast<int>(normY * quadHeight);
+                
+                // Draw a 3x3 pixel dot for the prop
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        int cx = px + dx;
+                        int cy = py + dy;
+                        if (cx >= 0 && cx < quadWidth && cy >= 0 && cy < quadHeight) {
+                            int idx = (cy * quadWidth + cx) * 4;
+                            pixels[idx + 0] = (prop.TintColor >> 16) & 0xFF; // R
+                            pixels[idx + 1] = (prop.TintColor >> 8) & 0xFF;  // G
+                            pixels[idx + 2] = (prop.TintColor) & 0xFF;       // B
+                        }
+                    }
+                }
+            }
+        }
         GLuint textureID = existingTexture;
         if (textureID == 0) {
             // Generate a new OpenGL texture
