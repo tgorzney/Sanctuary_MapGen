@@ -94,6 +94,7 @@ bool SupComImporter::LoadLua(const std::string& filepath, GenerationParams& outP
                         std::string targetType = "";
                         if (currentMarkerType == "Mass") targetType = "Alloy";
                         else if (currentMarkerType == "Hydrocarbon") targetType = "Plasma";
+                        else if (currentMarkerName.find("ARMY_") == 0) targetType = "Spawn";
                         
                         if (!targetType.empty()) {
                             MarkerTransform mt;

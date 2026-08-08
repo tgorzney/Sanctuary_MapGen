@@ -335,67 +335,93 @@ namespace UI {
         
         std::string keyToDelete = "";
         
-        std::vector<std::map<std::string, SanmapGen::MarkerTransform>::iterator> markerIters;
+        std::map<std::string, std::vector<std::map<std::string, SanmapGen::MarkerTransform>::iterator>> groupedMarkers;
         for (auto it = params.MarkersList.begin(); it != params.MarkersList.end(); ++it) {
-            markerIters.push_back(it);
+            groupedMarkers[it->second.Type].push_back(it);
         }
         
-        ImGuiListClipper clipper;
-        clipper.Begin((int)markerIters.size());
-        while (clipper.Step()) {
-            for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-                auto& kvp = *markerIters[i];
-                auto& key = kvp.first;
-                auto& marker = kvp.second;
-                
-                ImGui::PushID(key.c_str());
-                char label[128];
-                snprintf(label, sizeof(label), "%s (%s)", marker.CustomName.empty() ? key.c_str() : marker.CustomName.c_str(), marker.Type.c_str());
-                
-                if (ImGui::CollapsingHeader(label)) {
-                    char nameBuf[128]; 
-                    strncpy(nameBuf, marker.CustomName.c_str(), sizeof(nameBuf));
-                    if (ImGui::InputText("Name/ID", nameBuf, sizeof(nameBuf))) {
-                        marker.CustomName = nameBuf;
-                        bNeedsMapUpdate = true;
-                    }
+        for (auto& groupPair : groupedMarkers) {
+            if (ImGui::CollapsingHeader((groupPair.first + " (" + std::to_string(groupPair.second.size()) + ")").c_str())) {
+                ImGui::Indent();
+                for (auto& iter : groupPair.second) {
+                    auto& key = iter->first;
+                    auto& marker = iter->second;
                     
-                    if (ImGui::DragFloat3("Position (X,Y,Z)", marker.Position, 1.0f, 0.0f, 4096.0f)) bNeedsMapUpdate = true;
-                    if (ImGui::ColorEdit4("Color Override", marker.Color)) bNeedsMapUpdate = true;
+                    ImGui::PushID(key.c_str());
+                    char label[128];
+                    snprintf(label, sizeof(label), "%s", marker.CustomName.empty() ? key.c_str() : marker.CustomName.c_str());
                     
-                    std::string iconToDisplay = marker.IconOverride.empty() ? marker.Type : marker.IconOverride;
-                    RenderIconPicker("MarkerIcon", iconToDisplay, params, bNeedsPreviewRender);
-                    if (iconToDisplay != marker.Type) marker.IconOverride = iconToDisplay;
-                    else marker.IconOverride = "";
-                    
-                    // Select Marker Type using params.KnownMarkerTypes
-                    if (!params.KnownMarkerTypes.empty()) {
-                        int currentType = -1;
-                        for (int j = 0; j < (int)params.KnownMarkerTypes.size(); ++j) {
-                            if (params.KnownMarkerTypes[j] == marker.Type) {
-                                currentType = j;
-                                break;
-                            }
+                    if (ImGui::CollapsingHeader(label)) {
+                        char nameBuf[128]; 
+                        strncpy(nameBuf, marker.CustomName.c_str(), sizeof(nameBuf));
+                        if (ImGui::InputText("Name/ID", nameBuf, sizeof(nameBuf))) {
+                            marker.CustomName = nameBuf;
+                            bNeedsMapUpdate = true;
                         }
-                        std::vector<const char*> types;
-                        for (const auto& t : params.KnownMarkerTypes) types.push_back(t.c_str());
                         
-                        if (ImGui::Combo("Type", &currentType, types.data(), (int)types.size())) {
-                            if (currentType >= 0 && currentType < (int)params.KnownMarkerTypes.size()) {
-                                marker.Type = params.KnownMarkerTypes[currentType];
-                                bNeedsMapUpdate = true;
+                        if (ImGui::DragFloat3("Position (X,Y,Z)", marker.Position, 1.0f, 0.0f, 4096.0f)) bNeedsMapUpdate = true;
+                        if (ImGui::ColorEdit4("Color Override", marker.Color)) bNeedsMapUpdate = true;
+                        
+                        std::string iconToDisplay = marker.IconOverride.empty() ? marker.Type : marker.IconOverride;
+                        RenderIconPicker("MarkerIcon", iconToDisplay, params, bNeedsPreviewRender);
+                        if (iconToDisplay != marker.Type) marker.IconOverride = iconToDisplay;
+                        else marker.IconOverride = "";
+                        
+                        ImGui::Spacing();
+                        ImGui::Text("Symmetry Settings");
+                        if (ImGui::Checkbox("Use Global Symmetry", &marker.SymmetryUseGlobal)) bNeedsMapUpdate = true;
+                        if (!marker.SymmetryUseGlobal) {
+                            bool symPoint  = (marker.SymmetryMask & Symmetry_Point);
+                            bool symX      = (marker.SymmetryMask & Symmetry_X);
+                            bool symZ      = (marker.SymmetryMask & Symmetry_Z);
+                            bool symXY     = (marker.SymmetryMask & Symmetry_XY);
+                            bool symRadial = (marker.SymmetryMask & Symmetry_Radial);
+                            
+                            if (ImGui::Checkbox("Point (Origin)", &symPoint)) bNeedsMapUpdate = true;
+                            if (ImGui::Checkbox("X-Axis (Left/Right)", &symX)) bNeedsMapUpdate = true;
+                            if (ImGui::Checkbox("Z-Axis (Top/Bottom)", &symZ)) bNeedsMapUpdate = true;
+                            if (ImGui::Checkbox("XY-Axis (Diagonal)", &symXY)) bNeedsMapUpdate = true;
+                            if (ImGui::Checkbox("Radial", &symRadial)) bNeedsMapUpdate = true;
+                            
+                            int newMask = 0;
+                            if (symPoint)  newMask |= Symmetry_Point;
+                            if (symX)      newMask |= Symmetry_X;
+                            if (symZ)      newMask |= Symmetry_Z;
+                            if (symXY)     newMask |= Symmetry_XY;
+                            if (symRadial) newMask |= Symmetry_Radial;
+                            
+                            marker.SymmetryMask = newMask;
+                        }
+
+                        // Select Marker Type using params.KnownMarkerTypes
+                        if (!params.KnownMarkerTypes.empty()) {
+                            int currentType = -1;
+                            for (int j = 0; j < (int)params.KnownMarkerTypes.size(); ++j) {
+                                if (params.KnownMarkerTypes[j] == marker.Type) {
+                                    currentType = j;
+                                    break;
+                                }
+                            }
+                            std::vector<const char*> types;
+                            for (const auto& t : params.KnownMarkerTypes) types.push_back(t.c_str());
+                            
+                            if (ImGui::Combo("Type", &currentType, types.data(), (int)types.size())) {
+                                if (currentType >= 0 && currentType < (int)params.KnownMarkerTypes.size()) {
+                                    marker.Type = params.KnownMarkerTypes[currentType];
+                                    bNeedsMapUpdate = true;
+                                }
                             }
                         }
+                        
+                        if (ImGui::Button("Delete Marker", ImVec2(-1, 20))) {
+                            keyToDelete = key;
+                        }
                     }
-                    
-                    if (ImGui::Button("Delete Marker", ImVec2(-1, 20))) {
-                        keyToDelete = key;
-                    }
+                    ImGui::PopID();
                 }
-                ImGui::PopID();
+                ImGui::Unindent();
             }
         }
-        clipper.End();
         
         if (!keyToDelete.empty()) {
             if (selectedMarkerKey == keyToDelete) selectedMarkerKey = "";
