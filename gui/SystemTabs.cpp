@@ -17,7 +17,7 @@ namespace UI {
         if (ImGui::Checkbox("Use GPU Flow Accumulation", &params.UseGPUFlowMap)) bNeedsMapUpdate = true;
     }
 
-    void RenderSaveExportTab(GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool& bNeedsMapUpdate) {
+    void RenderSaveExportTab(GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool& bNeedsMapUpdate, bool& bResetPreviewTransform) {
         ImGui::Text("Export Map Data");
         ImGui::Separator();
         
@@ -37,6 +37,7 @@ namespace UI {
                 importDebugLog.clear();
                 if (MapImporter::LoadSanmap(path, params, importDebugLog)) {
                     bNeedsMapUpdate = true;
+                    bResetPreviewTransform = true; // Snap preview camera back to default on new map load
                 } else {
                     importDebugLog += "\nFailed to load Sanmap.\n";
                 }

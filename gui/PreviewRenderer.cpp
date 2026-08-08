@@ -2,6 +2,11 @@
 #include <vector>
 #include <algorithm>
 
+// GL_CLAMP_TO_EDGE is OpenGL 1.2+; define as fallback in case the bundled GL header only covers 1.1
+#ifndef GL_CLAMP_TO_EDGE
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
+
 namespace SanmapGen {
 
     GLuint PreviewRenderer::UpdatePreviewTexture(const FloatMask& heightmap, const GenerationResult& genResult, const GenerationParams& params, GLuint existingTexture, bool bGeometryChanged) {
@@ -68,8 +73,9 @@ namespace SanmapGen {
                 float v01 = heightmap.Get(x, y + 1);
                 float v11 = heightmap.Get(x + 1, y + 1);
 
-                // Quad Mean Height
-                float val = heightmap.GetDataPtr()[y * width + x];
+                // Center-of-quad height: average all 4 vertices so preview pixels map
+                // correctly to the quad grid (matches the two-heightmap architecture).
+                float val = (v00 + v10 + v01 + v11) * 0.25f;
                 
                 if (params.AutoLevelPreview) {
                     val = (val - minHeight) / (maxHeight - minHeight);
@@ -379,11 +385,13 @@ namespace SanmapGen {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         
-        // This is necessary if texture doesn't wrap correctly
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        // Clamp to edge so the texture doesn't tile/wrap at boundaries when UVs sit near 0 or 1
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         // Upload pixels to GPU memory
+        // Ensure no row-padding misalignment regardless of future format changes
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, quadWidth, quadHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
         
         // Unbind texture

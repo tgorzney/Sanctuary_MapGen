@@ -216,41 +216,58 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
         int w1, h1, c1;
         unsigned char* s14Data = stbi_load(s1_4Path.c_str(), &w1, &h1, &c1, 4);
         unsigned char* s58Data = nullptr;
-        
+        int w2 = 0, h2 = 0; // Hoisted so s58Data dimensions are accessible outside the inner block
+
         if (fs::exists(s5_8Path)) {
             log("Found stratums_5_8.tga. Loading...\n");
-            int w2, h2, c2;
+            int c2;
             s58Data = stbi_load(s5_8Path.c_str(), &w2, &h2, &c2, 4);
         }
-        
-        log("s14Data loaded: " + std::string(s14Data ? "YES" : "NO") + ". Dimensions: " + std::to_string(w1) + "x" + std::to_string(h1) + " (Expected MapSize: " + std::to_string(outParams.MapSize) + ")\n");
-        
-        if (s14Data && w1 == outParams.MapSize) {
-            log("Splat maps perfectly match map size. Extracting and converting to ImportedMaskData.\n");
+
+        log("s14Data loaded: " + std::string(s14Data ? "YES" : "NO") + ". Dimensions: " + std::to_string(w1) + "x" + std::to_string(h1) + " (MapSize: " + std::to_string(outParams.MapSize) + ")\n");
+
+        if (s14Data) {
             int texSize = outParams.MapSize;
             int pixelCount = texSize * texSize;
-            
+
+            // Splat maps are recommended to be exported at a higher resolution than the landscape
+            // (e.g. 4096x4096 for a 2048-quad map). Resample to MapSize x MapSize using
+            // nearest-neighbour so any splat resolution is accepted without dimension matching.
+            log("Resampling splat maps (" + std::to_string(w1) + "x" + std::to_string(h1) +
+                ") -> ImportedMaskData (" + std::to_string(texSize) + "x" + std::to_string(texSize) + ").\n");
+
             for (auto& s : outParams.Stratums) {
                 s.ImportedMaskData.assign(pixelCount, 0.0f);
                 s.UseImportedMask = true; // Auto-enable on import
             }
-            
-            for (int i = 0; i < pixelCount; ++i) {
-                int baseIdx = i * 4;
-                if (0 < outParams.Stratums.size()) outParams.Stratums[0].ImportedMaskData[i] = s14Data[baseIdx] / 255.0f;
-                if (1 < outParams.Stratums.size()) outParams.Stratums[1].ImportedMaskData[i] = s14Data[baseIdx + 1] / 255.0f;
-                if (2 < outParams.Stratums.size()) outParams.Stratums[2].ImportedMaskData[i] = s14Data[baseIdx + 2] / 255.0f;
-                if (3 < outParams.Stratums.size()) outParams.Stratums[3].ImportedMaskData[i] = s14Data[baseIdx + 3] / 255.0f;
-                
-                if (s58Data) {
-                    if (4 < outParams.Stratums.size()) outParams.Stratums[4].ImportedMaskData[i] = s58Data[baseIdx] / 255.0f;
-                    if (5 < outParams.Stratums.size()) outParams.Stratums[5].ImportedMaskData[i] = s58Data[baseIdx + 1] / 255.0f;
-                    if (6 < outParams.Stratums.size()) outParams.Stratums[6].ImportedMaskData[i] = s58Data[baseIdx + 2] / 255.0f;
-                    if (7 < outParams.Stratums.size()) outParams.Stratums[7].ImportedMaskData[i] = s58Data[baseIdx + 3] / 255.0f;
+
+            for (int sy = 0; sy < texSize; ++sy) {
+                for (int sx = 0; sx < texSize; ++sx) {
+                    // Map from landscape grid coords to splat texel coords (nearest-neighbour)
+                    int tx1 = std::clamp((sx * w1) / texSize, 0, w1 - 1);
+                    int ty1 = std::clamp((sy * h1) / texSize, 0, h1 - 1);
+                    int sIdx1 = (ty1 * w1 + tx1) * 4;
+                    int maskIdx = sy * texSize + sx;
+
+                    if (0 < outParams.Stratums.size()) outParams.Stratums[0].ImportedMaskData[maskIdx] = s14Data[sIdx1 + 0] / 255.0f;
+                    if (1 < outParams.Stratums.size()) outParams.Stratums[1].ImportedMaskData[maskIdx] = s14Data[sIdx1 + 1] / 255.0f;
+                    if (2 < outParams.Stratums.size()) outParams.Stratums[2].ImportedMaskData[maskIdx] = s14Data[sIdx1 + 2] / 255.0f;
+                    if (3 < outParams.Stratums.size()) outParams.Stratums[3].ImportedMaskData[maskIdx] = s14Data[sIdx1 + 3] / 255.0f;
+
+                    if (s58Data && w2 > 0 && h2 > 0) {
+                        int tx2 = std::clamp((sx * w2) / texSize, 0, w2 - 1);
+                        int ty2 = std::clamp((sy * h2) / texSize, 0, h2 - 1);
+                        int sIdx2 = (ty2 * w2 + tx2) * 4;
+                        if (4 < outParams.Stratums.size()) outParams.Stratums[4].ImportedMaskData[maskIdx] = s58Data[sIdx2 + 0] / 255.0f;
+                        if (5 < outParams.Stratums.size()) outParams.Stratums[5].ImportedMaskData[maskIdx] = s58Data[sIdx2 + 1] / 255.0f;
+                        if (6 < outParams.Stratums.size()) outParams.Stratums[6].ImportedMaskData[maskIdx] = s58Data[sIdx2 + 2] / 255.0f;
+                        if (7 < outParams.Stratums.size()) outParams.Stratums[7].ImportedMaskData[maskIdx] = s58Data[sIdx2 + 3] / 255.0f;
+                    }
                 }
             }
+            log("Stratum masks imported successfully.\n");
         }
-        
+
         if (s14Data) stbi_image_free(s14Data);
         if (s58Data) stbi_image_free(s58Data);
     } else {

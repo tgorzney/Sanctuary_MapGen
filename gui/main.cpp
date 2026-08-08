@@ -164,16 +164,10 @@ GLuint GetMarkerIcon(const std::string& typeName, SanmapGen::GenerationParams& p
             std::string targetPath = "";
             int targetIndex = -1;
             
-            std::ofstream debugFile("C:\\Users\\Tylre Gorzney\\.gemini\\antigravity\\brain\\0469c144-23c5-4280-9921-07d2b4449c2b\\scratch\\ScannerDebug.txt", std::ios::app);
-            debugFile << "Looking up: '" << typeName << "' (lower: '" << typeLower << "')\n";
-            debugFile << "  Zip cache size: " << s_IconToZipPath.size() << "\n";
-            
             if (s_IconToZipPath.find(typeLower) != s_IconToZipPath.end()) {
                 targetPath = s_IconToZipPath[typeLower];
                 targetIndex = s_IconToZipIndex[typeLower];
             }
-            
-            debugFile << "  Resolved targetPath: '" << targetPath << "' (Index: " << targetIndex << ")\n";
             
             if (!targetPath.empty()) {
                 auto ends_with = [](const std::string& str, const std::string& suffix) {
@@ -190,8 +184,6 @@ GLuint GetMarkerIcon(const std::string& typeName, SanmapGen::GenerationParams& p
             } else {
                 localDebug += "Could not resolve '" + typeName + "' in zip cache.\n";
             }
-            if (!localDebug.empty()) debugFile << localDebug << "\n";
-            debugFile.close();
         }
     }
     if (t == 0 && !localDebug.empty()) {
@@ -354,6 +346,7 @@ int main(int, char**)
     bool bNeedsMapUpdate = true;
     bool bNeedsPreviewRender = true;
     bool bGeometryChanged = true;
+    bool bResetPreviewTransform = false; // Set to true after LoadSanmap to snap preview camera to default
     int initVertSize = params.MapSize + 1;
     SanmapGen::FloatMask dummyMap(initVertSize, initVertSize, 0.0f);
     std::vector<SanmapGen::FloatMask> stratums;
@@ -542,7 +535,7 @@ int main(int, char**)
             case 9: SanmapGen::UI::RenderMarkersTab(params, selectedMarkerKey, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 10: SanmapGen::UI::RenderPropsTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 11: SanmapGen::UI::RenderPerformanceTab(params, bNeedsMapUpdate); break;
-            case 12: SanmapGen::UI::RenderSaveExportTab(params, dummyMap, genResult, bNeedsMapUpdate); break;
+            case 12: SanmapGen::UI::RenderSaveExportTab(params, dummyMap, genResult, bNeedsMapUpdate, bResetPreviewTransform); break;
         }
         ImGui::EndChild(); // SettingsPane
         
@@ -645,6 +638,13 @@ int main(int, char**)
             
             static ImVec2 mapOffset(0.0f, 0.0f);
             static float mapZoom = 1.0f;
+            
+            // Reset preview transform when a new sanmap is loaded
+            if (bResetPreviewTransform) {
+                mapZoom = 1.0f;
+                mapOffset = ImVec2(0.0f, 0.0f);
+                bResetPreviewTransform = false;
+            }
             
             // Interaction logic
             ImGui::InvisibleButton("MapCanvas", ImVec2(renderSize, renderSize));

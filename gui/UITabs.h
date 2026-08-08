@@ -27,7 +27,7 @@ namespace UI {
     void RenderMarkersTab(GenerationParams& params, std::string& selectedMarkerKey, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderPropsTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderPerformanceTab(GenerationParams& params, bool& bNeedsMapUpdate);
-    void RenderSaveExportTab(GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool& bNeedsMapUpdate);
+    void RenderSaveExportTab(GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool& bNeedsMapUpdate, bool& bResetPreviewTransform);
 
 } // namespace UI
 } // namespace SanmapGen

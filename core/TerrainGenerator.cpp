@@ -399,7 +399,7 @@ namespace SanmapGen {
                 int x0 = std::clamp(static_cast<int>(imgX), 0, layer.ImageWidth - 1);
                 int y0 = std::clamp(static_cast<int>(imgY), 0, layer.ImageHeight - 1);
                 int x1 = std::clamp(x0 + 1, 0, layer.ImageWidth - 1);
-                int y1 = std::clamp(y0 + 1, 0, layer.ImageWidth - 1);
+                int y1 = std::clamp(y0 + 1, 0, layer.ImageHeight - 1);
                 
                 float fracX = imgX - static_cast<float>(x0);
                 float fracY = imgY - static_cast<float>(y0);
@@ -449,7 +449,8 @@ namespace SanmapGen {
             inOutResult.MaterialMasks.push_back(FloatMask(vertSize, vertSize, 0.0f));
         }
         
-        if (inOutResult.CachedRawNoise.size() != flatLayers.size()) {
+        if (inOutResult.CachedRawNoise.size() != flatLayers.size() ||
+            (!inOutResult.CachedRawNoise.empty() && inOutResult.CachedRawNoise[0].GetWidth() != vertSize)) {
             inOutResult.CachedRawNoise.clear();
             inOutResult.CachedNoiseHashes.clear();
             for (size_t i = 0; i < flatLayers.size(); ++i) {
