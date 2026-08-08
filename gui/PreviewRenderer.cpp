@@ -214,7 +214,8 @@ namespace SanmapGen {
                         }
                     }
                     else if (layer.Type == GenerationParams::PreviewLayerType::Markers) {
-                        for (const auto& rule : params.Markers) {
+                        if (params.ProceduralMarkerLayers.empty() || !params.ProceduralMarkerLayers[0].Enabled) continue;
+                        for (const auto& rule : params.ProceduralMarkerLayers[0].Rules) {
                             if (!rule.Enabled) continue;
                             if (slopeDegrees >= rule.MinSlope && slopeDegrees <= rule.MaxSlope &&
                                 realHeight >= rule.MinHeight && realHeight <= rule.MaxHeight) {
@@ -324,8 +325,8 @@ namespace SanmapGen {
                 }
                 
                 // --- FOCUS GRADIENT DEBUG OVERLAY ---
-                if (params.ShowFocusGradientDebugRuleIndex >= 0 && params.ShowFocusGradientDebugRuleIndex < (int)params.Markers.size()) {
-                    const auto& rule = params.Markers[params.ShowFocusGradientDebugRuleIndex];
+                if (params.ShowFocusGradientDebugRuleIndex >= 0 && params.ShowFocusGradientDebugRuleIndex < (int)params.ProceduralMarkerLayers[0].Rules.size()) {
+                    const auto& rule = params.ProceduralMarkerLayers[0].Rules[params.ShowFocusGradientDebugRuleIndex];
                     if (rule.FocusGradient != Gradient_None) {
                         float dx = (float)(x - (width / 2));
                         float dy = (float)(y - (height / 2));

@@ -42,6 +42,8 @@ namespace SanmapGen {
     public:
         // Main entry point for generating the terrain heightmap. Returns individual stratum masks and flow data.
         static void GenerateMap(FloatMask& outMap, const GenerationParams& params, GenerationResult& inOutResult);
+        
+        static void CalculateMarkerSymmetryGroups(GenerationParams& params);
 
     private:
         // Converts X,Y into a Morton Z-Curve index for cache locality

@@ -441,6 +441,24 @@ namespace SanmapGen {
         float MinHeight = 0.0f;
         float MaxHeight = 128.0f;
     };
+    struct ProceduralMarkerLayer {
+        std::string Name = "New Layer";
+        bool Enabled = true;
+        bool Locked = false;
+        std::vector<MarkerRule> Rules;
+    };
+    
+        enum class LayerType {
+        Manual,
+        Fixed
+    };
+    struct PlacedMarkerLayer {
+        std::string Name = "Imported";
+        LayerType Type = LayerType::Manual;
+        bool Enabled = true;
+        bool Locked = false;
+        std::vector<std::string> MarkerKeys; // Keys for MarkersList
+    };
 
     struct GeoLayerDef {
         bool Enabled = true;
@@ -513,6 +531,9 @@ namespace SanmapGen {
         float TorusMajorRadius = 128.0f;
         float TorusMinorRadius = 64.0f;
         
+        float SymmetryDetectionTolerance = 1.0f;
+        bool SnapImperfectSymmetry = false;
+        
         // --- The Dynamic Layer Stacks ---
         std::vector<GeoLayerDef> GeoLayers; // Main heightmap generation
         // Helper to get a flat list of all layers across all GeoLayers in calculation order
@@ -559,7 +580,32 @@ namespace SanmapGen {
         GlobalTexturingSettings TexturingGlobals;
         
         std::vector<StratumSettings> Stratums;
-        std::vector<MarkerRule> Markers;
+        std::vector<ProceduralMarkerLayer> ProceduralMarkerLayers = { {"Procedural Markers", true, {}} };
+        std::vector<PlacedMarkerLayer> PlacedMarkerLayers;
+        int SelectedPlacedLayerIndex = -1;
+        
+        std::vector<const MarkerRule*> GetFlatMarkerRules() const {
+            std::vector<const MarkerRule*> flat;
+            for (const auto& l : ProceduralMarkerLayers) {
+                if (!l.Enabled) continue;
+                for (const auto& r : l.Rules) {
+                    flat.push_back(&r);
+                }
+            }
+            return flat;
+        }
+        
+        std::vector<MarkerRule*> GetFlatMarkerRulesMutable() {
+            std::vector<MarkerRule*> flat;
+            for (auto& l : ProceduralMarkerLayers) {
+                if (!l.Enabled) continue;
+                for (auto& r : l.Rules) {
+                    flat.push_back(&r);
+                }
+            }
+            return flat;
+        }
+        
         bool EnableProceduralMarkers = false;
         std::vector<PropRule> Props;
         std::vector<DecalRule> Decals;
@@ -749,7 +795,8 @@ namespace SanmapGen {
                 hash ^= hasher(val) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
             };
             
-            for (const auto& rule : Markers) {
+            for (const auto* rule_ptr : GetFlatMarkerRules()) {
+                const auto& rule = *rule_ptr;
                 combine(rule.Enabled);
                 combine(rule.Count);
                 combine(rule.Density);
@@ -778,3 +825,6 @@ namespace SanmapGen {
     };
 
 } // namespace SanmapGen
+
+
+

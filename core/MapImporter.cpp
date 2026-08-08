@@ -278,8 +278,15 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
         log("stratums_1_4.tga does not exist.\n");
     }
 
+    // Extract map name from path
+    std::filesystem::path p(pathOrFolder);
+    std::string mapName = p.stem().string();
+
     // Load explicitly placed markers (and wipe procedural rules)
-    outParams.Markers.clear(); // User explicitly asked to disable procedural markers on map load
+    outParams.ProceduralMarkerLayers.clear();
+    PlacedMarkerLayer importedSanmapLayer;
+    importedSanmapLayer.Name = mapName + " Markers";
+    importedSanmapLayer.Type = LayerType::Fixed;
     
     // Auto-scale markers if Playable Area width is smaller than MapSize
     float markerScaleFactor = 1.0f;
@@ -333,6 +340,7 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     
                     if (isGameplay) {
                         outParams.MarkersList[transformName] = mt;
+                        importedSanmapLayer.MarkerKeys.push_back(transformName);
                     } else {
                         GenerationParams::PropInstance pi;
                         pi.X = mt.Position[0];
@@ -356,6 +364,8 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             int cy = std::clamp(static_cast<int>(normY * chunks), 0, chunks - 1);
             outParams.MarkerSpatialGrid[cy * chunks + cx].MarkerKeys.push_back(key);
         }
+        
+        outParams.PlacedMarkerLayers.push_back(importedSanmapLayer);
     }
 
     log("--- End LoadSanmap (SUCCESS) ---\n");

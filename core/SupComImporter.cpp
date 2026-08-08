@@ -1,4 +1,5 @@
 #include "SupComImporter.h"
+#include "TerrainGenerator.h"
 #include <fstream>
 #include <sstream>
 #include <regex>
@@ -18,6 +19,8 @@ bool SupComImporter::LoadLua(const std::string& filepath, GenerationParams& outP
     // 1. Clear existing markers
     outParams.MarkersList.clear();
     outParams.StaticPropsList.clear();
+    PlacedMarkerLayer importedLayer;
+    importedLayer.Name = "Imported SupCom Markers";
 
     std::string line;
     float originalMapSize = 0.0f;
@@ -76,6 +79,7 @@ bool SupComImporter::LoadLua(const std::string& filepath, GenerationParams& outP
                     mt.Position[1] = currentPosY;
                     mt.Position[2] = currentPosZ;
                     outParams.MarkersList[mt.CustomName] = mt;
+                    importedLayer.MarkerKeys.push_back(mt.CustomName);
                     
                     currentMarkerName = "";
                     currentMarkerValid = false;
@@ -105,6 +109,7 @@ bool SupComImporter::LoadLua(const std::string& filepath, GenerationParams& outP
                             mt.Position[1] = currentPosY;
                             mt.Position[2] = currentPosZ;
                             outParams.MarkersList[mt.CustomName] = mt;
+                    importedLayer.MarkerKeys.push_back(mt.CustomName);
                         }
                     }
                     currentMarkerName = "";
@@ -149,6 +154,11 @@ bool SupComImporter::LoadLua(const std::string& filepath, GenerationParams& outP
         int cy = std::clamp(static_cast<int>(normY * chunks), 0, chunks - 1);
         outParams.MarkerSpatialGrid[cy * chunks + cx].MarkerKeys.push_back(key);
     }
+    
+    outParams.PlacedMarkerLayers.push_back(importedLayer);
+    
+    // Auto-detect symmetry
+    TerrainGenerator::CalculateMarkerSymmetryGroups(outParams);
     
     outDebugLog += "Successfully imported " + std::to_string(outParams.MarkersList.size()) + " markers from Lua.\n";
     return true;
