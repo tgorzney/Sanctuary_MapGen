@@ -1,4 +1,5 @@
 #include "UITabs.h"
+#include "widgets/Widget_LayerManager.h"
 #include "imgui.h"
 #include "FileDialog.h"
 
@@ -447,28 +448,28 @@ namespace UI {
             ImGui::EndCombo();
         }
         ImGui::Spacing();
-        RenderLayerStack(params, params.DetailNormalLayers, nullptr, false, bNeedsPreviewRender);
+        Widget_LayerManager::RenderLayerStack(params, params.DetailNormalLayers, nullptr, false, bNeedsPreviewRender);
     }
 
     void RenderSmoothnessTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender) {
         if (ImGui::Checkbox("##showSmoothness", &params.ShowSmoothness)) bNeedsPreviewRender = true; ImGui::SameLine();
         ImGui::Text("Smoothness Masking");
         ImGui::Separator();
-        RenderLayerStack(params, params.SmoothnessLayers, nullptr, false, bNeedsPreviewRender);
+        Widget_LayerManager::RenderLayerStack(params, params.SmoothnessLayers, nullptr, false, bNeedsPreviewRender);
     }
 
     void RenderTintTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender) {
         if (ImGui::Checkbox("##showTint", &params.ShowTint)) bNeedsPreviewRender = true; ImGui::SameLine();
         ImGui::Text("Procedural Tinting");
         ImGui::Separator();
-        RenderLayerStack(params, params.TintLayers, nullptr, false, bNeedsPreviewRender);
+        Widget_LayerManager::RenderLayerStack(params, params.TintLayers, nullptr, false, bNeedsPreviewRender);
     }
 
     void RenderHolesTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender) {
         if (ImGui::Checkbox("##showHoles", &params.ShowHoles)) bNeedsPreviewRender = true; ImGui::SameLine();
         ImGui::Text("Dyson Sphere Holes");
         ImGui::Separator();
-        RenderLayerStack(params, params.HoleLayers, nullptr, false, bNeedsPreviewRender);
+        Widget_LayerManager::RenderLayerStack(params, params.HoleLayers, nullptr, false, bNeedsPreviewRender);
     }
 
 } // namespace UI

@@ -49,23 +49,10 @@ target_include_directories(imgui PUBLIC
 )
 target_link_libraries(imgui PUBLIC glfw)
 
-# Create a static library for the core generation logic
-set(CORE_SOURCES
-    core/Mask2D.h
-    core/Mask2D.cpp
-    core/TerrainGenerator.h
-    core/TerrainGenerator.cpp
-    core/ErosionSimulator.cpp
-    core/ErosionCompute.cpp
-    core/TerrainCompute.cpp
-    core/MapExporter.cpp
-    core/MapImporter.cpp
-    core/SupComImporter.cpp
-    core/FileDialog.cpp
-    core/ImageUtils.cpp
-    core/PlacementRules.h
-    core/PlacementRules.cpp
-)
+# Glob all source files in core/ and gui/ automatically
+file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "core/*.cpp" "core/*.h")
+list(FILTER CORE_SOURCES EXCLUDE REGEX "miniz\\.c")
+file(GLOB_RECURSE GUI_SOURCES CONFIGURE_DEPENDS "gui/*.cpp" "gui/*.h")
 
 # Download FastNoiseLite header if it doesn't exist
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/core/FastNoiseLite.h")
@@ -110,14 +97,8 @@ find_package(OpenMP REQUIRED)
 
 # Add our application executable
 add_executable(SanmapGenerator
-    core/TextureLoader.cpp
-    gui/main.cpp
-    gui/PreviewRenderer.cpp
-    gui/TerrainTabs.cpp
-    gui/MaterialTabs.cpp
-    gui/EnvironmentTabs.cpp
-    gui/SystemTabs.cpp
     ${CORE_SOURCES}
+    ${GUI_SOURCES}
     core/miniz.c
 )
 

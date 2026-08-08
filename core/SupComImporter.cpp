@@ -1,5 +1,6 @@
 #include "SupComImporter.h"
 #include "TerrainGenerator.h"
+#include "gen/Gen_Marker_Placement.h"
 #include <fstream>
 #include <sstream>
 #include <regex>
@@ -158,7 +159,7 @@ bool SupComImporter::LoadLua(const std::string& filepath, GenerationParams& outP
     outParams.PlacedMarkerLayers.push_back(importedLayer);
     
     // Auto-detect symmetry
-    TerrainGenerator::CalculateMarkerSymmetryGroups(outParams);
+    Gen_Marker_Placement::CalculateMarkerSymmetryGroups(outParams);
     
     outDebugLog += "Successfully imported " + std::to_string(outParams.MarkersList.size()) + " markers from Lua.\n";
     return true;
