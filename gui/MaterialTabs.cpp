@@ -566,15 +566,24 @@ namespace UI {
     void ReloadStratumTextures(GenerationParams& params) {
         for (size_t i = 0; i < params.Stratums.size(); ++i) {
             float avg[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+            
+            if (params.Stratums[i].previewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].previewAlbedoTex);
+            params.Stratums[i].previewAlbedoTex = 0;
             if (!params.Stratums[i].albedo.path.empty()) {
                 params.Stratums[i].previewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].albedo.path, params.MapFolderPath, avg);
                 params.Stratums[i].previewColor[0] = avg[0];
                 params.Stratums[i].previewColor[1] = avg[1];
                 params.Stratums[i].previewColor[2] = avg[2];
             }
+            
+            if (params.Stratums[i].previewNormalTex) glDeleteTextures(1, &params.Stratums[i].previewNormalTex);
+            params.Stratums[i].previewNormalTex = 0;
             if (!params.Stratums[i].normal.path.empty()) {
                 params.Stratums[i].previewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].normal.path, params.MapFolderPath, nullptr);
             }
+            
+            if (params.Stratums[i].previewMaskTex) glDeleteTextures(1, &params.Stratums[i].previewMaskTex);
+            params.Stratums[i].previewMaskTex = 0;
             if (!params.Stratums[i].mask.path.empty()) {
                 params.Stratums[i].previewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].mask.path, params.MapFolderPath, nullptr);
             }

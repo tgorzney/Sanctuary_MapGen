@@ -45,6 +45,13 @@ namespace UI {
             std::string path;
             if (FileDialog::OpenFile("Sanmap Files\0*.sanmap\0All Files\0*.*\0", path)) {
                 importDebugLog.clear();
+                
+                // Clear all generated GL textures before loading the new map
+                for (auto& s : params.Stratums) {
+                    if (s.previewActualMaskTex) glDeleteTextures(1, &s.previewActualMaskTex);
+                    s.previewActualMaskTex = 0;
+                }
+                
                 bool bMismatch = false;
                 int discoveredDim = 0;
                 if (MapImporter::LoadSanmap(path, params, importDebugLog, bMismatch, discoveredDim)) {
