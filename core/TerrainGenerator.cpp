@@ -156,7 +156,7 @@ FloatMask TerrainGenerator::SymmetrizeErodedTerrain(const FloatMask& terrainMap,
         
         if (!skipBlending) {
             if (params.UseGPUTerrain) {
-                TerrainCompute::DispatchTerrain(Stratums, params);
+                TerrainCompute::DispatchTerrain(Stratums, params, inOutResult);
             } else {
             
         for (size_t i = 0; i < flatLayers.size(); ++i) {

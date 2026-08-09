@@ -4,6 +4,8 @@
 #include <vector>
 
 namespace SanmapGen {
+    struct GenerationResult;
+
     class TerrainCompute {
     private:
         static unsigned int s_ComputeProgram;
@@ -11,7 +13,7 @@ namespace SanmapGen {
 
     public:
         // Run GPU Compute for Base Terrain Generation
-        static void DispatchTerrain(std::vector<FloatMask>& stratums, const GenerationParams& params);
+        static void DispatchTerrain(std::vector<FloatMask>& stratums, const GenerationParams& params, GenerationResult& inOutResult);
         
         // Cleanup shader
         static void Shutdown();

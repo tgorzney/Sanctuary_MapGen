@@ -1,4 +1,5 @@
 #include "TerrainCompute.h"
+#include "TerrainGenerator.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -132,7 +133,14 @@ namespace SanmapGen {
         float plateauDensity;
         
         float rampDensity;
-        float padding[3]; // Align to vec4 layout
+        float levelsShadows;
+        float levelsMidtones;
+        float levelsHighlights;
+        
+        float levelsOutputBlack;
+        float levelsOutputWhite;
+        float pad1;
+        float pad2;
     };
 
     void TerrainCompute::DispatchTerrain(std::vector<FloatMask>& stratums, const GenerationParams& params) {
@@ -179,9 +187,23 @@ namespace SanmapGen {
         GLuint computeProgram = s_ComputeProgram;
 
         std::vector<LayerConfigGLSL> activeLayers;
-        // flatLayers already declared above
-    for (size_t i = 0; i < flatLayers.size(); ++i) {
+        int vertSize = params.MapSize + 1;
+        int totalStrataTypes = (int)flatLayers.size();
+        size_t mapPixels = vertSize * vertSize;
+
+        std::vector<float> flattenedRawNoise(mapPixels * totalStrataTypes, 0.0f);
+        bool anyNoiseGenNeeded = false;
+
+        for (size_t i = 0; i < flatLayers.size(); ++i) {
             const auto& layer = *flatLayers[i];
+            
+            // Populate initial flattenedRawNoise from Cache (if valid)
+            if (i < inOutResult.CachedRawNoise.size() && inOutResult.CachedRawNoise[i].GetWidth() == vertSize) {
+                std::copy(inOutResult.CachedRawNoise[i].GetDataPtr(), 
+                          inOutResult.CachedRawNoise[i].GetDataPtr() + mapPixels, 
+                          flattenedRawNoise.data() + (i * mapPixels));
+            }
+            
             if (layer.Enabled && layer.Type != NoiseType::None) {
                 LayerConfigGLSL cfg;
                 cfg.freq = layer.Frequency;
@@ -193,28 +215,49 @@ namespace SanmapGen {
                 cfg.mountainDensity = layer.MountainDensity;
                 cfg.plateauDensity = layer.PlateauDensity;
                 cfg.rampDensity = layer.RampDensity;
+                cfg.levelsShadows = layer.LevelsShadows;
+                cfg.levelsMidtones = layer.LevelsMidtones;
+                cfg.levelsHighlights = layer.LevelsHighlights;
+                cfg.levelsOutputBlack = layer.LevelsOutputBlack;
+                cfg.levelsOutputWhite = layer.LevelsOutputWhite;
+                
+                size_t layerHash = layer.GetNoiseHash(params.Seed + (int)i, params.GlobalSymmetryMask, (int)params.SymAlgorithm);
+                if (i >= inOutResult.CachedNoiseHashes.size() || inOutResult.CachedNoiseHashes[i] != layerHash) {
+                    cfg.needsNoiseGen = 1;
+                    anyNoiseGenNeeded = true;
+                    
+                    // Update cache hash immediately
+                    if (i >= inOutResult.CachedNoiseHashes.size()) inOutResult.CachedNoiseHashes.resize(i + 1, 0);
+                    inOutResult.CachedNoiseHashes[i] = layerHash;
+                } else {
+                    cfg.needsNoiseGen = 0;
+                }
+                
                 activeLayers.push_back(cfg);
             }
         }
         
         if (activeLayers.empty()) return;
         int layerCount = (int)activeLayers.size();
-        
-        int vertSize = params.MapSize + 1;
-        int totalStrataTypes = (int)flatLayers.size();
-        size_t mapPixels = vertSize * vertSize;
         std::vector<float> flattenedStrata(mapPixels * totalStrataTypes, 0.0f);
 
-        GLuint ssbo[2];
-        glGenBuffersT(2, ssbo);
+        GLuint ssbo[3];
+        glGenBuffersT(3, ssbo);
 
+        // SSBO 0: Final Thicknesses
         glBindBufferT(GL_SHADER_STORAGE_BUFFER, ssbo[0]);
         glBufferDataT(GL_SHADER_STORAGE_BUFFER, flattenedStrata.size() * sizeof(float), flattenedStrata.data(), GL_DYNAMIC_COPY);
         glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 0, ssbo[0]);
 
+        // SSBO 1: Layer Config
         glBindBufferT(GL_SHADER_STORAGE_BUFFER, ssbo[1]);
         glBufferDataT(GL_SHADER_STORAGE_BUFFER, activeLayers.size() * sizeof(LayerConfigGLSL), activeLayers.data(), GL_DYNAMIC_COPY);
         glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 1, ssbo[1]);
+
+        // SSBO 2: Raw Noise Cache
+        glBindBufferT(GL_SHADER_STORAGE_BUFFER, ssbo[2]);
+        glBufferDataT(GL_SHADER_STORAGE_BUFFER, flattenedRawNoise.size() * sizeof(float), flattenedRawNoise.data(), GL_DYNAMIC_COPY);
+        glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 2, ssbo[2]);
 
         glUseProgramT(computeProgram);
         glUniform1iT(glGetUniformLocationT(computeProgram, "mapSize"), vertSize);
@@ -223,9 +266,20 @@ namespace SanmapGen {
 
         int workgroupX = (vertSize + 15) / 16;
         int workgroupY = (vertSize + 15) / 16;
+
+        // --- Pass 0: Noise Generation ---
+        if (anyNoiseGenNeeded) {
+            glUniform1iT(glGetUniformLocationT(computeProgram, "passMode"), 0);
+            glDispatchComputeT(workgroupX, workgroupY, 1);
+            glMemoryBarrierT(GL_SHADER_STORAGE_BARRIER_BIT);
+        }
+
+        // --- Pass 1: Shaping & Blending ---
+        glUniform1iT(glGetUniformLocationT(computeProgram, "passMode"), 1);
         glDispatchComputeT(workgroupX, workgroupY, 1);
         glMemoryBarrierT(GL_SHADER_STORAGE_BARRIER_BIT);
 
+        // Read back Stratums
         glBindBufferT(GL_SHADER_STORAGE_BUFFER, ssbo[0]);
         float* ptr = (float*)glMapBufferT(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
         if (ptr) {
@@ -237,6 +291,24 @@ namespace SanmapGen {
             glUnmapBufferT(GL_SHADER_STORAGE_BUFFER);
         }
 
-        glDeleteBuffersT(2, ssbo);
+        // Read back Raw Noise Cache
+        if (anyNoiseGenNeeded) {
+            glBindBufferT(GL_SHADER_STORAGE_BUFFER, ssbo[2]);
+            float* ptrNoise = (float*)glMapBufferT(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+            if (ptrNoise) {
+                if (inOutResult.CachedRawNoise.size() < (size_t)totalStrataTypes) {
+                    inOutResult.CachedRawNoise.resize(totalStrataTypes, FloatMask(vertSize, vertSize, 0.0f));
+                }
+                for (int s = 0; s < totalStrataTypes; ++s) {
+                    if (inOutResult.CachedRawNoise[s].GetWidth() != vertSize) {
+                        inOutResult.CachedRawNoise[s].Resize(vertSize, vertSize, 0.0f);
+                    }
+                    std::copy(ptrNoise + (s * mapPixels), ptrNoise + ((s + 1) * mapPixels), inOutResult.CachedRawNoise[s].GetMutableDataPtr());
+                }
+                glUnmapBufferT(GL_SHADER_STORAGE_BUFFER);
+            }
+        }
+
+        glDeleteBuffersT(3, ssbo);
     }
 }

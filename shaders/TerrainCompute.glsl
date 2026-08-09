@@ -16,16 +16,28 @@ struct LayerConfig {
     float plateauDensity;
     
     float rampDensity;
-    vec3 padding;
+    float levelsShadows;
+    float levelsMidtones;
+    float levelsHighlights;
+    
+    float levelsOutputBlack;
+    float levelsOutputWhite;
+    int needsNoiseGen;
+    float pad2;
 };
 
 layout(std430, binding = 1) buffer LayerData {
     LayerConfig layers[];
 };
 
+layout(std430, binding = 2) buffer RawNoiseData {
+    float rawNoise[];
+};
+
 uniform int mapSize;
 uniform int layerCount;
 uniform int seed;
+uniform int passMode;
 
 // Simplex 3D Noise 
 // by Ian McEwan, Ashima Arts
@@ -112,44 +124,68 @@ void main() {
     // Evaluate noise for each layer
     for (int l = 0; l < layerCount; ++l) {
         LayerConfig cfg = layers[l];
-        
-        // Symmetrize Point (for demo purposes if Point symmetry is on)
-        // If we want full symmetry, we'd do Superposition max over the mirrored quadrants
-        
-        // Base Noise
-        vec3 p = vec3(float(pos.x) * cfg.freq, float(pos.y) * cfg.freq, float(seed + l * 997));
-        float n = fbm(p, cfg.octaves, cfg.gain);
-        
-        // Superposition Point Symmetry
-        vec3 pSym = vec3(float(mapSize - pos.x - 1) * cfg.freq, float(mapSize - pos.y - 1) * cfg.freq, float(seed + l * 997));
-        float nSym = fbm(pSym, cfg.octaves, cfg.gain);
-        
-        n = max(n, nSym); // Defaulting to Max Point Superposition for GPU
-        
-        // Normalize -1..1 to 0..1
-        n = (n + 1.0) * 0.5;
-        
-        // Shaping Math
-        n = n * (cfg.landDensity * 2.0);
-        float origNoise = n;
-        
-        if (cfg.mountainDensity > 0.0) {
-            float smoothN = n * n * (3.0 - 2.0 * n);
-            n = (n * (1.0 - cfg.mountainDensity)) + (smoothN * cfg.mountainDensity);
-            if (n > 0.5) n += (n - 0.5) * cfg.mountainDensity;
-            n = clamp(n, 0.0, 1.0);
-        }
-        if (cfg.plateauDensity > 0.0) {
-            float terraces = 3.0 + (cfg.plateauDensity * 27.0); 
-            float terraceHeight = 1.0 / terraces;
-            n = floor(n / terraceHeight) * terraceHeight;
-        }
-        if (cfg.rampDensity > 0.0) {
-            n = (n * (1.0 - cfg.rampDensity)) + (origNoise * cfg.rampDensity);
-        }
-        
-        // Output to flattened array
         int idx = cfg.stratumIdx * mapSize * mapSize + pos.y * mapSize + pos.x;
-        thicknesses[idx] += n * cfg.opacity;
+        
+        if (passMode == 0) {
+            if (cfg.needsNoiseGen == 1) {
+                // Symmetrize Point (for demo purposes if Point symmetry is on)
+                // If we want full symmetry, we'd do Superposition max over the mirrored quadrants
+                
+                // Base Noise
+                vec3 p = vec3(float(pos.x) * cfg.freq, float(pos.y) * cfg.freq, float(seed + l * 997));
+                float n = fbm(p, cfg.octaves, cfg.gain);
+                
+                // Superposition Point Symmetry
+                vec3 pSym = vec3(float(mapSize - pos.x - 1) * cfg.freq, float(mapSize - pos.y - 1) * cfg.freq, float(seed + l * 997));
+                float nSym = fbm(pSym, cfg.octaves, cfg.gain);
+                
+                n = max(n, nSym); // Defaulting to Max Point Superposition for GPU
+                
+                // Normalize -1..1 to 0..1
+                n = (n + 1.0) * 0.5;
+                
+                rawNoise[idx] = n;
+            }
+        } 
+        else if (passMode == 1) {
+            float n = rawNoise[idx];
+            
+            // Shaping Math
+            n = n * (cfg.landDensity * 2.0);
+            float origNoise = n;
+            
+            if (cfg.mountainDensity > 0.0) {
+                float smoothN = n * n * (3.0 - 2.0 * n);
+                n = (n * (1.0 - cfg.mountainDensity)) + (smoothN * cfg.mountainDensity);
+                if (n > 0.5) n += (n - 0.5) * cfg.mountainDensity;
+                n = clamp(n, 0.0, 1.0);
+            }
+            if (cfg.plateauDensity > 0.0) {
+                float terraces = 3.0 + (cfg.plateauDensity * 27.0); 
+                float terraceHeight = 1.0 / terraces;
+                n = floor(n / terraceHeight) * terraceHeight;
+            }
+            if (cfg.rampDensity > 0.0) {
+                n = (n * (1.0 - cfg.rampDensity)) + (origNoise * cfg.rampDensity);
+            }
+            
+            // Levels
+            float s = cfg.levelsShadows;
+            float h = cfg.levelsHighlights;
+            float m = cfg.levelsMidtones;
+            if (h > s) {
+                n = clamp((n - s) / (h - s), 0.0, 1.0);
+            } else {
+                n = (n >= s) ? 1.0 : 0.0;
+            }
+            if (m != 1.0 && m > 0.0) {
+                n = pow(n, m);
+            }
+            n = cfg.levelsOutputBlack + n * (cfg.levelsOutputWhite - cfg.levelsOutputBlack);
+            n = clamp(n, 0.0, 1.0);
+            
+            // Output to flattened array
+            thicknesses[idx] += n * cfg.opacity;
+        }
     }
 }
