@@ -113,22 +113,33 @@ FloatMask TerrainGenerator::SymmetrizeErodedTerrain(const FloatMask& terrainMap,
 
     void TerrainGenerator::GenerateMap(FloatMask& outMap, const GenerationParams& params, GenerationResult& inOutResult) {
         int vertSize = params.MapSize + 1;
-        
         outMap.Resize(vertSize, vertSize, 0.0f);
-        
-        for (int y = 0; y < vertSize; ++y)
-            for (int x = 0; x < vertSize; ++x)
-                outMap.Set(x, y, 0.0f);
-        
-        uint32_t pow2Size = 1;
-        while (pow2Size < (uint32_t)vertSize) pow2Size <<= 1;
-        uint32_t totalMortonCells = pow2Size * pow2Size;
         
         std::vector<FloatMask> Stratums;
         auto flatLayers = params.GetFlatLayers();
         for (size_t i = 0; i < flatLayers.size(); ++i) {
             Stratums.push_back(FloatMask(vertSize, vertSize, 0.0f));
         }
+        
+        size_t currentBlendHash = 0;
+        ProcessNoiseAndBlend(outMap, Stratums, params, inOutResult, currentBlendHash);
+        
+        size_t currentErosionHash = 0;
+        ProcessErosion(outMap, Stratums, params, inOutResult, currentBlendHash, currentErosionHash);
+        
+        size_t currentFlowHash = 0;
+        ProcessFlow(outMap, params, inOutResult, currentErosionHash, currentFlowHash);
+        
+        ProcessPlacement(outMap, params, inOutResult, currentErosionHash, currentFlowHash);
+    }
+
+    void TerrainGenerator::ProcessNoiseAndBlend(FloatMask& outMap, std::vector<FloatMask>& Stratums, const GenerationParams& params, GenerationResult& inOutResult, size_t& outBlendHash) {
+        int vertSize = params.MapSize + 1;
+        uint32_t pow2Size = 1;
+        while (pow2Size < (uint32_t)vertSize) pow2Size <<= 1;
+        uint32_t totalMortonCells = pow2Size * pow2Size;
+        
+        auto flatLayers = params.GetFlatLayers();
         
         inOutResult.MaterialMasks.clear();
         for (size_t i = 0; i < 9; ++i) {
@@ -275,7 +286,14 @@ FloatMask TerrainGenerator::SymmetrizeErodedTerrain(const FloatMask& terrainMap,
             inOutResult.CachedBlendedStratums = Stratums;
         }
         
-        // --- Process Erosion Sequentially Layer-by-Layer ---
+        
+        outBlendHash = currentBlendHash;
+    }
+
+void TerrainGenerator::ProcessErosion(FloatMask& outMap, std::vector<FloatMask>& Stratums, const GenerationParams& params, GenerationResult& inOutResult, size_t currentBlendHash, size_t& outErosionHash) {
+        int vertSize = params.MapSize + 1;
+        auto flatLayers = params.GetFlatLayers();
+// --- Process Erosion Sequentially Layer-by-Layer ---
         size_t currentErosionHash = params.GetErosionHash(currentBlendHash);
         bool skipErosion = false;
         
@@ -622,7 +640,13 @@ FloatMask TerrainGenerator::SymmetrizeErodedTerrain(const FloatMask& terrainMap,
         inOutResult.TerrainMinHeight = minH;
         inOutResult.TerrainMaxHeight = maxH;
         
-        size_t currentFlowHash = params.GetFlowHash(currentErosionHash);
+        
+        outErosionHash = currentErosionHash;
+    }
+
+void TerrainGenerator::ProcessFlow(const FloatMask& outMap, const GenerationParams& params, GenerationResult& inOutResult, size_t currentErosionHash, size_t& outFlowHash) {
+        int vertSize = params.MapSize + 1;
+size_t currentFlowHash = params.GetFlowHash(currentErosionHash);
         bool skipFlow = false;
         
         if (currentFlowHash == inOutResult.CachedFlowHash && inOutResult.CachedFlowMap.GetWidth() == vertSize) {
@@ -799,7 +823,13 @@ FloatMask TerrainGenerator::SymmetrizeErodedTerrain(const FloatMask& terrainMap,
             inOutResult.CachedAccumulationMap = inOutResult.AccumulationMap;
         } // End skipFlow
 
-        size_t currentPlacementHash = params.GetPlacementHash(currentFlowHash);
+        
+        outFlowHash = currentFlowHash;
+    }
+
+void TerrainGenerator::ProcessPlacement(const FloatMask& outMap, const GenerationParams& params, GenerationResult& inOutResult, size_t currentErosionHash, size_t currentFlowHash) {
+        int vertSize = params.MapSize + 1;
+size_t currentPlacementHash = params.GetPlacementHash(currentFlowHash);
         bool skipPlacement = false;
         
         if (currentPlacementHash == inOutResult.CachedPlacementHash) {
@@ -808,6 +838,7 @@ FloatMask TerrainGenerator::SymmetrizeErodedTerrain(const FloatMask& terrainMap,
         }
         
         if (!skipPlacement) {
+            if (params.FastPreviewMode) return;
             // 1. Calculate slopemap for procedural rules (Cached)
             if (inOutResult.CachedSlopeHash != currentErosionHash || inOutResult.CachedSlopeMap.GetWidth() != vertSize) {
                 inOutResult.CachedSlopeMap.Resize(vertSize, vertSize, 0.0f);
@@ -823,7 +854,10 @@ FloatMask TerrainGenerator::SymmetrizeErodedTerrain(const FloatMask& terrainMap,
             
             inOutResult.CachedPlacementHash = currentPlacementHash;
         }
+    
     }
+
+
 
     
 
