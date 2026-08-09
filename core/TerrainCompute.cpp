@@ -110,6 +110,17 @@ static void LoadGLExtensionsT() {
 
 namespace SanmapGen {
 
+    unsigned int TerrainCompute::s_ComputeProgram = 0;
+    bool TerrainCompute::s_Initialized = false;
+
+    void TerrainCompute::Shutdown() {
+        if (s_ComputeProgram != 0 && glDeleteProgramT) {
+            glDeleteProgramT(s_ComputeProgram);
+            s_ComputeProgram = 0;
+        }
+        s_Initialized = false;
+    }
+
     struct LayerConfigGLSL {
         float freq;
         int octaves;
@@ -134,33 +145,38 @@ namespace SanmapGen {
             return;
         }
 
-        std::ifstream file("D:/Projects/Sanctuary/Map Generator/shaders/TerrainCompute.glsl");
-        if(!file.is_open()) {
-            std::cerr << "Failed to open TerrainCompute.glsl!" << std::endl;
-            return;
+        if (!s_Initialized) {
+            std::ifstream file("D:/Projects/Sanctuary/Map Generator/shaders/TerrainCompute.glsl");
+            if(!file.is_open()) {
+                std::cerr << "Failed to open TerrainCompute.glsl!" << std::endl;
+                return;
+            }
+            std::stringstream buffer;
+            buffer << file.rdbuf();
+            std::string shaderSourceStr = buffer.str();
+            const char* shaderSource = shaderSourceStr.c_str();
+
+            GLuint computeShader = glCreateShaderT(GL_COMPUTE_SHADER);
+            glShaderSourceT(computeShader, 1, &shaderSource, NULL);
+            glCompileShaderT(computeShader);
+
+            GLint success;
+            glGetShaderivT(computeShader, 0x8B81, &success);
+            if (!success) {
+                GLchar infoLog[512];
+                glGetShaderInfoLogT(computeShader, 512, NULL, infoLog);
+                std::cerr << "Terrain Compute Shader Compilation Failed:\n" << infoLog << std::endl;
+                return;
+            }
+
+            s_ComputeProgram = glCreateProgramT();
+            glAttachShaderT(s_ComputeProgram, computeShader);
+            glLinkProgramT(s_ComputeProgram);
+            glDeleteShaderT(computeShader);
+            s_Initialized = true;
         }
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string shaderSourceStr = buffer.str();
-        const char* shaderSource = shaderSourceStr.c_str();
 
-        GLuint computeShader = glCreateShaderT(GL_COMPUTE_SHADER);
-        glShaderSourceT(computeShader, 1, &shaderSource, NULL);
-        glCompileShaderT(computeShader);
-
-        GLint success;
-        glGetShaderivT(computeShader, 0x8B81, &success);
-        if (!success) {
-            GLchar infoLog[512];
-            glGetShaderInfoLogT(computeShader, 512, NULL, infoLog);
-            std::cerr << "Terrain Compute Shader Compilation Failed:\n" << infoLog << std::endl;
-            return;
-        }
-
-        GLuint computeProgram = glCreateProgramT();
-        glAttachShaderT(computeProgram, computeShader);
-        glLinkProgramT(computeProgram);
-        glDeleteShaderT(computeShader);
+        GLuint computeProgram = s_ComputeProgram;
 
         std::vector<LayerConfigGLSL> activeLayers;
         // flatLayers already declared above
@@ -222,6 +238,5 @@ namespace SanmapGen {
         }
 
         glDeleteBuffersT(2, ssbo);
-        glDeleteProgramT(computeProgram);
     }
 }
