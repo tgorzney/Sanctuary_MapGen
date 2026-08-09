@@ -10,7 +10,7 @@ namespace fs = std::filesystem;
 
 namespace SanmapGen {
 
-bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& outParams, std::string& outDebugLog, bool& bSizeMismatch, int& outDiscoveredDim) {
+bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& outParams, std::string& outDebugLog) {
     std::ofstream dbg("debug_importer.txt");
     auto log = [&](const std::string& msg) {
         dbg << msg;
@@ -18,9 +18,6 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     };
     log("--- Start LoadSanmap ---\n");
     log("Input path: " + pathOrFolder + "\n");
-    
-    bSizeMismatch = false;
-    outDiscoveredDim = 0;
 
     // Clear old state before loading to prevent leaked array dimension bugs
     outParams.MarkersList.clear();
@@ -255,34 +252,27 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             int expectedDim = outParams.MapSize + 1;
             log("Heightmap file size: " + std::to_string(size) + " bytes. Expected dim: " + std::to_string(expectedDim) + " (" + std::to_string(expectedDim * expectedDim * sizeof(uint16_t)) + " bytes)\n");
             
-            // Check if size perfectly matches an NxN 16-bit heightmap
             int deducedDim = std::round(std::sqrt(size / sizeof(uint16_t)));
             if (deducedDim * deducedDim * sizeof(uint16_t) == size) {
-                outDiscoveredDim = deducedDim;
-                if (deducedDim != expectedDim) {
-                    bSizeMismatch = true;
-                    log("Heightmap dimension mismatch! Discovered: " + std::to_string(deducedDim) + ", Expected: " + std::to_string(expectedDim) + "\n");
-                } else {
-                    std::vector<uint16_t> rawData(expectedDim * expectedDim);
-                    if (hmFile.read(reinterpret_cast<char*>(rawData.data()), size)) {
-                        log("Heightmap successfully read and injected into GeoLayers.\n");
-                        GeoLayerDef gl;
-                        gl.Name = "Imported Heightmap";
-                        
-                        NoiseLayer baseLayer;
-                        baseLayer.Name = "Baked Heightmap";
-                        baseLayer.UseImage = true;
-                        baseLayer.ImageWidth = expectedDim;
-                        baseLayer.ImageHeight = expectedDim;
-                        baseLayer.ImageData.resize(rawData.size());
-                        
-                        for (size_t i = 0; i < rawData.size(); ++i) {
-                            baseLayer.ImageData[i] = static_cast<float>(rawData[i]) / 65535.0f;
-                        }
-                        
-                        gl.Layers.push_back(baseLayer);
-                        outParams.GeoLayers.push_back(gl);
+                std::vector<uint16_t> rawData(deducedDim * deducedDim);
+                if (hmFile.read(reinterpret_cast<char*>(rawData.data()), size)) {
+                    log("Heightmap successfully read and injected into GeoLayers.\n");
+                    GeoLayerDef gl;
+                    gl.Name = "Imported Heightmap";
+                    
+                    NoiseLayer baseLayer;
+                    baseLayer.Name = "Baked Heightmap";
+                    baseLayer.UseImage = true;
+                    baseLayer.ImageWidth = deducedDim;
+                    baseLayer.ImageHeight = deducedDim;
+                    baseLayer.ImageData.resize(rawData.size());
+                    
+                    for (size_t i = 0; i < rawData.size(); ++i) {
+                        baseLayer.ImageData[i] = static_cast<float>(rawData[i]) / 65535.0f;
                     }
+                    
+                    gl.Layers.push_back(baseLayer);
+                    outParams.GeoLayers.push_back(gl);
                 }
             } else {
                 log("Heightmap size is not a perfect square for 16-bit depth.\n");

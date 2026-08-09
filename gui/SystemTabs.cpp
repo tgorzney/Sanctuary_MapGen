@@ -6,6 +6,7 @@
 #include "SupComImporter.h"
 #include "UIHelpers.h"
 #include <filesystem>
+#include <GLFW/glfw3.h>
 
 namespace SanmapGen {
 namespace UI {
@@ -52,50 +53,14 @@ namespace UI {
                     s.previewActualMaskTex = 0;
                 }
                 
-                bool bMismatch = false;
-                int discoveredDim = 0;
-                if (MapImporter::LoadSanmap(path, params, importDebugLog, bMismatch, discoveredDim)) {
+                if (MapImporter::LoadSanmap(path, params, importDebugLog)) {
                     SanmapGen::UI::ReloadStratumTextures(params);
                     bNeedsMapUpdate = true;
                     bResetPreviewTransform = true; 
-                    if (bMismatch) {
-                        mismatchDiscoveredDim = discoveredDim;
-                        ImGui::OpenPopup("Heightmap Size Mismatch");
-                    }
                 } else {
                     importDebugLog += "\nFailed to load Sanmap.\n";
                 }
             }
-        }
-
-        if (ImGui::BeginPopupModal("Heightmap Size Mismatch", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("The loaded .sanmap settings specify a Map Size of %d.", params.MapSize);
-            ImGui::Text("However, the discovered heightmap.raw file corresponds to a Map Size of %d.", mismatchDiscoveredDim - 1);
-            ImGui::Spacing();
-            ImGui::Text("How would you like to proceed?");
-            ImGui::Spacing();
-            
-            if (ImGui::Button("Update Map Size", ImVec2(-1, 0))) {
-                params.MapSize = mismatchDiscoveredDim - 1;
-                bNeedsMapUpdate = true;
-                ImGui::CloseCurrentPopup();
-            }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Changes the Map Size setting to match the heightmap file.");
-            
-            if (ImGui::Button("Scale Heightmap", ImVec2(-1, 0))) {
-                bNeedsMapUpdate = true;
-                ImGui::CloseCurrentPopup();
-            }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Keeps the current Map Size and scales the heightmap data to fit.");
-            
-            if (ImGui::Button("Ignore Heightmap", ImVec2(-1, 0))) {
-                params.GeoLayers.clear(); // Discard the mismatched heightmap
-                bNeedsMapUpdate = true;
-                ImGui::CloseCurrentPopup();
-            }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Loads the settings only and discards the heightmap data.");
-            
-            ImGui::EndPopup();
         }
         
         if (ImGui::Button("Import SupCom Lua", ImVec2(-1, 30))) {
