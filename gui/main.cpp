@@ -1,4 +1,6 @@
 #include <unordered_set>
+#include <future>
+#include <chrono>
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -354,9 +356,16 @@ int main(int, char**)
     std::vector<SanmapGen::FloatMask> stratums;
     SanmapGen::GenerationResult genResult;
 
+    
+    std::future<std::pair<SanmapGen::FloatMask, SanmapGen::GenerationResult>> genFuture;
+    bool bIsGenerating = false;
+    SanmapGen::GenerationResult pendingGenResult;
+    SanmapGen::FloatMask pendingDummyMap(initVertSize, initVertSize, 0.0f);
+    SanmapGen::GenerationParams pendingParams;
+
     while (!glfwWindowShouldClose(window))
     {
-        if (bNeedsMapUpdate || bNeedsPreviewRender || ImGui::GetIO().WantSetMousePos) {
+        if (bNeedsMapUpdate || bNeedsPreviewRender || bIsGenerating || ImGui::GetIO().WantSetMousePos) {
             glfwPollEvents();
         } else {
             glfwWaitEvents();
@@ -498,33 +507,60 @@ int main(int, char**)
         wasInteracting = isInteracting;
         lastHash = currentHash;
         
-        if (ImGui::Button("Force Generate", ImVec2(-1, 40)) || bNeedsMapUpdate) {
+        if (ImGui::Button("Force Generate", ImVec2(-1, 40))) {
+            bNeedsMapUpdate = true;
+        }
+        
+        if (bNeedsMapUpdate && !bIsGenerating) {
             bNeedsMapUpdate = false;
-            bGeometryChanged = true;
+            bIsGenerating = true;
             
             int vertSize = params.MapSize + 1;
             if (dummyMap.GetWidth() != vertSize || dummyMap.GetHeight() != vertSize) {
                 dummyMap = SanmapGen::FloatMask(vertSize, vertSize, 0.0f);
             }
             
-            SanmapGen::TerrainGenerator::GenerateMap(dummyMap, params, genResult);
-            stratums = genResult.Stratums;
-            params.TerrainMinHeight = genResult.TerrainMinHeight;
-            params.TerrainMaxHeight = genResult.TerrainMaxHeight;
+            pendingDummyMap = dummyMap;
+            pendingGenResult = genResult;
+            pendingParams = params;
             
-            // Merge procedural markers (delete old procedural ones first)
-            for (auto it = params.MarkersList.begin(); it != params.MarkersList.end(); ) {
-                if (!it->second.IsManual) {
-                    it = params.MarkersList.erase(it);
-                } else {
-                    ++it;
+            // Capture by value for safety, except for pointers which are managed safely
+            genFuture = std::async(std::launch::async, [pendingDummyMap, pendingParams, pendingGenResult]() mutable {
+                SanmapGen::TerrainGenerator::GenerateMap(pendingDummyMap, pendingParams, pendingGenResult);
+                return std::make_pair(pendingDummyMap, pendingGenResult);
+            });
+        }
+        
+        if (bIsGenerating) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1,0.5f,0,1), "Generating Map...");
+            
+            if (genFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                auto result = genFuture.get(); // finalize
+                bIsGenerating = false;
+                
+                // Commit changes
+                dummyMap = result.first;
+                genResult = result.second;
+                stratums = genResult.Stratums;
+                params.TerrainMinHeight = genResult.TerrainMinHeight;
+                params.TerrainMaxHeight = genResult.TerrainMaxHeight;
+                
+                // Merge procedural markers
+                for (auto it = params.MarkersList.begin(); it != params.MarkersList.end(); ) {
+                    if (!it->second.IsManual) {
+                        it = params.MarkersList.erase(it);
+                    } else {
+                        ++it;
+                    }
                 }
+                for (const auto& kvp : genResult.GeneratedMarkers) {
+                    params.MarkersList[kvp.first] = kvp.second;
+                }
+                
+                bNeedsPreviewRender = true;
+                bGeometryChanged = true;
             }
-            for (const auto& kvp : genResult.GeneratedMarkers) {
-                params.MarkersList[kvp.first] = kvp.second;
-            }
-            
-            bNeedsPreviewRender = true;
         }
         
         if (bNeedsPreviewRender) {
