@@ -574,11 +574,6 @@ void MapExporter::SaveSettings(const std::string& filePath, const GenerationPara
         l["MountainDensity"] = layer.MountainDensity;
         l["RampDensity"] = layer.RampDensity;
 
-        l["Hardness"] = layer.hardness;
-        l["Friction"] = layer.friction;
-        l["Cohesion"] = layer.cohesion;
-        l["CapacityMult"] = layer.capacityMult;
-
         json e;
         e["Enabled"] = layer.Erosion.Enabled;
         e["UseGPU"] = params.UseGPUHydraulic;
@@ -761,20 +756,6 @@ bool MapExporter::LoadSettings(const std::string& filePath, GenerationParams& ou
             if (l.contains("PlateauDensity")) layer.PlateauDensity = l["PlateauDensity"];
             if (l.contains("MountainDensity")) layer.MountainDensity = l["MountainDensity"];
             if (l.contains("RampDensity")) layer.RampDensity = l["RampDensity"];
-
-            if (l.contains("Hardness")) layer.hardness = l["Hardness"];
-            else if (version > 0 && j.contains("Stratums") && j["Stratums"].is_array() && layer.StratumIndex >= 0 && layer.StratumIndex < j["Stratums"].size()) {
-                // Migration: pull physics from matching Stratum JSON if it exists there
-                const auto& sj = j["Stratums"][layer.StratumIndex];
-                if (sj.contains("Hardness")) layer.hardness = sj["Hardness"];
-                if (sj.contains("Friction")) layer.friction = sj["Friction"];
-                if (sj.contains("Cohesion")) layer.cohesion = sj["Cohesion"];
-                if (sj.contains("CapacityMult")) layer.capacityMult = sj["CapacityMult"];
-            }
-
-            if (l.contains("Friction")) layer.friction = l["Friction"];
-            if (l.contains("Cohesion")) layer.cohesion = l["Cohesion"];
-            if (l.contains("CapacityMult")) layer.capacityMult = l["CapacityMult"];
 
             if (l.contains("Erosion")) {
                 const auto& e = l["Erosion"];

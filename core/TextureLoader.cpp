@@ -648,5 +648,101 @@ std::vector<std::string> TextureLoader::ScanSanpackForMarkers(const std::string&
     if (debugOut) *debugOut += "Found " + std::to_string(markers.size()) + " markers in zip from " + std::to_string(filesFound) + " potential UI files.\n";
     return markers;
 }
+std::vector<std::string> TextureLoader::GetEnvironmentsFromSanpack(const std::string& zipPath) {
+    std::vector<std::string> envs;
+    if (zipPath.empty()) return envs;
+    mz_zip_archive zip_archive;
+    memset(&zip_archive, 0, sizeof(zip_archive));
+    if (!mz_zip_reader_init_file(&zip_archive, zipPath.c_str(), 0)) return envs;
+    
+    int numFiles = (int)mz_zip_reader_get_num_files(&zip_archive);
+    for (int i = 0; i < numFiles; ++i) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
+        std::string fname = file_stat.m_filename;
+        
+        size_t stratumPos = fname.find("/Stratum/");
+        if (stratumPos != std::string::npos) {
+            std::string envFolder = fname.substr(0, stratumPos);
+            if (std::find(envs.begin(), envs.end(), envFolder) == envs.end()) {
+                envs.push_back(envFolder);
+            }
+        } else if (fname.find("Stratum/") == 0) {
+            std::string envFolder = "Root";
+            if (std::find(envs.begin(), envs.end(), envFolder) == envs.end()) {
+                envs.push_back(envFolder);
+            }
+        }
+    }
+    mz_zip_reader_end(&zip_archive);
+    return envs;
+}
+
+std::vector<std::string> TextureLoader::GetMaterialsFromSanpack(const std::string& zipPath, const std::string& env) {
+    std::vector<std::string> mats;
+    if (zipPath.empty() || env.empty()) return mats;
+    mz_zip_archive zip_archive;
+    memset(&zip_archive, 0, sizeof(zip_archive));
+    if (!mz_zip_reader_init_file(&zip_archive, zipPath.c_str(), 0)) return mats;
+    
+    int numFiles = (int)mz_zip_reader_get_num_files(&zip_archive);
+    for (int i = 0; i < numFiles; ++i) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
+        std::string fname = file_stat.m_filename;
+        if (fname.find(env) != std::string::npos && fname.find("Stratum") != std::string::npos && !mz_zip_reader_is_file_a_directory(&zip_archive, i)) {
+            size_t lastSlash = fname.find_last_of('/');
+            std::string basename = (lastSlash != std::string::npos) ? fname.substr(lastSlash + 1) : fname;
+            
+            std::string basenameLower = basename;
+            std::transform(basenameLower.begin(), basenameLower.end(), basenameLower.begin(), ::tolower);
+            
+            size_t underscore = basenameLower.rfind("_albedo");
+            if (underscore == std::string::npos) underscore = basenameLower.rfind("_normal");
+            if (underscore == std::string::npos) underscore = basenameLower.rfind("_mask");
+            if (underscore != std::string::npos) {
+                std::string mat = basename.substr(0, underscore);
+                if (std::find(mats.begin(), mats.end(), mat) == mats.end()) {
+                    mats.push_back(mat);
+                }
+            }
+        }
+    }
+    mz_zip_reader_end(&zip_archive);
+    return mats;
+}
+
+void TextureLoader::ScanSanpackForMaterial(const std::string& zipPath, const std::string& environmentTheme, const std::string& materialName, SanmapGen::StratumSettings& stratum) {
+    if (zipPath.empty() || materialName.empty()) return;
+    mz_zip_archive zip_archive;
+    memset(&zip_archive, 0, sizeof(zip_archive));
+    if (!mz_zip_reader_init_file(&zip_archive, zipPath.c_str(), 0)) return;
+    
+    int numFiles = (int)mz_zip_reader_get_num_files(&zip_archive);
+    
+    std::string materialNameLower = materialName;
+    std::transform(materialNameLower.begin(), materialNameLower.end(), materialNameLower.begin(), ::tolower);
+    
+    for (int i = 0; i < numFiles; ++i) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
+        
+        std::string fname = file_stat.m_filename;
+        std::string fnameLower = fname;
+        std::transform(fnameLower.begin(), fnameLower.end(), fnameLower.begin(), ::tolower);
+        
+        if (fname.find(environmentTheme) != std::string::npos && fname.find("Stratum") != std::string::npos && fnameLower.find(materialNameLower) != std::string::npos) {
+            if (fnameLower.find("_albedo") != std::string::npos) {
+                stratum.albedo.path = fname;
+            } else if (fnameLower.find("_normal") != std::string::npos) {
+                stratum.normal.path = fname;
+            } else if (fnameLower.find("_mask") != std::string::npos) {
+                stratum.mask.path = fname;
+            }
+        }
+    }
+    mz_zip_reader_end(&zip_archive);
+}
+
 
 } // namespace SanmapGen

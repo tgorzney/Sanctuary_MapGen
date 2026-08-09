@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include "Parameters.h"
 
 // Forward declaration of OpenGL texture ID type
 typedef unsigned int GLuint;
@@ -27,6 +28,15 @@ public:
     
     // Scans UI.sanpack for valid marker icons (ending in _icon.dds)
     static std::vector<std::string> ScanSanpackForMarkers(const std::string& archivePath, std::string* debugOut = nullptr);
+    
+    // Scans the .sanpack for environments (subfolders in the root)
+    static std::vector<std::string> GetEnvironmentsFromSanpack(const std::string& zipPath);
+    
+    // Scans the .sanpack for materials within an environment
+    static std::vector<std::string> GetMaterialsFromSanpack(const std::string& zipPath, const std::string& env);
+    
+    // Scans the .sanpack for a given material and sets the Albedo/Normal/Composite paths
+    static void ScanSanpackForMaterial(const std::string& zipPath, const std::string& environmentTheme, const std::string& materialName, SanmapGen::StratumSettings& stratum);
 };
 
 } // namespace SanmapGen

@@ -16,7 +16,7 @@ namespace UI {
     void RenderHeightmapTab(GenerationParams& params, bool& bNeedsMapUpdate);
     void RenderSlopeMapTab(GenerationParams& params, bool& bNeedsPreviewRender);
     void RenderFlowMapTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
-    void RenderAccumulationMapTab(GenerationParams& params, bool& bNeedsPreviewRender);
+    void RenderAccumulationMapTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderStratumsTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderDetailNormalTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderSmoothnessTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
@@ -29,6 +29,7 @@ namespace UI {
     void RenderPropsTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender);
     void RenderPerformanceTab(GenerationParams& params, bool& bNeedsMapUpdate);
     void RenderSaveExportTab(GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool& bNeedsMapUpdate, bool& bResetPreviewTransform);
-
+    
+    void ReloadStratumTextures(GenerationParams& params);
 } // namespace UI
 } // namespace SanmapGen

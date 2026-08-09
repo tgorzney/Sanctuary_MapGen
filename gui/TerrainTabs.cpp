@@ -268,7 +268,17 @@ namespace UI {
         ImGui::Spacing();
         if (ImGui::DragFloat("Precipitation Rate", &params.FlowSettingsParams.Precipitation, 0.01f, 0.0f, 10.0f)) bNeedsMapUpdate = true;
         if (ImGui::SliderInt("Iterations (Time)", &params.FlowSettingsParams.Iterations, 1, 100)) bNeedsMapUpdate = true;
-        if (ImGui::Checkbox("Use GPU Compute (Flow)", &params.FlowSettingsParams.UseGPU)) bNeedsMapUpdate = true;
+        
+        ImGui::Spacing();
+        ImGui::Text("Advanced Flow Physics");
+        if (ImGui::SliderFloat("Flow Volume Multiplier", &params.FlowSettingsParams.FlowVolumeMultiplier, 0.1f, 10.0f)) bNeedsMapUpdate = true;
+        if (ImGui::SliderFloat("Stochastic Variance", &params.FlowSettingsParams.StochasticVariance, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+        if (ImGui::SliderFloat("Slope Adherence (Divergence)", &params.FlowSettingsParams.SlopeAdherence, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+        if (ImGui::SliderFloat("Flow Momentum", &params.FlowSettingsParams.FlowMomentum, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+        
+        ImGui::Spacing();
+        ImGui::Text("Execution Mode");
+        if (ImGui::Checkbox("Use GPU Compute (Fast Mode)", &params.FlowSettingsParams.UseGPU)) bNeedsMapUpdate = true;
         
         ImGui::Spacing();
         ImGui::Separator();
@@ -278,13 +288,21 @@ namespace UI {
         }
     }
 
-    void RenderAccumulationMapTab(GenerationParams& params, bool& bNeedsPreviewRender) {
+    void RenderAccumulationMapTab(GenerationParams& params, bool& bNeedsMapUpdate, bool& bNeedsPreviewRender) {
         ImGui::Text("Accumulation Map Settings");
         if (ImGui::Checkbox("Show Accumulation Overlay", &params.ShowAccumulationMap)) bNeedsPreviewRender = true;
         ImGui::Separator();
         
+        ImGui::Spacing();
+        ImGui::Text("Accumulation Physics");
+        if (ImGui::Checkbox("Accurate Simultaneous Accumulation", &params.FlowSettingsParams.AccurateSimultaneousAccumulation)) bNeedsMapUpdate = true;
+        ImGui::SameLine(); ImGui::TextDisabled("(Expensive CPU calculation)");
+        
+        if (ImGui::SliderFloat("Spillover Threshold", &params.FlowSettingsParams.SpilloverThreshold, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+        
+        ImGui::Spacing();
+        ImGui::Separator();
         ImGui::Text("Accumulation Gradient");
-        // Reuse Flow gradient settings or add new one? I'll reuse the Flow Settings Gradient for now, or add Accumulation Gradient if needed.
         if (GradientEditor("AccGradient", params.FlowSettingsParams.Gradient, 100.0f)) {
             bNeedsPreviewRender = true;
         }

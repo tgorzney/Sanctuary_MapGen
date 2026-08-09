@@ -6,7 +6,7 @@
 
 namespace SanmapGen {
 
-    void Gen_Mask_Slope::GenerateSlopeMap(const FloatMask& heightMap, FloatMask& outSlopeMap, GenerationResult* result) {
+    void Gen_Mask_Slope::GenerateSlopeMap(const FloatMask& heightMap, FloatMask& outSlopeMap, bool bUseEngineParityMath, GenerationResult* result) {
         int vertSize = heightMap.GetWidth();
         outSlopeMap.Resize(vertSize, vertSize, 0.0f);
         

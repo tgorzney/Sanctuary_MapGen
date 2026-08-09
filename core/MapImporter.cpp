@@ -65,6 +65,8 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
         outParams.MapSize = mapdef["width"];
     }
 
+    outParams.MapFolderPath = folderPath;
+
     // Load Water
     if (mapdef.contains("waterLevelMin")) outParams.Water.WaterLevelMin = mapdef["waterLevelMin"];
     else if (mapdef.contains("waterLevel")) {
@@ -128,18 +130,44 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     if (mapdef.contains("globalWindDirection")) outParams.Atmosphere.GlobalWindDirection = mapdef["globalWindDirection"];
 
     // Load Stratums
-    if (mapdef.contains("stratums") && mapdef["stratums"].is_array()) {
-        auto str = mapdef["stratums"];
+    if (mapdef.contains("stratumLayers") && mapdef["stratumLayers"].is_array()) {
+        auto str = mapdef["stratumLayers"];
         for (size_t i = 0; i < str.size() && i < outParams.Stratums.size(); ++i) {
             auto s = str[i];
             auto& strat = outParams.Stratums[i];
             
-            if (s.contains("albedo")) strat.albedo.path = s["albedo"];
-            if (s.contains("normal")) strat.normal.path = s["normal"];
-            if (s.contains("mask")) strat.mask.path = s["mask"];
+            if (s.contains("albedo") && s["albedo"].is_object() && s["albedo"].contains("path")) strat.albedo.path = s["albedo"]["path"];
+            if (s.contains("normal") && s["normal"].is_object() && s["normal"].contains("path")) strat.normal.path = s["normal"]["path"];
+            if (s.contains("mask") && s["mask"].is_object() && s["mask"].contains("path")) strat.mask.path = s["mask"]["path"];
             
-            if (s.contains("tileSize")) { strat.tileSize[0] = s["tileSize"]["x"]; strat.tileSize[1] = s["tileSize"]["y"]; }
-            if (s.contains("tileSizeFar")) { strat.tileSizeFar[0] = s["tileSizeFar"]["x"]; strat.tileSizeFar[1] = s["tileSizeFar"]["y"]; }
+            auto parseVec2 = [](const json& j, SanVector2& out) {
+                if (j.is_array() && j.size() >= 2) { out.x = j[0]; out.y = j[1]; }
+                else if (j.is_object()) {
+                    if (j.contains("x")) out.x = j["x"];
+                    if (j.contains("y")) out.y = j["y"];
+                }
+            };
+            auto parseColor = [](const json& j, SanColor& out) {
+                if (j.is_array() && j.size() >= 4) { out.r = j[0]; out.g = j[1]; out.b = j[2]; out.a = j[3]; }
+                else if (j.is_object()) {
+                    if (j.contains("r")) out.r = j["r"];
+                    if (j.contains("g")) out.g = j["g"];
+                    if (j.contains("b")) out.b = j["b"];
+                    if (j.contains("a")) out.a = j["a"];
+                }
+            };
+            auto parseVec4 = [](const json& j, SanVector4& out) {
+                if (j.is_array() && j.size() >= 4) { out.x = j[0]; out.y = j[1]; out.z = j[2]; out.w = j[3]; }
+                else if (j.is_object()) {
+                    if (j.contains("x")) out.x = j["x"];
+                    if (j.contains("y")) out.y = j["y"];
+                    if (j.contains("z")) out.z = j["z"];
+                    if (j.contains("w")) out.w = j["w"];
+                }
+            };
+
+            if (s.contains("tileSize")) parseVec2(s["tileSize"], strat.tileSize);
+            if (s.contains("tileSizeFar")) parseVec2(s["tileSizeFar"], strat.tileSizeFar);
             if (s.contains("tileSizeTriplanar")) strat.tileSizeTriplanar = s["tileSizeTriplanar"];
             if (s.contains("tileSizeFarTriplanar")) strat.tileSizeFarTriplanar = s["tileSizeFarTriplanar"];
             
@@ -148,18 +176,15 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             if (s.contains("normalFarNearBlend")) strat.normalFarNearBlend = s["normalFarNearBlend"];
             if (s.contains("heightFarNearBlend")) strat.heightFarNearBlend = s["heightFarNearBlend"];
             
-            if (s.contains("diffuseRemap")) { strat.diffuseRemap[0] = s["diffuseRemap"]["x"]; strat.diffuseRemap[1] = s["diffuseRemap"]["y"]; strat.diffuseRemap[2] = s["diffuseRemap"]["z"]; strat.diffuseRemap[3] = s["diffuseRemap"]["w"]; }
-            if (s.contains("farColorRemap")) { strat.farColorRemap[0] = s["farColorRemap"]["x"]; strat.farColorRemap[1] = s["farColorRemap"]["y"]; strat.farColorRemap[2] = s["farColorRemap"]["z"]; strat.farColorRemap[3] = s["farColorRemap"]["w"]; }
-            if (s.contains("maskRemapMin")) { strat.maskRemapMin[0] = s["maskRemapMin"]["x"]; strat.maskRemapMin[1] = s["maskRemapMin"]["y"]; strat.maskRemapMin[2] = s["maskRemapMin"]["z"]; strat.maskRemapMin[3] = s["maskRemapMin"]["w"]; }
-            if (s.contains("maskRemapMax")) { strat.maskRemapMax[0] = s["maskRemapMax"]["x"]; strat.maskRemapMax[1] = s["maskRemapMax"]["y"]; strat.maskRemapMax[2] = s["maskRemapMax"]["z"]; strat.maskRemapMax[3] = s["maskRemapMax"]["w"]; }
+            if (s.contains("diffuseRemap")) parseColor(s["diffuseRemap"], strat.diffuseRemap);
+            if (s.contains("farColorRemap")) parseColor(s["farColorRemap"], strat.farColorRemap);
+            if (s.contains("maskRemapMin")) parseVec4(s["maskRemapMin"], strat.maskRemapMin);
+            if (s.contains("maskRemapMax")) parseVec4(s["maskRemapMax"], strat.maskRemapMax);
             
-            if (s.contains("physics")) {
-                auto p = s["physics"];
-                if (p.contains("hardness")) strat.hardness = p["hardness"];
-                if (p.contains("friction")) strat.friction = p["friction"];
-                if (p.contains("cohesion")) strat.cohesion = p["cohesion"];
-                if (p.contains("capacityMult")) strat.capacityMult = p["capacityMult"];
-            }
+            if (s.contains("hardness")) strat.hardness = s["hardness"];
+            if (s.contains("friction")) strat.friction = s["friction"];
+            if (s.contains("cohesion")) strat.cohesion = s["cohesion"];
+            if (s.contains("capacityMult")) strat.capacityMult = s["capacityMult"];
         }
     }
 

@@ -5,7 +5,8 @@ namespace SanmapGen {
 
     void Gen_Thermal::ProcessCohesion(std::vector<FloatMask>& threadStratums, FloatMask& threadTotalHeight,
                                       int mapSize, const std::vector<size_t>& cohesionLayers,
-                                      const std::vector<const NoiseLayer*>& flatLayers) {
+                                      const std::vector<const NoiseLayer*>& flatLayers,
+                                      const GenerationParams& params) {
         
         for (int p = 0; p < 2; ++p) { // 2 passes
             for (int y = 1; y < mapSize - 1; ++y) {
@@ -35,7 +36,7 @@ namespace SanmapGen {
                         float total_dh = dh_l + dh_r + dh_u + dh_d;
                         
                         // Cohesion determines the max angle/slope
-                        float maxSlope = (*flatLayers[idx]).cohesion;
+                        float maxSlope = params.Stratums[(*flatLayers[idx]).StratumIndex].cohesion;
                         
                         // Branchless gate: If total_dh <= maxSlope, slide = 0
                         float slideActive = (total_dh > maxSlope) ? 1.0f : 0.0f;

@@ -3,6 +3,8 @@
 #include <cmath>
 #include <algorithm>
 
+#include <execution>
+
 namespace SanmapGen {
 
     // (This is duplicated locally from ErosionSimulator to decouple it without header tangling, or you can expose it)
@@ -30,7 +32,8 @@ namespace SanmapGen {
         height = h00 * (1.0f - u) * (1.0f - v) + h10 * u * (1.0f - v) + h01 * (1.0f - u) * v + h11 * u * v;
     }
 
-    void Gen_Hydraulic::ProcessDroplets(std::vector<FloatMask>& threadStratums, FloatMask& threadTotalHeight,
+    template<bool AccurateAccumulation>
+    void ProcessDropletsImpl(std::vector<FloatMask>& threadStratums, FloatMask& threadTotalHeight,
                                         const std::vector<DropletSpawn>& spawns, int dropStart, int dropCount,
                                         const ErosionSettings& settings, const GenerationParams& params,
                                         int mapSize, int currentLayerIdx, const std::vector<size_t>& activeLayers,
@@ -62,21 +65,31 @@ namespace SanmapGen {
                     if (threadStratums[activeLayers[l]].Get(nodeX, nodeY) > 0.0001f) {
                         topLayerIdx = activeLayers[l];
                         const auto& layer = (*flatLayers[topLayerIdx]);
-                        topHardness = layer.hardness;
-                        topFriction = layer.friction;
-                        topCohesion = layer.cohesion;
-                        topCapacityMult = layer.capacityMult;
-                        topAbsorptionRate = layer.AbsorptionRate;
+                        const auto& stratum = params.Stratums[layer.StratumIndex];
+                        topHardness = stratum.hardness;
+                        topFriction = stratum.friction;
+                        topCohesion = stratum.cohesion;
+                        topCapacityMult = stratum.capacityMult;
+                        topAbsorptionRate = stratum.absorptionRate;
                         break;
                     }
                 }
+
+                // SLOPE DIVERGENCE FACTOR
+                float slopeLength = std::sqrt(gradX * gradX + gradY * gradY);
+                float randMeanderX = ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
+                float randMeanderY = ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
+                float divergence = (1.0f - params.FlowSettingsParams.SlopeAdherence) * (1.0f - std::min(slopeLength * 10.0f, 1.0f));
+                
+                float effectiveGradX = gradX + randMeanderX * divergence;
+                float effectiveGradY = gradY + randMeanderY * divergence;
 
                 float inertia = 0.05f + (1.0f - topFriction) * 0.1f;
                 // Scientific Viscosity: higher viscosity directly dampens velocity inertia
                 inertia *= (1.0f / std::max(0.1f, settings.FluidViscosity));
                 
-                dirX = (dirX * inertia) - (gradX * (1.0f - inertia));
-                dirY = (dirY * inertia) - (gradY * (1.0f - inertia));
+                dirX = (dirX * inertia) - (effectiveGradX * (1.0f - inertia));
+                dirY = (dirY * inertia) - (effectiveGradY * (1.0f - inertia));
 
                 float len = std::sqrt(dirX * dirX + dirY * dirY);
                 if (len != 0.0f) { dirX /= len; dirY /= len; }
@@ -104,24 +117,30 @@ namespace SanmapGen {
                     
                     int depIdx = currentLayerIdx;
                     
-                    float u = oldPosX - static_cast<int>(oldPosX);
-                    float v = oldPosY - static_cast<int>(oldPosY);
-                    
-                    float d00 = amountToDeposit * (1-u)*(1-v);
-                    float d10 = amountToDeposit * u*(1-v);
-                    float d01 = amountToDeposit * (1-u)*v;
-                    float d11 = amountToDeposit * u*v;
-                    
-                    threadStratums[depIdx].Set(nodeX, nodeY, threadStratums[depIdx].Get(nodeX, nodeY) + d00);
-                    threadStratums[depIdx].Set(nodeX+1, nodeY, threadStratums[depIdx].Get(nodeX+1, nodeY) + d10);
-                    threadStratums[depIdx].Set(nodeX, nodeY+1, threadStratums[depIdx].Get(nodeX, nodeY+1) + d01);
-                    threadStratums[depIdx].Set(nodeX+1, nodeY+1, threadStratums[depIdx].Get(nodeX+1, nodeY+1) + d11);
-                    
-                    threadTotalHeight.Set(nodeX, nodeY, threadTotalHeight.Get(nodeX, nodeY) + d00);
-                    threadTotalHeight.Set(nodeX+1, nodeY, threadTotalHeight.Get(nodeX+1, nodeY) + d10);
-                    threadTotalHeight.Set(nodeX, nodeY+1, threadTotalHeight.Get(nodeX, nodeY+1) + d01);
-                    threadTotalHeight.Set(nodeX+1, nodeY+1, threadTotalHeight.Get(nodeX+1, nodeY+1) + d11);
-
+                    if constexpr (AccurateAccumulation) {
+                        // In accurate mode, drop all sediment directly at the node for steep localized piling (resolved by DAG Solver later)
+                        threadStratums[depIdx].Set(nodeX, nodeY, threadStratums[depIdx].Get(nodeX, nodeY) + amountToDeposit);
+                        threadTotalHeight.Set(nodeX, nodeY, threadTotalHeight.Get(nodeX, nodeY) + amountToDeposit);
+                    } else {
+                        // Bilinear deferred dropping for faster processing
+                        float u = oldPosX - static_cast<int>(oldPosX);
+                        float v = oldPosY - static_cast<int>(oldPosY);
+                        
+                        float d00 = amountToDeposit * (1-u)*(1-v);
+                        float d10 = amountToDeposit * u*(1-v);
+                        float d01 = amountToDeposit * (1-u)*v;
+                        float d11 = amountToDeposit * u*v;
+                        
+                        threadStratums[depIdx].Set(nodeX, nodeY, threadStratums[depIdx].Get(nodeX, nodeY) + d00);
+                        threadStratums[depIdx].Set(nodeX+1, nodeY, threadStratums[depIdx].Get(nodeX+1, nodeY) + d10);
+                        threadStratums[depIdx].Set(nodeX, nodeY+1, threadStratums[depIdx].Get(nodeX, nodeY+1) + d01);
+                        threadStratums[depIdx].Set(nodeX+1, nodeY+1, threadStratums[depIdx].Get(nodeX+1, nodeY+1) + d11);
+                        
+                        threadTotalHeight.Set(nodeX, nodeY, threadTotalHeight.Get(nodeX, nodeY) + d00);
+                        threadTotalHeight.Set(nodeX+1, nodeY, threadTotalHeight.Get(nodeX+1, nodeY) + d10);
+                        threadTotalHeight.Set(nodeX, nodeY+1, threadTotalHeight.Get(nodeX, nodeY+1) + d01);
+                        threadTotalHeight.Set(nodeX+1, nodeY+1, threadTotalHeight.Get(nodeX+1, nodeY+1) + d11);
+                    }
                 } else if (!settings.DepositionMode) {
                     float erosionRate = 0.3f * (1.0f - topHardness); 
                     float amountToErode = std::min((capacity - sediment) * erosionRate, -deltaHeight);
@@ -175,6 +194,74 @@ namespace SanmapGen {
                     break;
                 }
             }
+        }
+    }
+
+    void Gen_Hydraulic::ProcessDroplets(std::vector<FloatMask>& threadStratums, FloatMask& threadTotalHeight,
+                                        const std::vector<DropletSpawn>& spawns, int dropStart, int dropCount,
+                                        const ErosionSettings& settings, const GenerationParams& params,
+                                        int mapSize, int currentLayerIdx, const std::vector<size_t>& activeLayers,
+                                        const std::vector<const NoiseLayer*>& flatLayers) {
+        
+        if (params.FlowSettingsParams.AccurateSimultaneousAccumulation) {
+            ProcessDropletsImpl<true>(threadStratums, threadTotalHeight, spawns, dropStart, dropCount, settings, params, mapSize, currentLayerIdx, activeLayers, flatLayers);
+            
+            // Single-Pass Topological DAG Solver for Valley Filling (O(N))
+            int totalNodes = mapSize * mapSize;
+            std::vector<int> sortedIndices(totalNodes);
+            for (int i = 0; i < totalNodes; ++i) sortedIndices[i] = i;
+            
+            // Sort indices from highest to lowest elevation
+            std::sort(std::execution::par_unseq, sortedIndices.begin(), sortedIndices.end(),
+                [&threadTotalHeight, mapSize](int a, int b) {
+                    float ha = threadTotalHeight.Get(a % mapSize, a / mapSize);
+                    float hb = threadTotalHeight.Get(b % mapSize, b / mapSize);
+                    return ha > hb;
+                });
+                
+            float spillThreshold = params.FlowSettingsParams.SpilloverThreshold;
+            
+            for (int i = 0; i < totalNodes; ++i) {
+                int idx = sortedIndices[i];
+                int x = idx % mapSize;
+                int y = idx / mapSize;
+                
+                if (x <= 0 || x >= mapSize - 1 || y <= 0 || y >= mapSize - 1) continue;
+                
+                float h = threadTotalHeight.Get(x, y);
+                float spillAmt = threadStratums[currentLayerIdx].Get(x, y) - spillThreshold;
+                
+                if (spillAmt > 0.0f) {
+                    // Find lowest neighbor using branchless/FMA concepts where possible, but a standard topological flow handles it O(N)
+                    float lowestH = h;
+                    int lowestNX = -1, lowestNY = -1;
+                    
+                    const int dx[] = { -1, 1, 0, 0, -1, 1, -1, 1 };
+                    const int dy[] = { 0, 0, -1, 1, -1, -1, 1, 1 };
+                    
+                    for (int n = 0; n < 8; ++n) {
+                        float nh = threadTotalHeight.Get(x + dx[n], y + dy[n]);
+                        if (nh < lowestH) {
+                            lowestH = nh;
+                            lowestNX = x + dx[n];
+                            lowestNY = y + dy[n];
+                        }
+                    }
+                    
+                    if (lowestNX != -1 && lowestNY != -1) {
+                        float diff = (h - lowestH) / 2.0f;
+                        float transfer = std::min(spillAmt, diff);
+                        
+                        threadStratums[currentLayerIdx].Set(x, y, threadStratums[currentLayerIdx].Get(x, y) - transfer);
+                        threadTotalHeight.Set(x, y, h - transfer);
+                        
+                        threadStratums[currentLayerIdx].Set(lowestNX, lowestNY, threadStratums[currentLayerIdx].Get(lowestNX, lowestNY) + transfer);
+                        threadTotalHeight.Set(lowestNX, lowestNY, threadTotalHeight.Get(lowestNX, lowestNY) + transfer);
+                    }
+                }
+            }
+        } else {
+            ProcessDropletsImpl<false>(threadStratums, threadTotalHeight, spawns, dropStart, dropCount, settings, params, mapSize, currentLayerIdx, activeLayers, flatLayers);
         }
     }
 }

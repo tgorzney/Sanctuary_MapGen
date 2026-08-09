@@ -1,5 +1,6 @@
 #include "Widget_LayerManager.h"
 #include "../core/FileDialog.h"
+#include "../UIHelpers.h"
 #include <fstream>
 #include <string>
 
@@ -152,14 +153,7 @@ namespace SanmapGen {
                 if (ImGui::SliderFloat("Blend Sharpness", &layer.HeightBlendContrast, 0.1f, 5.0f)) bNeedsMapUpdate = true;
                 if (ImGui::SliderFloat("Image Contrast", &layer.ImageContrast, 0.0f, 3.0f)) bNeedsMapUpdate = true;
                 if (ImGui::SliderFloat("Image Brightness", &layer.ImageBrightness, -1.0f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Mask Min", &layer.HeightBlendMin, 0.0f, 1.0f)) {
-                    if (layer.HeightBlendMin >= layer.HeightBlendMax) layer.HeightBlendMax = layer.HeightBlendMin + 0.001f;
-                    if (layer.HeightBlendMax > 1.0f) { layer.HeightBlendMax = 1.0f; layer.HeightBlendMin = 0.999f; }
-                    bNeedsMapUpdate = true;
-                }
-                if (ImGui::SliderFloat("Mask Max", &layer.HeightBlendMax, 0.0f, 1.0f)) {
-                    if (layer.HeightBlendMax <= layer.HeightBlendMin) layer.HeightBlendMin = layer.HeightBlendMax - 0.001f;
-                    if (layer.HeightBlendMin < 0.0f) { layer.HeightBlendMin = 0.0f; layer.HeightBlendMax = 0.001f; }
+                if (UI::RangeSliderFloat("Height Mask", &layer.HeightBlendMin, &layer.HeightBlendMax, 0.0f, 1.0f)) {
                     bNeedsMapUpdate = true;
                 }
                 ImGui::TreePop();
@@ -211,22 +205,24 @@ namespace SanmapGen {
                 ImGui::OpenPopup("SoilPresetsPopup");
             }
             if (ImGui::BeginPopup("SoilPresetsPopup")) {
-                if (ImGui::MenuItem("Bedrock")) { layer.hardness = 1.0f; layer.friction = 0.8f; layer.cohesion = 1.0f; layer.capacityMult = 0.1f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Rock")) { layer.hardness = 0.8f; layer.friction = 0.7f; layer.cohesion = 0.8f; layer.capacityMult = 0.5f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Clay")) { layer.hardness = 0.5f; layer.friction = 0.4f; layer.cohesion = 0.9f; layer.capacityMult = 1.0f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Dirt")) { layer.hardness = 0.4f; layer.friction = 0.5f; layer.cohesion = 0.5f; layer.capacityMult = 1.5f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Mud")) { layer.hardness = 0.2f; layer.friction = 0.2f; layer.cohesion = 0.7f; layer.capacityMult = 2.0f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Sand")) { layer.hardness = 0.1f; layer.friction = 0.6f; layer.cohesion = 0.1f; layer.capacityMult = 2.5f; bNeedsMapUpdate = true; }
+                auto& strat = params.Stratums[layer.StratumIndex];
+                if (ImGui::MenuItem("Bedrock")) { strat.hardness = 1.0f; strat.friction = 0.8f; strat.cohesion = 1.0f; strat.capacityMult = 0.1f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Rock")) { strat.hardness = 0.8f; strat.friction = 0.7f; strat.cohesion = 0.8f; strat.capacityMult = 0.5f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Clay")) { strat.hardness = 0.5f; strat.friction = 0.4f; strat.cohesion = 0.9f; strat.capacityMult = 1.0f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Dirt")) { strat.hardness = 0.4f; strat.friction = 0.5f; strat.cohesion = 0.5f; strat.capacityMult = 1.5f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Mud")) { strat.hardness = 0.2f; strat.friction = 0.2f; strat.cohesion = 0.7f; strat.capacityMult = 2.0f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Sand")) { strat.hardness = 0.1f; strat.friction = 0.6f; strat.cohesion = 0.1f; strat.capacityMult = 2.5f; bNeedsMapUpdate = true; }
                 ImGui::EndPopup();
             }
             ImGui::PopID();
 
             if (soilPhysicsOpen) {
-                if (ImGui::SliderFloat("Hardness", &layer.hardness, 0.01f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Friction", &layer.friction, 0.01f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Cohesion", &layer.cohesion, 0.01f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Capacity Mult", &layer.capacityMult, 0.1f, 5.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Absorption Rate", &layer.AbsorptionRate, 0.001f, 0.5f)) bNeedsMapUpdate = true;
+                auto& strat = params.Stratums[layer.StratumIndex];
+                if (ImGui::SliderFloat("Hardness", &strat.hardness, 0.01f, 1.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Friction", &strat.friction, 0.01f, 1.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Cohesion", &strat.cohesion, 0.01f, 1.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Capacity Mult", &strat.capacityMult, 0.1f, 5.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Absorption Rate", &strat.absorptionRate, 0.001f, 0.5f)) bNeedsMapUpdate = true;
                 ImGui::TreePop();
             }
 
@@ -273,8 +269,7 @@ namespace SanmapGen {
                 }
                 if (layer.Erosion.DepositionMode) {
                     if (ImGui::SliderFloat("Initial Load", &layer.Erosion.InitialSedimentLoad, 0.01f, 5.0f)) bNeedsMapUpdate = true;
-                    if (ImGui::SliderFloat("Spawn Min H", &layer.Erosion.SpawnMinHeight, 0.0f, 1.0f)) bNeedsMapUpdate = true;
-                    if (ImGui::SliderFloat("Spawn Max H", &layer.Erosion.SpawnMaxHeight, 0.0f, 1.0f)) bNeedsMapUpdate = true;
+                    if (UI::RangeSliderFloat("Spawn Height", &layer.Erosion.SpawnMinHeight, &layer.Erosion.SpawnMaxHeight, params.TerrainMinHeight, params.TerrainMaxHeight)) bNeedsMapUpdate = true;
                 }
                 ImGui::TreePop();
             }

@@ -221,10 +221,11 @@ namespace SanmapGen {
             // Flatten thickness
             std::copy(stratums[srcIdx].GetDataPtr(), stratums[srcIdx].GetDataPtr() + mapPixels, flattenedStrata.begin() + (l * mapPixels));
 
-            // Flatten physics — now read directly from the layer, not the stratum
+            // Flatten physics - now read directly from the stratum settings acting as a LUT
             const auto& layer = (*flatLayers[srcIdx]);
-            float encodedHardness = layer.Erodable ? layer.hardness : -1.0f; // sentinel < 0 = not erodable
-            physicsArray[l] = { encodedHardness, layer.friction, layer.cohesion, layer.capacityMult, layer.AbsorptionRate, 0.0f, 0.0f, 0.0f };
+            const auto& stratum = params.Stratums[layer.StratumIndex];
+            float encodedHardness = layer.Erodable ? stratum.hardness : -1.0f; // sentinel < 0 = not erodable
+            physicsArray[l] = { encodedHardness, stratum.friction, stratum.cohesion, stratum.capacityMult, stratum.absorptionRate, 0.0f, 0.0f, 0.0f };
         }
 
         // Setup SSBOs

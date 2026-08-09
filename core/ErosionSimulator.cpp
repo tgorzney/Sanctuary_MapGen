@@ -94,7 +94,7 @@ namespace SanmapGen {
                 if (currentLayer.Enabled) cohesionLayers.push_back(currentLayerIdx);
             }
 
-            Gen_Thermal::ProcessCohesion(threadStratums, threadTotalHeight, mapSize, cohesionLayers, flatLayers);
+            Gen_Thermal::ProcessCohesion(threadStratums, threadTotalHeight, mapSize, cohesionLayers, flatLayers, params);
 
             // Delta
             std::vector<FloatMask> threadDelta = threadStratums;

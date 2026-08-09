@@ -130,13 +130,6 @@ namespace SanmapGen {
         float LevelsOutputBlack = 0.0f;   // 0.0 to 1.0
         float LevelsOutputWhite = 1.0f;   // 0.0 to 1.0
 
-        // Soil Physics (single source — also editable on Stratums tab)
-        float hardness = 0.2f; 
-        float friction = 0.8f;
-        float cohesion = 0.5f;
-        float capacityMult = 2.0f;
-        float AbsorptionRate = 0.05f;
-
         // Layer-specific Erosion
         ErosionSettings Erosion;
         bool ErodeBeneath = false; // If true, droplets can dig into layers underneath
@@ -201,6 +194,11 @@ namespace SanmapGen {
         float StochasticVariance = 0.5f;
         float SlopeAdherence = 0.8f;
         float FlowMomentum = 0.2f;
+        
+        // --- Accumulation Variables ---
+        bool AccurateSimultaneousAccumulation = false;
+        float SpilloverThreshold = 0.01f;
+        
         GradientSettings Gradient = {
             "Default", 
             {
@@ -515,6 +513,7 @@ namespace SanmapGen {
     struct GenerationParams {
         int PresetVersion = 1; // Used for backwards compatibility
         std::string GlobalEnvironmentPath = ""; // Path to the .sanpack or folder
+        std::string MapFolderPath = ""; // Path to the currently loaded map folder
         
         int ShowFocusGradientDebugRuleIndex = -1; // -1 means off, otherwise the index of the MarkerRule being adjusted
         

@@ -222,96 +222,7 @@ void ForceScanIcons(SanmapGen::GenerationParams& params) {
     }
 }
 
-// Scans the .sanpack for a given material and sets the Albedo/Normal/Composite paths
-void ScanSanpackForMaterial(const std::string& zipPath, const std::string& environmentTheme, const std::string& materialName, SanmapGen::StratumSettings& stratum) {
-    if (zipPath.empty() || materialName.empty()) return;
-    mz_zip_archive zip_archive;
-    memset(&zip_archive, 0, sizeof(zip_archive));
-    if (!mz_zip_reader_init_file(&zip_archive, zipPath.c_str(), 0)) return;
-    
-    int numFiles = (int)mz_zip_reader_get_num_files(&zip_archive);
-    std::string prefix = environmentTheme + "/Stratum/";
-    
-    for (int i = 0; i < numFiles; ++i) {
-        mz_zip_archive_file_stat file_stat;
-        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
-        
-        std::string fname = file_stat.m_filename;
-        if (fname.find(environmentTheme) != std::string::npos && fname.find("Stratum") != std::string::npos && fname.find(materialName) != std::string::npos) {
-            if (fname.find("_albedo.dds") != std::string::npos || fname.find("_albedo.png") != std::string::npos) {
-                stratum.albedo.path = fname;
-            } else if (fname.find("_normal.dds") != std::string::npos || fname.find("_normal.png") != std::string::npos) {
-                stratum.normal.path = fname;
-            } else if (fname.find("_mask.dds") != std::string::npos || fname.find("_masks.dds") != std::string::npos || fname.find("_mask.png") != std::string::npos) {
-                stratum.mask.path = fname;
-            }
-        }
-    }
-    mz_zip_reader_end(&zip_archive);
-}
 
-// Scans the .sanpack for environments (subfolders in the root)
-std::vector<std::string> GetEnvironmentsFromSanpack(const std::string& zipPath) {
-    std::vector<std::string> envs;
-    if (zipPath.empty()) return envs;
-    mz_zip_archive zip_archive;
-    memset(&zip_archive, 0, sizeof(zip_archive));
-    if (!mz_zip_reader_init_file(&zip_archive, zipPath.c_str(), 0)) return envs;
-    
-    int numFiles = (int)mz_zip_reader_get_num_files(&zip_archive);
-    for (int i = 0; i < numFiles; ++i) {
-        mz_zip_archive_file_stat file_stat;
-        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
-        std::string fname = file_stat.m_filename;
-        
-        size_t stratumPos = fname.find("/Stratum/");
-        if (stratumPos != std::string::npos) {
-            std::string envFolder = fname.substr(0, stratumPos);
-            if (std::find(envs.begin(), envs.end(), envFolder) == envs.end()) {
-                envs.push_back(envFolder);
-            }
-        } else if (fname.find("Stratum/") == 0) {
-            std::string envFolder = "Root";
-            if (std::find(envs.begin(), envs.end(), envFolder) == envs.end()) {
-                envs.push_back(envFolder);
-            }
-        }
-    }
-    mz_zip_reader_end(&zip_archive);
-    return envs;
-}
-
-// Scans the .sanpack for materials within an environment
-std::vector<std::string> GetMaterialsFromSanpack(const std::string& zipPath, const std::string& env) {
-    std::vector<std::string> mats;
-    if (zipPath.empty() || env.empty()) return mats;
-    mz_zip_archive zip_archive;
-    memset(&zip_archive, 0, sizeof(zip_archive));
-    if (!mz_zip_reader_init_file(&zip_archive, zipPath.c_str(), 0)) return mats;
-    
-    int numFiles = (int)mz_zip_reader_get_num_files(&zip_archive);
-    for (int i = 0; i < numFiles; ++i) {
-        mz_zip_archive_file_stat file_stat;
-        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
-        std::string fname = file_stat.m_filename;
-        if (fname.find(env) != std::string::npos && fname.find("Stratum") != std::string::npos && !mz_zip_reader_is_file_a_directory(&zip_archive, i)) {
-            size_t lastSlash = fname.find_last_of('/');
-            std::string basename = (lastSlash != std::string::npos) ? fname.substr(lastSlash + 1) : fname;
-            
-            size_t underscore = basename.rfind("_albedo");
-            if (underscore == std::string::npos) underscore = basename.rfind("_normal");
-            if (underscore == std::string::npos) underscore = basename.rfind("_mask");
-            if (underscore != std::string::npos) {
-                std::string mat = basename.substr(0, underscore);
-                if (std::find(mats.begin(), mats.end(), mat) == mats.end()) {
-                    mats.push_back(mat);
-                }
-            }
-        }
-    }
-    mz_zip_reader_end(&zip_archive);
-    return mats;
-}
 
 // RenderLayerHeader and inline UI logic has been moved to gui/TerrainTabs.cpp and gui/UITabs.h
 
@@ -583,7 +494,7 @@ int main(int, char**)
             case 0: SanmapGen::UI::RenderHeightmapTab(params, bNeedsMapUpdate); break;
             case 1: SanmapGen::UI::RenderSlopeMapTab(params, bNeedsPreviewRender); break;
             case 13: SanmapGen::UI::RenderFlowMapTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
-            case 14: SanmapGen::UI::RenderAccumulationMapTab(params, bNeedsPreviewRender); break;
+            case 14: SanmapGen::UI::RenderAccumulationMapTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 2: SanmapGen::UI::RenderStratumsTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 3: SanmapGen::UI::RenderDetailNormalTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 4: SanmapGen::UI::RenderTintTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;

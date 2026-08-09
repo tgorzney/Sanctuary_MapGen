@@ -15,25 +15,11 @@ namespace UI {
         ImGui::Separator();
         
         if (ImGui::CollapsingHeader("Water Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-            float vLevels[2] = { params.Water.WaterLevelMin, params.Water.WaterLevelMax };
-            if (ImGui::DragFloat2("Water Level", vLevels, 0.1f, 0.0f, 128.0f)) {
-                vLevels[0] = std::min(vLevels[0], vLevels[1] - 0.1f);
-                vLevels[1] = std::max(vLevels[1], vLevels[0] + 0.1f);
-                vLevels[0] = std::max(0.0f, vLevels[0]);
-                vLevels[1] = std::min(128.0f, vLevels[1]);
-                params.Water.WaterLevelMin = vLevels[0];
-                params.Water.WaterLevelMax = vLevels[1];
+            if (UI::RangeSliderFloat("Water Level", &params.Water.WaterLevelMin, &params.Water.WaterLevelMax, params.TerrainMinHeight, params.TerrainMaxHeight)) {
                 bNeedsPreviewRender = true;
             }
             
-            float vDeep[2] = { params.Water.DeepWaterDepthMin, params.Water.DeepWaterDepthMax };
-            if (ImGui::DragFloat2("Deep Water", vDeep, 0.1f, 0.0f, 128.0f)) {
-                vDeep[0] = std::min(vDeep[0], vDeep[1] - 0.1f);
-                vDeep[1] = std::max(vDeep[1], vDeep[0] + 0.1f);
-                vDeep[0] = std::max(0.0f, vDeep[0]);
-                vDeep[1] = std::min(128.0f, vDeep[1]);
-                params.Water.DeepWaterDepthMin = vDeep[0];
-                params.Water.DeepWaterDepthMax = vDeep[1];
+            if (UI::RangeSliderFloat("Deep Water", &params.Water.DeepWaterDepthMin, &params.Water.DeepWaterDepthMax, 0.0f, 128.0f)) {
                 bNeedsPreviewRender = true;
             }
         }
@@ -279,10 +265,8 @@ namespace UI {
                             if (ImGui::Checkbox("Random Selection", &rule.RandomSelection)) bUpdate = true;
                             
                             ImGui::Text("Spatial & Tolerance");
-                            if (ImGui::SliderFloat("Min Height", &rule.MinHeight, 0.0f, 128.0f)) bNeedsPreviewRender = true;
-                            if (ImGui::SliderFloat("Max Height", &rule.MaxHeight, 0.0f, 128.0f)) bNeedsPreviewRender = true;
-                            if (ImGui::SliderFloat("Min Slope", &rule.MinSlope, 0.0f, 90.0f)) bNeedsPreviewRender = true;
-                            if (ImGui::SliderFloat("Max Slope", &rule.MaxSlope, 0.0f, 90.0f)) bNeedsPreviewRender = true;
+                            if (UI::RangeSliderFloat("Rule Height Bounds", &rule.MinHeight, &rule.MaxHeight, params.TerrainMinHeight, params.TerrainMaxHeight)) bNeedsPreviewRender = true;
+                            if (UI::RangeSliderFloat("Rule Slope Bounds", &rule.MinSlope, &rule.MaxSlope, 0.0f, 90.0f)) bNeedsPreviewRender = true;
                             
                             if (ImGui::SliderFloat("Area Radius Min", &rule.AreaRadiusMin, 1.0f, 200.0f)) bUpdate = true;
                             if (ImGui::Checkbox("Check Max Radius", &rule.CheckMaxRadius)) bUpdate = true;
@@ -529,19 +513,11 @@ namespace UI {
                 
                 if (ImGui::SliderFloat("Density", &params.Props[i].Density, 0.0f, 10.0f)) bNeedsPreviewRender = true;
                 
-                if (ImGui::DragFloat2("Slope Range", &params.Props[i].MinSlope, 0.01f, 0.0f, 90.0f, "%.2f")) {
-                    params.Props[i].MinSlope = std::min(params.Props[i].MinSlope, params.Props[i].MaxSlope - 0.01f);
-                    params.Props[i].MaxSlope = std::max(params.Props[i].MaxSlope, params.Props[i].MinSlope + 0.01f);
-                    params.Props[i].MinSlope = std::max(0.0f, params.Props[i].MinSlope);
-                    params.Props[i].MaxSlope = std::min(90.0f, params.Props[i].MaxSlope);
+                if (UI::RangeSliderFloat("Slope Range", &params.Props[i].MinSlope, &params.Props[i].MaxSlope, 0.0f, 90.0f)) {
                     bNeedsPreviewRender = true;
                 }
                 
-                if (ImGui::DragFloat2("Height Range", &params.Props[i].MinHeight, 0.1f, 0.0f, 128.0f, "%.1f")) {
-                    params.Props[i].MinHeight = std::min(params.Props[i].MinHeight, params.Props[i].MaxHeight - 0.1f);
-                    params.Props[i].MaxHeight = std::max(params.Props[i].MaxHeight, params.Props[i].MinHeight + 0.1f);
-                    params.Props[i].MinHeight = std::max(0.0f, params.Props[i].MinHeight);
-                    params.Props[i].MaxHeight = std::min(128.0f, params.Props[i].MaxHeight);
+                if (UI::RangeSliderFloat("Height Range", &params.Props[i].MinHeight, &params.Props[i].MaxHeight, params.TerrainMinHeight, params.TerrainMaxHeight)) {
                     bNeedsPreviewRender = true;
                 }
                 
@@ -585,19 +561,11 @@ namespace UI {
                 
                 if (ImGui::SliderFloat("Density", &params.Decals[i].Density, 0.0f, 10.0f)) bNeedsPreviewRender = true;
                 
-                if (ImGui::DragFloat2("Slope Range", &params.Decals[i].MinSlope, 0.01f, 0.0f, 90.0f, "%.2f")) {
-                    params.Decals[i].MinSlope = std::min(params.Decals[i].MinSlope, params.Decals[i].MaxSlope - 0.01f);
-                    params.Decals[i].MaxSlope = std::max(params.Decals[i].MaxSlope, params.Decals[i].MinSlope + 0.01f);
-                    params.Decals[i].MinSlope = std::max(0.0f, params.Decals[i].MinSlope);
-                    params.Decals[i].MaxSlope = std::min(90.0f, params.Decals[i].MaxSlope);
+                if (UI::RangeSliderFloat("Slope Range", &params.Decals[i].MinSlope, &params.Decals[i].MaxSlope, 0.0f, 90.0f)) {
                     bNeedsPreviewRender = true;
                 }
                 
-                if (ImGui::DragFloat2("Height Range", &params.Decals[i].MinHeight, 0.1f, 0.0f, 128.0f, "%.1f")) {
-                    params.Decals[i].MinHeight = std::min(params.Decals[i].MinHeight, params.Decals[i].MaxHeight - 0.1f);
-                    params.Decals[i].MaxHeight = std::max(params.Decals[i].MaxHeight, params.Decals[i].MinHeight + 0.1f);
-                    params.Decals[i].MinHeight = std::max(0.0f, params.Decals[i].MinHeight);
-                    params.Decals[i].MaxHeight = std::min(128.0f, params.Decals[i].MaxHeight);
+                if (UI::RangeSliderFloat("Height Range", &params.Decals[i].MinHeight, &params.Decals[i].MaxHeight, params.TerrainMinHeight, params.TerrainMaxHeight)) {
                     bNeedsPreviewRender = true;
                 }
                 

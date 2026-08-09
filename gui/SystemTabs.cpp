@@ -4,6 +4,7 @@
 #include "MapExporter.h"
 #include "MapImporter.h"
 #include "SupComImporter.h"
+#include "UIHelpers.h"
 #include <filesystem>
 
 namespace SanmapGen {
@@ -43,6 +44,7 @@ namespace UI {
             if (FileDialog::OpenFile("Sanmap Files\0*.sanmap\0All Files\0*.*\0", path)) {
                 importDebugLog.clear();
                 if (MapImporter::LoadSanmap(path, params, importDebugLog)) {
+                    SanmapGen::UI::ReloadStratumTextures(params);
                     bNeedsMapUpdate = true;
                     bResetPreviewTransform = true; // Snap preview camera back to default on new map load
                 } else {

@@ -2,12 +2,10 @@
 #include "widgets/Widget_LayerManager.h"
 #include "imgui.h"
 #include "FileDialog.h"
-
-extern std::vector<std::string> GetEnvironmentsFromSanpack(const std::string& zipPath);
-extern std::vector<std::string> GetMaterialsFromSanpack(const std::string& zipPath, const std::string& envName);
-
+#include "../core/TextureLoader.h"
 #include "miniz.h"
 #include "stb_image.h"
+#include <fstream>
 #include <GLFW/glfw3.h> // For OpenGL texture generation
 #include <stdint.h>
 
@@ -29,8 +27,6 @@ extern std::vector<std::string> GetMaterialsFromSanpack(const std::string& zipPa
 // Define function pointer for OpenGL extension
 typedef void (APIENTRY * PFNGLCOMPRESSEDTEXIMAGE2DPROC)(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const void *data);
 
-extern std::vector<std::string> GetEnvironmentsFromSanpack(const std::string& zipPath);
-extern std::vector<std::string> GetMaterialsFromSanpack(const std::string& zipPath, const std::string& envName);
 
 static unsigned int LoadDDSFromMemory(const unsigned char* buffer, size_t bufferSize, float outColor[4]) {
     if (bufferSize < 128) return 0;
@@ -69,6 +65,53 @@ static unsigned int LoadDDSFromMemory(const unsigned char* buffer, size_t buffer
     glGenTextures(1, &texID);
     glBindTexture(GL_TEXTURE_2D, texID);
     
+    if (outColor) {
+        int blocksX = (width + 3) / 4;
+        int blocksY = (height + 3) / 4;
+        int totalBlocks = blocksX * blocksY;
+        
+        if (totalBlocks > 0 && (fourCC == 0x31545844 || fourCC == 0x35545844)) {
+            long long totalR = 0, totalG = 0, totalB = 0;
+            int sampleCount = 0;
+            int step = std::max(1, totalBlocks / 1000); // Max 1000 samples for performance
+            
+            for (int i = 0; i < totalBlocks; i += step) {
+                size_t blockOffset = offset + i * blockSize;
+                if (blockOffset + blockSize > bufferSize) break;
+                
+                const uint16_t* colorBlock = (const uint16_t*)(buffer + blockOffset + (fourCC == 0x35545844 ? 8 : 0));
+                uint16_t c0 = colorBlock[0];
+                uint16_t c1 = colorBlock[1];
+                
+                int r0 = ((c0 >> 11) & 0x1F) * 255 / 31;
+                int g0 = ((c0 >> 5) & 0x3F) * 255 / 63;
+                int b0 = (c0 & 0x1F) * 255 / 31;
+                
+                int r1 = ((c1 >> 11) & 0x1F) * 255 / 31;
+                int g1 = ((c1 >> 5) & 0x3F) * 255 / 63;
+                int b1 = (c1 & 0x1F) * 255 / 31;
+                
+                totalR += (r0 + r1) / 2;
+                totalG += (g0 + g1) / 2;
+                totalB += (b0 + b1) / 2;
+                sampleCount++;
+            }
+            
+            if (sampleCount > 0) {
+                outColor[0] = (totalR / sampleCount) / 255.0f;
+                outColor[1] = (totalG / sampleCount) / 255.0f;
+                outColor[2] = (totalB / sampleCount) / 255.0f;
+                outColor[3] = 1.0f;
+            } else {
+                outColor[0] = outColor[1] = outColor[2] = 0.5f;
+                outColor[3] = 1.0f;
+            }
+        } else {
+            outColor[0] = outColor[1] = outColor[2] = 0.5f;
+            outColor[3] = 1.0f;
+        }
+    }
+    
     unsigned int w = width;
     unsigned int h = height;
     if (mipMapCount == 0) mipMapCount = 1;
@@ -89,18 +132,6 @@ static unsigned int LoadDDSFromMemory(const unsigned char* buffer, size_t buffer
             glCompressedTexImage2D_ptr(GL_TEXTURE_2D, level, format, w, h, 0, size, buffer + offset);
         }
         
-        if (w == 1 && h == 1 && outColor) {
-            if (format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) {
-                uint16_t color0 = *(uint16_t*)(buffer + offset);
-                outColor[0] = ((color0 >> 11) & 31) / 31.0f;
-                outColor[1] = ((color0 >> 5) & 63) / 63.0f;
-                outColor[2] = (color0 & 31) / 31.0f;
-                outColor[3] = 1.0f;
-            } else {
-                outColor[0] = 0.5f; outColor[1] = 0.5f; outColor[2] = 0.5f; outColor[3] = 1.0f;
-            }
-        }
-        
         offset += size;
         w /= 2;
         h /= 2;
@@ -112,51 +143,73 @@ static unsigned int LoadDDSFromMemory(const unsigned char* buffer, size_t buffer
     return texID;
 }
 
-static unsigned int LoadTextureFromSanpack(const std::string& zipPath, const std::string& texturePath, float outAverageColor[4]) {
-    if (zipPath.empty() || texturePath.empty()) return 0;
+static unsigned int LoadTextureFromSanpack(const std::string& zipPath, const std::string& texturePath, const std::string& mapFolderPath, float outAverageColor[4]) {
+    if (texturePath.empty()) return 0;
     
-    mz_zip_archive zip_archive;
-    memset(&zip_archive, 0, sizeof(zip_archive));
-    if (!mz_zip_reader_init_file(&zip_archive, zipPath.c_str(), 0)) return 0;
+    std::vector<uint8_t> fileData;
+    bool bFoundFile = false;
     
-    std::string targetPath = texturePath;
-    size_t lastSlash = targetPath.find_last_of("/\\");
-    if (lastSlash != std::string::npos) targetPath = targetPath.substr(lastSlash + 1);
-    size_t lastDot = targetPath.find_last_of('.');
-    if (lastDot != std::string::npos) targetPath = targetPath.substr(0, lastDot);
-    std::transform(targetPath.begin(), targetPath.end(), targetPath.begin(), ::tolower);
-    
-    int numFiles = (int)mz_zip_reader_get_num_files(&zip_archive);
-    int targetIndex = -1;
-    for (int i = 0; i < numFiles; ++i) {
-        mz_zip_archive_file_stat file_stat;
-        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
-        std::string fname = file_stat.m_filename;
-        std::string fnameLower = fname;
-        std::transform(fnameLower.begin(), fnameLower.end(), fnameLower.begin(), ::tolower);
-        if (fnameLower.find(targetPath) != std::string::npos) {
-            targetIndex = i;
-            break;
+    if (!zipPath.empty()) {
+        mz_zip_archive zip_archive;
+        memset(&zip_archive, 0, sizeof(zip_archive));
+        if (mz_zip_reader_init_file(&zip_archive, zipPath.c_str(), 0)) {
+            std::string targetPath = texturePath;
+            size_t lastSlash = targetPath.find_last_of("/\\");
+            if (lastSlash != std::string::npos) targetPath = targetPath.substr(lastSlash + 1);
+            size_t lastDot = targetPath.find_last_of('.');
+            if (lastDot != std::string::npos) targetPath = targetPath.substr(0, lastDot);
+            std::transform(targetPath.begin(), targetPath.end(), targetPath.begin(), ::tolower);
+            
+            int numFiles = (int)mz_zip_reader_get_num_files(&zip_archive);
+            int targetIndex = -1;
+            for (int i = 0; i < numFiles; ++i) {
+                mz_zip_archive_file_stat file_stat;
+                if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
+                std::string fname = file_stat.m_filename;
+                std::string fnameLower = fname;
+                std::transform(fnameLower.begin(), fnameLower.end(), fnameLower.begin(), ::tolower);
+                if (fnameLower.find(targetPath) != std::string::npos) {
+                    targetIndex = i;
+                    break;
+                }
+            }
+            
+            if (targetIndex != -1) {
+                size_t uncomp_size;
+                void* p = mz_zip_reader_extract_to_heap(&zip_archive, targetIndex, &uncomp_size, 0);
+                if (p) {
+                    fileData.resize(uncomp_size);
+                    memcpy(fileData.data(), p, uncomp_size);
+                    mz_free(p);
+                    bFoundFile = true;
+                }
+            }
+            mz_zip_reader_end(&zip_archive);
         }
     }
     
-    if (targetIndex == -1) {
-        mz_zip_reader_end(&zip_archive);
-        return 0;
+    // Fallback to MapFolderPath if not found in zip
+    if (!bFoundFile && !mapFolderPath.empty()) {
+        std::string fallbackPath = mapFolderPath + "/" + texturePath;
+        std::ifstream file(fallbackPath, std::ios::binary | std::ios::ate);
+        if (file) {
+            size_t uncomp_size = file.tellg();
+            file.seekg(0, std::ios::beg);
+            fileData.resize(uncomp_size);
+            if (file.read(reinterpret_cast<char*>(fileData.data()), uncomp_size)) {
+                bFoundFile = true;
+            }
+        }
     }
     
-    size_t uncomp_size;
-    void* p = mz_zip_reader_extract_to_heap(&zip_archive, targetIndex, &uncomp_size, 0);
-    mz_zip_reader_end(&zip_archive);
-    if (!p) return 0;
+    if (!bFoundFile || fileData.empty()) return 0;
     
     int w, h, channels;
-    unsigned char* data = stbi_load_from_memory((const stbi_uc*)p, (int)uncomp_size, &w, &h, &channels, 4);
+    unsigned char* data = stbi_load_from_memory((const stbi_uc*)fileData.data(), (int)fileData.size(), &w, &h, &channels, 4);
     
     if (!data) {
         // Fallback: Try loading it as a DDS file directly to the GPU!
-        unsigned int ddsTex = LoadDDSFromMemory((const unsigned char*)p, uncomp_size, outAverageColor);
-        mz_free(p);
+        unsigned int ddsTex = LoadDDSFromMemory(fileData.data(), fileData.size(), outAverageColor);
         
         if (ddsTex == 0 && outAverageColor) {
             // Unrecognized format
@@ -167,8 +220,6 @@ static unsigned int LoadTextureFromSanpack(const std::string& zipPath, const std
         }
         return ddsTex;
     }
-    
-    mz_free(p);
     
     if (data) {
         if (outAverageColor) {
@@ -215,6 +266,8 @@ namespace UI {
             std::string path;
             if (FileDialog::OpenFile("Sanctuary Packs\0*.sanpack;*.zip\0All Files\0*.*\0", path)) {
                 params.GlobalEnvironmentPath = path;
+                ReloadStratumTextures(params);
+                bNeedsPreviewRender = true;
             }
         }
         if (!params.GlobalEnvironmentPath.empty()) {
@@ -233,7 +286,7 @@ namespace UI {
                 
                 // Environment Auto-fill
                 if (!params.GlobalEnvironmentPath.empty()) {
-                    std::vector<std::string> envs = GetEnvironmentsFromSanpack(params.GlobalEnvironmentPath);
+                    std::vector<std::string> envs = SanmapGen::TextureLoader::GetEnvironmentsFromSanpack(params.GlobalEnvironmentPath);
                     if (!envs.empty()) {
                         static std::string selectedEnv = "";
                         ImGui::PushItemWidth(150.0f);
@@ -248,7 +301,7 @@ namespace UI {
                         
                         if (!selectedEnv.empty()) {
                             ImGui::SameLine();
-                            std::vector<std::string> mats = GetMaterialsFromSanpack(params.GlobalEnvironmentPath, selectedEnv);
+                            std::vector<std::string> mats = SanmapGen::TextureLoader::GetMaterialsFromSanpack(params.GlobalEnvironmentPath, selectedEnv);
                             if (ImGui::BeginCombo("Material", "Auto-fill...")) {
                                 for (const auto& mat : mats) {
                                     if (ImGui::Selectable(mat.c_str())) {
@@ -258,13 +311,13 @@ namespace UI {
                                         bNeedsPreviewRender = true;
                                         
                                         if (params.Stratums[i].previewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].previewAlbedoTex);
-                                        params.Stratums[i].previewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].albedo.path, &params.Stratums[i].previewColor.r);
+                                        params.Stratums[i].previewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].albedo.path, params.MapFolderPath, &params.Stratums[i].previewColor.r);
                                         
                                         if (params.Stratums[i].previewNormalTex) glDeleteTextures(1, &params.Stratums[i].previewNormalTex);
-                                        params.Stratums[i].previewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].normal.path, nullptr);
+                                        params.Stratums[i].previewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].normal.path, params.MapFolderPath, nullptr);
                                         
                                         if (params.Stratums[i].previewMaskTex) glDeleteTextures(1, &params.Stratums[i].previewMaskTex);
-                                        params.Stratums[i].previewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].mask.path, nullptr);
+                                        params.Stratums[i].previewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].mask.path, params.MapFolderPath, nullptr);
                                     }
                                 }
                                 ImGui::EndCombo();
@@ -319,7 +372,7 @@ namespace UI {
                         if (FileDialog::OpenFile("Images\0*.png;*.dds;*.tga\0All Files\0*.*\0", path)) {
                             params.Stratums[i].albedo.path = path;
                             if (params.Stratums[i].previewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].previewAlbedoTex);
-                            params.Stratums[i].previewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].albedo.path, &params.Stratums[i].previewColor.r);
+                            params.Stratums[i].previewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].albedo.path, params.MapFolderPath, &params.Stratums[i].previewColor.r);
                             bNeedsPreviewRender = true;
                         }
                     }
@@ -340,7 +393,7 @@ namespace UI {
                         if (FileDialog::OpenFile("Images\0*.png;*.dds;*.tga\0All Files\0*.*\0", path)) {
                             params.Stratums[i].normal.path = path;
                             if (params.Stratums[i].previewNormalTex) glDeleteTextures(1, &params.Stratums[i].previewNormalTex);
-                            params.Stratums[i].previewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].normal.path, nullptr);
+                            params.Stratums[i].previewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].normal.path, params.MapFolderPath, nullptr);
                             bNeedsPreviewRender = true;
                         }
                     }
@@ -353,7 +406,7 @@ namespace UI {
                         if (FileDialog::OpenFile("Images\0*.png;*.dds;*.tga\0All Files\0*.*\0", path)) {
                             params.Stratums[i].mask.path = path;
                             if (params.Stratums[i].previewMaskTex) glDeleteTextures(1, &params.Stratums[i].previewMaskTex);
-                            params.Stratums[i].previewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].mask.path, nullptr);
+                            params.Stratums[i].previewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].mask.path, params.MapFolderPath, nullptr);
                             bNeedsPreviewRender = true;
                         }
                     }
@@ -426,7 +479,7 @@ namespace UI {
                 if (ImGui::DragFloat2("Tile Size", &params.Stratums[i].tileSize.x, 0.1f, 0.1f, 1000.0f)) bNeedsPreviewRender = true;
                 if (ImGui::DragFloat2("Tile Size Far", &params.Stratums[i].tileSizeFar.x, 0.1f, 0.1f, 1000.0f)) bNeedsPreviewRender = true;
                 if (ImGui::SliderFloat("Triplanar Tile", &params.Stratums[i].tileSizeTriplanar, 0.1f, 100.0f)) bNeedsPreviewRender = true;
-                if (ImGui::SliderFloat("Far Triplanar Tile", &params.Stratums[i].tileSizeFar.xTriplanar, 0.1f, 100.0f)) bNeedsPreviewRender = true;
+                if (ImGui::SliderFloat("Far Triplanar Tile", &params.Stratums[i].tileSizeFarTriplanar, 0.1f, 100.0f)) bNeedsPreviewRender = true;
                 
                 ImGui::Separator();
                 if (ImGui::SliderFloat("Normal Scale", &params.Stratums[i].normalScale, 0.0f, 5.0f)) bNeedsPreviewRender = true;
@@ -504,6 +557,24 @@ namespace UI {
         ImGui::Text("Dyson Sphere Holes");
         ImGui::Separator();
         Widget_LayerManager::RenderLayerStack(params, params.HoleLayers, nullptr, false, bNeedsPreviewRender);
+    }
+
+    void ReloadStratumTextures(GenerationParams& params) {
+        for (size_t i = 0; i < params.Stratums.size(); ++i) {
+            float avg[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+            if (!params.Stratums[i].albedo.path.empty()) {
+                params.Stratums[i].previewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].albedo.path, params.MapFolderPath, avg);
+                params.Stratums[i].previewColor[0] = avg[0];
+                params.Stratums[i].previewColor[1] = avg[1];
+                params.Stratums[i].previewColor[2] = avg[2];
+            }
+            if (!params.Stratums[i].normal.path.empty()) {
+                params.Stratums[i].previewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].normal.path, params.MapFolderPath, nullptr);
+            }
+            if (!params.Stratums[i].mask.path.empty()) {
+                params.Stratums[i].previewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].mask.path, params.MapFolderPath, nullptr);
+            }
+        }
     }
 
 } // namespace UI

@@ -3,9 +3,135 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <algorithm>
+#include <cmath>
 
 namespace SanmapGen {
 namespace UI {
+
+inline bool RangeSliderFloat(const char* label, float* v_min, float* v_max, float v_min_limit, float v_max_limit, const char* format = "%.3f", float min_increment = 0.001f) {
+    bool value_changed = false;
+
+    ImGui::PushID(label);
+
+    ImGui::Text("%s", label);
+
+    float avail_width = ImGui::GetContentRegionAvail().x;
+    float track_height = ImGui::GetFrameHeight();
+    
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    
+    float handle_width = 10.0f;
+    float usable_width = avail_width - handle_width;
+
+    ImGui::InvisibleButton("##track", ImVec2(avail_width, track_height));
+    bool is_active = ImGui::IsItemActive();
+    bool is_hovered = ImGui::IsItemHovered();
+
+    float normalized_min = std::clamp((*v_min - v_min_limit) / (v_max_limit - v_min_limit), 0.0f, 1.0f);
+    float normalized_max = std::clamp((*v_max - v_min_limit) / (v_max_limit - v_min_limit), 0.0f, 1.0f);
+
+    static ImGuiID active_slider_id = 0;
+    static int active_handle = -1;
+    static bool was_dragging = false;
+    
+    ImGuiID id = ImGui::GetID("##track");
+
+    ImGuiID rt_id = ImGui::GetID("##rt_toggle");
+    bool* p_rt = ImGui::GetStateStorage()->GetBoolRef(rt_id, true);
+    bool update_rt = *p_rt;
+
+    if (is_active && ImGui::IsMouseClicked(0)) {
+        active_slider_id = id;
+        was_dragging = false;
+        float mouse_x = ImGui::GetIO().MousePos.x;
+        float handle_min_x = pos.x + normalized_min * usable_width + handle_width * 0.5f;
+        float handle_max_x = pos.x + normalized_max * usable_width + handle_width * 0.5f;
+        
+        if (std::abs(mouse_x - handle_min_x) < std::abs(mouse_x - handle_max_x)) {
+            active_handle = 0;
+        } else {
+            active_handle = 1;
+        }
+    }
+
+    if (is_active && active_slider_id == id && ImGui::IsMouseDragging(0, 0.0f)) {
+        float mouse_x_delta = ImGui::GetIO().MouseDelta.x;
+        float value_delta = (mouse_x_delta / usable_width) * (v_max_limit - v_min_limit);
+        
+        if (active_handle == 0) {
+            *v_min += value_delta;
+            *v_min = std::clamp(*v_min, v_min_limit, *v_max - min_increment);
+            if (update_rt) value_changed = true;
+            was_dragging = true;
+        } else if (active_handle == 1) {
+            *v_max += value_delta;
+            *v_max = std::clamp(*v_max, *v_min + min_increment, v_max_limit);
+            if (update_rt) value_changed = true;
+            was_dragging = true;
+        }
+    }
+
+    if (!ImGui::IsMouseDown(0) && active_slider_id == id) {
+        if (!update_rt && was_dragging) {
+            value_changed = true;
+        }
+        active_slider_id = 0;
+        active_handle = -1;
+        was_dragging = false;
+    }
+
+    normalized_min = std::clamp((*v_min - v_min_limit) / (v_max_limit - v_min_limit), 0.0f, 1.0f);
+    normalized_max = std::clamp((*v_max - v_min_limit) / (v_max_limit - v_min_limit), 0.0f, 1.0f);
+
+    ImU32 bg_col = ImGui::GetColorU32(ImGuiCol_FrameBg);
+    ImU32 fill_col = ImGui::GetColorU32(ImGuiCol_SliderGrab);
+    draw_list->AddRectFilled(pos, ImVec2(pos.x + avail_width, pos.y + track_height), bg_col, ImGui::GetStyle().FrameRounding);
+
+    ImVec2 fill_min_pos(pos.x + normalized_min * usable_width + handle_width * 0.5f, pos.y);
+    ImVec2 fill_max_pos(pos.x + normalized_max * usable_width + handle_width * 0.5f, pos.y + track_height);
+    draw_list->AddRectFilled(fill_min_pos, fill_max_pos, fill_col, ImGui::GetStyle().FrameRounding);
+
+    ImU32 handle_col = ImGui::GetColorU32(ImGuiCol_Button);
+    ImU32 handle_active_col = ImGui::GetColorU32(ImGuiCol_ButtonActive);
+    
+    ImVec2 handle_min_p0(pos.x + normalized_min * usable_width, pos.y);
+    ImVec2 handle_min_p1(handle_min_p0.x + handle_width, pos.y + track_height);
+    draw_list->AddRectFilled(handle_min_p0, handle_min_p1, (active_slider_id == id && active_handle == 0) ? handle_active_col : handle_col, ImGui::GetStyle().FrameRounding);
+
+    ImVec2 handle_max_p0(pos.x + normalized_max * usable_width, pos.y);
+    ImVec2 handle_max_p1(handle_max_p0.x + handle_width, pos.y + track_height);
+    draw_list->AddRectFilled(handle_max_p0, handle_max_p1, (active_slider_id == id && active_handle == 1) ? handle_active_col : handle_col, ImGui::GetStyle().FrameRounding);
+
+    float rt_btn_width = 30.0f;
+    float input_width = (avail_width - ImGui::GetStyle().ItemSpacing.x * 2.0f - rt_btn_width) * 0.5f;
+    
+    ImGui::SetNextItemWidth(input_width);
+    if (ImGui::DragFloat("##min_input", v_min, min_increment, v_min_limit, *v_max - min_increment, format)) {
+        *v_min = std::clamp(*v_min, v_min_limit, *v_max - min_increment);
+        value_changed = true;
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(input_width);
+    if (ImGui::DragFloat("##max_input", v_max, min_increment, *v_min + min_increment, v_max_limit, format)) {
+        *v_max = std::clamp(*v_max, *v_min + min_increment, v_max_limit);
+        value_changed = true;
+    }
+    ImGui::SameLine();
+    
+    ImGui::PushStyleColor(ImGuiCol_Button, update_rt ? ImGui::GetColorU32(ImGuiCol_ButtonActive) : ImGui::GetColorU32(ImGuiCol_Button));
+    if (ImGui::Button("RT", ImVec2(rt_btn_width, 0))) {
+        *p_rt = !(*p_rt);
+    }
+    ImGui::PopStyleColor();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Toggle Realtime Update");
+    }
+
+    ImGui::PopID();
+    return value_changed;
+}
 
 template <typename T>
 bool RenderDraggableLayerList(
