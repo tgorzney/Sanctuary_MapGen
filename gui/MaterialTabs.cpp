@@ -340,7 +340,11 @@ namespace UI {
                     glBindTexture(GL_TEXTURE_2D, params.Stratums[i].previewActualMaskTex);
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                    
+                    // Fix OpenGL row padding skewing for MapSizes that aren't multiples of 4
+                    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
                     glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, texSize, texSize, 0, GL_RED, GL_UNSIGNED_BYTE, thumbData.data());
+                    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
                     
                     // Tell OpenGL we want to sample RED into RGB (swizzle)
                     GLint swizzleMask[] = {GL_RED, GL_RED, GL_RED, GL_ONE};
