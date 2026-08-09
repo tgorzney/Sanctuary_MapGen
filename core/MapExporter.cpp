@@ -12,6 +12,106 @@ namespace fs = std::filesystem;
 
 namespace SanmapGen {
 
+    void to_json(nlohmann::json& j, const SanTextureLoader& t) { j = nlohmann::json{{"path", t.path}}; }
+    void from_json(const nlohmann::json& j, SanTextureLoader& t) { if (j.contains("path")) j.at("path").get_to(t.path); else if (j.is_string()) t.path = j.get<std::string>(); }
+    
+    void to_json(nlohmann::json& j, const SanNormalTextureLoader& t) { j = nlohmann::json{{"path", t.path}}; }
+    void from_json(const nlohmann::json& j, SanNormalTextureLoader& t) { if (j.contains("path")) j.at("path").get_to(t.path); else if (j.is_string()) t.path = j.get<std::string>(); }
+    
+    void to_json(nlohmann::json& j, const SanMaskTextureLoader& t) { j = nlohmann::json{{"path", t.path}}; }
+    void from_json(const nlohmann::json& j, SanMaskTextureLoader& t) { if (j.contains("path")) j.at("path").get_to(t.path); else if (j.is_string()) t.path = j.get<std::string>(); }
+    
+    void to_json(nlohmann::json& j, const SanVector2& v) { j = nlohmann::json{{"x", v.x}, {"y", v.y}}; }
+    void from_json(const nlohmann::json& j, SanVector2& v) {
+        if (j.is_array() && j.size() >= 2) { v.x = j[0]; v.y = j[1]; }
+        else { 
+            if (j.contains("x")) j.at("x").get_to(v.x); 
+            if (j.contains("y")) j.at("y").get_to(v.y); 
+        }
+    }
+    
+    void to_json(nlohmann::json& j, const SanVector4& v) { j = nlohmann::json{{"x", v.x}, {"y", v.y}, {"z", v.z}, {"w", v.w}}; }
+    void from_json(const nlohmann::json& j, SanVector4& v) {
+        if (j.is_array() && j.size() >= 4) { v.x = j[0]; v.y = j[1]; v.z = j[2]; v.w = j[3]; }
+        else {
+            if (j.contains("x")) j.at("x").get_to(v.x);
+            if (j.contains("y")) j.at("y").get_to(v.y);
+            if (j.contains("z")) j.at("z").get_to(v.z);
+            if (j.contains("w")) j.at("w").get_to(v.w);
+        }
+    }
+    
+    void to_json(nlohmann::json& j, const SanColor& v) { j = nlohmann::json{{"r", v.r}, {"g", v.g}, {"b", v.b}, {"a", v.a}}; }
+    void from_json(const nlohmann::json& j, SanColor& v) {
+        if (j.is_array() && j.size() >= 4) { v.r = j[0]; v.g = j[1]; v.b = j[2]; v.a = j[3]; }
+        else {
+            if (j.contains("r")) j.at("r").get_to(v.r);
+            if (j.contains("g")) j.at("g").get_to(v.g);
+            if (j.contains("b")) j.at("b").get_to(v.b);
+            if (j.contains("a")) j.at("a").get_to(v.a);
+        }
+    }
+    
+    void to_json(nlohmann::json& j, const StratumSettings& s) {
+        j = nlohmann::json{
+            {"name", s.name},
+            {"albedo", s.albedo},
+            {"normal", s.normal},
+            {"mask", s.mask},
+            {"tileSize", s.tileSize},
+            {"tileSizeFar", s.tileSizeFar},
+            {"tileSizeTriplanar", s.tileSizeTriplanar},
+            {"tileSizeFarTriplanar", s.tileSizeFarTriplanar},
+            {"normalScale", s.normalScale},
+            {"normalScaleFar", s.normalScaleFar},
+            {"normalFarNearBlend", s.normalFarNearBlend},
+            {"heightFarNearBlend", s.heightFarNearBlend},
+            {"diffuseRemap", s.diffuseRemap},
+            {"farColorRemap", s.farColorRemap},
+            {"previewColor", s.previewColor},
+            {"maskRemapMin", s.maskRemapMin},
+            {"maskRemapMax", s.maskRemapMax},
+            {"maskMode", (int)s.maskMode},
+            {"hardness", s.hardness},
+            {"friction", s.friction},
+            {"cohesion", s.cohesion},
+            {"capacityMult", s.capacityMult},
+            {"absorptionRate", s.absorptionRate}
+        };
+    }
+    
+    void from_json(const nlohmann::json& j, StratumSettings& s) {
+        if (j.contains("name")) j.at("name").get_to(s.name); else if (j.contains("Name")) j.at("Name").get_to(s.name);
+        
+        if (j.contains("albedo")) j.at("albedo").get_to(s.albedo); else if (j.contains("AlbedoPath")) s.albedo.path = j.at("AlbedoPath").get<std::string>();
+        if (j.contains("normal")) j.at("normal").get_to(s.normal); else if (j.contains("NormalPath")) s.normal.path = j.at("NormalPath").get<std::string>();
+        if (j.contains("mask")) j.at("mask").get_to(s.mask); else if (j.contains("MaskPath")) s.mask.path = j.at("MaskPath").get<std::string>();
+        
+        if (j.contains("tileSize")) j.at("tileSize").get_to(s.tileSize); else if (j.contains("TileSize")) j.at("TileSize").get_to(s.tileSize);
+        if (j.contains("tileSizeFar")) j.at("tileSizeFar").get_to(s.tileSizeFar); else if (j.contains("TileSizeFar")) j.at("TileSizeFar").get_to(s.tileSizeFar);
+        if (j.contains("tileSizeTriplanar")) j.at("tileSizeTriplanar").get_to(s.tileSizeTriplanar); else if (j.contains("TileSizeTriplanar")) j.at("TileSizeTriplanar").get_to(s.tileSizeTriplanar);
+        if (j.contains("tileSizeFarTriplanar")) j.at("tileSizeFarTriplanar").get_to(s.tileSizeFarTriplanar); else if (j.contains("TileSizeFarTriplanar")) j.at("TileSizeFarTriplanar").get_to(s.tileSizeFarTriplanar);
+        
+        if (j.contains("normalScale")) j.at("normalScale").get_to(s.normalScale); else if (j.contains("NormalScale")) j.at("NormalScale").get_to(s.normalScale);
+        if (j.contains("normalScaleFar")) j.at("normalScaleFar").get_to(s.normalScaleFar); else if (j.contains("NormalScaleFar")) j.at("NormalScaleFar").get_to(s.normalScaleFar);
+        if (j.contains("normalFarNearBlend")) j.at("normalFarNearBlend").get_to(s.normalFarNearBlend); else if (j.contains("NormalFarNearBlend")) j.at("NormalFarNearBlend").get_to(s.normalFarNearBlend);
+        if (j.contains("heightFarNearBlend")) j.at("heightFarNearBlend").get_to(s.heightFarNearBlend); else if (j.contains("HeightFarNearBlend")) j.at("HeightFarNearBlend").get_to(s.heightFarNearBlend);
+        
+        if (j.contains("diffuseRemap")) j.at("diffuseRemap").get_to(s.diffuseRemap); else if (j.contains("DiffuseRemap")) j.at("DiffuseRemap").get_to(s.diffuseRemap);
+        if (j.contains("farColorRemap")) j.at("farColorRemap").get_to(s.farColorRemap); else if (j.contains("FarColorRemap")) j.at("FarColorRemap").get_to(s.farColorRemap);
+        if (j.contains("previewColor")) j.at("previewColor").get_to(s.previewColor);
+        
+        if (j.contains("maskRemapMin")) j.at("maskRemapMin").get_to(s.maskRemapMin); else if (j.contains("MaskRemapMin")) j.at("MaskRemapMin").get_to(s.maskRemapMin);
+        if (j.contains("maskRemapMax")) j.at("maskRemapMax").get_to(s.maskRemapMax); else if (j.contains("MaskRemapMax")) j.at("MaskRemapMax").get_to(s.maskRemapMax);
+        
+        if (j.contains("maskMode")) s.maskMode = (ImportedMaskMode)j.at("maskMode").get<int>();
+        
+        if (j.contains("hardness")) j.at("hardness").get_to(s.hardness); else if (j.contains("Hardness")) j.at("Hardness").get_to(s.hardness);
+        if (j.contains("friction")) j.at("friction").get_to(s.friction); else if (j.contains("Friction")) j.at("Friction").get_to(s.friction);
+        if (j.contains("cohesion")) j.at("cohesion").get_to(s.cohesion); else if (j.contains("Cohesion")) j.at("Cohesion").get_to(s.cohesion);
+        if (j.contains("capacityMult")) j.at("capacityMult").get_to(s.capacityMult); else if (j.contains("CapacityMult")) j.at("CapacityMult").get_to(s.capacityMult);
+        if (j.contains("absorptionRate")) j.at("absorptionRate").get_to(s.absorptionRate); else if (j.contains("AbsorptionRate")) j.at("AbsorptionRate").get_to(s.absorptionRate);
+    }
 void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool exportTextures) {
     if (!fs::exists(folderPath)) {
         fs::create_directories(folderPath);
@@ -86,36 +186,67 @@ void MapExporter::ExportSanmap(const std::string& folderPath, const GenerationPa
     mapdef["globalWindDirection"] = params.Atmosphere.GlobalWindDirection;
 
     // Stratum Layers
-    json strata = json::array();
-    for (const auto& stratum : params.Stratums) {
-        json s;
-        s["albedo"] = { {"path", stratum.AlbedoPath} };
-        s["normal"] = { {"path", stratum.NormalPath} };
-        s["mask"] = { {"path", stratum.MaskPath} };
-        
-        s["tileSize"] = { {"x", stratum.TileSize[0]}, {"y", stratum.TileSize[1]} };
-        s["tileSizeFar"] = { {"x", stratum.TileSizeFar[0]}, {"y", stratum.TileSizeFar[1]} };
-        s["tileSizeTriplanar"] = stratum.TileSizeTriplanar;
-        s["tileSizeFarTriplanar"] = stratum.TileSizeFarTriplanar;
-        
-        s["normalScale"] = stratum.NormalScale;
-        s["normalScaleFar"] = stratum.NormalScaleFar;
-        s["normalFarNearBlend"] = stratum.NormalFarNearBlend;
-        s["heightFarNearBlend"] = stratum.HeightFarNearBlend;
-        
-        s["diffuseRemap"] = { {"r", stratum.DiffuseRemap[0]}, {"g", stratum.DiffuseRemap[1]}, {"b", stratum.DiffuseRemap[2]}, {"a", stratum.DiffuseRemap[3]} };
-        s["farColorRemap"] = { {"r", stratum.FarColorRemap[0]}, {"g", stratum.FarColorRemap[1]}, {"b", stratum.FarColorRemap[2]}, {"a", stratum.FarColorRemap[3]} };
-        
-        s["maskRemapMin"] = { {"x", stratum.MaskRemapMin[0]}, {"y", stratum.MaskRemapMin[1]}, {"z", stratum.MaskRemapMin[2]}, {"w", stratum.MaskRemapMin[3]} };
-        s["maskRemapMax"] = { {"x", stratum.MaskRemapMax[0]}, {"y", stratum.MaskRemapMax[1]}, {"z", stratum.MaskRemapMax[2]}, {"w", stratum.MaskRemapMax[3]} };
-        
-        strata.push_back(s);
-    }
-    mapdef["stratumLayers"] = strata;
+    mapdef["stratumLayers"] = params.Stratums;
     
     // Areas, armies, chains
     mapdef["areas"] = json::object();
-    mapdef["armies"] = json::object();
+    
+    // Serialize Armies
+    json armiesObj = json::object();
+    for (const auto& [armyName, army] : params.Armies) {
+        json armyJson = json::object();
+        armyJson["faction"] = army.Faction;
+        armyJson["alloys"] = army.Alloys;
+        armyJson["energy"] = army.Energy;
+        
+        // Recursive lambda for groups
+        std::function<json(const UnitGroup&)> serializeGroup;
+        serializeGroup = [&](const UnitGroup& group) -> json {
+            json gJson = json::object();
+            
+            json unitsObj = json::object();
+            for (const auto& [unitName, unit] : group.Units) {
+                json uJson = json::object();
+                uJson["type"] = unit.Type;
+                if (!unit.Tpid.empty()) uJson["tpid"] = unit.Tpid;
+                uJson["position"] = {{"x", unit.Position[0]}, {"y", unit.Position[1]}, {"z", unit.Position[2]}};
+                uJson["rotation"] = {{"x", unit.Rotation[0]}, {"y", unit.Rotation[1]}, {"z", unit.Rotation[2]}, {"w", unit.Rotation[3]}};
+                uJson["scale"] = {{"x", unit.Scale[0]}, {"y", unit.Scale[1]}, {"z", unit.Scale[2]}};
+                unitsObj[unitName] = uJson;
+            }
+            gJson["units"] = unitsObj;
+            
+            json subGroupsObj = json::object();
+            for (const auto& [subGroupName, subGroup] : group.Groups) {
+                subGroupsObj[subGroupName] = serializeGroup(subGroup);
+            }
+            gJson["groups"] = subGroupsObj;
+            
+            return gJson;
+        };
+        
+        json rootGroupsObj = json::object();
+        for (const auto& [groupName, group] : army.Groups) {
+            rootGroupsObj[groupName] = serializeGroup(group);
+        }
+        armyJson["groups"] = rootGroupsObj;
+        
+        armiesObj[armyName] = armyJson;
+    }
+    
+    // If no armies are defined, provide default empty armies based on spawn points
+    if (armiesObj.empty() && params.SpawnPointCount > 0) {
+        for (int i = 0; i < params.SpawnPointCount; i++) {
+            json fallbackArmy = json::object();
+            fallbackArmy["faction"] = 0;
+            fallbackArmy["alloys"] = 100.0;
+            fallbackArmy["energy"] = 1000.0;
+            fallbackArmy["groups"] = json::object();
+            armiesObj["Army_" + std::to_string(i + 1)] = fallbackArmy;
+        }
+    }
+    
+    mapdef["armies"] = armiesObj;
     
     json markersObj = json::object();
     
@@ -351,38 +482,7 @@ void MapExporter::SaveSettings(const std::string& filePath, const GenerationPara
     j["SpawnPointCount"] = params.SpawnPointCount;
     
     // Save Stratums
-    json stratums = json::array();
-    for (const auto& s : params.Stratums) {
-        json sj;
-        sj["Name"] = s.Name;
-        sj["AlbedoPath"] = s.AlbedoPath;
-        sj["NormalPath"] = s.NormalPath;
-        sj["MaskPath"] = s.MaskPath;
-        
-        sj["TileSize"] = {s.TileSize[0], s.TileSize[1]};
-        sj["TileSizeFar"] = {s.TileSizeFar[0], s.TileSizeFar[1]};
-        sj["TileSizeTriplanar"] = s.TileSizeTriplanar;
-        sj["TileSizeFarTriplanar"] = s.TileSizeFarTriplanar;
-        
-        sj["NormalScale"] = s.NormalScale;
-        sj["NormalScaleFar"] = s.NormalScaleFar;
-        sj["NormalFarNearBlend"] = s.NormalFarNearBlend;
-        sj["HeightFarNearBlend"] = s.HeightFarNearBlend;
-        
-        sj["DiffuseRemap"] = {s.DiffuseRemap[0], s.DiffuseRemap[1], s.DiffuseRemap[2], s.DiffuseRemap[3]};
-        sj["FarColorRemap"] = {s.FarColorRemap[0], s.FarColorRemap[1], s.FarColorRemap[2], s.FarColorRemap[3]};
-        
-        sj["MaskRemapMin"] = {s.MaskRemapMin[0], s.MaskRemapMin[1], s.MaskRemapMin[2], s.MaskRemapMin[3]};
-        sj["MaskRemapMax"] = {s.MaskRemapMax[0], s.MaskRemapMax[1], s.MaskRemapMax[2], s.MaskRemapMax[3]};
-        
-        sj["Hardness"] = s.Hardness;
-        sj["Friction"] = s.Friction;
-        sj["Cohesion"] = s.Cohesion;
-        sj["CapacityMult"] = s.CapacityMult;
-        
-        stratums.push_back(sj);
-    }
-    j["Stratums"] = stratums;
+    j["Stratums"] = params.Stratums;
     
     // Save Props & Decals
     json props = json::array();
@@ -403,6 +503,46 @@ void MapExporter::SaveSettings(const std::string& filePath, const GenerationPara
         decals.push_back(dj);
     }
     j["Decals"] = decals;
+
+    // Save Armies
+    json armiesMap = json::object();
+    for (const auto& [armyName, army] : params.Armies) {
+        json aj = json::object();
+        aj["Faction"] = army.Faction;
+        aj["Alloys"] = army.Alloys;
+        aj["Energy"] = army.Energy;
+        
+        std::function<json(const UnitGroup&)> saveGroup;
+        saveGroup = [&](const UnitGroup& group) -> json {
+            json g = json::object();
+            json unitsObj = json::object();
+            for (const auto& [uName, u] : group.Units) {
+                json uj;
+                uj["Type"] = u.Type;
+                uj["Tpid"] = u.Tpid;
+                uj["Position"] = {u.Position[0], u.Position[1], u.Position[2]};
+                uj["Rotation"] = {u.Rotation[0], u.Rotation[1], u.Rotation[2], u.Rotation[3]};
+                uj["Scale"] = {u.Scale[0], u.Scale[1], u.Scale[2]};
+                unitsObj[uName] = uj;
+            }
+            g["Units"] = unitsObj;
+            
+            json subgroupsObj = json::object();
+            for (const auto& [gName, sg] : group.Groups) {
+                subgroupsObj[gName] = saveGroup(sg);
+            }
+            g["Groups"] = subgroupsObj;
+            return g;
+        };
+        
+        json groupsObj = json::object();
+        for (const auto& [groupName, group] : army.Groups) {
+            groupsObj[groupName] = saveGroup(group);
+        }
+        aj["Groups"] = groupsObj;
+        armiesMap[armyName] = aj;
+    }
+    j["Armies"] = armiesMap;
 
     // Save Layers
     json layers = json::array();
@@ -434,10 +574,10 @@ void MapExporter::SaveSettings(const std::string& filePath, const GenerationPara
         l["MountainDensity"] = layer.MountainDensity;
         l["RampDensity"] = layer.RampDensity;
 
-        l["Hardness"] = layer.Hardness;
-        l["Friction"] = layer.Friction;
-        l["Cohesion"] = layer.Cohesion;
-        l["CapacityMult"] = layer.CapacityMult;
+        l["Hardness"] = layer.hardness;
+        l["Friction"] = layer.friction;
+        l["Cohesion"] = layer.cohesion;
+        l["CapacityMult"] = layer.capacityMult;
 
         json e;
         e["Enabled"] = layer.Erosion.Enabled;
@@ -489,34 +629,7 @@ bool MapExporter::LoadSettings(const std::string& filePath, GenerationParams& ou
     if (j.contains("Stratums")) {
         outParams.Stratums.clear();
         for (const auto& sj : j["Stratums"]) {
-            StratumSettings s;
-            if (sj.contains("Name")) s.Name = sj["Name"];
-            if (sj.contains("AlbedoPath")) s.AlbedoPath = sj["AlbedoPath"];
-            if (sj.contains("NormalPath")) s.NormalPath = sj["NormalPath"];
-            if (sj.contains("MaskPath")) s.MaskPath = sj["MaskPath"];
-            
-            if (sj.contains("TileSize")) { s.TileSize[0] = sj["TileSize"][0]; s.TileSize[1] = sj["TileSize"][1]; }
-            if (sj.contains("TileSizeFar")) { s.TileSizeFar[0] = sj["TileSizeFar"][0]; s.TileSizeFar[1] = sj["TileSizeFar"][1]; }
-            if (sj.contains("TileSizeTriplanar")) s.TileSizeTriplanar = sj["TileSizeTriplanar"];
-            if (sj.contains("TileSizeFarTriplanar")) s.TileSizeFarTriplanar = sj["TileSizeFarTriplanar"];
-            
-            if (sj.contains("NormalScale")) s.NormalScale = sj["NormalScale"];
-            if (sj.contains("NormalScaleFar")) s.NormalScaleFar = sj["NormalScaleFar"];
-            if (sj.contains("NormalFarNearBlend")) s.NormalFarNearBlend = sj["NormalFarNearBlend"];
-            if (sj.contains("HeightFarNearBlend")) s.HeightFarNearBlend = sj["HeightFarNearBlend"];
-            
-            if (sj.contains("DiffuseRemap")) { s.DiffuseRemap[0] = sj["DiffuseRemap"][0]; s.DiffuseRemap[1] = sj["DiffuseRemap"][1]; s.DiffuseRemap[2] = sj["DiffuseRemap"][2]; s.DiffuseRemap[3] = sj["DiffuseRemap"][3]; }
-            if (sj.contains("FarColorRemap")) { s.FarColorRemap[0] = sj["FarColorRemap"][0]; s.FarColorRemap[1] = sj["FarColorRemap"][1]; s.FarColorRemap[2] = sj["FarColorRemap"][2]; s.FarColorRemap[3] = sj["FarColorRemap"][3]; }
-            
-            if (sj.contains("MaskRemapMin")) { s.MaskRemapMin[0] = sj["MaskRemapMin"][0]; s.MaskRemapMin[1] = sj["MaskRemapMin"][1]; s.MaskRemapMin[2] = sj["MaskRemapMin"][2]; s.MaskRemapMin[3] = sj["MaskRemapMin"][3]; }
-            if (sj.contains("MaskRemapMax")) { s.MaskRemapMax[0] = sj["MaskRemapMax"][0]; s.MaskRemapMax[1] = sj["MaskRemapMax"][1]; s.MaskRemapMax[2] = sj["MaskRemapMax"][2]; s.MaskRemapMax[3] = sj["MaskRemapMax"][3]; }
-            
-            if (sj.contains("Hardness")) s.Hardness = sj["Hardness"];
-            if (sj.contains("Friction")) s.Friction = sj["Friction"];
-            if (sj.contains("Cohesion")) s.Cohesion = sj["Cohesion"];
-            if (sj.contains("CapacityMult")) s.CapacityMult = sj["CapacityMult"];
-            
-            outParams.Stratums.push_back(s);
+            outParams.Stratums.push_back(sj.get<StratumSettings>());
         }
     } else if (version == 0) {
         // Migration: If no stratums were saved, outParams.Stratums already has the 9 default stratums.
@@ -554,6 +667,47 @@ bool MapExporter::LoadSettings(const std::string& filePath, GenerationParams& ou
             if (dj.contains("MinHeight")) d.MinHeight = dj["MinHeight"];
             if (dj.contains("MaxHeight")) d.MaxHeight = dj["MaxHeight"];
             outParams.Decals.push_back(d);
+        }
+    }
+    
+    if (j.contains("Armies")) {
+        outParams.Armies.clear();
+        std::function<UnitGroup(const json&)> loadGroup;
+        loadGroup = [&](const json& gj) -> UnitGroup {
+            UnitGroup g;
+            if (gj.contains("Units") && gj["Units"].is_object()) {
+                for (auto it = gj["Units"].begin(); it != gj["Units"].end(); ++it) {
+                    const auto& uj = it.value();
+                    UnitTransform u;
+                    if (uj.contains("Type")) u.Type = uj["Type"];
+                    if (uj.contains("Tpid")) u.Tpid = uj["Tpid"];
+                    if (uj.contains("Position")) { u.Position[0] = uj["Position"][0]; u.Position[1] = uj["Position"][1]; u.Position[2] = uj["Position"][2]; }
+                    if (uj.contains("Rotation")) { u.Rotation[0] = uj["Rotation"][0]; u.Rotation[1] = uj["Rotation"][1]; u.Rotation[2] = uj["Rotation"][2]; u.Rotation[3] = uj["Rotation"][3]; }
+                    if (uj.contains("Scale")) { u.Scale[0] = uj["Scale"][0]; u.Scale[1] = uj["Scale"][1]; u.Scale[2] = uj["Scale"][2]; }
+                    g.Units[it.key()] = u;
+                }
+            }
+            if (gj.contains("Groups") && gj["Groups"].is_object()) {
+                for (auto it = gj["Groups"].begin(); it != gj["Groups"].end(); ++it) {
+                    g.Groups[it.key()] = loadGroup(it.value());
+                }
+            }
+            return g;
+        };
+
+        for (auto it = j["Armies"].begin(); it != j["Armies"].end(); ++it) {
+            Army a;
+            const auto& aj = it.value();
+            if (aj.contains("Faction")) a.Faction = aj["Faction"];
+            if (aj.contains("Alloys")) a.Alloys = aj["Alloys"];
+            if (aj.contains("Energy")) a.Energy = aj["Energy"];
+            
+            if (aj.contains("Groups") && aj["Groups"].is_object()) {
+                for (auto git = aj["Groups"].begin(); git != aj["Groups"].end(); ++git) {
+                    a.Groups[git.key()] = loadGroup(git.value());
+                }
+            }
+            outParams.Armies[it.key()] = a;
         }
     }
 
@@ -608,19 +762,19 @@ bool MapExporter::LoadSettings(const std::string& filePath, GenerationParams& ou
             if (l.contains("MountainDensity")) layer.MountainDensity = l["MountainDensity"];
             if (l.contains("RampDensity")) layer.RampDensity = l["RampDensity"];
 
-            if (l.contains("Hardness")) layer.Hardness = l["Hardness"];
+            if (l.contains("Hardness")) layer.hardness = l["Hardness"];
             else if (version > 0 && j.contains("Stratums") && j["Stratums"].is_array() && layer.StratumIndex >= 0 && layer.StratumIndex < j["Stratums"].size()) {
                 // Migration: pull physics from matching Stratum JSON if it exists there
                 const auto& sj = j["Stratums"][layer.StratumIndex];
-                if (sj.contains("Hardness")) layer.Hardness = sj["Hardness"];
-                if (sj.contains("Friction")) layer.Friction = sj["Friction"];
-                if (sj.contains("Cohesion")) layer.Cohesion = sj["Cohesion"];
-                if (sj.contains("CapacityMult")) layer.CapacityMult = sj["CapacityMult"];
+                if (sj.contains("Hardness")) layer.hardness = sj["Hardness"];
+                if (sj.contains("Friction")) layer.friction = sj["Friction"];
+                if (sj.contains("Cohesion")) layer.cohesion = sj["Cohesion"];
+                if (sj.contains("CapacityMult")) layer.capacityMult = sj["CapacityMult"];
             }
 
-            if (l.contains("Friction")) layer.Friction = l["Friction"];
-            if (l.contains("Cohesion")) layer.Cohesion = l["Cohesion"];
-            if (l.contains("CapacityMult")) layer.CapacityMult = l["CapacityMult"];
+            if (l.contains("Friction")) layer.friction = l["Friction"];
+            if (l.contains("Cohesion")) layer.cohesion = l["Cohesion"];
+            if (l.contains("CapacityMult")) layer.capacityMult = l["CapacityMult"];
 
             if (l.contains("Erosion")) {
                 const auto& e = l["Erosion"];
@@ -650,7 +804,7 @@ bool MapExporter::LoadSettings(const std::string& filePath, GenerationParams& ou
     // Make sure we have exactly 9 stratums
     while (outParams.Stratums.size() < 9) {
         StratumSettings s;
-        s.Name = "Stratum " + std::to_string(outParams.Stratums.size());
+        s.name = "Stratum " + std::to_string(outParams.Stratums.size());
         outParams.Stratums.push_back(s);
     }
     

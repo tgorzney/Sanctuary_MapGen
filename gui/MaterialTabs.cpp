@@ -224,10 +224,10 @@ namespace UI {
         ImGui::Separator();
         for (int i = 0; i < (int)params.Stratums.size(); ++i) {
             ImGui::PushID(i);
-            char label[64]; snprintf(label, sizeof(label), "Stratum %d - %s", i, params.Stratums[i].Name.c_str());
+            char label[64]; snprintf(label, sizeof(label), "Stratum %d - %s", i, params.Stratums[i].name.c_str());
             if (ImGui::CollapsingHeader(label)) {
-                char nameBuf[128]; strncpy(nameBuf, params.Stratums[i].Name.c_str(), sizeof(nameBuf));
-                if (ImGui::InputText("Name", nameBuf, IM_ARRAYSIZE(nameBuf))) params.Stratums[i].Name = nameBuf;
+                char nameBuf[128]; strncpy(nameBuf, params.Stratums[i].name.c_str(), sizeof(nameBuf));
+                if (ImGui::InputText("Name", nameBuf, IM_ARRAYSIZE(nameBuf))) params.Stratums[i].name = nameBuf;
                 
                 ImGui::Separator();
                 
@@ -252,19 +252,19 @@ namespace UI {
                             if (ImGui::BeginCombo("Material", "Auto-fill...")) {
                                 for (const auto& mat : mats) {
                                     if (ImGui::Selectable(mat.c_str())) {
-                                        params.Stratums[i].AlbedoPath = selectedEnv + "/" + mat + "_Albedo.png";
-                                        params.Stratums[i].NormalPath = selectedEnv + "/" + mat + "_Normal.png";
-                                        params.Stratums[i].MaskPath = selectedEnv + "/" + mat + "_Mask.png";
+                                        params.Stratums[i].albedo.path = selectedEnv + "/" + mat + "_Albedo.png";
+                                        params.Stratums[i].normal.path = selectedEnv + "/" + mat + "_Normal.png";
+                                        params.Stratums[i].mask.path = selectedEnv + "/" + mat + "_Mask.png";
                                         bNeedsPreviewRender = true;
                                         
-                                        if (params.Stratums[i].PreviewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].PreviewAlbedoTex);
-                                        params.Stratums[i].PreviewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].AlbedoPath, params.Stratums[i].PreviewColor);
+                                        if (params.Stratums[i].previewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].previewAlbedoTex);
+                                        params.Stratums[i].previewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].albedo.path, &params.Stratums[i].previewColor.r);
                                         
-                                        if (params.Stratums[i].PreviewNormalTex) glDeleteTextures(1, &params.Stratums[i].PreviewNormalTex);
-                                        params.Stratums[i].PreviewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].NormalPath, nullptr);
+                                        if (params.Stratums[i].previewNormalTex) glDeleteTextures(1, &params.Stratums[i].previewNormalTex);
+                                        params.Stratums[i].previewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].normal.path, nullptr);
                                         
-                                        if (params.Stratums[i].PreviewMaskTex) glDeleteTextures(1, &params.Stratums[i].PreviewMaskTex);
-                                        params.Stratums[i].PreviewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].MaskPath, nullptr);
+                                        if (params.Stratums[i].previewMaskTex) glDeleteTextures(1, &params.Stratums[i].previewMaskTex);
+                                        params.Stratums[i].previewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].mask.path, nullptr);
                                     }
                                 }
                                 ImGui::EndCombo();
@@ -276,15 +276,15 @@ namespace UI {
                 ImGui::Spacing();
                 
                 // Generate Actual Mask Thumbnail if it exists but hasn't been uploaded to GPU yet
-                if (!params.Stratums[i].ImportedMaskData.empty() && params.Stratums[i].PreviewActualMaskTex == 0) {
+                if (!params.Stratums[i].importedMaskData.empty() && params.Stratums[i].previewActualMaskTex == 0) {
                     int texSize = params.MapSize;
                     std::vector<uint8_t> thumbData(texSize * texSize);
                     for (size_t p = 0; p < thumbData.size(); ++p) {
-                        thumbData[p] = static_cast<uint8_t>(std::clamp(params.Stratums[i].ImportedMaskData[p], 0.0f, 1.0f) * 255.0f);
+                        thumbData[p] = static_cast<uint8_t>(std::clamp(params.Stratums[i].importedMaskData[p], 0.0f, 1.0f) * 255.0f);
                     }
                     
-                    glGenTextures(1, &params.Stratums[i].PreviewActualMaskTex);
-                    glBindTexture(GL_TEXTURE_2D, params.Stratums[i].PreviewActualMaskTex);
+                    glGenTextures(1, &params.Stratums[i].previewActualMaskTex);
+                    glBindTexture(GL_TEXTURE_2D, params.Stratums[i].previewActualMaskTex);
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                     glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, texSize, texSize, 0, GL_RED, GL_UNSIGNED_BYTE, thumbData.data());
@@ -300,43 +300,67 @@ namespace UI {
                     ImGui::TableNextRow();
                     
                     ImGui::TableSetColumnIndex(0);
-                    char albedoBuf[256]; strncpy(albedoBuf, params.Stratums[i].AlbedoPath.c_str(), sizeof(albedoBuf));
-                    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 100.0f);
-                    if (ImGui::InputText("Albedo Path", albedoBuf, IM_ARRAYSIZE(albedoBuf))) { 
-                        params.Stratums[i].AlbedoPath = albedoBuf; 
-                        if (params.Stratums[i].AlbedoPath.empty()) {
-                            params.Stratums[i].PreviewColor[0] = 1.0f;
-                            params.Stratums[i].PreviewColor[1] = 1.0f;
-                            params.Stratums[i].PreviewColor[2] = 1.0f;
-                            params.Stratums[i].PreviewColor[3] = 1.0f;
-                            if (params.Stratums[i].PreviewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].PreviewAlbedoTex);
-                            params.Stratums[i].PreviewAlbedoTex = 0;
-                        } else {
-                            if (params.Stratums[i].PreviewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].PreviewAlbedoTex);
-                            params.Stratums[i].PreviewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].AlbedoPath, params.Stratums[i].PreviewColor);
+                    auto getShortPath = [](const std::string& path) {
+                        if (path.empty()) return std::string("None");
+                        size_t lastSlash = path.find_last_of("/\\");
+                        if (lastSlash != std::string::npos && lastSlash > 0) {
+                            size_t prevSlash = path.find_last_of("/\\", lastSlash - 1);
+                            if (prevSlash != std::string::npos) {
+                                return path.substr(prevSlash + 1);
+                            }
                         }
-                        bNeedsPreviewRender = true; 
+                        return path;
+                    };
+
+                    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 120.0f);
+                    
+                    if (ImGui::Button(("Albedo##A" + std::to_string(i)).c_str(), ImVec2(80, 0))) {
+                        std::string path = params.Stratums[i].albedo.path;
+                        if (FileDialog::OpenFile("Images\0*.png;*.dds;*.tga\0All Files\0*.*\0", path)) {
+                            params.Stratums[i].albedo.path = path;
+                            if (params.Stratums[i].previewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].previewAlbedoTex);
+                            params.Stratums[i].previewAlbedoTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].albedo.path, &params.Stratums[i].previewColor.r);
+                            bNeedsPreviewRender = true;
+                        }
+                    }
+                    ImGui::SameLine();
+                    char albedoBuf[256]; strncpy(albedoBuf, getShortPath(params.Stratums[i].albedo.path).c_str(), sizeof(albedoBuf));
+                    if (ImGui::InputText("##AlbedoPath", albedoBuf, IM_ARRAYSIZE(albedoBuf), ImGuiInputTextFlags_ReadOnly)) {}
+                    if (params.Stratums[i].albedo.path.empty()) {
+                        params.Stratums[i].previewColor.r = 1.0f;
+                        params.Stratums[i].previewColor.g = 1.0f;
+                        params.Stratums[i].previewColor.b = 1.0f;
+                        params.Stratums[i].previewColor.a = 1.0f;
+                        if (params.Stratums[i].previewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].previewAlbedoTex);
+                        params.Stratums[i].previewAlbedoTex = 0;
                     }
                     
-                    char normalBuf[256]; strncpy(normalBuf, params.Stratums[i].NormalPath.c_str(), sizeof(normalBuf));
-                    if (ImGui::InputText("Normal Path", normalBuf, IM_ARRAYSIZE(normalBuf))) { 
-                        params.Stratums[i].NormalPath = normalBuf; 
-                        if (params.Stratums[i].PreviewNormalTex) glDeleteTextures(1, &params.Stratums[i].PreviewNormalTex);
-                        if (!params.Stratums[i].NormalPath.empty()) {
-                            params.Stratums[i].PreviewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].NormalPath, nullptr);
-                        } else params.Stratums[i].PreviewNormalTex = 0;
-                        bNeedsPreviewRender = true; 
+                    if (ImGui::Button(("Normal##N" + std::to_string(i)).c_str(), ImVec2(80, 0))) {
+                        std::string path = params.Stratums[i].normal.path;
+                        if (FileDialog::OpenFile("Images\0*.png;*.dds;*.tga\0All Files\0*.*\0", path)) {
+                            params.Stratums[i].normal.path = path;
+                            if (params.Stratums[i].previewNormalTex) glDeleteTextures(1, &params.Stratums[i].previewNormalTex);
+                            params.Stratums[i].previewNormalTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].normal.path, nullptr);
+                            bNeedsPreviewRender = true;
+                        }
                     }
+                    ImGui::SameLine();
+                    char normalBuf[256]; strncpy(normalBuf, getShortPath(params.Stratums[i].normal.path).c_str(), sizeof(normalBuf));
+                    if (ImGui::InputText("##NormalPath", normalBuf, IM_ARRAYSIZE(normalBuf), ImGuiInputTextFlags_ReadOnly)) {}
                     
-                    char maskBuf[256]; strncpy(maskBuf, params.Stratums[i].MaskPath.c_str(), sizeof(maskBuf));
-                    if (ImGui::InputText("Composite Path", maskBuf, IM_ARRAYSIZE(maskBuf))) { 
-                        params.Stratums[i].MaskPath = maskBuf; 
-                        if (params.Stratums[i].PreviewMaskTex) glDeleteTextures(1, &params.Stratums[i].PreviewMaskTex);
-                        if (!params.Stratums[i].MaskPath.empty()) {
-                            params.Stratums[i].PreviewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].MaskPath, nullptr);
-                        } else params.Stratums[i].PreviewMaskTex = 0;
-                        bNeedsPreviewRender = true; 
+                    if (ImGui::Button(("Composite##C" + std::to_string(i)).c_str(), ImVec2(80, 0))) {
+                        std::string path = params.Stratums[i].mask.path;
+                        if (FileDialog::OpenFile("Images\0*.png;*.dds;*.tga\0All Files\0*.*\0", path)) {
+                            params.Stratums[i].mask.path = path;
+                            if (params.Stratums[i].previewMaskTex) glDeleteTextures(1, &params.Stratums[i].previewMaskTex);
+                            params.Stratums[i].previewMaskTex = LoadTextureFromSanpack(params.GlobalEnvironmentPath, params.Stratums[i].mask.path, nullptr);
+                            bNeedsPreviewRender = true;
+                        }
                     }
+                    ImGui::SameLine();
+                    char maskBuf[256]; strncpy(maskBuf, getShortPath(params.Stratums[i].mask.path).c_str(), sizeof(maskBuf));
+                    if (ImGui::InputText("##MaskPath", maskBuf, IM_ARRAYSIZE(maskBuf), ImGuiInputTextFlags_ReadOnly)) {}
+                    
                     ImGui::PopItemWidth();
                     
                     ImGui::TableSetColumnIndex(1);
@@ -344,31 +368,41 @@ namespace UI {
                     if (groupHeight < 10) groupHeight = 80.0f;
                     ImVec2 texSize(80.0f, 80.0f);
                     
-                    if (params.Stratums[i].PreviewAlbedoTex) ImGui::Image((void*)(intptr_t)params.Stratums[i].PreviewAlbedoTex, texSize);
+                    if (params.Stratums[i].previewAlbedoTex) ImGui::Image((void*)(intptr_t)params.Stratums[i].previewAlbedoTex, texSize);
                     else ImGui::Button("No Image\nFound##A", texSize);
                     ImGui::SameLine();
                     
-                    if (params.Stratums[i].PreviewNormalTex) ImGui::Image((void*)(intptr_t)params.Stratums[i].PreviewNormalTex, texSize);
+                    if (params.Stratums[i].previewNormalTex) ImGui::Image((void*)(intptr_t)params.Stratums[i].previewNormalTex, texSize);
                     else ImGui::Button("No Image\nFound##N", texSize);
                     ImGui::SameLine();
                     
-                    if (params.Stratums[i].PreviewMaskTex) ImGui::Image((void*)(intptr_t)params.Stratums[i].PreviewMaskTex, texSize);
+                    if (params.Stratums[i].previewMaskTex) ImGui::Image((void*)(intptr_t)params.Stratums[i].previewMaskTex, texSize);
                     else ImGui::Button("No Image\nFound##M", texSize);
                     ImGui::SameLine();
                     
-                    bool pushedColor = params.Stratums[i].UseImportedMask;
+                    bool pushedColor = (params.Stratums[i].maskMode != ImportedMaskMode::Disabled);
                     if (pushedColor) {
                         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
                     }
-                    if (params.Stratums[i].PreviewActualMaskTex) {
-                        if (ImGui::ImageButton("##ToggleBtn", (ImTextureID)(intptr_t)params.Stratums[i].PreviewActualMaskTex, texSize)) {
-                            params.Stratums[i].UseImportedMask = !params.Stratums[i].UseImportedMask;
-                            bNeedsMapUpdate = true;
+                    
+                    auto toggleMode = [&]() {
+                        if (params.Stratums[i].maskMode == ImportedMaskMode::Disabled) params.Stratums[i].maskMode = ImportedMaskMode::ProceduralStart;
+                        else if (params.Stratums[i].maskMode == ImportedMaskMode::ProceduralStart) params.Stratums[i].maskMode = ImportedMaskMode::StaticOverride;
+                        else params.Stratums[i].maskMode = ImportedMaskMode::Disabled;
+                        bNeedsMapUpdate = true;
+                    };
+                    
+                    if (params.Stratums[i].previewActualMaskTex) {
+                        if (ImGui::ImageButton("##ToggleBtn", (ImTextureID)(intptr_t)params.Stratums[i].previewActualMaskTex, texSize)) {
+                            toggleMode();
                         }
                     } else {
-                        if (ImGui::Button(params.Stratums[i].UseImportedMask ? "Baked\nMask\n(ON)##B" : "Procedural\nMask\n(OFF)##B", texSize)) {
-                            params.Stratums[i].UseImportedMask = !params.Stratums[i].UseImportedMask;
-                            bNeedsMapUpdate = true;
+                        const char* btnText = "Procedural\nMask\n(OFF)##B";
+                        if (params.Stratums[i].maskMode == ImportedMaskMode::StaticOverride) btnText = "Static\nOverride\n(ON)##B";
+                        else if (params.Stratums[i].maskMode == ImportedMaskMode::ProceduralStart) btnText = "Procedural\nStart\n(ON)##B";
+                        
+                        if (ImGui::Button(btnText, texSize)) {
+                            toggleMode();
                         }
                     }
                     if (pushedColor) {
@@ -379,26 +413,26 @@ namespace UI {
                 }
                 
                 ImGui::Separator();
-                if (ImGui::ColorEdit4("Preview Base Color", params.Stratums[i].PreviewColor)) bNeedsPreviewRender = true;
+                if (ImGui::ColorEdit4("Preview Base Color", &params.Stratums[i].previewColor.r)) bNeedsPreviewRender = true;
                 
-                if (ImGui::ColorEdit4("Diffuse Remap", params.Stratums[i].DiffuseRemap)) bNeedsPreviewRender = true;
-                if (ImGui::ColorEdit4("Far Color Remap", params.Stratums[i].FarColorRemap)) bNeedsPreviewRender = true;
-                
-                ImGui::Separator();
-                if (ImGui::DragFloat4("Mask Remap Min", params.Stratums[i].MaskRemapMin, 0.01f, 0.0f, 10.0f)) bNeedsPreviewRender = true;
-                if (ImGui::DragFloat4("Mask Remap Max", params.Stratums[i].MaskRemapMax, 0.01f, 0.0f, 10.0f)) bNeedsPreviewRender = true;
+                if (ImGui::ColorEdit4("Diffuse Remap", &params.Stratums[i].diffuseRemap.r)) bNeedsPreviewRender = true;
+                if (ImGui::ColorEdit4("Far Color Remap", &params.Stratums[i].farColorRemap.r)) bNeedsPreviewRender = true;
                 
                 ImGui::Separator();
-                if (ImGui::DragFloat2("Tile Size", params.Stratums[i].TileSize, 0.1f, 0.1f, 1000.0f)) bNeedsPreviewRender = true;
-                if (ImGui::DragFloat2("Tile Size Far", params.Stratums[i].TileSizeFar, 0.1f, 0.1f, 1000.0f)) bNeedsPreviewRender = true;
-                if (ImGui::SliderFloat("Triplanar Tile", &params.Stratums[i].TileSizeTriplanar, 0.1f, 100.0f)) bNeedsPreviewRender = true;
-                if (ImGui::SliderFloat("Far Triplanar Tile", &params.Stratums[i].TileSizeFarTriplanar, 0.1f, 100.0f)) bNeedsPreviewRender = true;
+                if (ImGui::DragFloat4("Mask Remap Min", &params.Stratums[i].maskRemapMin.x, 0.01f, 0.0f, 10.0f)) bNeedsPreviewRender = true;
+                if (ImGui::DragFloat4("Mask Remap Max", &params.Stratums[i].maskRemapMax.x, 0.01f, 0.0f, 10.0f)) bNeedsPreviewRender = true;
                 
                 ImGui::Separator();
-                if (ImGui::SliderFloat("Normal Scale", &params.Stratums[i].NormalScale, 0.0f, 5.0f)) bNeedsPreviewRender = true;
-                if (ImGui::SliderFloat("Normal Scale Far", &params.Stratums[i].NormalScaleFar, 0.0f, 5.0f)) bNeedsPreviewRender = true;
-                if (ImGui::SliderFloat("Normal Far/Near Blend", &params.Stratums[i].NormalFarNearBlend, 0.0f, 1.0f)) bNeedsPreviewRender = true;
-                if (ImGui::SliderFloat("Height Far/Near Blend", &params.Stratums[i].HeightFarNearBlend, 0.0f, 1.0f)) bNeedsPreviewRender = true;
+                if (ImGui::DragFloat2("Tile Size", &params.Stratums[i].tileSize.x, 0.1f, 0.1f, 1000.0f)) bNeedsPreviewRender = true;
+                if (ImGui::DragFloat2("Tile Size Far", &params.Stratums[i].tileSizeFar.x, 0.1f, 0.1f, 1000.0f)) bNeedsPreviewRender = true;
+                if (ImGui::SliderFloat("Triplanar Tile", &params.Stratums[i].tileSizeTriplanar, 0.1f, 100.0f)) bNeedsPreviewRender = true;
+                if (ImGui::SliderFloat("Far Triplanar Tile", &params.Stratums[i].tileSizeFar.xTriplanar, 0.1f, 100.0f)) bNeedsPreviewRender = true;
+                
+                ImGui::Separator();
+                if (ImGui::SliderFloat("Normal Scale", &params.Stratums[i].normalScale, 0.0f, 5.0f)) bNeedsPreviewRender = true;
+                if (ImGui::SliderFloat("Normal Scale Far", &params.Stratums[i].normalScaleFar, 0.0f, 5.0f)) bNeedsPreviewRender = true;
+                if (ImGui::SliderFloat("Normal Far/Near Blend", &params.Stratums[i].normalFarNearBlend, 0.0f, 1.0f)) bNeedsPreviewRender = true;
+                if (ImGui::SliderFloat("Height Far/Near Blend", &params.Stratums[i].heightFarNearBlend, 0.0f, 1.0f)) bNeedsPreviewRender = true;
                 
                 ImGui::Separator();
                 ImGui::Text("Base Soil Physics");
@@ -408,20 +442,20 @@ namespace UI {
                     ImGui::OpenPopup("SoilPresetsPopup");
                 }
                 if (ImGui::BeginPopup("SoilPresetsPopup")) {
-                    if (ImGui::MenuItem("Bedrock")) { params.Stratums[i].Hardness = 1.0f; params.Stratums[i].Friction = 0.8f; params.Stratums[i].Cohesion = 1.0f; params.Stratums[i].CapacityMult = 0.1f; bNeedsMapUpdate = true; }
-                    if (ImGui::MenuItem("Rock")) { params.Stratums[i].Hardness = 0.8f; params.Stratums[i].Friction = 0.7f; params.Stratums[i].Cohesion = 0.8f; params.Stratums[i].CapacityMult = 0.5f; bNeedsMapUpdate = true; }
-                    if (ImGui::MenuItem("Clay")) { params.Stratums[i].Hardness = 0.5f; params.Stratums[i].Friction = 0.4f; params.Stratums[i].Cohesion = 0.9f; params.Stratums[i].CapacityMult = 1.0f; bNeedsMapUpdate = true; }
-                    if (ImGui::MenuItem("Dirt")) { params.Stratums[i].Hardness = 0.4f; params.Stratums[i].Friction = 0.5f; params.Stratums[i].Cohesion = 0.5f; params.Stratums[i].CapacityMult = 1.5f; bNeedsMapUpdate = true; }
-                    if (ImGui::MenuItem("Mud")) { params.Stratums[i].Hardness = 0.2f; params.Stratums[i].Friction = 0.2f; params.Stratums[i].Cohesion = 0.7f; params.Stratums[i].CapacityMult = 2.0f; bNeedsMapUpdate = true; }
-                    if (ImGui::MenuItem("Sand")) { params.Stratums[i].Hardness = 0.1f; params.Stratums[i].Friction = 0.6f; params.Stratums[i].Cohesion = 0.1f; params.Stratums[i].CapacityMult = 2.5f; bNeedsMapUpdate = true; }
+                    if (ImGui::MenuItem("Bedrock")) { params.Stratums[i].hardness = 1.0f; params.Stratums[i].friction = 0.8f; params.Stratums[i].cohesion = 1.0f; params.Stratums[i].capacityMult = 0.1f; bNeedsMapUpdate = true; }
+                    if (ImGui::MenuItem("Rock")) { params.Stratums[i].hardness = 0.8f; params.Stratums[i].friction = 0.7f; params.Stratums[i].cohesion = 0.8f; params.Stratums[i].capacityMult = 0.5f; bNeedsMapUpdate = true; }
+                    if (ImGui::MenuItem("Clay")) { params.Stratums[i].hardness = 0.5f; params.Stratums[i].friction = 0.4f; params.Stratums[i].cohesion = 0.9f; params.Stratums[i].capacityMult = 1.0f; bNeedsMapUpdate = true; }
+                    if (ImGui::MenuItem("Dirt")) { params.Stratums[i].hardness = 0.4f; params.Stratums[i].friction = 0.5f; params.Stratums[i].cohesion = 0.5f; params.Stratums[i].capacityMult = 1.5f; bNeedsMapUpdate = true; }
+                    if (ImGui::MenuItem("Mud")) { params.Stratums[i].hardness = 0.2f; params.Stratums[i].friction = 0.2f; params.Stratums[i].cohesion = 0.7f; params.Stratums[i].capacityMult = 2.0f; bNeedsMapUpdate = true; }
+                    if (ImGui::MenuItem("Sand")) { params.Stratums[i].hardness = 0.1f; params.Stratums[i].friction = 0.6f; params.Stratums[i].cohesion = 0.1f; params.Stratums[i].capacityMult = 2.5f; bNeedsMapUpdate = true; }
                     ImGui::EndPopup();
                 }
                 ImGui::PopID();
                 
-                if (ImGui::SliderFloat("Hardness", &params.Stratums[i].Hardness, 0.01f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Friction", &params.Stratums[i].Friction, 0.01f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Cohesion", &params.Stratums[i].Cohesion, 0.01f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Capacity Mult", &params.Stratums[i].CapacityMult, 0.1f, 5.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Hardness", &params.Stratums[i].hardness, 0.01f, 1.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Friction", &params.Stratums[i].friction, 0.01f, 1.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Cohesion", &params.Stratums[i].cohesion, 0.01f, 1.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Capacity Mult", &params.Stratums[i].capacityMult, 0.1f, 5.0f)) bNeedsMapUpdate = true;
             }
             ImGui::PopID();
         }

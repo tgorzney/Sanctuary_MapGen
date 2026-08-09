@@ -41,37 +41,42 @@ void main() {
     for (int l = layerCount - 1; l >= scanBottom; --l) {
         if (physics[l].x < 0.0) continue; // not erodable
         float thickness = getThickness(l, pos.x, pos.y);
-        if (thickness > 0.001) {
-            float maxSlope = physics[l].z; // Cohesion
+        if (thickness <= 0.001) continue;
 
-            float h = getTotalHeight(pos.x, pos.y);
-            int bestNX = pos.x;
-            int bestNY = pos.y;
-            float lowestH = h;
+        float maxSlope = physics[l].z; // Cohesion
+        float h = getTotalHeight(pos.x, pos.y);
 
-            int dx[4] = int[]( -1, 1, 0, 0 );
-            int dy[4] = int[]( 0, 0, -1, 1 );
+        float h_l = getTotalHeight(pos.x - 1, pos.y);
+        float h_r = getTotalHeight(pos.x + 1, pos.y);
+        float h_u = getTotalHeight(pos.x, pos.y - 1);
+        float h_d = getTotalHeight(pos.x, pos.y + 1);
 
-            for (int d = 0; d < 4; ++d) {
-                float nh = getTotalHeight(pos.x + dx[d], pos.y + dy[d]);
-                if (nh < lowestH) {
-                    lowestH = nh;
-                    bestNX = pos.x + dx[d];
-                    bestNY = pos.y + dy[d];
-                }
-            }
+        float dh_l = max(0.0, h - h_l);
+        float dh_r = max(0.0, h - h_r);
+        float dh_u = max(0.0, h - h_u);
+        float dh_d = max(0.0, h - h_d);
 
-            float diff = h - lowestH;
-            if (diff > maxSlope) {
-                float slideAmount = (diff - maxSlope) / 2.0;
-                slideAmount = min(slideAmount, thickness);
+        float total_dh = dh_l + dh_r + dh_u + dh_d;
 
-                setThickness(l, pos.x, pos.y, thickness - slideAmount);
+        float slideActive = (total_dh > maxSlope) ? 1.0 : 0.0;
+        float slideAmount = min(thickness, (total_dh - maxSlope) / 2.0) * slideActive;
 
-                int nIdx = l * mapSize * mapSize + bestNY * mapSize + bestNX;
-                thicknesses[nIdx] += slideAmount;
-            }
-        }
+        float inv_total_dh = (total_dh > 0.00001) ? (1.0 / total_dh) : 0.0;
+
+        float slip_l = slideAmount * (dh_l * inv_total_dh);
+        float slip_r = slideAmount * (dh_r * inv_total_dh);
+        float slip_u = slideAmount * (dh_u * inv_total_dh);
+        float slip_d = slideAmount * (dh_d * inv_total_dh);
+
+        float total_slip = slip_l + slip_r + slip_u + slip_d;
+
+        setThickness(l, pos.x, pos.y, thickness - total_slip);
+
+        int bL = l * mapSize * mapSize;
+        if(slip_l > 0.0) thicknesses[bL + pos.y * mapSize + (pos.x - 1)] += slip_l;
+        if(slip_r > 0.0) thicknesses[bL + pos.y * mapSize + (pos.x + 1)] += slip_r;
+        if(slip_u > 0.0) thicknesses[bL + (pos.y - 1) * mapSize + pos.x] += slip_u;
+        if(slip_d > 0.0) thicknesses[bL + (pos.y + 1) * mapSize + pos.x] += slip_d;
     }
 }
 

@@ -8,8 +8,19 @@ layout(std430, binding = 0) buffer StratumData {
 
 // Binding 1: Physics per layer slot (Hardness, Friction, Cohesion, CapacityMult)
 //   Hardness < 0 means NOT erodable (encoded sentinel)
+struct LayerPhysics {
+    float Hardness;
+    float Friction;
+    float Cohesion;
+    float CapacityMult;
+    float AbsorptionRate;
+    float Pad1;
+    float Pad2;
+    float Pad3;
+};
+
 layout(std430, binding = 1) buffer PhysicsData {
-    vec4 physics[]; // x=Hardness(sentinel if <0), y=Friction, z=Cohesion, w=CapacityMult
+    LayerPhysics physics[];
 };
 
 // Binding 2: Droplet spawn positions
@@ -27,6 +38,8 @@ uniform int totalDroplets;
 uniform int depositionMode;       // 1 = deposition only (no erosion), 0 = normal erosion
 uniform int erodeBeneath;         // 1 = can dig into all layers below, 0 = only current layer
 uniform float initialSedimentLoad; // starting sediment for deposition droplets
+uniform float fluidViscosity;
+uniform float carryingCapacityScale;
 
 float getThickness(int layer, int x, int y) {
     return thicknesses[layer * mapSize * mapSize + y * mapSize + x];
@@ -88,7 +101,7 @@ void main() {
 
         // Find top-most active layer for physics
         int topLayerSlot = currentLayerSlot; // default to current layer
-        vec4 topPhysics = physics[currentLayerSlot];
+        LayerPhysics topPhysics = physics[currentLayerSlot];
 
         // If erodeBeneath is enabled, scan all layers top-down
         int scanTop = (erodeBeneath != 0) ? layerCount - 1 : currentLayerSlot;
@@ -100,11 +113,13 @@ void main() {
             }
         }
 
-        float pHardness     = topPhysics.x;
-        float pFriction     = topPhysics.y;
-        float pCapacityMult = topPhysics.w;
+        float pHardness     = topPhysics.Hardness;
+        float pFriction     = topPhysics.Friction;
+        float pCapacityMult = topPhysics.CapacityMult;
+        float pAbsorption   = topPhysics.AbsorptionRate;
 
         float inertia = 0.05 + (1.0 - pFriction) * 0.1;
+        inertia *= (1.0 / max(0.1, fluidViscosity));
 
         dirX = (dirX * inertia) - (gradX * (1.0 - inertia));
         dirY = (dirY * inertia) - (gradY * (1.0 - inertia));
@@ -123,7 +138,7 @@ void main() {
         newH = getTotalHeight(posX, posY, dX2, dY2);
         float deltaHeight = newH - h;
 
-        float capacity = max(-deltaHeight * speed * water * 4.0 * pCapacityMult, 0.01);
+        float capacity = max(-deltaHeight * speed * water * 4.0 * pCapacityMult * carryingCapacityScale, 0.01);
         if (depositionMode == 1) {
             // In Deposition mode, force droplets to slide down slopes without depositing
             // by boosting capacity to hold all sediment as long as there is a downward slope.
@@ -163,7 +178,7 @@ void main() {
                 // Erode nodeX, nodeY
                 float rem = e00;
                 for (int l = scanLimit; l >= 0 && rem > 0.0; --l) {
-                    if (physics[l].x < 0.0) continue; // not erodable
+                    if (physics[l].Hardness < 0.0) continue; // not erodable
                     float th = getThickness(l, nodeX, nodeY);
                     float sub = min(th, rem);
                     if (sub > 0.0) { setThickness(l, nodeX, nodeY, th - sub); rem -= sub; }
@@ -171,7 +186,7 @@ void main() {
                 // Erode nodeX+1, nodeY
                 rem = e10;
                 for (int l = scanLimit; l >= 0 && rem > 0.0; --l) {
-                    if (physics[l].x < 0.0) continue;
+                    if (physics[l].Hardness < 0.0) continue;
                     float th = getThickness(l, nodeX+1, nodeY);
                     float sub = min(th, rem);
                     if (sub > 0.0) { setThickness(l, nodeX+1, nodeY, th - sub); rem -= sub; }
@@ -179,7 +194,7 @@ void main() {
                 // Erode nodeX, nodeY+1
                 rem = e01;
                 for (int l = scanLimit; l >= 0 && rem > 0.0; --l) {
-                    if (physics[l].x < 0.0) continue;
+                    if (physics[l].Hardness < 0.0) continue;
                     float th = getThickness(l, nodeX, nodeY+1);
                     float sub = min(th, rem);
                     if (sub > 0.0) { setThickness(l, nodeX, nodeY+1, th - sub); rem -= sub; }
@@ -187,7 +202,7 @@ void main() {
                 // Erode nodeX+1, nodeY+1
                 rem = e11;
                 for (int l = scanLimit; l >= 0 && rem > 0.0; --l) {
-                    if (physics[l].x < 0.0) continue;
+                    if (physics[l].Hardness < 0.0) continue;
                     float th = getThickness(l, nodeX+1, nodeY+1);
                     float sub = min(th, rem);
                     if (sub > 0.0) { setThickness(l, nodeX+1, nodeY+1, th - sub); rem -= sub; }
@@ -197,6 +212,14 @@ void main() {
 
         speed  = sqrt(max(0.0, speed * speed + deltaHeight * gravity));
         water *= (1.0 - evaporationRate);
+        
+        water *= (1.0 - pAbsorption);
+        if (water <= 0.001) {
+            if (sediment > 0.0001) {
+                addThickness(currentLayerSlot, nodeX, nodeY, sediment);
+            }
+            break;
+        }
     }
 }
 

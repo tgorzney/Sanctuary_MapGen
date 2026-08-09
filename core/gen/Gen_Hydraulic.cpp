@@ -55,21 +55,25 @@ namespace SanmapGen {
                 CalculateGradient(threadTotalHeight, posX, posY, h, gradX, gradY);
 
                 float topHardness = 0.2f, topFriction = 0.8f, topCohesion = 0.5f, topCapacityMult = 2.0f;
+                float topAbsorptionRate = settings.BaseAbsorptionRate;
                 int topLayerIdx = -1;
                 
                 for (int l = (int)activeLayers.size() - 1; l >= 0; --l) {
                     if (threadStratums[activeLayers[l]].Get(nodeX, nodeY) > 0.0001f) {
                         topLayerIdx = activeLayers[l];
                         const auto& layer = (*flatLayers[topLayerIdx]);
-                        topHardness = layer.Hardness;
-                        topFriction = layer.Friction;
-                        topCohesion = layer.Cohesion;
-                        topCapacityMult = layer.CapacityMult;
+                        topHardness = layer.hardness;
+                        topFriction = layer.friction;
+                        topCohesion = layer.cohesion;
+                        topCapacityMult = layer.capacityMult;
+                        topAbsorptionRate = layer.AbsorptionRate;
                         break;
                     }
                 }
 
                 float inertia = 0.05f + (1.0f - topFriction) * 0.1f;
+                // Scientific Viscosity: higher viscosity directly dampens velocity inertia
+                inertia *= (1.0f / std::max(0.1f, settings.FluidViscosity));
                 
                 dirX = (dirX * inertia) - (gradX * (1.0f - inertia));
                 dirY = (dirY * inertia) - (gradY * (1.0f - inertia));
@@ -88,7 +92,8 @@ namespace SanmapGen {
                 CalculateGradient(threadTotalHeight, posX, posY, newH, dummyX, dummyY);
                 float deltaHeight = newH - h;
                 
-                float capacity = std::max(-deltaHeight * speed * water * 4.0f * topCapacityMult, 0.01f);
+                // Scale Capacity dynamically per user parameters
+                float capacity = std::max(-deltaHeight * speed * water * 4.0f * topCapacityMult * settings.CarryingCapacityScale, 0.01f);
                 if (settings.DepositionMode) {
                     capacity = std::max(capacity, sediment * std::clamp(-deltaHeight * 100.0f, 0.0f, 1.0f));
                 }
@@ -157,6 +162,18 @@ namespace SanmapGen {
 
                 speed = std::sqrt(std::max(0.0f, speed * speed + deltaHeight * settings.Gravity));
                 water *= (1.0f - settings.EvaporationRate);
+                
+                // Scientific Absorption: Soil absorbs fluid, prematurely ending droplet lifecycle if it dries out
+                water *= (1.0f - topAbsorptionRate);
+                if (water <= 0.001f) {
+                    // Force drop all sediment instantly before dying
+                    if (sediment > 0.0001f) {
+                        int depIdx = currentLayerIdx;
+                        threadStratums[depIdx].Set(nodeX, nodeY, threadStratums[depIdx].Get(nodeX, nodeY) + sediment);
+                        threadTotalHeight.Set(nodeX, nodeY, threadTotalHeight.Get(nodeX, nodeY) + sediment);
+                    }
+                    break;
+                }
             }
         }
     }

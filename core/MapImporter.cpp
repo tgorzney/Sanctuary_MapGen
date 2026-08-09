@@ -134,32 +134,74 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             auto s = str[i];
             auto& strat = outParams.Stratums[i];
             
-            if (s.contains("albedo")) strat.AlbedoPath = s["albedo"];
-            if (s.contains("normal")) strat.NormalPath = s["normal"];
-            if (s.contains("mask")) strat.MaskPath = s["mask"];
+            if (s.contains("albedo")) strat.albedo.path = s["albedo"];
+            if (s.contains("normal")) strat.normal.path = s["normal"];
+            if (s.contains("mask")) strat.mask.path = s["mask"];
             
-            if (s.contains("tileSize")) { strat.TileSize[0] = s["tileSize"]["x"]; strat.TileSize[1] = s["tileSize"]["y"]; }
-            if (s.contains("tileSizeFar")) { strat.TileSizeFar[0] = s["tileSizeFar"]["x"]; strat.TileSizeFar[1] = s["tileSizeFar"]["y"]; }
-            if (s.contains("tileSizeTriplanar")) strat.TileSizeTriplanar = s["tileSizeTriplanar"];
-            if (s.contains("tileSizeFarTriplanar")) strat.TileSizeFarTriplanar = s["tileSizeFarTriplanar"];
+            if (s.contains("tileSize")) { strat.tileSize[0] = s["tileSize"]["x"]; strat.tileSize[1] = s["tileSize"]["y"]; }
+            if (s.contains("tileSizeFar")) { strat.tileSizeFar[0] = s["tileSizeFar"]["x"]; strat.tileSizeFar[1] = s["tileSizeFar"]["y"]; }
+            if (s.contains("tileSizeTriplanar")) strat.tileSizeTriplanar = s["tileSizeTriplanar"];
+            if (s.contains("tileSizeFarTriplanar")) strat.tileSizeFarTriplanar = s["tileSizeFarTriplanar"];
             
-            if (s.contains("normalScale")) strat.NormalScale = s["normalScale"];
-            if (s.contains("normalScaleFar")) strat.NormalScaleFar = s["normalScaleFar"];
-            if (s.contains("normalFarNearBlend")) strat.NormalFarNearBlend = s["normalFarNearBlend"];
-            if (s.contains("heightFarNearBlend")) strat.HeightFarNearBlend = s["heightFarNearBlend"];
+            if (s.contains("normalScale")) strat.normalScale = s["normalScale"];
+            if (s.contains("normalScaleFar")) strat.normalScaleFar = s["normalScaleFar"];
+            if (s.contains("normalFarNearBlend")) strat.normalFarNearBlend = s["normalFarNearBlend"];
+            if (s.contains("heightFarNearBlend")) strat.heightFarNearBlend = s["heightFarNearBlend"];
             
-            if (s.contains("diffuseRemap")) { strat.DiffuseRemap[0] = s["diffuseRemap"]["x"]; strat.DiffuseRemap[1] = s["diffuseRemap"]["y"]; strat.DiffuseRemap[2] = s["diffuseRemap"]["z"]; strat.DiffuseRemap[3] = s["diffuseRemap"]["w"]; }
-            if (s.contains("farColorRemap")) { strat.FarColorRemap[0] = s["farColorRemap"]["x"]; strat.FarColorRemap[1] = s["farColorRemap"]["y"]; strat.FarColorRemap[2] = s["farColorRemap"]["z"]; strat.FarColorRemap[3] = s["farColorRemap"]["w"]; }
-            if (s.contains("maskRemapMin")) { strat.MaskRemapMin[0] = s["maskRemapMin"]["x"]; strat.MaskRemapMin[1] = s["maskRemapMin"]["y"]; strat.MaskRemapMin[2] = s["maskRemapMin"]["z"]; strat.MaskRemapMin[3] = s["maskRemapMin"]["w"]; }
-            if (s.contains("maskRemapMax")) { strat.MaskRemapMax[0] = s["maskRemapMax"]["x"]; strat.MaskRemapMax[1] = s["maskRemapMax"]["y"]; strat.MaskRemapMax[2] = s["maskRemapMax"]["z"]; strat.MaskRemapMax[3] = s["maskRemapMax"]["w"]; }
+            if (s.contains("diffuseRemap")) { strat.diffuseRemap[0] = s["diffuseRemap"]["x"]; strat.diffuseRemap[1] = s["diffuseRemap"]["y"]; strat.diffuseRemap[2] = s["diffuseRemap"]["z"]; strat.diffuseRemap[3] = s["diffuseRemap"]["w"]; }
+            if (s.contains("farColorRemap")) { strat.farColorRemap[0] = s["farColorRemap"]["x"]; strat.farColorRemap[1] = s["farColorRemap"]["y"]; strat.farColorRemap[2] = s["farColorRemap"]["z"]; strat.farColorRemap[3] = s["farColorRemap"]["w"]; }
+            if (s.contains("maskRemapMin")) { strat.maskRemapMin[0] = s["maskRemapMin"]["x"]; strat.maskRemapMin[1] = s["maskRemapMin"]["y"]; strat.maskRemapMin[2] = s["maskRemapMin"]["z"]; strat.maskRemapMin[3] = s["maskRemapMin"]["w"]; }
+            if (s.contains("maskRemapMax")) { strat.maskRemapMax[0] = s["maskRemapMax"]["x"]; strat.maskRemapMax[1] = s["maskRemapMax"]["y"]; strat.maskRemapMax[2] = s["maskRemapMax"]["z"]; strat.maskRemapMax[3] = s["maskRemapMax"]["w"]; }
             
             if (s.contains("physics")) {
                 auto p = s["physics"];
-                if (p.contains("hardness")) strat.Hardness = p["hardness"];
-                if (p.contains("friction")) strat.Friction = p["friction"];
-                if (p.contains("cohesion")) strat.Cohesion = p["cohesion"];
-                if (p.contains("capacityMult")) strat.CapacityMult = p["capacityMult"];
+                if (p.contains("hardness")) strat.hardness = p["hardness"];
+                if (p.contains("friction")) strat.friction = p["friction"];
+                if (p.contains("cohesion")) strat.cohesion = p["cohesion"];
+                if (p.contains("capacityMult")) strat.capacityMult = p["capacityMult"];
             }
+        }
+    }
+
+    // Load Armies
+    if (mapdef.contains("armies") && mapdef["armies"].is_object()) {
+        outParams.Armies.clear();
+        std::function<UnitGroup(const json&)> loadGroup;
+        loadGroup = [&](const json& gj) -> UnitGroup {
+            UnitGroup g;
+            if (gj.contains("units") && gj["units"].is_object()) {
+                for (auto it = gj["units"].begin(); it != gj["units"].end(); ++it) {
+                    const auto& uj = it.value();
+                    UnitTransform u;
+                    if (uj.contains("type")) u.Type = uj["type"];
+                    if (uj.contains("tpid")) u.Tpid = uj["tpid"];
+                    if (uj.contains("position")) { u.Position[0] = uj["position"]["x"]; u.Position[1] = uj["position"]["y"]; u.Position[2] = uj["position"]["z"]; }
+                    if (uj.contains("rotation")) { u.Rotation[0] = uj["rotation"]["x"]; u.Rotation[1] = uj["rotation"]["y"]; u.Rotation[2] = uj["rotation"]["z"]; u.Rotation[3] = uj["rotation"]["w"]; }
+                    if (uj.contains("scale")) { u.Scale[0] = uj["scale"]["x"]; u.Scale[1] = uj["scale"]["y"]; u.Scale[2] = uj["scale"]["z"]; }
+                    g.Units[it.key()] = u;
+                }
+            }
+            if (gj.contains("groups") && gj["groups"].is_object()) {
+                for (auto it = gj["groups"].begin(); it != gj["groups"].end(); ++it) {
+                    g.Groups[it.key()] = loadGroup(it.value());
+                }
+            }
+            return g;
+        };
+
+        for (auto it = mapdef["armies"].begin(); it != mapdef["armies"].end(); ++it) {
+            Army a;
+            const auto& aj = it.value();
+            if (aj.contains("faction")) a.Faction = aj["faction"];
+            if (aj.contains("alloys")) a.Alloys = aj["alloys"];
+            if (aj.contains("energy")) a.Energy = aj["energy"];
+            
+            if (aj.contains("groups") && aj["groups"].is_object()) {
+                for (auto git = aj["groups"].begin(); git != aj["groups"].end(); ++git) {
+                    a.Groups[git.key()] = loadGroup(git.value());
+                }
+            }
+            outParams.Armies[it.key()] = a;
         }
     }
 
@@ -241,8 +283,8 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                 ") -> ImportedMaskData (" + std::to_string(texSize) + "x" + std::to_string(texSize) + ").\n");
 
             for (auto& s : outParams.Stratums) {
-                s.ImportedMaskData.assign(pixelCount, 0.0f);
-                s.UseImportedMask = true; // Auto-enable on import
+                s.importedMaskData.assign(pixelCount, 0.0f);
+                s.maskMode = ImportedMaskMode::StaticOverride; // Auto-enable on import
             }
 
             for (int sy = 0; sy < texSize; ++sy) {
@@ -253,19 +295,19 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     int sIdx1 = (ty1 * w1 + tx1) * 4;
                     int maskIdx = sy * texSize + sx;
 
-                    if (0 < outParams.Stratums.size()) outParams.Stratums[0].ImportedMaskData[maskIdx] = s14Data[sIdx1 + 0] / 255.0f;
-                    if (1 < outParams.Stratums.size()) outParams.Stratums[1].ImportedMaskData[maskIdx] = s14Data[sIdx1 + 1] / 255.0f;
-                    if (2 < outParams.Stratums.size()) outParams.Stratums[2].ImportedMaskData[maskIdx] = s14Data[sIdx1 + 2] / 255.0f;
-                    if (3 < outParams.Stratums.size()) outParams.Stratums[3].ImportedMaskData[maskIdx] = s14Data[sIdx1 + 3] / 255.0f;
+                    if (0 < outParams.Stratums.size()) outParams.Stratums[0].importedMaskData[maskIdx] = s14Data[sIdx1 + 0] / 255.0f;
+                    if (1 < outParams.Stratums.size()) outParams.Stratums[1].importedMaskData[maskIdx] = s14Data[sIdx1 + 1] / 255.0f;
+                    if (2 < outParams.Stratums.size()) outParams.Stratums[2].importedMaskData[maskIdx] = s14Data[sIdx1 + 2] / 255.0f;
+                    if (3 < outParams.Stratums.size()) outParams.Stratums[3].importedMaskData[maskIdx] = s14Data[sIdx1 + 3] / 255.0f;
 
                     if (s58Data && w2 > 0 && h2 > 0) {
                         int tx2 = std::clamp((sx * w2) / texSize, 0, w2 - 1);
                         int ty2 = std::clamp((sy * h2) / texSize, 0, h2 - 1);
                         int sIdx2 = (ty2 * w2 + tx2) * 4;
-                        if (4 < outParams.Stratums.size()) outParams.Stratums[4].ImportedMaskData[maskIdx] = s58Data[sIdx2 + 0] / 255.0f;
-                        if (5 < outParams.Stratums.size()) outParams.Stratums[5].ImportedMaskData[maskIdx] = s58Data[sIdx2 + 1] / 255.0f;
-                        if (6 < outParams.Stratums.size()) outParams.Stratums[6].ImportedMaskData[maskIdx] = s58Data[sIdx2 + 2] / 255.0f;
-                        if (7 < outParams.Stratums.size()) outParams.Stratums[7].ImportedMaskData[maskIdx] = s58Data[sIdx2 + 3] / 255.0f;
+                        if (4 < outParams.Stratums.size()) outParams.Stratums[4].importedMaskData[maskIdx] = s58Data[sIdx2 + 0] / 255.0f;
+                        if (5 < outParams.Stratums.size()) outParams.Stratums[5].importedMaskData[maskIdx] = s58Data[sIdx2 + 1] / 255.0f;
+                        if (6 < outParams.Stratums.size()) outParams.Stratums[6].importedMaskData[maskIdx] = s58Data[sIdx2 + 2] / 255.0f;
+                        if (7 < outParams.Stratums.size()) outParams.Stratums[7].importedMaskData[maskIdx] = s58Data[sIdx2 + 3] / 255.0f;
                     }
                 }
             }

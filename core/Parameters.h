@@ -72,6 +72,11 @@ namespace SanmapGen {
         float SpawnMinHeight = 0.0f;
         float SpawnMaxHeight = 1.0f;
         float InitialSedimentLoad = 1.0f;
+
+        // --- Scientific Flow Variables (TG_UE Architecture) ---
+        float FluidViscosity = 1.0f;
+        float BaseAbsorptionRate = 0.05f;
+        float CarryingCapacityScale = 1.0f;
     };
 
     struct NoiseLayer {
@@ -126,10 +131,11 @@ namespace SanmapGen {
         float LevelsOutputWhite = 1.0f;   // 0.0 to 1.0
 
         // Soil Physics (single source — also editable on Stratums tab)
-        float Hardness = 0.2f; 
-        float Friction = 0.8f;
-        float Cohesion = 0.5f;
-        float CapacityMult = 2.0f;
+        float hardness = 0.2f; 
+        float friction = 0.8f;
+        float cohesion = 0.5f;
+        float capacityMult = 2.0f;
+        float AbsorptionRate = 0.05f;
 
         // Layer-specific Erosion
         ErosionSettings Erosion;
@@ -189,6 +195,12 @@ namespace SanmapGen {
         float Precipitation = 1.0f;
         int Iterations = 50;
         bool UseGPU = false; // Toggle CPU vs GPU
+        
+        // --- God-Tier Stochastic Flow Variables ---
+        float FlowVolumeMultiplier = 1.0f;
+        float StochasticVariance = 0.5f;
+        float SlopeAdherence = 0.8f;
+        float FlowMomentum = 0.2f;
         GradientSettings Gradient = {
             "Default", 
             {
@@ -201,13 +213,13 @@ namespace SanmapGen {
     };
 
     struct SlopeSettings {
+        bool bUseEngineParityMath = false;
         GradientSettings Gradient = {
             "Slope", 
             {
                 {0.0f, {0.2f, 0.6f, 0.2f, 1.0f}},   // Green (Flat)
-                {30.0f, {0.6f, 0.6f, 0.2f, 1.0f}},  // Yellow (Moderate)
-                {45.0f, {0.6f, 0.4f, 0.2f, 1.0f}},  // Brown (Steep)
-                {90.0f, {0.4f, 0.4f, 0.4f, 1.0f}}   // Gray (Cliff)
+                {5.0f, {1.0f, 1.0f, 0.0f, 1.0f}},   // Yellow (Moderate)
+                {30.0f, {1.0f, 0.0f, 0.0f, 1.0f}}   // Red (Steep)
             },
             true
         };
@@ -291,6 +303,12 @@ namespace SanmapGen {
         float GlobalWindDirection = 160.0f;
     };
     
+    enum class ImportedMaskMode {
+        Disabled,
+        ProceduralStart,
+        StaticOverride
+    };
+
     struct GlobalTexturingSettings {
         std::string Shader = "RTS/TerrainLit";
         float HeightTransition = 0.5f;
@@ -298,44 +316,72 @@ namespace SanmapGen {
         float FadeStartDistance = 1.0f;
     };
 
+    struct SanTextureLoader { std::string path = ""; };
+    struct SanNormalTextureLoader { std::string path = ""; };
+    struct SanMaskTextureLoader { std::string path = ""; };
+    struct SanVector2 { float x = 0.0f; float y = 0.0f; float& operator[](int i) { return (i==0) ? x : y; } const float& operator[](int i) const { return (i==0) ? x : y; } };
+    struct SanVector4 { float x = 0.0f; float y = 0.0f; float z = 0.0f; float w = 0.0f; float& operator[](int i) { return (i==0) ? x : (i==1) ? y : (i==2) ? z : w; } const float& operator[](int i) const { return (i==0) ? x : (i==1) ? y : (i==2) ? z : w; } };
+    struct SanColor { float r = 1.0f; float g = 1.0f; float b = 1.0f; float a = 1.0f; float& operator[](int i) { return (i==0) ? r : (i==1) ? g : (i==2) ? b : a; } const float& operator[](int i) const { return (i==0) ? r : (i==1) ? g : (i==2) ? b : a; } };
+
     struct StratumSettings {
-        std::string Name = "Stratum";
+        std::string name = "Stratum";
         
-        std::string AlbedoPath = "";
-        std::string NormalPath = "";
-        std::string MaskPath = "";
+        SanTextureLoader albedo;
+        SanNormalTextureLoader normal;
+        SanMaskTextureLoader mask;
         
-        float TileSize[2] = { 10.0f, 10.0f };
-        float TileSizeFar[2] = { 64.0f, 64.0f };
-        float TileSizeTriplanar = 12.0f;
-        float TileSizeFarTriplanar = 36.0f;
+        SanVector2 tileSize = { 10.0f, 10.0f };
+        SanVector2 tileSizeFar = { 64.0f, 64.0f };
+        float tileSizeTriplanar = 12.0f;
+        float tileSizeFarTriplanar = 36.0f;
         
-        float NormalScale = 1.0f;
-        float NormalScaleFar = 1.0f;
-        float NormalFarNearBlend = 0.5f;
-        float HeightFarNearBlend = 0.5f;
+        float normalScale = 1.0f;
+        float normalScaleFar = 1.0f;
+        float normalFarNearBlend = 0.5f;
+        float heightFarNearBlend = 0.5f;
         
-        float DiffuseRemap[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-        float FarColorRemap[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        SanColor diffuseRemap = { 1.0f, 1.0f, 1.0f, 1.0f };
+        SanColor farColorRemap = { 0.0f, 0.0f, 0.0f, 0.0f };
         
-        float PreviewColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f }; // Debug tint for Map Preview only
+        SanColor previewColor = { 1.0f, 1.0f, 1.0f, 1.0f }; // Debug tint for Map Preview only
         
-        float MaskRemapMin[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        float MaskRemapMax[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        SanVector4 maskRemapMin = { 0.0f, 0.0f, 0.0f, 0.0f };
+        SanVector4 maskRemapMax = { 1.0f, 1.0f, 1.0f, 1.0f };
         
-        unsigned int PreviewAlbedoTex = 0;
-        unsigned int PreviewNormalTex = 0;
-        unsigned int PreviewMaskTex = 0;
-        unsigned int PreviewActualMaskTex = 0; // UI Thumbnail for the extracted uncompressed mask
+        unsigned int previewAlbedoTex = 0;
+        unsigned int previewNormalTex = 0;
+        unsigned int previewMaskTex = 0;
+        unsigned int previewActualMaskTex = 0; // UI Thumbnail for the extracted uncompressed mask
         
-        bool UseImportedMask = false;
-        std::vector<float> ImportedMaskData;
+        ImportedMaskMode maskMode = ImportedMaskMode::Disabled;
+        std::vector<float> importedMaskData;
         
         // Default Soil Physics for this Stratum
-        float Hardness = 0.2f;
-        float Friction = 0.8f;
-        float Cohesion = 0.5f;
-        float CapacityMult = 2.0f;
+        float hardness = 0.2f;
+        float friction = 0.8f;
+        float cohesion = 0.5f;
+        float capacityMult = 2.0f;
+        float absorptionRate = 0.05f; // Determines how fast water sinks into this layer
+    };
+
+    struct UnitTransform {
+        std::string Type;
+        std::string Tpid = "";
+        float Position[3] = {0.0f, 0.0f, 0.0f};
+        float Rotation[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+        float Scale[3] = {1.0f, 1.0f, 1.0f};
+    };
+
+    struct UnitGroup {
+        std::map<std::string, UnitTransform> Units;
+        std::map<std::string, UnitGroup> Groups;
+    };
+
+    struct Army {
+        int Faction = 0;
+        float Alloys = 100.0f;
+        float Energy = 1000.0f;
+        std::map<std::string, UnitGroup> Groups;
     };
 
     struct MarkerTransform {
@@ -499,6 +545,9 @@ namespace SanmapGen {
         std::map<std::string, MarkerTransform> MarkersList;
         std::vector<std::string> KnownMarkerTypes = {"Alloy", "Plasma", "Spawn", "Alloys", "Plasmas", "Spawns"};
         
+        // --- Armies ---
+        std::map<std::string, Army> Armies;
+        
         // --- DOP Optimizations ---
         // Props (Trees, Rocks) are segregated from interactive markers to prevent UI loops from processing 100,000+ items.
         // We use a flat Struct-of-Arrays (SoA) style flat buffer for maximum cache coherence.
@@ -610,11 +659,14 @@ namespace SanmapGen {
         std::vector<PropRule> Props;
         std::vector<DecalRule> Decals;
         
-        // --- Performance ---
+        // --- Performance & Accuracy (TG_UE Execution Tiers) ---
         bool UseGPUTerrain = false;
         bool UseGPUHydraulic = true;
         bool UseGPUDeposition = true;
         bool UseGPUFlowMap = false;
+        
+        bool WYSIWYGBaking = false; // Bypasses High-Accuracy CPU baking to bake the 1:1 Lossy GPU Preview
+        int GPUPreviewIterations = 20; // Allows real-time optimization dialing
         
         bool FastPreviewMode = false; // If true, defers Flow/Placement calculations to maintain high FPS while dragging sliders
         
@@ -667,6 +719,7 @@ namespace SanmapGen {
         bool ShowStratums = true;
         bool ShowWater = true;
         bool ShowMarkers = true;
+        bool ShowArmies = false;
         
         SlopeSettings SlopeSettingsParams;
         FlowSettings FlowSettingsParams;
@@ -702,7 +755,7 @@ namespace SanmapGen {
             // Initialize 9 blank stratums to match the Sanctuary format
             for (int i = 0; i < 9; ++i) {
                 StratumSettings s;
-                s.Name = "Stratum " + std::to_string(i);
+                s.name = "Stratum " + std::to_string(i);
                 Stratums.push_back(s);
             }
 
@@ -754,7 +807,7 @@ namespace SanmapGen {
             }
             
             for (const auto& stratum : Stratums) {
-                combine(stratum.UseImportedMask);
+                combine((int)stratum.maskMode);
             }
             return hash;
         }
@@ -787,9 +840,23 @@ namespace SanmapGen {
             }
             return hash;
         }
-        
-        size_t GetPlacementHash(size_t erosionHash) const {
-            size_t hash = erosionHash; // Placements depend on the final eroded heightmap
+        size_t GetFlowHash(size_t erosionHash) const {
+            size_t hash = erosionHash; // Flow depends on eroded heightmap
+            auto combine = [&hash](auto val) {
+                std::hash<decltype(val)> hasher;
+                hash ^= hasher(val) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+            };
+            combine(FlowSettingsParams.Precipitation);
+            combine(FlowSettingsParams.Iterations);
+            combine(FlowSettingsParams.FlowVolumeMultiplier);
+            combine(FlowSettingsParams.StochasticVariance);
+            combine(FlowSettingsParams.SlopeAdherence);
+            combine(FlowSettingsParams.FlowMomentum);
+            return hash;
+        }
+
+        size_t GetPlacementHash(size_t flowHash) const {
+            size_t hash = flowHash; // Placements depend on flow (if they use flow masks later, etc)
             auto combine = [&hash](auto val) {
                 std::hash<decltype(val)> hasher;
                 hash ^= hasher(val) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
@@ -820,7 +887,7 @@ namespace SanmapGen {
         }
         
         size_t GetHash() const {
-            return GetPlacementHash(GetErosionHash(GetBlendHash()));
+            return GetPlacementHash(GetFlowHash(GetErosionHash(GetBlendHash())));
         }
     };
 

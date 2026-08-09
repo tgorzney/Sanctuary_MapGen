@@ -4,6 +4,12 @@
 
 namespace SanmapGen {
 
+    enum class ImportedMaskMode {
+        Disabled,
+        ProceduralStart,
+        StaticOverride
+    };
+
     struct StratumSettings {
             std::string Name = "Stratum";
             
@@ -34,7 +40,7 @@ namespace SanmapGen {
             unsigned int PreviewMaskTex = 0;
             unsigned int PreviewActualMaskTex = 0; // UI Thumbnail for the extracted uncompressed mask
             
-            bool UseImportedMask = false;
+            ImportedMaskMode MaskMode = ImportedMaskMode::Disabled;
             std::vector<float> ImportedMaskData;
             
             // Default Soil Physics for this Stratum

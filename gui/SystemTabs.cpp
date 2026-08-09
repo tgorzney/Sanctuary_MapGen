@@ -16,6 +16,12 @@ namespace UI {
         if (ImGui::Checkbox("Use GPU Hydraulic Erosion", &params.UseGPUHydraulic)) bNeedsMapUpdate = true;
         if (ImGui::Checkbox("Use GPU Soil Deposition", &params.UseGPUDeposition)) bNeedsMapUpdate = true;
         if (ImGui::Checkbox("Use GPU Flow Accumulation", &params.UseGPUFlowMap)) bNeedsMapUpdate = true;
+        
+        ImGui::Spacing();
+        ImGui::Text("TG_UE Execution Tiers");
+        ImGui::Separator();
+        if (ImGui::Checkbox("WYSIWYG Baking (Override CPU High-Accuracy)", &params.WYSIWYGBaking)) bNeedsMapUpdate = true;
+        if (ImGui::SliderInt("GPU Preview Iterations", &params.GPUPreviewIterations, 1, 100)) bNeedsMapUpdate = true;
     }
 
     void RenderSaveExportTab(GenerationParams& params, const FloatMask& heightmap, const GenerationResult& genData, bool& bNeedsMapUpdate, bool& bResetPreviewTransform) {

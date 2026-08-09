@@ -125,6 +125,8 @@ namespace SanmapGen {
         float Friction;
         float Cohesion;
         float CapacityMult;
+        float AbsorptionRate;
+        float Pad1, Pad2, Pad3;
     };
 
     void ErosionCompute::DispatchStratified(std::vector<FloatMask>& stratums, const std::vector<DropletSpawn>& spawns, const ErosionSettings& settings, const GenerationParams& params, int mapSize, int currentLayerIdx) {
@@ -137,6 +139,7 @@ namespace SanmapGen {
             return;
         }
 
+        // Setup Compute Shader
         std::ifstream file("D:/Projects/Sanctuary/Map Generator/shaders/ErosionCompute.glsl");
         if(!file.is_open()) {
             std::cerr << "Failed to open ErosionCompute.glsl!" << std::endl;
@@ -144,15 +147,15 @@ namespace SanmapGen {
         }
         std::stringstream buffer;
         buffer << file.rdbuf();
-        std::string shaderSourceStr = buffer.str();
-        const char* shaderSource = shaderSourceStr.c_str();
+        std::string sourceStr = buffer.str();
+        const char* source = sourceStr.c_str();
 
         GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
-        glShaderSource(computeShader, 1, &shaderSource, NULL);
+        glShaderSource(computeShader, 1, &source, NULL);
         glCompileShader(computeShader);
 
         GLint success;
-        glGetShaderiv(computeShader, 0x8B81, &success); // GL_COMPILE_STATUS
+        glGetShaderiv(computeShader, 0x8B81, &success);
         if (!success) {
             GLchar infoLog[512];
             glGetShaderInfoLog(computeShader, 512, NULL, infoLog);
@@ -220,8 +223,8 @@ namespace SanmapGen {
 
             // Flatten physics — now read directly from the layer, not the stratum
             const auto& layer = (*flatLayers[srcIdx]);
-            float encodedHardness = layer.Erodable ? layer.Hardness : -1.0f; // sentinel < 0 = not erodable
-            physicsArray[l] = { encodedHardness, layer.Friction, layer.Cohesion, layer.CapacityMult };
+            float encodedHardness = layer.Erodable ? layer.hardness : -1.0f; // sentinel < 0 = not erodable
+            physicsArray[l] = { encodedHardness, layer.friction, layer.cohesion, layer.capacityMult, layer.AbsorptionRate, 0.0f, 0.0f, 0.0f };
         }
 
         // Setup SSBOs
@@ -256,6 +259,8 @@ namespace SanmapGen {
         glUniform1i(glGetUniformLocation(computeProgram, "depositionMode"), settings.DepositionMode ? 1 : 0);
         glUniform1i(glGetUniformLocation(computeProgram, "erodeBeneath"), (*flatLayers[currentLayerIdx]).ErodeBeneath ? 1 : 0);
         glUniform1f(glGetUniformLocation(computeProgram, "initialSedimentLoad"), settings.InitialSedimentLoad);
+        glUniform1f(glGetUniformLocation(computeProgram, "fluidViscosity"), settings.FluidViscosity);
+        glUniform1f(glGetUniformLocation(computeProgram, "carryingCapacityScale"), settings.CarryingCapacityScale);
 
         int workgroupSizeX = 256;
         int numWorkgroups = (settings.DropletCount + workgroupSizeX - 1) / workgroupSizeX;
@@ -273,7 +278,7 @@ namespace SanmapGen {
         int avaWorkgroupX = (mapSize + 15) / 16;
         int avaWorkgroupY = (mapSize + 15) / 16;
         
-        for(int p = 0; p < 2; ++p) {
+        for(int p = 0; p < std::max(1, params.GPUPreviewIterations); ++p) {
             glDispatchCompute(avaWorkgroupX, avaWorkgroupY, 1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }

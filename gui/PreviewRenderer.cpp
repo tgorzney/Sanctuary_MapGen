@@ -39,7 +39,16 @@ namespace SanmapGen {
                     float dy = (((v01 + v11) - (v00 + v10)) * 0.5f * 128.0f) / cellSize;
                     
                     int idx = y * width + x;
-                    cachedSlopes[idx] = atan(sqrt(dx*dx + dy*dy)) * (180.0f / 3.14159265f);
+                    
+                    if (params.SlopeSettingsParams.bUseEngineParityMath) {
+                        float lenSq = dx * dx + dy * dy + 1.0f;
+                        float len = std::sqrt(lenSq);
+                        float dotProduct = 1.0f / len; 
+                        cachedSlopes[idx] = std::acos(dotProduct) * (180.0f / 3.14159265f);
+                    } else {
+                        cachedSlopes[idx] = atan(sqrt(dx*dx + dy*dy)) * (180.0f / 3.14159265f);
+                    }
+                    
                     cachedHeights[idx] = v00 * 128.0f;
                 }
             }
@@ -165,16 +174,16 @@ namespace SanmapGen {
                             float m11 = genResult.MaterialMasks[i].Get(x + 1, y + 1);
                             float maskVal = (m00 + m10 + m01 + m11) * 0.25f;
                             
-                            float remapMin = params.Stratums[i].MaskRemapMin[0];
-                            float remapMax = params.Stratums[i].MaskRemapMax[0];
+                            float remapMin = params.Stratums[i].maskRemapMin[0];
+                            float remapMax = params.Stratums[i].maskRemapMax[0];
                             if (remapMax - remapMin > 0.0001f) {
                                 maskVal = (maskVal - remapMin) / (remapMax - remapMin);
                             }
                             maskVal = std::clamp(maskVal, 0.0f, 1.0f);
                             
-                            sR += params.Stratums[i].PreviewColor[0] * maskVal;
-                            sG += params.Stratums[i].PreviewColor[1] * maskVal;
-                            sB += params.Stratums[i].PreviewColor[2] * maskVal;
+                            sR += params.Stratums[i].previewColor[0] * maskVal;
+                            sG += params.Stratums[i].previewColor[1] * maskVal;
+                            sB += params.Stratums[i].previewColor[2] * maskVal;
                             totalMask += maskVal;
                         }
                         if (totalMask > 0.0001f) {

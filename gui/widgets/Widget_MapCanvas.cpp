@@ -202,7 +202,7 @@ namespace SanmapGen {
                     if (spawnIndex == 0) { // Debug first marker
                         char dbg[128];
                         snprintf(dbg, sizeof(dbg), "Pos(%.1f, %.1f) U(%.2f) V(%.2f) MapSz(%d)", marker.Position[0], marker.Position[2], worldU, worldV, params.MapSize);
-                        ImGui::GetWindowDrawList()->AddText(ImVec2(p0.x + 10, p0.y + 10), IM_COL32(255,255,255,255), dbg);
+                        // Debug text removed
                     }
                     
                     float screenU = (worldU - uv0.x) / (uv1.x - uv0.x);
@@ -296,15 +296,59 @@ namespace SanmapGen {
                             ImGui::GetWindowDrawList()->AddRectFilled(iconP0, iconP1, col);
                         }
                     }
-                    
-                    if (ImGui::BeginPopup(("MarkerContext_" + key).c_str())) {
-                        if (ImGui::MenuItem("Delete Marker")) {
-                            params.MarkersList.erase(key);
-                            ImGui::EndPopup();
-                            break; // Stop iteration as map was modified
-                        }
-                        ImGui::EndPopup();
-                    }
+                                        if (ImGui::BeginPopup(("MarkerContext_" + key).c_str())) {
+                          if (ImGui::MenuItem("Delete Marker")) {
+                              if (params.MarkersList[key].Type == "Spawn") {
+                                  params.Armies.erase(key);
+                                  float px = params.MarkersList[key].Position[0];
+                                  float py = params.MarkersList[key].Position[2];
+                                  params.MarkersList.erase(key);
+                                  
+                                  int symMask = params.GlobalSymmetryMask;
+                                  float halfSize = params.MapSize / 2.0f;
+                                  std::vector<std::pair<float, float>> symPoints;
+                                  
+                                  if (symMask & SanmapGen::Symmetry_Point) {
+                                      symPoints.push_back({params.MapSize - px, params.MapSize - py});
+                                  } else if (symMask & SanmapGen::Symmetry_X) {
+                                      symPoints.push_back({params.MapSize - px, py});
+                                  } else if (symMask & SanmapGen::Symmetry_Z) {
+                                      symPoints.push_back({px, params.MapSize - py});
+                                  } else if (symMask & SanmapGen::Symmetry_XY) {
+                                      symPoints.push_back({py, px});
+                                  } else if (symMask & SanmapGen::Symmetry_Radial && params.SpawnPointCount > 1) {
+                                      float dx = px - halfSize;
+                                      float dy = py - halfSize;
+                                      float angleStep = (2.0f * 3.14159265f) / static_cast<float>(params.SpawnPointCount);
+                                      for (int i = 1; i < params.SpawnPointCount; ++i) {
+                                          float cosA = std::cos(i * angleStep);
+                                          float sinA = std::sin(i * angleStep);
+                                          symPoints.push_back({dx * cosA - dy * sinA + halfSize, dx * sinA + dy * cosA + halfSize});
+                                      }
+                                  }
+                                  
+                                  for (const auto& sp : symPoints) {
+                                      for (auto it = params.MarkersList.begin(); it != params.MarkersList.end(); ) {
+                                          if (it->second.Type == "Spawn") {
+                                              float dx = it->second.Position[0] - sp.first;
+                                              float dy = it->second.Position[2] - sp.second;
+                                              if (dx*dx + dy*dy < 100.0f) { // 10 units squared tolerance
+                                                  params.Armies.erase(it->first);
+                                                  it = params.MarkersList.erase(it);
+                                                  continue;
+                                              }
+                                          }
+                                          ++it;
+                                      }
+                                  }
+                              } else {
+                                  params.MarkersList.erase(key);
+                              }
+                              ImGui::EndPopup();
+                              break; // Stop iteration as map was modified
+                          }
+                          ImGui::EndPopup();
+                      }
                 }
                 
                 // Handle dragging
@@ -339,28 +383,82 @@ namespace SanmapGen {
                     if (selIdx >= 0 && selIdx < (int)params.PlacedMarkerLayers.size()) {
                         auto& layer = params.PlacedMarkerLayers[selIdx];
                         if (layer.Type == SanmapGen::LayerType::Manual) {
-                            if (ImGui::BeginMenu("Add Marker to Selected Layer")) {
-                                auto placeMarker = [&](const std::string& type, const std::string& prefix) {
-                                    std::string newKey = prefix + "_" + std::to_string(params.MarkersList.size() + 1);
-                                    SanmapGen::MarkerTransform m;
-                                    m.Type = type;
-                                    m.IsManual = true;
-                                    float screenU_clk = (mousePos.x - p0.x) / renderSize;
-                                    float screenV_clk = (mousePos.y - p0.y) / renderSize;
-                                    m.Position[0] = (uv0.x + screenU_clk * (uv1.x - uv0.x)) * params.MapSize;
-                                    m.Position[2] = (uv0.y + screenV_clk * (uv1.y - uv0.y)) * params.MapSize;
-                                    m.Scale[0] = 1.0f; m.Scale[1] = 1.0f; m.Scale[2] = 1.0f;
-                                    params.MarkersList[newKey] = m;
-                                    layer.MarkerKeys.push_back(newKey);
-                                    bNeedsMapUpdate = true;
-                                    bNeedsPreviewRender = true;
-                                };
-                                
-                                if (ImGui::MenuItem("Alloy")) placeMarker("Alloy", "Alloys");
-                                if (ImGui::MenuItem("Plasma")) placeMarker("Plasma", "Plasmas");
-                                if (ImGui::MenuItem("Spawn")) placeMarker("Spawn", "Spawns");
-                                ImGui::EndMenu();
-                            }
+                              if (ImGui::BeginMenu("Add Marker to Selected Layer")) {
+                                  auto placeMarker = [&](const std::string& type, const std::string& prefix) {
+                                      float screenU_clk = (mousePos.x - p0.x) / renderSize;
+                                      float screenV_clk = (mousePos.y - p0.y) / renderSize;
+                                      float posX = (uv0.x + screenU_clk * (uv1.x - uv0.x)) * params.MapSize;
+                                      float posY = (uv0.y + screenV_clk * (uv1.y - uv0.y)) * params.MapSize;
+
+                                      if (type == "Spawn") {
+                                          auto addSymmetricSpawn = [&](float x, float y) {
+                                              int armyIdx = 1;
+                                              std::string newKey = "Army_1";
+                                              while (params.MarkersList.find(newKey) != params.MarkersList.end()) {
+                                                  armyIdx++;
+                                                  newKey = "Army_" + std::to_string(armyIdx);
+                                              }
+                                              SanmapGen::MarkerTransform m;
+                                              m.Type = type;
+                                              m.IsManual = true;
+                                              m.Position[0] = x;
+                                              m.Position[2] = y;
+                                              m.Scale[0] = 1.0f; m.Scale[1] = 1.0f; m.Scale[2] = 1.0f;
+                                              params.MarkersList[newKey] = m;
+                                              layer.MarkerKeys.push_back(newKey);
+                                              
+                                              if (params.Armies.find(newKey) == params.Armies.end()) {
+                                                  SanmapGen::Army newArmy;
+                                                  newArmy.Faction = 0;
+                                                  newArmy.Alloys = 100.0f;
+                                                  newArmy.Energy = 1000.0f;
+                                                  params.Armies[newKey] = newArmy;
+                                              }
+                                          };
+
+                                          addSymmetricSpawn(posX, posY);
+
+                                          float halfSize = params.MapSize / 2.0f;
+                                          int symMask = params.GlobalSymmetryMask;
+
+                                          if (symMask & SanmapGen::Symmetry_Point) {
+                                              addSymmetricSpawn(params.MapSize - posX, params.MapSize - posY);
+                                          } else if (symMask & SanmapGen::Symmetry_X) {
+                                              addSymmetricSpawn(params.MapSize - posX, posY);
+                                          } else if (symMask & SanmapGen::Symmetry_Z) {
+                                              addSymmetricSpawn(posX, params.MapSize - posY);
+                                          } else if (symMask & SanmapGen::Symmetry_XY) {
+                                              addSymmetricSpawn(posY, posX);
+                                          } else if (symMask & SanmapGen::Symmetry_Radial && params.SpawnPointCount > 1) {
+                                              float dx = posX - halfSize;
+                                              float dy = posY - halfSize;
+                                              float angleStep = (2.0f * 3.14159265f) / static_cast<float>(params.SpawnPointCount);
+                                              for (int i = 1; i < params.SpawnPointCount; ++i) {
+                                                  float cosA = std::cos(i * angleStep);
+                                                  float sinA = std::sin(i * angleStep);
+                                                  addSymmetricSpawn(dx * cosA - dy * sinA + halfSize, dx * sinA + dy * cosA + halfSize);
+                                              }
+                                          }
+                                      } else {
+                                          std::string newKey = prefix + "_" + std::to_string(params.MarkersList.size() + 1);
+                                          SanmapGen::MarkerTransform m;
+                                          m.Type = type;
+                                          m.IsManual = true;
+                                          m.Position[0] = posX;
+                                          m.Position[2] = posY;
+                                          m.Scale[0] = 1.0f; m.Scale[1] = 1.0f; m.Scale[2] = 1.0f;
+                                          params.MarkersList[newKey] = m;
+                                          layer.MarkerKeys.push_back(newKey);
+                                      }
+                                      bNeedsMapUpdate = true;
+                                      bNeedsPreviewRender = true;
+                                  };
+                                  
+                                  if (ImGui::MenuItem("Alloy")) placeMarker("Alloy", "Alloys");
+                                  if (ImGui::MenuItem("Plasma")) placeMarker("Plasma", "Plasmas");
+                                  if (ImGui::MenuItem("Spawn")) placeMarker("Spawn", "Spawns");
+                                  ImGui::EndMenu();
+                              }
                         } else if (layer.Type == SanmapGen::LayerType::Fixed) {
                             ImGui::TextDisabled("Selected layer is Fixed (Imported).");
                             ImGui::TextDisabled("Cannot manually place markers here.");

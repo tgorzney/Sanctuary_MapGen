@@ -239,11 +239,11 @@ void ScanSanpackForMaterial(const std::string& zipPath, const std::string& envir
         std::string fname = file_stat.m_filename;
         if (fname.find(environmentTheme) != std::string::npos && fname.find("Stratum") != std::string::npos && fname.find(materialName) != std::string::npos) {
             if (fname.find("_albedo.dds") != std::string::npos || fname.find("_albedo.png") != std::string::npos) {
-                stratum.AlbedoPath = fname;
+                stratum.albedo.path = fname;
             } else if (fname.find("_normal.dds") != std::string::npos || fname.find("_normal.png") != std::string::npos) {
-                stratum.NormalPath = fname;
+                stratum.normal.path = fname;
             } else if (fname.find("_mask.dds") != std::string::npos || fname.find("_masks.dds") != std::string::npos || fname.find("_mask.png") != std::string::npos) {
-                stratum.MaskPath = fname;
+                stratum.mask.path = fname;
             }
         }
     }
@@ -472,6 +472,7 @@ int main(int, char**)
         TabButton("Water", params.ShowWater, 7);
         TabButton("Atmosphere", params.ShowAtmosphere, 8);
         TabButton("Markers", params.ShowMarkers, 9);
+        TabButton("Armies", params.ShowArmies, 16);
         TabButton("Props", params.ShowProps, 10);
         
         ImGui::Spacing();
@@ -591,6 +592,7 @@ int main(int, char**)
             case 7: SanmapGen::UI::RenderWaterTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 8: SanmapGen::UI::RenderAtmosphereTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 9: SanmapGen::UI::RenderMarkersTab(params, selectedMarkerKey, bNeedsMapUpdate, bNeedsPreviewRender); break;
+            case 16: SanmapGen::UI::RenderArmiesTab(params, bNeedsMapUpdate); break;
             case 10: SanmapGen::UI::RenderPropsTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 11: SanmapGen::UI::RenderPerformanceTab(params, bNeedsMapUpdate); break;
             case 12: SanmapGen::UI::RenderSaveExportTab(params, dummyMap, genResult, bNeedsMapUpdate, bResetPreviewTransform); break;

@@ -16,6 +16,8 @@ namespace SanmapGen {
         
         float TerrainMinHeight = 0.0f;
         float TerrainMaxHeight = 128.0f;
+        float MapMinSlope = 0.0f;
+        float MapMaxSlope = 90.0f;
         
         std::vector<FloatMask> CachedRawNoise;
         std::vector<size_t> CachedNoiseHashes;
@@ -24,18 +26,25 @@ namespace SanmapGen {
         size_t CachedBlendHash = 0;
         FloatMask CachedBlendedMap;
         std::vector<FloatMask> CachedBlendedStratums;
-        std::vector<FloatMask> CachedBlendedMaterialMasks;
         
         size_t CachedErosionHash = 0;
         FloatMask CachedErodedMap;
         std::vector<FloatMask> CachedErodedStratums;
+        std::vector<FloatMask> CachedErodedMaterialMasks;
+        
+        size_t CachedSlopeHash = 0;
+        FloatMask CachedSlopeMap;
+        
+        size_t CachedFlowHash = 0;
+        FloatMask CachedFlowMap;
+        FloatMask CachedAccumulationMap;
         
         size_t CachedPlacementHash = 0;
         // --------------------------
         
         std::map<std::string, MarkerTransform> GeneratedMarkers;
         
-        GenerationResult() : FlowMap(0, 0), AccumulationMap(0, 0), CachedBlendedMap(0, 0), CachedErodedMap(0, 0) {}
+        GenerationResult() : FlowMap(0, 0), AccumulationMap(0, 0), CachedBlendedMap(0, 0), CachedErodedMap(0, 0), CachedSlopeMap(0, 0), CachedFlowMap(0, 0), CachedAccumulationMap(0, 0) {}
     };
 
     class TerrainGenerator {

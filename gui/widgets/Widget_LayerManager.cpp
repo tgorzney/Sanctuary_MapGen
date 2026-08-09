@@ -211,21 +211,22 @@ namespace SanmapGen {
                 ImGui::OpenPopup("SoilPresetsPopup");
             }
             if (ImGui::BeginPopup("SoilPresetsPopup")) {
-                if (ImGui::MenuItem("Bedrock")) { layer.Hardness = 1.0f; layer.Friction = 0.8f; layer.Cohesion = 1.0f; layer.CapacityMult = 0.1f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Rock")) { layer.Hardness = 0.8f; layer.Friction = 0.7f; layer.Cohesion = 0.8f; layer.CapacityMult = 0.5f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Clay")) { layer.Hardness = 0.5f; layer.Friction = 0.4f; layer.Cohesion = 0.9f; layer.CapacityMult = 1.0f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Dirt")) { layer.Hardness = 0.4f; layer.Friction = 0.5f; layer.Cohesion = 0.5f; layer.CapacityMult = 1.5f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Mud")) { layer.Hardness = 0.2f; layer.Friction = 0.2f; layer.Cohesion = 0.7f; layer.CapacityMult = 2.0f; bNeedsMapUpdate = true; }
-                if (ImGui::MenuItem("Sand")) { layer.Hardness = 0.1f; layer.Friction = 0.6f; layer.Cohesion = 0.1f; layer.CapacityMult = 2.5f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Bedrock")) { layer.hardness = 1.0f; layer.friction = 0.8f; layer.cohesion = 1.0f; layer.capacityMult = 0.1f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Rock")) { layer.hardness = 0.8f; layer.friction = 0.7f; layer.cohesion = 0.8f; layer.capacityMult = 0.5f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Clay")) { layer.hardness = 0.5f; layer.friction = 0.4f; layer.cohesion = 0.9f; layer.capacityMult = 1.0f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Dirt")) { layer.hardness = 0.4f; layer.friction = 0.5f; layer.cohesion = 0.5f; layer.capacityMult = 1.5f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Mud")) { layer.hardness = 0.2f; layer.friction = 0.2f; layer.cohesion = 0.7f; layer.capacityMult = 2.0f; bNeedsMapUpdate = true; }
+                if (ImGui::MenuItem("Sand")) { layer.hardness = 0.1f; layer.friction = 0.6f; layer.cohesion = 0.1f; layer.capacityMult = 2.5f; bNeedsMapUpdate = true; }
                 ImGui::EndPopup();
             }
             ImGui::PopID();
 
             if (soilPhysicsOpen) {
-                if (ImGui::SliderFloat("Hardness", &layer.Hardness, 0.01f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Friction", &layer.Friction, 0.01f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Cohesion", &layer.Cohesion, 0.01f, 1.0f)) bNeedsMapUpdate = true;
-                if (ImGui::SliderFloat("Capacity Mult", &layer.CapacityMult, 0.1f, 5.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Hardness", &layer.hardness, 0.01f, 1.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Friction", &layer.friction, 0.01f, 1.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Cohesion", &layer.cohesion, 0.01f, 1.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Capacity Mult", &layer.capacityMult, 0.1f, 5.0f)) bNeedsMapUpdate = true;
+                if (ImGui::SliderFloat("Absorption Rate", &layer.AbsorptionRate, 0.001f, 0.5f)) bNeedsMapUpdate = true;
                 ImGui::TreePop();
             }
 
@@ -236,6 +237,13 @@ namespace SanmapGen {
                     if (ImGui::DragInt("Droplet Count", &layer.Erosion.DropletCount, 1000.0f, 1000, 5000000)) bNeedsMapUpdate = true;
                     if (ImGui::SliderInt("Max Lifetime", &layer.Erosion.MaxLifetime, 5, 200)) bNeedsMapUpdate = true;
                     if (ImGui::SliderFloat("Evaporation", &layer.Erosion.EvaporationRate, 0.001f, 0.2f)) bNeedsMapUpdate = true;
+                    
+                    ImGui::Spacing();
+                    ImGui::Text("Scientific Fluid Mechanics");
+                    if (ImGui::SliderFloat("Viscosity", &layer.Erosion.FluidViscosity, 0.1f, 10.0f)) bNeedsMapUpdate = true;
+                    if (ImGui::SliderFloat("Base Absorption", &layer.Erosion.BaseAbsorptionRate, 0.001f, 0.5f)) bNeedsMapUpdate = true;
+                    if (ImGui::SliderFloat("Capacity Scale", &layer.Erosion.CarryingCapacityScale, 0.1f, 10.0f)) bNeedsMapUpdate = true;
+                    ImGui::Spacing();
                     
                     if (ImGui::Checkbox("Use Global Gravity", &layer.Erosion.GravityUseGlobal)) bNeedsMapUpdate = true;
                     if (!layer.Erosion.GravityUseGlobal) {

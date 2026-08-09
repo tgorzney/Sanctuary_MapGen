@@ -15,37 +15,57 @@ namespace SanmapGen {
                         if (!(*flatLayers[idx]).Erodable) continue;
                         
                         float thickness = threadStratums[idx].Get(x, y);
-                        if (thickness > 0.001f) {
-                            const auto& layer = (*flatLayers[idx]);
-                            float maxSlope = layer.Cohesion;
-                            
-                            float h = threadTotalHeight.Get(x, y);
-                            int bestNX = x, bestNY = y;
-                            float lowestH = h;
-                            
-                            const int dx[] = { -1, 1, 0, 0 };
-                            const int dy[] = { 0, 0, -1, 1 };
-                            for (int d = 0; d < 4; ++d) {
-                                float nh = threadTotalHeight.Get(x + dx[d], y + dy[d]);
-                                if (nh < lowestH) {
-                                    lowestH = nh;
-                                    bestNX = x + dx[d];
-                                    bestNY = y + dy[d];
-                                }
-                            }
-                            
-                            float diff = h - lowestH;
-                            if (diff > maxSlope) {
-                                float slideAmount = (diff - maxSlope) / 2.0f;
-                                slideAmount = std::min(slideAmount, thickness); 
-                                
-                                threadStratums[idx].Set(x, y, thickness - slideAmount);
-                                threadStratums[idx].Set(bestNX, bestNY, threadStratums[idx].Get(bestNX, bestNY) + slideAmount);
-                                
-                                threadTotalHeight.Set(x, y, threadTotalHeight.Get(x, y) - slideAmount);
-                                threadTotalHeight.Set(bestNX, bestNY, threadTotalHeight.Get(bestNX, bestNY) + slideAmount);
-                            }
-                        }
+                        // Skip trivial operations entirely (the only branch we want to keep for performance on sparse maps)
+                        if (thickness <= 0.001f) continue;
+
+                        float h = threadTotalHeight.Get(x, y);
+                        
+                        // Sample neighbors
+                        float h_l = threadTotalHeight.Get(x - 1, y);
+                        float h_r = threadTotalHeight.Get(x + 1, y);
+                        float h_u = threadTotalHeight.Get(x, y - 1);
+                        float h_d = threadTotalHeight.Get(x, y + 1);
+                        
+                        // Branchless differences (only positive differences count)
+                        float dh_l = std::max(0.0f, h - h_l);
+                        float dh_r = std::max(0.0f, h - h_r);
+                        float dh_u = std::max(0.0f, h - h_u);
+                        float dh_d = std::max(0.0f, h - h_d);
+                        
+                        float total_dh = dh_l + dh_r + dh_u + dh_d;
+                        
+                        // Cohesion determines the max angle/slope
+                        float maxSlope = (*flatLayers[idx]).cohesion;
+                        
+                        // Branchless gate: If total_dh <= maxSlope, slide = 0
+                        float slideActive = (total_dh > maxSlope) ? 1.0f : 0.0f;
+                        
+                        // Calculate total slide amount (bounded by thickness)
+                        float slideAmount = std::min(thickness, (total_dh - maxSlope) / 2.0f) * slideActive;
+                        
+                        // Branchless divide-by-zero protection
+                        float inv_total_dh = (total_dh > 0.00001f) ? (1.0f / total_dh) : 0.0f;
+                        
+                        // Distribute proportionally to seek true volumetric minimums
+                        float slip_l = slideAmount * (dh_l * inv_total_dh);
+                        float slip_r = slideAmount * (dh_r * inv_total_dh);
+                        float slip_u = slideAmount * (dh_u * inv_total_dh);
+                        float slip_d = slideAmount * (dh_d * inv_total_dh);
+                        
+                        float total_slip = slip_l + slip_r + slip_u + slip_d;
+                        
+                        // Apply modifications mathematically
+                        threadStratums[idx].Set(x, y, threadStratums[idx].Get(x, y) - total_slip);
+                        threadStratums[idx].Set(x - 1, y, threadStratums[idx].Get(x - 1, y) + slip_l);
+                        threadStratums[idx].Set(x + 1, y, threadStratums[idx].Get(x + 1, y) + slip_r);
+                        threadStratums[idx].Set(x, y - 1, threadStratums[idx].Get(x, y - 1) + slip_u);
+                        threadStratums[idx].Set(x, y + 1, threadStratums[idx].Get(x, y + 1) + slip_d);
+                        
+                        threadTotalHeight.Set(x, y, h - total_slip);
+                        threadTotalHeight.Set(x - 1, y, h_l + slip_l);
+                        threadTotalHeight.Set(x + 1, y, h_r + slip_r);
+                        threadTotalHeight.Set(x, y - 1, h_u + slip_u);
+                        threadTotalHeight.Set(x, y + 1, h_d + slip_d);
                     }
                 }
             }
