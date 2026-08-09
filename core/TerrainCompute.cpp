@@ -1,5 +1,6 @@
 #include "TerrainCompute.h"
 #include "TerrainGenerator.h"
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -139,11 +140,11 @@ namespace SanmapGen {
         
         float levelsOutputBlack;
         float levelsOutputWhite;
-        float pad1;
+        int needsNoiseGen;
         float pad2;
     };
 
-    void TerrainCompute::DispatchTerrain(std::vector<FloatMask>& stratums, const GenerationParams& params) {
+    void TerrainCompute::DispatchTerrain(std::vector<FloatMask>& stratums, const GenerationParams& params, GenerationResult& inOutResult) {
         auto flatLayers = params.GetFlatLayers();
         if(flatLayers.empty()) return;
 
