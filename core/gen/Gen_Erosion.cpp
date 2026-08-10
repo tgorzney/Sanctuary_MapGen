@@ -374,13 +374,13 @@ void Gen_Erosion::Process(FloatMask& outMap, std::vector<FloatMask>& Stratums, c
                 if (sIdx < params.Stratums.size()) {
                     const auto& stratum = params.Stratums[sIdx];
                     if (stratum.maskMode != ImportedMaskMode::Disabled && !stratum.importedMaskData.empty()) {
-                        int texSize = params.MapSize;
+                        int maskSize = static_cast<int>(std::sqrt(stratum.importedMaskData.size()));
                         #pragma omp parallel for
                         for (int y = 0; y < vertSize; ++y) {
-                            int sy = std::min(y, texSize - 1);
+                            int sy = std::clamp(static_cast<int>((static_cast<float>(y) / params.MapSize) * (maskSize - 1)), 0, maskSize - 1);
                             for (int x = 0; x < vertSize; ++x) {
-                                int sx = std::min(x, texSize - 1);
-                                float importedVal = stratum.importedMaskData[sy * texSize + sx];
+                                int sx = std::clamp(static_cast<int>((static_cast<float>(x) / params.MapSize) * (maskSize - 1)), 0, maskSize - 1);
+                                float importedVal = stratum.importedMaskData[sy * maskSize + sx];
                                 
                                 if (stratum.maskMode == ImportedMaskMode::StaticOverride) {
                                     inOutResult.MaterialMasks[sIdx].Set(x, y, importedVal);

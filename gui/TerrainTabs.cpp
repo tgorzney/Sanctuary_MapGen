@@ -42,8 +42,99 @@ namespace UI {
                         bNeedsMapUpdate = true;
                         if (params.ScaleFeaturesToMapSize) {
                             float scale = static_cast<float>(sizes[n]) / oldS; // Corrected scaling math: new / old
+                            auto scaleNoiseLayer = [&](NoiseLayer& l) {
+                                l.Frequency /= scale; // Frequency gets smaller to stretch
+                                
+                                // Physically upscale imported heightmaps so erosion can add detail at the new resolution
+                                if (l.UseImage && !l.ImageData.empty()) {
+                                    int oldW = l.ImageWidth;
+                                    int oldH = l.ImageHeight;
+                                    int newW = static_cast<int>(oldW * scale);
+                                    int newH = static_cast<int>(oldH * scale);
+                                    
+                                    if (newW > 0 && newH > 0 && (newW != oldW || newH != oldH)) {
+                                        std::vector<float> resizedData(newW * newH);
+                                        float ratioW = static_cast<float>(oldW) / newW;
+                                        float ratioH = static_cast<float>(oldH) / newH;
+                                        
+                                        #pragma omp parallel for
+                                        for (int y = 0; y < newH; ++y) {
+                                            float fy = (y + 0.5f) * ratioH - 0.5f;
+                                            int y0 = std::clamp(static_cast<int>(fy), 0, oldH - 1);
+                                            int y1 = std::clamp(y0 + 1, 0, oldH - 1);
+                                            float wy = fy - static_cast<float>(y0);
+                                            if (wy < 0.0f) wy = 0.0f;
+                                            
+                                            for (int x = 0; x < newW; ++x) {
+                                                float fx = (x + 0.5f) * ratioW - 0.5f;
+                                                int x0 = std::clamp(static_cast<int>(fx), 0, oldW - 1);
+                                                int x1 = std::clamp(x0 + 1, 0, oldW - 1);
+                                                float wx = fx - static_cast<float>(x0);
+                                                if (wx < 0.0f) wx = 0.0f;
+                                                
+                                                float v00 = l.ImageData[y0 * oldW + x0];
+                                                float v10 = l.ImageData[y0 * oldW + x1];
+                                                float v01 = l.ImageData[y1 * oldW + x0];
+                                                float v11 = l.ImageData[y1 * oldW + x1];
+                                                
+                                                float v0 = v00 * (1.0f - wx) + v10 * wx;
+                                                float v1 = v01 * (1.0f - wx) + v11 * wx;
+                                                resizedData[y * newW + x] = v0 * (1.0f - wy) + v1 * wy;
+                                            }
+                                        }
+                                        l.ImageData = std::move(resizedData);
+                                        l.ImageWidth = newW;
+                                        l.ImageHeight = newH;
+                                    }
+                                }
+                            };
+                            
                             for (auto& gl : params.GeoLayers) {
-                                for (auto& l : gl.Layers) l.Frequency /= scale; // Frequency gets smaller to stretch
+                                for (auto& l : gl.Layers) scaleNoiseLayer(l);
+                            }
+                            for (auto& l : params.DetailNormalLayers) scaleNoiseLayer(l);
+                            for (auto& l : params.SmoothnessLayers) scaleNoiseLayer(l);
+                            for (auto& l : params.TintLayers) scaleNoiseLayer(l);
+                            for (auto& l : params.HoleLayers) scaleNoiseLayer(l);
+                            
+                            // Scale imported masks to maintain texel density relative to map size
+                            for (auto& stratum : params.Stratums) {
+                                if (!stratum.importedMaskData.empty()) {
+                                    int oldMaskSize = static_cast<int>(std::sqrt(stratum.importedMaskData.size()));
+                                    int newMaskSize = static_cast<int>(oldMaskSize * scale);
+                                    if (newMaskSize > 0 && newMaskSize != oldMaskSize) {
+                                        std::vector<float> resizedData(newMaskSize * newMaskSize);
+                                        float ratio = static_cast<float>(oldMaskSize) / newMaskSize;
+                                        
+                                        #pragma omp parallel for
+                                        for (int y = 0; y < newMaskSize; ++y) {
+                                            float fy = (y + 0.5f) * ratio - 0.5f;
+                                            int y0 = std::clamp(static_cast<int>(fy), 0, oldMaskSize - 1);
+                                            int y1 = std::clamp(y0 + 1, 0, oldMaskSize - 1);
+                                            float wy = fy - static_cast<float>(y0);
+                                            if (wy < 0.0f) wy = 0.0f;
+                                            
+                                            for (int x = 0; x < newMaskSize; ++x) {
+                                                float fx = (x + 0.5f) * ratio - 0.5f;
+                                                int x0 = std::clamp(static_cast<int>(fx), 0, oldMaskSize - 1);
+                                                int x1 = std::clamp(x0 + 1, 0, oldMaskSize - 1);
+                                                float wx = fx - static_cast<float>(x0);
+                                                if (wx < 0.0f) wx = 0.0f;
+                                                
+                                                float v00 = stratum.importedMaskData[y0 * oldMaskSize + x0];
+                                                float v10 = stratum.importedMaskData[y0 * oldMaskSize + x1];
+                                                float v01 = stratum.importedMaskData[y1 * oldMaskSize + x0];
+                                                float v11 = stratum.importedMaskData[y1 * oldMaskSize + x1];
+                                                
+                                                float v0 = v00 * (1.0f - wx) + v10 * wx;
+                                                float v1 = v01 * (1.0f - wx) + v11 * wx;
+                                                resizedData[y * newMaskSize + x] = v0 * (1.0f - wy) + v1 * wy;
+                                            }
+                                        }
+                                        stratum.importedMaskData = std::move(resizedData);
+                                        stratum.previewActualMaskTex = 0; // Force texture regen
+                                    }
+                                }
                             }
                             
                             // Hardware-optimized SIMD scaling for manual markers

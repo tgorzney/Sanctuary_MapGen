@@ -330,8 +330,8 @@ namespace UI {
                 
                 // Generate Actual Mask Thumbnail if it exists but hasn't been uploaded to GPU yet
                 if (!params.Stratums[i].importedMaskData.empty() && params.Stratums[i].previewActualMaskTex == 0) {
-                    int texSize = params.MapSize;
-                    std::vector<uint8_t> thumbData(texSize * texSize);
+                    int maskSize = static_cast<int>(std::sqrt(params.Stratums[i].importedMaskData.size()));
+                    std::vector<uint8_t> thumbData(maskSize * maskSize);
                     for (size_t p = 0; p < thumbData.size(); ++p) {
                         thumbData[p] = static_cast<uint8_t>(std::clamp(params.Stratums[i].importedMaskData[p], 0.0f, 1.0f) * 255.0f);
                     }
@@ -343,7 +343,7 @@ namespace UI {
                     
                     // Fix OpenGL row padding skewing for MapSizes that aren't multiples of 4
                     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, texSize, texSize, 0, GL_RED, GL_UNSIGNED_BYTE, thumbData.data());
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, maskSize, maskSize, 0, GL_RED, GL_UNSIGNED_BYTE, thumbData.data());
                     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
                     
                     // Tell OpenGL we want to sample RED into RGB (swizzle)
