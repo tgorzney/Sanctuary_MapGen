@@ -111,7 +111,18 @@ namespace SanmapGen {
         std::vector<std::string> AvailableIcons; // Populated from .sanpack
         std::map<std::string, unsigned int> IconCache; // name -> GLuint texture ID
         
-        std::string ImportedPropsJSON = "";
+        // --- Manual Props (Parsed from Imported JSON) ---
+        struct ManualPropTransform {
+            float Position[3] = {0.0f, 0.0f, 0.0f};
+            float Rotation[4] = {0.0f, 0.0f, 0.0f, 1.0f}; // x, y, z, w
+            float Scale[3] = {1.0f, 1.0f, 1.0f};
+        };
+        struct ManualPropGroup {
+            std::string BlueprintPath;
+            std::vector<ManualPropTransform> Transforms;
+        };
+        std::vector<ManualPropGroup> ManualProps;
+        
         std::string ImportedDecalsJSON = "";
         
         float FlowMapColor[4] = { 0.0f, 0.5f, 1.0f, 1.0f };

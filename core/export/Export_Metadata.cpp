@@ -346,10 +346,19 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["armies"] = armiesObj;
 
     json propsArr = json::array();
-    if (!params.ImportedPropsJSON.empty()) {
-        try {
-            propsArr = json::parse(params.ImportedPropsJSON);
-        } catch(...) {}
+    for (const auto& mpg : params.ManualProps) {
+        json groupJson;
+        groupJson["blueprintPath"] = mpg.BlueprintPath;
+        json transformsArr = json::array();
+        for (const auto& t : mpg.Transforms) {
+            json tJson;
+            tJson["position"] = { {"x", t.Position[0]}, {"y", t.Position[1]}, {"z", t.Position[2]} };
+            tJson["rotation"] = { {"x", t.Rotation[0]}, {"y", t.Rotation[1]}, {"z", t.Rotation[2]}, {"w", t.Rotation[3]} };
+            tJson["scale"] = { {"x", t.Scale[0]}, {"y", t.Scale[1]}, {"z", t.Scale[2]} };
+            transformsArr.push_back(tJson);
+        }
+        groupJson["transforms"] = transformsArr;
+        propsArr.push_back(groupJson);
     }
     json decalsArr = json::array();
     if (!params.ImportedDecalsJSON.empty()) {

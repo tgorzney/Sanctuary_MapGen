@@ -520,26 +520,52 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     }
                 }
             }
-            outParams.ImportedPropsJSON = propsArray.dump();
+            outParams.ManualProps.clear();
             
-            // Populate StaticPropsList so manual props appear as dots on the map preview
             for (const auto& propGroup : propsArray) {
+                GenerationParams::ManualPropGroup mpg;
+                if (propGroup.contains("blueprintPath")) {
+                    mpg.BlueprintPath = propGroup["blueprintPath"];
+                }
+                
                 if (propGroup.contains("transforms") && propGroup["transforms"].is_array()) {
                     for (const auto& t : propGroup["transforms"]) {
+                        GenerationParams::ManualPropTransform mpt;
+                        
                         if (t.contains("position") && t["position"].is_object()) {
+                            mpt.Position[0] = t["position"].contains("x") ? static_cast<float>(t["position"]["x"]) : 0.0f;
+                            mpt.Position[1] = t["position"].contains("y") ? static_cast<float>(t["position"]["y"]) : 0.0f;
+                            mpt.Position[2] = t["position"].contains("z") ? static_cast<float>(t["position"]["z"]) : 0.0f;
+                            
+                            // Populate preview dots seamlessly
                             GenerationParams::PropInstance pi;
-                            pi.X = t["position"].contains("x") ? static_cast<float>(t["position"]["x"]) : 0.0f;
-                            pi.Y = t["position"].contains("y") ? static_cast<float>(t["position"]["y"]) : 0.0f;
-                            pi.Z = t["position"].contains("z") ? static_cast<float>(t["position"]["z"]) : 0.0f;
-                            pi.TintColor = 0xFF00FF00; // Green dot for manual prop
+                            pi.X = mpt.Position[0];
+                            pi.Y = mpt.Position[1];
+                            pi.Z = mpt.Position[2];
+                            pi.TintColor = 0xFF00FF00;
                             outParams.StaticPropsList.push_back(pi);
                         }
+                        
+                        if (t.contains("rotation") && t["rotation"].is_object()) {
+                            mpt.Rotation[0] = t["rotation"].contains("x") ? static_cast<float>(t["rotation"]["x"]) : 0.0f;
+                            mpt.Rotation[1] = t["rotation"].contains("y") ? static_cast<float>(t["rotation"]["y"]) : 0.0f;
+                            mpt.Rotation[2] = t["rotation"].contains("z") ? static_cast<float>(t["rotation"]["z"]) : 0.0f;
+                            mpt.Rotation[3] = t["rotation"].contains("w") ? static_cast<float>(t["rotation"]["w"]) : 1.0f;
+                        }
+                        
+                        if (t.contains("scale") && t["scale"].is_object()) {
+                            mpt.Scale[0] = t["scale"].contains("x") ? static_cast<float>(t["scale"]["x"]) : 1.0f;
+                            mpt.Scale[1] = t["scale"].contains("y") ? static_cast<float>(t["scale"]["y"]) : 1.0f;
+                            mpt.Scale[2] = t["scale"].contains("z") ? static_cast<float>(t["scale"]["z"]) : 1.0f;
+                        }
+                        
+                        mpg.Transforms.push_back(mpt);
                     }
                 }
+                outParams.ManualProps.push_back(mpg);
             }
-            outParams.ImportedPropsJSON = propsArray.dump();
         } else {
-            outParams.ImportedPropsJSON = "";
+            outParams.ManualProps.clear();
         }
 
         // Load and scale decals if they exist
