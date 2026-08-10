@@ -83,6 +83,19 @@ namespace SanmapGen {
         ErosionSettings Erosion;
         bool ErodeBeneath = false; // If true, droplets can dig into layers underneath
         
+        // --- PROPS / DECALS FIELDS ---
+        std::string BlueprintPath = "";
+        float MinSlope = 0.0f;
+        float MaxSlope = 90.0f;
+        float MinHeight = 0.0f;
+        float MaxHeight = 128.0f;
+        bool AvoidWater = true;
+        bool NearCliffs = false;
+        
+        bool PhysicsTagSimulate = false;
+        std::string PhysicsTagCollision = "Default";
+        // -----------------------------
+        
         // Hash for caching raw structural noise (excludes Photoshop Levels and Density Shaping)
         size_t GetNoiseHash(int globalSeed, int globalSymmetryMask, int symAlg) const {
             size_t hash = 0;
@@ -235,6 +248,7 @@ namespace SanmapGen {
     struct GeoLayerDef {
         bool Enabled = true;
         std::string Name = "New GeoLayer";
+        LayerType Type = LayerType::Terrain;
         std::vector<NoiseLayer> Layers;
     };
 

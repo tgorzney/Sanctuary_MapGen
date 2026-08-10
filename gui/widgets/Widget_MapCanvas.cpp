@@ -1,4 +1,5 @@
 #include "Widget_MapCanvas.h"
+#include "Widget_AreaEditor.h"
 #include <unordered_set>
 #include <algorithm>
 #include <string>
@@ -480,7 +481,11 @@ namespace SanmapGen {
                     ImGui::EndPopup();
                 }
             }
+            
+            // Draw Area Editor Overlay
+            Widget_AreaEditor::RenderOverlay(params, p0, p1, uv0, uv1, renderSize, mapZoom, mapOffset, bNeedsMapUpdate);
         }
+        
         ImGui::End(); // Map Preview Window
     }
 }

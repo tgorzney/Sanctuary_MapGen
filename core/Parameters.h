@@ -42,6 +42,14 @@ namespace SanmapGen {
     
 
 
+    struct MapArea {
+        std::string Name;
+        float X = 0.0f;
+        float Y = 0.0f;
+        float Width = 2048.0f;
+        float Length = 2048.0f;
+    };
+
     struct GenerationParams {
         int PresetVersion = 1; // Used for backwards compatibility
         std::string GlobalEnvironmentPath = ""; // Path to the .sanpack or folder
@@ -192,8 +200,6 @@ namespace SanmapGen {
         }
         
         bool EnableProceduralMarkers = false;
-        std::vector<PropRule> Props;
-        std::vector<DecalRule> Decals;
         
         // --- Performance & Accuracy (TG_UE Execution Tiers) ---
         bool UseGPUTerrain = false;
@@ -255,6 +261,9 @@ namespace SanmapGen {
         bool ShowWater = true;
         bool ShowMarkers = true;
         bool ShowArmies = false;
+        bool ShowAreas = false;
+        
+        std::map<std::string, MapArea> Areas;
         
         SlopeSettings SlopeSettingsParams;
         FlowSettings FlowSettingsParams;
@@ -267,6 +276,14 @@ namespace SanmapGen {
         
         // Default constructor to push one base layer
         GenerationParams() {
+            MapArea defaultArea;
+            defaultArea.Name = "PlayableArea";
+            defaultArea.X = 0.0f;
+            defaultArea.Y = 0.0f;
+            defaultArea.Width = 2048.0f; // Will update dynamically or default to 2048
+            defaultArea.Length = 2048.0f;
+            Areas["PlayableArea"] = defaultArea;
+            
             NoiseLayer baseLayer;
             baseLayer.Name = "Base Mountain (Low Freq)";
             baseLayer.Frequency = 0.005f;
