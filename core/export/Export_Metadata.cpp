@@ -429,6 +429,7 @@ void MetadataExporter::SaveSettings(const std::string& filePath, const Generatio
         aj["Faction"] = army.Faction;
         aj["Alloys"] = army.Alloys;
         aj["Energy"] = army.Energy;
+        aj["Color"] = {army.Color[0], army.Color[1], army.Color[2], army.Color[3]};
         
         std::function<json(const UnitGroup&)> saveGroup;
         saveGroup = [&](const UnitGroup& group) -> json {
