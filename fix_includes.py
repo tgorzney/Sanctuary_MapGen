@@ -1,15 +1,11 @@
-import os
-import glob
-
-for filepath in glob.glob('core/data/*.h'):
-    with open(filepath, 'r', encoding='utf-8') as f:
+﻿def prepend(file, includes):
+    with open(file, 'r', encoding='utf-8') as f:
         content = f.read()
-    
-    # Fix the bad include that contains \n literally inside the quotes
-    if '#include "MarkerType_Rule.h\\n"' in content:
-        content = content.replace('#include "MarkerType_Rule.h\\n"', '#include "MarkerType_Rule.h"')
-        
-    with open(filepath, 'w', encoding='utf-8') as f:
+    content = content.replace('#pragma once', '#pragma once\n' + includes)
+    with open(file, 'w', encoding='utf-8') as f:
         f.write(content)
-        
-print('Fixed includes in headers')
+
+prepend('core/params/Params_ErosionFlow.h', '#include "Params_Enums.h"\n#include <string>\n#include <vector>\n#include <map>\n')
+prepend('core/params/Params_Geometry.h', '#include "Params_Enums.h"\n#include "Params_ErosionFlow.h"\n#include <string>\n#include <vector>\n#include <map>\n')
+prepend('core/params/Params_Environment.h', '#include "Params_Enums.h"\n#include <string>\n#include <vector>\n#include <map>\n')
+

@@ -1,7 +1,7 @@
 #include "../UITabs.h"
 #include "../UIHelpers.h"
 #include "imgui.h"
-#include "../FileDialog.h"
+#include "FileDialog.h"
 #include <GLFW/glfw3.h>
 
 extern GLuint GetMarkerIcon(const std::string& typeName, SanmapGen::GenerationParams& params, void* openZipArchive = nullptr);
