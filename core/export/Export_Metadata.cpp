@@ -399,6 +399,141 @@ void MetadataExporter::SaveSettings(const std::string& filePath, const Generatio
     j["SymAlgorithm"] = static_cast<int>(params.SymAlgorithm);
     j["SpawnPointCount"] = params.SpawnPointCount;
     
+
+    // --- Phase 2: Missing IO Sync (Save) ---
+    json w;
+    w["WaterLevelMin"] = params.Water.WaterLevelMin;
+    w["WaterLevelMax"] = params.Water.WaterLevelMax;
+    w["DeepWaterDepthMin"] = params.Water.DeepWaterDepthMin;
+    w["DeepWaterDepthMax"] = params.Water.DeepWaterDepthMax;
+    w["WaterWindSpeed"] = params.Water.WaterWindSpeed;
+    w["WaterWindDirection"] = params.Water.WaterWindDirection;
+    w["WaterWindShoreWavesRemap"] = params.Water.WaterWindShoreWavesRemap;
+    w["WaterShoreDepthOffset"] = params.Water.WaterShoreDepthOffset;
+    w["WaterShoreDepthStrength"] = params.Water.WaterShoreDepthStrength;
+    w["WaterShoreDistanceOffset"] = params.Water.WaterShoreDistanceOffset;
+    w["WaterShoreDistanceStrength"] = params.Water.WaterShoreDistanceStrength;
+    w["WaveGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
+    j["Water"] = w;
+
+    json a;
+    a["SunRA"] = params.Atmosphere.SunRA;
+    a["SunDA"] = params.Atmosphere.SunDA;
+    a["SunIntensity"] = params.Atmosphere.SunIntensity;
+    a["SunTint"] = {params.Atmosphere.SunTint[0], params.Atmosphere.SunTint[1], params.Atmosphere.SunTint[2], params.Atmosphere.SunTint[3]};
+    a["SunTemperature"] = params.Atmosphere.SunTemperature;
+    a["SunAngularDiameter"] = params.Atmosphere.SunAngularDiameter;
+    a["SunVolumetricsMultiplier"] = params.Atmosphere.SunVolumetricsMultiplier;
+    a["SunVolumetricsShadowDimer"] = params.Atmosphere.SunVolumetricsShadowDimer;
+    a["SunPosition"] = {params.Atmosphere.SunPosition[0], params.Atmosphere.SunPosition[1], params.Atmosphere.SunPosition[2]};
+    a["SunCookiePath"] = params.Atmosphere.SunCookiePath;
+    a["SunCookieSize"] = {params.Atmosphere.SunCookieSize[0], params.Atmosphere.SunCookieSize[1]};
+    a["SkylightIntensity"] = params.Atmosphere.SkylightIntensity;
+    a["SkylightTint"] = {params.Atmosphere.SkylightTint[0], params.Atmosphere.SkylightTint[1], params.Atmosphere.SkylightTint[2], params.Atmosphere.SkylightTint[3]};
+    a["SkylightTemperature"] = params.Atmosphere.SkylightTemperature;
+    a["Exposure"] = params.Atmosphere.Exposure;
+    a["ExposureCompensation"] = params.Atmosphere.ExposureCompensation;
+    a["SkyboxRotation"] = params.Atmosphere.SkyboxRotation;
+    a["SkyboxIntensityMode"] = static_cast<int>(params.Atmosphere.SkyboxIntensityMode);
+    a["SkyboxExposure"] = params.Atmosphere.SkyboxExposure;
+    a["SkyboxMultiplier"] = params.Atmosphere.SkyboxMultiplier;
+    a["SkyboxLuxValue"] = params.Atmosphere.SkyboxLuxValue;
+    a["FogAttenuationDistance"] = params.Atmosphere.FogAttenuationDistance;
+    a["FogBaseHeight"] = params.Atmosphere.FogBaseHeight;
+    a["FogMaximumHeight"] = params.Atmosphere.FogMaximumHeight;
+    a["FogMaximumDistance"] = params.Atmosphere.FogMaximumDistance;
+    a["FogAnisotropy"] = params.Atmosphere.FogAnisotropy;
+    a["SkyboxPath"] = params.Atmosphere.SkyboxPath;
+    a["GlobalWindSpeed"] = params.Atmosphere.GlobalWindSpeed;
+    a["GlobalWindDirection"] = params.Atmosphere.GlobalWindDirection;
+    a["BackgroundFogIntensity"] = params.Atmosphere.BackgroundFogIntensity;
+    a["BackgroundFogRange"] = params.Atmosphere.BackgroundFogRange;
+    a["BackgroundFogMinimum"] = params.Atmosphere.BackgroundFogMinimum;
+    a["BackgroundSkyColorIntensity"] = params.Atmosphere.BackgroundSkyColorIntensity;
+    a["BackgroundColorIntensity"] = params.Atmosphere.BackgroundColorIntensity;
+    a["BackgroundColor"] = {params.Atmosphere.BackgroundColor[0], params.Atmosphere.BackgroundColor[1], params.Atmosphere.BackgroundColor[2], params.Atmosphere.BackgroundColor[3]};
+    a["BackgroundColorFadeoutRange"] = params.Atmosphere.BackgroundColorFadeoutRange;
+    a["BackgroundColorFadeoutPower"] = params.Atmosphere.BackgroundColorFadeoutPower;
+    a["HeightFogIntensity"] = params.Atmosphere.HeightFogIntensity;
+    a["HeightFogRange"] = {params.Atmosphere.HeightFogRange[0], params.Atmosphere.HeightFogRange[1]};
+    a["HeightFogStart"] = params.Atmosphere.HeightFogStart;
+    a["HeightFogEnd"] = params.Atmosphere.HeightFogEnd;
+    a["HeightFogPower"] = params.Atmosphere.HeightFogPower;
+    a["LinearFogIntensity"] = params.Atmosphere.LinearFogIntensity;
+    a["LinearFogStart"] = params.Atmosphere.LinearFogStart;
+    a["LinearFogEnd"] = params.Atmosphere.LinearFogEnd;
+    a["LinearFogPower"] = params.Atmosphere.LinearFogPower;
+    a["LinearFogCameraIntensity"] = params.Atmosphere.LinearFogCameraIntensity;
+    a["LinearFogCameraStart"] = params.Atmosphere.LinearFogCameraStart;
+    a["LinearFogCameraEnd"] = params.Atmosphere.LinearFogCameraEnd;
+    j["Atmosphere"] = a;
+
+    j["TerrainMinHeight"] = params.TerrainMinHeight;
+    j["TerrainMaxHeight"] = params.TerrainMaxHeight;
+    j["ScaleFeaturesToMapSize"] = params.ScaleFeaturesToMapSize;
+    j["GlobalGravity"] = params.GlobalGravity;
+    j["GamedataPath"] = params.GamedataPath;
+    
+    j["MarkerScaleAlloy"] = params.MarkerScaleAlloy;
+    j["MarkerScalePlasma"] = params.MarkerScalePlasma;
+    j["MarkerScaleSpawn"] = params.MarkerScaleSpawn;
+    j["MarkerColorAlloy"] = {params.MarkerColorAlloy[0], params.MarkerColorAlloy[1], params.MarkerColorAlloy[2], params.MarkerColorAlloy[3]};
+    j["MarkerColorPlasma"] = {params.MarkerColorPlasma[0], params.MarkerColorPlasma[1], params.MarkerColorPlasma[2], params.MarkerColorPlasma[3]};
+    j["MarkerColorSpawn"] = {params.MarkerColorSpawn[0], params.MarkerColorSpawn[1], params.MarkerColorSpawn[2], params.MarkerColorSpawn[3]};
+    j["GlobalIconAlloy"] = params.GlobalIconAlloy;
+    j["GlobalIconPlasma"] = params.GlobalIconPlasma;
+    j["GlobalIconSpawn"] = params.GlobalIconSpawn;
+    
+    json markersObj = json::object();
+    for(const auto& [k, v] : params.MarkersList) {
+        json m;
+        m["Type"] = v.Type;
+        m["IsManual"] = v.IsManual;
+        m["CustomName"] = v.CustomName;
+        m["Position"] = {v.Position[0], v.Position[1], v.Position[2]};
+        m["Rotation"] = {v.Rotation[0], v.Rotation[1], v.Rotation[2], v.Rotation[3]};
+        m["Scale"] = {v.Scale[0], v.Scale[1], v.Scale[2]};
+        markersObj[k] = m;
+    }
+    j["MarkersList"] = markersObj;
+
+    j["GlobalSymmetryMask"] = params.GlobalSymmetryMask;
+    j["SymSuperpositionBlend"] = static_cast<int>(params.SymSuperpositionBlend);
+    j["SymmetryBlurRadius"] = params.SymmetryBlurRadius;
+    j["CrossFadeWidth"] = params.CrossFadeWidth;
+    j["CylinderZScale"] = params.CylinderZScale;
+    j["TorusMajorRadius"] = params.TorusMajorRadius;
+    j["TorusMinorRadius"] = params.TorusMinorRadius;
+    j["SymmetryDetectionTolerance"] = params.SymmetryDetectionTolerance;
+    j["SnapImperfectSymmetry"] = params.SnapImperfectSymmetry;
+
+    j["DetailNormalMapSize"] = params.DetailNormalMapSize;
+    
+    j["HydroMultiplier"] = params.HydroMultiplier;
+    j["ReclaimDensity"] = params.ReclaimDensity;
+    j["MexDensity"] = params.MexDensity;
+    
+    j["UseGPUFlowMap"] = params.UseGPUFlowMap;
+    j["UseGPUMarkers"] = params.UseGPUMarkers;
+    j["WYSIWYGBaking"] = params.WYSIWYGBaking;
+    j["GPUPreviewIterations"] = params.GPUPreviewIterations;
+    j["FastPreviewMode"] = params.FastPreviewMode;
+    j["FlowMapColor"] = {params.FlowMapColor[0], params.FlowMapColor[1], params.FlowMapColor[2], params.FlowMapColor[3]};
+    
+    json sp;
+    sp["bUseEngineParityMath"] = params.SlopeSettingsParams.bUseEngineParityMath;
+    j["SlopeSettingsParams"] = sp;
+    
+    json fp;
+    fp["Precipitation"] = params.FlowSettingsParams.Precipitation;
+    fp["Iterations"] = params.FlowSettingsParams.Iterations;
+    fp["FlowVolumeMultiplier"] = params.FlowSettingsParams.FlowVolumeMultiplier;
+    fp["StochasticVariance"] = params.FlowSettingsParams.StochasticVariance;
+    fp["SlopeAdherence"] = params.FlowSettingsParams.SlopeAdherence;
+    fp["FlowMomentum"] = params.FlowSettingsParams.FlowMomentum;
+    j["FlowSettingsParams"] = fp;
+    // --- End Phase 2 Save ---
+
     // Save Stratums
     j["Stratums"] = params.Stratums;
     
@@ -539,6 +674,170 @@ bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParam
     if (j.contains("SymAlgorithm")) outParams.SymAlgorithm = static_cast<SymmetryAlgorithm>(j["SymAlgorithm"].get<int>());
     if (j.contains("SpawnPointCount")) outParams.SpawnPointCount = j["SpawnPointCount"];
     
+
+    // --- Phase 2: Missing IO Sync (Load) ---
+    if (j.contains("Water")) {
+        auto w = j["Water"];
+        if(w.contains("WaterLevelMin")) outParams.Water.WaterLevelMin = w["WaterLevelMin"];
+        if(w.contains("WaterLevelMax")) outParams.Water.WaterLevelMax = w["WaterLevelMax"];
+        if(w.contains("DeepWaterDepthMin")) outParams.Water.DeepWaterDepthMin = w["DeepWaterDepthMin"];
+        if(w.contains("DeepWaterDepthMax")) outParams.Water.DeepWaterDepthMax = w["DeepWaterDepthMax"];
+        if(w.contains("WaterWindSpeed")) outParams.Water.WaterWindSpeed = w["WaterWindSpeed"];
+        if(w.contains("WaterWindDirection")) outParams.Water.WaterWindDirection = w["WaterWindDirection"];
+        if(w.contains("WaterWindShoreWavesRemap")) outParams.Water.WaterWindShoreWavesRemap = w["WaterWindShoreWavesRemap"];
+        if(w.contains("WaterShoreDepthOffset")) outParams.Water.WaterShoreDepthOffset = w["WaterShoreDepthOffset"];
+        if(w.contains("WaterShoreDepthStrength")) outParams.Water.WaterShoreDepthStrength = w["WaterShoreDepthStrength"];
+        if(w.contains("WaterShoreDistanceOffset")) outParams.Water.WaterShoreDistanceOffset = w["WaterShoreDistanceOffset"];
+        if(w.contains("WaterShoreDistanceStrength")) outParams.Water.WaterShoreDistanceStrength = w["WaterShoreDistanceStrength"];
+        if(w.contains("WaveGeneratorBlueprint")) outParams.Water.WaveGeneratorBlueprint = w["WaveGeneratorBlueprint"];
+    }
+
+    if (j.contains("Atmosphere")) {
+        auto a = j["Atmosphere"];
+        if(a.contains("SunRA")) outParams.Atmosphere.SunRA = a["SunRA"];
+        if(a.contains("SunDA")) outParams.Atmosphere.SunDA = a["SunDA"];
+        if(a.contains("SunIntensity")) outParams.Atmosphere.SunIntensity = a["SunIntensity"];
+        if(a.contains("SunTint") && a["SunTint"].is_array() && a["SunTint"].size() == 4) {
+            outParams.Atmosphere.SunTint[0] = a["SunTint"][0]; outParams.Atmosphere.SunTint[1] = a["SunTint"][1];
+            outParams.Atmosphere.SunTint[2] = a["SunTint"][2]; outParams.Atmosphere.SunTint[3] = a["SunTint"][3];
+        }
+        if(a.contains("SunTemperature")) outParams.Atmosphere.SunTemperature = a["SunTemperature"];
+        if(a.contains("SunAngularDiameter")) outParams.Atmosphere.SunAngularDiameter = a["SunAngularDiameter"];
+        if(a.contains("SunVolumetricsMultiplier")) outParams.Atmosphere.SunVolumetricsMultiplier = a["SunVolumetricsMultiplier"];
+        if(a.contains("SunVolumetricsShadowDimer")) outParams.Atmosphere.SunVolumetricsShadowDimer = a["SunVolumetricsShadowDimer"];
+        if(a.contains("SunPosition") && a["SunPosition"].is_array() && a["SunPosition"].size() == 3) {
+            outParams.Atmosphere.SunPosition[0] = a["SunPosition"][0]; outParams.Atmosphere.SunPosition[1] = a["SunPosition"][1]; outParams.Atmosphere.SunPosition[2] = a["SunPosition"][2];
+        }
+        if(a.contains("SunCookiePath")) outParams.Atmosphere.SunCookiePath = a["SunCookiePath"];
+        if(a.contains("SunCookieSize") && a["SunCookieSize"].is_array() && a["SunCookieSize"].size() == 2) {
+            outParams.Atmosphere.SunCookieSize[0] = a["SunCookieSize"][0]; outParams.Atmosphere.SunCookieSize[1] = a["SunCookieSize"][1];
+        }
+        if(a.contains("SkylightIntensity")) outParams.Atmosphere.SkylightIntensity = a["SkylightIntensity"];
+        if(a.contains("SkylightTint") && a["SkylightTint"].is_array() && a["SkylightTint"].size() == 4) {
+            outParams.Atmosphere.SkylightTint[0] = a["SkylightTint"][0]; outParams.Atmosphere.SkylightTint[1] = a["SkylightTint"][1];
+            outParams.Atmosphere.SkylightTint[2] = a["SkylightTint"][2]; outParams.Atmosphere.SkylightTint[3] = a["SkylightTint"][3];
+        }
+        if(a.contains("SkylightTemperature")) outParams.Atmosphere.SkylightTemperature = a["SkylightTemperature"];
+        if(a.contains("Exposure")) outParams.Atmosphere.Exposure = a["Exposure"];
+        if(a.contains("ExposureCompensation")) outParams.Atmosphere.ExposureCompensation = a["ExposureCompensation"];
+        if(a.contains("SkyboxRotation")) outParams.Atmosphere.SkyboxRotation = a["SkyboxRotation"];
+        if(a.contains("SkyboxIntensityMode")) outParams.Atmosphere.SkyboxIntensityMode = static_cast<SkyIntensityMode>(a["SkyboxIntensityMode"].get<int>());
+        if(a.contains("SkyboxExposure")) outParams.Atmosphere.SkyboxExposure = a["SkyboxExposure"];
+        if(a.contains("SkyboxMultiplier")) outParams.Atmosphere.SkyboxMultiplier = a["SkyboxMultiplier"];
+        if(a.contains("SkyboxLuxValue")) outParams.Atmosphere.SkyboxLuxValue = a["SkyboxLuxValue"];
+        if(a.contains("FogAttenuationDistance")) outParams.Atmosphere.FogAttenuationDistance = a["FogAttenuationDistance"];
+        if(a.contains("FogBaseHeight")) outParams.Atmosphere.FogBaseHeight = a["FogBaseHeight"];
+        if(a.contains("FogMaximumHeight")) outParams.Atmosphere.FogMaximumHeight = a["FogMaximumHeight"];
+        if(a.contains("FogMaximumDistance")) outParams.Atmosphere.FogMaximumDistance = a["FogMaximumDistance"];
+        if(a.contains("FogAnisotropy")) outParams.Atmosphere.FogAnisotropy = a["FogAnisotropy"];
+        if(a.contains("SkyboxPath")) outParams.Atmosphere.SkyboxPath = a["SkyboxPath"];
+        if(a.contains("GlobalWindSpeed")) outParams.Atmosphere.GlobalWindSpeed = a["GlobalWindSpeed"];
+        if(a.contains("GlobalWindDirection")) outParams.Atmosphere.GlobalWindDirection = a["GlobalWindDirection"];
+        if(a.contains("BackgroundFogIntensity")) outParams.Atmosphere.BackgroundFogIntensity = a["BackgroundFogIntensity"];
+        if(a.contains("BackgroundFogRange")) outParams.Atmosphere.BackgroundFogRange = a["BackgroundFogRange"];
+        if(a.contains("BackgroundFogMinimum")) outParams.Atmosphere.BackgroundFogMinimum = a["BackgroundFogMinimum"];
+        if(a.contains("BackgroundSkyColorIntensity")) outParams.Atmosphere.BackgroundSkyColorIntensity = a["BackgroundSkyColorIntensity"];
+        if(a.contains("BackgroundColorIntensity")) outParams.Atmosphere.BackgroundColorIntensity = a["BackgroundColorIntensity"];
+        if(a.contains("BackgroundColor") && a["BackgroundColor"].is_array() && a["BackgroundColor"].size() == 4) {
+            outParams.Atmosphere.BackgroundColor[0] = a["BackgroundColor"][0]; outParams.Atmosphere.BackgroundColor[1] = a["BackgroundColor"][1];
+            outParams.Atmosphere.BackgroundColor[2] = a["BackgroundColor"][2]; outParams.Atmosphere.BackgroundColor[3] = a["BackgroundColor"][3];
+        }
+        if(a.contains("BackgroundColorFadeoutRange")) outParams.Atmosphere.BackgroundColorFadeoutRange = a["BackgroundColorFadeoutRange"];
+        if(a.contains("BackgroundColorFadeoutPower")) outParams.Atmosphere.BackgroundColorFadeoutPower = a["BackgroundColorFadeoutPower"];
+        if(a.contains("HeightFogIntensity")) outParams.Atmosphere.HeightFogIntensity = a["HeightFogIntensity"];
+        if(a.contains("HeightFogRange") && a["HeightFogRange"].is_array() && a["HeightFogRange"].size() == 2) {
+            outParams.Atmosphere.HeightFogRange[0] = a["HeightFogRange"][0]; outParams.Atmosphere.HeightFogRange[1] = a["HeightFogRange"][1];
+        }
+        if(a.contains("HeightFogStart")) outParams.Atmosphere.HeightFogStart = a["HeightFogStart"];
+        if(a.contains("HeightFogEnd")) outParams.Atmosphere.HeightFogEnd = a["HeightFogEnd"];
+        if(a.contains("HeightFogPower")) outParams.Atmosphere.HeightFogPower = a["HeightFogPower"];
+        if(a.contains("LinearFogIntensity")) outParams.Atmosphere.LinearFogIntensity = a["LinearFogIntensity"];
+        if(a.contains("LinearFogStart")) outParams.Atmosphere.LinearFogStart = a["LinearFogStart"];
+        if(a.contains("LinearFogEnd")) outParams.Atmosphere.LinearFogEnd = a["LinearFogEnd"];
+        if(a.contains("LinearFogPower")) outParams.Atmosphere.LinearFogPower = a["LinearFogPower"];
+        if(a.contains("LinearFogCameraIntensity")) outParams.Atmosphere.LinearFogCameraIntensity = a["LinearFogCameraIntensity"];
+        if(a.contains("LinearFogCameraStart")) outParams.Atmosphere.LinearFogCameraStart = a["LinearFogCameraStart"];
+        if(a.contains("LinearFogCameraEnd")) outParams.Atmosphere.LinearFogCameraEnd = a["LinearFogCameraEnd"];
+    }
+
+    if(j.contains("TerrainMinHeight")) outParams.TerrainMinHeight = j["TerrainMinHeight"];
+    if(j.contains("TerrainMaxHeight")) outParams.TerrainMaxHeight = j["TerrainMaxHeight"];
+    if(j.contains("ScaleFeaturesToMapSize")) outParams.ScaleFeaturesToMapSize = j["ScaleFeaturesToMapSize"];
+    if(j.contains("GlobalGravity")) outParams.GlobalGravity = j["GlobalGravity"];
+    if(j.contains("GamedataPath")) outParams.GamedataPath = j["GamedataPath"];
+    
+    if(j.contains("MarkerScaleAlloy")) outParams.MarkerScaleAlloy = j["MarkerScaleAlloy"];
+    if(j.contains("MarkerScalePlasma")) outParams.MarkerScalePlasma = j["MarkerScalePlasma"];
+    if(j.contains("MarkerScaleSpawn")) outParams.MarkerScaleSpawn = j["MarkerScaleSpawn"];
+    if(j.contains("GlobalIconAlloy")) outParams.GlobalIconAlloy = j["GlobalIconAlloy"];
+    if(j.contains("GlobalIconPlasma")) outParams.GlobalIconPlasma = j["GlobalIconPlasma"];
+    if(j.contains("GlobalIconSpawn")) outParams.GlobalIconSpawn = j["GlobalIconSpawn"];
+    
+    if(j.contains("MarkerColorAlloy") && j["MarkerColorAlloy"].is_array() && j["MarkerColorAlloy"].size() == 4) {
+        for(int i=0; i<4; i++) outParams.MarkerColorAlloy[i] = j["MarkerColorAlloy"][i];
+    }
+    if(j.contains("MarkerColorPlasma") && j["MarkerColorPlasma"].is_array() && j["MarkerColorPlasma"].size() == 4) {
+        for(int i=0; i<4; i++) outParams.MarkerColorPlasma[i] = j["MarkerColorPlasma"][i];
+    }
+    if(j.contains("MarkerColorSpawn") && j["MarkerColorSpawn"].is_array() && j["MarkerColorSpawn"].size() == 4) {
+        for(int i=0; i<4; i++) outParams.MarkerColorSpawn[i] = j["MarkerColorSpawn"][i];
+    }
+    
+    if(j.contains("MarkersList")) {
+        outParams.MarkersList.clear();
+        for(auto it = j["MarkersList"].begin(); it != j["MarkersList"].end(); ++it) {
+            MarkerTransform mt;
+            auto m = it.value();
+            if(m.contains("Type")) mt.Type = m["Type"];
+            if(m.contains("IsManual")) mt.IsManual = m["IsManual"];
+            if(m.contains("CustomName")) mt.CustomName = m["CustomName"];
+            if(m.contains("Position")) { mt.Position[0] = m["Position"][0]; mt.Position[1] = m["Position"][1]; mt.Position[2] = m["Position"][2]; }
+            if(m.contains("Rotation")) { mt.Rotation[0] = m["Rotation"][0]; mt.Rotation[1] = m["Rotation"][1]; mt.Rotation[2] = m["Rotation"][2]; mt.Rotation[3] = m["Rotation"][3]; }
+            if(m.contains("Scale")) { mt.Scale[0] = m["Scale"][0]; mt.Scale[1] = m["Scale"][1]; mt.Scale[2] = m["Scale"][2]; }
+            outParams.MarkersList[it.key()] = mt;
+        }
+    }
+
+    if(j.contains("GlobalSymmetryMask")) outParams.GlobalSymmetryMask = j["GlobalSymmetryMask"];
+    if(j.contains("SymSuperpositionBlend")) outParams.SymSuperpositionBlend = static_cast<BlendMode>(j["SymSuperpositionBlend"].get<int>());
+    if(j.contains("SymmetryBlurRadius")) outParams.SymmetryBlurRadius = j["SymmetryBlurRadius"];
+    if(j.contains("CrossFadeWidth")) outParams.CrossFadeWidth = j["CrossFadeWidth"];
+    if(j.contains("CylinderZScale")) outParams.CylinderZScale = j["CylinderZScale"];
+    if(j.contains("TorusMajorRadius")) outParams.TorusMajorRadius = j["TorusMajorRadius"];
+    if(j.contains("TorusMinorRadius")) outParams.TorusMinorRadius = j["TorusMinorRadius"];
+    if(j.contains("SymmetryDetectionTolerance")) outParams.SymmetryDetectionTolerance = j["SymmetryDetectionTolerance"];
+    if(j.contains("SnapImperfectSymmetry")) outParams.SnapImperfectSymmetry = j["SnapImperfectSymmetry"];
+
+    if(j.contains("DetailNormalMapSize")) outParams.DetailNormalMapSize = j["DetailNormalMapSize"];
+    
+    if(j.contains("HydroMultiplier")) outParams.HydroMultiplier = j["HydroMultiplier"];
+    if(j.contains("ReclaimDensity")) outParams.ReclaimDensity = j["ReclaimDensity"];
+    if(j.contains("MexDensity")) outParams.MexDensity = j["MexDensity"];
+    
+    if(j.contains("UseGPUFlowMap")) outParams.UseGPUFlowMap = j["UseGPUFlowMap"];
+    if(j.contains("UseGPUMarkers")) outParams.UseGPUMarkers = j["UseGPUMarkers"];
+    if(j.contains("WYSIWYGBaking")) outParams.WYSIWYGBaking = j["WYSIWYGBaking"];
+    if(j.contains("GPUPreviewIterations")) outParams.GPUPreviewIterations = j["GPUPreviewIterations"];
+    if(j.contains("FastPreviewMode")) outParams.FastPreviewMode = j["FastPreviewMode"];
+    if(j.contains("FlowMapColor") && j["FlowMapColor"].is_array() && j["FlowMapColor"].size() == 4) {
+        for(int i=0; i<4; i++) outParams.FlowMapColor[i] = j["FlowMapColor"][i];
+    }
+    
+    if(j.contains("SlopeSettingsParams")) {
+        auto sp = j["SlopeSettingsParams"];
+        if(sp.contains("bUseEngineParityMath")) outParams.SlopeSettingsParams.bUseEngineParityMath = sp["bUseEngineParityMath"];
+    }
+    if(j.contains("FlowSettingsParams")) {
+        auto fp = j["FlowSettingsParams"];
+        if(fp.contains("Precipitation")) outParams.FlowSettingsParams.Precipitation = fp["Precipitation"];
+        if(fp.contains("Iterations")) outParams.FlowSettingsParams.Iterations = fp["Iterations"];
+        if(fp.contains("FlowVolumeMultiplier")) outParams.FlowSettingsParams.FlowVolumeMultiplier = fp["FlowVolumeMultiplier"];
+        if(fp.contains("StochasticVariance")) outParams.FlowSettingsParams.StochasticVariance = fp["StochasticVariance"];
+        if(fp.contains("SlopeAdherence")) outParams.FlowSettingsParams.SlopeAdherence = fp["SlopeAdherence"];
+        if(fp.contains("FlowMomentum")) outParams.FlowSettingsParams.FlowMomentum = fp["FlowMomentum"];
+    }
+    // --- End Phase 2 Load ---
+
     if (j.contains("Stratums")) {
         outParams.Stratums.clear();
         for (const auto& sj : j["Stratums"]) {

@@ -21,7 +21,7 @@ namespace SanmapGen {
             "Slope", 
             {
                 {0.0f, {0.2f, 0.6f, 0.2f, 1.0f}},   // Green (Flat)
-                {5.0f, {1.0f, 1.0f, 0.0f, 1.0f}},   // Yellow (Moderate)
+                {29.0f, {1.0f, 1.0f, 0.0f, 1.0f}},  // Yellow (Moderate)
                 {30.0f, {1.0f, 0.0f, 0.0f, 1.0f}}   // Red (Steep)
             },
             true

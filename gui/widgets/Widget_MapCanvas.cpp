@@ -232,9 +232,8 @@ namespace SanmapGen {
                         globalColor[0] = params.MarkerColorAlloy[0]; globalColor[1] = params.MarkerColorAlloy[1]; globalColor[2] = params.MarkerColorAlloy[2]; globalColor[3] = params.MarkerColorAlloy[3];
                     } else if (marker.Type == "Spawn" || marker.Type == "Spawns") {
                         iconName = params.GlobalIconSpawn;
-                        globalColor[0] = params.MarkerColorSpawn[0]; globalColor[1] = params.MarkerColorSpawn[1]; globalColor[2] = params.MarkerColorSpawn[2]; globalColor[3] = params.MarkerColorSpawn[3];
                         
-                        // Tint by army color
+                        // Use exactly the army color, default to white if not found
                         std::string armyId = "";
                         if (marker.CustomName.find("Spawn_") == 0) {
                             armyId = marker.CustomName.substr(6);
@@ -242,10 +241,12 @@ namespace SanmapGen {
                             armyId = marker.CustomName;
                         }
                         if (params.Armies.find(armyId) != params.Armies.end()) {
-                            globalColor[0] *= params.Armies.at(armyId).Color[0];
-                            globalColor[1] *= params.Armies.at(armyId).Color[1];
-                            globalColor[2] *= params.Armies.at(armyId).Color[2];
-                            globalColor[3] *= params.Armies.at(armyId).Color[3];
+                            globalColor[0] = params.Armies.at(armyId).Color[0];
+                            globalColor[1] = params.Armies.at(armyId).Color[1];
+                            globalColor[2] = params.Armies.at(armyId).Color[2];
+                            globalColor[3] = params.Armies.at(armyId).Color[3];
+                        } else {
+                            globalColor[0] = 1.0f; globalColor[1] = 1.0f; globalColor[2] = 1.0f; globalColor[3] = 1.0f;
                         }
                     } else if (marker.Type == "Plasma" || marker.Type == "Plasmas") {
                         iconName = params.GlobalIconPlasma;

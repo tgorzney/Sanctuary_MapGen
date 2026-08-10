@@ -122,8 +122,6 @@ namespace UI {
         RenderIconPicker("GlobalSpawn", params.GlobalIconSpawn, params, bNeedsPreviewRender);
         ImGui::SameLine();
         if (ImGui::SliderFloat("Spawn", &params.MarkerScaleSpawn, 0.1f, 10.0f)) bNeedsPreviewRender = true;
-        ImGui::SameLine();
-        if (ImGui::ColorEdit4("##ColorSpawn", params.MarkerColorSpawn, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel)) bNeedsPreviewRender = true;
         ImGui::PopItemWidth();
 
         ImGui::Spacing();

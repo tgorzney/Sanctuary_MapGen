@@ -89,11 +89,12 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     
     if (mapdef.contains("waterWindSpeed")) outParams.Water.WaterWindSpeed = mapdef["waterWindSpeed"];
     if (mapdef.contains("waterWindDirection")) outParams.Water.WaterWindDirection = mapdef["waterWindDirection"];
+    if (mapdef.contains("waterWindShoreWavesRemap")) outParams.Water.WaterWindShoreWavesRemap = mapdef["waterWindShoreWavesRemap"];
     if (mapdef.contains("waterShoreDepthOffset")) outParams.Water.WaterShoreDepthOffset = mapdef["waterShoreDepthOffset"];
     if (mapdef.contains("waterShoreDepthStrength")) outParams.Water.WaterShoreDepthStrength = mapdef["waterShoreDepthStrength"];
     if (mapdef.contains("waterShoreDistanceOffset")) outParams.Water.WaterShoreDistanceOffset = mapdef["waterShoreDistanceOffset"];
     if (mapdef.contains("waterShoreDistanceStrength")) outParams.Water.WaterShoreDistanceStrength = mapdef["waterShoreDistanceStrength"];
-    if (mapdef.contains("waveGeneratorBlueprint")) outParams.Water.WaveGeneratorBlueprint = mapdef["waveGeneratorBlueprint"];
+    if (mapdef.contains("waterShoreGeneratorBlueprint")) outParams.Water.WaveGeneratorBlueprint = mapdef["waterShoreGeneratorBlueprint"];
 
     // Load Atmosphere
     if (mapdef.contains("sunRA")) outParams.Atmosphere.SunRA = mapdef["sunRA"];
@@ -109,6 +110,11 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     if (mapdef.contains("sunAngularDiameter")) outParams.Atmosphere.SunAngularDiameter = mapdef["sunAngularDiameter"];
     if (mapdef.contains("sunVolumetricsMultiplier")) outParams.Atmosphere.SunVolumetricsMultiplier = mapdef["sunVolumetricsMultiplier"];
     if (mapdef.contains("sunVolumetricsShadowDimer")) outParams.Atmosphere.SunVolumetricsShadowDimer = mapdef["sunVolumetricsShadowDimer"];
+    if (mapdef.contains("sunCookie") && mapdef["sunCookie"].is_object() && mapdef["sunCookie"].contains("path")) outParams.Atmosphere.SunCookiePath = mapdef["sunCookie"]["path"];
+    if (mapdef.contains("sunCookieSize") && mapdef["sunCookieSize"].is_object()) {
+        if (mapdef["sunCookieSize"].contains("x")) outParams.Atmosphere.SunCookieSize[0] = mapdef["sunCookieSize"]["x"];
+        if (mapdef["sunCookieSize"].contains("y")) outParams.Atmosphere.SunCookieSize[1] = mapdef["sunCookieSize"]["y"];
+    }
     
     if (mapdef.contains("skylightIntensity")) outParams.Atmosphere.SkylightIntensity = mapdef["skylightIntensity"];
     if (mapdef.contains("skylightTint")) {
@@ -129,10 +135,58 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     if (mapdef.contains("fogMaximumDistance")) outParams.Atmosphere.FogMaximumDistance = mapdef["fogMaximumDistance"];
     if (mapdef.contains("fogAnisotropy")) outParams.Atmosphere.FogAnisotropy = mapdef["fogAnisotropy"];
     
-    if (mapdef.contains("skyboxPath")) outParams.Atmosphere.SkyboxPath = mapdef["skyboxPath"];
     
-    if (mapdef.contains("globalWindSpeed")) outParams.Atmosphere.GlobalWindSpeed = mapdef["globalWindSpeed"];
-    if (mapdef.contains("globalWindDirection")) outParams.Atmosphere.GlobalWindDirection = mapdef["globalWindDirection"];
+    if (mapdef.contains("skybox") && mapdef["skybox"].is_object() && mapdef["skybox"].contains("path")) outParams.Atmosphere.SkyboxPath = mapdef["skybox"]["path"];
+    if (mapdef.contains("skyboxRotation")) outParams.Atmosphere.SkyboxRotation = mapdef["skyboxRotation"];
+    if (mapdef.contains("skyboxIntensityMode")) {
+        std::string mode = mapdef["skyboxIntensityMode"];
+        if (mode == "Exposure") outParams.Atmosphere.SkyboxIntensityMode = SkyIntensityMode::Exposure;
+        else if (mode == "Lux") outParams.Atmosphere.SkyboxIntensityMode = SkyIntensityMode::Lux;
+        else if (mode == "Multiplier") outParams.Atmosphere.SkyboxIntensityMode = SkyIntensityMode::Multiplier;
+    }
+    if (mapdef.contains("skyboxMultiplier")) outParams.Atmosphere.SkyboxMultiplier = mapdef["skyboxMultiplier"];
+    if (mapdef.contains("skyboxLuxValue")) outParams.Atmosphere.SkyboxLuxValue = mapdef["skyboxLuxValue"];
+
+    
+    if (mapdef.contains("windSpeed")) outParams.Atmosphere.GlobalWindSpeed = mapdef["windSpeed"];
+    if (mapdef.contains("windDirection")) outParams.Atmosphere.GlobalWindDirection = mapdef["windDirection"];
+    
+    // Background Fog
+    if (mapdef.contains("backgroundFogIntensity")) outParams.Atmosphere.BackgroundFogIntensity = mapdef["backgroundFogIntensity"];
+    if (mapdef.contains("backgroundFogRange")) outParams.Atmosphere.BackgroundFogRange = mapdef["backgroundFogRange"];
+    if (mapdef.contains("backgroundFogMinimum")) outParams.Atmosphere.BackgroundFogMinimum = mapdef["backgroundFogMinimum"];
+    if (mapdef.contains("backgroundSkyColorIntensity")) outParams.Atmosphere.BackgroundSkyColorIntensity = mapdef["backgroundSkyColorIntensity"];
+    if (mapdef.contains("backgroundColorIntensity")) outParams.Atmosphere.BackgroundColorIntensity = mapdef["backgroundColorIntensity"];
+    if (mapdef.contains("backgroundColor") && mapdef["backgroundColor"].is_object()) {
+        auto bc = mapdef["backgroundColor"];
+        if(bc.contains("r")) outParams.Atmosphere.BackgroundColor[0] = bc["r"];
+        if(bc.contains("g")) outParams.Atmosphere.BackgroundColor[1] = bc["g"];
+        if(bc.contains("b")) outParams.Atmosphere.BackgroundColor[2] = bc["b"];
+        if(bc.contains("a")) outParams.Atmosphere.BackgroundColor[3] = bc["a"];
+    }
+    if (mapdef.contains("backgroundColorFadeoutRange")) outParams.Atmosphere.BackgroundColorFadeoutRange = mapdef["backgroundColorFadeoutRange"];
+    if (mapdef.contains("backgroundColorFadeoutPower")) outParams.Atmosphere.BackgroundColorFadeoutPower = mapdef["backgroundColorFadeoutPower"];
+    
+    // Height Fog
+    if (mapdef.contains("heightFogIntensity")) outParams.Atmosphere.HeightFogIntensity = mapdef["heightFogIntensity"];
+    if (mapdef.contains("heightFogRange") && mapdef["heightFogRange"].is_object()) {
+        auto hfr = mapdef["heightFogRange"];
+        if(hfr.contains("x")) outParams.Atmosphere.HeightFogRange[0] = hfr["x"];
+        if(hfr.contains("y")) outParams.Atmosphere.HeightFogRange[1] = hfr["y"];
+    }
+    if (mapdef.contains("heightFogStart")) outParams.Atmosphere.HeightFogStart = mapdef["heightFogStart"];
+    if (mapdef.contains("heightFogEnd")) outParams.Atmosphere.HeightFogEnd = mapdef["heightFogEnd"];
+    if (mapdef.contains("heightFogPower")) outParams.Atmosphere.HeightFogPower = mapdef["heightFogPower"];
+    
+    // Linear Fog
+    if (mapdef.contains("linearFogIntensity")) outParams.Atmosphere.LinearFogIntensity = mapdef["linearFogIntensity"];
+    if (mapdef.contains("linearFogStart")) outParams.Atmosphere.LinearFogStart = mapdef["linearFogStart"];
+    if (mapdef.contains("linearFogEnd")) outParams.Atmosphere.LinearFogEnd = mapdef["linearFogEnd"];
+    if (mapdef.contains("linearFogPower")) outParams.Atmosphere.LinearFogPower = mapdef["linearFogPower"];
+    if (mapdef.contains("linearFogCameraIntensity")) outParams.Atmosphere.LinearFogCameraIntensity = mapdef["linearFogCameraIntensity"];
+    if (mapdef.contains("linearFogCameraStart")) outParams.Atmosphere.LinearFogCameraStart = mapdef["linearFogCameraStart"];
+    if (mapdef.contains("linearFogCameraEnd")) outParams.Atmosphere.LinearFogCameraEnd = mapdef["linearFogCameraEnd"];
+
 
     // Load Stratums
     if (mapdef.contains("stratumLayers") && mapdef["stratumLayers"].is_array()) {
@@ -404,6 +458,27 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     if (isGameplay) {
                         outParams.MarkersList[transformName] = mt;
                         importedSanmapLayer.MarkerKeys.push_back(transformName);
+                        
+                        // Infer missing armies from Spawns
+                        if (markerType == "Spawn" || markerType == "Spawns") {
+                            std::string armyId = originalKey;
+                            if (armyId.find("Spawn_") == 0) {
+                                armyId = armyId.substr(6);
+                            }
+                            if (outParams.Armies.find(armyId) == outParams.Armies.end()) {
+                                Army a;
+                                static const float defaultColors[8][4] = {
+                                    {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.4f, 0.7f, 1.0f}, {1.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f, 0.5f, 1.0f},
+                                    {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.5f, 0.5f, 1.0f}, {0.0f, 0.5f, 0.0f, 1.0f}, {0.2f, 0.8f, 0.2f, 1.0f}
+                                };
+                                int cIdx = outParams.Armies.size() % 8;
+                                a.Color[0] = defaultColors[cIdx][0];
+                                a.Color[1] = defaultColors[cIdx][1];
+                                a.Color[2] = defaultColors[cIdx][2];
+                                a.Color[3] = defaultColors[cIdx][3];
+                                outParams.Armies[armyId] = a;
+                            }
+                        }
                     } else {
                         GenerationParams::PropInstance pi;
                         pi.X = mt.Position[0];
@@ -413,6 +488,28 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                         outParams.StaticPropsList.push_back(pi);
                     }
                 }
+            }
+        }
+        
+        // Ensure every loaded Army has a Spawn marker
+        for (const auto& [armyId, army] : outParams.Armies) {
+            bool foundSpawn = false;
+            for (const auto& [key, marker] : outParams.MarkersList) {
+                if ((marker.Type == "Spawn" || marker.Type == "Spawns") && marker.CustomName.find(armyId) != std::string::npos) {
+                    foundSpawn = true;
+                    break;
+                }
+            }
+            if (!foundSpawn) {
+                MarkerTransform mt;
+                mt.Type = "Spawn";
+                mt.CustomName = "Spawn_" + armyId;
+                mt.IsManual = true;
+                mt.Position[0] = outParams.MapSize / 2.0f;
+                mt.Position[1] = 0.0f;
+                mt.Position[2] = outParams.MapSize / 2.0f;
+                outParams.MarkersList[mt.CustomName] = mt;
+                importedSanmapLayer.MarkerKeys.push_back(mt.CustomName);
             }
         }
         
