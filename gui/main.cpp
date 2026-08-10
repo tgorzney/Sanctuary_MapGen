@@ -16,7 +16,7 @@
 #include "PreviewRenderer.h"
 #include "widgets/Widget_MapCanvas.h"
 #include "TerrainGenerator.h"
-#include "MapExporter.h"
+#include "export/Export_Metadata.h"
 #include "FileDialog.h"
 #include "stb_image.h"
 #include "stb_image_write.h"

@@ -1,10 +1,11 @@
 #include "UITabs.h"
 #include "imgui.h"
 #include "FileDialog.h"
-#include "MapExporter.h"
+#include "export/Export_Metadata.h"
 #include "MapImporter.h"
 #include "SupComImporter.h"
 #include "UIHelpers.h"
+#include "export/Export_Textures.h"
 #include <filesystem>
 #include <GLFW/glfw3.h>
 
@@ -37,7 +38,7 @@ namespace UI {
         if (ImGui::Button("Open Generator File", ImVec2(-1, 30))) {
             std::string path;
             if (FileDialog::OpenFile("Generator Settings\0*.json\0All Files\0*.*\0", path)) {
-                MapExporter::LoadSettings(path, params);
+                MetadataExporter::LoadSettings(path, params);
                 bNeedsMapUpdate = true;
             }
         }
@@ -85,14 +86,14 @@ namespace UI {
             std::string path;
             if (FileDialog::SaveFile("Generator Settings\0*.json\0All Files\0*.*\0", "json", path)) {
                 if(path.find(".json") == std::string::npos) path += ".json";
-                MapExporter::SaveSettings(path, params);
+                MetadataExporter::SaveSettings(path, params);
             }
         }
         
         if (ImGui::Button("Export Sanmap File Only (.sanmap)", ImVec2(-1, 30))) {
             std::string path;
             if (FileDialog::SelectFolder(path)) {
-                MapExporter::ExportSanmap(path, params, heightmap, genData, false);
+                MetadataExporter::ExportSanmap(path, params, heightmap, genData, false);
             }
         }
         
@@ -100,7 +101,7 @@ namespace UI {
         if (ImGui::Button("Export All (Project + Textures)", ImVec2(-1, 30))) {
             std::string path;
             if (FileDialog::SelectFolder(path)) {
-                MapExporter::ExportSanmap(path, params, heightmap, genData, true);
+                MetadataExporter::ExportSanmap(path, params, heightmap, genData, true);
             }
         }
         
@@ -108,31 +109,34 @@ namespace UI {
         ImGui::Text("Individual Layer Exports");
         ImGui::Separator();
         
-        if (ImGui::Button("Export Heightmap (.raw)", ImVec2(-1, 24))) {
+        if (ImGui::Button("Export Heightmap (RAW)")) {
             std::string path;
             if (FileDialog::SaveFile("RAW Heightmap\0*.raw\0All Files\0*.*\0", "raw", path)) {
                 if(path.find(".raw") == std::string::npos) path += ".raw";
-                MapExporter::ExportHeightmap(path, params, heightmap);
+                TextureExporter::ExportHeightmap(path, params, heightmap);
             }
         }
-        if (ImGui::Button("Export Slope Map (.png)", ImVec2(-1, 24))) {
+        ImGui::SameLine();
+        if (ImGui::Button("Export Slope Map (PNG)")) {
             std::string path;
             if (FileDialog::SaveFile("PNG Image\0*.png\0All Files\0*.*\0", "png", path)) {
                 if(path.find(".png") == std::string::npos) path += ".png";
-                MapExporter::ExportSlopeMap(path, params, heightmap);
+                TextureExporter::ExportSlopeMap(path, params, heightmap);
             }
         }
-        if (ImGui::Button("Export Flow Map (.png)", ImVec2(-1, 24))) {
+        
+        if (ImGui::Button("Export Flow Map (PNG)")) {
             std::string path;
             if (FileDialog::SaveFile("PNG Image\0*.png\0All Files\0*.*\0", "png", path)) {
                 if(path.find(".png") == std::string::npos) path += ".png";
-                MapExporter::ExportFlowMap(path, params, genData);
+                TextureExporter::ExportFlowMap(path, params, genData);
             }
         }
-        if (ImGui::Button("Export Stratums (.tga masks)", ImVec2(-1, 24))) {
+        ImGui::SameLine();
+        if (ImGui::Button("Export Stratums (TGA)")) {
             std::string path;
             if (FileDialog::SelectFolder(path)) {
-                MapExporter::ExportStratums(path, params, genData);
+                TextureExporter::ExportStratums(path, params, genData);
             }
         }
         
@@ -152,3 +156,4 @@ namespace UI {
 
 } // namespace UI
 } // namespace SanmapGen
+
