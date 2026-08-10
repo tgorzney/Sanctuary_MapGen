@@ -208,8 +208,7 @@ namespace SanmapGen {
     struct DecalRule {
         std::string Name = "New Decal Layer";
         bool Enabled = true;
-        std::string AlbedoPath = "";
-        std::string NormalPath = "";
+        std::string BlueprintPath = "";
         
         float Density = 0.1f;
         float MinSlope = 0.0f;

@@ -41,6 +41,8 @@ namespace SanmapGen {
         float SunVolumetricsMultiplier = 6.7f;
         float SunVolumetricsShadowDimer = 0.5f;
         float SunPosition[3] = { 512.0f, 10.0f, 256.0f };
+        std::string SunCookiePath = "";
+        float SunCookieSize[2] = { 1024.0f, 1024.0f };
         
         float SkylightIntensity = 0.0f;
         float SkylightTint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -51,6 +53,7 @@ namespace SanmapGen {
         
         std::string SkyboxPath = "";
         float SkyboxRotation = 0.0f;
+        SkyIntensityMode SkyboxIntensityMode = SkyIntensityMode::Exposure;
         float SkyboxExposure = 12.0f;
         float SkyboxMultiplier = 1.0f;
         float SkyboxLuxValue = 10000.0f;

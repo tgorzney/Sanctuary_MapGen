@@ -134,11 +134,12 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     
     mapdef["waterWindSpeed"] = params.Water.WaterWindSpeed;
     mapdef["waterWindDirection"] = params.Water.WaterWindDirection;
+    mapdef["waterWindShoreWavesRemap"] = params.Water.WaterWindShoreWavesRemap;
     mapdef["waterShoreDepthOffset"] = params.Water.WaterShoreDepthOffset;
     mapdef["waterShoreDepthStrength"] = params.Water.WaterShoreDepthStrength;
     mapdef["waterShoreDistanceOffset"] = params.Water.WaterShoreDistanceOffset;
     mapdef["waterShoreDistanceStrength"] = params.Water.WaterShoreDistanceStrength;
-    mapdef["waveGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
+    mapdef["waterShoreGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
 
     mapdef["shader"] = "RTS/TerrainLit";
     mapdef["heightTransition"] = 0.5;
@@ -159,6 +160,9 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["sunAngularDiameter"] = params.Atmosphere.SunAngularDiameter;
     mapdef["sunVolumetricsMultiplier"] = params.Atmosphere.SunVolumetricsMultiplier;
     mapdef["sunVolumetricsShadowDimer"] = params.Atmosphere.SunVolumetricsShadowDimer;
+    mapdef["sunPosition"] = {{"x", params.Atmosphere.SunPosition[0]}, {"y", params.Atmosphere.SunPosition[1]}, {"z", params.Atmosphere.SunPosition[2]}};
+    mapdef["sunCookie"] = {{"path", params.Atmosphere.SunCookiePath}};
+    mapdef["sunCookieSize"] = {{"x", params.Atmosphere.SunCookieSize[0]}, {"y", params.Atmosphere.SunCookieSize[1]}};
     
     mapdef["skylightIntensity"] = params.Atmosphere.SkylightIntensity;
     mapdef["skylightTint"] = {
@@ -171,7 +175,17 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     
     mapdef["exposure"] = params.Atmosphere.Exposure;
     mapdef["exposureCompensation"] = params.Atmosphere.ExposureCompensation;
+    
+    mapdef["skyboxRotation"] = params.Atmosphere.SkyboxRotation;
+    switch (params.Atmosphere.SkyboxIntensityMode) {
+        case SkyIntensityMode::Exposure: mapdef["skyboxIntensityMode"] = "Exposure"; break;
+        case SkyIntensityMode::Lux: mapdef["skyboxIntensityMode"] = "Lux"; break;
+        case SkyIntensityMode::Multiplier: mapdef["skyboxIntensityMode"] = "Multiplier"; break;
+    }
+    
     mapdef["skyboxExposure"] = params.Atmosphere.SkyboxExposure;
+    mapdef["skyboxMultiplier"] = params.Atmosphere.SkyboxMultiplier;
+    mapdef["skyboxLuxValue"] = params.Atmosphere.SkyboxLuxValue;
     
     mapdef["fogAttenuationDistance"] = params.Atmosphere.FogAttenuationDistance;
     mapdef["fogBaseHeight"] = params.Atmosphere.FogBaseHeight;
@@ -179,10 +193,33 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["fogMaximumDistance"] = params.Atmosphere.FogMaximumDistance;
     mapdef["fogAnisotropy"] = params.Atmosphere.FogAnisotropy;
     
-    mapdef["skyboxPath"] = params.Atmosphere.SkyboxPath;
+    mapdef["skybox"] = {{"path", params.Atmosphere.SkyboxPath}};
     
-    mapdef["globalWindSpeed"] = params.Atmosphere.GlobalWindSpeed;
-    mapdef["globalWindDirection"] = params.Atmosphere.GlobalWindDirection;
+    mapdef["backgroundFogIntensity"] = params.Atmosphere.BackgroundFogIntensity;
+    mapdef["backgroundFogRange"] = params.Atmosphere.BackgroundFogRange;
+    mapdef["backgroundFogMinimum"] = params.Atmosphere.BackgroundFogMinimum;
+    mapdef["backgroundSkyColorIntensity"] = params.Atmosphere.BackgroundSkyColorIntensity;
+    mapdef["backgroundColorIntensity"] = params.Atmosphere.BackgroundColorIntensity;
+    mapdef["backgroundColor"] = {{"r", params.Atmosphere.BackgroundColor[0]}, {"g", params.Atmosphere.BackgroundColor[1]}, {"b", params.Atmosphere.BackgroundColor[2]}, {"a", params.Atmosphere.BackgroundColor[3]}};
+    mapdef["backgroundColorFadeoutRange"] = params.Atmosphere.BackgroundColorFadeoutRange;
+    mapdef["backgroundColorFadeoutPower"] = params.Atmosphere.BackgroundColorFadeoutPower;
+    
+    mapdef["heightFogIntensity"] = params.Atmosphere.HeightFogIntensity;
+    mapdef["heightFogRange"] = {{"x", params.Atmosphere.HeightFogRange[0]}, {"y", params.Atmosphere.HeightFogRange[1]}};
+    mapdef["heightFogStart"] = params.Atmosphere.HeightFogStart;
+    mapdef["heightFogEnd"] = params.Atmosphere.HeightFogEnd;
+    mapdef["heightFogPower"] = params.Atmosphere.HeightFogPower;
+    
+    mapdef["linearFogIntensity"] = params.Atmosphere.LinearFogIntensity;
+    mapdef["linearFogStart"] = params.Atmosphere.LinearFogStart;
+    mapdef["linearFogEnd"] = params.Atmosphere.LinearFogEnd;
+    mapdef["linearFogPower"] = params.Atmosphere.LinearFogPower;
+    mapdef["linearFogCameraIntensity"] = params.Atmosphere.LinearFogCameraIntensity;
+    mapdef["linearFogCameraStart"] = params.Atmosphere.LinearFogCameraStart;
+    mapdef["linearFogCameraEnd"] = params.Atmosphere.LinearFogCameraEnd;
+    
+    mapdef["windSpeed"] = params.Atmosphere.GlobalWindSpeed;
+    mapdef["windDirection"] = params.Atmosphere.GlobalWindDirection;
 
     // Stratum Layers
     mapdef["stratumLayers"] = params.Stratums;
@@ -305,8 +342,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     for (const auto& rule : params.Decals) {
         if (!rule.Enabled) continue;
         json decalType;
-        decalType["albedoPath"] = rule.AlbedoPath; // Note: native uses blueprintPath for decals, but keeping this for now
-        decalType["normalPath"] = rule.NormalPath;
+        decalType["blueprintPath"] = rule.BlueprintPath;
         decalType["transforms"] = json::array(); // Placeholder for actual transforms generated
         decalsArr.push_back(decalType);
     }
@@ -379,7 +415,7 @@ void MetadataExporter::SaveSettings(const std::string& filePath, const Generatio
     
     json decals = json::array();
     for (const auto& d : params.Decals) {
-        json dj; dj["Name"] = d.Name; dj["Enabled"] = d.Enabled; dj["AlbedoPath"] = d.AlbedoPath; dj["NormalPath"] = d.NormalPath;
+        json dj; dj["Name"] = d.Name; dj["Enabled"] = d.Enabled; dj["BlueprintPath"] = d.BlueprintPath;
         dj["Density"] = d.Density; dj["MinSlope"] = d.MinSlope; dj["MaxSlope"] = d.MaxSlope;
         dj["MinHeight"] = d.MinHeight; dj["MaxHeight"] = d.MaxHeight;
         decals.push_back(dj);
@@ -393,7 +429,6 @@ void MetadataExporter::SaveSettings(const std::string& filePath, const Generatio
         aj["Faction"] = army.Faction;
         aj["Alloys"] = army.Alloys;
         aj["Energy"] = army.Energy;
-        aj["Color"] = {army.Color[0], army.Color[1], army.Color[2], army.Color[3]};
         
         std::function<json(const UnitGroup&)> saveGroup;
         saveGroup = [&](const UnitGroup& group) -> json {
@@ -536,8 +571,7 @@ bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParam
             DecalRule d;
             if (dj.contains("Name")) d.Name = dj["Name"];
             if (dj.contains("Enabled")) d.Enabled = dj["Enabled"];
-            if (dj.contains("AlbedoPath")) d.AlbedoPath = dj["AlbedoPath"];
-            if (dj.contains("NormalPath")) d.NormalPath = dj["NormalPath"];
+            if (dj.contains("BlueprintPath")) d.BlueprintPath = dj["BlueprintPath"];
             if (dj.contains("Density")) d.Density = dj["Density"];
             if (dj.contains("MinSlope")) d.MinSlope = dj["MinSlope"];
             if (dj.contains("MaxSlope")) d.MaxSlope = dj["MaxSlope"];

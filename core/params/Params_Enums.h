@@ -34,6 +34,12 @@ namespace SanmapGen {
         Gradient_Torus = 3
     };
 
+    enum class SkyIntensityMode {
+        Exposure,
+        Lux,
+        Multiplier
+    };
+
     enum class BlendMode {
         Add,
         Subtract,
