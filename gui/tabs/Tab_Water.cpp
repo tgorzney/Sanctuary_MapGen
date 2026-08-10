@@ -17,6 +17,10 @@ namespace UI {
             if (UI::RangeSliderFloat("Deep Water", &params.Water.DeepWaterDepthMin, &params.Water.DeepWaterDepthMax, 0.0f, 128.0f)) {
                 bNeedsPreviewRender = true;
             }
+            
+            if (UI::GradientEditor("Water Preview Gradient", params.Water.Gradient, 128.0f)) {
+                bNeedsPreviewRender = true;
+            }
         }
         
         if (ImGui::CollapsingHeader("Shore & Wind", ImGuiTreeNodeFlags_DefaultOpen)) {

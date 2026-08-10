@@ -41,8 +41,28 @@ namespace SanmapGen {
                 ImGui::PushID(i);
                 
                 ImGui::AlignTextToFramePadding();
-                ImGui::Text("%-15s", layer.Name.c_str());
-                ImGui::SameLine(120);
+                ImGui::Selectable(layer.Name.c_str(), false, 0, ImVec2(120, 0));
+                
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+                    ImGui::SetDragDropPayload("PREVIEW_LAYER_POPUP_DRAG", &i, sizeof(int));
+                    ImGui::Text("Moving %s", layer.Name.c_str());
+                    ImGui::EndDragDropSource();
+                }
+                if (ImGui::BeginDragDropTarget()) {
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PREVIEW_LAYER_POPUP_DRAG")) {
+                        int source_i = *(const int*)payload->Data;
+                        if (source_i != i) {
+                            auto movingLayer = params.PreviewLayers[source_i];
+                            params.PreviewLayers.erase(params.PreviewLayers.begin() + source_i);
+                            int insert_i = (source_i < i) ? i - 1 : i;
+                            params.PreviewLayers.insert(params.PreviewLayers.begin() + insert_i, movingLayer);
+                            bNeedsPreviewRender = true;
+                        }
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+                
+                ImGui::SameLine(135);
                 
                 ImGui::SetNextItemWidth(100);
                 int current_blend = (int)layer.Blend;

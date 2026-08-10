@@ -297,13 +297,13 @@ namespace SanmapGen {
             PreviewLayers.push_back({ PreviewLayerType::Holes, "Holes", false, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Stratums, "Stratum Colors", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Tint, "Tint", false, LayerBlendMode::None });
-            PreviewLayers.push_back({ PreviewLayerType::Water, "Water", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Smoothness, "Smoothness", false, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Slope, "Slope Map", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Flow, "Flow Map", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Accumulation, "Accumulation Map", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Markers, "Markers", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Props, "Props", false, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Water, "Water", true, LayerBlendMode::None });
         }
         
         // --- Dependency Graph Hashing for Dirty Flags ---

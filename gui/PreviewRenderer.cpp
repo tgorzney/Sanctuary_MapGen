@@ -186,12 +186,20 @@ namespace SanmapGen {
                             sB += params.Stratums[i].previewColor[2] * maskVal;
                             totalMask += maskVal;
                         }
+
                         if (totalMask > 0.0001f) {
                             sR /= totalMask;
                             sG /= totalMask;
                             sB /= totalMask;
+                            
+                            if (layer.Blend == GenerationParams::LayerBlendMode::Normal) {
+                                sA = 1.0f; // Solid opaque in normal mode
+                            } else {
+                                sA = std::min(totalMask, 1.0f);
+                            }
+                        } else {
+                            sA = 0.0f;
                         }
-                        sA = std::min(totalMask, 1.0f);
                         if (sA > 0) hasColor = true;
                     }
                     else if (layer.Type == GenerationParams::PreviewLayerType::Slope) {
@@ -211,14 +219,12 @@ namespace SanmapGen {
                     else if (layer.Type == GenerationParams::PreviewLayerType::Water) {
                         if (realHeight <= params.Water.WaterLevelMax) {
                             float depth = params.Water.WaterLevelMax - realHeight;
-                            float deepRatio = std::clamp((depth - params.Water.DeepWaterDepthMin) / 
-                                              std::max(0.1f, (params.Water.DeepWaterDepthMax - params.Water.DeepWaterDepthMin)), 0.0f, 1.0f);
-                            float shallowR = 0.2f, shallowG = 0.6f, shallowB = 0.8f;
-                            float deepR = 0.05f, deepG = 0.1f, deepB = 0.3f;
-                            sR = shallowR * (1.0f - deepRatio) + deepR * deepRatio;
-                            sG = shallowG * (1.0f - deepRatio) + deepG * deepRatio;
-                            sB = shallowB * (1.0f - deepRatio) + deepB * deepRatio;
-                            sA = std::min(depth * 0.1f, 0.85f);
+                            EvalGradientColor(depth, params.Water.Gradient, sR, sG, sB, sA);
+                            
+                            if (layer.Blend == GenerationParams::LayerBlendMode::Normal) {
+                                sA = 1.0f; // 100% opaque in normal mode to easily see the water line
+                            }
+                            
                             hasColor = true;
                         }
                     }

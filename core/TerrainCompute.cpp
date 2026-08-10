@@ -41,6 +41,7 @@ typedef void* (APIENTRYP PFNGLMAPBUFFERPROC) (GLenum target, GLenum access);
 typedef GLboolean (APIENTRYP PFNGLUNMAPBUFFERPROC) (GLenum target);
 typedef GLint (APIENTRYP PFNGLGETUNIFORMLOCATIONPROC) (GLuint program, const GLchar *name);
 typedef void (APIENTRYP PFNGLUNIFORM1IPROC) (GLint location, GLint v0);
+typedef void (APIENTRYP PFNGLUNIFORM1FPROC) (GLint location, GLfloat v0);
 typedef void (APIENTRYP PFNGLDELETESHADERPROC) (GLuint shader);
 typedef void (APIENTRYP PFNGLDELETEPROGRAMPROC) (GLuint program);
 typedef void (APIENTRYP PFNGLDELETEBUFFERSPROC) (GLsizei n, const GLuint *buffers);
@@ -64,6 +65,7 @@ static PFNGLMAPBUFFERPROC glMapBufferT = nullptr;
 static PFNGLUNMAPBUFFERPROC glUnmapBufferT = nullptr;
 static PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocationT = nullptr;
 static PFNGLUNIFORM1IPROC glUniform1iT = nullptr;
+static PFNGLUNIFORM1FPROC glUniform1fT = nullptr;
 static PFNGLDELETESHADERPROC glDeleteShaderT = nullptr;
 static PFNGLDELETEPROGRAMPROC glDeleteProgramT = nullptr;
 static PFNGLDELETEBUFFERSPROC glDeleteBuffersT = nullptr;
@@ -103,6 +105,7 @@ static void LoadGLExtensionsT() {
     glUnmapBufferT = (PFNGLUNMAPBUFFERPROC)getProc("glUnmapBuffer");
     glGetUniformLocationT = (PFNGLGETUNIFORMLOCATIONPROC)getProc("glGetUniformLocation");
     glUniform1iT = (PFNGLUNIFORM1IPROC)getProc("glUniform1i");
+    glUniform1fT = (PFNGLUNIFORM1FPROC)getProc("glUniform1f");
     glDeleteShaderT = (PFNGLDELETESHADERPROC)getProc("glDeleteShader");
     glDeleteProgramT = (PFNGLDELETEPROGRAMPROC)getProc("glDeleteProgram");
     glDeleteBuffersT = (PFNGLDELETEBUFFERSPROC)getProc("glDeleteBuffers");
@@ -310,6 +313,98 @@ namespace SanmapGen {
             }
         }
 
+        glDeleteBuffersT(3, ssbo);
+    }
+
+    unsigned int TerrainCompute::s_MarkerComputeProgram = 0;
+    bool TerrainCompute::s_MarkerInitialized = false;
+
+    void TerrainCompute::DispatchMarkers(const GenerationParams& params, const MarkerRule& rule, const FloatMask& heightmap, const FloatMask& slopeMap, std::vector<int>& outMask) {
+        int vertSize = heightmap.GetWidth();
+        if (vertSize <= 0) return;
+
+        LoadGLExtensionsT();
+        if (!glCreateShaderT || !glUniform1fT) return;
+
+        if (!s_MarkerInitialized) {
+            std::ifstream file("D:/Projects/Sanctuary/Map Generator/shaders/MarkerCompute.glsl");
+            if (!file.is_open()) return;
+            std::stringstream buffer;
+            buffer << file.rdbuf();
+            std::string shaderSourceStr = buffer.str();
+            const char* shaderSource = shaderSourceStr.c_str();
+
+            GLuint computeShader = glCreateShaderT(GL_COMPUTE_SHADER);
+            glShaderSourceT(computeShader, 1, &shaderSource, NULL);
+            glCompileShaderT(computeShader);
+
+            GLint success;
+            glGetShaderivT(computeShader, 0x8B81, &success);
+            if (!success) return; // Silent fail in batch
+
+            s_MarkerComputeProgram = glCreateProgramT();
+            glAttachShaderT(s_MarkerComputeProgram, computeShader);
+            glLinkProgramT(s_MarkerComputeProgram);
+            glDeleteShaderT(computeShader);
+            s_MarkerInitialized = true;
+        }
+
+        if (s_MarkerComputeProgram == 0) return;
+
+        GLuint ssbo[3];
+        glGenBuffersT(3, ssbo);
+
+        // HeightMap
+        glBindBufferT(GL_SHADER_STORAGE_BUFFER, ssbo[0]);
+        glBufferDataT(GL_SHADER_STORAGE_BUFFER, vertSize * vertSize * sizeof(float), heightmap.GetDataPtr(), GL_READ_ONLY);
+        glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 0, ssbo[0]);
+
+        // SlopeMap
+        glBindBufferT(GL_SHADER_STORAGE_BUFFER, ssbo[1]);
+        glBufferDataT(GL_SHADER_STORAGE_BUFFER, vertSize * vertSize * sizeof(float), slopeMap.GetDataPtr(), GL_READ_ONLY);
+        glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 1, ssbo[1]);
+
+        // OutMask
+        outMask.assign(vertSize * vertSize, 0);
+        glBindBufferT(GL_SHADER_STORAGE_BUFFER, ssbo[2]);
+        glBufferDataT(GL_SHADER_STORAGE_BUFFER, outMask.size() * sizeof(int), outMask.data(), GL_DYNAMIC_COPY);
+        glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 2, ssbo[2]);
+
+        glUseProgramT(s_MarkerComputeProgram);
+        glUniform1iT(glGetUniformLocationT(s_MarkerComputeProgram, "mapSize"), vertSize);
+        glUniform1iT(glGetUniformLocationT(s_MarkerComputeProgram, "halfSize"), vertSize / 2);
+        
+        int symMask = rule.SymmetryUseGlobal ? params.GlobalSymmetryMask : rule.SymmetryMask;
+        glUniform1iT(glGetUniformLocationT(s_MarkerComputeProgram, "symMask"), symMask);
+
+        float minRad = std::min(rule.MinSlope, 89.9f) * (3.14159265f / 180.0f);
+        float maxRad = std::min(rule.MaxSlope, 89.9f) * (3.14159265f / 180.0f);
+        float minGradSq = std::tan(minRad) * std::tan(minRad);
+        float maxGradSq = std::tan(maxRad) * std::tan(maxRad);
+        
+        glUniform1fT(glGetUniformLocationT(s_MarkerComputeProgram, "minGradSq"), minGradSq);
+        glUniform1fT(glGetUniformLocationT(s_MarkerComputeProgram, "maxGradSq"), maxGradSq);
+        glUniform1fT(glGetUniformLocationT(s_MarkerComputeProgram, "minHeight"), rule.MinHeight);
+        glUniform1fT(glGetUniformLocationT(s_MarkerComputeProgram, "maxHeight"), rule.MaxHeight);
+
+        glUniform1iT(glGetUniformLocationT(s_MarkerComputeProgram, "focusGradientMode"), (int)rule.FocusGradient);
+        glUniform1fT(glGetUniformLocationT(s_MarkerComputeProgram, "focusRadius"), rule.FocusGradientRadius);
+        glUniform1fT(glGetUniformLocationT(s_MarkerComputeProgram, "focusContrast"), rule.FocusGradientContrast);
+        glUniform1fT(glGetUniformLocationT(s_MarkerComputeProgram, "focusStrength"), rule.FocusGradientStrength);
+        glUniform1iT(glGetUniformLocationT(s_MarkerComputeProgram, "seed"), params.Seed);
+
+        int groupX = (vertSize + 7) / 8;
+        int groupY = (vertSize + 7) / 8;
+        glDispatchComputeT(groupX, groupY, 1);
+        glMemoryBarrierT(GL_SHADER_STORAGE_BARRIER_BIT);
+
+        glBindBufferT(GL_SHADER_STORAGE_BUFFER, ssbo[2]);
+        int* ptr = (int*)glMapBufferT(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+        if (ptr) {
+            std::copy(ptr, ptr + outMask.size(), outMask.begin());
+            glUnmapBufferT(GL_SHADER_STORAGE_BUFFER);
+        }
+        
         glDeleteBuffersT(3, ssbo);
     }
 }

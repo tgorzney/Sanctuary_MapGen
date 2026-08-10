@@ -4,6 +4,7 @@
 #include "../math/Sanmath_Spatial.h"
 #include "../math/Sanmath_SIMD.h"
 #include "../math/Sanmath_FastMath.h"
+#include "../TerrainCompute.h"
 #include <random>
 #include <omp.h>
 #include <mutex>
@@ -198,10 +199,39 @@ namespace SanmapGen {
                     continue; 
                 }
                 
-                // DETERMINISTIC PATH: AVX2 L1-Tiled Loop
-                int tileSize = 64; 
-                
-                #pragma omp parallel for collapse(2)
+                // GPU PATH: Compute Shader
+                if (params.UseGPUMarkers) {
+                    std::vector<int> gpuMask;
+                    TerrainCompute::DispatchMarkers(params, rule, heightmap, slopeMap, gpuMask);
+                    
+                    for (int y = startBound; y < endBound; ++y) {
+                        for (int x = startBound; x < endBound; ++x) {
+                            if (gpuMask[y * mapSize + x] == 1) {
+                                float flatRadius = 0.0f;
+                                if (params.FastPreviewMode) {
+                                    auto res = Math::ScoreRadialClearance_Stochastic(heightmap, x, y, rule.MinHeight, rule.MaxHeight, rule.AreaHeightRange, maxSearchRadius, (int)rule.AreaRadiusMin, params.Seed ^ x ^ y);
+                                    flatRadius = (float)res.first;
+                                } else {
+                                    if (rule.AreaRadiusMin > 0.0f) flatRadius = jfaDistanceMap.Get(x, y);
+                                    else flatRadius = (float)maxSearchRadius;
+                                }
+                                
+                                if (flatRadius >= rule.AreaRadiusMin && (!rule.CheckMaxRadius || flatRadius <= rule.AreaRadiusMax)) {
+                                    MarkerCandidate cand;
+                                    cand.x = x; cand.y = y;
+                                    cand.maxFlatRadius = (int)flatRadius;
+                                    cand.variance = 0.0f;
+                                    candidates.push_back(cand);
+                                }
+                            }
+                        }
+                    }
+                }
+                else {
+                    // DETERMINISTIC PATH: AVX2 L1-Tiled Loop
+                    int tileSize = 64; 
+                    
+                    #pragma omp parallel for collapse(2)
                 for (int tileY = 0; tileY < mapSize; tileY += tileSize) {
                     for (int tileX = 0; tileX < mapSize; tileX += tileSize) {
                         
@@ -293,9 +323,10 @@ namespace SanmapGen {
                         if (!localCandidates.empty()) {
                             std::lock_guard<std::mutex> lock(mtx);
                             candidates.insert(candidates.end(), localCandidates.begin(), localCandidates.end());
+                            }
                         }
                     }
-                }
+                } // End of CPU/GPU branch
                 
                 if (candidates.empty()) continue;
                 

@@ -1,11 +1,9 @@
 #pragma once
 #include "Params_Enums.h"
+#include "Params_Gradients.h"
 #include <string>
 #include <vector>
 #include <map>
-
-#include <string>
-#include <vector>
 
 namespace SanmapGen {
     struct WaterSettings {
@@ -21,6 +19,15 @@ namespace SanmapGen {
         float WaterShoreDistanceOffset = 0.0f;
         float WaterShoreDistanceStrength = 2.0f;
         std::string WaveGeneratorBlueprint = "";
+        
+        GradientSettings Gradient = {
+            "Water", 
+            {
+                {0.0f, {0.05f, 0.1f, 0.3f, 0.85f}},   // Deep
+                {8.0f, {0.2f, 0.6f, 0.8f, 0.5f}}      // Shallow
+            },
+            true
+        };
     };
 
     struct AtmosphereSettings {
