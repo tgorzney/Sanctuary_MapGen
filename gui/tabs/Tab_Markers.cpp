@@ -66,6 +66,10 @@ namespace UI {
         if (ImGui::Checkbox("Enable Procedural Markers", &params.EnableProceduralMarkers)) {
             bNeedsMapUpdate = true;
         }
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Use GPU Generation", &params.UseGPUMarkers)) {
+            bNeedsMapUpdate = true;
+        }
         ImGui::Separator();
 
         if (ImGui::Button("Browse Gamedata...")) {

@@ -195,6 +195,7 @@ namespace SanmapGen {
         // --- Performance & Accuracy (TG_UE Execution Tiers) ---
         bool UseGPUTerrain = false;
         bool UseGPUFlowMap = false;
+        bool UseGPUMarkers = true;
         
         bool WYSIWYGBaking = false; // Bypasses High-Accuracy CPU baking to bake the 1:1 Lossy GPU Preview
         int GPUPreviewIterations = 20; // Allows real-time optimization dialing
