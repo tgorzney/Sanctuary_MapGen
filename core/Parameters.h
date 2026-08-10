@@ -98,6 +98,8 @@ namespace SanmapGen {
         struct PropInstance {
             float X, Y, Z;
             uint32_t TintColor;
+            int LayerIndex = -1;
+            int GroupIndex = -1;
         };
         std::vector<PropInstance> StaticPropsList;
         
@@ -119,9 +121,32 @@ namespace SanmapGen {
         };
         struct ManualPropGroup {
             std::string BlueprintPath;
+            float Color[4] = {0.0f, 1.0f, 0.0f, 1.0f}; // Default green
             std::vector<ManualPropTransform> Transforms;
         };
-        std::vector<ManualPropGroup> ManualProps;
+        struct ManualPropLayer {
+            std::string Name = "Default Props Layer";
+            float GroupColor[4] = {0.8f, 0.8f, 0.8f, 1.0f};
+            bool UseGroupColor = false;
+            std::vector<ManualPropGroup> Groups;
+        };
+        std::vector<ManualPropLayer> ManualPropLayers;
+
+        void UpdateStaticPropsColors() {
+            for (auto& pi : StaticPropsList) {
+                if (pi.LayerIndex >= 0 && pi.LayerIndex < (int)ManualPropLayers.size()) {
+                    auto& layer = ManualPropLayers[pi.LayerIndex];
+                    if (pi.GroupIndex >= 0 && pi.GroupIndex < (int)layer.Groups.size()) {
+                        auto& group = layer.Groups[pi.GroupIndex];
+                        float* c = layer.UseGroupColor ? layer.GroupColor : group.Color;
+                        uint8_t r = (uint8_t)(std::clamp(c[0] * 255.0f, 0.0f, 255.0f));
+                        uint8_t g = (uint8_t)(std::clamp(c[1] * 255.0f, 0.0f, 255.0f));
+                        uint8_t b = (uint8_t)(std::clamp(c[2] * 255.0f, 0.0f, 255.0f));
+                        pi.TintColor = (r << 16) | (g << 8) | b;
+                    }
+                }
+            }
+        }
         
         std::string ImportedDecalsJSON = "";
         

@@ -22,6 +22,7 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     // Clear old state before loading to prevent leaked array dimension bugs
     outParams.MarkersList.clear();
     outParams.StaticPropsList.clear();
+    outParams.ManualPropLayers.clear();
     outParams.GeoLayers.clear();
     for (auto& s : outParams.Stratums) {
         s.importedMaskData.clear();
@@ -494,11 +495,39 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                         importedSanmapLayer.MarkerKeys.push_back(transformName);
                         // No army inference logic; rely entirely on the armies defined in the map file.
                     } else {
+                        if (outParams.ManualPropLayers.empty()) {
+                            GenerationParams::ManualPropLayer markerLayer;
+                            markerLayer.Name = "Imported Markers";
+                            outParams.ManualPropLayers.push_back(markerLayer);
+                        }
+                        auto& layer = outParams.ManualPropLayers[0];
+                        
+                        int groupIdx = -1;
+                        for (int i = 0; i < (int)layer.Groups.size(); ++i) {
+                            if (layer.Groups[i].BlueprintPath == markerType) {
+                                groupIdx = i; break;
+                            }
+                        }
+                        if (groupIdx == -1) {
+                            GenerationParams::ManualPropGroup newGroup;
+                            newGroup.BlueprintPath = markerType;
+                            newGroup.Color[0] = 1.0f; newGroup.Color[1] = 0.5f; newGroup.Color[2] = 0.0f; // Orange
+                            layer.Groups.push_back(newGroup);
+                            groupIdx = (int)layer.Groups.size() - 1;
+                        }
+                        
+                        GenerationParams::ManualPropTransform mpt;
+                        mpt.Position[0] = mt.Position[0];
+                        mpt.Position[1] = mt.Position[1];
+                        mpt.Position[2] = mt.Position[2];
+                        layer.Groups[groupIdx].Transforms.push_back(mpt);
+                        
                         GenerationParams::PropInstance pi;
                         pi.X = mt.Position[0];
                         pi.Y = mt.Position[1];
                         pi.Z = mt.Position[2];
-                        pi.TintColor = 0xFF00FF00; // Default green for props
+                        pi.LayerIndex = 0;
+                        pi.GroupIndex = groupIdx;
                         outParams.StaticPropsList.push_back(pi);
                     }
                 }
@@ -520,14 +549,32 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     }
                 }
             }
-            outParams.ManualProps.clear();
+            if (outParams.ManualPropLayers.empty() || outParams.ManualPropLayers.back().Name != "Imported Props") {
+                GenerationParams::ManualPropLayer propLayer;
+                propLayer.Name = "Imported Props";
+                outParams.ManualPropLayers.push_back(propLayer);
+            }
+            auto& layer = outParams.ManualPropLayers.back();
+            int layerIdx = (int)outParams.ManualPropLayers.size() - 1;
             
             for (const auto& propGroup : propsArray) {
                 GenerationParams::ManualPropGroup mpg;
                 if (propGroup.contains("blueprintPath")) {
                     mpg.BlueprintPath = propGroup["blueprintPath"];
+                    std::string bpLower = mpg.BlueprintPath;
+                    std::transform(bpLower.begin(), bpLower.end(), bpLower.begin(), ::tolower);
+                    if (bpLower.find("crystal") != std::string::npos) {
+                        mpg.Color[0] = 0.8f; mpg.Color[1] = 0.2f; mpg.Color[2] = 0.8f; // Purple
+                    } else if (bpLower.find("tree") != std::string::npos || bpLower.find("bush") != std::string::npos || bpLower.find("foliage") != std::string::npos) {
+                        mpg.Color[0] = 0.2f; mpg.Color[1] = 0.8f; mpg.Color[2] = 0.2f; // Green
+                    } else if (bpLower.find("unit") != std::string::npos || bpLower.find("building") != std::string::npos) {
+                        mpg.Color[0] = 0.2f; mpg.Color[1] = 0.4f; mpg.Color[2] = 1.0f; // Blue
+                    } else if (bpLower.find("rock") != std::string::npos) {
+                        mpg.Color[0] = 0.5f; mpg.Color[1] = 0.5f; mpg.Color[2] = 0.5f; // Gray
+                    }
                 }
                 
+                int groupIdx = (int)layer.Groups.size();
                 if (propGroup.contains("transforms") && propGroup["transforms"].is_array()) {
                     for (const auto& t : propGroup["transforms"]) {
                         GenerationParams::ManualPropTransform mpt;
@@ -542,7 +589,8 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                             pi.X = mpt.Position[0];
                             pi.Y = mpt.Position[1];
                             pi.Z = mpt.Position[2];
-                            pi.TintColor = 0xFF00FF00;
+                            pi.LayerIndex = layerIdx;
+                            pi.GroupIndex = groupIdx;
                             outParams.StaticPropsList.push_back(pi);
                         }
                         
@@ -562,10 +610,10 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                         mpg.Transforms.push_back(mpt);
                     }
                 }
-                outParams.ManualProps.push_back(mpg);
+                layer.Groups.push_back(mpg);
             }
         } else {
-            outParams.ManualProps.clear();
+            // No action needed for ManualPropLayers if empty
         }
 
         // Load and scale decals if they exist
@@ -801,6 +849,7 @@ void MapImporter::LoadPendingTextures(GenerationParams& outParams, std::string& 
         }
     }
 
+    outParams.UpdateStaticPropsColors();
     outParams.PendingSplat14Path = "";
     outParams.PendingSplat58Path = "";
     outParams.PendingHeightmapPath = "";

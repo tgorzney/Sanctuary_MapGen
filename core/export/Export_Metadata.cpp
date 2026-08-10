@@ -131,7 +131,6 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     
     mapdef["waterLevel"] = params.Water.WaterLevelMin;
     mapdef["waterDepth"] = params.Water.DeepWaterDepthMin;
-    
     mapdef["waterWindSpeed"] = params.Water.WaterWindSpeed;
     mapdef["waterWindDirection"] = params.Water.WaterWindDirection;
     mapdef["waterWindShoreWavesRemap"] = params.Water.WaterWindShoreWavesRemap;
@@ -331,13 +330,18 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     if (groupedTransforms.find("Spawn") != groupedTransforms.end()) {
         for (auto& el : groupedTransforms["Spawn"].items()) {
             std::string spawnKey = el.key();
-            if (!armiesObj.contains(spawnKey)) {
+            std::string strippedKey = spawnKey;
+            if (spawnKey.find("Spawn_") == 0) {
+                strippedKey = spawnKey.substr(6);
+            }
+            
+            if (!armiesObj.contains(spawnKey) && !armiesObj.contains(strippedKey)) {
                 json fallbackArmy = json::object();
                 fallbackArmy["faction"] = 1; // Default
                 fallbackArmy["alloys"] = 1000.0f;
                 fallbackArmy["energy"] = 1000.0f;
                 fallbackArmy["groups"] = json::object();
-                armiesObj[spawnKey] = fallbackArmy;
+                armiesObj[strippedKey] = fallbackArmy;
             }
         }
     }
@@ -346,19 +350,23 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["armies"] = armiesObj;
 
     json propsArr = json::array();
-    for (const auto& mpg : params.ManualProps) {
-        json groupJson;
-        groupJson["blueprintPath"] = mpg.BlueprintPath;
-        json transformsArr = json::array();
-        for (const auto& t : mpg.Transforms) {
-            json tJson;
-            tJson["position"] = { {"x", t.Position[0]}, {"y", t.Position[1]}, {"z", t.Position[2]} };
-            tJson["rotation"] = { {"x", t.Rotation[0]}, {"y", t.Rotation[1]}, {"z", t.Rotation[2]}, {"w", t.Rotation[3]} };
-            tJson["scale"] = { {"x", t.Scale[0]}, {"y", t.Scale[1]}, {"z", t.Scale[2]} };
-            transformsArr.push_back(tJson);
+    for (const auto& layer : params.ManualPropLayers) {
+        if (layer.Name == "Imported Markers") continue; // We don't export unknown markers as props to avoid changing their identity
+        
+        for (const auto& mpg : layer.Groups) {
+            json groupJson;
+            groupJson["blueprintPath"] = mpg.BlueprintPath;
+            json transformsArr = json::array();
+            for (const auto& t : mpg.Transforms) {
+                json tJson;
+                tJson["position"] = { {"x", t.Position[0]}, {"y", t.Position[1]}, {"z", t.Position[2]} };
+                tJson["rotation"] = { {"x", t.Rotation[0]}, {"y", t.Rotation[1]}, {"z", t.Rotation[2]}, {"w", t.Rotation[3]} };
+                tJson["scale"] = { {"x", t.Scale[0]}, {"y", t.Scale[1]}, {"z", t.Scale[2]} };
+                transformsArr.push_back(tJson);
+            }
+            groupJson["transforms"] = transformsArr;
+            propsArr.push_back(groupJson);
         }
-        groupJson["transforms"] = transformsArr;
-        propsArr.push_back(groupJson);
     }
     json decalsArr = json::array();
     if (!params.ImportedDecalsJSON.empty()) {
