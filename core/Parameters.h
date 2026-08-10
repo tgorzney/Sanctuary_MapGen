@@ -264,6 +264,7 @@ namespace SanmapGen {
         bool ShowMarkers = true;
         bool ShowArmies = false;
         bool ShowAreas = false;
+        bool AreasLocked = true;
         
         std::vector<MapArea> Areas;
         

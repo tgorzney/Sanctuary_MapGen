@@ -13,7 +13,7 @@ namespace SanmapGen {
         
         bool isAreaLayerEnabled = false;
         for (const auto& l : params.PreviewLayers) {
-            if (l.Type == GenerationParams::PreviewLayerType::Areas && l.Enabled) {
+            if (l.Type == GenerationParams::PreviewLayerType::Areas && l.Blend != GenerationParams::LayerBlendMode::None) {
                 isAreaLayerEnabled = true;
                 break;
             }

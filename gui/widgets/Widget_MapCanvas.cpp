@@ -80,6 +80,7 @@ namespace SanmapGen {
                         case SanmapGen::GenerationParams::PreviewLayerType::Water: params.ShowWater = enabled; break;
                         case SanmapGen::GenerationParams::PreviewLayerType::Markers: params.ShowMarkers = enabled; break;
                         case SanmapGen::GenerationParams::PreviewLayerType::Props: params.ShowProps = enabled; break;
+                        case SanmapGen::GenerationParams::PreviewLayerType::Areas: params.ShowAreas = enabled; break;
                         case SanmapGen::GenerationParams::PreviewLayerType::DetailNormal: params.ShowDetailNormal = enabled; break;
                         case SanmapGen::GenerationParams::PreviewLayerType::Tint: params.ShowTint = enabled; break;
                         case SanmapGen::GenerationParams::PreviewLayerType::Holes: params.ShowHoles = enabled; break;

@@ -430,6 +430,26 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
         }
     }
     
+    // Ensure PlayableArea always exists
+    bool hasPlayArea = false;
+    for (const auto& a : outParams.Areas) {
+        if (a.Name == "PlayableArea" || a.Name == "Playable Area" || a.Name == "Playable") {
+            hasPlayArea = true;
+            break;
+        }
+    }
+    if (!hasPlayArea) {
+        MapArea playArea;
+        playArea.Name = "PlayableArea";
+        playArea.X = 0.0f;
+        playArea.Y = 0.0f;
+        playArea.Width = static_cast<float>(outParams.MapSize);
+        playArea.Length = static_cast<float>(outParams.MapSize);
+        playArea.Color[0] = 0.0f; playArea.Color[1] = 1.0f; playArea.Color[2] = 0.0f; playArea.Color[3] = 0.2f;
+        outParams.Areas.push_back(playArea);
+        log("Injected missing PlayableArea default.\n");
+    }
+    
     if (mapdef.contains("markers") && mapdef["markers"].is_object()) {
         auto markers = mapdef["markers"];
         for (auto it = markers.begin(); it != markers.end(); ++it) {
@@ -501,6 +521,23 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                 }
             }
             outParams.ImportedPropsJSON = propsArray.dump();
+            
+            // Populate StaticPropsList so manual props appear as dots on the map preview
+            for (const auto& propGroup : propsArray) {
+                if (propGroup.contains("transforms") && propGroup["transforms"].is_array()) {
+                    for (const auto& t : propGroup["transforms"]) {
+                        if (t.contains("position") && t["position"].is_object()) {
+                            GenerationParams::PropInstance pi;
+                            pi.X = t["position"].contains("x") ? static_cast<float>(t["position"]["x"]) : 0.0f;
+                            pi.Y = t["position"].contains("y") ? static_cast<float>(t["position"]["y"]) : 0.0f;
+                            pi.Z = t["position"].contains("z") ? static_cast<float>(t["position"]["z"]) : 0.0f;
+                            pi.TintColor = 0xFF00FF00; // Green dot for manual prop
+                            outParams.StaticPropsList.push_back(pi);
+                        }
+                    }
+                }
+            }
+            outParams.ImportedPropsJSON = propsArray.dump();
         } else {
             outParams.ImportedPropsJSON = "";
         }
@@ -534,15 +571,73 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                 }
             }
             if (!foundSpawn) {
-                MarkerTransform mt;
-                mt.Type = "Spawn";
-                mt.CustomName = "Spawn_" + armyId;
-                mt.IsManual = true;
-                mt.Position[0] = outParams.MapSize / 2.0f;
-                mt.Position[1] = 0.0f;
-                mt.Position[2] = outParams.MapSize / 2.0f;
-                outParams.MarkersList[mt.CustomName] = mt;
-                importedSanmapLayer.MarkerKeys.push_back(mt.CustomName);
+                // Try to find an UNASSIGNED spawn marker
+                bool assignedExisting = false;
+                for (auto& [key, marker] : outParams.MarkersList) {
+                    if (marker.Type == "Spawn" || marker.Type == "Spawns") {
+                        // Is it already assigned to another army?
+                        bool alreadyAssigned = false;
+                        for (const auto& [otherArmyId, _] : outParams.Armies) {
+                            if (marker.CustomName.find(otherArmyId) != std::string::npos) {
+                                alreadyAssigned = true;
+                                break;
+                            }
+                        }
+                        if (!alreadyAssigned) {
+                            marker.CustomName = "Spawn_" + armyId;
+                            assignedExisting = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!assignedExisting) {
+                    MarkerTransform mt;
+                    mt.Type = "Spawn";
+                    mt.CustomName = "Spawn_" + armyId;
+                    mt.IsManual = true;
+                    mt.Position[0] = outParams.MapSize / 2.0f;
+                    mt.Position[1] = 0.0f;
+                    mt.Position[2] = outParams.MapSize / 2.0f;
+                    outParams.MarkersList[mt.CustomName] = mt;
+                    importedSanmapLayer.MarkerKeys.push_back(mt.CustomName);
+                }
+            }
+        }
+        
+        // HEURISTIC: Recover missing Armies from orphaned Spawn markers
+        // Some map editors or manual edits save Spawn points with an Army name (e.g. "Spawn_ARMY_1")
+        // but completely forget to define the "armies" section in the JSON file.
+        for (const auto& [key, marker] : outParams.MarkersList) {
+            if (marker.Type == "Spawn" || marker.Type == "Spawns") {
+                std::string impliedArmyId = "";
+                if (marker.CustomName.find("Spawn_") == 0) {
+                    impliedArmyId = marker.CustomName.substr(6);
+                } else if (marker.CustomName.find("ARMY_") != std::string::npos) {
+                    impliedArmyId = marker.CustomName; // fallback if just named "ARMY_X"
+                }
+                
+                if (!impliedArmyId.empty() && outParams.Armies.find(impliedArmyId) == outParams.Armies.end()) {
+                    Army newArmy;
+                    newArmy.Faction = 0;
+                    newArmy.Alloys = 100.0f;
+                    newArmy.Energy = 1000.0f;
+                    
+                    int cIdx = outParams.Armies.size() % 8;
+                    const float defaultColors[8][4] = {
+                        {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.4f, 0.7f, 1.0f}, 
+                        {1.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f, 0.5f, 1.0f}, 
+                        {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 1.0f, 1.0f}, 
+                        {1.0f, 1.0f, 0.0f, 1.0f}, {0.2f, 0.8f, 0.2f, 1.0f}
+                    };
+                    newArmy.Color[0] = defaultColors[cIdx][0];
+                    newArmy.Color[1] = defaultColors[cIdx][1];
+                    newArmy.Color[2] = defaultColors[cIdx][2];
+                    newArmy.Color[3] = defaultColors[cIdx][3];
+                    
+                    outParams.Armies[impliedArmyId] = newArmy;
+                    log("Auto-recovered missing Army from Spawn marker: " + impliedArmyId + "\n");
+                }
             }
         }
         

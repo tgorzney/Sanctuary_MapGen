@@ -21,6 +21,8 @@ namespace UI {
             params.Areas.push_back(a);
             bNeedsPreviewRender = true;
         }
+        ImGui::SameLine();
+        ImGui::Checkbox("Lock Areas", &params.AreasLocked);
 
         ImGui::Spacing();
         ImGui::Separator();
