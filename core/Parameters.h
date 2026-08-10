@@ -47,6 +47,10 @@ namespace SanmapGen {
         std::string GlobalEnvironmentPath = ""; // Path to the .sanpack or folder
         std::string MapFolderPath = ""; // Path to the currently loaded map folder
         
+        std::string PendingSplat14Path = ""; // Used to trigger fallback UI popups
+        std::string PendingSplat58Path = "";
+        std::string PendingHeightmapPath = "";
+        
         int ShowFocusGradientDebugRuleIndex = -1; // -1 means off, otherwise the index of the MarkerRule being adjusted
         
         std::string DebugInfo = "";

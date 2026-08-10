@@ -281,14 +281,13 @@ namespace UI {
             if (ImGui::CollapsingHeader(label)) {
                 char nameBuf[128]; strncpy(nameBuf, params.Stratums[i].name.c_str(), sizeof(nameBuf));
                 if (ImGui::InputText("Name", nameBuf, IM_ARRAYSIZE(nameBuf))) params.Stratums[i].name = nameBuf;
-                
                 ImGui::Separator();
                 
                 // Environment Auto-fill
                 if (!params.GlobalEnvironmentPath.empty()) {
                     std::vector<std::string> envs = SanmapGen::TextureLoader::GetEnvironmentsFromSanpack(params.GlobalEnvironmentPath);
                     if (!envs.empty()) {
-                        static std::string selectedEnv = "";
+                        std::string& selectedEnv = params.Stratums[i].EnvironmentTheme;
                         ImGui::PushItemWidth(150.0f);
                         if (ImGui::BeginCombo("Environment", selectedEnv.empty() ? "Select..." : selectedEnv.c_str())) {
                             for (const auto& env : envs) {
@@ -302,12 +301,12 @@ namespace UI {
                         if (!selectedEnv.empty()) {
                             ImGui::SameLine();
                             std::vector<std::string> mats = SanmapGen::TextureLoader::GetMaterialsFromSanpack(params.GlobalEnvironmentPath, selectedEnv);
-                            if (ImGui::BeginCombo("Material", "Auto-fill...")) {
+                            std::string& selectedMat = params.Stratums[i].MaterialName;
+                            if (ImGui::BeginCombo("Material", selectedMat.empty() ? "Auto-fill..." : selectedMat.c_str())) {
                                 for (const auto& mat : mats) {
-                                    if (ImGui::Selectable(mat.c_str())) {
-                                        params.Stratums[i].albedo.path = selectedEnv + "/" + mat + "_Albedo.png";
-                                        params.Stratums[i].normal.path = selectedEnv + "/" + mat + "_Normal.png";
-                                        params.Stratums[i].mask.path = selectedEnv + "/" + mat + "_Mask.png";
+                                    if (ImGui::Selectable(mat.c_str(), selectedMat == mat)) {
+                                        selectedMat = mat;
+                                        SanmapGen::TextureLoader::ScanSanpackForMaterial(params.GlobalEnvironmentPath, selectedEnv, mat, params.Stratums[i]);
                                         bNeedsPreviewRender = true;
                                         
                                         if (params.Stratums[i].previewAlbedoTex) glDeleteTextures(1, &params.Stratums[i].previewAlbedoTex);

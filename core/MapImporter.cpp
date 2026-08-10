@@ -141,7 +141,30 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             auto s = str[i];
             auto& strat = outParams.Stratums[i];
             
-            if (s.contains("albedo") && s["albedo"].is_object() && s["albedo"].contains("path")) strat.albedo.path = s["albedo"]["path"];
+            if (s.contains("albedo") && s["albedo"].is_object() && s["albedo"].contains("path")) {
+                strat.albedo.path = s["albedo"]["path"];
+                std::string pathStr = strat.albedo.path;
+                
+                // Attempt to reverse engineer EnvironmentTheme and MaterialName
+                // Format: Environment/ThemeName/Stratum/MaterialName_albedo.dds
+                size_t envPos = pathStr.find("Environment/");
+                if (envPos != std::string::npos) {
+                    size_t themeStart = envPos + 12;
+                    size_t themeEnd = pathStr.find('/', themeStart);
+                    if (themeEnd != std::string::npos) {
+                        strat.EnvironmentTheme = pathStr.substr(themeStart, themeEnd - themeStart);
+                        
+                        size_t fileStart = pathStr.find_last_of('/');
+                        if (fileStart != std::string::npos) {
+                            std::string filename = pathStr.substr(fileStart + 1);
+                            size_t albedoPos = filename.find("_albedo");
+                            if (albedoPos != std::string::npos) {
+                                strat.MaterialName = filename.substr(0, albedoPos);
+                            }
+                        }
+                    }
+                }
+            }
             if (s.contains("normal") && s["normal"].is_object() && s["normal"].contains("path")) strat.normal.path = s["normal"]["path"];
             if (s.contains("mask") && s["mask"].is_object() && s["mask"].contains("path")) strat.mask.path = s["mask"]["path"];
             
@@ -280,79 +303,28 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
         }
     }
 
-    // Process Splat Maps (stratums_1_4.tga, stratums_5_8.tga)
-    std::string s1_4Path = folderPath + "/Textures/stratums_1_4.tga";
-    if (!fs::exists(s1_4Path)) s1_4Path = folderPath + "/stratums_1_4.tga";
-    
-    std::string s5_8Path = folderPath + "/Textures/stratums_5_8.tga";
-    if (!fs::exists(s5_8Path)) s5_8Path = folderPath + "/stratums_5_8.tga";
-    
-    log("Looking for splat maps: " + s1_4Path + " and " + s5_8Path + "\n");
-    
-    if (fs::exists(s1_4Path)) {
-        log("Found stratums_1_4.tga. Loading...\n");
-        int w1, h1, c1;
-        unsigned char* s14Data = stbi_load(s1_4Path.c_str(), &w1, &h1, &c1, 4);
-        unsigned char* s58Data = nullptr;
-        int w2 = 0, h2 = 0; // Hoisted so s58Data dimensions are accessible outside the inner block
-
-        if (fs::exists(s5_8Path)) {
-            log("Found stratums_5_8.tga. Loading...\n");
-            int c2;
-            s58Data = stbi_load(s5_8Path.c_str(), &w2, &h2, &c2, 4);
-        }
-
-        log("s14Data loaded: " + std::string(s14Data ? "YES" : "NO") + ". Dimensions: " + std::to_string(w1) + "x" + std::to_string(h1) + " (MapSize: " + std::to_string(outParams.MapSize) + ")\n");
-
-        if (s14Data) {
-            int texSize = outParams.MapSize;
-            int pixelCount = texSize * texSize;
-
-            // Splat maps are recommended to be exported at a higher resolution than the landscape
-            // (e.g. 4096x4096 for a 2048-quad map). Resample to MapSize x MapSize using
-            // nearest-neighbour so any splat resolution is accepted without dimension matching.
-            log("Resampling splat maps (" + std::to_string(w1) + "x" + std::to_string(h1) +
-                ") -> ImportedMaskData (" + std::to_string(texSize) + "x" + std::to_string(texSize) + ").\n");
-
-            for (auto& s : outParams.Stratums) {
-                s.importedMaskData.assign(pixelCount, 0.0f);
-                s.maskMode = ImportedMaskMode::StaticOverride; // Auto-enable on import
+    // Look for Splat Maps and Heightmaps universally
+    auto findFile = [](const std::string& dir, const std::string& prefix) -> std::string {
+        if (!fs::exists(dir)) return "";
+        for (const auto& entry : fs::directory_iterator(dir)) {
+            if (entry.is_regular_file()) {
+                std::string fname = entry.path().filename().string();
+                if (fname.find(prefix) == 0) return entry.path().string();
             }
-
-            for (int sy = 0; sy < texSize; ++sy) {
-                for (int sx = 0; sx < texSize; ++sx) {
-                    // Map from landscape grid coords to splat texel coords (nearest-neighbour)
-                    int tx1 = std::clamp((sx * w1) / texSize, 0, w1 - 1);
-                    int ty1 = std::clamp((sy * h1) / texSize, 0, h1 - 1);
-                    int sIdx1 = (ty1 * w1 + tx1) * 4;
-                    int maskIdx = sy * texSize + sx;
-
-                    if (0 < outParams.Stratums.size()) outParams.Stratums[0].importedMaskData[maskIdx] = s14Data[sIdx1 + 0] / 255.0f;
-                    if (1 < outParams.Stratums.size()) outParams.Stratums[1].importedMaskData[maskIdx] = s14Data[sIdx1 + 1] / 255.0f;
-                    if (2 < outParams.Stratums.size()) outParams.Stratums[2].importedMaskData[maskIdx] = s14Data[sIdx1 + 2] / 255.0f;
-                    if (3 < outParams.Stratums.size()) outParams.Stratums[3].importedMaskData[maskIdx] = s14Data[sIdx1 + 3] / 255.0f;
-
-                    if (s58Data && w2 > 0 && h2 > 0) {
-                        int tx2 = std::clamp((sx * w2) / texSize, 0, w2 - 1);
-                        int ty2 = std::clamp((sy * h2) / texSize, 0, h2 - 1);
-                        int sIdx2 = (ty2 * w2 + tx2) * 4;
-                        if (4 < outParams.Stratums.size()) outParams.Stratums[4].importedMaskData[maskIdx] = s58Data[sIdx2 + 0] / 255.0f;
-                        if (5 < outParams.Stratums.size()) outParams.Stratums[5].importedMaskData[maskIdx] = s58Data[sIdx2 + 1] / 255.0f;
-                        if (6 < outParams.Stratums.size()) outParams.Stratums[6].importedMaskData[maskIdx] = s58Data[sIdx2 + 2] / 255.0f;
-                        if (7 < outParams.Stratums.size()) outParams.Stratums[7].importedMaskData[maskIdx] = s58Data[sIdx2 + 3] / 255.0f;
-                    }
-                }
-            }
-            log("Stratum masks imported successfully.\n");
         }
+        return "";
+    };
+    
+    std::string texFolder = folderPath + "/Textures";
+    outParams.PendingSplat14Path = findFile(texFolder, "stratums_1_4.");
+    if (outParams.PendingSplat14Path.empty()) outParams.PendingSplat14Path = findFile(folderPath, "stratums_1_4.");
+    
+    outParams.PendingSplat58Path = findFile(texFolder, "stratums_5_8.");
+    if (outParams.PendingSplat58Path.empty()) outParams.PendingSplat58Path = findFile(folderPath, "stratums_5_8.");
+    
+    outParams.PendingHeightmapPath = findFile(texFolder, "heightmap.");
+    if (outParams.PendingHeightmapPath.empty()) outParams.PendingHeightmapPath = findFile(folderPath, "heightmap.");
 
-        if (s14Data) stbi_image_free(s14Data);
-        if (s58Data) stbi_image_free(s58Data);
-    } else {
-        log("stratums_1_4.tga does not exist.\n");
-    }
-
-    // Extract map name from path
     std::filesystem::path p(pathOrFolder);
     std::string mapName = p.stem().string();
 
@@ -444,6 +416,126 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
 
     log("--- End LoadSanmap (SUCCESS) ---\n");
     return true;
+}
+
+void MapImporter::LoadPendingTextures(GenerationParams& outParams, std::string& outDebugLog) {
+    std::ofstream dbg("debug_importer_textures.txt", std::ios::app);
+    auto log = [&](const std::string& msg) {
+        dbg << msg;
+        outDebugLog += msg;
+    };
+    log("--- Start LoadPendingTextures ---\n");
+
+    std::string s1_4Path = outParams.PendingSplat14Path;
+    std::string s5_8Path = outParams.PendingSplat58Path;
+    std::string hmapPath = outParams.PendingHeightmapPath;
+
+    // Load Splat maps
+    if (!s1_4Path.empty() && fs::exists(s1_4Path)) {
+        log("Found splat map 1-4: " + s1_4Path + ". Loading...\n");
+        int w1, h1, c1;
+        unsigned char* s14Data = stbi_load(s1_4Path.c_str(), &w1, &h1, &c1, 4);
+        unsigned char* s58Data = nullptr;
+        int w2 = 0, h2 = 0;
+
+        if (!s5_8Path.empty() && fs::exists(s5_8Path)) {
+            log("Found splat map 5-8: " + s5_8Path + ". Loading...\n");
+            int c2;
+            s58Data = stbi_load(s5_8Path.c_str(), &w2, &h2, &c2, 4);
+        }
+
+        if (s14Data) {
+            int texSize = outParams.MapSize;
+            int pixelCount = texSize * texSize;
+            log("Resampling splat maps (" + std::to_string(w1) + "x" + std::to_string(h1) +
+                ") -> ImportedMaskData (" + std::to_string(texSize) + "x" + std::to_string(texSize) + ").\n");
+
+            for (auto& s : outParams.Stratums) {
+                s.importedMaskData.assign(pixelCount, 0.0f);
+                s.maskMode = ImportedMaskMode::StaticOverride; // Auto-enable on import
+            }
+
+            for (int sy = 0; sy < texSize; ++sy) {
+                for (int sx = 0; sx < texSize; ++sx) {
+                    int tx1 = std::clamp((sx * w1) / texSize, 0, w1 - 1);
+                    int ty1 = std::clamp((sy * h1) / texSize, 0, h1 - 1);
+                    int sIdx1 = (ty1 * w1 + tx1) * 4;
+                    int maskIdx = sy * texSize + sx;
+
+                    if (0 < outParams.Stratums.size()) outParams.Stratums[0].importedMaskData[maskIdx] = s14Data[sIdx1 + 0] / 255.0f;
+                    if (1 < outParams.Stratums.size()) outParams.Stratums[1].importedMaskData[maskIdx] = s14Data[sIdx1 + 1] / 255.0f;
+                    if (2 < outParams.Stratums.size()) outParams.Stratums[2].importedMaskData[maskIdx] = s14Data[sIdx1 + 2] / 255.0f;
+                    if (3 < outParams.Stratums.size()) outParams.Stratums[3].importedMaskData[maskIdx] = s14Data[sIdx1 + 3] / 255.0f;
+
+                    if (s58Data && w2 > 0 && h2 > 0) {
+                        int tx2 = std::clamp((sx * w2) / texSize, 0, w2 - 1);
+                        int ty2 = std::clamp((sy * h2) / texSize, 0, h2 - 1);
+                        int sIdx2 = (ty2 * w2 + tx2) * 4;
+                        if (4 < outParams.Stratums.size()) outParams.Stratums[4].importedMaskData[maskIdx] = s58Data[sIdx2 + 0] / 255.0f;
+                        if (5 < outParams.Stratums.size()) outParams.Stratums[5].importedMaskData[maskIdx] = s58Data[sIdx2 + 1] / 255.0f;
+                        if (6 < outParams.Stratums.size()) outParams.Stratums[6].importedMaskData[maskIdx] = s58Data[sIdx2 + 2] / 255.0f;
+                        if (7 < outParams.Stratums.size()) outParams.Stratums[7].importedMaskData[maskIdx] = s58Data[sIdx2 + 3] / 255.0f;
+                    }
+                }
+            }
+            log("Stratum masks imported successfully.\n");
+        }
+
+        if (s14Data) stbi_image_free(s14Data);
+        if (s58Data) stbi_image_free(s58Data);
+    }
+    
+    // Load heightmap if provided
+    if (!hmapPath.empty() && fs::exists(hmapPath)) {
+        log("Loading pending heightmap: " + hmapPath + "\n");
+        // We will do a generic load. If it's .raw, we load 16-bit. If it's .png, we load 16-bit.
+        std::ifstream file(hmapPath, std::ios::binary | std::ios::ate);
+        if (file) {
+            std::streamsize size = file.tellg();
+            file.seekg(0, std::ios::beg);
+            
+            // Assume 16-bit single channel for raw
+            int expectedDim = static_cast<int>(std::sqrt(size / 2));
+            if (expectedDim > 0 && size % 2 == 0) {
+                std::vector<uint16_t> buffer(size / 2);
+                if (file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+                    if (outParams.GeoLayers.empty()) {
+                        outParams.GeoLayers.push_back({});
+                        outParams.GeoLayers.back().Name = "Imported Heightmap";
+                    }
+                    
+                    auto& geo = outParams.GeoLayers.back();
+                    if (geo.Layers.empty()) {
+                        geo.Layers.push_back({});
+                    }
+                    auto& layer = geo.Layers.back();
+                    layer.Name = "Imported Heightmap";
+                    layer.Blend = BlendMode::Add;
+                    layer.UseImage = true;
+                    layer.ImageWidth = outParams.MapSize;
+                    layer.ImageHeight = outParams.MapSize;
+                    layer.ImagePath = hmapPath;
+
+                    int targetDim = outParams.MapSize;
+                    layer.ImageData.assign(targetDim * targetDim, 0.0f);
+                    
+                    for (int y = 0; y < targetDim; ++y) {
+                        for (int x = 0; x < targetDim; ++x) {
+                            int sx = std::clamp((x * expectedDim) / targetDim, 0, expectedDim - 1);
+                            int sy = std::clamp((y * expectedDim) / targetDim, 0, expectedDim - 1);
+                            float val = static_cast<float>(buffer[sy * expectedDim + sx]) / 65535.0f;
+                            layer.ImageData[y * targetDim + x] = val;
+                        }
+                    }
+                    log("Heightmap imported successfully.\n");
+                }
+            }
+        }
+    }
+
+    outParams.PendingSplat14Path = "";
+    outParams.PendingSplat58Path = "";
+    outParams.PendingHeightmapPath = "";
 }
 
 } // namespace SanmapGen

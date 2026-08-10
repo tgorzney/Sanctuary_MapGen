@@ -110,6 +110,8 @@ namespace SanmapGen {
 
     struct StratumSettings {
         std::string name = "Stratum";
+        std::string EnvironmentTheme = "";
+        std::string MaterialName = "";
         
         SanTextureLoader albedo;
         SanNormalTextureLoader normal;

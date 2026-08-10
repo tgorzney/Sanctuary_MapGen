@@ -189,7 +189,6 @@ size_t currentFlowHash = params.GetFlowHash(currentErosionHash);
                 flowPtr[i] /= maxVel;
                 accPtr[i] /= maxAcc;
             }
-            
             inOutResult.CachedFlowHash = currentFlowHash;
             inOutResult.CachedFlowMap = inOutResult.FlowMap;
             inOutResult.CachedAccumulationMap = inOutResult.AccumulationMap;

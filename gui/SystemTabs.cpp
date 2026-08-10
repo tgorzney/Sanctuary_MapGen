@@ -41,6 +41,8 @@ namespace UI {
             }
         }
         
+        static bool bShowFallbackPopup = false;
+        
         if (ImGui::Button("Open Sanmap File", ImVec2(-1, 30))) {
             std::string path;
             if (FileDialog::OpenFile("Sanmap Files\0*.sanmap\0All Files\0*.*\0", path)) {
@@ -56,10 +58,40 @@ namespace UI {
                     SanmapGen::UI::ReloadStratumTextures(params);
                     bNeedsMapUpdate = true;
                     bResetPreviewTransform = true; 
+                    
+                    if (!params.PendingSplat14Path.empty() || !params.PendingSplat58Path.empty() || !params.PendingHeightmapPath.empty()) {
+                        bShowFallbackPopup = true;
+                    }
                 } else {
                     importDebugLog += "\nFailed to load Sanmap.\n";
                 }
             }
+        }
+        
+        if (bShowFallbackPopup) {
+            ImGui::OpenPopup("Found Imported Textures");
+        }
+        
+        if (ImGui::BeginPopupModal("Found Imported Textures", &bShowFallbackPopup, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("A Textures folder with baked splatmaps/heightmap was found.");
+            ImGui::Text("Do you want to load these textures to update the Map Generator's imported data?");
+            ImGui::Separator();
+            
+            if (ImGui::Button("Yes, Load Textures", ImVec2(150, 0))) {
+                MapImporter::LoadPendingTextures(params, importDebugLog);
+                bNeedsMapUpdate = true;
+                bShowFallbackPopup = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("No, Ignore", ImVec2(120, 0))) {
+                params.PendingSplat14Path = "";
+                params.PendingSplat58Path = "";
+                params.PendingHeightmapPath = "";
+                bShowFallbackPopup = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
         }
         
         if (ImGui::Button("Import SupCom Lua", ImVec2(-1, 30))) {
