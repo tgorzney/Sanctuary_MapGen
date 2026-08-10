@@ -66,9 +66,9 @@ namespace SanmapGen {
         
         // --- Markers & Gamedata ---
         std::string GamedataPath = ""; // Path to the Sanctuary Gamedata folder containing UI.zip / UI.sanpack
-        float MarkerScaleAlloy = 1.0f;
-        float MarkerScalePlasma = 1.0f;
-        float MarkerScaleSpawn = 1.0f;
+        float MarkerScaleAlloy = 0.17f;
+        float MarkerScalePlasma = 0.17f;
+        float MarkerScaleSpawn = 0.17f;
         float MarkerColorAlloy[4] = {0.8f, 0.8f, 0.2f, 1.0f};
         float MarkerColorPlasma[4] = {0.2f, 0.8f, 0.8f, 1.0f};
         float MarkerColorSpawn[4] = {0.8f, 0.2f, 0.2f, 1.0f};
