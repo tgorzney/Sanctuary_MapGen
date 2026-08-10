@@ -18,7 +18,7 @@ namespace UI {
                 bNeedsPreviewRender = true;
             }
             
-            if (UI::GradientEditor("Water Preview Gradient", params.Water.Gradient, 128.0f)) {
+            if (UI::GradientEditor("Water Preview Gradient", params.Water.Gradient, 1.0f)) {
                 bNeedsPreviewRender = true;
             }
         }

@@ -23,8 +23,8 @@ namespace SanmapGen {
         GradientSettings Gradient = {
             "Water", 
             {
-                {0.0f, {0.2f, 0.6f, 0.8f, 0.5f}},      // Shallow
-                {1.0f, {0.05f, 0.1f, 0.3f, 0.85f}}     // Deep
+                {0.0f, {0.05f, 0.1f, 0.3f, 0.85f}},    // Deep
+                {1.0f, {0.2f, 0.6f, 0.8f, 0.5f}}       // Shallow
             },
             true
         };

@@ -218,8 +218,16 @@ namespace SanmapGen {
                     }
                     else if (layer.Type == GenerationParams::PreviewLayerType::Water) {
                         if (realHeight <= params.Water.WaterLevelMax) {
-                            float depth = params.Water.WaterLevelMax - realHeight;
-                            EvalGradientColor(depth, params.Water.Gradient, sR, sG, sB, sA);
+                            float minH = genResult.TerrainMinHeight;
+                            float maxH = params.Water.WaterLevelMax;
+                            float t = 0.0f;
+                            if (maxH > minH) {
+                                t = (realHeight - minH) / (maxH - minH);
+                                t = std::clamp(t, 0.0f, 1.0f);
+                            } else {
+                                t = 1.0f;
+                            }
+                            EvalGradientColor(t, params.Water.Gradient, sR, sG, sB, sA);
                             
                             if (layer.Blend == GenerationParams::LayerBlendMode::Normal) {
                                 sA = 1.0f; // 100% opaque in normal mode to easily see the water line

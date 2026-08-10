@@ -428,7 +428,16 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                 auto transforms = typeObj["transforms"];
                 for (auto tIt = transforms.begin(); tIt != transforms.end(); ++tIt) {
                     std::string originalKey = tIt.key();
-                    std::string transformName = markerType + "_" + originalKey;
+                    std::string transformName = originalKey;
+                    
+                    // If the original key doesn't already start with the marker type (or "Spawn_"), prefix it to ensure uniqueness
+                    if (markerType == "Spawn" || markerType == "Spawns") {
+                        if (transformName.find("Spawn_") != 0 && transformName.find("ARMY_") != 0) {
+                            transformName = "Spawn_" + originalKey;
+                        }
+                    } else if (transformName.find(markerType) != 0) {
+                        transformName = markerType + "_" + originalKey;
+                    }
                     auto tVal = tIt.value();
                     
                     MarkerTransform mt;
