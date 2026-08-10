@@ -405,17 +405,28 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     importedSanmapLayer.Name = mapName + " Markers";
     importedSanmapLayer.Type = LayerType::Fixed;
     
-    // Auto-scale markers if Playable Area width is smaller than MapSize
+    // Parse Areas and determine auto-scale
     float markerScaleFactor = 1.0f;
-    if (mapdef.contains("areas") && mapdef["areas"].is_object() && 
-        mapdef["areas"].contains("Playable") && mapdef["areas"]["Playable"].is_object() &&
-        mapdef["areas"]["Playable"].contains("width")) {
-        float playableWidth = mapdef["areas"]["Playable"]["width"];
-        if (playableWidth > 0 && playableWidth != outParams.MapSize) {
-            markerScaleFactor = static_cast<float>(outParams.MapSize) / playableWidth;
-            log("Detected Playable Area mismatch (Playable: " + std::to_string(playableWidth) + 
-                ", MapSize: " + std::to_string(outParams.MapSize) + "). Applying scale factor: " + 
-                std::to_string(markerScaleFactor) + "\n");
+    if (mapdef.contains("areas") && mapdef["areas"].is_object()) {
+        outParams.Areas.clear();
+        for (auto it = mapdef["areas"].begin(); it != mapdef["areas"].end(); ++it) {
+            MapArea a;
+            a.Name = it.key();
+            auto areaJson = it.value();
+            if (areaJson.is_object()) {
+                if (areaJson.contains("x")) a.X = areaJson["x"];
+                if (areaJson.contains("y")) a.Y = areaJson["y"];
+                if (areaJson.contains("width")) a.Width = areaJson["width"];
+                if (areaJson.contains("length")) a.Length = areaJson["length"];
+            }
+            outParams.Areas.push_back(a);
+            
+            if ((a.Name == "PlayableArea" || a.Name == "Playable") && a.Width > 0 && a.Width != (float)outParams.MapSize) {
+                markerScaleFactor = static_cast<float>(outParams.MapSize) / a.Width;
+                log("Detected Playable Area mismatch (" + a.Name + ": " + std::to_string(a.Width) + 
+                    ", MapSize: " + std::to_string(outParams.MapSize) + "). Applying scale factor: " + 
+                    std::to_string(markerScaleFactor) + "\n");
+            }
         }
     }
     
