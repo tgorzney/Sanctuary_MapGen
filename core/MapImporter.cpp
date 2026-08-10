@@ -430,14 +430,8 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     std::string originalKey = tIt.key();
                     std::string transformName = originalKey;
                     
-                    // If the original key doesn't already start with the marker type (or "Spawn_"), prefix it to ensure uniqueness
-                    if (markerType == "Spawn" || markerType == "Spawns") {
-                        if (transformName.find("Spawn_") != 0 && transformName.find("ARMY_") != 0) {
-                            transformName = "Spawn_" + originalKey;
-                        }
-                    } else if (transformName.find(markerType) != 0) {
-                        transformName = markerType + "_" + originalKey;
-                    }
+                    // Keep the exact original key from the map file, as the Sanctuary Map Editor uses these string names to lookup prefabs.
+                    // Modifying them causes the editor to throw NullReferenceExceptions during the 100% loading phase.
                     auto tVal = tIt.value();
                     
                     MarkerTransform mt;
@@ -467,27 +461,7 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     if (isGameplay) {
                         outParams.MarkersList[transformName] = mt;
                         importedSanmapLayer.MarkerKeys.push_back(transformName);
-                        
-                        // Infer missing armies from Spawns
-                        if (markerType == "Spawn" || markerType == "Spawns") {
-                            std::string armyId = originalKey;
-                            if (armyId.find("Spawn_") == 0) {
-                                armyId = armyId.substr(6);
-                            }
-                            if (outParams.Armies.find(armyId) == outParams.Armies.end()) {
-                                Army a;
-                                static const float defaultColors[8][4] = {
-                                    {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.4f, 0.7f, 1.0f}, {1.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f, 0.5f, 1.0f},
-                                    {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.5f, 0.5f, 1.0f}, {0.0f, 0.5f, 0.0f, 1.0f}, {0.2f, 0.8f, 0.2f, 1.0f}
-                                };
-                                int cIdx = outParams.Armies.size() % 8;
-                                a.Color[0] = defaultColors[cIdx][0];
-                                a.Color[1] = defaultColors[cIdx][1];
-                                a.Color[2] = defaultColors[cIdx][2];
-                                a.Color[3] = defaultColors[cIdx][3];
-                                outParams.Armies[armyId] = a;
-                            }
-                        }
+                        // No army inference logic; rely entirely on the armies defined in the map file.
                     } else {
                         GenerationParams::PropInstance pi;
                         pi.X = mt.Position[0];

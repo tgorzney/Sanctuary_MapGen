@@ -121,17 +121,18 @@ void ExportTints(const std::string& folderPath, const GenerationParams& params) 
     stbi_write_tga_with_rle = 0; // Disable RLE compression
     stbi_write_tga(pColors.c_str(), texSize, texSize, 4, tintColors.data());
 
-    // 5. Export tint_geometry.tga (RG = Normals (128), B = Holes (255 for no hole))
-    std::vector<uint8_t> tintGeom(pixelCount * 3, 0);
-    for (int i = 0; i < pixelCount * 3; i += 3) {
+    // 5. Export tint_geometry.tga (RG = Normals (128), B = Holes (255 for no hole), A = Padding (255))
+    std::vector<uint8_t> tintGeom(pixelCount * 4, 0);
+    for (int i = 0; i < pixelCount * 4; i += 4) {
         tintGeom[i + 0] = 128; // R
         tintGeom[i + 1] = 128; // G
         tintGeom[i + 2] = 255; // B
+        tintGeom[i + 3] = 255; // A
     }
     // TODO: Calculate real normals or holes from data
     std::string pGeom = folderPath + "/tint_geometry.tga";
     stbi_write_tga_with_rle = 0; // Disable RLE compression
-    stbi_write_tga(pGeom.c_str(), texSize, texSize, 3, tintGeom.data());
+    stbi_write_tga(pGeom.c_str(), texSize, texSize, 4, tintGeom.data());
 }
 
 } // namespace TextureExporter

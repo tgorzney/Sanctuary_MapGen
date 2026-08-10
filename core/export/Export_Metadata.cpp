@@ -272,17 +272,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
         armiesObj[armyName] = armyJson;
     }
     
-    // If no armies are defined, provide default empty armies based on spawn points
-    if (armiesObj.empty() && params.SpawnPointCount > 0) {
-        for (int i = 0; i < params.SpawnPointCount; i++) {
-            json fallbackArmy = json::object();
-            fallbackArmy["faction"] = 0;
-            fallbackArmy["alloys"] = 100.0;
-            fallbackArmy["energy"] = 1000.0;
-            fallbackArmy["groups"] = json::object();
-            armiesObj["Army_" + std::to_string(i + 1)] = fallbackArmy;
-        }
-    }
+    // If the map originally had no armies (like Pandemonium Isthmus), we leave it empty.
     
     mapdef["armies"] = armiesObj;
     
@@ -341,7 +331,14 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
         json propType;
         propType["blueprintPath"] = rule.BlueprintPath;
         propType["transforms"] = json::array(); // Placeholder for actual transforms generated
-        propsArr.push_back(propType);
+        
+        // Wait, if we generate actual transforms procedurally here, we should populate them.
+        // But since this is a stub for procedural rules, let's just make sure we only push it if we actually added transforms to it!
+        // Right now, this code just pushes empty transform arrays for every enabled rule!
+        // We MUST skip empty transform arrays.
+        if (!propType["transforms"].empty()) {
+            propsArr.push_back(propType);
+        }
     }
     mapdef["props"] = propsArr;
 
