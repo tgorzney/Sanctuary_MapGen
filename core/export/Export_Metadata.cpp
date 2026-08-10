@@ -235,6 +235,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
         armyJson["faction"] = army.Faction;
         armyJson["alloys"] = army.Alloys;
         armyJson["energy"] = army.Energy;
+        armyJson["color"] = {{"r", army.Color[0]}, {"g", army.Color[1]}, {"b", army.Color[2]}, {"a", army.Color[3]}};
         
         // Recursive lambda for groups
         std::function<json(const UnitGroup&)> serializeGroup;
