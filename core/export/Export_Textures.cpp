@@ -49,6 +49,8 @@ void ExportStratums(const std::string& folderPath, const GenerationParams& param
     }
     std::string p1 = folderPath + "/stratums_1_4.tga";
     std::string p2 = folderPath + "/stratums_5_8.tga";
+
+    stbi_write_tga_with_rle = 0; // Disable RLE compression for Sanctuary editor compatibility
     stbi_write_tga(p1.c_str(), texSize, texSize, 4, s1_4.data());
     stbi_write_tga(p2.c_str(), texSize, texSize, 4, s5_8.data());
 }
@@ -116,6 +118,7 @@ void ExportTints(const std::string& folderPath, const GenerationParams& params) 
     }
     // TODO: Actually fill Tint/Smoothness based on layers if applicable in future
     std::string pColors = folderPath + "/tint_colors.tga";
+    stbi_write_tga_with_rle = 0; // Disable RLE compression
     stbi_write_tga(pColors.c_str(), texSize, texSize, 4, tintColors.data());
 
     // 5. Export tint_geometry.tga (RG = Normals (128), B = Holes (255 for no hole))
@@ -127,6 +130,7 @@ void ExportTints(const std::string& folderPath, const GenerationParams& params) 
     }
     // TODO: Calculate real normals or holes from data
     std::string pGeom = folderPath + "/tint_geometry.tga";
+    stbi_write_tga_with_rle = 0; // Disable RLE compression
     stbi_write_tga(pGeom.c_str(), texSize, texSize, 3, tintGeom.data());
 }
 

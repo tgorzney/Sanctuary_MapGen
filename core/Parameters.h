@@ -102,6 +102,9 @@ namespace SanmapGen {
         std::vector<std::string> AvailableIcons; // Populated from .sanpack
         std::map<std::string, unsigned int> IconCache; // name -> GLuint texture ID
         
+        std::string ImportedPropsJSON = "";
+        std::string ImportedDecalsJSON = "";
+        
         float FlowMapColor[4] = { 0.0f, 0.5f, 1.0f, 1.0f };
 
         

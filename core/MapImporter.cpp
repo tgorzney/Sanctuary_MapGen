@@ -500,6 +500,45 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             }
         }
         
+        // Load and scale props if they exist
+        if (mapdef.contains("props") && mapdef["props"].is_array()) {
+            auto propsArray = mapdef["props"];
+            if (markerScaleFactor != 1.0f) {
+                for (auto& propGroup : propsArray) {
+                    if (propGroup.contains("transforms") && propGroup["transforms"].is_array()) {
+                        for (auto& t : propGroup["transforms"]) {
+                            if (t.contains("position") && t["position"].is_object()) {
+                                if (t["position"].contains("x")) t["position"]["x"] = static_cast<float>(t["position"]["x"]) * markerScaleFactor;
+                                if (t["position"].contains("z")) t["position"]["z"] = static_cast<float>(t["position"]["z"]) * markerScaleFactor;
+                            }
+                        }
+                    }
+                }
+            }
+            outParams.ImportedPropsJSON = propsArray.dump();
+        } else {
+            outParams.ImportedPropsJSON = "";
+        }
+
+        // Load and scale decals if they exist
+        if (mapdef.contains("decals") && mapdef["decals"].is_array()) {
+            auto decalsArray = mapdef["decals"];
+            if (markerScaleFactor != 1.0f) {
+                for (auto& decalGroup : decalsArray) {
+                    if (decalGroup.contains("transforms") && decalGroup["transforms"].is_array()) {
+                        for (auto& t : decalGroup["transforms"]) {
+                            if (t.contains("position") && t["position"].is_object()) {
+                                if (t["position"].contains("x")) t["position"]["x"] = static_cast<float>(t["position"]["x"]) * markerScaleFactor;
+                                if (t["position"].contains("z")) t["position"]["z"] = static_cast<float>(t["position"]["z"]) * markerScaleFactor;
+                            }
+                        }
+                    }
+                }
+            }
+            outParams.ImportedDecalsJSON = decalsArray.dump();
+        } else {
+            outParams.ImportedDecalsJSON = "";
+        }
         // Ensure every loaded Army has a Spawn marker
         for (const auto& [armyId, army] : outParams.Armies) {
             bool foundSpawn = false;

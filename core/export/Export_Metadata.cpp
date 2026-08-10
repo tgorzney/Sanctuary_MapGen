@@ -139,7 +139,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["waterShoreDepthStrength"] = params.Water.WaterShoreDepthStrength;
     mapdef["waterShoreDistanceOffset"] = params.Water.WaterShoreDistanceOffset;
     mapdef["waterShoreDistanceStrength"] = params.Water.WaterShoreDistanceStrength;
-    mapdef["waterShoreGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
+    mapdef["waveGeneratorBlueprint"] = params.Water.WaveGeneratorBlueprint;
 
     mapdef["shader"] = "RTS/TerrainLit";
     mapdef["heightTransition"] = 0.5;
@@ -218,8 +218,9 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["linearFogCameraStart"] = params.Atmosphere.LinearFogCameraStart;
     mapdef["linearFogCameraEnd"] = params.Atmosphere.LinearFogCameraEnd;
     
-    mapdef["windSpeed"] = params.Atmosphere.GlobalWindSpeed;
-    mapdef["windDirection"] = params.Atmosphere.GlobalWindDirection;
+    mapdef["globalWindSpeed"] = params.Atmosphere.GlobalWindSpeed;
+    mapdef["globalWindDirection"] = params.Atmosphere.GlobalWindDirection;
+    mapdef["skyboxPath"] = params.Atmosphere.SkyboxPath;
 
     // Stratum Layers
     mapdef["stratumLayers"] = params.Stratums;
@@ -329,6 +330,11 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["markers"] = markersObj;
 
     json propsArr = json::array();
+    if (!params.ImportedPropsJSON.empty()) {
+        try {
+            propsArr = json::parse(params.ImportedPropsJSON);
+        } catch(...) {}
+    }
     for (const auto& rule : params.Props) {
         if (!rule.Enabled) continue;
         json propType;
@@ -339,6 +345,11 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["props"] = propsArr;
 
     json decalsArr = json::array();
+    if (!params.ImportedDecalsJSON.empty()) {
+        try {
+            decalsArr = json::parse(params.ImportedDecalsJSON);
+        } catch(...) {}
+    }
     for (const auto& rule : params.Decals) {
         if (!rule.Enabled) continue;
         json decalType;
