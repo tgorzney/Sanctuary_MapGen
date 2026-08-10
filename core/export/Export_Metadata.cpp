@@ -116,8 +116,8 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
         fs::create_directories(folderPath);
     }
     
-    // Construct the sanmap JSON matching SanMap.cs
-    json mapdef;
+    // Construct the sanmap JSON matching SanMap.cs (using ordered_json to preserve insertion order, keeping massive lists at the bottom)
+    nlohmann::ordered_json mapdef;
     mapdef["fileVersion"] = 3;
     mapdef["mapVersion"] = 1;
     mapdef["name"] = "Generated Map";
@@ -223,7 +223,8 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["skyboxPath"] = params.Atmosphere.SkyboxPath;
 
     // Stratum Layers
-    mapdef["stratumLayers"] = params.Stratums;
+    json stratumsArr = params.Stratums;
+    mapdef["stratumLayers"] = stratumsArr;
     
     // Areas, armies, chains
     mapdef["areas"] = json::object();
@@ -343,35 +344,40 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
             propsArr = json::parse(params.ImportedPropsJSON);
         } catch(...) {}
     }
-    for (const auto& rule : params.Props) {
-        if (!rule.Enabled) continue;
-        json propType;
-        propType["blueprintPath"] = rule.BlueprintPath;
-        propType["transforms"] = json::array(); // Placeholder for actual transforms generated
-        
-        // Wait, if we generate actual transforms procedurally here, we should populate them.
-        // But since this is a stub for procedural rules, let's just make sure we only push it if we actually added transforms to it!
-        // Right now, this code just pushes empty transform arrays for every enabled rule!
-        // We MUST skip empty transform arrays.
-        if (!propType["transforms"].empty()) {
-            propsArr.push_back(propType);
-        }
-    }
-    mapdef["props"] = propsArr;
-
     json decalsArr = json::array();
     if (!params.ImportedDecalsJSON.empty()) {
         try {
             decalsArr = json::parse(params.ImportedDecalsJSON);
         } catch(...) {}
     }
-    for (const auto& rule : params.Decals) {
-        if (!rule.Enabled) continue;
-        json decalType;
-        decalType["blueprintPath"] = rule.BlueprintPath;
-        decalType["transforms"] = json::array(); // Placeholder for actual transforms generated
-        decalsArr.push_back(decalType);
+
+    for (const auto& gl : params.GeoLayers) {
+        if (!gl.Enabled) continue;
+        
+        if (gl.Type == LayerType::Prop) {
+            for (const auto& layer : gl.Layers) {
+                if (!layer.Enabled) continue;
+                json propType;
+                propType["blueprintPath"] = layer.BlueprintPath;
+                propType["transforms"] = json::array();
+                if (!propType["transforms"].empty()) {
+                    propsArr.push_back(propType);
+                }
+            }
+        } else if (gl.Type == LayerType::Decal) {
+            for (const auto& layer : gl.Layers) {
+                if (!layer.Enabled) continue;
+                json decalType;
+                decalType["blueprintPath"] = layer.BlueprintPath;
+                decalType["transforms"] = json::array();
+                if (!decalType["transforms"].empty()) {
+                    decalsArr.push_back(decalType);
+                }
+            }
+        }
     }
+    
+    mapdef["props"] = propsArr;
     mapdef["decals"] = decalsArr;
     mapdef["chains"] = json::object();
 
@@ -568,26 +574,6 @@ void MetadataExporter::SaveSettings(const std::string& filePath, const Generatio
     // Save Stratums
     j["Stratums"] = params.Stratums;
     
-    // Save Props & Decals
-    json props = json::array();
-    for (const auto& p : params.Props) {
-        json pj; pj["Name"] = p.Name; pj["Enabled"] = p.Enabled; pj["BlueprintPath"] = p.BlueprintPath;
-        pj["Density"] = p.Density; pj["MinSlope"] = p.MinSlope; pj["MaxSlope"] = p.MaxSlope;
-        pj["MinHeight"] = p.MinHeight; pj["MaxHeight"] = p.MaxHeight;
-        pj["AvoidWater"] = p.AvoidWater; pj["NearCliffs"] = p.NearCliffs;
-        props.push_back(pj);
-    }
-    j["Props"] = props;
-    
-    json decals = json::array();
-    for (const auto& d : params.Decals) {
-        json dj; dj["Name"] = d.Name; dj["Enabled"] = d.Enabled; dj["BlueprintPath"] = d.BlueprintPath;
-        dj["Density"] = d.Density; dj["MinSlope"] = d.MinSlope; dj["MaxSlope"] = d.MaxSlope;
-        dj["MinHeight"] = d.MinHeight; dj["MaxHeight"] = d.MaxHeight;
-        decals.push_back(dj);
-    }
-    j["Decals"] = decals;
-
     // Save Armies
     json armiesMap = json::object();
     for (const auto& [armyName, army] : params.Armies) {
@@ -629,58 +615,77 @@ void MetadataExporter::SaveSettings(const std::string& filePath, const Generatio
     }
     j["Armies"] = armiesMap;
 
-    // Save Layers
-    json layers = json::array();
-    for (const auto* layerPtr : params.GetFlatLayers()) {
-        const auto& layer = *layerPtr;
-        if (!layer.Enabled) continue;
-        json l;
-        l["Name"] = layer.Name;
-        l["Enabled"] = layer.Enabled;
-        l["UseImage"] = layer.UseImage;
-        l["ImagePath"] = layer.ImagePath;
-        l["OriginPresetPath"] = layer.OriginPresetPath;
-        l["Erodable"] = layer.Erodable;
-        l["StratumIndex"] = layer.StratumIndex;
-        l["Blend"] = static_cast<int>(layer.Blend);
-        l["Type"] = static_cast<int>(layer.Type);
-        l["Fractal"] = static_cast<int>(layer.Fractal);
-        l["SymmetryMask"] = layer.SymmetryMask;
+    // Save GeoLayers
+    json geoLayersJson = json::array();
+    for (const auto& gl : params.GeoLayers) {
+        json glj;
+        glj["Name"] = gl.Name;
+        glj["Enabled"] = gl.Enabled;
+        glj["Type"] = static_cast<int>(gl.Type);
         
-        l["Frequency"] = layer.Frequency;
-        l["Octaves"] = layer.Octaves;
-        l["Gain"] = layer.Gain;
-        l["PingPongStrength"] = layer.PingPongStrength;
-        l["Opacity"] = layer.Opacity;
-        l["CellularJitter"] = layer.CellularJitter;
-        
-        l["LandDensity"] = layer.LandDensity;
-        l["PlateauDensity"] = layer.PlateauDensity;
-        l["MountainDensity"] = layer.MountainDensity;
-        l["RampDensity"] = layer.RampDensity;
+        json layers = json::array();
+        for (const auto& layer : gl.Layers) {
+            json l;
+            l["Name"] = layer.Name;
+            l["Enabled"] = layer.Enabled;
+            l["UseImage"] = layer.UseImage;
+            l["ImagePath"] = layer.ImagePath;
+            l["OriginPresetPath"] = layer.OriginPresetPath;
+            l["Erodable"] = layer.Erodable;
+            l["StratumIndex"] = layer.StratumIndex;
+            l["Blend"] = static_cast<int>(layer.Blend);
+            l["Type"] = static_cast<int>(layer.Type);
+            l["Fractal"] = static_cast<int>(layer.Fractal);
+            l["SymmetryMask"] = layer.SymmetryMask;
+            
+            l["Frequency"] = layer.Frequency;
+            l["Octaves"] = layer.Octaves;
+            l["Gain"] = layer.Gain;
+            l["PingPongStrength"] = layer.PingPongStrength;
+            l["Opacity"] = layer.Opacity;
+            l["CellularJitter"] = layer.CellularJitter;
+            
+            l["LandDensity"] = layer.LandDensity;
+            l["PlateauDensity"] = layer.PlateauDensity;
+            l["MountainDensity"] = layer.MountainDensity;
+            l["RampDensity"] = layer.RampDensity;
 
-        json e;
-        e["Enabled"] = layer.Erosion.Enabled;
-        e["DropletCount"] = layer.Erosion.DropletCount;
-        e["MaxLifetime"] = layer.Erosion.MaxLifetime;
-        e["Gravity"] = layer.Erosion.Gravity;
-        e["EvaporationRate"] = layer.Erosion.EvaporationRate;
-        e["UseRainNoise"] = layer.Erosion.UseRainNoise;
-        e["RainNoiseFreq"] = layer.Erosion.RainNoiseFreq;
-        e["RainNoiseOctaves"] = layer.Erosion.RainNoiseOctaves;
-        e["RainNoiseThreshold"] = layer.Erosion.RainNoiseThreshold;
-        e["UseOrographicRain"] = layer.Erosion.UseOrographicRain;
-        e["WindAngle"] = layer.Erosion.WindAngle;
-        e["DepositionMode"] = layer.Erosion.DepositionMode;
-        e["SpawnMinHeight"] = layer.Erosion.SpawnMinHeight;
-        e["SpawnMaxHeight"] = layer.Erosion.SpawnMaxHeight;
-        e["InitialSedimentLoad"] = layer.Erosion.InitialSedimentLoad;
-        l["Erosion"] = e;
-        l["ErodeBeneath"] = layer.ErodeBeneath;
+            json e;
+            e["Enabled"] = layer.Erosion.Enabled;
+            e["DropletCount"] = layer.Erosion.DropletCount;
+            e["MaxLifetime"] = layer.Erosion.MaxLifetime;
+            e["Gravity"] = layer.Erosion.Gravity;
+            e["EvaporationRate"] = layer.Erosion.EvaporationRate;
+            e["UseRainNoise"] = layer.Erosion.UseRainNoise;
+            e["RainNoiseFreq"] = layer.Erosion.RainNoiseFreq;
+            e["RainNoiseOctaves"] = layer.Erosion.RainNoiseOctaves;
+            e["RainNoiseThreshold"] = layer.Erosion.RainNoiseThreshold;
+            e["UseOrographicRain"] = layer.Erosion.UseOrographicRain;
+            e["WindAngle"] = layer.Erosion.WindAngle;
+            e["DepositionMode"] = layer.Erosion.DepositionMode;
+            e["SpawnMinHeight"] = layer.Erosion.SpawnMinHeight;
+            e["SpawnMaxHeight"] = layer.Erosion.SpawnMaxHeight;
+            e["InitialSedimentLoad"] = layer.Erosion.InitialSedimentLoad;
+            l["Erosion"] = e;
+            l["ErodeBeneath"] = layer.ErodeBeneath;
+            
+            // Props/Decals
+            l["BlueprintPath"] = layer.BlueprintPath;
+            l["MinSlope"] = layer.MinSlope;
+            l["MaxSlope"] = layer.MaxSlope;
+            l["MinHeight"] = layer.MinHeight;
+            l["MaxHeight"] = layer.MaxHeight;
+            l["AvoidWater"] = layer.AvoidWater;
+            l["NearCliffs"] = layer.NearCliffs;
+            l["PhysicsTagSimulate"] = layer.PhysicsTagSimulate;
+            l["PhysicsTagCollision"] = layer.PhysicsTagCollision;
 
-        layers.push_back(l);
+            layers.push_back(l);
+        }
+        glj["Layers"] = layers;
+        geoLayersJson.push_back(glj);
     }
-    j["Layers"] = layers;
+    j["GeoLayers"] = geoLayersJson;
 
     std::ofstream out(filePath);
     out << j.dump(4);
@@ -879,37 +884,43 @@ bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParam
     }
     
     if (j.contains("Props")) {
-        outParams.Props.clear();
+        GeoLayerDef propGroup;
+        propGroup.Name = "Migrated Legacy Props";
+        propGroup.Type = LayerType::Prop;
         for (const auto& pj : j["Props"]) {
-            PropRule p;
+            NoiseLayer p;
             if (pj.contains("Name")) p.Name = pj["Name"];
             if (pj.contains("Enabled")) p.Enabled = pj["Enabled"];
             if (pj.contains("BlueprintPath")) p.BlueprintPath = pj["BlueprintPath"];
-            if (pj.contains("Density")) p.Density = pj["Density"];
+            if (pj.contains("Density")) p.LandDensity = pj["Density"];
             if (pj.contains("MinSlope")) p.MinSlope = pj["MinSlope"];
             if (pj.contains("MaxSlope")) p.MaxSlope = pj["MaxSlope"];
             if (pj.contains("MinHeight")) p.MinHeight = pj["MinHeight"];
             if (pj.contains("MaxHeight")) p.MaxHeight = pj["MaxHeight"];
             if (pj.contains("AvoidWater")) p.AvoidWater = pj["AvoidWater"];
             if (pj.contains("NearCliffs")) p.NearCliffs = pj["NearCliffs"];
-            outParams.Props.push_back(p);
+            propGroup.Layers.push_back(p);
         }
+        outParams.GeoLayers.push_back(propGroup);
     }
     
     if (j.contains("Decals")) {
-        outParams.Decals.clear();
+        GeoLayerDef decalGroup;
+        decalGroup.Name = "Migrated Legacy Decals";
+        decalGroup.Type = LayerType::Decal;
         for (const auto& dj : j["Decals"]) {
-            DecalRule d;
+            NoiseLayer d;
             if (dj.contains("Name")) d.Name = dj["Name"];
             if (dj.contains("Enabled")) d.Enabled = dj["Enabled"];
             if (dj.contains("BlueprintPath")) d.BlueprintPath = dj["BlueprintPath"];
-            if (dj.contains("Density")) d.Density = dj["Density"];
+            if (dj.contains("Density")) d.LandDensity = dj["Density"];
             if (dj.contains("MinSlope")) d.MinSlope = dj["MinSlope"];
             if (dj.contains("MaxSlope")) d.MaxSlope = dj["MaxSlope"];
             if (dj.contains("MinHeight")) d.MinHeight = dj["MinHeight"];
             if (dj.contains("MaxHeight")) d.MaxHeight = dj["MaxHeight"];
-            outParams.Decals.push_back(d);
+            decalGroup.Layers.push_back(d);
         }
+        outParams.GeoLayers.push_back(decalGroup);
     }
     
     if (j.contains("Armies")) {
@@ -972,10 +983,83 @@ bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParam
         }
     }
 
-    if (j.contains("Layers")) {
+    if (j.contains("GeoLayers")) {
+        outParams.GeoLayers.clear();
+        for (const auto& glj : j["GeoLayers"]) {
+            GeoLayerDef gl;
+            if (glj.contains("Name")) gl.Name = glj["Name"];
+            if (glj.contains("Enabled")) gl.Enabled = glj["Enabled"];
+            if (glj.contains("Type")) gl.Type = static_cast<LayerType>(glj["Type"].get<int>());
+            
+            if (glj.contains("Layers")) {
+                for (const auto& l : glj["Layers"]) {
+                    NoiseLayer layer;
+                    if (l.contains("Name")) layer.Name = l["Name"];
+                    if (l.contains("Enabled")) layer.Enabled = l["Enabled"];
+                    if (l.contains("UseImage")) layer.UseImage = l["UseImage"];
+                    if (l.contains("ImagePath")) layer.ImagePath = l["ImagePath"];
+                    if (l.contains("OriginPresetPath")) layer.OriginPresetPath = l["OriginPresetPath"];
+                    if (l.contains("Erodable")) layer.Erodable = l["Erodable"];
+                    
+                    if (l.contains("StratumIndex")) layer.StratumIndex = l["StratumIndex"];
+                    if (l.contains("Blend")) layer.Blend = static_cast<BlendMode>(l["Blend"].get<int>());
+                    if (l.contains("Type")) layer.Type = static_cast<NoiseType>(l["Type"].get<int>());
+                    if (l.contains("Fractal")) layer.Fractal = static_cast<FractalType>(l["Fractal"].get<int>());
+                    if (l.contains("SymmetryMask")) layer.SymmetryMask = l["SymmetryMask"];
+                    
+                    if (l.contains("Frequency")) layer.Frequency = l["Frequency"];
+                    if (l.contains("Octaves")) layer.Octaves = l["Octaves"];
+                    if (l.contains("Gain")) layer.Gain = l["Gain"];
+                    if (l.contains("PingPongStrength")) layer.PingPongStrength = l["PingPongStrength"];
+                    if (l.contains("Opacity")) layer.Opacity = l["Opacity"];
+                    if (l.contains("CellularJitter")) layer.CellularJitter = l["CellularJitter"];
+                    
+                    if (l.contains("LandDensity")) layer.LandDensity = l["LandDensity"];
+                    if (l.contains("PlateauDensity")) layer.PlateauDensity = l["PlateauDensity"];
+                    if (l.contains("MountainDensity")) layer.MountainDensity = l["MountainDensity"];
+                    if (l.contains("RampDensity")) layer.RampDensity = l["RampDensity"];
+
+                    if (l.contains("Erosion")) {
+                        const auto& e = l["Erosion"];
+                        if (e.contains("Enabled")) layer.Erosion.Enabled = e["Enabled"];
+                        if (e.contains("DropletCount")) layer.Erosion.DropletCount = e["DropletCount"];
+                        if (e.contains("MaxLifetime")) layer.Erosion.MaxLifetime = e["MaxLifetime"];
+                        if (e.contains("Gravity")) layer.Erosion.Gravity = e["Gravity"];
+                        if (e.contains("EvaporationRate")) layer.Erosion.EvaporationRate = e["EvaporationRate"];
+                        if (e.contains("UseRainNoise")) layer.Erosion.UseRainNoise = e["UseRainNoise"];
+                        if (e.contains("RainNoiseFreq")) layer.Erosion.RainNoiseFreq = e["RainNoiseFreq"];
+                        if (e.contains("RainNoiseOctaves")) layer.Erosion.RainNoiseOctaves = e["RainNoiseOctaves"];
+                        if (e.contains("RainNoiseThreshold")) layer.Erosion.RainNoiseThreshold = e["RainNoiseThreshold"];
+                        if (e.contains("UseOrographicRain")) layer.Erosion.UseOrographicRain = e["UseOrographicRain"];
+                        if (e.contains("WindAngle")) layer.Erosion.WindAngle = e["WindAngle"];
+                        if (e.contains("DepositionMode")) layer.Erosion.DepositionMode = e["DepositionMode"];
+                        if (e.contains("SpawnMinHeight")) layer.Erosion.SpawnMinHeight = e["SpawnMinHeight"];
+                        if (e.contains("SpawnMaxHeight")) layer.Erosion.SpawnMaxHeight = e["SpawnMaxHeight"];
+                        if (e.contains("InitialSedimentLoad")) layer.Erosion.InitialSedimentLoad = e["InitialSedimentLoad"];
+                    }
+                    if (l.contains("ErodeBeneath")) layer.ErodeBeneath = l["ErodeBeneath"];
+                    
+                    if (l.contains("BlueprintPath")) layer.BlueprintPath = l["BlueprintPath"];
+                    if (l.contains("MinSlope")) layer.MinSlope = l["MinSlope"];
+                    if (l.contains("MaxSlope")) layer.MaxSlope = l["MaxSlope"];
+                    if (l.contains("MinHeight")) layer.MinHeight = l["MinHeight"];
+                    if (l.contains("MaxHeight")) layer.MaxHeight = l["MaxHeight"];
+                    if (l.contains("AvoidWater")) layer.AvoidWater = l["AvoidWater"];
+                    if (l.contains("NearCliffs")) layer.NearCliffs = l["NearCliffs"];
+                    if (l.contains("PhysicsTagSimulate")) layer.PhysicsTagSimulate = l["PhysicsTagSimulate"];
+                    if (l.contains("PhysicsTagCollision")) layer.PhysicsTagCollision = l["PhysicsTagCollision"];
+
+                    gl.Layers.push_back(layer);
+                }
+            }
+            outParams.GeoLayers.push_back(gl);
+        }
+    } else if (j.contains("Layers")) {
+        // LEGACY FALLBACK FOR V0-V3 PRESETS
         outParams.GeoLayers.clear();
         outParams.GeoLayers.push_back(GeoLayerDef());
         outParams.GeoLayers[0].Name = "Migrated GeoLayer";
+        outParams.GeoLayers[0].Type = LayerType::Terrain;
         for (const auto& l : j["Layers"]) {
             NoiseLayer layer;
             if (l.contains("Name")) layer.Name = l["Name"];
@@ -988,7 +1072,6 @@ bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParam
             // VERSION MIGRATION for Stratum Type -> Stratum Index
             if (version == 0 && l.contains("Stratum")) {
                 int oldEnum = l["Stratum"].get<int>();
-                // old mapping: 0=Bedrock, 1=Sand, 2=Silt, 3=Clay, 4=Loam, 5=Snow
                 switch(oldEnum) {
                     case 0: layer.StratumIndex = 0; break;
                     case 1: layer.StratumIndex = 2; break; // Map sand to stratum 2
@@ -998,10 +1081,6 @@ bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParam
                     case 5: layer.StratumIndex = 8; break; // Snow to top
                     default: layer.StratumIndex = 1; break;
                 }
-                
-                // In V4, physics moved to Layer, so no need to map legacy V0 V1 physics to Stratums anymore.
-                // We will attempt to load V1 physics from Stratum to Layer below if it's missing in Layer.
-                
             } else if (l.contains("StratumIndex")) {
                 layer.StratumIndex = l["StratumIndex"];
             }
@@ -1026,7 +1105,7 @@ bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParam
             if (l.contains("Erosion")) {
                 const auto& e = l["Erosion"];
                 if (e.contains("Enabled")) layer.Erosion.Enabled = e["Enabled"];
-                        if (e.contains("DropletCount")) layer.Erosion.DropletCount = e["DropletCount"];
+                if (e.contains("DropletCount")) layer.Erosion.DropletCount = e["DropletCount"];
                 if (e.contains("MaxLifetime")) layer.Erosion.MaxLifetime = e["MaxLifetime"];
                 if (e.contains("Gravity")) layer.Erosion.Gravity = e["Gravity"];
                 if (e.contains("EvaporationRate")) layer.Erosion.EvaporationRate = e["EvaporationRate"];

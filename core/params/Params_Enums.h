@@ -73,6 +73,9 @@ namespace SanmapGen {
     };
 
     enum class LayerType {
+        Terrain,
+        Prop,
+        Decal,
         Manual,
         Fixed
     };

@@ -252,18 +252,24 @@ namespace SanmapGen {
                         }
                     }
                     else if (layer.Type == GenerationParams::PreviewLayerType::Props) {
-                        for (const auto& rule : params.Props) {
-                            if (!rule.Enabled) continue;
-                            if (rule.AvoidWater && realHeight <= params.Water.WaterLevelMax) continue;
-                            if (slopeDegrees >= rule.MinSlope && slopeDegrees <= rule.MaxSlope &&
-                                realHeight >= rule.MinHeight && realHeight <= rule.MaxHeight) {
-                                float hash = fmod(sin(x * 9.123f + y * 83.456f) * 43758.5453f, 1.0f);
-                                if (hash < 0.0f) hash += 1.0f;
-                                if (hash < rule.Density * 0.01f) { 
-                                    sR = 0.2f; sG = 1.0f; sB = 0.2f; sA = 1.0f; 
-                                    hasColor = true; break; 
+                        for (const auto& gl : params.GeoLayers) {
+                            if (gl.Type != LayerType::Prop || !gl.Enabled) continue;
+                            for (const auto& rule : gl.Layers) {
+                                if (!rule.Enabled) continue;
+                                if (rule.AvoidWater && realHeight <= params.Water.WaterLevelMax) continue;
+                                if (slopeDegrees >= rule.MinSlope && slopeDegrees <= rule.MaxSlope &&
+                                    realHeight >= rule.MinHeight && realHeight <= rule.MaxHeight) {
+                                    float hash = fmod(sin(x * 9.123f + y * 83.456f) * 43758.5453f, 1.0f);
+                                    if (hash < 0.0f) hash += 1.0f;
+                                    
+                                    // Use LandDensity to simulate the density for props
+                                    if (hash < rule.LandDensity) { 
+                                        sR = 0.2f; sG = 1.0f; sB = 0.2f; sA = 1.0f; 
+                                        hasColor = true; break; 
+                                    }
                                 }
                             }
+                            if (hasColor) break;
                         }
                     }
                     

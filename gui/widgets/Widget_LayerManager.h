@@ -7,9 +7,9 @@ namespace SanmapGen {
     class Widget_LayerManager {
     public:
         static void RenderLayerStack(GenerationParams& params, std::vector<NoiseLayer>& flatLayers, 
-                                     std::vector<GeoLayerDef>* geoLayers, bool useGeoLayers, bool& bNeedsMapUpdate);
+                                     std::vector<GeoLayerDef>* geoLayers, bool useGeoLayers, bool& bNeedsMapUpdate, LayerType filterType = LayerType::Terrain);
     private:
         static void RenderSingleLayerSettings(GenerationParams& params, size_t i, NoiseLayer& layer, 
-                                              std::vector<NoiseLayer>& layerArray, bool& bNeedsMapUpdate);
+                                              std::vector<NoiseLayer>& layerArray, bool& bNeedsMapUpdate, LayerType type);
     };
 }

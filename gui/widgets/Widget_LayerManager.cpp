@@ -6,7 +6,7 @@
 
 namespace SanmapGen {
 
-    void Widget_LayerManager::RenderSingleLayerSettings(GenerationParams& params, size_t i, NoiseLayer& layer, std::vector<NoiseLayer>& layerArray, bool& bNeedsMapUpdate) {
+    void Widget_LayerManager::RenderSingleLayerSettings(GenerationParams& params, size_t i, NoiseLayer& layer, std::vector<NoiseLayer>& layerArray, bool& bNeedsMapUpdate, LayerType type) {
         float headerWidth = ImGui::GetContentRegionAvail().x;
         ImVec2 headerPos = ImGui::GetCursorScreenPos();
         float headerHeight = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y;
@@ -274,24 +274,46 @@ namespace SanmapGen {
                 ImGui::TreePop();
             }
 
+            if (type == LayerType::Prop) {
+                if (ImGui::TreeNodeEx("Prop Placement Rules", ImGuiTreeNodeFlags_DefaultOpen)) {
+                    char bpBuf[256]; strncpy(bpBuf, layer.BlueprintPath.c_str(), sizeof(bpBuf));
+                    if (ImGui::InputText("Blueprint", bpBuf, IM_ARRAYSIZE(bpBuf))) layer.BlueprintPath = bpBuf;
+                    
+                    if (UI::RangeSliderFloat("Slope Range", &layer.MinSlope, &layer.MaxSlope, 0.0f, 90.0f)) bNeedsMapUpdate = true;
+                    if (UI::RangeSliderFloat("Height Range", &layer.MinHeight, &layer.MaxHeight, params.TerrainMinHeight, params.TerrainMaxHeight)) bNeedsMapUpdate = true;
+                    
+                    if (ImGui::Checkbox("Avoid Water", &layer.AvoidWater)) bNeedsMapUpdate = true;
+                    if (ImGui::Checkbox("Near Cliffs", &layer.NearCliffs)) bNeedsMapUpdate = true;
+                    
+                    ImGui::Separator();
+                    if (ImGui::Checkbox("Physics Simulate", &layer.PhysicsTagSimulate)) bNeedsMapUpdate = true;
+                    char tagBuf[128]; strncpy(tagBuf, layer.PhysicsTagCollision.c_str(), sizeof(tagBuf));
+                    if (ImGui::InputText("Collision Tag", tagBuf, IM_ARRAYSIZE(tagBuf))) layer.PhysicsTagCollision = tagBuf;
+                    ImGui::TreePop();
+                }
+            }
+
             ImGui::Unindent();
         }
     }
 
-    void Widget_LayerManager::RenderLayerStack(GenerationParams& params, std::vector<NoiseLayer>& flatLayers, std::vector<GeoLayerDef>* geoLayers, bool useGeoLayers, bool& bNeedsMapUpdate) {
+    void Widget_LayerManager::RenderLayerStack(GenerationParams& params, std::vector<NoiseLayer>& flatLayers, std::vector<GeoLayerDef>* geoLayers, bool useGeoLayers, bool& bNeedsMapUpdate, LayerType filterType) {
         if (useGeoLayers && geoLayers) {
             // Render Nested GeoLayers
-            if (ImGui::Button("Add GeoLayer", ImVec2(-1, 30))) {
+            if (ImGui::Button(filterType == LayerType::Prop ? "Add Prop Group" : "Add GeoLayer", ImVec2(-1, 30))) {
                 GeoLayerDef newGeoLayer;
-                newGeoLayer.Name = "GeoLayer " + std::to_string(geoLayers->size());
+                newGeoLayer.Name = (filterType == LayerType::Prop ? "Prop Group " : "GeoLayer ") + std::to_string(geoLayers->size());
+                newGeoLayer.Type = filterType;
                 geoLayers->push_back(newGeoLayer);
                 bNeedsMapUpdate = true;
             }
             ImGui::Spacing();
 
             for (int g = (int)geoLayers->size() - 1; g >= 0; --g) {
-                ImGui::PushID(g * 1000);
                 GeoLayerDef& geoLayer = (*geoLayers)[g];
+                if (geoLayer.Type != filterType) continue; // FILTER
+
+                ImGui::PushID(g * 1000);
                 bool geoExpanded = ImGui::CollapsingHeader(geoLayer.Name.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
                 
                 if (geoExpanded) {
@@ -304,7 +326,7 @@ namespace SanmapGen {
                     }
                     for (int i = (int)geoLayer.Layers.size() - 1; i >= 0; --i) {
                         ImGui::PushID(i);
-                        RenderSingleLayerSettings(params, i, geoLayer.Layers[i], geoLayer.Layers, bNeedsMapUpdate);
+                        RenderSingleLayerSettings(params, i, geoLayer.Layers[i], geoLayer.Layers, bNeedsMapUpdate, filterType);
                         // Safety break handles array size changes
                         ImGui::PopID();
                         if (bNeedsMapUpdate) break; 
@@ -323,7 +345,7 @@ namespace SanmapGen {
             }
             for (size_t i = 0; i < flatLayers.size(); ++i) {
                 ImGui::PushID((int)i);
-                RenderSingleLayerSettings(params, i, flatLayers[i], flatLayers, bNeedsMapUpdate);
+                RenderSingleLayerSettings(params, i, flatLayers[i], flatLayers, bNeedsMapUpdate, filterType);
                 ImGui::PopID();
                 if (bNeedsMapUpdate && i >= flatLayers.size()) break; // Safety break
             }

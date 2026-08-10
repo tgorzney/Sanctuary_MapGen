@@ -192,8 +192,6 @@ namespace SanmapGen {
         }
         
         bool EnableProceduralMarkers = false;
-        std::vector<PropRule> Props;
-        std::vector<DecalRule> Decals;
         
         // --- Performance & Accuracy (TG_UE Execution Tiers) ---
         bool UseGPUTerrain = false;
