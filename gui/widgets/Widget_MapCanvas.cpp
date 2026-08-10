@@ -483,7 +483,7 @@ namespace SanmapGen {
             }
             
             // Draw Area Editor Overlay
-            Widget_AreaEditor::RenderOverlay(params, p0, p1, uv0, uv1, renderSize, mapZoom, mapOffset, bNeedsMapUpdate);
+            Widget_AreaEditor::RenderOverlay(params, p0, p1, uv0, uv1, renderSize, mapZoom, mapOffset, bNeedsPreviewRender);
         }
         
         ImGui::End(); // Map Preview Window

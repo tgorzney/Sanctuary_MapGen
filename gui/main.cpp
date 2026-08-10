@@ -506,7 +506,7 @@ int main(int, char**)
             case 9: SanmapGen::UI::RenderMarkersTab(params, selectedMarkerKey, bNeedsMapUpdate, bNeedsPreviewRender); break;
             case 16: SanmapGen::UI::RenderArmiesTab(params, bNeedsMapUpdate); break;
             case 10: SanmapGen::UI::RenderPropsTab(params, bNeedsMapUpdate, bNeedsPreviewRender); break;
-            case 17: SanmapGen::UI::RenderAreasTab(params); break;
+            case 17: SanmapGen::UI::RenderAreasTab(params, bNeedsPreviewRender); break;
             case 11: SanmapGen::UI::RenderPerformanceTab(params, bNeedsMapUpdate); break;
             case 12: SanmapGen::UI::RenderSaveExportTab(params, dummyMap, genResult, bNeedsMapUpdate, bResetPreviewTransform); break;
         }

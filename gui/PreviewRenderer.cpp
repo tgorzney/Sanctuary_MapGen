@@ -272,6 +272,26 @@ namespace SanmapGen {
                             if (hasColor) break;
                         }
                     }
+                    else if (layer.Type == GenerationParams::PreviewLayerType::Areas) {
+                        if (!params.Areas.empty()) {
+                            float wX = ((float)x / (float)(width - 1)) * params.MapSize;
+                            float wZ = ((float)y / (float)(height - 1)) * params.MapSize;
+                            int numAreas = (int)params.Areas.size();
+                            const MapArea* areasData = params.Areas.data();
+                            for (int i = numAreas - 1; i >= 0; --i) {
+                                const MapArea& area = areasData[i];
+                                if (wX >= area.X && wX <= (area.X + area.Width) &&
+                                    wZ >= area.Y && wZ <= (area.Y + area.Length)) {
+                                    sR = area.Color[0];
+                                    sG = area.Color[1];
+                                    sB = area.Color[2];
+                                    sA = area.Color[3];
+                                    hasColor = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     
                     if (!hasColor || sA <= 0.0f) continue;
                     

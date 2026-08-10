@@ -48,6 +48,7 @@ namespace SanmapGen {
         float Y = 0.0f;
         float Width = 2048.0f;
         float Length = 2048.0f;
+        float Color[4] = {1.0f, 1.0f, 0.0f, 0.3f};
     };
 
     struct GenerationParams {
@@ -228,7 +229,8 @@ namespace SanmapGen {
             Flow,
             Accumulation,
             Markers,
-            Props
+            Props,
+            Areas
         };
 
         struct PreviewLayer {
@@ -263,7 +265,7 @@ namespace SanmapGen {
         bool ShowArmies = false;
         bool ShowAreas = false;
         
-        std::map<std::string, MapArea> Areas;
+        std::vector<MapArea> Areas;
         
         SlopeSettings SlopeSettingsParams;
         FlowSettings FlowSettingsParams;
@@ -280,9 +282,9 @@ namespace SanmapGen {
             defaultArea.Name = "PlayableArea";
             defaultArea.X = 0.0f;
             defaultArea.Y = 0.0f;
-            defaultArea.Width = 2048.0f; // Will update dynamically or default to 2048
-            defaultArea.Length = 2048.0f;
-            Areas["PlayableArea"] = defaultArea;
+            defaultArea.Width = (float)MapSize;
+            defaultArea.Length = (float)MapSize;
+            Areas.push_back(defaultArea);
             
             NoiseLayer baseLayer;
             baseLayer.Name = "Base Mountain (Low Freq)";
@@ -323,6 +325,7 @@ namespace SanmapGen {
             PreviewLayers.push_back({ PreviewLayerType::Accumulation, "Accumulation Map", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Markers, "Markers", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Props, "Props", false, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Areas, "Areas", true, LayerBlendMode::Normal });
             PreviewLayers.push_back({ PreviewLayerType::Water, "Water", true, LayerBlendMode::None });
         }
         

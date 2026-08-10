@@ -228,13 +228,13 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     
     // Areas, armies, chains
     json areasObj = json::object();
-    for (const auto& [areaName, area] : params.Areas) {
+    for (const auto& area : params.Areas) {
         json aJson;
         aJson["x"] = area.X;
         aJson["y"] = area.Y;
         aJson["width"] = area.Width;
         aJson["length"] = area.Length;
-        areasObj[areaName] = aJson;
+        areasObj[area.Name] = aJson;
     }
     mapdef["areas"] = areasObj;
     
