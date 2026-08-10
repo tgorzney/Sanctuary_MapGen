@@ -84,7 +84,7 @@ size_t currentFlowHash = params.GetFlowHash(currentErosionHash);
                                                 accPtr[bestY*vertSize + bestX] += transfer;
                                                 
                                                 float incomingVelScalar = flowPtr[y*vertSize + px];
-                                                float newVel = (incomingVelScalar + maxDrop) * 0.85f;
+                                                float newVel = (incomingVelScalar + maxDrop) * params.FlowSettingsParams.FlowMomentum;
                                                 #pragma omp atomic
                                                 flowPtr[bestY*vertSize + bestX] += newVel;
                                             }
@@ -162,7 +162,7 @@ size_t currentFlowHash = params.GetFlowHash(currentErosionHash);
                                             accPtr[by*vertSize + bx] += transfer;
                                             
                                             float incomingVelScalar = flowPtr[y*vertSize + x + i];
-                                            float newVel = (incomingVelScalar + maxDropArr[i]) * 0.85f;
+                                            float newVel = (incomingVelScalar + maxDropArr[i]) * params.FlowSettingsParams.FlowMomentum;
                                             #pragma omp atomic
                                             flowPtr[by*vertSize + bx] += newVel;
                                         }

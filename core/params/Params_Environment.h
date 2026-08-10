@@ -86,12 +86,6 @@ namespace SanmapGen {
         float GlobalWindDirection = 160.0f;
     };
 
-    struct GlobalTexturingSettings {
-        std::string Shader = "RTS/TerrainLit";
-        float HeightTransition = 0.5f;
-        float FadeDistance = 128.0f;
-        float FadeStartDistance = 1.0f;
-    };
 
     struct SanTextureLoader { std::string path = ""; };
     struct SanNormalTextureLoader { std::string path = ""; };

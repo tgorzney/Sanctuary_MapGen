@@ -16,8 +16,6 @@ namespace UI {
         ImGui::Text("Hardware Acceleration Options");
         ImGui::Separator();
         if (ImGui::Checkbox("Use GPU Terrain Generation", &params.UseGPUTerrain)) bNeedsMapUpdate = true;
-        if (ImGui::Checkbox("Use GPU Hydraulic Erosion", &params.UseGPUHydraulic)) bNeedsMapUpdate = true;
-        if (ImGui::Checkbox("Use GPU Soil Deposition", &params.UseGPUDeposition)) bNeedsMapUpdate = true;
         if (ImGui::Checkbox("Use GPU Flow Accumulation", &params.UseGPUFlowMap)) bNeedsMapUpdate = true;
         
         ImGui::Spacing();

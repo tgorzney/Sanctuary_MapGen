@@ -8,7 +8,11 @@ namespace SanmapGen {
                                       const std::vector<const NoiseLayer*>& flatLayers,
                                       const GenerationParams& params) {
         
-        for (int p = 0; p < 2; ++p) { // 2 passes
+        int iterations = 2;
+        if (!cohesionLayers.empty()) {
+            iterations = (*flatLayers[cohesionLayers[0]]).Erosion.ThermalIterations;
+        }
+        for (int p = 0; p < iterations; ++p) {
             for (int y = 1; y < mapSize - 1; ++y) {
                 for (int x = 1; x < mapSize - 1; ++x) {
                     for (int l = (int)cohesionLayers.size() - 1; l >= 0; --l) {
@@ -42,7 +46,7 @@ namespace SanmapGen {
                         float slideActive = (total_dh > maxSlope) ? 1.0f : 0.0f;
                         
                         // Calculate total slide amount (bounded by thickness)
-                        float slideAmount = std::min(thickness, (total_dh - maxSlope) / 2.0f) * slideActive;
+                        float slideAmount = std::min(thickness, (total_dh - maxSlope) / (*flatLayers[idx]).Erosion.ThermalRate) * slideActive;
                         
                         // Branchless divide-by-zero protection
                         float inv_total_dh = (total_dh > 0.00001f) ? (1.0f / total_dh) : 0.0f;

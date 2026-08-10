@@ -36,6 +36,14 @@ namespace SanmapGen {
         float FluidViscosity = 1.0f;
         float BaseAbsorptionRate = 0.05f;
         float CarryingCapacityScale = 1.0f;
+        
+        // --- Hardcoded Erosion Simulation Constants ---
+        float BaseErosionRate = 0.3f;
+        float BaseDepositionRate = 0.3f;
+        float MeanderStrength = 2.0f;
+        float DivergenceThreshold = 10.0f;
+        int ThermalIterations = 2;
+        float ThermalRate = 2.0f;
     };
 
     struct FlowSettings {

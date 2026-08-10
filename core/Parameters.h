@@ -149,7 +149,6 @@ namespace SanmapGen {
         
         // --- Gameplay ---
         int SpawnPointCount = 2;
-        float AlloyMultiplier = 1.0f;
         float HydroMultiplier = 1.0f;
         float ReclaimDensity = 1.0f;
         float MexDensity = 1.0f;
@@ -157,7 +156,6 @@ namespace SanmapGen {
         // --- Tab Data ---
         WaterSettings Water;
         AtmosphereSettings Atmosphere;
-        GlobalTexturingSettings TexturingGlobals;
         
         std::vector<StratumSettings> Stratums;
         std::vector<ProceduralMarkerLayer> ProceduralMarkerLayers = { {"Procedural Markers", true, {}} };
@@ -192,8 +190,6 @@ namespace SanmapGen {
         
         // --- Performance & Accuracy (TG_UE Execution Tiers) ---
         bool UseGPUTerrain = false;
-        bool UseGPUHydraulic = true;
-        bool UseGPUDeposition = true;
         bool UseGPUFlowMap = false;
         
         bool WYSIWYGBaking = false; // Bypasses High-Accuracy CPU baking to bake the 1:1 Lossy GPU Preview

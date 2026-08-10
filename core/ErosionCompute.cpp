@@ -254,7 +254,8 @@ namespace SanmapGen {
         glUniform1i(glGetUniformLocation(computeProgram, "layerCount"), layerCount);
         glUniform1i(glGetUniformLocation(computeProgram, "currentLayerSlot"), currentLayerSlot);
         glUniform1i(glGetUniformLocation(computeProgram, "maxLifetime"), settings.MaxLifetime);
-        glUniform1f(glGetUniformLocation(computeProgram, "gravity"), settings.Gravity);
+        float effectiveGravity = settings.GravityUseGlobal ? params.GlobalGravity : settings.Gravity;
+        glUniform1f(glGetUniformLocation(computeProgram, "gravity"), effectiveGravity);
         glUniform1f(glGetUniformLocation(computeProgram, "evaporationRate"), settings.EvaporationRate);
         glUniform1i(glGetUniformLocation(computeProgram, "totalDroplets"), settings.DropletCount);
         glUniform1i(glGetUniformLocation(computeProgram, "depositionMode"), settings.DepositionMode ? 1 : 0);

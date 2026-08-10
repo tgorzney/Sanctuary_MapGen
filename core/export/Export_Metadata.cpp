@@ -458,7 +458,6 @@ void MetadataExporter::SaveSettings(const std::string& filePath, const Generatio
 
         json e;
         e["Enabled"] = layer.Erosion.Enabled;
-        e["UseGPU"] = params.UseGPUHydraulic;
         e["DropletCount"] = layer.Erosion.DropletCount;
         e["MaxLifetime"] = layer.Erosion.MaxLifetime;
         e["Gravity"] = layer.Erosion.Gravity;
@@ -642,8 +641,7 @@ bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParam
             if (l.contains("Erosion")) {
                 const auto& e = l["Erosion"];
                 if (e.contains("Enabled")) layer.Erosion.Enabled = e["Enabled"];
-                if (e.contains("UseGPU")) outParams.UseGPUHydraulic = e["UseGPU"];
-                if (e.contains("DropletCount")) layer.Erosion.DropletCount = e["DropletCount"];
+                        if (e.contains("DropletCount")) layer.Erosion.DropletCount = e["DropletCount"];
                 if (e.contains("MaxLifetime")) layer.Erosion.MaxLifetime = e["MaxLifetime"];
                 if (e.contains("Gravity")) layer.Erosion.Gravity = e["Gravity"];
                 if (e.contains("EvaporationRate")) layer.Erosion.EvaporationRate = e["EvaporationRate"];

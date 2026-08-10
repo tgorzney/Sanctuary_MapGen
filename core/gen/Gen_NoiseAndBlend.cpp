@@ -72,7 +72,11 @@ namespace SanmapGen {
                 noise.SetFractalOctaves(layer.Octaves);
                 noise.SetFractalGain(layer.Gain);
                 noise.SetFractalPingPongStrength(layer.PingPongStrength);
-                noise.SetFrequency(layer.Frequency);
+                float effectiveFreq = layer.Frequency;
+                if (params.ScaleFeaturesToMapSize && params.MapSize > 0) {
+                    effectiveFreq *= (512.0f / (float)params.MapSize);
+                }
+                noise.SetFrequency(effectiveFreq);
                 noise.SetCellularJitter(layer.CellularJitter);
                 
                 if (params.SymAlgorithm == SymmetryAlgorithm::NativeHash) {

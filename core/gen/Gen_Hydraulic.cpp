@@ -48,6 +48,8 @@ namespace SanmapGen {
             float water = 1.0f;
             float sediment = settings.DepositionMode ? settings.InitialSedimentLoad : 0.0f;
             
+            float effectiveGravity = settings.GravityUseGlobal ? params.GlobalGravity : settings.Gravity;
+            
             for (int life = 0; life < settings.MaxLifetime; ++life) {
                 float oldPosX = posX;
                 float oldPosY = posY;
@@ -77,9 +79,9 @@ namespace SanmapGen {
 
                 // SLOPE DIVERGENCE FACTOR
                 float slopeLength = std::sqrt(gradX * gradX + gradY * gradY);
-                float randMeanderX = ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
-                float randMeanderY = ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
-                float divergence = (1.0f - params.FlowSettingsParams.SlopeAdherence) * (1.0f - std::min(slopeLength * 10.0f, 1.0f));
+                float randMeanderX = ((rand() % 100) / 100.0f - 0.5f) * settings.MeanderStrength;
+                float randMeanderY = ((rand() % 100) / 100.0f - 0.5f) * settings.MeanderStrength;
+                float divergence = (1.0f - params.FlowSettingsParams.SlopeAdherence) * (1.0f - std::min(slopeLength * settings.DivergenceThreshold, 1.0f));
                 
                 float effectiveGradX = gradX + randMeanderX * divergence;
                 float effectiveGradY = gradY + randMeanderY * divergence;
@@ -112,7 +114,7 @@ namespace SanmapGen {
                 }
 
                 if (sediment > capacity || deltaHeight > 0.0f) {
-                    float amountToDeposit = (deltaHeight > 0.0f) ? std::min(deltaHeight, sediment) : (sediment - capacity) * 0.3f;
+                    float amountToDeposit = (deltaHeight > 0.0f) ? std::min(deltaHeight, sediment) : (sediment - capacity) * settings.BaseDepositionRate;
                     sediment -= amountToDeposit;
                     
                     int depIdx = currentLayerIdx;
@@ -142,7 +144,7 @@ namespace SanmapGen {
                         threadTotalHeight.Set(nodeX+1, nodeY+1, threadTotalHeight.Get(nodeX+1, nodeY+1) + d11);
                     }
                 } else if (!settings.DepositionMode) {
-                    float erosionRate = 0.3f * (1.0f - topHardness); 
+                    float erosionRate = settings.BaseErosionRate * (1.0f - topHardness); 
                     float amountToErode = std::min((capacity - sediment) * erosionRate, -deltaHeight);
                     
                     if (amountToErode > 0.0f && topLayerIdx != -1) {
@@ -179,7 +181,7 @@ namespace SanmapGen {
                     }
                 }
 
-                speed = std::sqrt(std::max(0.0f, speed * speed + deltaHeight * settings.Gravity));
+                speed = std::sqrt(std::max(0.0f, speed * speed + deltaHeight * effectiveGravity));
                 water *= (1.0f - settings.EvaporationRate);
                 
                 // Scientific Absorption: Soil absorbs fluid, prematurely ending droplet lifecycle if it dries out
