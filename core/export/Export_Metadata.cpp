@@ -272,9 +272,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
         armiesObj[armyName] = armyJson;
     }
     
-    // If the map originally had no armies (like Pandemonium Isthmus), we leave it empty.
-    
-    mapdef["armies"] = armiesObj;
+    // Armies will be finalized and assigned after processing markers to ensure 1:1 sync.
     
     json markersObj = json::object();
     
@@ -320,6 +318,25 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     
     mapdef["markers"] = markersObj;
 
+    // Phase 1: Enforce strict 1:1 synchronization between `armies` and `Spawn` marker keys.
+    if (groupedTransforms.find("Spawn") != groupedTransforms.end()) {
+        for (auto& el : groupedTransforms["Spawn"].items()) {
+            std::string spawnKey = el.key();
+            if (!armiesObj.contains(spawnKey)) {
+                json fallbackArmy = json::object();
+                fallbackArmy["faction"] = 1; // Default
+                fallbackArmy["alloys"] = 1000.0f;
+                fallbackArmy["energy"] = 1000.0f;
+                fallbackArmy["color"] = {{"r", 1.0f}, {"g", 1.0f}, {"b", 1.0f}, {"a", 1.0f}};
+                fallbackArmy["groups"] = json::object();
+                armiesObj[spawnKey] = fallbackArmy;
+            }
+        }
+    }
+    
+    // Assign finalized armies back to root
+    mapdef["armies"] = armiesObj;
+
     json propsArr = json::array();
     if (!params.ImportedPropsJSON.empty()) {
         try {
@@ -357,6 +374,11 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     }
     mapdef["decals"] = decalsArr;
     mapdef["chains"] = json::object();
+
+    // Phase 1: Centralized Map Generator Data Block
+    // The Unity Engine (Newtonsoft.Json) safely ignores this block.
+    // All UI physics tags, procedural layer info, and custom simulation variables will be stored here in Phase 2.
+    mapdef["mapGeneratorData"] = json::object();
 
     // Determine the map name from the folder path
     std::string mapName = "mapdef";
