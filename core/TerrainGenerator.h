@@ -55,7 +55,6 @@ namespace SanmapGen {
         
 
     private:
-        static void ProcessNoiseAndBlend(FloatMask& outMap, std::vector<FloatMask>& Stratums, const GenerationParams& params, GenerationResult& inOutResult, size_t& outBlendHash);
         static void ProcessErosion(FloatMask& outMap, std::vector<FloatMask>& Stratums, const GenerationParams& params, GenerationResult& inOutResult, size_t currentBlendHash, size_t& outErosionHash);
         static void ProcessFlow(const FloatMask& outMap, const GenerationParams& params, GenerationResult& inOutResult, size_t currentErosionHash, size_t& outFlowHash);
         static void ProcessPlacement(const FloatMask& outMap, const GenerationParams& params, GenerationResult& inOutResult, size_t currentErosionHash, size_t currentFlowHash);
