@@ -290,9 +290,13 @@ void Gen_Erosion::Process(FloatMask& outMap, std::vector<FloatMask>& Stratums, c
         }
         
             // Save cache
-            inOutResult.CachedErosionHash = currentErosionHash;
-            inOutResult.CachedErodedMap = outMap;
-            inOutResult.CachedErodedStratums = Stratums;
+            if (!params.FastPreviewMode) {
+                inOutResult.CachedErosionHash = currentErosionHash;
+                inOutResult.CachedErodedMap = outMap;
+                inOutResult.CachedErodedStratums = Stratums;
+            } else {
+                inOutResult.CachedErosionHash = 0; // Force recalculation on slider release
+            }
             
             // --- Post-Erosion Top-Down Occlusion (AVX2 SIMD) ---
             #pragma omp parallel for

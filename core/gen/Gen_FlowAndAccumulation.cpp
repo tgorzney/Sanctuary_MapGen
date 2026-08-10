@@ -189,9 +189,13 @@ size_t currentFlowHash = params.GetFlowHash(currentErosionHash);
                 flowPtr[i] /= maxVel;
                 accPtr[i] /= maxAcc;
             }
-            inOutResult.CachedFlowHash = currentFlowHash;
-            inOutResult.CachedFlowMap = inOutResult.FlowMap;
-            inOutResult.CachedAccumulationMap = inOutResult.AccumulationMap;
+            if (!params.FastPreviewMode) {
+                inOutResult.CachedFlowHash = currentFlowHash;
+                inOutResult.CachedFlowMap = inOutResult.FlowMap;
+                inOutResult.CachedAccumulationMap = inOutResult.AccumulationMap;
+            } else {
+                inOutResult.CachedFlowHash = 0; // Force recalculation on slider release
+            }
         } // End skipFlow
 
         

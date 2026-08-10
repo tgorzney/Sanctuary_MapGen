@@ -75,6 +75,8 @@ namespace UI {
         if (ImGui::BeginPopupModal("Found Imported Textures", &bShowFallbackPopup, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Text("A Textures folder with baked splatmaps/heightmap was found.");
             ImGui::Text("Do you want to load these textures to update the Map Generator's imported data?");
+            ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(This loads 'stratums_1_4.tga', 'stratums_5_8.tga', and 'heightmap.raw' from the Textures folder)");
+            ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(Material Textures like Albedo/Normal are loaded separately from the Environment Sanpack)");
             ImGui::Separator();
             
             if (ImGui::Button("Yes, Load Textures", ImVec2(150, 0))) {
