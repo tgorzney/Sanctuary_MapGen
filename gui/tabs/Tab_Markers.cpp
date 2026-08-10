@@ -389,6 +389,32 @@ namespace UI {
                                     }
                                 }
                                 
+                                if (marker.Type == "Spawn" && !params.Armies.empty()) {
+                                    ImGui::Spacing();
+                                    ImGui::Text("Spawn Army Assignment");
+                                    for (const auto& [armyName, army] : params.Armies) {
+                                        ImVec4 col(army.Color[0], army.Color[1], army.Color[2], army.Color[3]);
+                                        bool isSelected = (marker.CustomName == "Spawn_" + armyName || marker.CustomName == armyName);
+                                        
+                                        if (isSelected) {
+                                            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+                                            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
+                                        }
+                                        
+                                        if (ImGui::ColorButton(armyName.c_str(), col, 0, ImVec2(24, 24))) {
+                                            marker.CustomName = "Spawn_" + armyName;
+                                            localUpdate = true;
+                                        }
+                                        
+                                        if (isSelected) {
+                                            ImGui::PopStyleVar();
+                                            ImGui::PopStyleColor();
+                                        }
+                                        ImGui::SameLine();
+                                    }
+                                    ImGui::NewLine();
+                                }
+                                
                                 if (localUpdate) {
                                     bUpdate = true;
                                     triggerSymmetryDeltaUpdate(marker);

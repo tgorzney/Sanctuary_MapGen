@@ -191,19 +191,7 @@ namespace SanmapGen {
             bool isHoveringPreview = isHovered;
 
             if (params.ShowMarkers && dummyMap.GetWidth() == params.MapSize + 1) {
-                int spawnIndex = 0;
-                ImU32 spawnColors[] = {
-                    IM_COL32(255, 0, 0, 255),    // Red
-                    IM_COL32(255, 255, 0, 255),  // Yellow
-                    IM_COL32(255, 128, 0, 255),  // Orange
-                    IM_COL32(0, 0, 255, 255),    // Blue
-                    IM_COL32(0, 255, 0, 255),    // Green
-                    IM_COL32(128, 0, 128, 255),  // Purple
-                    IM_COL32(255, 192, 203, 255),// Pink
-                    IM_COL32(255, 0, 255, 255),  // Magenta
-                    IM_COL32(0, 128, 128, 255)   // Teal
-                };
-                int numSpawnColors = sizeof(spawnColors) / sizeof(spawnColors[0]);
+
                 
                 // Determine screen position for each marker
                 std::unordered_set<std::string> hiddenMarkers;
@@ -219,11 +207,6 @@ namespace SanmapGen {
                     float worldU = marker.Position[0] / (float)params.MapSize;
                     float worldV = marker.Position[2] / (float)params.MapSize;
                     
-                    if (spawnIndex == 0) { // Debug first marker
-                        char dbg[128];
-                        snprintf(dbg, sizeof(dbg), "Pos(%.1f, %.1f) U(%.2f) V(%.2f) MapSz(%d)", marker.Position[0], marker.Position[2], worldU, worldV, params.MapSize);
-                        // Debug text removed
-                    }
                     
                     float screenU = (worldU - uv0.x) / (uv1.x - uv0.x);
                     float screenV = (worldV - uv0.y) / (uv1.y - uv0.y);
@@ -252,12 +235,18 @@ namespace SanmapGen {
                         globalColor[0] = params.MarkerColorSpawn[0]; globalColor[1] = params.MarkerColorSpawn[1]; globalColor[2] = params.MarkerColorSpawn[2]; globalColor[3] = params.MarkerColorSpawn[3];
                         
                         // Tint by army color
-                        ImU32 sc = spawnColors[spawnIndex % numSpawnColors];
-                        globalColor[0] *= ((sc >> 0) & 0xFF) / 255.0f;
-                        globalColor[1] *= ((sc >> 8) & 0xFF) / 255.0f;
-                        globalColor[2] *= ((sc >> 16) & 0xFF) / 255.0f;
-                        globalColor[3] *= ((sc >> 24) & 0xFF) / 255.0f;
-                        spawnIndex++;
+                        std::string armyId = "";
+                        if (marker.CustomName.find("Spawn_") == 0) {
+                            armyId = marker.CustomName.substr(6);
+                        } else {
+                            armyId = marker.CustomName;
+                        }
+                        if (params.Armies.find(armyId) != params.Armies.end()) {
+                            globalColor[0] *= params.Armies.at(armyId).Color[0];
+                            globalColor[1] *= params.Armies.at(armyId).Color[1];
+                            globalColor[2] *= params.Armies.at(armyId).Color[2];
+                            globalColor[3] *= params.Armies.at(armyId).Color[3];
+                        }
                     } else if (marker.Type == "Plasma" || marker.Type == "Plasmas") {
                         iconName = params.GlobalIconPlasma;
                         globalColor[0] = params.MarkerColorPlasma[0]; globalColor[1] = params.MarkerColorPlasma[1]; globalColor[2] = params.MarkerColorPlasma[2]; globalColor[3] = params.MarkerColorPlasma[3];

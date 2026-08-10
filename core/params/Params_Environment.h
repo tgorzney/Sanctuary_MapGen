@@ -120,6 +120,7 @@ namespace SanmapGen {
         int Faction = 0;
         float Alloys = 100.0f;
         float Energy = 1000.0f;
+        float Color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
         std::map<std::string, UnitGroup> Groups;
     };
 

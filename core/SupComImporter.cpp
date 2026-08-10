@@ -158,6 +158,35 @@ bool SupComImporter::LoadLua(const std::string& filepath, GenerationParams& outP
     
     outParams.PlacedMarkerLayers.push_back(importedLayer);
     
+    // Auto-generate missing armies based on imported Spawn markers
+    const float defaultColors[8][4] = {
+        {1.0f, 0.0f, 0.0f, 1.0f}, // Red
+        {1.0f, 0.4f, 0.7f, 1.0f}, // Pink
+        {1.0f, 0.5f, 0.0f, 1.0f}, // Orange
+        {0.5f, 0.0f, 0.5f, 1.0f}, // Purple
+        {0.0f, 0.0f, 1.0f, 1.0f}, // Blue
+        {0.0f, 0.5f, 0.5f, 1.0f}, // Teal
+        {0.0f, 0.5f, 0.0f, 1.0f}, // Green
+        {0.2f, 0.8f, 0.2f, 1.0f}  // Lime Green
+    };
+    int armyIdx = 0;
+    for (const auto& [key, marker] : outParams.MarkersList) {
+        if (marker.Type == "Spawn") {
+            std::string armyId = key;
+            if (key.find("Spawn_") == 0) armyId = key.substr(6);
+            if (outParams.Armies.find(armyId) == outParams.Armies.end()) {
+                Army a;
+                int cIdx = armyIdx % 8;
+                a.Color[0] = defaultColors[cIdx][0];
+                a.Color[1] = defaultColors[cIdx][1];
+                a.Color[2] = defaultColors[cIdx][2];
+                a.Color[3] = defaultColors[cIdx][3];
+                outParams.Armies[armyId] = a;
+                armyIdx++;
+            }
+        }
+    }
+    
     // Auto-detect symmetry
     Gen_Marker_Placement::CalculateMarkerSymmetryGroups(outParams);
     

@@ -393,6 +393,7 @@ void MetadataExporter::SaveSettings(const std::string& filePath, const Generatio
         aj["Faction"] = army.Faction;
         aj["Alloys"] = army.Alloys;
         aj["Energy"] = army.Energy;
+        aj["Color"] = {army.Color[0], army.Color[1], army.Color[2], army.Color[3]};
         
         std::function<json(const UnitGroup&)> saveGroup;
         saveGroup = [&](const UnitGroup& group) -> json {
@@ -577,6 +578,25 @@ bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParam
             if (aj.contains("Faction")) a.Faction = aj["Faction"];
             if (aj.contains("Alloys")) a.Alloys = aj["Alloys"];
             if (aj.contains("Energy")) a.Energy = aj["Energy"];
+            if (aj.contains("Color") && aj["Color"].is_array() && aj["Color"].size() == 4) {
+                a.Color[0] = aj["Color"][0];
+                a.Color[1] = aj["Color"][1];
+                a.Color[2] = aj["Color"][2];
+                a.Color[3] = aj["Color"][3];
+            } else {
+                // Assign a default based on some order if no color is found
+                static const float defaultColors[8][4] = {
+                    {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.4f, 0.7f, 1.0f}, {1.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f, 0.5f, 1.0f},
+                    {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.5f, 0.5f, 1.0f}, {0.0f, 0.5f, 0.0f, 1.0f}, {0.2f, 0.8f, 0.2f, 1.0f}
+                };
+                static int loadedArmyIdx = 0;
+                int cIdx = loadedArmyIdx % 8;
+                a.Color[0] = defaultColors[cIdx][0];
+                a.Color[1] = defaultColors[cIdx][1];
+                a.Color[2] = defaultColors[cIdx][2];
+                a.Color[3] = defaultColors[cIdx][3];
+                loadedArmyIdx++;
+            }
             
             if (aj.contains("Groups") && aj["Groups"].is_object()) {
                 for (auto git = aj["Groups"].begin(); git != aj["Groups"].end(); ++git) {

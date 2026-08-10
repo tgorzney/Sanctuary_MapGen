@@ -242,8 +242,25 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             return g;
         };
 
+        const float defaultColors[8][4] = {
+            {1.0f, 0.0f, 0.0f, 1.0f}, // Red
+            {1.0f, 0.4f, 0.7f, 1.0f}, // Pink
+            {1.0f, 0.5f, 0.0f, 1.0f}, // Orange
+            {0.5f, 0.0f, 0.5f, 1.0f}, // Purple
+            {0.0f, 0.0f, 1.0f, 1.0f}, // Blue
+            {0.0f, 0.5f, 0.5f, 1.0f}, // Teal
+            {0.0f, 0.5f, 0.0f, 1.0f}, // Green
+            {0.2f, 0.8f, 0.2f, 1.0f}  // Lime Green
+        };
+        int armyIdx = 0;
         for (auto it = mapdef["armies"].begin(); it != mapdef["armies"].end(); ++it) {
             Army a;
+            int cIdx = armyIdx % 8;
+            a.Color[0] = defaultColors[cIdx][0];
+            a.Color[1] = defaultColors[cIdx][1];
+            a.Color[2] = defaultColors[cIdx][2];
+            a.Color[3] = defaultColors[cIdx][3];
+            armyIdx++;
             const auto& aj = it.value();
             if (aj.contains("faction")) a.Faction = aj["faction"];
             if (aj.contains("alloys")) a.Alloys = aj["alloys"];
