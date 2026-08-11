@@ -591,6 +591,7 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                             pi.Z = mpt.Position[2];
                             pi.LayerIndex = layerIdx;
                             pi.GroupIndex = groupIdx;
+                            pi.TransformIndex = (int)mpg.Transforms.size();
                             outParams.StaticPropsList.push_back(pi);
                         }
                         

@@ -36,6 +36,12 @@ namespace UI {
                             bNeedsPreviewRender = true;
                         }
                     }
+                    if (ImGui::SliderFloat("Layer Icon Scale", &layer.IconScale, 0.1f, 10.0f)) {
+                        if (layer.UseGroupColor) {
+                            params.UpdateStaticPropsColors();
+                            bNeedsPreviewRender = true;
+                        }
+                    }
                     
                     ImGui::Spacing();
                     
@@ -55,6 +61,13 @@ namespace UI {
                         }
                         
                         if (groupOpen) {
+                            if (ImGui::SliderFloat("Icon Scale", &group.IconScale, 0.1f, 10.0f)) {
+                                if (!layer.UseGroupColor) {
+                                    params.UpdateStaticPropsColors();
+                                    bNeedsPreviewRender = true;
+                                }
+                            }
+                            
                             ImGuiListClipper clipper;
                             clipper.Begin((int)group.Transforms.size());
                             while (clipper.Step()) {

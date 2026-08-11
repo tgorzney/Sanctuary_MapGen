@@ -73,6 +73,10 @@ namespace SanmapGen {
 
         std::vector<uint8_t> pixels(quadWidth * quadHeight * 4);
         
+        params.EntityIDBuffer.assign(quadWidth * quadHeight, 0xFFFFFFFF);
+        params.EntityIDBufferWidth = quadWidth;
+        params.EntityIDBufferHeight = quadHeight;
+        
         #pragma omp parallel for
         for (int y = 0; y < quadHeight; ++y) {
             for (int x = 0; x < quadWidth; ++x) {
@@ -426,23 +430,30 @@ namespace SanmapGen {
         // --- BAKE STATIC PROPS (Flattened Image Layer) ---
         // Instead of processing 100,000+ items every frame in ImGui, we bake them into the texture once!
         if (!params.StaticPropsList.empty()) {
-            for (const auto& prop : params.StaticPropsList) {
+            for (size_t i = 0; i < params.StaticPropsList.size(); ++i) {
+                const auto& prop = params.StaticPropsList[i];
                 float normX = prop.X / static_cast<float>(params.MapSize);
                 float normY = prop.Z / static_cast<float>(params.MapSize);
                 
                 int px = static_cast<int>(normX * quadWidth);
                 int py = static_cast<int>(normY * quadHeight);
                 
-                // Draw a 3x3 pixel dot for the prop
-                for (int dy = -1; dy <= 1; ++dy) {
-                    for (int dx = -1; dx <= 1; ++dx) {
+                int radius = static_cast<int>(1.5f * prop.IconScale);
+                if (radius < 1) radius = 1;
+                
+                for (int dy = -radius; dy <= radius; ++dy) {
+                    for (int dx = -radius; dx <= radius; ++dx) {
                         int cx = px + dx;
                         int cy = py + dy;
                         if (cx >= 0 && cx < quadWidth && cy >= 0 && cy < quadHeight) {
-                            int idx = (cy * quadWidth + cx) * 4;
+                            int bufIdx = cy * quadWidth + cx;
+                            int idx = bufIdx * 4;
                             pixels[idx + 0] = (prop.TintColor >> 16) & 0xFF; // R
                             pixels[idx + 1] = (prop.TintColor >> 8) & 0xFF;  // G
                             pixels[idx + 2] = (prop.TintColor) & 0xFF;       // B
+                            
+                            // Stamp the exact Prop ID (index) into the ID Buffer
+                            params.EntityIDBuffer[bufIdx] = static_cast<uint32_t>(i);
                         }
                     }
                 }

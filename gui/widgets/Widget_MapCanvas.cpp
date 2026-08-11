@@ -170,6 +170,8 @@ namespace SanmapGen {
             
                         static std::string draggingMarker = "";
             static bool isDraggingMarker = false;
+            static int draggingPropIndex = -1;
+            static bool isDraggingProp = false;
             static ImVec2 dragOffset(0, 0);
             
             if (isActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && !isDraggingMarker) {
@@ -363,7 +365,76 @@ namespace SanmapGen {
                       }
                 }
                 
-                // Handle dragging
+                // --- O(1) Prop Click Detection ---
+                if (isHoveringPreview && params.ShowProps && !isDraggingMarker && !isDraggingProp) {
+                    float screenU_clk = (mousePos.x - p0.x) / renderSize;
+                    float screenV_clk = (mousePos.y - p0.y) / renderSize;
+                    
+                    float uvX = uv0.x + screenU_clk * (uv1.x - uv0.x);
+                    float uvY = uv0.y + screenV_clk * (uv1.y - uv0.y);
+                    
+                    if (uvX >= 0.0f && uvX <= 1.0f && uvY >= 0.0f && uvY <= 1.0f && params.EntityIDBufferWidth > 0) {
+                        int px = static_cast<int>(uvX * params.EntityIDBufferWidth);
+                        int py = static_cast<int>(uvY * params.EntityIDBufferHeight);
+                        int bufIdx = py * params.EntityIDBufferWidth + px;
+                        
+                        if (bufIdx >= 0 && bufIdx < (int)params.EntityIDBuffer.size()) {
+                            uint32_t hitId = params.EntityIDBuffer[bufIdx];
+                            if (hitId != 0xFFFFFFFF && hitId < params.StaticPropsList.size()) {
+                                if (ImGui::IsMouseClicked(0)) {
+                                    draggingPropIndex = hitId;
+                                    isDraggingProp = true;
+                                    
+                                    float worldU = params.StaticPropsList[hitId].X / (float)params.MapSize;
+                                    float worldV = params.StaticPropsList[hitId].Z / (float)params.MapSize;
+                                    float screenU = (worldU - uv0.x) / (uv1.x - uv0.x);
+                                    float screenV = (worldV - uv0.y) / (uv1.y - uv0.y);
+                                    ImVec2 screenPos(p0.x + screenU * renderSize, p0.y + screenV * renderSize);
+                                    
+                                    dragOffset.x = mousePos.x - screenPos.x;
+                                    dragOffset.y = mousePos.y - screenPos.y;
+                                    
+                                    activeTab = 8; // Switch to Props tab
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Handle Prop Dragging
+                if (isDraggingProp) {
+                    if (ImGui::IsMouseDragging(0, 0.0f) && draggingPropIndex >= 0 && draggingPropIndex < (int)params.StaticPropsList.size()) {
+                        float screenU_drag = (mousePos.x - dragOffset.x - p0.x) / renderSize;
+                        float screenV_drag = (mousePos.y - dragOffset.y - p0.y) / renderSize;
+                        
+                        float worldU_drag = uv0.x + screenU_drag * (uv1.x - uv0.x);
+                        float worldV_drag = uv0.y + screenV_drag * (uv1.y - uv0.y);
+                        
+                        auto& pi = params.StaticPropsList[draggingPropIndex];
+                        pi.X = std::clamp(worldU_drag * params.MapSize, 0.0f, (float)params.MapSize);
+                        pi.Z = std::clamp(worldV_drag * params.MapSize, 0.0f, (float)params.MapSize);
+                        
+                        if (pi.LayerIndex >= 0 && pi.LayerIndex < (int)params.ManualPropLayers.size()) {
+                            auto& layer = params.ManualPropLayers[pi.LayerIndex];
+                            if (pi.GroupIndex >= 0 && pi.GroupIndex < (int)layer.Groups.size()) {
+                                auto& group = layer.Groups[pi.GroupIndex];
+                                if (pi.TransformIndex >= 0 && pi.TransformIndex < (int)group.Transforms.size()) {
+                                    group.Transforms[pi.TransformIndex].Position[0] = pi.X;
+                                    group.Transforms[pi.TransformIndex].Position[2] = pi.Z;
+                                }
+                            }
+                        }
+                        
+                        bNeedsPreviewRender = true; // Constantly re-render to see drag
+                    }
+                    if (ImGui::IsMouseReleased(0)) {
+                        bNeedsMapUpdate = true;
+                        isDraggingProp = false;
+                        draggingPropIndex = -1;
+                    }
+                }
+                
+                // Handle Marker dragging
                 if (isDraggingMarker) {
                     if (ImGui::IsMouseDragging(0, 0.0f)) {
                         auto it = params.MarkersList.find(draggingMarker);

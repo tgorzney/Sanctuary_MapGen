@@ -98,8 +98,10 @@ namespace SanmapGen {
         struct PropInstance {
             float X, Y, Z;
             uint32_t TintColor;
+            float IconScale = 1.0f;
             int LayerIndex = -1;
             int GroupIndex = -1;
+            int TransformIndex = -1; // Added for O(1) drag-and-drop
         };
         std::vector<PropInstance> StaticPropsList;
         
@@ -122,15 +124,22 @@ namespace SanmapGen {
         struct ManualPropGroup {
             std::string BlueprintPath;
             float Color[4] = {0.0f, 1.0f, 0.0f, 1.0f}; // Default green
+            float IconScale = 1.0f;
             std::vector<ManualPropTransform> Transforms;
         };
         struct ManualPropLayer {
             std::string Name = "Default Props Layer";
             float GroupColor[4] = {0.8f, 0.8f, 0.8f, 1.0f};
+            float IconScale = 1.0f;
             bool UseGroupColor = false;
             std::vector<ManualPropGroup> Groups;
         };
         std::vector<ManualPropLayer> ManualPropLayers;
+
+        // --- O(1) Selection ID Buffer ---
+        mutable std::vector<uint32_t> EntityIDBuffer; // Exact size of preview texture
+        mutable int EntityIDBufferWidth = 0;
+        mutable int EntityIDBufferHeight = 0;
 
         void UpdateStaticPropsColors() {
             for (auto& pi : StaticPropsList) {
@@ -139,6 +148,7 @@ namespace SanmapGen {
                     if (pi.GroupIndex >= 0 && pi.GroupIndex < (int)layer.Groups.size()) {
                         auto& group = layer.Groups[pi.GroupIndex];
                         float* c = layer.UseGroupColor ? layer.GroupColor : group.Color;
+                        pi.IconScale = layer.UseGroupColor ? layer.IconScale : group.IconScale;
                         uint8_t r = (uint8_t)(std::clamp(c[0] * 255.0f, 0.0f, 255.0f));
                         uint8_t g = (uint8_t)(std::clamp(c[1] * 255.0f, 0.0f, 255.0f));
                         uint8_t b = (uint8_t)(std::clamp(c[2] * 255.0f, 0.0f, 255.0f));
