@@ -185,15 +185,8 @@ void main() {
     float dx = (((v10 + v11) - (v00 + v01)) * 0.5) / cellSize;
     float dy = (((v01 + v11) - (v00 + v10)) * 0.5) / cellSize;
     
-    float slopeDegrees = 0.0;
-    if (bUseEngineParityMath == 1) {
-        float lenSq = dx * dx + dy * dy + 1.0;
-        float len = sqrt(lenSq);
-        float dotProduct = 1.0 / len; 
-        slopeDegrees = acos(dotProduct) * (180.0 / 3.14159265);
-    } else {
-        slopeDegrees = atan(sqrt(dx*dx + dy*dy)) * (180.0 / 3.14159265);
-    }
+    // Hardware-accelerated Engine Parity Math (maximum performance)
+    float slopeDegrees = acos(inversesqrt(dx * dx + dy * dy + 1.0)) * 57.2957795131;
     
     // finalColor is already initialized from imageLoad earlier in the shader
     
