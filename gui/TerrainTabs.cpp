@@ -153,6 +153,16 @@ namespace UI {
                                 p.Z *= scale;
                             });
                             
+                            // Scale underlying ManualPropLayers hierarchy for export correctness
+                            for (auto& layer : params.ManualPropLayers) {
+                                for (auto& group : layer.Groups) {
+                                    for (auto& t : group.Transforms) {
+                                        t.Position[0] *= scale;
+                                        t.Position[2] *= scale;
+                                    }
+                                }
+                            }
+                            
                             // Rebuild Spatial Grid
                             int chunks = params.SpatialGridResolution;
                             params.MarkerSpatialGrid.assign(chunks * chunks, GenerationParams::MarkerChunk());
