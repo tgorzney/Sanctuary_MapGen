@@ -189,8 +189,8 @@ void main() {
     float hD = GetHeight(x, y + 1);
       
     // Engine parity differences
-    float dx = (hR - hL) * 128.0 * 0.5;
-    float dy = (hD - hU) * 128.0 * 0.5;
+    float dx = (hR - hL) * 0.5;
+    float dy = (hD - hU) * 0.5;
       
     // Hardware-accelerated Engine Parity Math (maximum performance)
     float slopeDegrees = acos(inversesqrt(dx * dx + dy * dy + 1.0)) * 57.2957795131;
