@@ -1,7 +1,7 @@
 #version 430 core
 layout(local_size_x = 16, local_size_y = 16) in;
 
-layout(rgba8, binding = 0) writeonly uniform image2D outTexture;
+layout(rgba8, binding = 0) uniform image2D outTexture;
 layout(std430, binding = 0) buffer EntityIDBuffer { uint entityIDs[]; };
 layout(std430, binding = 1) buffer HeightmapBuffer { float heightmap[]; };
 layout(std430, binding = 2) buffer FlowMapBuffer { float flowMap[]; };
@@ -36,8 +36,8 @@ uniform float minHeight;
 uniform float maxHeight;
 uniform int autoLevelPreview;
 
-// 0: Heightmap, 1: DetailNormal, 2: Holes, 3: Stratums, 4: Tint, 5: Smoothness, 6: Slope, 7: Flow, 8: Accum, 9: Water, 10: Markers, 11: Props, 12: Areas
-uniform int layerBlends[13]; // -1 = None, 0 = Normal, 1 = Add, 2 = Subtract, 3 = Multiply, 4 = Divide, 5 = Screen, 6 = Overlay, 7 = SoftLight, 8 = HardLight
+// LayerBlend is now a single int passed for the current permutation pass
+uniform int currentLayerBlend; // -1 = None, 0 = Normal, 1 = Add, 2 = Subtract, 3 = Multiply, 4 = Divide, 5 = Screen, 6 = Overlay, 7 = SoftLight, 8 = HardLight
 uniform int numStratums;
 uniform vec4 stratumColors[9];
 uniform vec2 stratumRemaps[9];
@@ -46,6 +46,8 @@ uniform vec4 flowMapColor; // default flow map color if no gradient
 
 uniform vec4 waterColor;
 uniform float waterLevelMax;
+uniform float deepWaterMin;
+uniform float deepWaterMax;
 uniform float terrainMinHeight;
 
 uniform int numPropLayers; // we can map props to rules
@@ -149,14 +151,22 @@ float hash2D(int x, int y, float magic1, float magic2) {
 
 void main() {
     ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
-    if (coord.x >= quadWidth || coord.y >= quadHeight) return;
-    
     int x = coord.x;
     int y = coord.y;
     
+    if (coord.x >= quadWidth || coord.y >= quadHeight) return;
+    
+#ifdef PASS_CLEAR
     // Clear EntityIDBuffer
     int pxIdx = y * quadWidth + x;
     entityIDs[pxIdx] = 0xFFFFFFFFu;
+    imageStore(outTexture, coord, vec4(0.0, 0.0, 0.0, 1.0));
+    return;
+#endif
+
+    // Read existing color from previous pass
+    vec3 finalColor = imageLoad(outTexture, coord).rgb;
+
     
     float v00 = GetHeight(x, y);
     float v10 = GetHeight(x + 1, y);
@@ -170,10 +180,10 @@ void main() {
     }
     val = clamp(val, 0.0, 1.0);
     
-    float realHeight = v00 * 128.0;
+    float realHeight = v00;
     
-    float dx = (((v10 + v11) - (v00 + v01)) * 0.5 * 128.0) / cellSize;
-    float dy = (((v01 + v11) - (v00 + v10)) * 0.5 * 128.0) / cellSize;
+    float dx = (((v10 + v11) - (v00 + v01)) * 0.5) / cellSize;
+    float dy = (((v01 + v11) - (v00 + v10)) * 0.5) / cellSize;
     
     float slopeDegrees = 0.0;
     if (bUseEngineParityMath == 1) {
@@ -185,23 +195,32 @@ void main() {
         slopeDegrees = atan(sqrt(dx*dx + dy*dy)) * (180.0 / 3.14159265);
     }
     
-    vec3 finalColor = vec3(0.0);
+    // finalColor is already initialized from imageLoad earlier in the shader
     
-    // Compositor layers based on layerBlends uniform
+#ifdef PASS_LAYER_0
     // 0: Heightmap
-    if (layerBlends[0] != -1) {
-        finalColor = ApplyBlend(layerBlends[0], finalColor, vec3(val), 1.0);
+    if (currentLayerBlend != -1) {
+        finalColor = ApplyBlend(currentLayerBlend, finalColor, vec3(val), 1.0);
     }
+#endif
+
+#ifdef PASS_LAYER_1
     // 1: DetailNormal
-    if (layerBlends[1] != -1) {
-        finalColor = ApplyBlend(layerBlends[1], finalColor, vec3(0.5, 0.5, 1.0), 1.0);
+    if (currentLayerBlend != -1) {
+        finalColor = ApplyBlend(currentLayerBlend, finalColor, vec3(0.5, 0.5, 1.0), 1.0);
     }
+#endif
+
+#ifdef PASS_LAYER_2
     // 2: Holes
-    if (layerBlends[2] != -1) {
-        finalColor = ApplyBlend(layerBlends[2], finalColor, vec3(0.0), 0.0);
+    if (currentLayerBlend != -1) {
+        finalColor = ApplyBlend(currentLayerBlend, finalColor, vec3(0.0), 0.0);
     }
+#endif
+
+#ifdef PASS_LAYER_3
     // 3: Stratums
-    if (layerBlends[3] != -1) {
+    if (currentLayerBlend != -1) {
         vec3 sColor = vec3(0.0);
         float totalMask = 0.0;
         for (int i = 0; i < numStratums; ++i) {
@@ -224,75 +243,105 @@ void main() {
         }
         if (totalMask > 0.0001) {
             sColor /= totalMask;
-            float sA = (layerBlends[3] == 0) ? 1.0 : min(totalMask, 1.0);
-            finalColor = ApplyBlend(layerBlends[3], finalColor, sColor, sA);
+            float sA = (currentLayerBlend == 0) ? 1.0 : min(totalMask, 1.0);
+            finalColor = ApplyBlend(currentLayerBlend, finalColor, sColor, sA);
         }
     }
+#endif
+
+#ifdef PASS_LAYER_4
     // 4: Tint
-    if (layerBlends[4] != -1) {
-        finalColor = ApplyBlend(layerBlends[4], finalColor, vec3(1.0), 1.0);
+    if (currentLayerBlend != -1) {
+        finalColor = ApplyBlend(currentLayerBlend, finalColor, vec3(1.0), 1.0);
     }
-    // 5: Smoothness
-    if (layerBlends[5] != -1) {
-        finalColor = ApplyBlend(layerBlends[5], finalColor, vec3(0.5), 1.0);
-    }
-    // 6: Slope
-    if (layerBlends[6] != -1) {
-        int idx = clamp(int((slopeDegrees / 90.0) * 255.0), 0, 255);
-        vec4 sc = slopeGradient[idx];
-        finalColor = ApplyBlend(layerBlends[6], finalColor, sc.rgb, sc.a);
-    }
-    // 7: Flow
-    if (layerBlends[7] != -1) {
-        float flowVal = flowMap[y * width + x] * 100.0;
-        int idx = clamp(int(flowVal * 255.0), 0, 255);
-        vec4 fc = flowGradient[idx];
-        finalColor = ApplyBlend(layerBlends[7], finalColor, fc.rgb, fc.a);
-    }
-    // 8: Accumulation
-    if (layerBlends[8] != -1) {
-        float accVal = accumMap[y * width + x] * 100.0;
-        int idx = clamp(int(accVal * 255.0), 0, 255);
-        vec4 ac = accumGradient[idx];
-        finalColor = ApplyBlend(layerBlends[8], finalColor, ac.rgb, ac.a);
-    }
-    // 9: Water
-    if (layerBlends[9] != -1) {
+#endif
+
+#ifdef PASS_LAYER_5
+    // 5: Water
+    if (currentLayerBlend != -1) {
         if (realHeight <= waterLevelMax) {
             float t = 1.0;
-            if (waterLevelMax > terrainMinHeight) {
-                t = clamp((realHeight - terrainMinHeight) / (waterLevelMax - terrainMinHeight), 0.0, 1.0);
+            if (deepWaterMin < deepWaterMax) {
+                t = clamp((realHeight - deepWaterMin) / (deepWaterMax - deepWaterMin), 0.0, 1.0);
             }
             int idx = clamp(int(t * 255.0), 0, 255);
             vec4 wc = waterGradient[idx];
-            float sA = (layerBlends[9] == 0) ? 1.0 : wc.a;
-            finalColor = ApplyBlend(layerBlends[9], finalColor, wc.rgb, sA);
+            float sA = (currentLayerBlend == 0) ? 1.0 : wc.a;
+            finalColor = ApplyBlend(currentLayerBlend, finalColor, wc.rgb, sA);
         }
     }
+#endif
+
+#ifdef PASS_LAYER_6
+    // 6: Smoothness
+    if (currentLayerBlend != -1) {
+        finalColor = ApplyBlend(currentLayerBlend, finalColor, vec3(0.5), 1.0);
+    }
+#endif
+
+#ifdef PASS_LAYER_7
+    // 7: Slope
+    if (currentLayerBlend != -1) {
+        int idx = clamp(int((slopeDegrees / 90.0) * 255.0), 0, 255);
+        vec4 sc = slopeGradient[idx];
+        finalColor = ApplyBlend(currentLayerBlend, finalColor, sc.rgb, sc.a);
+    }
+#endif
+
+#ifdef PASS_LAYER_8
+    // 8: Flow
+    if (currentLayerBlend != -1) {
+        float flowVal = flowMap[y * width + x] * 100.0;
+        int idx = clamp(int(flowVal * 255.0), 0, 255);
+        vec4 fc = flowGradient[idx];
+        finalColor = ApplyBlend(currentLayerBlend, finalColor, fc.rgb, fc.a);
+    }
+#endif
+
+#ifdef PASS_LAYER_9
+    // 9: Accumulation
+    if (currentLayerBlend != -1) {
+        float accVal = accumMap[y * width + x] * 100.0;
+        int idx = clamp(int(accVal * 255.0), 0, 255);
+        vec4 ac = accumGradient[idx];
+        finalColor = ApplyBlend(currentLayerBlend, finalColor, ac.rgb, ac.a);
+    }
+#endif
+
+
+#if defined(PASS_LAYER_10) || defined(PASS_LAYER_11)
     // 10: Markers & 11: Props (Using RulesBuffer)
-    if (layerBlends[10] != -1 || layerBlends[11] != -1) {
+    if (currentLayerBlend != -1) {
         for (int i = 0; i < numRules; ++i) {
             vec4 bnds = GetRuleBounds(i);
             vec4 prms = GetRuleParams(i);
             if (slopeDegrees >= bnds.x && slopeDegrees <= bnds.y && realHeight >= bnds.z && realHeight <= bnds.w) {
-                if (prms.y > 0.5 && layerBlends[10] != -1) { // isMarker
+#ifdef PASS_LAYER_10
+                if (prms.y > 0.5) { // isMarker
                     float h = hash2D(x, y, 12.9898, 78.233);
                     if (h < prms.x * 0.01) {
-                        finalColor = ApplyBlend(layerBlends[10], finalColor, vec3(1.0, 0.2, 0.2), 1.0);
-                        break;
-                    }
-                } else if (prms.z > 0.5 && layerBlends[11] != -1) { // isProp
-                    float h = hash2D(x, y, 9.123, 83.456);
-                    if (h < prms.x) { // LandDensity
-                        finalColor = ApplyBlend(layerBlends[11], finalColor, vec3(0.2, 1.0, 0.2), 1.0);
+                        finalColor = ApplyBlend(currentLayerBlend, finalColor, vec3(1.0, 0.2, 0.2), 1.0);
                         break;
                     }
                 }
+#endif
+#ifdef PASS_LAYER_11
+                if (prms.z > 0.5) { // isProp
+                    float h = hash2D(x, y, 9.123, 83.456);
+                    if (h < prms.x) { // LandDensity
+                        finalColor = ApplyBlend(currentLayerBlend, finalColor, vec3(0.2, 1.0, 0.2), 1.0);
+                        break;
+                    }
+                }
+#endif
             }
         }
     }
+#endif
+
+#ifdef PASS_LAYER_12
     // 12: Areas
-    if (layerBlends[12] != -1 && numAreas > 0) {
+    if (currentLayerBlend != -1 && numAreas > 0) {
         // We evaluate back to front as in original (for loop i = numAreas - 1 to 0)
         float mapSizeF = float(width - 1);
         float wX = (float(x) / mapSizeF) * mapSizeF; // wait, params.MapSize
@@ -305,13 +354,16 @@ void main() {
             vec4 b = GetAreaBounds(i);
             if (wX >= b.x && wX <= (b.x + b.z) && wZ >= b.y && wZ <= (b.y + b.w)) {
                 vec4 ac = GetAreaColor(i);
-                finalColor = ApplyBlend(layerBlends[12], finalColor, ac.rgb, ac.a);
+                finalColor = ApplyBlend(currentLayerBlend, finalColor, ac.rgb, ac.a);
                 found = true;
                 break;
             }
         }
     }
+#endif
+
     
+#ifdef PASS_OVERLAY
     // Focus gradient debug overlay
     if (focusDebugRuleIndex >= 0) {
         float dx_f = float(x - (width / 2));
@@ -339,6 +391,7 @@ void main() {
             finalColor = finalColor * (1.0 - debugAlpha) + vec3(1.0, 0.0, 0.0) * debugAlpha;
         }
     }
+#endif
     
     finalColor = clamp(finalColor, 0.0, 1.0);
     imageStore(outTexture, coord, vec4(finalColor, 1.0));

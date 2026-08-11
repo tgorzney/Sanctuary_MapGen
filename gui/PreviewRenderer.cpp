@@ -33,6 +33,7 @@ typedef char GLchar;
 #define GL_DYNAMIC_COPY                   0x88EA
 #define GL_READ_ONLY                      0x88B8
 #define GL_WRITE_ONLY                     0x88B9
+#define GL_READ_WRITE                     0x88BA
 #define GL_DYNAMIC_DRAW                   0x88E8
 #define GL_RGBA8                          0x8058
 
@@ -149,7 +150,46 @@ static void LoadGLExtensionsT() {
     s_GLTInitialized = true;
 }
 
-static GLuint s_ComputeProgram = 0;
+    struct ShaderPermutation {
+        GLuint Program;
+        GLint loc_width, loc_height, loc_quadWidth, loc_quadHeight;
+        GLint loc_cellSize, loc_bUseEngineParityMath, loc_minHeight, loc_maxHeight, loc_autoLevelPreview;
+        GLint loc_currentLayerBlend, loc_numStratums, loc_stratumColors, loc_stratumRemaps;
+        GLint loc_flowMapColor, loc_waterLevelMax, loc_deepWaterMin, loc_deepWaterMax, loc_terrainMinHeight;
+        GLint loc_numAreas, loc_numRules;
+        GLint loc_focusDebugRuleIndex, loc_focusGradientType, loc_focusGradientRadius, loc_focusGradientContrast, loc_focusGradientStrength;
+        
+        void Init(GLuint prog) {
+            Program = prog;
+            loc_width = glGetUniformLocationT(prog, "width");
+            loc_height = glGetUniformLocationT(prog, "height");
+            loc_quadWidth = glGetUniformLocationT(prog, "quadWidth");
+            loc_quadHeight = glGetUniformLocationT(prog, "quadHeight");
+            loc_cellSize = glGetUniformLocationT(prog, "cellSize");
+            loc_bUseEngineParityMath = glGetUniformLocationT(prog, "bUseEngineParityMath");
+            loc_minHeight = glGetUniformLocationT(prog, "minHeight");
+            loc_maxHeight = glGetUniformLocationT(prog, "maxHeight");
+            loc_autoLevelPreview = glGetUniformLocationT(prog, "autoLevelPreview");
+            loc_currentLayerBlend = glGetUniformLocationT(prog, "currentLayerBlend");
+            loc_numStratums = glGetUniformLocationT(prog, "numStratums");
+            loc_stratumColors = glGetUniformLocationT(prog, "stratumColors");
+            loc_stratumRemaps = glGetUniformLocationT(prog, "stratumRemaps");
+            loc_flowMapColor = glGetUniformLocationT(prog, "flowMapColor");
+            loc_waterLevelMax = glGetUniformLocationT(prog, "waterLevelMax");
+            loc_deepWaterMin = glGetUniformLocationT(prog, "deepWaterMin");
+            loc_deepWaterMax = glGetUniformLocationT(prog, "deepWaterMax");
+            loc_terrainMinHeight = glGetUniformLocationT(prog, "terrainMinHeight");
+            loc_numAreas = glGetUniformLocationT(prog, "numAreas");
+            loc_numRules = glGetUniformLocationT(prog, "numRules");
+            loc_focusDebugRuleIndex = glGetUniformLocationT(prog, "focusDebugRuleIndex");
+            loc_focusGradientType = glGetUniformLocationT(prog, "focusGradientType");
+            loc_focusGradientRadius = glGetUniformLocationT(prog, "focusGradientRadius");
+            loc_focusGradientContrast = glGetUniformLocationT(prog, "focusGradientContrast");
+            loc_focusGradientStrength = glGetUniformLocationT(prog, "focusGradientStrength");
+        }
+    };
+
+static ShaderPermutation s_ComputePrograms[15];
 static GLuint s_SSBOs[8] = {0};
 static bool s_ShaderInitialized = false;
 static int s_AllocatedWidth = 0;
@@ -161,39 +201,52 @@ static void InitializeShader() {
     std::ifstream file("D:/Projects/Sanctuary/Map Generator/shaders/PreviewCompute.glsl");
     if(!file.is_open()) return;
     std::stringstream buffer; buffer << file.rdbuf();
-    std::string sourceStr = buffer.str();
-    const char* source = sourceStr.c_str();
-    GLuint cs = glCreateShaderT(GL_COMPUTE_SHADER);
-    glShaderSourceT(cs, 1, &source, NULL);
-    glCompileShaderT(cs);
-    GLint success;
-    glGetShaderivT(cs, 0x8B81, &success);
-    if (!success) {
-        GLchar infoLog[512];
-        glGetShaderInfoLogT(cs, 512, NULL, infoLog);
-        std::cerr << "Preview Compute Shader Compilation Failed:\n" << infoLog << std::endl;
-        return;
-    }
-    s_ComputeProgram = glCreateProgramT();
-    glAttachShaderT(s_ComputeProgram, cs);
-    glLinkProgramT(s_ComputeProgram);
-    
-    GLint linkSuccess;
+    std::string baseSourceStr = buffer.str();
+
     PFNGLGETPROGRAMIVPROC glGetProgramivT = (PFNGLGETPROGRAMIVPROC)wglGetProcAddress("glGetProgramiv");
     if(!glGetProgramivT) glGetProgramivT = (PFNGLGETPROGRAMIVPROC)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glGetProgramiv");
     PFNGLGETPROGRAMINFOLOGPROC glGetProgramInfoLogT = (PFNGLGETPROGRAMINFOLOGPROC)wglGetProcAddress("glGetProgramInfoLog");
     if(!glGetProgramInfoLogT) glGetProgramInfoLogT = (PFNGLGETPROGRAMINFOLOGPROC)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glGetProgramInfoLog");
-    
-    if (glGetProgramivT && glGetProgramInfoLogT) {
-        glGetProgramivT(s_ComputeProgram, 0x8B82 /* GL_LINK_STATUS */, &linkSuccess);
-        if (!linkSuccess) {
+
+    auto compilePermutation = [&](const std::string& defineMacros) -> GLuint {
+        size_t versionEnd = baseSourceStr.find('\n');
+        if (versionEnd == std::string::npos) versionEnd = 16;
+        std::string sourceStr = baseSourceStr.substr(0, versionEnd + 1) + defineMacros + "\n" + baseSourceStr.substr(versionEnd + 1);
+        const char* source = sourceStr.c_str();
+        GLuint cs = glCreateShaderT(GL_COMPUTE_SHADER);
+        glShaderSourceT(cs, 1, &source, NULL);
+        glCompileShaderT(cs);
+        GLint success;
+        glGetShaderivT(cs, 0x8B81, &success);
+        if (!success) {
             GLchar infoLog[512];
-            glGetProgramInfoLogT(s_ComputeProgram, 512, NULL, infoLog);
-            std::cerr << "Preview Compute Shader Link Failed:\n" << infoLog << std::endl;
+            glGetShaderInfoLogT(cs, 512, NULL, infoLog);
+            std::cerr << "Preview Compute Shader Compilation Failed (" << defineMacros << "):\n" << infoLog << std::endl;
+            return 0;
         }
+        GLuint prog = glCreateProgramT();
+        glAttachShaderT(prog, cs);
+        glLinkProgramT(prog);
+        
+        if (glGetProgramivT && glGetProgramInfoLogT) {
+            GLint linkSuccess;
+            glGetProgramivT(prog, 0x8B82 /* GL_LINK_STATUS */, &linkSuccess);
+            if (!linkSuccess) {
+                GLchar infoLog[512];
+                glGetProgramInfoLogT(prog, 512, NULL, infoLog);
+                std::cerr << "Preview Compute Shader Link Failed (" << defineMacros << "):\n" << infoLog << std::endl;
+            }
+        }
+        glDeleteShaderT(cs);
+        return prog;
+    };
+
+    s_ComputePrograms[0].Init(compilePermutation("#define PASS_CLEAR"));
+    for (int i = 0; i < 13; ++i) {
+        s_ComputePrograms[i + 1].Init(compilePermutation("#define PASS_LAYER_" + std::to_string(i)));
     }
-    
-    glDeleteShaderT(cs);
+    s_ComputePrograms[14].Init(compilePermutation("#define PASS_OVERLAY"));
+
     s_ShaderInitialized = true;
 }
 
@@ -359,37 +412,10 @@ static void InitializeShader() {
             }
             glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 6, s_SSBOs[6]);
 
-            glUseProgramT(s_ComputeProgram);
-
             // Bind Texture as Image
-            glBindImageTextureT(0, textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-
-            // Setup Uniforms
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "width"), width);
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "height"), height);
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "quadWidth"), quadWidth);
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "quadHeight"), quadHeight);
-            
-            float cellSize = static_cast<float>(params.MapSize) / quadWidth;
-            if (cellSize < 1.0f) cellSize = 1.0f;
-            glUniform1fT(glGetUniformLocationT(s_ComputeProgram, "cellSize"), cellSize);
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "bUseEngineParityMath"), params.SlopeSettingsParams.bUseEngineParityMath ? 1 : 0);
-            glUniform1fT(glGetUniformLocationT(s_ComputeProgram, "minHeight"), minHeight);
-            glUniform1fT(glGetUniformLocationT(s_ComputeProgram, "maxHeight"), maxHeight);
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "autoLevelPreview"), params.AutoLevelPreview ? 1 : 0);
-            
-            int layerBlends[13];
-            for(int i=0; i<13; ++i) layerBlends[i] = -1;
-            for (const auto& layer : params.PreviewLayers) {
-                if (layer.Enabled && layer.Blend != GenerationParams::LayerBlendMode::None) {
-                    layerBlends[(int)layer.Type] = (int)layer.Blend - 1; // mapping None=0 -> -1
-                }
-            }
-            glUniform1ivT(glGetUniformLocationT(s_ComputeProgram, "layerBlends"), 13, layerBlends);
+            glBindImageTextureT(0, textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
 
             int numStratums = (int)genResult.MaterialMasks.size();
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "numStratums"), numStratums);
-            
             std::vector<float> stratColors, stratRemaps;
             for(int i=0; i<9; ++i) {
                 if(i < (int)params.Stratums.size()) {
@@ -404,15 +430,6 @@ static void InitializeShader() {
                     stratRemaps.push_back(0.0f); stratRemaps.push_back(1.0f);
                 }
             }
-            glUniform4fvT(glGetUniformLocationT(s_ComputeProgram, "stratumColors"), 9, stratColors.data());
-            glUniform2fT(glGetUniformLocationT(s_ComputeProgram, "stratumRemaps"), stratRemaps[0], stratRemaps[1]);
-            
-            glUniform4fT(glGetUniformLocationT(s_ComputeProgram, "flowMapColor"), params.FlowMapColor[0], params.FlowMapColor[1], params.FlowMapColor[2], params.FlowMapColor[3]);
-            glUniform1fT(glGetUniformLocationT(s_ComputeProgram, "waterLevelMax"), params.Water.WaterLevelMax);
-            glUniform1fT(glGetUniformLocationT(s_ComputeProgram, "terrainMinHeight"), genResult.TerrainMinHeight);
-            
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "numAreas"), (int)params.Areas.size());
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "numRules"), (int)ruleBoundsFlat.size()/4);
             
             // Build baked gradient caches
             auto buildGradientCache = [](const GradientSettings& settings, float* cache) {
@@ -462,22 +479,69 @@ static void InitializeShader() {
             glBufferDataT(GL_SHADER_STORAGE_BUFFER, gradientCacheFlat.size() * sizeof(float), gradientCacheFlat.data(), GL_DYNAMIC_COPY);
             glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 7, s_SSBOs[7]);
 
-            glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "focusDebugRuleIndex"), params.ShowFocusGradientDebugRuleIndex);
-            if(params.ShowFocusGradientDebugRuleIndex >= 0 && params.ShowFocusGradientDebugRuleIndex < (int)params.ProceduralMarkerLayers[0].Rules.size()) {
-                auto& r = params.ProceduralMarkerLayers[0].Rules[params.ShowFocusGradientDebugRuleIndex];
-                glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "focusGradientType"), r.FocusGradient);
-                glUniform1fT(glGetUniformLocationT(s_ComputeProgram, "focusGradientRadius"), r.FocusGradientRadius);
-                glUniform1fT(glGetUniformLocationT(s_ComputeProgram, "focusGradientContrast"), r.FocusGradientContrast);
-                glUniform1fT(glGetUniformLocationT(s_ComputeProgram, "focusGradientStrength"), r.FocusGradientStrength);
-            }
-
-            // Dispatch Compute
             GLuint numGroupsX = (quadWidth + 15) / 16;
             GLuint numGroupsY = (quadHeight + 15) / 16;
-            glDispatchComputeT(numGroupsX, numGroupsY, 1);
-            
-            // Memory barrier for image and SSBO access
-            glMemoryBarrierT(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+            float cellSize = static_cast<float>(params.MapSize) / quadWidth;
+            if (cellSize < 1.0f) cellSize = 1.0f;
+
+            auto dispatchProgram = [&](int permIdx, int currentLayerBlend) {
+                const auto& p = s_ComputePrograms[permIdx];
+                if(p.Program == 0) return;
+                glUseProgramT(p.Program);
+
+                glUniform1iT(p.loc_width, width);
+                glUniform1iT(p.loc_height, height);
+                glUniform1iT(p.loc_quadWidth, quadWidth);
+                glUniform1iT(p.loc_quadHeight, quadHeight);
+                glUniform1fT(p.loc_cellSize, cellSize);
+                glUniform1iT(p.loc_bUseEngineParityMath, params.SlopeSettingsParams.bUseEngineParityMath ? 1 : 0);
+                glUniform1fT(p.loc_minHeight, minHeight);
+                glUniform1fT(p.loc_maxHeight, maxHeight);
+                glUniform1iT(p.loc_autoLevelPreview, params.AutoLevelPreview ? 1 : 0);
+                glUniform1iT(p.loc_currentLayerBlend, currentLayerBlend);
+                
+                glUniform1iT(p.loc_numStratums, numStratums);
+                if (p.loc_stratumColors != -1) glUniform4fvT(p.loc_stratumColors, 9, stratColors.data());
+                if (p.loc_stratumRemaps != -1) glUniform2fT(p.loc_stratumRemaps, stratRemaps[0], stratRemaps[1]);
+                
+                if (p.loc_flowMapColor != -1) glUniform4fT(p.loc_flowMapColor, params.FlowMapColor[0], params.FlowMapColor[1], params.FlowMapColor[2], params.FlowMapColor[3]);
+                glUniform1fT(p.loc_waterLevelMax, params.Water.WaterLevelMax);
+                glUniform1fT(p.loc_deepWaterMin, params.Water.DeepWaterDepthMin);
+                glUniform1fT(p.loc_deepWaterMax, params.Water.DeepWaterDepthMax);
+                glUniform1fT(p.loc_terrainMinHeight, genResult.TerrainMinHeight);
+                
+                glUniform1iT(p.loc_numAreas, (int)params.Areas.size());
+                glUniform1iT(p.loc_numRules, (int)ruleBoundsFlat.size()/4);
+                
+                glUniform1iT(p.loc_focusDebugRuleIndex, params.ShowFocusGradientDebugRuleIndex);
+                if(params.ShowFocusGradientDebugRuleIndex >= 0 && params.ShowFocusGradientDebugRuleIndex < (int)params.ProceduralMarkerLayers[0].Rules.size()) {
+                    auto& r = params.ProceduralMarkerLayers[0].Rules[params.ShowFocusGradientDebugRuleIndex];
+                    glUniform1iT(p.loc_focusGradientType, r.FocusGradient);
+                    glUniform1fT(p.loc_focusGradientRadius, r.FocusGradientRadius);
+                    glUniform1fT(p.loc_focusGradientContrast, r.FocusGradientContrast);
+                    glUniform1fT(p.loc_focusGradientStrength, r.FocusGradientStrength);
+                }
+
+                glDispatchComputeT(numGroupsX, numGroupsY, 1);
+                glMemoryBarrierT(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+            };
+
+            // 1. Dispatch Clear Pass (idx 0)
+            dispatchProgram(0, -1);
+
+            // 2. Dispatch Active Layers in precise UI render order
+            for (const auto& layer : params.PreviewLayers) {
+                if (layer.Enabled && layer.Blend != GenerationParams::LayerBlendMode::None) {
+                    int layerType = (int)layer.Type;
+                    int currentLayerBlend = (int)layer.Blend - 1; // mapping None=0 -> -1
+                    dispatchProgram(layerType + 1, currentLayerBlend);
+                }
+            }
+
+            // 3. Dispatch Overlay Pass (idx 14)
+            if (params.ShowFocusGradientDebugRuleIndex >= 0) {
+                dispatchProgram(14, -1);
+            }
             
             // Read back EntityIDBuffer
             glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[0]);

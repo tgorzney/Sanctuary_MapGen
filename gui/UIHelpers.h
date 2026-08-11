@@ -29,8 +29,11 @@ inline bool RangeSliderFloat(const char* label, float* v_min, float* v_max, floa
     bool is_active = ImGui::IsItemActive();
     bool is_hovered = ImGui::IsItemHovered();
 
-    float normalized_min = std::clamp((*v_min - v_min_limit) / (v_max_limit - v_min_limit), 0.0f, 1.0f);
-    float normalized_max = std::clamp((*v_max - v_min_limit) / (v_max_limit - v_min_limit), 0.0f, 1.0f);
+    float range = v_max_limit - v_min_limit;
+    if (range < 0.00001f) range = 1.0f; // Prevent div-by-zero, fallback to 1.0 range
+    
+    float normalized_min = std::clamp((*v_min - v_min_limit) / range, 0.0f, 1.0f);
+    float normalized_max = std::clamp((*v_max - v_min_limit) / range, 0.0f, 1.0f);
 
     static ImGuiID active_slider_id = 0;
     static int active_handle = -1;
@@ -57,17 +60,19 @@ inline bool RangeSliderFloat(const char* label, float* v_min, float* v_max, floa
     }
 
     if (is_active && active_slider_id == id && ImGui::IsMouseDragging(0, 0.0f)) {
-        float mouse_x_delta = ImGui::GetIO().MouseDelta.x;
-        float value_delta = (mouse_x_delta / usable_width) * (v_max_limit - v_min_limit);
+        float mouse_x = ImGui::GetIO().MousePos.x;
+        float relative_x = mouse_x - (pos.x + handle_width * 0.5f);
+        float new_normalized = std::clamp(relative_x / usable_width, 0.0f, 1.0f);
+        float new_value = v_min_limit + new_normalized * range;
         
         if (active_handle == 0) {
-            *v_min += value_delta;
-            *v_min = std::clamp(*v_min, v_min_limit, *v_max - min_increment);
+            float upper = std::max(v_min_limit, *v_max - min_increment);
+            *v_min = std::clamp(new_value, v_min_limit, upper);
             if (update_rt) value_changed = true;
             was_dragging = true;
         } else if (active_handle == 1) {
-            *v_max += value_delta;
-            *v_max = std::clamp(*v_max, *v_min + min_increment, v_max_limit);
+            float lower = std::min(v_max_limit, *v_min + min_increment);
+            *v_max = std::clamp(new_value, lower, v_max_limit);
             if (update_rt) value_changed = true;
             was_dragging = true;
         }
@@ -82,8 +87,8 @@ inline bool RangeSliderFloat(const char* label, float* v_min, float* v_max, floa
         was_dragging = false;
     }
 
-    normalized_min = std::clamp((*v_min - v_min_limit) / (v_max_limit - v_min_limit), 0.0f, 1.0f);
-    normalized_max = std::clamp((*v_max - v_min_limit) / (v_max_limit - v_min_limit), 0.0f, 1.0f);
+    normalized_min = std::clamp((*v_min - v_min_limit) / range, 0.0f, 1.0f);
+    normalized_max = std::clamp((*v_max - v_min_limit) / range, 0.0f, 1.0f);
 
     ImU32 bg_col = ImGui::GetColorU32(ImGuiCol_FrameBg);
     ImU32 fill_col = ImGui::GetColorU32(ImGuiCol_SliderGrab);
@@ -109,13 +114,15 @@ inline bool RangeSliderFloat(const char* label, float* v_min, float* v_max, floa
     
     ImGui::SetNextItemWidth(input_width);
     if (ImGui::DragFloat("##min_input", v_min, min_increment, v_min_limit, *v_max - min_increment, format)) {
-        *v_min = std::clamp(*v_min, v_min_limit, *v_max - min_increment);
+        float upper = std::max(v_min_limit, *v_max - min_increment);
+        *v_min = std::clamp(*v_min, v_min_limit, upper);
         value_changed = true;
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(input_width);
     if (ImGui::DragFloat("##max_input", v_max, min_increment, *v_min + min_increment, v_max_limit, format)) {
-        *v_max = std::clamp(*v_max, *v_min + min_increment, v_max_limit);
+        float lower = std::min(v_max_limit, *v_min + min_increment);
+        *v_max = std::clamp(*v_max, lower, v_max_limit);
         value_changed = true;
     }
     ImGui::SameLine();
