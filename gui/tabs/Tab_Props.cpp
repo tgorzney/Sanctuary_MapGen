@@ -1,6 +1,7 @@
 #include "../UITabs.h"
 #include "../UIHelpers.h"
 #include "../widgets/Widget_LayerManager.h"
+#include "../widgets/VirtualListRenderer.h"
 #include "imgui.h"
 
 namespace SanmapGen {
@@ -49,8 +50,10 @@ namespace UI {
                         auto& group = layer.Groups[groupIdx];
                         ImGui::PushID(groupIdx);
                         
-                        std::string headerName = group.BlueprintPath + " (" + std::to_string(group.Transforms.size()) + ")";
-                        bool groupOpen = ImGui::TreeNode(headerName.c_str());
+                        char headerName[256];
+                        snprintf(headerName, sizeof(headerName), "%s (%zu)###group_%d", group.BlueprintPath.c_str(), group.Transforms.size(), groupIdx);
+                        
+                        bool groupOpen = ImGui::TreeNode(headerName);
                         
                         ImGui::SameLine();
                         if (ImGui::ColorEdit4("##TypeColor", group.Color, ImGuiColorEditFlags_NoInputs)) {
@@ -68,15 +71,12 @@ namespace UI {
                                 }
                             }
                             
-                            ImGuiListClipper clipper;
-                            clipper.Begin((int)group.Transforms.size());
-                            while (clipper.Step()) {
-                                for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-                                    const auto& t = group.Transforms[i];
+                            using TransformType = decltype(group.Transforms)::value_type;
+                            UI::VirtualListRenderer<TransformType>::Render("PropsList", group.Transforms, ImGui::GetTextLineHeightWithSpacing(), 
+                                [](int i, const auto& t) {
                                     ImGui::Text("  [%d] Pos: %.1f, %.1f, %.1f", i, t.Position[0], t.Position[1], t.Position[2]);
-                                }
-                            }
-                            clipper.End();
+                                });
+                            
                             ImGui::TreePop();
                         }
                         ImGui::PopID();
@@ -105,10 +105,7 @@ namespace UI {
         ImGui::Separator();
         ImGui::Text("Decal Rules");
         Widget_LayerManager::RenderLayerStack(params, dummy, &params.GeoLayers, true, bNeedsMapUpdate, LayerType::Decal);
-        
-        // Reclaim density moved to markers tab
-}
-
+    }
 
 } // namespace UI
 } // namespace SanmapGen

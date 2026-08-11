@@ -1,5 +1,6 @@
 #include "../UITabs.h"
 #include "../UIHelpers.h"
+#include "../widgets/VirtualListRenderer.h"
 #include "imgui.h"
 #include "FileDialog.h"
 #include <GLFW/glfw3.h>
@@ -316,114 +317,119 @@ namespace UI {
                 }
                 
                 for (auto& groupPair : groupedMarkers) {
-                    if (ImGui::CollapsingHeader((groupPair.first + " (" + std::to_string(groupPair.second.size()) + ")##" + std::to_string(layerIdx)).c_str())) {
+                    char groupHeader[128];
+                    snprintf(groupHeader, sizeof(groupHeader), "%s (%zu)###%d_%s", groupPair.first.c_str(), groupPair.second.size(), (int)layerIdx, groupPair.first.c_str());
+                    
+                    if (ImGui::CollapsingHeader(groupHeader)) {
                         ImGui::Indent();
-                        for (const auto& key : groupPair.second) {
-                            auto& marker = params.MarkersList[key];
-                            
-                            ImGui::PushID(key.c_str());
-                            char label[128];
-                            snprintf(label, sizeof(label), "%s%s", marker.CustomName.empty() ? key.c_str() : marker.CustomName.c_str(), marker.SymmetryId != 0 ? (" [Sym " + std::to_string(marker.SymmetryId) + "]").c_str() : "");
-                            
-                            if (ImGui::CollapsingHeader(label)) {
-                                bool localUpdate = false;
-                                char nameBuf[128]; 
-                                strncpy(nameBuf, marker.CustomName.c_str(), sizeof(nameBuf));
-                                if (ImGui::InputText("Name/ID", nameBuf, sizeof(nameBuf))) {
-                                    marker.CustomName = nameBuf;
-                                    localUpdate = true;
-                                }
+                        
+                        UI::VirtualListRenderer<std::string>::Render((groupPair.first + "_List").c_str(), groupPair.second, 25.0f, // Approx height, will expand
+                            [&](int idx, const std::string& key) {
+                                auto& marker = params.MarkersList[key];
                                 
-                                if (ImGui::DragFloat3("Position (X,Y,Z)", marker.Position, 1.0f, 0.0f, 4096.0f)) localUpdate = true;
+                                ImGui::PushID(key.c_str());
+                                char label[128];
+                                snprintf(label, sizeof(label), "%s%s", marker.CustomName.empty() ? key.c_str() : marker.CustomName.c_str(), marker.SymmetryId != 0 ? (" [Sym " + std::to_string(marker.SymmetryId) + "]").c_str() : "");
                                 
-                                
-                                std::string iconToDisplay = marker.IconOverride.empty() ? marker.Type : marker.IconOverride;
-                                RenderIconPicker("MarkerIcon", iconToDisplay, params, bNeedsPreviewRender);
-                                if (iconToDisplay != marker.Type) { marker.IconOverride = iconToDisplay; localUpdate = true; }
-                                else if (!marker.IconOverride.empty()) { marker.IconOverride = ""; localUpdate = true; }
-                                
-                                ImGui::Spacing();
-                                ImGui::Text("Symmetry Settings");
-                                if (ImGui::Checkbox("Use Global Symmetry", &marker.SymmetryUseGlobal)) localUpdate = true;
-                                if (!marker.SymmetryUseGlobal) {
-                                    bool symPoint  = (marker.SymmetryMask & Symmetry_Point);
-                                    bool symX      = (marker.SymmetryMask & Symmetry_X);
-                                    bool symZ      = (marker.SymmetryMask & Symmetry_Z);
-                                    bool symXY     = (marker.SymmetryMask & Symmetry_XY);
-                                    bool symRadial = (marker.SymmetryMask & Symmetry_Radial);
-                                    
-                                    if (ImGui::Checkbox("Point (Origin)", &symPoint)) localUpdate = true;
-                                    if (ImGui::Checkbox("X-Axis (Left/Right)", &symX)) localUpdate = true;
-                                    if (ImGui::Checkbox("Z-Axis (Top/Bottom)", &symZ)) localUpdate = true;
-                                    if (ImGui::Checkbox("XY-Axis (Diagonal)", &symXY)) localUpdate = true;
-                                    if (ImGui::Checkbox("Radial", &symRadial)) localUpdate = true;
-                                    
-                                    int newMask = 0;
-                                    if (symPoint)  newMask |= Symmetry_Point;
-                                    if (symX)      newMask |= Symmetry_X;
-                                    if (symZ)      newMask |= Symmetry_Z;
-                                    if (symXY)     newMask |= Symmetry_XY;
-                                    if (symRadial) newMask |= Symmetry_Radial;
-                                    
-                                    marker.SymmetryMask = newMask;
-                                }
-
-                                if (!params.KnownMarkerTypes.empty()) {
-                                    int currentType = -1;
-                                    for (int j = 0; j < (int)params.KnownMarkerTypes.size(); ++j) {
-                                        if (params.KnownMarkerTypes[j] == marker.Type) {
-                                            currentType = j;
-                                            break;
-                                        }
+                                if (ImGui::CollapsingHeader(label)) {
+                                    bool localUpdate = false;
+                                    char nameBuf[128]; 
+                                    strncpy(nameBuf, marker.CustomName.c_str(), sizeof(nameBuf));
+                                    if (ImGui::InputText("Name/ID", nameBuf, sizeof(nameBuf))) {
+                                        marker.CustomName = nameBuf;
+                                        localUpdate = true;
                                     }
-                                    std::vector<const char*> types;
-                                    for (const auto& t : params.KnownMarkerTypes) types.push_back(t.c_str());
                                     
-                                    if (ImGui::Combo("Type", &currentType, types.data(), (int)types.size())) {
-                                        if (currentType >= 0 && currentType < (int)params.KnownMarkerTypes.size()) {
-                                            marker.Type = params.KnownMarkerTypes[currentType];
-                                            localUpdate = true;
-                                        }
-                                    }
-                                }
-                                
-                                if (marker.Type == "Spawn" && !params.Armies.empty()) {
+                                    if (ImGui::DragFloat3("Position (X,Y,Z)", marker.Position, 1.0f, 0.0f, 4096.0f)) localUpdate = true;
+                                    
+                                    std::string iconToDisplay = marker.IconOverride.empty() ? marker.Type : marker.IconOverride;
+                                    RenderIconPicker("MarkerIcon", iconToDisplay, params, bNeedsPreviewRender);
+                                    if (iconToDisplay != marker.Type) { marker.IconOverride = iconToDisplay; localUpdate = true; }
+                                    else if (!marker.IconOverride.empty()) { marker.IconOverride = ""; localUpdate = true; }
+                                    
                                     ImGui::Spacing();
-                                    ImGui::Text("Spawn Army Assignment");
-                                    for (const auto& [armyName, army] : params.Armies) {
-                                        ImVec4 col(army.Color[0], army.Color[1], army.Color[2], army.Color[3]);
-                                        bool isSelected = (marker.CustomName == "Spawn_" + armyName || marker.CustomName == armyName);
+                                    ImGui::Text("Symmetry Settings");
+                                    if (ImGui::Checkbox("Use Global Symmetry", &marker.SymmetryUseGlobal)) localUpdate = true;
+                                    if (!marker.SymmetryUseGlobal) {
+                                        bool symPoint  = (marker.SymmetryMask & Symmetry_Point);
+                                        bool symX      = (marker.SymmetryMask & Symmetry_X);
+                                        bool symZ      = (marker.SymmetryMask & Symmetry_Z);
+                                        bool symXY     = (marker.SymmetryMask & Symmetry_XY);
+                                        bool symRadial = (marker.SymmetryMask & Symmetry_Radial);
                                         
-                                        if (isSelected) {
-                                            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-                                            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
-                                        }
+                                        if (ImGui::Checkbox("Point (Origin)", &symPoint)) localUpdate = true;
+                                        if (ImGui::Checkbox("X-Axis (Left/Right)", &symX)) localUpdate = true;
+                                        if (ImGui::Checkbox("Z-Axis (Top/Bottom)", &symZ)) localUpdate = true;
+                                        if (ImGui::Checkbox("XY-Axis (Diagonal)", &symXY)) localUpdate = true;
+                                        if (ImGui::Checkbox("Radial", &symRadial)) localUpdate = true;
                                         
-                                        if (ImGui::ColorButton(armyName.c_str(), col, 0, ImVec2(24, 24))) {
-                                            marker.CustomName = "Spawn_" + armyName;
-                                            localUpdate = true;
-                                        }
+                                        int newMask = 0;
+                                        if (symPoint)  newMask |= Symmetry_Point;
+                                        if (symX)      newMask |= Symmetry_X;
+                                        if (symZ)      newMask |= Symmetry_Z;
+                                        if (symXY)     newMask |= Symmetry_XY;
+                                        if (symRadial) newMask |= Symmetry_Radial;
                                         
-                                        if (isSelected) {
-                                            ImGui::PopStyleVar();
-                                            ImGui::PopStyleColor();
-                                        }
-                                        ImGui::SameLine();
+                                        marker.SymmetryMask = newMask;
                                     }
-                                    ImGui::NewLine();
+
+                                    if (!params.KnownMarkerTypes.empty()) {
+                                        int currentType = -1;
+                                        for (int j = 0; j < (int)params.KnownMarkerTypes.size(); ++j) {
+                                            if (params.KnownMarkerTypes[j] == marker.Type) {
+                                                currentType = j;
+                                                break;
+                                            }
+                                        }
+                                        std::vector<const char*> types;
+                                        for (const auto& t : params.KnownMarkerTypes) types.push_back(t.c_str());
+                                        
+                                        if (ImGui::Combo("Type", &currentType, types.data(), (int)types.size())) {
+                                            if (currentType >= 0 && currentType < (int)params.KnownMarkerTypes.size()) {
+                                                marker.Type = params.KnownMarkerTypes[currentType];
+                                                localUpdate = true;
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (marker.Type == "Spawn" && !params.Armies.empty()) {
+                                        ImGui::Spacing();
+                                        ImGui::Text("Spawn Army Assignment");
+                                        for (const auto& [armyName, army] : params.Armies) {
+                                            ImVec4 col(army.Color[0], army.Color[1], army.Color[2], army.Color[3]);
+                                            bool isSelected = (marker.CustomName == "Spawn_" + armyName || marker.CustomName == armyName);
+                                            
+                                            if (isSelected) {
+                                                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+                                                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
+                                            }
+                                            
+                                            if (ImGui::ColorButton(armyName.c_str(), col, 0, ImVec2(24, 24))) {
+                                                marker.CustomName = "Spawn_" + armyName;
+                                                localUpdate = true;
+                                            }
+                                            
+                                            if (isSelected) {
+                                                ImGui::PopStyleVar();
+                                                ImGui::PopStyleColor();
+                                            }
+                                            ImGui::SameLine();
+                                        }
+                                        ImGui::NewLine();
+                                    }
+                                    
+                                    if (localUpdate) {
+                                        bUpdate = true;
+                                        triggerSymmetryDeltaUpdate(marker);
+                                    }
+                                    
+                                    if (ImGui::Button("Delete Marker", ImVec2(-1, 20))) {
+                                        keyToDelete = key;
+                                    }
                                 }
-                                
-                                if (localUpdate) {
-                                    bUpdate = true;
-                                    triggerSymmetryDeltaUpdate(marker);
-                                }
-                                
-                                if (ImGui::Button("Delete Marker", ImVec2(-1, 20))) {
-                                    keyToDelete = key;
-                                }
-                            }
-                            ImGui::PopID();
-                        }
+                                ImGui::PopID();
+                            });
+                        
                         ImGui::Unindent();
                     }
                 }

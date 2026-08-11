@@ -1,19 +1,13 @@
-#include "PreviewRenderer.h"
-#include <vector>
-#include <algorithm>
+import re
 
-// GL_CLAMP_TO_EDGE is OpenGL 1.2+; define as fallback in case the bundled GL header only covers 1.1
-#ifndef GL_CLAMP_TO_EDGE
-#define GL_CLAMP_TO_EDGE 0x812F
-#endif
+with open("D:/Projects/Sanctuary/Map Generator/gui/PreviewRenderer.cpp", "r") as f:
+    content = f.read()
 
+gl_ext = """
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #define NOMINMAX
-#ifdef APIENTRY
-#undef APIENTRY
-#endif
 #include <Windows.h>
 #include <GL/gl.h>
 
@@ -21,10 +15,7 @@
 #define APIENTRYP APIENTRY *
 #endif
 
-namespace SanmapGen {
-
 typedef ptrdiff_t GLsizeiptr;
-typedef ptrdiff_t GLintptr;
 typedef char GLchar;
 #define GL_COMPUTE_SHADER                 0x91B9
 #define GL_SHADER_STORAGE_BUFFER          0x90D2
@@ -41,8 +32,6 @@ typedef void (APIENTRYP PFNGLSHADERSOURCEPROC) (GLuint shader, GLsizei count, co
 typedef void (APIENTRYP PFNGLCOMPILESHADERPROC) (GLuint shader);
 typedef void (APIENTRYP PFNGLGETSHADERIVPROC) (GLuint shader, GLenum pname, GLint *params);
 typedef void (APIENTRYP PFNGLGETSHADERINFOLOGPROC) (GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
-typedef void (APIENTRYP PFNGLGETPROGRAMIVPROC) (GLuint program, GLenum pname, GLint *params);
-typedef void (APIENTRYP PFNGLGETPROGRAMINFOLOGPROC) (GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
 typedef GLuint (APIENTRYP PFNGLCREATEPROGRAMPROC) (void);
 typedef void (APIENTRYP PFNGLATTACHSHADERPROC) (GLuint program, GLuint shader);
 typedef void (APIENTRYP PFNGLLINKPROGRAMPROC) (GLuint program);
@@ -65,12 +54,6 @@ typedef void (APIENTRYP PFNGLDELETESHADERPROC) (GLuint shader);
 typedef void (APIENTRYP PFNGLDELETEPROGRAMPROC) (GLuint program);
 typedef void (APIENTRYP PFNGLBINDIMAGETEXTUREPROC) (GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format);
 typedef void (APIENTRYP PFNGLGETBUFFERSUBDATAPROC) (GLenum target, GLintptr offset, GLsizeiptr size, void *data);
-typedef void* (APIENTRYP PFNGLMAPBUFFERRANGEPROC) (GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
-typedef GLboolean (APIENTRYP PFNGLUNMAPBUFFERPROC) (GLenum target);
-
-#define GL_MAP_WRITE_BIT 0x0002
-#define GL_MAP_INVALIDATE_BUFFER_BIT 0x0008
-#define GL_MAP_UNSYNCHRONIZED_BIT 0x0020
 
 static PFNGLCREATESHADERPROC glCreateShaderT = nullptr;
 static PFNGLSHADERSOURCEPROC glShaderSourceT = nullptr;
@@ -99,8 +82,7 @@ static PFNGLDELETESHADERPROC glDeleteShaderT = nullptr;
 static PFNGLDELETEPROGRAMPROC glDeleteProgramT = nullptr;
 static PFNGLBINDIMAGETEXTUREPROC glBindImageTextureT = nullptr;
 static PFNGLGETBUFFERSUBDATAPROC glGetBufferSubDataT = nullptr;
-static PFNGLMAPBUFFERRANGEPROC glMapBufferRangeT = nullptr;
-static PFNGLUNMAPBUFFERPROC glUnmapBufferT = nullptr;
+
 static bool s_GLTInitialized = false;
 static void LoadGLExtensionsT() {
     if (s_GLTInitialized) return;
@@ -141,8 +123,6 @@ static void LoadGLExtensionsT() {
     glDeleteProgramT = (PFNGLDELETEPROGRAMPROC)getProc("glDeleteProgram");
     glBindImageTextureT = (PFNGLBINDIMAGETEXTUREPROC)getProc("glBindImageTexture");
     glGetBufferSubDataT = (PFNGLGETBUFFERSUBDATAPROC)getProc("glGetBufferSubData");
-    glMapBufferRangeT = (PFNGLMAPBUFFERRANGEPROC)getProc("glMapBufferRange");
-    glUnmapBufferT = (PFNGLUNMAPBUFFERPROC)getProc("glUnmapBuffer");
     s_GLTInitialized = true;
 }
 
@@ -166,45 +146,19 @@ static void InitializeShader() {
     if (!success) {
         GLchar infoLog[512];
         glGetShaderInfoLogT(cs, 512, NULL, infoLog);
-        std::cerr << "Preview Compute Shader Compilation Failed:\n" << infoLog << std::endl;
+        std::cerr << "Preview Compute Shader Compilation Failed:\\n" << infoLog << std::endl;
         return;
     }
     s_ComputeProgram = glCreateProgramT();
     glAttachShaderT(s_ComputeProgram, cs);
     glLinkProgramT(s_ComputeProgram);
-    
-    GLint linkSuccess;
-    PFNGLGETPROGRAMIVPROC glGetProgramivT = (PFNGLGETPROGRAMIVPROC)wglGetProcAddress("glGetProgramiv");
-    if(!glGetProgramivT) glGetProgramivT = (PFNGLGETPROGRAMIVPROC)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glGetProgramiv");
-    PFNGLGETPROGRAMINFOLOGPROC glGetProgramInfoLogT = (PFNGLGETPROGRAMINFOLOGPROC)wglGetProcAddress("glGetProgramInfoLog");
-    if(!glGetProgramInfoLogT) glGetProgramInfoLogT = (PFNGLGETPROGRAMINFOLOGPROC)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glGetProgramInfoLog");
-    
-    if (glGetProgramivT && glGetProgramInfoLogT) {
-        glGetProgramivT(s_ComputeProgram, 0x8B82 /* GL_LINK_STATUS */, &linkSuccess);
-        if (!linkSuccess) {
-            GLchar infoLog[512];
-            glGetProgramInfoLogT(s_ComputeProgram, 512, NULL, infoLog);
-            std::cerr << "Preview Compute Shader Link Failed:\n" << infoLog << std::endl;
-        }
-    }
-    
     glDeleteShaderT(cs);
+    glGenBuffersT(8, s_SSBOs);
     s_ShaderInitialized = true;
 }
+"""
 
-
-
-    GLuint PreviewRenderer::UpdatePreviewTexture(const FloatMask& heightmap, const GenerationResult& genResult, const GenerationParams& params, GLuint existingTexture, bool bGeometryChanged) {
-        int width = heightmap.GetWidth();
-        int height = heightmap.GetHeight();
-
-        // If the mask is empty, return 0
-        if (width <= 1 || height <= 1) return existingTexture;
-
-        int quadWidth = width - 1;
-        int quadHeight = height - 1;
-        
-                // Ensure GL extensions and Compute Shader are initialized
+replacement = """        // Ensure GL extensions and Compute Shader are initialized
         if (!s_ShaderInitialized) {
             InitializeShader();
         }
@@ -230,9 +184,6 @@ static void InitializeShader() {
         params.EntityIDBufferHeight = quadHeight;
 
         GLuint textureID = existingTexture;
-        if (s_SSBOs[0] == 0) {
-            glGenBuffersT(8, s_SSBOs);
-        }
         if (textureID == 0) {
             glGenTextures(1, &textureID);
             glBindTexture(GL_TEXTURE_2D, textureID);
@@ -248,19 +199,19 @@ static void InitializeShader() {
             // Upload data to SSBOs
             glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[0]);
             glBufferDataT(GL_SHADER_STORAGE_BUFFER, params.EntityIDBuffer.size() * sizeof(uint32_t), params.EntityIDBuffer.data(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 0, s_SSBOs[0]);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 1, s_SSBOs[0]);
             
             glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[1]);
             glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * sizeof(float), heightmap.GetDataPtr(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 1, s_SSBOs[1]);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 2, s_SSBOs[1]);
 
             glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[2]);
             glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * sizeof(float), genResult.FlowMap.GetDataPtr(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 2, s_SSBOs[2]);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 3, s_SSBOs[2]);
 
             glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[3]);
             glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * sizeof(float), genResult.AccumulationMap.GetDataPtr(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 3, s_SSBOs[3]);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 4, s_SSBOs[3]);
             
             // Material Masks (stratums)
             std::vector<float> stratumsFlat(width * height * 9, 0.0f);
@@ -269,7 +220,7 @@ static void InitializeShader() {
             }
             glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[4]);
             glBufferDataT(GL_SHADER_STORAGE_BUFFER, stratumsFlat.size() * sizeof(float), stratumsFlat.data(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 4, s_SSBOs[4]);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 5, s_SSBOs[4]);
 
             // Areas
             std::vector<float> areaBoundsFlat;
@@ -283,16 +234,12 @@ static void InitializeShader() {
             if(areaBoundsFlat.empty()) { areaBoundsFlat.resize(4, 0.0f); areaColorsFlat.resize(4, 0.0f); }
             
             glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[5]);
-            size_t areaBoundsSize = areaBoundsFlat.size() * sizeof(float);
-            size_t areaColorsSize = areaColorsFlat.size() * sizeof(float);
-            glBufferDataT(GL_SHADER_STORAGE_BUFFER, areaBoundsSize + areaColorsSize, nullptr, GL_DYNAMIC_DRAW);
-            void* ptrAreas = glMapBufferRangeT(GL_SHADER_STORAGE_BUFFER, 0, areaBoundsSize + areaColorsSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-            if (ptrAreas) {
-                std::memcpy(ptrAreas, areaBoundsFlat.data(), areaBoundsSize);
-                std::memcpy(static_cast<char*>(ptrAreas) + areaBoundsSize, areaColorsFlat.data(), areaColorsSize);
-                glUnmapBufferT(GL_SHADER_STORAGE_BUFFER);
-            }
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 5, s_SSBOs[5]);
+            glBufferDataT(GL_SHADER_STORAGE_BUFFER, areaBoundsFlat.size() * sizeof(float), areaBoundsFlat.data(), GL_DYNAMIC_COPY);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 6, s_SSBOs[5]);
+            
+            glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[6]);
+            glBufferDataT(GL_SHADER_STORAGE_BUFFER, areaColorsFlat.size() * sizeof(float), areaColorsFlat.data(), GL_DYNAMIC_COPY);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 7, s_SSBOs[6]);
 
             // Rules for Markers / Props
             std::vector<float> ruleBoundsFlat;
@@ -316,17 +263,9 @@ static void InitializeShader() {
             }
             if(ruleBoundsFlat.empty()) { ruleBoundsFlat.resize(4, 0.0f); ruleParamsFlat.resize(4, 0.0f); }
 
-            glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[6]);
-            size_t boundsSize = ruleBoundsFlat.size() * sizeof(float);
-            size_t paramsSize = ruleParamsFlat.size() * sizeof(float);
-            glBufferDataT(GL_SHADER_STORAGE_BUFFER, boundsSize + paramsSize, nullptr, GL_DYNAMIC_DRAW);
-            void* ptrRules = glMapBufferRangeT(GL_SHADER_STORAGE_BUFFER, 0, boundsSize + paramsSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-            if (ptrRules) {
-                std::memcpy(ptrRules, ruleBoundsFlat.data(), boundsSize);
-                std::memcpy(static_cast<char*>(ptrRules) + boundsSize, ruleParamsFlat.data(), paramsSize);
-                glUnmapBufferT(GL_SHADER_STORAGE_BUFFER);
-            }
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 6, s_SSBOs[6]);
+            glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[7]);
+            glBufferDataT(GL_SHADER_STORAGE_BUFFER, ruleBoundsFlat.size() * sizeof(float), ruleBoundsFlat.data(), GL_DYNAMIC_COPY);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 8, s_SSBOs[7]);
 
             glUseProgramT(s_ComputeProgram);
 
@@ -350,7 +289,7 @@ static void InitializeShader() {
             int layerBlends[13];
             for(int i=0; i<13; ++i) layerBlends[i] = -1;
             for (const auto& layer : params.PreviewLayers) {
-                if (layer.Enabled && layer.Blend != GenerationParams::LayerBlendMode::None) {
+                if(layer.Blend != GenerationParams::LayerBlendMode::None) {
                     layerBlends[(int)layer.Type] = (int)layer.Blend - 1; // mapping None=0 -> -1
                 }
             }
@@ -420,16 +359,10 @@ static void InitializeShader() {
             buildGradientCache(params.FlowSettingsParams.Gradient, accumGrad); // Same for accumulation in legacy
             buildGradientCache(params.Water.Gradient, waterGrad);
             
-            std::vector<float> gradientCacheFlat;
-            gradientCacheFlat.reserve(256 * 4 * 4);
-            gradientCacheFlat.insert(gradientCacheFlat.end(), slopeGrad, slopeGrad + 256*4);
-            gradientCacheFlat.insert(gradientCacheFlat.end(), flowGrad, flowGrad + 256*4);
-            gradientCacheFlat.insert(gradientCacheFlat.end(), accumGrad, accumGrad + 256*4);
-            gradientCacheFlat.insert(gradientCacheFlat.end(), waterGrad, waterGrad + 256*4);
-
-            glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[7]);
-            glBufferDataT(GL_SHADER_STORAGE_BUFFER, gradientCacheFlat.size() * sizeof(float), gradientCacheFlat.data(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 7, s_SSBOs[7]);
+            glUniform4fvT(glGetUniformLocationT(s_ComputeProgram, "slopeGradient"), 256, slopeGrad);
+            glUniform4fvT(glGetUniformLocationT(s_ComputeProgram, "flowGradient"), 256, flowGrad);
+            glUniform4fvT(glGetUniformLocationT(s_ComputeProgram, "accumGradient"), 256, accumGrad);
+            glUniform4fvT(glGetUniformLocationT(s_ComputeProgram, "waterGradient"), 256, waterGrad);
 
             glUniform1iT(glGetUniformLocationT(s_ComputeProgram, "focusDebugRuleIndex"), params.ShowFocusGradientDebugRuleIndex);
             if(params.ShowFocusGradientDebugRuleIndex >= 0 && params.ShowFocusGradientDebugRuleIndex < (int)params.ProceduralMarkerLayers[0].Rules.size()) {
@@ -454,7 +387,20 @@ static void InitializeShader() {
             
             glUseProgramT(0);
         }
-        return textureID;
-    }
+"""
 
-} // namespace SanmapGen
+start_marker = "static std::vector<float> cachedSlopes;"
+end_marker = "        // Upload the pixel buffer to the GPU"
+
+start_idx = content.find(start_marker)
+end_idx = content.find(end_marker)
+
+if start_idx == -1 or end_idx == -1:
+    print("Could not find markers to replace")
+else:
+    new_content = content[:content.find("namespace SanmapGen {") + len("namespace SanmapGen {")] + "\n" + gl_ext + "\n" + content[content.find("namespace SanmapGen {") + len("namespace SanmapGen {"):start_idx] + replacement + content[end_idx:]
+
+    with open("D:/Projects/Sanctuary/Map Generator/gui/PreviewRenderer.cpp", "w") as f:
+        f.write(new_content)
+    print("Successfully patched PreviewRenderer.cpp")
+
