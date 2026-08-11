@@ -52,7 +52,9 @@ namespace SanmapGen {
         // Main entry point for generating the terrain heightmap. Returns individual stratum masks and flow data.
         static void GenerateMap(FloatMask& outMap, const GenerationParams& params, GenerationResult& inOutResult);
         
-        
+        // Bake support
+        static void BakeLayer(const GenerationParams& params, NoiseLayer* layer);
+        static void ClearBakedLayer(NoiseLayer* layer);
 
     private:
         

@@ -40,6 +40,11 @@ namespace SanmapGen {
         int ImageWidth = 0;
         int ImageHeight = 0;
         
+        // Bake Support
+        bool IsBaked = false;
+        bool BakeRequested = false;
+        std::vector<float> BakedImageData; 
+        
         bool Erodable = true;
         
         int StratumIndex = 1; // 0 to 8 mapping to the 9 Stratums (also selects GeoLayer group)

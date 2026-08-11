@@ -47,7 +47,8 @@ namespace SanmapGen {
 
         const float btnWidth = 70.0f;
         const float btnGap = 4.0f;
-        float buttonsWidth = btnWidth * 3.0f + btnGap * 2.0f;
+        // Expanded to 4 buttons (Import, Duplicate, Bake/Clear, Delete)
+        float buttonsWidth = btnWidth * 4.0f + btnGap * 3.0f;
         ImGui::SameLine(headerWidth - buttonsWidth);
 
         if (ImGui::Button("Import RAW...", ImVec2(btnWidth, 0))) {
@@ -58,8 +59,6 @@ namespace SanmapGen {
                     std::streamsize size = inFile.tellg();
                     inFile.seekg(0, std::ios::beg);
                     
-                    // We assume 16-bit uint raw maps that match MapSize+1.
-                    // If the user selects a random raw file, we still just read floats.
                     std::vector<uint16_t> rawData(size / sizeof(uint16_t));
                     if (inFile.read(reinterpret_cast<char*>(rawData.data()), size)) {
                         layer.ImageData.resize(rawData.size());
@@ -67,7 +66,6 @@ namespace SanmapGen {
                             layer.ImageData[k] = static_cast<float>(rawData[k]) / 65535.0f;
                         }
                         
-                        // Guess dimensions (assume square)
                         int dim = static_cast<int>(std::sqrt(rawData.size()));
                         layer.ImageWidth = dim;
                         layer.ImageHeight = dim;
@@ -88,6 +86,27 @@ namespace SanmapGen {
             return;
         }
         ImGui::SameLine(0, btnGap);
+        
+        if (layer.IsBaked) {
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,  ImVec4(0.3f, 0.7f, 0.3f, 1.0f));
+            if (ImGui::Button("Unbake", ImVec2(btnWidth, 0))) {
+                layer.IsBaked = false;
+                // Add TerrainGenerator::ClearBakedLayer call hook here eventually
+                bNeedsMapUpdate = true;
+            }
+            ImGui::PopStyleColor(2);
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.2f, 0.2f, 0.6f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,  ImVec4(0.3f, 0.3f, 0.7f, 1.0f));
+            if (ImGui::Button("Bake", ImVec2(btnWidth, 0))) {
+                layer.IsBaked = true;
+                layer.BakeRequested = true; // Triggers the async compute pass
+                bNeedsMapUpdate = true;
+            }
+            ImGui::PopStyleColor(2);
+        }
+        ImGui::SameLine(0, btnGap);
 
         ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,  ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
@@ -101,6 +120,12 @@ namespace SanmapGen {
 
         if (expanded) {
             ImGui::Indent();
+            
+            // Disable all procedural settings if the layer is currently baked
+            if (layer.IsBaked) {
+                ImGui::BeginDisabled(true);
+            }
+            
             char nameBuf[128];
             strncpy(nameBuf, layer.Name.c_str(), sizeof(nameBuf));
             if (ImGui::InputText("Layer Name", nameBuf, IM_ARRAYSIZE(nameBuf))) {
@@ -293,6 +318,10 @@ namespace SanmapGen {
                 }
             }
 
+            if (layer.IsBaked) {
+                ImGui::EndDisabled();
+            }
+            
             ImGui::Unindent();
         }
     }

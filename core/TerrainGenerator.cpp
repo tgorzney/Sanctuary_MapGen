@@ -19,6 +19,7 @@
 #include "ErosionCompute.h"
 #include "PlacementRules.h"
 #include "math/Sanmath_SIMD.h"
+#include "gen/LayerBakeCompute.h"
 
 namespace SanmapGen {
 
@@ -79,5 +80,20 @@ namespace SanmapGen {
     
 
     // Returns {MaxFlatRadius, Variance}
+
+    void TerrainGenerator::BakeLayer(const GenerationParams& params, NoiseLayer* layer) {
+        if (!layer) return;
+        layer->IsBaked = true;
+        layer->BakeRequested = false;
+        
+        LayerBakeCompute::Dispatch(params, layer);
+    }
+    
+    void TerrainGenerator::ClearBakedLayer(NoiseLayer* layer) {
+        if (!layer) return;
+        layer->IsBaked = false;
+        layer->BakeRequested = false;
+        layer->BakedImageData.clear();
+    }
 
 } // namespace SanmapGen
