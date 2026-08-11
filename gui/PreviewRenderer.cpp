@@ -65,6 +65,7 @@ typedef void (APIENTRYP PFNGLDELETESHADERPROC) (GLuint shader);
 typedef void (APIENTRYP PFNGLDELETEPROGRAMPROC) (GLuint program);
 typedef void (APIENTRYP PFNGLBINDIMAGETEXTUREPROC) (GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format);
 typedef void (APIENTRYP PFNGLGETBUFFERSUBDATAPROC) (GLenum target, GLintptr offset, GLsizeiptr size, void *data);
+typedef void (APIENTRYP PFNGLBUFFERSUBDATAPROC) (GLenum target, GLintptr offset, GLsizeiptr size, const void *data);
 typedef void* (APIENTRYP PFNGLMAPBUFFERRANGEPROC) (GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
 typedef GLboolean (APIENTRYP PFNGLUNMAPBUFFERPROC) (GLenum target);
 
@@ -99,6 +100,7 @@ static PFNGLDELETESHADERPROC glDeleteShaderT = nullptr;
 static PFNGLDELETEPROGRAMPROC glDeleteProgramT = nullptr;
 static PFNGLBINDIMAGETEXTUREPROC glBindImageTextureT = nullptr;
 static PFNGLGETBUFFERSUBDATAPROC glGetBufferSubDataT = nullptr;
+static PFNGLBUFFERSUBDATAPROC glBufferSubDataT = nullptr;
 static PFNGLMAPBUFFERRANGEPROC glMapBufferRangeT = nullptr;
 static PFNGLUNMAPBUFFERPROC glUnmapBufferT = nullptr;
 static bool s_GLTInitialized = false;
@@ -141,6 +143,7 @@ static void LoadGLExtensionsT() {
     glDeleteProgramT = (PFNGLDELETEPROGRAMPROC)getProc("glDeleteProgram");
     glBindImageTextureT = (PFNGLBINDIMAGETEXTUREPROC)getProc("glBindImageTexture");
     glGetBufferSubDataT = (PFNGLGETBUFFERSUBDATAPROC)getProc("glGetBufferSubData");
+    glBufferSubDataT = (PFNGLBUFFERSUBDATAPROC)getProc("glBufferSubData");
     glMapBufferRangeT = (PFNGLMAPBUFFERRANGEPROC)getProc("glMapBufferRange");
     glUnmapBufferT = (PFNGLUNMAPBUFFERPROC)getProc("glUnmapBuffer");
     s_GLTInitialized = true;
@@ -149,6 +152,8 @@ static void LoadGLExtensionsT() {
 static GLuint s_ComputeProgram = 0;
 static GLuint s_SSBOs[8] = {0};
 static bool s_ShaderInitialized = false;
+static int s_AllocatedWidth = 0;
+static int s_AllocatedHeight = 0;
 
 static void InitializeShader() {
     LoadGLExtensionsT();
@@ -240,36 +245,62 @@ static void InitializeShader() {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, quadWidth, quadHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
             glBindTexture(GL_TEXTURE_2D, 0);
         }
 
-        if (s_ShaderInitialized) {
-            // Upload data to SSBOs
-            glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[0]);
-            glBufferDataT(GL_SHADER_STORAGE_BUFFER, params.EntityIDBuffer.size() * sizeof(uint32_t), params.EntityIDBuffer.data(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 0, s_SSBOs[0]);
+        bool bNeedsReallocation = (s_AllocatedWidth != quadWidth || s_AllocatedHeight != quadHeight);
+        if (bNeedsReallocation) {
+            glBindTexture(GL_TEXTURE_2D, textureID);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, quadWidth, quadHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glBindTexture(GL_TEXTURE_2D, 0);
             
-            glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[1]);
-            glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * sizeof(float), heightmap.GetDataPtr(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 1, s_SSBOs[1]);
-
-            glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[2]);
-            glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * sizeof(float), genResult.FlowMap.GetDataPtr(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 2, s_SSBOs[2]);
-
-            glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[3]);
-            glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * sizeof(float), genResult.AccumulationMap.GetDataPtr(), GL_DYNAMIC_COPY);
-            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 3, s_SSBOs[3]);
+            s_AllocatedWidth = quadWidth;
+            s_AllocatedHeight = quadHeight;
             
-            // Material Masks (stratums)
-            std::vector<float> stratumsFlat(width * height * 9, 0.0f);
-            for(size_t i = 0; i < genResult.MaterialMasks.size() && i < 9; ++i) {
-                memcpy(stratumsFlat.data() + i * (width * height), genResult.MaterialMasks[i].GetDataPtr(), width * height * sizeof(float));
+            if (s_SSBOs[0] != 0) {
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[0]);
+                glBufferDataT(GL_SHADER_STORAGE_BUFFER, quadWidth * quadHeight * sizeof(uint32_t), nullptr, GL_DYNAMIC_COPY);
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[1]);
+                glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * sizeof(float), nullptr, GL_DYNAMIC_COPY);
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[2]);
+                glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * sizeof(float), nullptr, GL_DYNAMIC_COPY);
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[3]);
+                glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * sizeof(float), nullptr, GL_DYNAMIC_COPY);
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[4]);
+                glBufferDataT(GL_SHADER_STORAGE_BUFFER, width * height * 9 * sizeof(float), nullptr, GL_DYNAMIC_COPY);
             }
-            glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[4]);
-            glBufferDataT(GL_SHADER_STORAGE_BUFFER, stratumsFlat.size() * sizeof(float), stratumsFlat.data(), GL_DYNAMIC_COPY);
+        }
+
+        if (s_ShaderInitialized) {
+            // Ensure base bindings
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 0, s_SSBOs[0]);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 1, s_SSBOs[1]);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 2, s_SSBOs[2]);
+            glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 3, s_SSBOs[3]);
             glBindBufferBaseT(GL_SHADER_STORAGE_BUFFER, 4, s_SSBOs[4]);
+
+            if (bGeometryChanged || bNeedsReallocation) {
+                // Upload data to SSBOs
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[0]);
+                glBufferSubDataT(GL_SHADER_STORAGE_BUFFER, 0, params.EntityIDBuffer.size() * sizeof(uint32_t), params.EntityIDBuffer.data());
+                
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[1]);
+                glBufferSubDataT(GL_SHADER_STORAGE_BUFFER, 0, width * height * sizeof(float), heightmap.GetDataPtr());
+
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[2]);
+                glBufferSubDataT(GL_SHADER_STORAGE_BUFFER, 0, width * height * sizeof(float), genResult.FlowMap.GetDataPtr());
+
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[3]);
+                glBufferSubDataT(GL_SHADER_STORAGE_BUFFER, 0, width * height * sizeof(float), genResult.AccumulationMap.GetDataPtr());
+                
+                // Material Masks (stratums)
+                std::vector<float> stratumsFlat(width * height * 9, 0.0f);
+                for(size_t i = 0; i < genResult.MaterialMasks.size() && i < 9; ++i) {
+                    memcpy(stratumsFlat.data() + i * (width * height), genResult.MaterialMasks[i].GetDataPtr(), width * height * sizeof(float));
+                }
+                glBindBufferT(GL_SHADER_STORAGE_BUFFER, s_SSBOs[4]);
+                glBufferSubDataT(GL_SHADER_STORAGE_BUFFER, 0, stratumsFlat.size() * sizeof(float), stratumsFlat.data());
+            } // end bGeometryChanged
 
             // Areas
             std::vector<float> areaBoundsFlat;

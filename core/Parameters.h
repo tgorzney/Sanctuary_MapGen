@@ -372,8 +372,8 @@ namespace SanmapGen {
             PreviewLayers.push_back({ PreviewLayerType::Accumulation, "Accumulation Map", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Markers, "Markers", true, LayerBlendMode::None });
             PreviewLayers.push_back({ PreviewLayerType::Props, "Props", false, LayerBlendMode::None });
-            PreviewLayers.push_back({ PreviewLayerType::Areas, "Areas", true, LayerBlendMode::Normal });
-            PreviewLayers.push_back({ PreviewLayerType::Water, "Water", true, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Areas, "Areas", true, LayerBlendMode::None });
+            PreviewLayers.push_back({ PreviewLayerType::Water, "Water", true, LayerBlendMode::Normal });
         }
         
         // --- Dependency Graph Hashing for Dirty Flags ---
