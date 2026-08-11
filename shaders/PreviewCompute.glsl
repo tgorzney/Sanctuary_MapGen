@@ -180,11 +180,18 @@ void main() {
     }
     val = clamp(val, 0.0, 1.0);
     
-    float realHeight = v00;
-    
-    float dx = (((v10 + v11) - (v00 + v01)) * 0.5) / cellSize;
-    float dy = (((v01 + v11) - (v00 + v10)) * 0.5) / cellSize;
-    
+    float realHeight = (v00 + v10 + v01 + v11) * 0.25 * 128.0;
+      
+    // Sample surrounding vertices for central difference
+    float hL = GetHeight(x - 1, y);
+    float hR = GetHeight(x + 1, y);
+    float hU = GetHeight(x, y - 1);
+    float hD = GetHeight(x, y + 1);
+      
+    // Engine parity differences
+    float dx = (hR - hL) * 128.0 * 0.5;
+    float dy = (hD - hU) * 128.0 * 0.5;
+      
     // Hardware-accelerated Engine Parity Math (maximum performance)
     float slopeDegrees = acos(inversesqrt(dx * dx + dy * dy + 1.0)) * 57.2957795131;
     
