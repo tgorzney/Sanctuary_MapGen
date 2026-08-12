@@ -137,6 +137,8 @@ namespace SanmapGen {
         bool SymmetryUseGlobal = true;
         int SymmetryMask = Symmetry_Point;
         
+        std::string GeneratorAlias = ""; // Internal Map Generator custom name alias
+        
         // Keep track of what type this is (Spawn, Alloy, Plasma, etc.)
         std::string Type;
         // Allows customizing the JSON key for Spawn (e.g., "ARMY_1") or Alloys (e.g. "Mex 0")

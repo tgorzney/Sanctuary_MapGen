@@ -726,6 +726,17 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             }
         }
         
+        // Load Map Generator Specific Aliases
+        if (mapdef.contains("mapGeneratorData") && mapdef["mapGeneratorData"].contains("Aliases")) {
+            auto aliasesObj = mapdef["mapGeneratorData"]["Aliases"];
+            for (auto it = aliasesObj.begin(); it != aliasesObj.end(); ++it) {
+                std::string engineKey = it.key();
+                if (outParams.MarkersList.find(engineKey) != outParams.MarkersList.end()) {
+                    outParams.MarkersList[engineKey].GeneratorAlias = it.value();
+                }
+            }
+        }
+        
         // Build Spatial Chunk Grid for O(1) click detection
         int chunks = outParams.SpatialGridResolution;
         outParams.MarkerSpatialGrid.assign(chunks * chunks, GenerationParams::MarkerChunk());

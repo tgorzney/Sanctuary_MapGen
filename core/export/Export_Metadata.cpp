@@ -130,11 +130,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["hasWater"] = true;
     
     mapdef["waterLevel"] = params.Water.WaterLevelMin;
-    mapdef["waterLevelMin"] = params.Water.WaterLevelMin;
-    mapdef["waterLevelMax"] = params.Water.WaterLevelMax;
     mapdef["waterDepth"] = params.Water.DeepWaterDepthMin;
-    mapdef["deepWaterDepthMin"] = params.Water.DeepWaterDepthMin;
-    mapdef["deepWaterDepthMax"] = params.Water.DeepWaterDepthMax;
     mapdef["waterWindSpeed"] = params.Water.WaterWindSpeed;
     mapdef["waterWindDirection"] = params.Water.WaterWindDirection;
     mapdef["waterWindShoreWavesRemap"] = params.Water.WaterWindShoreWavesRemap;
@@ -223,7 +219,6 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     
     mapdef["windSpeed"] = params.Atmosphere.GlobalWindSpeed;
     mapdef["windDirection"] = params.Atmosphere.GlobalWindDirection;
-    mapdef["skyboxPath"] = params.Atmosphere.SkyboxPath;
 
     // Stratum Layers
     json stratumsArr = params.Stratums;
@@ -287,6 +282,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     // Armies will be finalized and assigned after processing markers to ensure 1:1 sync.
     
     json markersObj = json::object();
+    json aliasesObj = json::object();
     
     // We want to group markers by Type (e.g. "Spawn", "Alloy", "Plasma")
     std::map<std::string, json> groupedTransforms;
@@ -309,21 +305,32 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
             }
         }
         
-        if (transformKey.empty() || marker.Type == "Alloy" || marker.Type == "Plasma") {
-            if (marker.Type == "Spawn") {
+        std::string rawType = marker.Type;
+        if (rawType == "Alloys") rawType = "Alloy";
+        if (rawType == "Plasmas") rawType = "Plasma";
+        if (rawType == "Spawns") rawType = "Spawn";
+        
+        if (transformKey.empty() || rawType == "Alloy" || rawType == "Plasma") {
+            if (rawType == "Spawn") {
                 transformKey = "Army_" + std::to_string(++typeCounters["Spawn"]);
-            } else if (marker.Type == "Alloy") {
+            } else if (rawType == "Alloy") {
                 int count = typeCounters["Alloy"]++;
                 transformKey = (count == 0) ? "AlloyMarker" : "AlloyMarker_" + std::to_string(count);
-            } else if (marker.Type == "Plasma") {
+            } else if (rawType == "Plasma") {
                 int count = typeCounters["Plasma"]++;
                 transformKey = (count == 0) ? "PlasmaMarker" : "PlasmaMarker_" + std::to_string(count);
             } else {
-                transformKey = marker.Type + "_" + std::to_string(++typeCounters[marker.Type]);
+                transformKey = rawType + "_" + std::to_string(++typeCounters[rawType]);
             }
         }
         
-        groupedTransforms[marker.Type][transformKey] = tfObj;
+        if (!marker.GeneratorAlias.empty()) {
+            aliasesObj[transformKey] = marker.GeneratorAlias;
+        } else if (marker.CustomName != transformKey) {
+            aliasesObj[transformKey] = marker.CustomName;
+        }
+        
+        groupedTransforms[rawType][transformKey] = tfObj;
     }
     
     // Create the structured markers object
@@ -425,6 +432,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     // The Unity Engine (Newtonsoft.Json) safely ignores this block.
     // All UI physics tags, procedural layer info, and custom simulation variables will be stored here in Phase 2.
     mapdef["mapGeneratorData"] = SerializeSettings(params);
+    mapdef["mapGeneratorData"]["Aliases"] = aliasesObj;
 
     // Determine the map name from the folder path
     std::string mapName = "mapdef";

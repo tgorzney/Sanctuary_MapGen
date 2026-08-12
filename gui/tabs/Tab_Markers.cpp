@@ -328,17 +328,19 @@ namespace UI {
                                 auto& marker = params.MarkersList[key];
                                 
                                 ImGui::PushID(key.c_str());
-                                char label[128];
-                                snprintf(label, sizeof(label), "%s%s", marker.CustomName.empty() ? key.c_str() : marker.CustomName.c_str(), marker.SymmetryId != 0 ? (" [Sym " + std::to_string(marker.SymmetryId) + "]").c_str() : "");
+                                char label[256];
+                                std::string displayName = marker.GeneratorAlias.empty() ? marker.CustomName : marker.GeneratorAlias + " (" + marker.CustomName + ")";
+                                snprintf(label, sizeof(label), "%s%s", displayName.c_str(), marker.SymmetryId != 0 ? (" [Sym " + std::to_string(marker.SymmetryId) + "]").c_str() : "");
                                 
                                 if (ImGui::CollapsingHeader(label)) {
                                     bool localUpdate = false;
                                     char nameBuf[128]; 
-                                    strncpy(nameBuf, marker.CustomName.c_str(), sizeof(nameBuf));
-                                    if (ImGui::InputText("Name/ID", nameBuf, sizeof(nameBuf))) {
-                                        marker.CustomName = nameBuf;
+                                    strncpy(nameBuf, marker.GeneratorAlias.c_str(), sizeof(nameBuf));
+                                    if (ImGui::InputText("Alias", nameBuf, sizeof(nameBuf))) {
+                                        marker.GeneratorAlias = nameBuf;
                                         localUpdate = true;
                                     }
+                                    ImGui::TextDisabled("Engine Prefab: %s", marker.CustomName.c_str());
                                     
                                     if (ImGui::DragFloat3("Position (X,Y,Z)", marker.Position, 1.0f, 0.0f, 4096.0f)) localUpdate = true;
                                     
