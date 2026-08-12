@@ -147,7 +147,6 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["shader"] = "RTS/TerrainLit";
     mapdef["heightTransition"] = 0.5;
     mapdef["fadeDistance"] = 128.0;
-    mapdef["spawnPointCount"] = params.SpawnPointCount;
     mapdef["fadeStartDistance"] = 1.0;
 
     // Atmosphere
@@ -302,11 +301,23 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
         tfObj["scale"] = {{"x", marker.Scale[0]}, {"y", marker.Scale[1]}, {"z", marker.Scale[2]}};
         
         std::string transformKey = marker.CustomName;
-        if (transformKey.empty()) {
+        if (marker.Type == "Spawn" && transformKey.find("Spawn_") == 0) {
+            transformKey = transformKey.substr(6);
+            // Ensure correct case: "ARMY_1" -> "Army_1"
+            if (transformKey.find("ARMY_") == 0) {
+                transformKey = "Army_" + transformKey.substr(5);
+            }
+        }
+        
+        if (transformKey.empty() || marker.Type == "Alloy" || marker.Type == "Plasma") {
             if (marker.Type == "Spawn") {
-                transformKey = "ARMY_" + std::to_string(++typeCounters["Spawn"]);
+                transformKey = "Army_" + std::to_string(++typeCounters["Spawn"]);
             } else if (marker.Type == "Alloy") {
-                transformKey = "Mex " + std::to_string(typeCounters["Alloy"]++);
+                int count = typeCounters["Alloy"]++;
+                transformKey = (count == 0) ? "AlloyMarker" : "AlloyMarker_" + std::to_string(count);
+            } else if (marker.Type == "Plasma") {
+                int count = typeCounters["Plasma"]++;
+                transformKey = (count == 0) ? "PlasmaMarker" : "PlasmaMarker_" + std::to_string(count);
             } else {
                 transformKey = marker.Type + "_" + std::to_string(++typeCounters[marker.Type]);
             }
@@ -406,14 +417,14 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
         }
     }
     
-    mapdef["props"] = propsArr;
+    mapdef["props"] = json::array();
     mapdef["decals"] = decalsArr;
     mapdef["chains"] = json::object();
 
     // Phase 1: Centralized Map Generator Data Block
     // The Unity Engine (Newtonsoft.Json) safely ignores this block.
     // All UI physics tags, procedural layer info, and custom simulation variables will be stored here in Phase 2.
-    mapdef["mapGeneratorData"] = json::object();
+    mapdef["mapGeneratorData"] = SerializeSettings(params);
 
     // Determine the map name from the folder path
     std::string mapName = "mapdef";
@@ -454,6 +465,13 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
 
 
 void MetadataExporter::SaveSettings(const std::string& filePath, const GenerationParams& params) {
+    json j = SerializeSettings(params);
+    std::ofstream out(filePath);
+    out << j.dump(4);
+    out.close();
+}
+
+nlohmann::json MetadataExporter::SerializeSettings(const GenerationParams& params) {
     json j;
     j["PresetVersion"] = params.PresetVersion;
     j["GlobalEnvironmentPath"] = params.GlobalEnvironmentPath;
@@ -716,9 +734,7 @@ void MetadataExporter::SaveSettings(const std::string& filePath, const Generatio
     }
     j["GeoLayers"] = geoLayersJson;
 
-    std::ofstream out(filePath);
-    out << j.dump(4);
-    out.close();
+    return j;
 }
 
 bool MetadataExporter::LoadSettings(const std::string& filePath, GenerationParams& outParams) {

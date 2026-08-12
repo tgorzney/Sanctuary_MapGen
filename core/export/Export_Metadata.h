@@ -2,6 +2,7 @@
 #include "../Parameters.h"
 #include <string>
 #include "../TerrainGenerator.h"
+#include <nlohmann/json.hpp>
 
 namespace SanmapGen {
 
@@ -12,6 +13,9 @@ public:
 
     // Save Map Generator settings to a project file (.json)
     static void SaveSettings(const std::string& filePath, const GenerationParams& params);
+
+    // Serialize Map Generator settings to a JSON object
+    static nlohmann::json SerializeSettings(const GenerationParams& params);
 
     // Load Map Generator settings from a project file (.json)
     static bool LoadSettings(const std::string& filePath, GenerationParams& outParams);

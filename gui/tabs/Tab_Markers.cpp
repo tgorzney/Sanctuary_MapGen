@@ -405,7 +405,7 @@ namespace UI {
                                             }
                                             
                                             if (ImGui::ColorButton(armyName.c_str(), col, 0, ImVec2(24, 24))) {
-                                                marker.CustomName = "Spawn_" + armyName;
+                                                marker.CustomName = armyName;
                                                 localUpdate = true;
                                             }
                                             
