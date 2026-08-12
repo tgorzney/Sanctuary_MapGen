@@ -259,7 +259,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
                 json uJson = json::object();
                 uJson["type"] = unit.Type;
                 if (!unit.Tpid.empty()) uJson["tpid"] = unit.Tpid;
-                uJson["position"] = {{"x", unit.Position[0]}, {"y", unit.Position[1]}, {"z", unit.Position[2]}};
+                uJson["position"] = {{"x", unit.Position[0]}, {"y", unit.Position[1]}, {"z", params.MapSize - unit.Position[2]}};
                 uJson["rotation"] = {{"x", unit.Rotation[0]}, {"y", unit.Rotation[1]}, {"z", unit.Rotation[2]}, {"w", unit.Rotation[3]}};
                 uJson["scale"] = {{"x", unit.Scale[0]}, {"y", unit.Scale[1]}, {"z", unit.Scale[2]}};
                 unitsObj[unitName] = uJson;
@@ -296,7 +296,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
         if (marker.IsHidden) continue;
         
         json tfObj;
-        tfObj["position"] = {{"x", marker.Position[0]}, {"y", marker.Position[1]}, {"z", marker.Position[2]}};
+        tfObj["position"] = {{"x", marker.Position[0]}, {"y", marker.Position[1]}, {"z", params.MapSize - marker.Position[2]}};
         tfObj["rotation"] = {{"x", marker.Rotation[0]}, {"y", marker.Rotation[1]}, {"z", marker.Rotation[2]}, {"w", marker.Rotation[3]}};
         tfObj["scale"] = {{"x", marker.Scale[0]}, {"y", marker.Scale[1]}, {"z", marker.Scale[2]}};
         
@@ -375,7 +375,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
             json transformsArr = json::array();
             for (const auto& t : mpg.Transforms) {
                 json tJson;
-                tJson["position"] = { {"x", t.Position[0]}, {"y", t.Position[1]}, {"z", t.Position[2]} };
+                tJson["position"] = { {"x", t.Position[0]}, {"y", t.Position[1]}, {"z", params.MapSize - t.Position[2]} };
                 tJson["rotation"] = { {"x", t.Rotation[0]}, {"y", t.Rotation[1]}, {"z", t.Rotation[2]}, {"w", t.Rotation[3]} };
                 tJson["scale"] = { {"x", t.Scale[0]}, {"y", t.Scale[1]}, {"z", t.Scale[2]} };
                 transformsArr.push_back(tJson);

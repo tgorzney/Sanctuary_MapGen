@@ -292,7 +292,7 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     UnitTransform u;
                     if (uj.contains("type")) u.Type = uj["type"];
                     if (uj.contains("tpid")) u.Tpid = uj["tpid"];
-                    if (uj.contains("position")) { u.Position[0] = uj["position"]["x"]; u.Position[1] = uj["position"]["y"]; u.Position[2] = uj["position"]["z"]; }
+                    if (uj.contains("position")) { u.Position[0] = uj["position"]["x"]; u.Position[1] = uj["position"]["y"]; u.Position[2] = outParams.MapSize - static_cast<float>(uj["position"]["z"]); }
                     if (uj.contains("rotation")) { u.Rotation[0] = uj["rotation"]["x"]; u.Rotation[1] = uj["rotation"]["y"]; u.Rotation[2] = uj["rotation"]["z"]; u.Rotation[3] = uj["rotation"]["w"]; }
                     if (uj.contains("scale")) { u.Scale[0] = uj["scale"]["x"]; u.Scale[1] = uj["scale"]["y"]; u.Scale[2] = uj["scale"]["z"]; }
                     g.Units[it.key()] = u;
@@ -484,12 +484,12 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     if (tVal.is_array() && tVal.size() >= 3) {
                         mt.Position[0] = static_cast<float>(tVal[0]) * markerScaleFactor;
                         mt.Position[1] = tVal[1];
-                        mt.Position[2] = static_cast<float>(tVal[2]) * markerScaleFactor;
+                        mt.Position[2] = outParams.MapSize - (static_cast<float>(tVal[2]) * markerScaleFactor);
                     } else if (tVal.is_object() && tVal.contains("position") && tVal["position"].is_object()) {
                         auto pos = tVal["position"];
                         if (pos.contains("x")) mt.Position[0] = static_cast<float>(pos["x"]) * markerScaleFactor;
                         if (pos.contains("y")) mt.Position[1] = pos["y"];
-                        if (pos.contains("z")) mt.Position[2] = static_cast<float>(pos["z"]) * markerScaleFactor;
+                        if (pos.contains("z")) mt.Position[2] = outParams.MapSize - (static_cast<float>(pos["z"]) * markerScaleFactor);
                     }
                     
                     bool isGameplay = false;
@@ -592,7 +592,7 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                         if (t.contains("position") && t["position"].is_object()) {
                             mpt.Position[0] = t["position"].contains("x") ? static_cast<float>(t["position"]["x"]) : 0.0f;
                             mpt.Position[1] = t["position"].contains("y") ? static_cast<float>(t["position"]["y"]) : 0.0f;
-                            mpt.Position[2] = t["position"].contains("z") ? static_cast<float>(t["position"]["z"]) : 0.0f;
+                            mpt.Position[2] = t["position"].contains("z") ? outParams.MapSize - static_cast<float>(t["position"]["z"]) : 0.0f;
                             
                             // Populate preview dots seamlessly
                             GenerationParams::PropInstance pi;
