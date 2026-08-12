@@ -268,8 +268,9 @@ void main() {
     if (currentLayerBlend != -1) {
         if (realHeight <= waterLevelMax) {
             float t = 1.0;
-            if (deepWaterMin < deepWaterMax) {
-                t = clamp((realHeight - deepWaterMin) / (deepWaterMax - deepWaterMin), 0.0, 1.0);
+            if (deepWaterMax > 0.0) {
+                float deepAbsolute = waterLevelMax - deepWaterMax;
+                t = clamp((realHeight - deepAbsolute) / deepWaterMax, 0.0, 1.0);
             }
             int idx = clamp(int(t * 255.0), 0, 255);
             vec4 wc = waterGradient[idx];

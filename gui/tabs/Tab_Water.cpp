@@ -14,7 +14,7 @@ namespace UI {
                 bNeedsPreviewRender = true;
             }
             
-            if (UI::RangeSliderFloat("Deep Water", &params.Water.DeepWaterDepthMin, &params.Water.DeepWaterDepthMax, params.Water.WaterLevelMin, params.Water.WaterLevelMax)) {
+            if (UI::RangeSliderFloat("Deep Water Depth", &params.Water.DeepWaterDepthMin, &params.Water.DeepWaterDepthMax, 0.0f, 50.0f)) {
                 bNeedsPreviewRender = true;
             }
             
