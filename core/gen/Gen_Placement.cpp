@@ -20,7 +20,7 @@ size_t currentPlacementHash = params.GetPlacementHash(currentFlowHash);
             // 1. Calculate slopemap for procedural rules (Cached)
             if (inOutResult.CachedSlopeHash != currentErosionHash || inOutResult.CachedSlopeMap.GetWidth() != vertSize) {
                 inOutResult.CachedSlopeMap.Resize(vertSize, vertSize, 0.0f);
-                Gen_Mask_Slope::GenerateSlopeMap(outMap, inOutResult.CachedSlopeMap, &inOutResult);
+                Gen_Mask_Slope::GenerateSlopeMap(outMap, inOutResult.CachedSlopeMap, params.SlopeSettingsParams.bUseEngineParityMath, &inOutResult, params.TerrainMaxHeight);
                 inOutResult.CachedSlopeHash = currentErosionHash;
             }
             

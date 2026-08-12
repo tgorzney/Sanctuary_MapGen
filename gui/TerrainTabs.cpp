@@ -180,6 +180,10 @@ namespace UI {
             ImGui::EndCombo();
         }
         
+        if (ImGui::DragFloat("Terrain Height (Units)", &params.TerrainMaxHeight, 1.0f, 1.0f, 4096.0f, "%.1f")) {
+            bNeedsMapUpdate = true;
+        }
+        
         if (ImGui::SliderFloat("Global Gravity", &params.GlobalGravity, 1.0f, 20.0f)) bNeedsMapUpdate = true;
 
         ImGui::Spacing();

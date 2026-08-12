@@ -456,8 +456,8 @@ int main(int, char**)
                 dummyMap = result.first;
                 genResult = result.second;
                 stratums = genResult.Stratums;
-                params.TerrainMinHeight = genResult.TerrainMinHeight;
-                params.TerrainMaxHeight = genResult.TerrainMaxHeight;
+                
+                
                 
                 // Merge procedural markers
                 for (auto it = params.MarkersList.begin(); it != params.MarkersList.end(); ) {

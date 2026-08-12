@@ -433,8 +433,8 @@ void Gen_Erosion::Process(FloatMask& outMap, std::vector<FloatMask>& Stratums, c
             if (h > maxH) maxH = h;
         }
 
-        inOutResult.TerrainMinHeight = minH;
-        inOutResult.TerrainMaxHeight = maxH;
+        inOutResult.StatisticalMinHeight = minH;
+        inOutResult.StatisticalMaxHeight = maxH;
         
         
         outErosionHash = currentErosionHash;
@@ -442,3 +442,6 @@ void Gen_Erosion::Process(FloatMask& outMap, std::vector<FloatMask>& Stratums, c
 
 
 } // namespace SanmapGen
+  
+ 
+ 

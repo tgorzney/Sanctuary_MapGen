@@ -6,7 +6,7 @@
 
 namespace SanmapGen {
 
-    void Gen_Mask_Slope::GenerateSlopeMap(const FloatMask& heightMap, FloatMask& outSlopeMap, bool bUseEngineParityMath, GenerationResult* result) {
+    void Gen_Mask_Slope::GenerateSlopeMap(const FloatMask& heightMap, FloatMask& outSlopeMap, bool bUseEngineParityMath, GenerationResult* result, float terrainMaxHeight, float cellSize) {
         int vertSize = heightMap.GetWidth();
         outSlopeMap.Resize(vertSize, vertSize, 0.0f);
         
@@ -64,8 +64,14 @@ namespace SanmapGen {
                 }
                 
                 for (; x < vertSize - 1; ++x) {
-                    float dx = (inData[rowOffset + x + 1] - inData[rowOffset + x - 1]) * 0.5f;
-                    float dy = (inData[nextRowOffset + x] - inData[prevRowOffset + x]) * 0.5f;
+                    // =========================================================================
+                    // [WARNING] SINGLE SOURCE OF TRUTH LINK
+                    // If you alter this engine parity slope math, you MUST mirror the exact
+                    // math in shaders/PreviewCompute.glsl! The GPU dynamically recalculates
+                    // this to avoid PCIe VRAM bandwidth bottlenecks during preview rendering.
+                    // =========================================================================
+                    float dx = (inData[rowOffset + x + 1] - inData[rowOffset + x - 1]) * 0.5f * (terrainMaxHeight * 10.0f);
+                    float dy = (inData[nextRowOffset + x] - inData[prevRowOffset + x]) * 0.5f * (terrainMaxHeight * 10.0f);
                     
                     float val;
                     if (bUseEngineParityMath) {

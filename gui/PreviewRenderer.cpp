@@ -155,7 +155,7 @@ static void LoadGLExtensionsT() {
         GLint loc_width, loc_height, loc_quadWidth, loc_quadHeight;
         GLint loc_cellSize, loc_bUseEngineParityMath, loc_minHeight, loc_maxHeight, loc_autoLevelPreview;
         GLint loc_currentLayerBlend, loc_numStratums, loc_stratumColors, loc_stratumRemaps;
-        GLint loc_flowMapColor, loc_waterLevelMax, loc_deepWaterMin, loc_deepWaterMax, loc_terrainMinHeight;
+        GLint loc_flowMapColor, loc_waterLevelMax, loc_deepWaterMin, loc_deepWaterMax, loc_terrainMinHeight, loc_terrainMaxHeight;
         GLint loc_numAreas, loc_numRules;
         GLint loc_focusDebugRuleIndex, loc_focusGradientType, loc_focusGradientRadius, loc_focusGradientContrast, loc_focusGradientStrength;
         
@@ -178,7 +178,7 @@ static void LoadGLExtensionsT() {
             loc_waterLevelMax = glGetUniformLocationT(prog, "waterLevelMax");
             loc_deepWaterMin = glGetUniformLocationT(prog, "deepWaterMin");
             loc_deepWaterMax = glGetUniformLocationT(prog, "deepWaterMax");
-            loc_terrainMinHeight = glGetUniformLocationT(prog, "terrainMinHeight");
+            loc_terrainMinHeight = glGetUniformLocationT(prog, "terrainMinHeight"); loc_terrainMaxHeight = glGetUniformLocationT(prog, "terrainMaxHeight");
             loc_numAreas = glGetUniformLocationT(prog, "numAreas");
             loc_numRules = glGetUniformLocationT(prog, "numRules");
             loc_focusDebugRuleIndex = glGetUniformLocationT(prog, "focusDebugRuleIndex");
@@ -508,7 +508,7 @@ static void InitializeShader() {
                 glUniform1fT(p.loc_waterLevelMax, params.Water.WaterLevelMax);
                 glUniform1fT(p.loc_deepWaterMin, params.Water.DeepWaterDepthMin);
                 glUniform1fT(p.loc_deepWaterMax, params.Water.DeepWaterDepthMax);
-                glUniform1fT(p.loc_terrainMinHeight, genResult.TerrainMinHeight);
+                glUniform1fT(p.loc_terrainMinHeight, genResult.StatisticalMinHeight); glUniform1fT(p.loc_terrainMaxHeight, params.TerrainMaxHeight);
                 
                 glUniform1iT(p.loc_numAreas, (int)params.Areas.size());
                 glUniform1iT(p.loc_numRules, (int)ruleBoundsFlat.size()/4);

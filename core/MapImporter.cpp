@@ -70,6 +70,15 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     if (mapdef.contains("width")) {
         outParams.MapSize = mapdef["width"];
     }
+    
+    if (mapdef.contains("height")) {
+        auto& hNode = mapdef["height"];
+        if (hNode.is_number_integer()) {
+            outParams.TerrainMaxHeight = static_cast<float>(hNode.get<int>());
+        } else if (hNode.is_number_float()) {
+            outParams.TerrainMaxHeight = hNode.get<float>();
+        }
+    }
 
     outParams.MapFolderPath = folderPath;
 

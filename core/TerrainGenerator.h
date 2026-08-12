@@ -14,8 +14,8 @@ namespace SanmapGen {
         FloatMask FlowMap;
         FloatMask AccumulationMap;
         
-        float TerrainMinHeight = 0.0f;
-        float TerrainMaxHeight = 128.0f;
+        float StatisticalMinHeight = 0.0f;
+        float StatisticalMaxHeight = 1.0f;
         float MapMinSlope = 0.0f;
         float MapMaxSlope = 90.0f;
         

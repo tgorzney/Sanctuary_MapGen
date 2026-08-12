@@ -48,7 +48,7 @@ uniform vec4 waterColor;
 uniform float waterLevelMax;
 uniform float deepWaterMin;
 uniform float deepWaterMax;
-uniform float terrainMinHeight;
+uniform float terrainMinHeight; uniform float terrainMaxHeight;
 
 uniform int numPropLayers; // we can map props to rules
 
@@ -158,7 +158,7 @@ void main() {
     
 #ifdef PASS_CLEAR
     // Clear EntityIDBuffer
-    int pxIdx = y * quadWidth + x;
+    int pxIdx = coord.y * quadWidth + coord.x;
     entityIDs[pxIdx] = 0xFFFFFFFFu;
     imageStore(outTexture, coord, vec4(0.0, 0.0, 0.0, 1.0));
     return;
@@ -189,11 +189,18 @@ void main() {
     float hD = GetHeight(x, y + 1);
       
     // Engine parity differences
-    float dx = (hR - hL) * 0.5;
-    float dy = (hD - hU) * 0.5;
+    float dx = (hR - hL) * 0.5 * (terrainMaxHeight * 10.0);
+    float dy = (hD - hU) * 0.5 * (terrainMaxHeight * 10.0);
       
     // Hardware-accelerated Engine Parity Math (maximum performance)
-    float slopeDegrees = acos(inversesqrt(dx * dx + dy * dy + 1.0)) * 57.2957795131;
+    float slopeDegrees;
+    if (bUseEngineParityMath == 1) {
+        slopeDegrees = acos(inversesqrt(dx * dx + dy * dy + 1.0)) * 57.2957795131;
+    } else {
+        float old_dx = (hR - hL) * 0.5;
+        float old_dy = (hD - hU) * 0.5;
+        slopeDegrees = sqrt(old_dx * old_dx + old_dy * old_dy) * 100.0;
+    }
     
     // finalColor is already initialized from imageLoad earlier in the shader
     
