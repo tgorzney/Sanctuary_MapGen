@@ -23,6 +23,7 @@
 #include "miniz.h"
 #include "UITabs.h"
 #include "../core/TextureLoader.h"
+#include "../core/UnitParser.h"
 
 using json = nlohmann::json;
 
@@ -294,6 +295,10 @@ int main(int, char**)
 
         if (!bHasLoadedIcons && !params.GamedataPath.empty()) {
             params.DebugInfo = "";
+            
+            // Load Unit Templates directly from Lua tables
+            SanmapGen::UnitParser::LoadUnitDefinitions(params);
+            
             std::string uiPack = params.GamedataPath + "/UI.sanpack";
             std::string cacheFile = params.GamedataPath + "/icons_cache.json";
             

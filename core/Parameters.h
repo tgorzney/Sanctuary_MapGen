@@ -91,6 +91,12 @@ namespace SanmapGen {
         
         // --- Armies ---
         std::map<std::string, Army> Armies;
+        std::map<std::string, UnitDefinition> UnitDefinitions; // Loaded from .santp templates
+        
+        // --- Unit Placement Tool State ---
+        std::string ActiveArmyForUnits = "";
+        std::vector<std::string> SelectedUnitsToSpawn;
+        int UnitsToSpawnCount = 1;
         
         // --- DOP Optimizations ---
         // Props (Trees, Rocks) are segregated from interactive markers to prevent UI loops from processing 100,000+ items.

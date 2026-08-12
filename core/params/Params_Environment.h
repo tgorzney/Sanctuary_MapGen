@@ -106,6 +106,16 @@ namespace SanmapGen {
     struct SanVector4 { float x = 0.0f; float y = 0.0f; float z = 0.0f; float w = 0.0f; float& operator[](int i) { return (i==0) ? x : (i==1) ? y : (i==2) ? z : w; } const float& operator[](int i) const { return (i==0) ? x : (i==1) ? y : (i==2) ? z : w; } };
     struct SanColor { float r = 1.0f; float g = 1.0f; float b = 1.0f; float a = 1.0f; float& operator[](int i) { return (i==0) ? r : (i==1) ? g : (i==2) ? b : a; } const float& operator[](int i) const { return (i==0) ? r : (i==1) ? g : (i==2) ? b : a; } };
 
+    struct UnitDefinition {
+        std::string Type; // e.g., "uca1001"
+        std::string Name = "";
+        std::string DisplayName = "";
+        float FootprintX = 1.0f;
+        float FootprintY = 1.0f;
+        float Speed = 10.0f;
+        float Acceleration = 10.0f;
+    };
+
     struct UnitTransform {
         std::string Type;
         std::string Tpid = "";

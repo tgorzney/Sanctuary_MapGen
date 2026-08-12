@@ -1,13 +1,28 @@
 #include "../UITabs.h"
 #include "../UIHelpers.h"
+#include "FileDialog.h"
+#include "imgui.h"
 #include "imgui.h"
 #include <string>
+#include <unordered_map>
 
 namespace SanmapGen {
 namespace UI {
 
 void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
     ImGui::Text("ARMIES CONFIGURATION");
+    ImGui::Separator();
+    ImGui::Spacing();
+    
+    if (ImGui::Button("Browse Gamedata...")) {
+        std::string outPath;
+        if (FileDialog::SelectFolder(outPath)) {
+            params.GamedataPath = outPath;
+            bNeedsMapUpdate = true;
+        }
+    }
+    ImGui::SameLine();
+    ImGui::TextWrapped("Current: %s", params.GamedataPath.empty() ? "None" : params.GamedataPath.c_str());
     ImGui::Separator();
     ImGui::Spacing();
     
@@ -56,6 +71,14 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
                 bNeedsMapUpdate = true;
             }
             
+            ImGui::SameLine();
+            if (ImGui::Button("Add Units")) {
+                params.ActiveArmyForUnits = armyName;
+                params.SelectedUnitsToSpawn.clear();
+                params.UnitsToSpawnCount = 1;
+                ImGui::OpenPopup("Add Units##Modal");
+            }
+            
             // Faction dropdown
             const char* factions[] = { "UEF (0)", "Cybran (1)", "Aeon (2)" };
             int currentFaction = army.Faction;
@@ -83,6 +106,60 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
         params.Armies.erase(toRemove);
         params.MarkersList.erase(toRemove);
         bNeedsMapUpdate = true;
+    }
+    
+    ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
+    if (ImGui::BeginPopupModal("Add Units##Modal", NULL, ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::Text("Select Units to add to %s", params.ActiveArmyForUnits.c_str());
+        ImGui::Separator();
+        
+        ImGui::BeginChild("##UnitSelection", ImVec2(0, -60), true);
+        
+        // Show all parsed unit definitions
+        int columns = 4;
+        if (ImGui::BeginTable("##UnitGrid", columns)) {
+            for (const auto& [typeId, def] : params.UnitDefinitions) {
+                ImGui::TableNextColumn();
+                
+                bool isSelected = std::find(params.SelectedUnitsToSpawn.begin(), params.SelectedUnitsToSpawn.end(), typeId) != params.SelectedUnitsToSpawn.end();
+                
+                // Optional: Render thumbnail here
+                // ImGui::Image(...);
+                
+                if (ImGui::Selectable(def.DisplayName.empty() ? typeId.c_str() : def.DisplayName.c_str(), &isSelected, ImGuiSelectableFlags_DontClosePopups, ImVec2(120, 120))) {
+                    if (!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyShift) {
+                        params.SelectedUnitsToSpawn.clear();
+                    }
+                    if (isSelected) {
+                        params.SelectedUnitsToSpawn.push_back(typeId);
+                    } else {
+                        params.SelectedUnitsToSpawn.erase(std::remove(params.SelectedUnitsToSpawn.begin(), params.SelectedUnitsToSpawn.end(), typeId), params.SelectedUnitsToSpawn.end());
+                    }
+                }
+            }
+            ImGui::EndTable();
+        }
+        ImGui::EndChild();
+        
+        ImGui::Separator();
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Count:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(100);
+        ImGui::InputInt("##UnitCount", &params.UnitsToSpawnCount);
+        if (params.UnitsToSpawnCount < 1) params.UnitsToSpawnCount = 1;
+        
+        ImGui::SameLine(ImGui::GetWindowWidth() - 160);
+        if (ImGui::Button("Cancel", ImVec2(70, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Confirm", ImVec2(70, 0))) {
+            // State is already saved in params. Just close.
+            ImGui::CloseCurrentPopup();
+        }
+        
+        ImGui::EndPopup();
     }
 }
 
