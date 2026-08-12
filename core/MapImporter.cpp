@@ -83,19 +83,19 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     outParams.MapFolderPath = folderPath;
 
     // Load Water
-    if (mapdef.contains("waterLevelMin")) outParams.Water.WaterLevelMin = mapdef["waterLevelMin"];
-    else if (mapdef.contains("waterLevel")) {
+    if (mapdef.contains("waterLevelMin") && mapdef["waterLevelMin"].is_number()) outParams.Water.WaterLevelMin = mapdef["waterLevelMin"];
+    else if (mapdef.contains("waterLevel") && mapdef["waterLevel"].is_number()) {
         outParams.Water.WaterLevelMin = mapdef["waterLevel"];
         outParams.Water.WaterLevelMax = mapdef["waterLevel"];
     }
-    if (mapdef.contains("waterLevelMax")) outParams.Water.WaterLevelMax = mapdef["waterLevelMax"];
+    if (mapdef.contains("waterLevelMax") && mapdef["waterLevelMax"].is_number()) outParams.Water.WaterLevelMax = mapdef["waterLevelMax"];
     
-    if (mapdef.contains("deepWaterDepthMin")) outParams.Water.DeepWaterDepthMin = mapdef["deepWaterDepthMin"];
-    else if (mapdef.contains("waterDepth")) {
+    if (mapdef.contains("deepWaterDepthMin") && mapdef["deepWaterDepthMin"].is_number()) outParams.Water.DeepWaterDepthMin = mapdef["deepWaterDepthMin"];
+    else if (mapdef.contains("waterDepth") && mapdef["waterDepth"].is_number()) {
         outParams.Water.DeepWaterDepthMin = mapdef["waterDepth"];
         outParams.Water.DeepWaterDepthMax = mapdef["waterDepth"];
     }
-    if (mapdef.contains("deepWaterDepthMax")) outParams.Water.DeepWaterDepthMax = mapdef["deepWaterDepthMax"];
+    if (mapdef.contains("deepWaterDepthMax") && mapdef["deepWaterDepthMax"].is_number()) outParams.Water.DeepWaterDepthMax = mapdef["deepWaterDepthMax"];
     
     if (mapdef.contains("waterWindSpeed")) outParams.Water.WaterWindSpeed = mapdef["waterWindSpeed"];
     if (mapdef.contains("waterWindDirection")) outParams.Water.WaterWindDirection = mapdef["waterWindDirection"];
@@ -120,7 +120,7 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     if (mapdef.contains("sunAngularDiameter")) outParams.Atmosphere.SunAngularDiameter = mapdef["sunAngularDiameter"];
     if (mapdef.contains("sunVolumetricsMultiplier")) outParams.Atmosphere.SunVolumetricsMultiplier = mapdef["sunVolumetricsMultiplier"];
     if (mapdef.contains("sunVolumetricsShadowDimer")) outParams.Atmosphere.SunVolumetricsShadowDimer = mapdef["sunVolumetricsShadowDimer"];
-    if (mapdef.contains("sunCookie") && mapdef["sunCookie"].is_object() && mapdef["sunCookie"].contains("path")) outParams.Atmosphere.SunCookiePath = mapdef["sunCookie"]["path"];
+    if (mapdef.contains("sunCookie") && mapdef["sunCookie"].is_object() && mapdef["sunCookie"].contains("path") && mapdef["sunCookie"]["path"].is_string()) outParams.Atmosphere.SunCookiePath = mapdef["sunCookie"]["path"];
     if (mapdef.contains("sunCookieSize") && mapdef["sunCookieSize"].is_object()) {
         if (mapdef["sunCookieSize"].contains("x")) outParams.Atmosphere.SunCookieSize[0] = mapdef["sunCookieSize"]["x"];
         if (mapdef["sunCookieSize"].contains("y")) outParams.Atmosphere.SunCookieSize[1] = mapdef["sunCookieSize"]["y"];
@@ -146,9 +146,9 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
     if (mapdef.contains("fogAnisotropy")) outParams.Atmosphere.FogAnisotropy = mapdef["fogAnisotropy"];
     
     
-    if (mapdef.contains("skybox") && mapdef["skybox"].is_object() && mapdef["skybox"].contains("path")) outParams.Atmosphere.SkyboxPath = mapdef["skybox"]["path"];
+    if (mapdef.contains("skybox") && mapdef["skybox"].is_object() && mapdef["skybox"].contains("path") && mapdef["skybox"]["path"].is_string()) outParams.Atmosphere.SkyboxPath = mapdef["skybox"]["path"];
     if (mapdef.contains("skyboxRotation")) outParams.Atmosphere.SkyboxRotation = mapdef["skyboxRotation"];
-    if (mapdef.contains("skyboxIntensityMode")) {
+    if (mapdef.contains("skyboxIntensityMode") && mapdef["skyboxIntensityMode"].is_string()) {
         std::string mode = mapdef["skyboxIntensityMode"];
         if (mode == "Exposure") outParams.Atmosphere.SkyboxIntensityMode = SkyIntensityMode::Exposure;
         else if (mode == "Lux") outParams.Atmosphere.SkyboxIntensityMode = SkyIntensityMode::Lux;
@@ -205,7 +205,7 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
             auto s = str[i];
             auto& strat = outParams.Stratums[i];
             
-            if (s.contains("albedo") && s["albedo"].is_object() && s["albedo"].contains("path")) {
+            if (s.contains("albedo") && s["albedo"].is_object() && s["albedo"].contains("path") && s["albedo"]["path"].is_string()) {
                 strat.albedo.path = s["albedo"]["path"];
                 std::string pathStr = strat.albedo.path;
                 
@@ -229,8 +229,8 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                     }
                 }
             }
-            if (s.contains("normal") && s["normal"].is_object() && s["normal"].contains("path")) strat.normal.path = s["normal"]["path"];
-            if (s.contains("mask") && s["mask"].is_object() && s["mask"].contains("path")) strat.mask.path = s["mask"]["path"];
+            if (s.contains("normal") && s["normal"].is_object() && s["normal"].contains("path") && s["normal"]["path"].is_string()) strat.normal.path = s["normal"]["path"];
+            if (s.contains("mask") && s["mask"].is_object() && s["mask"].contains("path") && s["mask"]["path"].is_string()) strat.mask.path = s["mask"]["path"];
             
             auto parseVec2 = [](const json& j, SanVector2& out) {
                 if (j.is_array() && j.size() >= 2) { out.x = j[0]; out.y = j[1]; }
@@ -428,6 +428,7 @@ bool MapImporter::LoadSanmap(const std::string& pathOrFolder, GenerationParams& 
                 if (areaJson.contains("y")) a.Y = areaJson["y"];
                 if (areaJson.contains("width")) a.Width = areaJson["width"];
                 if (areaJson.contains("length")) a.Length = areaJson["length"];
+                else if (areaJson.contains("height")) a.Length = areaJson["height"];
             }
             outParams.Areas.push_back(a);
             

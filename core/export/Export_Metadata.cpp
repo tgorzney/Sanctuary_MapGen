@@ -130,7 +130,11 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["hasWater"] = true;
     
     mapdef["waterLevel"] = params.Water.WaterLevelMin;
+    mapdef["waterLevelMin"] = params.Water.WaterLevelMin;
+    mapdef["waterLevelMax"] = params.Water.WaterLevelMax;
     mapdef["waterDepth"] = params.Water.DeepWaterDepthMin;
+    mapdef["deepWaterDepthMin"] = params.Water.DeepWaterDepthMin;
+    mapdef["deepWaterDepthMax"] = params.Water.DeepWaterDepthMax;
     mapdef["waterWindSpeed"] = params.Water.WaterWindSpeed;
     mapdef["waterWindDirection"] = params.Water.WaterWindDirection;
     mapdef["waterWindShoreWavesRemap"] = params.Water.WaterWindShoreWavesRemap;
@@ -143,6 +147,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     mapdef["shader"] = "RTS/TerrainLit";
     mapdef["heightTransition"] = 0.5;
     mapdef["fadeDistance"] = 128.0;
+    mapdef["spawnPointCount"] = params.SpawnPointCount;
     mapdef["fadeStartDistance"] = 1.0;
 
     // Atmosphere
@@ -232,7 +237,7 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
         aJson["x"] = area.X;
         aJson["y"] = area.Y;
         aJson["width"] = area.Width;
-        aJson["length"] = area.Length;
+        aJson["height"] = area.Length;
         areasObj[area.Name] = aJson;
     }
     mapdef["areas"] = areasObj;
