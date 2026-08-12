@@ -129,8 +129,8 @@ void MetadataExporter::ExportSanmap(const std::string& folderPath, const Generat
     
     mapdef["hasWater"] = true;
     
-    mapdef["waterLevel"] = params.Water.WaterLevelMin;
-    mapdef["waterDepth"] = params.Water.DeepWaterDepthMin;
+    mapdef["waterLevel"] = params.Water.WaterLevelMax;
+    mapdef["waterDepth"] = params.Water.DeepWaterDepthMax;
     mapdef["waterWindSpeed"] = params.Water.WaterWindSpeed;
     mapdef["waterWindDirection"] = params.Water.WaterWindDirection;
     mapdef["waterWindShoreWavesRemap"] = params.Water.WaterWindShoreWavesRemap;
