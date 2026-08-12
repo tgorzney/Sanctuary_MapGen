@@ -180,7 +180,8 @@ void main() {
     }
     val = clamp(val, 0.0, 1.0);
     
-    float realHeight = (v00 + v10 + v01 + v11) * 0.25 * 128.0;
+    // Use the highest vertex of the quad for the pixel height evaluation
+    float realHeight = max(max(v00, v10), max(v01, v11)) * 128.0;
       
     // Sample surrounding vertices for central difference
     float hL = GetHeight(x - 1, y);
@@ -197,9 +198,7 @@ void main() {
     if (bUseEngineParityMath == 1) {
         slopeDegrees = acos(inversesqrt(dx * dx + dy * dy + 1.0)) * 57.2957795131;
     } else {
-        float old_dx = (hR - hL) * 0.5;
-        float old_dy = (hD - hU) * 0.5;
-        slopeDegrees = sqrt(old_dx * old_dx + old_dy * old_dy) * 100.0;
+        slopeDegrees = atan(sqrt(dx * dx + dy * dy)) * 57.2957795131;
     }
     
     // finalColor is already initialized from imageLoad earlier in the shader
