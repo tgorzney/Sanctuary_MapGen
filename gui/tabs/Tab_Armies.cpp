@@ -16,17 +16,6 @@ static std::string activeArmyForUnits = "";
 static std::unordered_map<std::string, bool> selectedUnits;
 static int unitsToAddCount = 1;
 
-static GLuint GetUnitThumbnail(const std::string& typeName, GenerationParams& params) {
-    if (typeName.empty()) return 0;
-    std::string cacheKey = "UNIT_" + typeName;
-    auto it = params.IconCache.find(cacheKey);
-    if (it != params.IconCache.end()) return it->second;
-    
-    // Not loaded yet, request it asynchronously and return 0
-    AsyncTextureManager::RequestUnitIcon(typeName, cacheKey);
-    return 0;
-}
-
 void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
     ImGui::Text("ARMIES CONFIGURATION");
     ImGui::Separator();
@@ -223,9 +212,15 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
                         
                         ImGui::PushID(typeId.c_str());
                         
-                        GLuint tex = GetUnitThumbnail(typeId, params);
-                        if (tex != 0) {
-                            ImGui::Image((void*)(intptr_t)tex, ImVec2(80, 80));
+                        GLuint tex = params.UnitAtlasTexture;
+                        ImVec2 uv0 = ImVec2(0, 0);
+                        ImVec2 uv1 = ImVec2(1, 1);
+                        auto uvIt = params.UnitAtlasUVs.find(typeId);
+                        
+                        if (tex != 0 && uvIt != params.UnitAtlasUVs.end()) {
+                            uv0 = ImVec2(uvIt->second[0], uvIt->second[1]);
+                            uv1 = ImVec2(uvIt->second[2], uvIt->second[3]);
+                            ImGui::Image((void*)(intptr_t)tex, ImVec2(80, 80), uv0, uv1);
                         } else {
                             ImGui::Button("?", ImVec2(80, 80)); // Placeholder if icon fails to load
                         }

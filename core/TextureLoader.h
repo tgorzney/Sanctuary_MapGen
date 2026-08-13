@@ -37,6 +37,9 @@ public:
     
     // Scans the .sanpack for a given material and sets the Albedo/Normal/Composite paths
     static void ScanSanpackForMaterial(const std::string& zipPath, const std::string& environmentTheme, const std::string& materialName, SanmapGen::StratumSettings& stratum);
+    
+    // Atlas Generation
+    static void GenerateUnitAtlas(SanmapGen::GenerationParams& params);
 };
 
 struct AsyncTextureRequest {

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <array>
 #include <algorithm>
 #include <functional>
 #include <cstdint>
@@ -92,6 +93,9 @@ namespace SanmapGen {
         // --- Armies ---
         std::map<std::string, Army> Armies;
         std::map<std::string, UnitDefinition> UnitDefinitions; // Loaded from .santp templates
+        
+        uint32_t UnitAtlasTexture = 0; // Using uint32_t instead of GLuint to avoid GL headers here
+        std::map<std::string, std::array<float, 4>> UnitAtlasUVs;
         
         // --- Unit Placement Tool State ---
         std::string ActiveArmyForUnits = "";

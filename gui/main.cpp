@@ -293,10 +293,32 @@ int main(int, char**)
             lastGamedataPath = params.GamedataPath;
         }
 
+        static bool bTriggerCacheOptimization = false;
+        
         if (!bHasLoadedIcons && !params.GamedataPath.empty()) {
+            if (!bTriggerCacheOptimization) {
+                ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+                if (ImGui::Begin("OptimizingCache", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav)) {
+                    ImGui::Text("Optimizing Cache... Please Wait (This may take a few seconds)");
+                    ImGui::End();
+                }
+                bTriggerCacheOptimization = true;
+                // Force a render so the user sees the popup BEFORE the blocking parse happens on the next frame
+                ImGui::Render();
+                int display_w, display_h;
+                glfwGetFramebufferSize(window, &display_w, &display_h);
+                glViewport(0, 0, display_w, display_h);
+                glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT);
+                ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+                glfwSwapBuffers(window);
+                continue;
+            }
+            
+            bTriggerCacheOptimization = false;
             params.DebugInfo = "";
             
-            // Load Unit Templates directly from Lua tables
+            // Load Unit Templates directly from Lua tables (or fast Cache)
             SanmapGen::UnitParser::LoadUnitDefinitions(params);
             
             std::string uiPack = params.GamedataPath + "/UI.sanpack";

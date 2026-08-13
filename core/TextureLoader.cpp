@@ -935,4 +935,137 @@ void AsyncTextureManager::ProcessReadyQueue(SanmapGen::GenerationParams& params)
     }
 }
 
+void TextureLoader::GenerateUnitAtlas(SanmapGen::GenerationParams& params) {
+    if (params.GamedataPath.empty()) return;
+    
+    std::string uiPack = params.GamedataPath + "/UI.sanpack";
+    std::string atlasFile = params.GamedataPath + "/SanmapGen_UnitAtlas.raw";
+    
+    int atlasSize = 4096;
+    int iconSize = 80;
+    int iconsPerRow = atlasSize / iconSize;
+    
+    std::vector<uint8_t> atlasBuffer;
+    
+    if (std::filesystem::exists(atlasFile)) {
+        // Load fast raw cache
+        params.DebugInfo += "Loading Texture Atlas from CACHE...\n";
+        atlasBuffer.resize(atlasSize * atlasSize * 4);
+        std::ifstream file(atlasFile, std::ios::binary);
+        if (file.is_open()) {
+            file.read(reinterpret_cast<char*>(atlasBuffer.data()), atlasBuffer.size());
+        }
+    } else {
+        // Generate Atlas
+        params.DebugInfo += "Building Texture Atlas from scratch (this may take a few seconds)...\n";
+        atlasBuffer.resize(atlasSize * atlasSize * 4, 0); // Transparent black
+        
+        mz_zip_archive zip_archive = {};
+        if (mz_zip_reader_init_file(&zip_archive, uiPack.c_str(), 0)) {
+            
+            int index = 0;
+            for (auto& [typeId, def] : params.UnitDefinitions) {
+                std::string searchName = typeId;
+                std::transform(searchName.begin(), searchName.end(), searchName.begin(), ::tolower);
+                
+                std::string candidates[2] = {
+                    "UI/Sprites/Icons/Units/" + searchName + "_icon.dds",
+                    "UI/Sprites/Icons/Units/" + searchName + ".dds"
+                };
+                
+                int file_index = -1;
+                for (int i = 0; i < 2; ++i) {
+                    file_index = mz_zip_reader_locate_file(&zip_archive, candidates[i].c_str(), nullptr, 0);
+                    if (file_index >= 0) break;
+                    file_index = mz_zip_reader_locate_file(&zip_archive, candidates[i].c_str(), nullptr, 0x0200);
+                    if (file_index >= 0) break;
+                }
+                
+                if (file_index >= 0) {
+                    size_t uncomp_size = 0;
+                    void* p = mz_zip_reader_extract_to_heap(&zip_archive, file_index, &uncomp_size, 0);
+                    if (p) {
+                        const uint8_t* data = static_cast<const uint8_t*>(p);
+                        if (uncomp_size >= 128 && data[0] == 'D' && data[1] == 'D' && data[2] == 'S' && data[3] == ' ') {
+                            DDS_HEADER header;
+                            memcpy(&header, data + 4, sizeof(DDS_HEADER));
+                            uint32_t width = header.dwWidth;
+                            uint32_t height = header.dwHeight;
+                            
+                            std::vector<uint8_t> rgbaBuffer;
+                            bool bSuccess = false;
+                            
+                            if (header.ddspf.dwFourCC == 0x31545844) { 
+                                ConvertDXT1ToRGBAWithBlackKey(data + 128, width, height, rgbaBuffer);
+                                bSuccess = true;
+                            } else if (header.ddspf.dwFourCC == 0) {
+                                if (header.ddspf.dwRGBBitCount == 32) {
+                                    // BGRA to RGBA
+                                    rgbaBuffer.resize(width * height * 4);
+                                    const uint8_t* src = data + 128;
+                                    for (size_t i = 0; i < width * height; ++i) {
+                                        rgbaBuffer[i*4 + 0] = src[i*4 + 2];
+                                        rgbaBuffer[i*4 + 1] = src[i*4 + 1];
+                                        rgbaBuffer[i*4 + 2] = src[i*4 + 0];
+                                        rgbaBuffer[i*4 + 3] = src[i*4 + 3];
+                                    }
+                                    bSuccess = true;
+                                }
+                            }
+                            
+                            if (bSuccess) {
+                                // Stamp into atlas
+                                int destX = (index % iconsPerRow) * iconSize;
+                                int destY = (index / iconsPerRow) * iconSize;
+                                
+                                int copyWidth = min((int)width, iconSize);
+                                int copyHeight = min((int)height, iconSize);
+                                
+                                for (int y = 0; y < copyHeight; ++y) {
+                                    for (int x = 0; x < copyWidth; ++x) {
+                                        int srcIdx = (y * width + x) * 4;
+                                        int destIdx = ((destY + y) * atlasSize + (destX + x)) * 4;
+                                        atlasBuffer[destIdx + 0] = rgbaBuffer[srcIdx + 0];
+                                        atlasBuffer[destIdx + 1] = rgbaBuffer[srcIdx + 1];
+                                        atlasBuffer[destIdx + 2] = rgbaBuffer[srcIdx + 2];
+                                        atlasBuffer[destIdx + 3] = rgbaBuffer[srcIdx + 3];
+                                    }
+                                }
+                                
+                                // Calculate UVs
+                                float uv0_x = (float)destX / atlasSize;
+                                float uv0_y = (float)destY / atlasSize;
+                                float uv1_x = (float)(destX + copyWidth) / atlasSize;
+                                float uv1_y = (float)(destY + copyHeight) / atlasSize;
+                                
+                                params.UnitAtlasUVs[typeId] = {uv0_x, uv0_y, uv1_x, uv1_y};
+                                index++;
+                            }
+                        }
+                        free(p);
+                    }
+                }
+            }
+            mz_zip_reader_end(&zip_archive);
+            
+            // Save raw atlas cache
+            std::ofstream file(atlasFile, std::ios::binary);
+            if (file.is_open()) {
+                file.write(reinterpret_cast<const char*>(atlasBuffer.data()), atlasBuffer.size());
+            }
+        }
+    }
+    
+    // Upload Atlas to GPU
+    if (!atlasBuffer.empty()) {
+        GLuint tex;
+        glGenTextures(1, &tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlasSize, atlasSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, atlasBuffer.data());
+        params.UnitAtlasTexture = tex;
+    }
+}
+
 } // namespace SanmapGen
