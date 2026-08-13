@@ -1,54 +1,76 @@
 # UNIT_PROP_MARKER_DATA_SPEC — game entity definitions
 
-Source of truth: lua at `engine/LJ/lua/common/{units,props,markers}` +
-`resourceSpot.lua`, `area.lua`. **The `.sanpack` files are assets only** (dds
+Source of truth: lua at `engine/LJ/lua/common/{units,props,markers}`,
+`resourceSpot.lua`, `area.lua`, and `AI/UnitBlueprintValidator.lua`
+(authoritative tpId decoder). **The `.sanpack` files are assets only** (dds
 icons, editor brushes, models/textures) — NOT the definitions.
 
+## Factions
+Three factions: **Chosen, Guard, EDA**. Army indices in map scripts:
+Chosen = 0, Guard = 1, EDA = 2.
+
+## tpId scheme (authoritative, from `analyzeUnitID`)
+A template id is 7 chars: `<object><faction><type><tech><role><id2>`.
+- **char1 object:** `u`=Unit, `p`=Projectile, `e`=Prop.
+- **char2 faction:** `c`=Chosen, `g`=Guard, `e`=EDA (`x`=unknown).
+- **char3 type:** `s`=Structure, `a`=Mobile Air, `l`=Mobile Land, `n`=Mobile
+  Naval, `o`=Mobile Orbital.
+- **char4 tech:** `0`=Commander, `1`=T1, `2`=T2, `3`=T3, `4`=T4/Experimental,
+  `5`=experimental/unknown.
+- **char5 role:** 0 Direct_Fire, 1 Indirect_Fire, 2 Anti_Air, 3 Anti_Naval,
+  4 Defence, 5 Construction, 6 Economy, 7 Intel, 8 Special, 9 Civilian.
+- **chars6-7:** unique id. Example `ucl3001` = Unit / Chosen / Land / T3 /
+  Direct / 01.
+
 ## Units
-- Templates live in `units/unitsTemplates/<tpId>/` — ~280 templates. `tpId`
-  scheme: `u<faction><domain><NNNN>` (factions c/e/g/n…; domain a=air, l=land,
-  s=structure/sea, n, w=water). e.g. `ucl3001`.
-- `availableUnits.lua` = the catalog; `templateExplainations.lua` = the schema;
-  `unitEnums.lua` = small enums (DestroyType).
-- **UnitTemplate sections** (LuaLS `---@class`): `general` (displayName, icon
-  {shape,symbol,tech}, iconUI, iconUIType land/air/water/amphibious, tpId,
-  orders, toggles), `economy` (buildTime, cost/production/maintenance/storage
-  EconomyTables), `defence` (armor / health / shields), `movement` (type enum,
-  speed, rotationSpeed, collision layers), `intel` (vision/radar/sonar/counter/
-  stealth/jamming radii), `weapons[]` (damage, rangeMin/Max, reloadTime,
-  aimControllers, projectileTemplate, muzzle groups, beam), `collisionInfo`
-  (hitbox), `footprint` (pathfinding), `skirtSize` (structures), `visuals`
-  (mesh LODs, effects), `tags`, `audio`.
-- Enums the ARCH/UI may need: Layer (Air/Land/WaterSurface/Water/Seabed);
-  MovementType (Gunship/Hover/Legs*/Tracks*/Plane/WaterSurface/UnderWater);
-  IconShape/IconSymbol/IconTech (strategic icons).
-- Projectiles are separate `ProjectileTemplate`s (also `Projectiles.sanpack`).
+- Templates in `units/unitsTemplates/<tpId>/` (~280). `availableUnits.lua` =
+  catalog; `templateExplainations.lua` = the schema; `unitEnums.lua` = enums.
+- **UnitTemplate sections:** `general` (displayName, icon{shape,symbol,tech},
+  iconUI, iconUIType, tpId, orders, toggles), `economy` (buildTime, cost/
+  production/maintenance/storage), `defence` (armor/health/shields), `movement`
+  (type enum, speed, collision layers), `intel` (vision/radar/sonar/…),
+  `weapons[]` (damage, range, reload, aimControllers, projectileTemplate,
+  muzzles, beam), `collisionInfo`, `footprint`, `skirtSize` (structures),
+  `visuals` (mesh LODs, effects), `tags`, `audio`.
+- Enums the UI needs: Layer (Air/Land/WaterSurface/Water/Seabed); MovementType
+  (Gunship/Hover/Legs*/Tracks*/Plane/WaterSurface/UnderWater); IconShape/Symbol/
+  Tech (strategic icons).
 
 ## Props
-- `props/propsTemplates/` holds `.santp` templates (`exe000x/`,
-  `defaultWreckage.santp`). Most **environment props live in
-  `Environment.sanpack`** (2.3 GB), referenced by maps via `blueprintPath` like
+- `props/propsTemplates/` holds `.santp` templates. Most environment props live
+  in `Environment.sanpack` (2.3 GB), referenced by maps via `blueprintPath` like
   `Environment/01_Highlands/Props/edbm0149/edbm0149.santp` (codes edbm*, edmm*).
-- Map props store only `{ blueprintPath, transforms[] }` (pos/rot/scale) — see
-  the format spec.
 
 ## Markers
-- `markers/markerTemplates/`: `alloyMarker` (mex/resource), `constructionBracket`,
-  `formationBracket`, `selectionBracket`, `m002`, `m003`. Templates are `.santp`.
-- `resourceSpot.lua` `ResourcesInfo`: `alloys` → strategicIcon `alloy_spot`,
-  decal `Environment/Common/Decals/alloy_spot.sandecal`, markerTemplate
-  `common/markers/markerTemplates/alloyMarker/alloyMarker.santp`. Energy is
-  commented out (no energy decals) — so resource markers = alloys only, today.
+- `markers/markerTemplates/`: `alloyMarker` (mex), construction/formation/
+  selection brackets, `m002`, `m003`. `resourceSpot.lua` maps `alloys` →
+  alloyMarker.santp + decal `alloy_spot.sandecal`. Energy is commented out ⇒
+  resource markers = alloys only today.
 
 ## Areas
-- Engine `Area` = center `position` + `size` (float2), XZ plane. Map `MapArea`
-  = corner `x,y` + `width,height`. `area.lua` `Area.FromMapArea` converts
-  (center = x + w/2). SanGen must map between the two forms on import/export.
+- Engine `Area` = center + size; map `MapArea` = corner x,y + width,height.
+  `area.lua Area.FromMapArea` converts. SanGen maps between them on import/export.
+
+## The `.san*` proprietary format family
+`.sanmap` (map), `.santp` (unit/prop/marker template), `.sandecal` (decal),
+`.sanmodel` (proprietary FBX-like mesh — per owner), `.sananimation`, `.sanvfx`,
+`.sanmaterial`. SanGen references these by path; it does not need to parse the
+mesh/vfx bodies for map generation, only the templates/decals.
+
+## Asset validation — pre-alpha files are unreliable (REQUIRED)
+The game ships `AI/UnitBlueprintValidator.lua` (171 KB) and
+`ProjectileBlueprintValidator.lua`: they validate every blueprint **data**
+section and auto-fill missing/invalid fields with safe defaults, logging each
+fix. Mirror that **validate-then-fallback** pattern.
+- BUT those validate lua data, NOT texture/icon files. SanGen must add its own
+  **asset-safety layer** for loading dds icons/textures into the UI (the
+  100k-scroll lists): before loading, cap file size and image dimensions,
+  sanity-check the dds/format header, and fall back to a placeholder icon on any
+  failure — never load an unverified/corrupt file straight into RAM or the UI.
+  This is the concrete form of the project rule "validate all input to avoid
+  crashes."
 
 ## What SanGen actually needs (for the ARCH)
-- Map placement stores only `UnitTransform{ type, tpid }`; SanGen's UI needs the
-  **unit catalog** — tpId + displayName + icon + iconUIType(layer) — to drive
-  the 100k-scrollable placement lists. Full weapon/economy detail is game-side,
-  not required for placement but available in the templates.
-- The heavy environment prop set lives in `Environment.sanpack`; SanGen needs an
-  index of prop blueprintPaths + preview icons, not the models.
+Placement stores only `UnitTransform{ type, tpid }`; the UI needs a unit catalog
+(tpId + displayName + icon + iconUIType) and a prop-blueprint index (path +
+preview icon), both loaded through the asset-safety layer above.

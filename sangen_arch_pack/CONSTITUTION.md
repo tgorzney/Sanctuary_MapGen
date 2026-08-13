@@ -52,7 +52,15 @@ portability; the eventual UE-plugin port re-implements the swappable seams at
 port time. Keep platform-specific touchpoints behind thin seams (IO/BRIDGE,
 SYS); if a seam ever conflicts with peak performance, performance wins.
 
-## 6. Work-order schema
+## 6. Input & asset safety (pre-alpha data is unreliable)
+All external files (game blueprints, dds icons/textures, .san* assets, imported
+maps) are validated before use: cap file size and image dimensions, sanity-check
+format headers, and fall back to a safe placeholder on any failure — never load
+an unverified or corrupt file into RAM or the UI. Mirror the game's own
+validate-then-default-then-log pattern (see MODDING_SCRIPTING_SPEC). This is the
+concrete form of "validate all input to avoid crashes."
+
+## 7. Work-order schema
 Coders execute schema-valid work-orders only. Required fields: title; root
 problem; target file(s); layer & accuracy class; backend policy; ARCH rules
 invoked; solution + benchmark-backed performance estimate (with basis);
