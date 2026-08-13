@@ -55,3 +55,18 @@ farNearBlend; diffuseRemap / farColorRemap (Color); maskRemapMin / Max (Vector4)
   confirm real defaults against the official maps.
 - **Still to read:** `MapUtils.cs` (save/load logic) and `Colors.cs` (palette)
   — pending, needed for the full import/export spec.
+
+## Validated against an official map (~TEAM-1v1_Tropical_256)
+- Confirms: fileVersion 3, mapVersion 1; width=length=256, height=128;
+  `heightmapResolution = 257` (N+1); exactly 9 `stratumLayers`.
+- A map on disk is a folder: `<name>.sanmap` + `preview.png` + `Textures/`.
+- **Terrain data is NOT in the JSON.** The `.sanmap` holds metadata + entities
+  only; the heightmap and stratum masks live as files in the `Textures/`
+  folder. Import/Export must handle both the JSON and the texture set.
+- Markers seen: `Spawn` (resource=false, keyed per army: `ARMY_1`/`ARMY_2`)
+  and `Alloys` (resource=true — these are mexes, keyed `Mex N`). Symmetry is
+  encoded in the transform name suffix (`Mex 0 sym 0`).
+- `armies` keyed `ARMY_1..N`, faction int, alloys/energy floats; `groups` was
+  empty here (units come via markers in this map).
+- `areas` has a `PlayableArea` spanning the full map; `decals` and `props`
+  empty in this map.
