@@ -20,12 +20,6 @@ void UnitParser::LoadUnitDefinitions(GenerationParams& params) {
         return;
     }
 
-    std::regex fpXRegex("x\\s*=\\s*([0-9.]+)");
-    std::regex fpYRegex("y\\s*=\\s*([0-9.]+)");
-    std::regex speedRegex("speed\\s*=\\s*([0-9.]+)");
-    std::regex accelRegex("acceleration\\s*=\\s*([0-9.]+)");
-    std::regex nameRegex("displayName\\s*=\\s*\"([^\"]+)\"");
-
     for (const auto& entry : std::filesystem::recursive_directory_iterator(templatesPath)) {
         if (entry.is_regular_file() && entry.path().extension() == ".santp") {
             std::string typeId = entry.path().stem().string(); // e.g. "uca1001"
@@ -45,19 +39,58 @@ void UnitParser::LoadUnitDefinitions(GenerationParams& params) {
                 if (line.find("movement = {") != std::string::npos) inMovement = true;
                 if (line.find("general = {") != std::string::npos) inGeneral = true;
                 if (line.find("},") != std::string::npos) {
-                    if (inFootprint) inFootprint = false;
+                    inFootprint = false;
+                    inMovement = false;
+                    inGeneral = false;
                 }
 
-                std::smatch match;
                 if (inFootprint) {
-                    if (std::regex_search(line, match, fpXRegex)) def.FootprintX = std::stof(match[1]);
-                    if (std::regex_search(line, match, fpYRegex)) def.FootprintY = std::stof(match[1]);
+                    size_t xPos = line.find("x");
+                    if (xPos != std::string::npos) {
+                        size_t eq = line.find("=", xPos);
+                        if (eq != std::string::npos) {
+                            try { def.FootprintX = std::stof(line.substr(eq + 1)); } catch(...) {}
+                        }
+                    }
+                    size_t yPos = line.find("y");
+                    if (yPos != std::string::npos && yPos > line.find("footprint") && line.find("type") == std::string::npos) {
+                        // Ensure it's isolated y, basic check
+                        size_t eq = line.find("=", yPos);
+                        if (eq != std::string::npos) {
+                            try { def.FootprintY = std::stof(line.substr(eq + 1)); } catch(...) {}
+                        }
+                    }
                 }
                 
-                if (std::regex_search(line, match, speedRegex)) def.Speed = std::stof(match[1]);
-                if (std::regex_search(line, match, accelRegex)) def.Acceleration = std::stof(match[1]);
+                if (inMovement) {
+                    size_t sPos = line.find("speed");
+                    if (sPos != std::string::npos) {
+                        size_t eq = line.find("=", sPos);
+                        if (eq != std::string::npos) {
+                            try { def.Speed = std::stof(line.substr(eq + 1)); } catch(...) {}
+                        }
+                    }
+                    size_t aPos = line.find("acceleration");
+                    if (aPos != std::string::npos) {
+                        size_t eq = line.find("=", aPos);
+                        if (eq != std::string::npos) {
+                            try { def.Acceleration = std::stof(line.substr(eq + 1)); } catch(...) {}
+                        }
+                    }
+                }
                 
-                if (inGeneral && std::regex_search(line, match, nameRegex)) def.DisplayName = match[1];
+                if (inGeneral) {
+                    size_t dPos = line.find("displayName");
+                    if (dPos != std::string::npos) {
+                        size_t start = line.find("\"", dPos);
+                        if (start != std::string::npos) {
+                            size_t end = line.find("\"", start + 1);
+                            if (end != std::string::npos) {
+                                def.DisplayName = line.substr(start + 1, end - start - 1);
+                            }
+                        }
+                    }
+                }
             }
 
             params.UnitDefinitions[typeId] = def;

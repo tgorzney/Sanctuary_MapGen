@@ -106,7 +106,10 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
     
     ImGui::Spacing();
     
+    ImGui::Spacing();
+    
     std::string toRemove = "";
+    bool openUnitModal = false;
     for (auto& [armyName, army] : params.Armies) {
         ImGui::PushID(armyName.c_str());
         if (ImGui::CollapsingHeader(armyName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -122,7 +125,7 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
                 params.ActiveArmyForUnits = armyName;
                 params.SelectedUnitsToSpawn.clear();
                 params.UnitsToSpawnCount = 1;
-                ImGui::OpenPopup("Add Units##Modal");
+                openUnitModal = true;
             }
             
             // Faction dropdown
@@ -154,6 +157,10 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
         bNeedsMapUpdate = true;
     }
     
+    if (openUnitModal) {
+        ImGui::OpenPopup("Add Units##Modal");
+    }
+    
     ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
     if (ImGui::BeginPopupModal("Add Units##Modal", NULL, ImGuiWindowFlags_NoSavedSettings)) {
         ImGui::Text("Select Units to add to %s", params.ActiveArmyForUnits.c_str());
@@ -161,35 +168,57 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
         
         ImGui::BeginChild("##UnitSelection", ImVec2(0, -60), true);
         
-        // Show all parsed unit definitions
+        static std::vector<std::string> unitKeys;
+        if (ImGui::IsWindowAppearing()) {
+            unitKeys.clear();
+            for (const auto& [typeId, def] : params.UnitDefinitions) {
+                unitKeys.push_back(typeId);
+            }
+            std::sort(unitKeys.begin(), unitKeys.end());
+        }
+        
+        // Show all parsed unit definitions using Clipper so we don't load 200 icons instantly
         int columns = 4;
         if (ImGui::BeginTable("##UnitGrid", columns)) {
-            for (const auto& [typeId, def] : params.UnitDefinitions) {
-                ImGui::TableNextColumn();
-                
-                bool isSelected = std::find(params.SelectedUnitsToSpawn.begin(), params.SelectedUnitsToSpawn.end(), typeId) != params.SelectedUnitsToSpawn.end();
-                
-                ImGui::PushID(typeId.c_str());
-                
-                GLuint tex = GetUnitThumbnail(typeId, params);
-                if (tex != 0) {
-                    ImGui::Image((void*)(intptr_t)tex, ImVec2(80, 80));
-                } else {
-                    ImGui::Button("?", ImVec2(80, 80)); // Placeholder if icon fails to load
-                }
-                
-                if (ImGui::Selectable(def.DisplayName.empty() ? typeId.c_str() : def.DisplayName.c_str(), &isSelected, ImGuiSelectableFlags_DontClosePopups, ImVec2(120, 30))) {
-                    if (!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyShift) {
-                        params.SelectedUnitsToSpawn.clear();
+            ImGuiListClipper clipper;
+            int rows = (unitKeys.size() + columns - 1) / columns;
+            clipper.Begin(rows);
+            while (clipper.Step()) {
+                for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++) {
+                    ImGui::TableNextRow();
+                    for (int col = 0; col < columns; col++) {
+                        int idx = row * columns + col;
+                        if (idx >= (int)unitKeys.size()) break;
+                        ImGui::TableSetColumnIndex(col);
+                        
+                        std::string typeId = unitKeys[idx];
+                        auto& def = params.UnitDefinitions[typeId];
+                        
+                        bool isSelected = std::find(params.SelectedUnitsToSpawn.begin(), params.SelectedUnitsToSpawn.end(), typeId) != params.SelectedUnitsToSpawn.end();
+                        
+                        ImGui::PushID(typeId.c_str());
+                        
+                        GLuint tex = GetUnitThumbnail(typeId, params);
+                        if (tex != 0) {
+                            ImGui::Image((void*)(intptr_t)tex, ImVec2(80, 80));
+                        } else {
+                            ImGui::Button("?", ImVec2(80, 80)); // Placeholder if icon fails to load
+                        }
+                        
+                        if (ImGui::Selectable(def.DisplayName.empty() ? typeId.c_str() : def.DisplayName.c_str(), &isSelected, ImGuiSelectableFlags_DontClosePopups, ImVec2(120, 30))) {
+                            if (!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyShift) {
+                                params.SelectedUnitsToSpawn.clear();
+                            }
+                            if (isSelected) {
+                                params.SelectedUnitsToSpawn.push_back(typeId);
+                            } else {
+                                params.SelectedUnitsToSpawn.erase(std::remove(params.SelectedUnitsToSpawn.begin(), params.SelectedUnitsToSpawn.end(), typeId), params.SelectedUnitsToSpawn.end());
+                            }
+                        }
+                        
+                        ImGui::PopID();
                     }
-                    if (isSelected) {
-                        params.SelectedUnitsToSpawn.push_back(typeId);
-                    } else {
-                        params.SelectedUnitsToSpawn.erase(std::remove(params.SelectedUnitsToSpawn.begin(), params.SelectedUnitsToSpawn.end(), typeId), params.SelectedUnitsToSpawn.end());
-                    }
                 }
-                
-                ImGui::PopID();
             }
             ImGui::EndTable();
         }
