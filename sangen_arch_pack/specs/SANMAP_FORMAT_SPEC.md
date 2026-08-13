@@ -70,3 +70,44 @@ farNearBlend; diffuseRemap / farColorRemap (Color); maskRemapMin / Max (Vector4)
   empty here (units come via markers in this map).
 - `areas` has a `PlayableArea` spanning the full map; `decals` and `props`
   empty in this map.
+
+## Feature variation across ~23 official maps (schema survey)
+- **Survival difficulty variants are structurally identical** (byte-for-byte
+  near-identical: same props, markers, armies). Difficulty lives elsewhere, not
+  in the map structure — read one per family, not all six.
+- **Props** appear heavily in real maps (Forge 63.5k instances / 39 blueprints;
+  White_Desert 29k; Two_Step 22.5k; There_Is_Time 4.9k). Blueprints are
+  `.santp` paths; each transform is position/rotation/scale.
+- **Decals** in There_Is_Time (4 types, 76) and Two_Step (1). Blueprints are
+  `.sandecal`; DecalType = { blueprintPath, transforms }.
+- **Chains** only in Two_Step (`FirstChain`, 3 elems, `{type:'Alloys',
+  name:'AlloyMarker'}`) — confirms MarkerChain.
+- Marker types across all maps are just `Spawn` (res=false) + `Alloys`
+  (res=true = mexes). Sizes 256–2048; height up to 1600 (Forge); one non-square
+  map (1023×1024). Army keys casing varies: `ARMY_1` vs `Army_1`; faction 0 or 1.
+- Armies show `groups` present but no units found by traversal — verify the
+  army→group→unit nesting against a map that actually ships placed units.
+
+## mapGeneratorData — SanGen's generator-state round-trip (CRITICAL)
+An extra top-level key present ONLY in SanGen-made maps (e.g. Pandemonium), not
+in shipped maps. It is the **entire generator state serialized into the
+.sanmap** — i.e. the on-disk form of the code's `GenerationParams`. Import/Export
+must round-trip this. Top-level fields observed:
+- Terrain/shape: MapSize, Seed, TerrainMinHeight, TerrainMaxHeight,
+  ScaleFeaturesToMapSize, CylinderZScale, TorusMajorRadius, TorusMinorRadius,
+  GlobalGravity, HydroMultiplier.
+- Layers/materials: GeoLayers[], Stratums, DetailNormalMapSize, CrossFadeWidth.
+- Symmetry: SymAlgorithm, GlobalSymmetryMask, SymSuperpositionBlend,
+  SymmetryBlurRadius, SymmetryDetectionTolerance, SnapImperfectSymmetry.
+- Erosion/flow: FlowSettingsParams { FlowMomentum, FlowVolumeMultiplier,
+  Iterations, Precipitation, SlopeAdherence, StochasticVariance },
+  SlopeSettingsParams.
+- Markers/resource: MarkersList, MexDensity, ReclaimDensity, SpawnPointCount,
+  marker color/scale/icon globals for Alloy/Plasma/Spawn.
+- GPU toggles (match the code survey): UseGPUFlowMap, UseGPUMarkers,
+  UseGPUTerrain, WYSIWYGBaking, GPUPreviewIterations, FastPreviewMode.
+- Also: Armies (16 entries, 5 keys each), Atmosphere (full fog/sun/sky block),
+  Water, GamedataPath / GlobalEnvironmentPath, PresetVersion, Aliases.
+- **Implication:** this block is the DATA-layer params in disk form; it belongs
+  to a future PARAMS spec and is the Import/Export round-trip contract. Confirms
+  the GPU-dispatch toggles the ARCH must unify.
