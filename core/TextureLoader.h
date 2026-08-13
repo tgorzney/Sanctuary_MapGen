@@ -27,7 +27,7 @@ public:
     static GLuint LoadDDSFromFile(const std::string& filePath, std::string* debugOut = nullptr);
     
     // Scans UI.sanpack for valid marker icons (ending in _icon.dds)
-    static std::vector<std::string> ScanSanpackForMarkers(const std::string& archivePath, std::string* debugOut = nullptr);
+    static std::vector<std::string> ScanSanpackForMarkers(const std::string& archivePath, std::string* debugOut = nullptr, void* openZipArchive = nullptr);
     
     // Scans the .sanpack for environments (subfolders in the root)
     static std::vector<std::string> GetEnvironmentsFromSanpack(const std::string& zipPath);
@@ -39,7 +39,7 @@ public:
     static void ScanSanpackForMaterial(const std::string& zipPath, const std::string& environmentTheme, const std::string& materialName, SanmapGen::StratumSettings& stratum);
     
     // Atlas Generation
-    static void GenerateUnitAtlas(SanmapGen::GenerationParams& params);
+    static void GenerateUnitAtlas(SanmapGen::GenerationParams& params, void* openZipArchive = nullptr);
 };
 
 struct AsyncTextureRequest {

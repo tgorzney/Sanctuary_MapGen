@@ -267,6 +267,12 @@ GLuint TextureLoader::LoadDDSFromArchive(const std::string& archivePath, const s
         return 0;
     }
     
+    if (width > 4096 || height > 4096 || width == 0 || height == 0) {
+        if (debugOut) *debugOut += "  [DDS_ARCHIVE] ERROR: Invalid dimensions\n";
+        free(p);
+        return 0;
+    }
+
     GLuint textureID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
@@ -276,40 +282,58 @@ GLuint TextureLoader::LoadDDSFromArchive(const std::string& archivePath, const s
     // Upload mip 0
     if (bIsCompressed) {
         uint32_t size = ((width + 3) / 4) * ((height + 3) / 4) * blockSize;
-        if (size > bufferSize) size = bufferSize;
+        if (size > bufferSize) {
+            if (debugOut) *debugOut += "  [DDS_ARCHIVE] ERROR: Unexpected EOF\n";
+            glDeleteTextures(1, &textureID);
+            free(p);
+            return 0;
+        }
+        
         if (format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) {
             std::vector<uint8_t> rgba;
-            ConvertDXT1ToRGBAWithBlackKey(buffer, width, height, rgba);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            try {
+                ConvertDXT1ToRGBAWithBlackKey(buffer, width, height, rgba);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            } catch (...) {
+                if (debugOut) *debugOut += "  [DDS_ARCHIVE] ERROR: DXT1 parsing failed\n";
+            }
         } else {
             glCompressedTexImage2D_PTR(GL_TEXTURE_2D, 0, format, width, height, 0, size, buffer);
             
             if (format == GL_COMPRESSED_RG_RGTC2) {
-                std::vector<uint8_t> uncomp(width * height * 4);
-                glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, uncomp.data());
-                
-                for (size_t i = 0; i < width * height; ++i) {
-                    uint8_t r = uncomp[i*4 + 0]; // Marker shape
-                    uint8_t g = uncomp[i*4 + 1]; // Glow shape
+                std::vector<uint8_t> uncomp;
+                try {
+                    uncomp.resize(width * height * 4);
+                    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, uncomp.data());
                     
-                    // Map Marker to White, Glow to Cyan
-                    uint8_t outR = r;
-                    uint8_t outG = (std::max)(r, g);
-                    uint8_t outB = (std::max)(r, g);
-                    uint8_t outA = (std::max)(r, g);
-                    
-                    uncomp[i*4 + 0] = outR;
-                    uncomp[i*4 + 1] = outG;
-                    uncomp[i*4 + 2] = outB;
-                    uncomp[i*4 + 3] = outA;
-                }
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, uncomp.data());
+                    for (size_t i = 0; i < width * height; ++i) {
+                        uint8_t r = uncomp[i*4 + 0]; // Marker shape
+                        uint8_t g = uncomp[i*4 + 1]; // Glow shape
+                        
+                        // Map Marker to White, Glow to Cyan
+                        uint8_t outR = r;
+                        uint8_t outG = (std::max)(r, g);
+                        uint8_t outB = (std::max)(r, g);
+                        uint8_t outA = (std::max)(r, g);
+                        
+                        uncomp[i*4 + 0] = outR;
+                        uncomp[i*4 + 1] = outG;
+                        uncomp[i*4 + 2] = outB;
+                        uncomp[i*4 + 3] = outA;
+                    }
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, uncomp.data());
+                } catch (...) {}
             }
         }
     } else {
         uint32_t bytesPerPixel = (header.ddspf.dwRGBBitCount / 8);
         uint32_t size = width * height * bytesPerPixel;
-        if (size > bufferSize) size = bufferSize; // Safety (though glTexImage2D doesn't take size)
+        if (size > bufferSize) {
+            if (debugOut) *debugOut += "  [DDS_ARCHIVE] ERROR: Unexpected EOF in uncompressed\n";
+            glDeleteTextures(1, &textureID);
+            free(p);
+            return 0;
+        }
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, pixelFormat, GL_UNSIGNED_BYTE, buffer);
     }
     
@@ -484,7 +508,11 @@ GLuint TextureLoader::LoadDDSFromFile(const std::string& filePath, std::string* 
         if (debugOut) *debugOut += "  [DDS_FILE] ERROR: Unsupported DDS FourCC format: " + std::to_string(header.ddspf.dwFourCC) + "\n";
         return 0;
     }
-    
+    if (width > 4096 || height > 4096 || width == 0 || height == 0) {
+        if (debugOut) *debugOut += "  [DDS_FILE] ERROR: Invalid dimensions\n";
+        return 0;
+    }
+
     GLuint textureID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
@@ -493,39 +521,54 @@ GLuint TextureLoader::LoadDDSFromFile(const std::string& filePath, std::string* 
     
     if (bIsCompressed) {
         uint32_t expectedSize = ((width + 3) / 4) * ((height + 3) / 4) * blockSize;
-        if (expectedSize > bufferSize) expectedSize = bufferSize;
+        if (expectedSize > bufferSize) {
+            if (debugOut) *debugOut += "  [DDS_FILE] ERROR: Unexpected EOF\n";
+            glDeleteTextures(1, &textureID);
+            return 0;
+        }
         if (format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) {
             std::vector<uint8_t> rgba;
-            ConvertDXT1ToRGBAWithBlackKey(buffer, width, height, rgba);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            try {
+                ConvertDXT1ToRGBAWithBlackKey(buffer, width, height, rgba);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+            } catch (...) {
+                if (debugOut) *debugOut += "  [DDS_FILE] ERROR: DXT1 parsing failed\n";
+            }
         } else {
             glCompressedTexImage2D_PTR(GL_TEXTURE_2D, 0, format, width, height, 0, expectedSize, buffer);
             
             if (format == GL_COMPRESSED_RG_RGTC2) {
-                std::vector<uint8_t> uncomp(width * height * 4);
-                glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, uncomp.data());
-                
-                for (size_t i = 0; i < width * height; ++i) {
-                    uint8_t r = uncomp[i*4 + 0]; 
-                    uint8_t g = uncomp[i*4 + 1]; 
+                std::vector<uint8_t> uncomp;
+                try {
+                    uncomp.resize(width * height * 4);
+                    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, uncomp.data());
                     
-                    uint8_t outR = r;
-                    uint8_t outG = (std::max)(r, g);
-                    uint8_t outB = (std::max)(r, g);
-                    uint8_t outA = (std::max)(r, g);
-                    
-                    uncomp[i*4 + 0] = outR;
-                    uncomp[i*4 + 1] = outG;
-                    uncomp[i*4 + 2] = outB;
-                    uncomp[i*4 + 3] = outA;
-                }
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, uncomp.data());
+                    for (size_t i = 0; i < width * height; ++i) {
+                        uint8_t r = uncomp[i*4 + 0]; 
+                        uint8_t g = uncomp[i*4 + 1]; 
+                        
+                        uint8_t outR = r;
+                        uint8_t outG = (std::max)(r, g);
+                        uint8_t outB = (std::max)(r, g);
+                        uint8_t outA = (std::max)(r, g);
+                        
+                        uncomp[i*4 + 0] = outR;
+                        uncomp[i*4 + 1] = outG;
+                        uncomp[i*4 + 2] = outB;
+                        uncomp[i*4 + 3] = outA;
+                    }
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, uncomp.data());
+                } catch (...) {}
             }
         }
     } else {
         uint32_t bytesPerPixel = (header.ddspf.dwRGBBitCount / 8);
         uint32_t expectedSize = width * height * bytesPerPixel;
-        if (expectedSize > bufferSize) expectedSize = bufferSize;
+        if (expectedSize > bufferSize) {
+            if (debugOut) *debugOut += "  [DDS_FILE] ERROR: Unexpected EOF in uncompressed\n";
+            glDeleteTextures(1, &textureID);
+            return 0;
+        }
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, pixelFormat, GL_UNSIGNED_BYTE, buffer);
     }
     
@@ -533,7 +576,7 @@ GLuint TextureLoader::LoadDDSFromFile(const std::string& filePath, std::string* 
 }
 
 
-std::vector<std::string> TextureLoader::ScanSanpackForMarkers(const std::string& archivePath, std::string* debugOut) {
+std::vector<std::string> TextureLoader::ScanSanpackForMarkers(const std::string& archivePath, std::string* debugOut, void* openZipArchive) {
     std::vector<std::string> markers;
     if (debugOut) *debugOut += "--- SCANNING FOR MARKERS ---\n";
     if (debugOut) *debugOut += "ArchivePath: " + archivePath + "\n";
@@ -549,41 +592,45 @@ std::vector<std::string> TextureLoader::ScanSanpackForMarkers(const std::string&
                 return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
             };
             int filesFound = 0;
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(iconsPath)) {
-                if (!entry.is_regular_file()) continue;
-                filesFound++;
-                std::string name = entry.path().filename().string();
-                if (ends_with(name, ".dds") || ends_with(name, ".png") || ends_with(name, ".jpg")) {
-                    std::string lowerName = name;
-                    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
-                    std::string basename = name.substr(name.find_last_of('/') + 1);
-                    std::string lowerBase = basename;
-                    std::transform(lowerBase.begin(), lowerBase.end(), lowerBase.begin(), ::tolower);
-                    if (lowerBase.find("icon_") == std::string::npos && lowerBase.find("_icon") == std::string::npos && lowerBase.find("_symbol") == std::string::npos) continue;
-                    
-                    std::string typeName = basename;
-                    size_t dotPos = typeName.find_last_of('.');
-                    if (dotPos != std::string::npos) typeName = typeName.substr(0, dotPos);
-                    
-                    // case insensitive erase of "icon" and "_" if they exist
-                    std::string lowerType = typeName;
-                    std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), ::tolower);
-                    size_t idx = lowerType.find("icon");
-                    if (idx != std::string::npos) { typeName.erase(idx, 4); lowerType.erase(idx, 4); }
-                    idx = lowerType.find("_");
-                    if (idx != std::string::npos) { typeName.erase(idx, 1); lowerType.erase(idx, 1); }
-                    
-                    if (!typeName.empty()) {
-                        typeName[0] = toupper(typeName[0]);
-                        if (std::find(markers.begin(), markers.end(), typeName) == markers.end()) {
-                            markers.push_back(typeName);
-                            if (debugOut) *debugOut += "  ACCEPTED: " + name + " -> Type: " + typeName + "\n";
+            try {
+                std::error_code ec;
+                for (const auto& entry : std::filesystem::recursive_directory_iterator(iconsPath, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                    if (ec) continue;
+                    if (!entry.is_regular_file(ec)) continue;
+                    filesFound++;
+                    std::string name = entry.path().filename().string();
+                    if (ends_with(name, ".dds") || ends_with(name, ".png") || ends_with(name, ".jpg")) {
+                        std::string lowerName = name;
+                        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+                        std::string basename = name.substr(name.find_last_of('/') + 1);
+                        std::string lowerBase = basename;
+                        std::transform(lowerBase.begin(), lowerBase.end(), lowerBase.begin(), ::tolower);
+                        if (lowerBase.find("icon_") == std::string::npos && lowerBase.find("_icon") == std::string::npos && lowerBase.find("_symbol") == std::string::npos) continue;
+                        
+                        std::string typeName = basename;
+                        size_t dotPos = typeName.find_last_of('.');
+                        if (dotPos != std::string::npos) typeName = typeName.substr(0, dotPos);
+                        
+                        // case insensitive erase of "icon" and "_" if they exist
+                        std::string lowerType = typeName;
+                        std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), ::tolower);
+                        size_t idx = lowerType.find("icon");
+                        if (idx != std::string::npos) { typeName.erase(idx, 4); lowerType.erase(idx, 4); }
+                        idx = lowerType.find("_");
+                        if (idx != std::string::npos) { typeName.erase(idx, 1); lowerType.erase(idx, 1); }
+                        
+                        if (!typeName.empty()) {
+                            typeName[0] = toupper(typeName[0]);
+                            if (std::find(markers.begin(), markers.end(), typeName) == markers.end()) {
+                                markers.push_back(typeName);
+                                if (debugOut) *debugOut += "  ACCEPTED: " + name + " -> Type: " + typeName + "\n";
+                            }
                         }
+                    } else {
+                        if (debugOut) *debugOut += "  Rejected: " + name + " (wrong extension)\n";
                     }
-                } else {
-                    if (debugOut) *debugOut += "  Rejected: " + name + " (wrong extension)\n";
                 }
-            }
+            } catch (...) {}
             if (debugOut) *debugOut += "Total files iterated: " + std::to_string(filesFound) + "\n";
         } else {
             if (debugOut) *debugOut += "Icons Path DOES NOT EXIST.\n";
@@ -593,19 +640,28 @@ std::vector<std::string> TextureLoader::ScanSanpackForMarkers(const std::string&
     }
     
     if (debugOut) *debugOut += "Path is an archive (.sanpack/.zip). Searching inside zip...\n";
-    mz_zip_archive zip_archive;
-    memset(&zip_archive, 0, sizeof(zip_archive));
-    if (!mz_zip_reader_init_file(&zip_archive, archivePath.c_str(), 0)) {
-        return markers;
+    mz_zip_archive local_zip_archive;
+    mz_zip_archive* zip_archive_ptr = nullptr;
+    bool needsClose = false;
+    
+    if (openZipArchive) {
+        zip_archive_ptr = static_cast<mz_zip_archive*>(openZipArchive);
+    } else {
+        memset(&local_zip_archive, 0, sizeof(local_zip_archive));
+        if (!mz_zip_reader_init_file(&local_zip_archive, archivePath.c_str(), 0)) {
+            return markers;
+        }
+        zip_archive_ptr = &local_zip_archive;
+        needsClose = true;
     }
     
-    int numFiles = (int)mz_zip_reader_get_num_files(&zip_archive);
+    int numFiles = (int)mz_zip_reader_get_num_files(zip_archive_ptr);
     if (debugOut) *debugOut += "Zip contains " + std::to_string(numFiles) + " total files/folders.\n";
     
     int filesFound = 0;
     for (int i = 0; i < numFiles; ++i) {
         mz_zip_archive_file_stat file_stat;
-        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
+        if (!mz_zip_reader_file_stat(zip_archive_ptr, i, &file_stat)) continue;
         
         std::string name = file_stat.m_filename;
         for (char& c : name) { if (c == '\\') c = '/'; }
@@ -650,7 +706,7 @@ std::vector<std::string> TextureLoader::ScanSanpackForMarkers(const std::string&
             }
         }
     }
-    mz_zip_reader_end(&zip_archive);
+    if (needsClose) mz_zip_reader_end(zip_archive_ptr);
     
     if (debugOut) *debugOut += "Found " + std::to_string(markers.size()) + " markers in zip from " + std::to_string(filesFound) + " potential UI files.\n";
     return markers;
@@ -811,6 +867,11 @@ void AsyncTextureManagerWorkerLoop() {
                         res.width = header.dwWidth;
                         res.height = header.dwHeight;
                         
+                        if (res.width > 4096 || res.height > 4096 || res.width == 0 || res.height == 0) {
+                            mz_free(p);
+                            continue;
+                        }
+                        
                         uint32_t blockSize = 16;
                         res.format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
                         res.bIsCompressed = true;
@@ -834,16 +895,24 @@ void AsyncTextureManagerWorkerLoop() {
                         }
                         
                         if (res.bIsCompressed) {
-                            uint32_t size = ((res.width + 3) / 4) * ((res.height + 3) / 4) * blockSize;
-                            if (size > bufferSize) size = bufferSize;
-                            
-                            if (res.format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) {
-                                ConvertDXT1ToRGBAWithBlackKey(buffer, res.width, res.height, res.buffer);
-                                res.pixelFormat = GL_RGBA;
-                                res.bIsCompressed = false; 
-                            } else {
-                                res.buffer.assign(buffer, buffer + size);
+                            uint32_t expectedSize = ((res.width + 3) / 4) * ((res.height + 3) / 4) * blockSize;
+                            if (expectedSize > bufferSize) {
+                                mz_free(p);
+                                continue;
                             }
+                            if (res.format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) {
+                                try {
+                                    res.buffer.resize(res.width * res.height * 4);
+                                    ConvertDXT1ToRGBAWithBlackKey(buffer, res.width, res.height, res.buffer);
+                                } catch (...) {
+                                    res.buffer.clear();
+                                }
+                            } else {
+                                res.buffer.resize(expectedSize);
+                                memcpy(res.buffer.data(), buffer, expectedSize);
+                            }
+                            res.pixelFormat = GL_RGBA;
+                            res.bIsCompressed = false; 
                         } else {
                             uint32_t bytesPerPixel = (header.ddspf.dwRGBBitCount / 8);
                             uint32_t size = res.width * res.height * bytesPerPixel;
@@ -935,10 +1004,10 @@ void AsyncTextureManager::ProcessReadyQueue(SanmapGen::GenerationParams& params)
     }
 }
 
-void TextureLoader::GenerateUnitAtlas(SanmapGen::GenerationParams& params) {
+void TextureLoader::GenerateUnitAtlas(SanmapGen::GenerationParams& params, void* openZipArchive) {
     if (params.GamedataPath.empty()) return;
     
-    std::string uiPack = params.GamedataPath + "/UI.sanpack";
+    std::string uiPack = (std::filesystem::path(params.GamedataPath) / "UI.sanpack").string();
     std::string atlasFile = params.GamedataPath + "/SanmapGen_UnitAtlas.raw";
     
     int atlasSize = 4096;
@@ -960,8 +1029,20 @@ void TextureLoader::GenerateUnitAtlas(SanmapGen::GenerationParams& params) {
         params.DebugInfo += "Building Texture Atlas from scratch (this may take a few seconds)...\n";
         atlasBuffer.resize(atlasSize * atlasSize * 4, 0); // Transparent black
         
-        mz_zip_archive zip_archive = {};
-        if (mz_zip_reader_init_file(&zip_archive, uiPack.c_str(), 0)) {
+        mz_zip_archive local_zip_archive = {};
+        mz_zip_archive* zip_archive_ptr = nullptr;
+        bool needsClose = false;
+        
+        if (openZipArchive) {
+            zip_archive_ptr = static_cast<mz_zip_archive*>(openZipArchive);
+        } else {
+            if (mz_zip_reader_init_file(&local_zip_archive, uiPack.c_str(), 0)) {
+                zip_archive_ptr = &local_zip_archive;
+                needsClose = true;
+            }
+        }
+        
+        if (zip_archive_ptr) {
             
             int index = 0;
             for (auto& [typeId, def] : params.UnitDefinitions) {
@@ -975,15 +1056,15 @@ void TextureLoader::GenerateUnitAtlas(SanmapGen::GenerationParams& params) {
                 
                 int file_index = -1;
                 for (int i = 0; i < 2; ++i) {
-                    file_index = mz_zip_reader_locate_file(&zip_archive, candidates[i].c_str(), nullptr, 0);
+                    file_index = mz_zip_reader_locate_file(zip_archive_ptr, candidates[i].c_str(), nullptr, 0);
                     if (file_index >= 0) break;
-                    file_index = mz_zip_reader_locate_file(&zip_archive, candidates[i].c_str(), nullptr, 0x0200);
+                    file_index = mz_zip_reader_locate_file(zip_archive_ptr, candidates[i].c_str(), nullptr, 0x0200);
                     if (file_index >= 0) break;
                 }
                 
                 if (file_index >= 0) {
                     size_t uncomp_size = 0;
-                    void* p = mz_zip_reader_extract_to_heap(&zip_archive, file_index, &uncomp_size, 0);
+                    void* p = mz_zip_reader_extract_to_heap(zip_archive_ptr, file_index, &uncomp_size, 0);
                     if (p) {
                         const uint8_t* data = static_cast<const uint8_t*>(p);
                         if (uncomp_size >= 128 && data[0] == 'D' && data[1] == 'D' && data[2] == 'S' && data[3] == ' ') {
@@ -1056,7 +1137,7 @@ void TextureLoader::GenerateUnitAtlas(SanmapGen::GenerationParams& params) {
                     }
                 }
             }
-            mz_zip_reader_end(&zip_archive);
+            if (needsClose) mz_zip_reader_end(zip_archive_ptr);
             
             // Save raw atlas cache
             std::ofstream file(atlasFile, std::ios::binary);

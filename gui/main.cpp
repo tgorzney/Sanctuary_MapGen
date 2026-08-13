@@ -53,27 +53,31 @@ GLuint GetMarkerIcon(const std::string& typeName, SanmapGen::GenerationParams& p
     // First try loose folder (only search inside UI/Sprites/Icons, searching all Gamedata takes multiple seconds on Windows)
     std::string looseIconsDir = params.GamedataPath + "/UI/Sprites/Icons";
     if (std::filesystem::exists(looseIconsDir) && std::filesystem::is_directory(looseIconsDir)) {
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(looseIconsDir)) {
-            if (!entry.is_regular_file()) continue;
-            std::string filename = entry.path().filename().string();
-            std::string lower = filename;
-            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-            std::string search1 = typeLower + "_icon";
-            std::string search2 = typeLower;
-            std::string search3 = "icon_" + typeLower;
-            
-            if (lower.find(search1) != std::string::npos || lower.find(search3) != std::string::npos || (lower.find(search2) != std::string::npos && lower.find(".dds") != std::string::npos)) {
-                auto ends_with = [](const std::string& str, const std::string& suffix) {
-                    return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
-                };
-                if (ends_with(lower, ".png") || ends_with(lower, ".jpg") || ends_with(lower, ".tga")) {
-                    t = SanmapGen::TextureLoader::LoadImageFromFile(entry.path().string());
-                } else if (ends_with(lower, ".dds")) {
-                    t = SanmapGen::TextureLoader::LoadDDSFromFile(entry.path().string(), &localDebug);
+        try {
+            std::error_code ec;
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(looseIconsDir, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                if (ec) continue;
+                if (!entry.is_regular_file(ec)) continue;
+                std::string filename = entry.path().filename().string();
+                std::string lower = filename;
+                std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                std::string search1 = typeLower + "_icon";
+                std::string search2 = typeLower;
+                std::string search3 = "icon_" + typeLower;
+                
+                if (lower.find(search1) != std::string::npos || lower.find(search3) != std::string::npos || (lower.find(search2) != std::string::npos && lower.find(".dds") != std::string::npos)) {
+                    auto ends_with = [](const std::string& str, const std::string& suffix) {
+                        return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+                    };
+                    if (ends_with(lower, ".png") || ends_with(lower, ".jpg") || ends_with(lower, ".tga")) {
+                        t = SanmapGen::TextureLoader::LoadImageFromFile(entry.path().string());
+                    } else if (ends_with(lower, ".dds")) {
+                        t = SanmapGen::TextureLoader::LoadDDSFromFile(entry.path().string(), &localDebug);
+                    }
+                    if (t != 0) break;
                 }
-                if (t != 0) break;
             }
-        }
+        } catch (...) {}
     }
     
     // Then try sanpack
@@ -81,25 +85,29 @@ GLuint GetMarkerIcon(const std::string& typeName, SanmapGen::GenerationParams& p
         if (std::filesystem::is_directory(uiPack)) {
             std::string iconsPath = uiPack + "/UI/Sprites/Icons";
             if (std::filesystem::exists(iconsPath)) {
-                for (const auto& entry : std::filesystem::recursive_directory_iterator(iconsPath)) {
-                    if (!entry.is_regular_file()) continue;
-                    std::string basename = entry.path().filename().string();
-                    std::string lower = basename;
-                    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-                    
-                    std::string lowerNoExt = lower.substr(0, lower.find_last_of('.'));
-                    if (lowerNoExt == "icon_" + typeLower || lowerNoExt == typeLower + "_icon") {
-                        auto ends_with = [](const std::string& str, const std::string& suffix) {
-                            return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
-                        };
-                        if (ends_with(lower, ".png") || ends_with(lower, ".jpg")) {
-                            t = SanmapGen::TextureLoader::LoadImageFromFile(entry.path().string());
-                        } else if (ends_with(lower, ".dds")) {
-                            t = SanmapGen::TextureLoader::LoadDDSFromFile(entry.path().string(), &localDebug);
+                try {
+                    std::error_code ec;
+                    for (const auto& entry : std::filesystem::recursive_directory_iterator(iconsPath, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                        if (ec) continue;
+                        if (!entry.is_regular_file(ec)) continue;
+                        std::string basename = entry.path().filename().string();
+                        std::string lower = basename;
+                        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                        
+                        std::string lowerNoExt = lower.substr(0, lower.find_last_of('.'));
+                        if (lowerNoExt == "icon_" + typeLower || lowerNoExt == typeLower + "_icon") {
+                            auto ends_with = [](const std::string& str, const std::string& suffix) {
+                                return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+                            };
+                            if (ends_with(lower, ".png") || ends_with(lower, ".jpg")) {
+                                t = SanmapGen::TextureLoader::LoadImageFromFile(entry.path().string());
+                            } else if (ends_with(lower, ".dds")) {
+                                t = SanmapGen::TextureLoader::LoadDDSFromFile(entry.path().string(), &localDebug);
+                            }
+                            if (t != 0) break;
                         }
-                        if (t != 0) break;
                     }
-                }
+                } catch (...) {}
             }
         } else {
             // It's a zip archive
@@ -298,10 +306,11 @@ int main(int, char**)
         if (!bHasLoadedIcons && !params.GamedataPath.empty()) {
             if (!bTriggerCacheOptimization) {
                 ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-                if (ImGui::Begin("OptimizingCache", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav)) {
+                bool open = ImGui::Begin("OptimizingCache", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav);
+                if (open) {
                     ImGui::Text("Optimizing Cache... Please Wait (This may take a few seconds)");
-                    ImGui::End();
                 }
+                ImGui::End();
                 bTriggerCacheOptimization = true;
                 // Force a render so the user sees the popup BEFORE the blocking parse happens on the next frame
                 ImGui::Render();
@@ -318,11 +327,20 @@ int main(int, char**)
             bTriggerCacheOptimization = false;
             params.DebugInfo = "";
             
-            // Load Unit Templates directly from Lua tables (or fast Cache)
-            SanmapGen::UnitParser::LoadUnitDefinitions(params);
-            
+            // Initialize Global Archive for synchronous loading
             std::string uiPack = params.GamedataPath + "/UI.sanpack";
             std::string cacheFile = params.GamedataPath + "/icons_cache.json";
+            
+            mz_zip_archive global_ui_archive = {};
+            mz_zip_archive* global_ui_archive_ptr = nullptr;
+            if (std::filesystem::exists(uiPack)) {
+                if (mz_zip_reader_init_file(&global_ui_archive, uiPack.c_str(), 0)) {
+                    global_ui_archive_ptr = &global_ui_archive;
+                }
+            }
+            
+            // Load Unit Templates directly from Lua tables (or fast Cache)
+            SanmapGen::UnitParser::LoadUnitDefinitions(params, global_ui_archive_ptr);
             
             if (std::filesystem::exists(cacheFile)) {
                 try {
@@ -336,7 +354,7 @@ int main(int, char**)
             
             if (params.AvailableIcons.empty()) {
                 if (std::filesystem::exists(uiPack)) {
-                    std::vector<std::string> scanned = SanmapGen::TextureLoader::ScanSanpackForMarkers(uiPack);
+                    std::vector<std::string> scanned = SanmapGen::TextureLoader::ScanSanpackForMarkers(uiPack, &params.DebugInfo, global_ui_archive_ptr);
                     if (!scanned.empty()) {
                         params.AvailableIcons = scanned;
                         try {
@@ -353,14 +371,14 @@ int main(int, char**)
             params.IconCache.clear();
             
             // PRELOAD ALL ICONS SO THE SELECTOR IS INSTANT
-            if (std::filesystem::exists(uiPack) && !params.AvailableIcons.empty()) {
-                mz_zip_archive zip_archive = {};
-                if (mz_zip_reader_init_file(&zip_archive, uiPack.c_str(), 0)) {
-                    for (const auto& tName : params.AvailableIcons) {
-                        GetMarkerIcon(tName, params, &zip_archive);
-                    }
-                    mz_zip_reader_end(&zip_archive);
+            if (global_ui_archive_ptr && !params.AvailableIcons.empty()) {
+                for (const auto& tName : params.AvailableIcons) {
+                    GetMarkerIcon(tName, params, global_ui_archive_ptr);
                 }
+            }
+            
+            if (global_ui_archive_ptr) {
+                mz_zip_reader_end(global_ui_archive_ptr);
             }
             
             SanmapGen::AsyncTextureManager::Init(params.GamedataPath);

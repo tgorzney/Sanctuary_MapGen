@@ -10,7 +10,7 @@ using json = nlohmann::json;
 
 namespace SanmapGen {
 
-void UnitParser::LoadUnitDefinitions(GenerationParams& params) {
+void UnitParser::LoadUnitDefinitions(GenerationParams& params, void* openZipArchive) {
     if (params.GamedataPath.empty()) return;
 
     // GamedataPath is typically: .../engine/Sanctuary_Data/Gamedata
@@ -48,7 +48,7 @@ void UnitParser::LoadUnitDefinitions(GenerationParams& params) {
             }
             
             // Load Atlas texture
-            TextureLoader::GenerateUnitAtlas(params);
+            TextureLoader::GenerateUnitAtlas(params, openZipArchive);
             
             params.DebugInfo += "Loaded " + std::to_string(params.UnitDefinitions.size()) + " unit templates from CACHE.\n";
             return;
@@ -57,13 +57,16 @@ void UnitParser::LoadUnitDefinitions(GenerationParams& params) {
         }
     }
 
-    if (!std::filesystem::exists(templatesPath) || !std::filesystem::is_directory(templatesPath)) {
-        params.DebugInfo += "UnitTemplates path not found: " + templatesPath.string() + "\n";
+    std::error_code ec;
+    if (!std::filesystem::exists(templatesPath, ec) || !std::filesystem::is_directory(templatesPath, ec)) {
+        params.DebugInfo += "UnitTemplates path not found or not a directory: " + templatesPath.string() + "\n";
         return;
     }
 
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(templatesPath)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".santp") {
+    try {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(templatesPath, std::filesystem::directory_options::skip_permission_denied, ec)) {
+            if (ec) continue;
+            if (entry.is_regular_file(ec) && entry.path().extension() == ".santp") {
             std::string typeId = entry.path().stem().string(); // e.g. "uca1001"
             std::ifstream file(entry.path());
             if (!file.is_open()) continue;
@@ -137,10 +140,13 @@ void UnitParser::LoadUnitDefinitions(GenerationParams& params) {
 
             params.UnitDefinitions[typeId] = def;
         }
+        }
+    } catch (const std::exception& e) {
+        params.DebugInfo += std::string("Error during UnitTemplates parsing: ") + e.what() + "\n";
     }
     
     // Generate Atlas (this builds the raw file and the UVs)
-    TextureLoader::GenerateUnitAtlas(params);
+    TextureLoader::GenerateUnitAtlas(params, openZipArchive);
     
     // Save Cache
     try {
