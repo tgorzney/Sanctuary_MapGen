@@ -174,10 +174,18 @@ namespace SanmapGen {
             static bool isDraggingProp = false;
             static ImVec2 dragOffset(0, 0);
             
-            if (isActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && !isDraggingMarker) {
-                ImVec2 delta = ImGui::GetIO().MouseDelta;
-                mapOffset.x -= delta.x / renderSize / mapZoom;
-                mapOffset.y -= delta.y / renderSize / mapZoom;
+            static bool isDraggingUnitBox = false;
+            static ImVec2 unitBoxStartWorld(0, 0);
+            static ImVec2 unitBoxEndWorld(0, 0);
+            
+            bool isUnitPlacementMode = !params.ActiveArmyForUnits.empty() && !params.SelectedUnitsToSpawn.empty();
+            
+            if (isActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && !isDraggingMarker && !isDraggingUnitBox) {
+                if (!isUnitPlacementMode) {
+                    ImVec2 delta = ImGui::GetIO().MouseDelta;
+                    mapOffset.x -= delta.x / renderSize / mapZoom;
+                    mapOffset.y -= delta.y / renderSize / mapZoom;
+                }
             }
             
             // Constrain offset
@@ -190,9 +198,91 @@ namespace SanmapGen {
             
             ImGui::GetWindowDrawList()->AddImage((void*)(intptr_t)previewTexture, p0, p1, uv0, uv1);
 
-
             ImVec2 mousePos = ImGui::GetIO().MousePos;
             bool isHoveringPreview = isHovered;
+
+            // Unit Placement Logic
+            if (isUnitPlacementMode) {
+                if (isActive && ImGui::IsMouseClicked(0)) {
+                    isDraggingUnitBox = true;
+                    float screenU = (mousePos.x - p0.x) / renderSize;
+                    float screenV = (mousePos.y - p0.y) / renderSize;
+                    unitBoxStartWorld.x = (uv0.x + screenU * (uv1.x - uv0.x)) * params.MapSize;
+                    unitBoxStartWorld.y = (uv0.y + screenV * (uv1.y - uv0.y)) * params.MapSize;
+                    unitBoxEndWorld = unitBoxStartWorld;
+                }
+                
+                if (isDraggingUnitBox && ImGui::IsMouseDragging(0)) {
+                    float screenU = (mousePos.x - p0.x) / renderSize;
+                    float screenV = (mousePos.y - p0.y) / renderSize;
+                    unitBoxEndWorld.x = (uv0.x + screenU * (uv1.x - uv0.x)) * params.MapSize;
+                    unitBoxEndWorld.y = (uv0.y + screenV * (uv1.y - uv0.y)) * params.MapSize;
+                    
+                    float su1 = (unitBoxStartWorld.x / params.MapSize - uv0.x) / (uv1.x - uv0.x);
+                    float sv1 = (unitBoxStartWorld.y / params.MapSize - uv0.y) / (uv1.y - uv0.y);
+                    float su2 = (unitBoxEndWorld.x / params.MapSize - uv0.x) / (uv1.x - uv0.x);
+                    float sv2 = (unitBoxEndWorld.y / params.MapSize - uv0.y) / (uv1.y - uv0.y);
+                    
+                    ImVec2 rectMin(p0.x + std::min(su1, su2) * renderSize, p0.y + std::min(sv1, sv2) * renderSize);
+                    ImVec2 rectMax(p0.x + std::max(su1, su2) * renderSize, p0.y + std::max(sv1, sv2) * renderSize);
+                    ImGui::GetWindowDrawList()->AddRect(rectMin, rectMax, IM_COL32(0, 255, 0, 255), 0.0f, 0, 2.0f);
+                }
+                
+                if (isDraggingUnitBox && ImGui::IsMouseReleased(0)) {
+                    isDraggingUnitBox = false;
+                    
+                    float minX = std::min(unitBoxStartWorld.x, unitBoxEndWorld.x);
+                    float maxX = std::max(unitBoxStartWorld.x, unitBoxEndWorld.x);
+                    float minY = std::min(unitBoxStartWorld.y, unitBoxEndWorld.y);
+                    float maxY = std::max(unitBoxStartWorld.y, unitBoxEndWorld.y);
+                    
+                    float boxWidth = maxX - minX;
+                    float boxHeight = maxY - minY;
+                    
+                    if (boxWidth < 1.0f) boxWidth = 10.0f;
+                    if (boxHeight < 1.0f) boxHeight = 10.0f;
+                    
+                    int unitCount = params.UnitsToSpawnCount;
+                    if (unitCount < 1) unitCount = 1;
+                    
+                    int cols = std::ceil(std::sqrt(unitCount));
+                    int rows = std::ceil((float)unitCount / cols);
+                    
+                    float stepX = boxWidth / cols;
+                    float stepY = boxHeight / rows;
+                    
+                    int spawned = 0;
+                    for (int r = 0; r < rows; ++r) {
+                        for (int c = 0; c < cols; ++c) {
+                            if (spawned >= unitCount) break;
+                            
+                            std::string typeToSpawn = params.SelectedUnitsToSpawn[spawned % params.SelectedUnitsToSpawn.size()];
+                            float px = minX + (c + 0.5f) * stepX;
+                            float py = minY + (r + 0.5f) * stepY;
+                            
+                            UnitTransform u;
+                            u.Type = typeToSpawn;
+                            u.Position[0] = px;
+                            u.Position[2] = py;
+                            u.Tpid = typeToSpawn + "_" + std::to_string(rand() % 1000000) + std::to_string(spawned);
+                            
+                            params.Armies[params.ActiveArmyForUnits].Groups["INITIAL"].Units[u.Tpid] = u;
+                            spawned++;
+                        }
+                    }
+                    
+                    params.ActiveArmyForUnits = "";
+                    params.SelectedUnitsToSpawn.clear();
+                    bNeedsMapUpdate = true;
+                }
+                
+                // Cancel with right click
+                if (ImGui::IsMouseClicked(1)) {
+                    isDraggingUnitBox = false;
+                    params.ActiveArmyForUnits = "";
+                    params.SelectedUnitsToSpawn.clear();
+                }
+            }
 
             if (params.ShowMarkers && dummyMap.GetWidth() == params.MapSize + 1) {
 
@@ -363,6 +453,54 @@ namespace SanmapGen {
                           }
                           ImGui::EndPopup();
                       }
+                }
+                
+                // --- Render Units ---
+                if (params.ShowMarkers) { // Tie to markers for now
+                    for (const auto& [armyName, army] : params.Armies) {
+                        for (const auto& [groupName, group] : army.Groups) {
+                            for (const auto& [unitTpid, unit] : group.Units) {
+                                float worldU = unit.Position[0] / (float)params.MapSize;
+                                float worldV = unit.Position[2] / (float)params.MapSize;
+                                
+                                float screenU = (worldU - uv0.x) / (uv1.x - uv0.x);
+                                float screenV = (worldV - uv0.y) / (uv1.y - uv0.y);
+                                
+                                ImVec2 screenPos;
+                                screenPos.x = p0.x + screenU * renderSize;
+                                screenPos.y = p0.y + screenV * renderSize;
+                                
+                                // LOD based on zoom
+                                float baseScale = (mapZoom < 3.0f) ? 8.0f : 16.0f * (mapZoom / 3.0f);
+                                if (baseScale > 64.0f) baseScale = 64.0f;
+                                
+                                ImVec2 iconP0(screenPos.x - baseScale/2.0f, screenPos.y - baseScale/2.0f);
+                                ImVec2 iconP1(screenPos.x + baseScale/2.0f, screenPos.y + baseScale/2.0f);
+                                
+                                ImU32 tintCol = IM_COL32(
+                                    std::clamp((int)(army.Color[0] * 255.0f), 0, 255),
+                                    std::clamp((int)(army.Color[1] * 255.0f), 0, 255),
+                                    std::clamp((int)(army.Color[2] * 255.0f), 0, 255),
+                                    255 // full alpha for visibility
+                                );
+                                
+                                // Placeholder Unit rendering until we move texture loader to UIHelpers
+                                if (mapZoom < 3.0f) {
+                                    // Strategic icon LOD placeholder (diamond shape)
+                                    ImVec2 p1(screenPos.x, iconP0.y);
+                                    ImVec2 p2(iconP1.x, screenPos.y);
+                                    ImVec2 p3(screenPos.x, iconP1.y);
+                                    ImVec2 p4(iconP0.x, screenPos.y);
+                                    ImGui::GetWindowDrawList()->AddQuadFilled(p1, p2, p3, p4, tintCol);
+                                    ImGui::GetWindowDrawList()->AddQuad(p1, p2, p3, p4, IM_COL32(0,0,0,255));
+                                } else {
+                                    // Thumbnail LOD placeholder (square shape)
+                                    ImGui::GetWindowDrawList()->AddRectFilled(iconP0, iconP1, tintCol);
+                                    ImGui::GetWindowDrawList()->AddRect(iconP0, iconP1, IM_COL32(0,0,0,255));
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 // --- O(1) Prop Click Detection ---

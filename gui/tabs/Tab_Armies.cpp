@@ -5,9 +5,55 @@
 #include "imgui.h"
 #include <string>
 #include <unordered_map>
+#include <algorithm>
+#include <filesystem>
+#include "TextureLoader.h"
 
 namespace SanmapGen {
 namespace UI {
+
+static std::string activeArmyForUnits = "";
+static std::unordered_map<std::string, bool> selectedUnits;
+static int unitsToAddCount = 1;
+
+static GLuint GetUnitThumbnail(const std::string& typeName, GenerationParams& params) {
+    if (typeName.empty()) return 0;
+    std::string cacheKey = "UNIT_" + typeName;
+    auto it = params.IconCache.find(cacheKey);
+    if (it != params.IconCache.end()) return it->second;
+
+    std::string uiPack = params.GamedataPath + "/UI.sanpack";
+    std::string typeLower = typeName;
+    std::transform(typeLower.begin(), typeLower.end(), typeLower.begin(), ::tolower);
+    
+    GLuint t = 0;
+    
+    // Attempt 1: Loose folder
+    std::string loosePath = params.GamedataPath + "/UI/Sprites/Icons/Units/" + typeLower + "_icon.dds";
+    if (std::filesystem::exists(loosePath)) {
+        t = TextureLoader::LoadDDSFromFile(loosePath);
+    }
+    
+    // Attempt 2: Sanpack archive
+    if (t == 0 && std::filesystem::exists(uiPack)) {
+        t = TextureLoader::LoadDDSFromArchive(uiPack, "UI/Sprites/Icons/Units/" + typeLower + "_icon.dds");
+    }
+    
+    // Attempt 3: Without _icon suffix
+    if (t == 0) {
+        loosePath = params.GamedataPath + "/UI/Sprites/Icons/Units/" + typeLower + ".dds";
+        if (std::filesystem::exists(loosePath)) {
+            t = TextureLoader::LoadDDSFromFile(loosePath);
+        }
+    }
+    
+    if (t == 0 && std::filesystem::exists(uiPack)) {
+        t = TextureLoader::LoadDDSFromArchive(uiPack, "UI/Sprites/Icons/Units/" + typeLower + ".dds");
+    }
+
+    params.IconCache[cacheKey] = t; // Cache even if 0 to prevent I/O spam
+    return t;
+}
 
 void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
     ImGui::Text("ARMIES CONFIGURATION");
@@ -123,10 +169,16 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
                 
                 bool isSelected = std::find(params.SelectedUnitsToSpawn.begin(), params.SelectedUnitsToSpawn.end(), typeId) != params.SelectedUnitsToSpawn.end();
                 
-                // Optional: Render thumbnail here
-                // ImGui::Image(...);
+                ImGui::PushID(typeId.c_str());
                 
-                if (ImGui::Selectable(def.DisplayName.empty() ? typeId.c_str() : def.DisplayName.c_str(), &isSelected, ImGuiSelectableFlags_DontClosePopups, ImVec2(120, 120))) {
+                GLuint tex = GetUnitThumbnail(typeId, params);
+                if (tex != 0) {
+                    ImGui::Image((void*)(intptr_t)tex, ImVec2(80, 80));
+                } else {
+                    ImGui::Button("?", ImVec2(80, 80)); // Placeholder if icon fails to load
+                }
+                
+                if (ImGui::Selectable(def.DisplayName.empty() ? typeId.c_str() : def.DisplayName.c_str(), &isSelected, ImGuiSelectableFlags_DontClosePopups, ImVec2(120, 30))) {
                     if (!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyShift) {
                         params.SelectedUnitsToSpawn.clear();
                     }
@@ -136,6 +188,8 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
                         params.SelectedUnitsToSpawn.erase(std::remove(params.SelectedUnitsToSpawn.begin(), params.SelectedUnitsToSpawn.end(), typeId), params.SelectedUnitsToSpawn.end());
                     }
                 }
+                
+                ImGui::PopID();
             }
             ImGui::EndTable();
         }
