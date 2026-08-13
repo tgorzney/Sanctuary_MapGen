@@ -992,24 +992,31 @@ void TextureLoader::GenerateUnitAtlas(SanmapGen::GenerationParams& params) {
                             uint32_t width = header.dwWidth;
                             uint32_t height = header.dwHeight;
                             
-                            std::vector<uint8_t> rgbaBuffer;
-                            bool bSuccess = false;
-                            
-                            if (header.ddspf.dwFourCC == 0x31545844) { 
-                                ConvertDXT1ToRGBAWithBlackKey(data + 128, width, height, rgbaBuffer);
-                                bSuccess = true;
+                            if (width <= 1024 && height <= 1024 && width > 0 && height > 0) {
+                                std::vector<uint8_t> rgbaBuffer;
+                                bool bSuccess = false;
+                                
+                                if (header.ddspf.dwFourCC == 0x31545844) { 
+                                size_t expectedSize = 128 + ((width + 3) / 4) * ((height + 3) / 4) * 8;
+                                if (uncomp_size >= expectedSize) {
+                                    ConvertDXT1ToRGBAWithBlackKey(data + 128, width, height, rgbaBuffer);
+                                    bSuccess = true;
+                                }
                             } else if (header.ddspf.dwFourCC == 0) {
                                 if (header.ddspf.dwRGBBitCount == 32) {
-                                    // BGRA to RGBA
-                                    rgbaBuffer.resize(width * height * 4);
-                                    const uint8_t* src = data + 128;
-                                    for (size_t i = 0; i < width * height; ++i) {
-                                        rgbaBuffer[i*4 + 0] = src[i*4 + 2];
-                                        rgbaBuffer[i*4 + 1] = src[i*4 + 1];
-                                        rgbaBuffer[i*4 + 2] = src[i*4 + 0];
-                                        rgbaBuffer[i*4 + 3] = src[i*4 + 3];
+                                    size_t expectedSize = 128 + width * height * 4;
+                                    if (uncomp_size >= expectedSize) {
+                                        // BGRA to RGBA
+                                        rgbaBuffer.resize(width * height * 4);
+                                        const uint8_t* src = data + 128;
+                                        for (size_t i = 0; i < width * height; ++i) {
+                                            rgbaBuffer[i*4 + 0] = src[i*4 + 2];
+                                            rgbaBuffer[i*4 + 1] = src[i*4 + 1];
+                                            rgbaBuffer[i*4 + 2] = src[i*4 + 0];
+                                            rgbaBuffer[i*4 + 3] = src[i*4 + 3];
+                                        }
+                                        bSuccess = true;
                                     }
-                                    bSuccess = true;
                                 }
                             }
                             
@@ -1018,29 +1025,32 @@ void TextureLoader::GenerateUnitAtlas(SanmapGen::GenerationParams& params) {
                                 int destX = (index % iconsPerRow) * iconSize;
                                 int destY = (index / iconsPerRow) * iconSize;
                                 
-                                int copyWidth = min((int)width, iconSize);
-                                int copyHeight = min((int)height, iconSize);
-                                
-                                for (int y = 0; y < copyHeight; ++y) {
-                                    for (int x = 0; x < copyWidth; ++x) {
-                                        int srcIdx = (y * width + x) * 4;
-                                        int destIdx = ((destY + y) * atlasSize + (destX + x)) * 4;
-                                        atlasBuffer[destIdx + 0] = rgbaBuffer[srcIdx + 0];
-                                        atlasBuffer[destIdx + 1] = rgbaBuffer[srcIdx + 1];
-                                        atlasBuffer[destIdx + 2] = rgbaBuffer[srcIdx + 2];
-                                        atlasBuffer[destIdx + 3] = rgbaBuffer[srcIdx + 3];
+                                if (destY + iconSize <= atlasSize) {
+                                    int copyWidth = min((int)width, iconSize);
+                                    int copyHeight = min((int)height, iconSize);
+                                    
+                                    for (int y = 0; y < copyHeight; ++y) {
+                                        for (int x = 0; x < copyWidth; ++x) {
+                                            int srcIdx = (y * width + x) * 4;
+                                            int destIdx = ((destY + y) * atlasSize + (destX + x)) * 4;
+                                            atlasBuffer[destIdx + 0] = rgbaBuffer[srcIdx + 0];
+                                            atlasBuffer[destIdx + 1] = rgbaBuffer[srcIdx + 1];
+                                            atlasBuffer[destIdx + 2] = rgbaBuffer[srcIdx + 2];
+                                            atlasBuffer[destIdx + 3] = rgbaBuffer[srcIdx + 3];
+                                        }
                                     }
+                                    
+                                    // Calculate UVs
+                                    float uv0_x = (float)destX / atlasSize;
+                                    float uv0_y = (float)destY / atlasSize;
+                                    float uv1_x = (float)(destX + copyWidth) / atlasSize;
+                                    float uv1_y = (float)(destY + copyHeight) / atlasSize;
+                                    
+                                    params.UnitAtlasUVs[typeId] = {uv0_x, uv0_y, uv1_x, uv1_y};
+                                    index++;
                                 }
-                                
-                                // Calculate UVs
-                                float uv0_x = (float)destX / atlasSize;
-                                float uv0_y = (float)destY / atlasSize;
-                                float uv1_x = (float)(destX + copyWidth) / atlasSize;
-                                float uv1_y = (float)(destY + copyHeight) / atlasSize;
-                                
-                                params.UnitAtlasUVs[typeId] = {uv0_x, uv0_y, uv1_x, uv1_y};
-                                index++;
                             }
+                        }
                         }
                         free(p);
                     }
