@@ -5,7 +5,7 @@ spec(s) a question needs — never the whole pack.
 
 | Topic | Spec(s) |
 | --- | --- |
-| *(none yet — specs are authored during ARCH Expert setup)* | — |
+| .sanmap file format, import/export target, map entities on disk | `specs/SANMAP_FORMAT_SPEC.md` |
 
 **Planned specs** (created as the ARCH Expert populates the pack): terrain /
 noise, erosion (hydraulic / thermal / flow), masking, placement / scatter,
