@@ -25,8 +25,12 @@ Where the pack stands and what to do next. (Read the Setup Plan + CONSTITUTION
    model (reconcile the two data-model families).
 2. Deep AI/host/client/systems read (AIFunctions 233KB, platoon functions 614KB)
    — only if pursuing custom AI; tangential to core map-gen.
-3. Read leftover `SanMap File Format/MapUtils.cs` + `Colors.cs` (save/load +
-   palette) to finish the import/export spec.
+
+## Known fix-targets (from import/export)
+- Exporter writes identity quaternions — rotation conversion is unimplemented.
+- Props export is disabled (outdated prop formats fail loading) — needs fixing.
+- Coordinate flip `world.z = length - z - 1` must be applied on export / inverted
+  on import.
 
 ## Then: author the ARCH
 With the user, work Appendix A's hit-list into `ARCH.md`: naming law + file-size

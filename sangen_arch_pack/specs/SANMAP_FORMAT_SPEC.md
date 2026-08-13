@@ -53,8 +53,23 @@ farNearBlend; diffuseRemap / farColorRemap (Color); maskRemapMin / Max (Vector4)
   markers/units are keyed by string name in dictionaries.
 - Several lighting/fog fields are marked "Random, unknown value" in source —
   confirm real defaults against the official maps.
-- **Still to read:** `MapUtils.cs` (save/load logic) and `Colors.cs` (palette)
-  — pending, needed for the full import/export spec.
+## Conversion / import-export logic (MapUtils.cs, Colors.cs)
+- **Coordinate flip (critical):** internal map data is in texture coords
+  (origin top-left); Sanctuary markers/entities use world coords (origin
+  bottom-left). Transform: `world = (x, y, length - z - 1)`
+  (`TextureToWorldOrigin`). Export applies it; import must invert it.
+- Marker/area names are fixed constants: `Spawn` (resource=false), `Alloys`
+  (resource=true), area `PlayableArea`.
+- Export defaults: each army written as `faction=0, alloys=500, energy=500`,
+  empty `groups`; spawns→`Spawn`, mexes→`Alloys` (with duplicate-id guard).
+- **Known gaps in the current exporter (fix targets):** (1) rotations are NOT
+  converted — spawns/mexes/decals/props all write an identity quaternion (TODO);
+  (2) **props export is disabled** — commented out because "many prop formats
+  are outdated, causing maps to fail loading."
+- **Faction / army colors (Colors.cs):** EDA = dark green (0.078,0.329,0.196),
+  Chosen = dark red (0.412,0.008,0.008), Guard = golden amber
+  (0.690,0.549,0.188); plus a 32-entry `ArmyColors[]` palette + named
+  `ColorLookup`. Used for army/marker coloring in the UI.
 
 ## Validated against an official map (~TEAM-1v1_Tropical_256)
 - Confirms: fileVersion 3, mapVersion 1; width=length=256, height=128;
