@@ -21,38 +21,10 @@ static GLuint GetUnitThumbnail(const std::string& typeName, GenerationParams& pa
     std::string cacheKey = "UNIT_" + typeName;
     auto it = params.IconCache.find(cacheKey);
     if (it != params.IconCache.end()) return it->second;
-
-    std::string uiPack = params.GamedataPath + "/UI.sanpack";
-    std::string typeLower = typeName;
-    std::transform(typeLower.begin(), typeLower.end(), typeLower.begin(), ::tolower);
     
-    GLuint t = 0;
-    
-    // Attempt 1: Loose folder
-    std::string loosePath = params.GamedataPath + "/UI/Sprites/Icons/Units/" + typeLower + "_icon.dds";
-    if (std::filesystem::exists(loosePath)) {
-        t = TextureLoader::LoadDDSFromFile(loosePath);
-    }
-    
-    // Attempt 2: Sanpack archive
-    if (t == 0 && std::filesystem::exists(uiPack)) {
-        t = TextureLoader::LoadDDSFromArchive(uiPack, "UI/Sprites/Icons/Units/" + typeLower + "_icon.dds");
-    }
-    
-    // Attempt 3: Without _icon suffix
-    if (t == 0) {
-        loosePath = params.GamedataPath + "/UI/Sprites/Icons/Units/" + typeLower + ".dds";
-        if (std::filesystem::exists(loosePath)) {
-            t = TextureLoader::LoadDDSFromFile(loosePath);
-        }
-    }
-    
-    if (t == 0 && std::filesystem::exists(uiPack)) {
-        t = TextureLoader::LoadDDSFromArchive(uiPack, "UI/Sprites/Icons/Units/" + typeLower + ".dds");
-    }
-
-    params.IconCache[cacheKey] = t; // Cache even if 0 to prevent I/O spam
-    return t;
+    // Not loaded yet, request it asynchronously and return 0
+    AsyncTextureManager::RequestUnitIcon(typeName, cacheKey);
+    return 0;
 }
 
 void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
@@ -142,6 +114,59 @@ void RenderArmiesTab(GenerationParams& params, bool& bNeedsMapUpdate) {
             if (ImGui::DragFloat("Starting Energy", &army.Energy, 100.0f, 0.0f, 1000000.0f)) bNeedsMapUpdate = true;
             
             ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Text("Unit Groups & Placements");
+            
+            std::string groupToRemove = "";
+            for (auto& [groupName, group] : army.Groups) {
+                ImGui::PushID(groupName.c_str());
+                if (ImGui::TreeNode(groupName.c_str(), "%s (Units: %zu)", groupName.c_str(), group.Units.size())) {
+                    
+                    if (ImGui::Button("Delete Entire Group")) {
+                        groupToRemove = groupName;
+                    }
+                    
+                    ImGui::Spacing();
+                    
+                    // Group units by Type for clean UI
+                    std::map<std::string, std::vector<std::string>> unitsByType;
+                    for (auto& [tpid, u] : group.Units) {
+                        unitsByType[u.Type].push_back(tpid);
+                    }
+                    
+                    for (auto& [typeId, tpids] : unitsByType) {
+                        std::string typeLabel = typeId + " (" + std::to_string(tpids.size()) + ")";
+                        if (ImGui::TreeNode(typeId.c_str(), "%s", typeLabel.c_str())) {
+                            if (ImGui::Button("Delete All of this Type")) {
+                                for (const auto& id : tpids) group.Units.erase(id);
+                                bNeedsMapUpdate = true;
+                            }
+                            
+                            for (const auto& tpid : tpids) {
+                                ImGui::Text("%s", tpid.c_str());
+                                ImGui::SameLine();
+                                if (ImGui::Button(("Delete##" + tpid).c_str())) {
+                                    group.Units.erase(tpid);
+                                    bNeedsMapUpdate = true;
+                                    break; // Break inner loop since map was modified
+                                }
+                            }
+                            ImGui::TreePop();
+                        }
+                    }
+                    ImGui::TreePop();
+                }
+                ImGui::PopID();
+            }
+            
+            if (!groupToRemove.empty()) {
+                army.Groups.erase(groupToRemove);
+                bNeedsMapUpdate = true;
+            }
+            
+            ImGui::Spacing();
+            ImGui::Separator();
+            
             if (ImGui::Button("Remove Army")) {
                 toRemove = armyName;
             }

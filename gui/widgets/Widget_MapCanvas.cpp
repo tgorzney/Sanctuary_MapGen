@@ -260,9 +260,28 @@ namespace SanmapGen {
                             float px = minX + (c + 0.5f) * stepX;
                             float py = minY + (r + 0.5f) * stepY;
                             
+                            // TG_UE Framework Expert: Exact Geometric Triangle Intersection
+                            int ix = (int)px;
+                            int iy = (int)py;
+                            float u_frac = px - ix;
+                            float v_frac = py - iy;
+                            
+                            float h00 = dummyMap.Get(ix, iy) * params.TerrainMaxHeight;
+                            float h10 = dummyMap.Get(ix + 1, iy) * params.TerrainMaxHeight;
+                            float h01 = dummyMap.Get(ix, iy + 1) * params.TerrainMaxHeight;
+                            float h11 = dummyMap.Get(ix + 1, iy + 1) * params.TerrainMaxHeight;
+                            
+                            float zHeight;
+                            if (u_frac > v_frac) {
+                                zHeight = h00 + u_frac * (h10 - h00) + v_frac * (h11 - h10);
+                            } else {
+                                zHeight = h00 + u_frac * (h11 - h01) + v_frac * (h01 - h00);
+                            }
+                            
                             UnitTransform u;
                             u.Type = typeToSpawn;
                             u.Position[0] = px;
+                            u.Position[1] = zHeight;
                             u.Position[2] = py;
                             u.Tpid = typeToSpawn + "_" + std::to_string(rand() % 1000000) + std::to_string(spawned);
                             

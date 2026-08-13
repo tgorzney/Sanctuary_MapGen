@@ -341,6 +341,7 @@ int main(int, char**)
                 }
             }
             
+            SanmapGen::AsyncTextureManager::Init(params.GamedataPath);
             bHasLoadedIcons = true;
         }
 
@@ -522,6 +523,8 @@ int main(int, char**)
         
         // --- MAP PREVIEW WINDOW ---
         SanmapGen::Widget_MapCanvas::Render(params, previewTexture, bNeedsMapUpdate, activeTab, selectedMarkerKey, bNeedsPreviewRender, bResetPreviewTransform, dummyMap);
+        
+        SanmapGen::AsyncTextureManager::ProcessReadyQueue(params);
 
         ImGui::Render();
         int display_w, display_h;
@@ -542,6 +545,7 @@ int main(int, char**)
         glfwSwapBuffers(window);
     }
 
+    SanmapGen::AsyncTextureManager::Shutdown();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

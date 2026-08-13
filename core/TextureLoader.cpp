@@ -8,6 +8,13 @@
 #include <windows.h>
 #include <GL/gl.h>
 
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+#include <unordered_map>
+#include <algorithm>
+
 // Define missing OpenGL compressed texture constants
 #ifndef GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
 #define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT 0x83F1
@@ -744,5 +751,188 @@ void TextureLoader::ScanSanpackForMaterial(const std::string& zipPath, const std
     mz_zip_reader_end(&zip_archive);
 }
 
+std::queue<AsyncTextureRequest> AsyncTextureManager_RequestQueue;
+std::queue<AsyncTextureResult> AsyncTextureManager_ReadyQueue;
+std::mutex AsyncTextureManager_QueueMutex;
+std::condition_variable AsyncTextureManager_QueueCond;
+std::thread AsyncTextureManager_WorkerThread;
+bool AsyncTextureManager_bIsRunning = false;
+mz_zip_archive AsyncTextureManager_UIArchive;
+bool AsyncTextureManager_bArchiveOpen = false;
+std::unordered_map<std::string, bool> AsyncTextureManager_RequestedKeys;
+std::string AsyncTextureManager_GamedataPath;
+
+void AsyncTextureManagerWorkerLoop() {
+    while (AsyncTextureManager_bIsRunning) {
+        AsyncTextureRequest req;
+        {
+            std::unique_lock<std::mutex> lock(AsyncTextureManager_QueueMutex);
+            AsyncTextureManager_QueueCond.wait(lock, [] { 
+                return !AsyncTextureManager_RequestQueue.empty() || !AsyncTextureManager_bIsRunning; 
+            });
+            
+            if (!AsyncTextureManager_bIsRunning && AsyncTextureManager_RequestQueue.empty()) break;
+            
+            req = AsyncTextureManager_RequestQueue.front();
+            AsyncTextureManager_RequestQueue.pop();
+        }
+        
+        AsyncTextureResult res;
+        res.cacheKey = req.cacheKey;
+        res.success = false;
+        
+        if (AsyncTextureManager_bArchiveOpen) {
+            std::string searchName = req.typeName;
+            std::transform(searchName.begin(), searchName.end(), searchName.begin(), ::tolower);
+            
+            std::string candidates[2] = {
+                "UI/Sprites/Icons/Units/" + searchName + "_icon.dds",
+                "UI/Sprites/Icons/Units/" + searchName + ".dds"
+            };
+            
+            int file_index = -1;
+            for (int i = 0; i < 2; ++i) {
+                file_index = mz_zip_reader_locate_file(&AsyncTextureManager_UIArchive, candidates[i].c_str(), nullptr, 0);
+                if (file_index >= 0) {
+                    // Try case-insensitive just in case
+                    if (file_index < 0) file_index = mz_zip_reader_locate_file(&AsyncTextureManager_UIArchive, candidates[i].c_str(), nullptr, 0x0200 /*MZ_ZIP_FLAG_IGNORE_PATH/CASE*/);
+                    break;
+                }
+            }
+            
+            if (file_index >= 0) {
+                size_t uncomp_size = 0;
+                void* p = mz_zip_reader_extract_to_heap(&AsyncTextureManager_UIArchive, file_index, &uncomp_size, 0);
+                if (p) {
+                    const uint8_t* data = static_cast<const uint8_t*>(p);
+                    if (uncomp_size >= 128 && data[0] == 'D' && data[1] == 'D' && data[2] == 'S' && data[3] == ' ') {
+                        DDS_HEADER header;
+                        memcpy(&header, data + 4, sizeof(DDS_HEADER));
+                        res.width = header.dwWidth;
+                        res.height = header.dwHeight;
+                        
+                        uint32_t blockSize = 16;
+                        res.format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+                        res.bIsCompressed = true;
+                        res.pixelFormat = GL_RGBA;
+                        
+                        const uint8_t* buffer = data + 128;
+                        size_t bufferSize = uncomp_size - 128;
+                        
+                        if (header.ddspf.dwFourCC == 0x31545844) { res.format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT; blockSize = 8; }
+                        else if (header.ddspf.dwFourCC == 0x33545844) { res.format = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; }
+                        else if (header.ddspf.dwFourCC == 0x35545844) { res.format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; }
+                        else if (header.ddspf.dwFourCC == 0) {
+                            res.bIsCompressed = false;
+                            if (header.ddspf.dwRGBBitCount == 32) {
+                                res.format = GL_RGBA;
+                                res.pixelFormat = GL_BGRA;
+                            } else if (header.ddspf.dwRGBBitCount == 24) {
+                                res.format = GL_RGB;
+                                res.pixelFormat = GL_BGR;
+                            }
+                        }
+                        
+                        if (res.bIsCompressed) {
+                            uint32_t size = ((res.width + 3) / 4) * ((res.height + 3) / 4) * blockSize;
+                            if (size > bufferSize) size = bufferSize;
+                            
+                            if (res.format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) {
+                                ConvertDXT1ToRGBAWithBlackKey(buffer, res.width, res.height, res.buffer);
+                                res.pixelFormat = GL_RGBA;
+                                res.bIsCompressed = false; 
+                            } else {
+                                res.buffer.assign(buffer, buffer + size);
+                            }
+                        } else {
+                            uint32_t bytesPerPixel = (header.ddspf.dwRGBBitCount / 8);
+                            uint32_t size = res.width * res.height * bytesPerPixel;
+                            if (size > bufferSize) size = bufferSize;
+                            res.buffer.assign(buffer, buffer + size);
+                        }
+                        res.success = true;
+                    }
+                    free(p);
+                }
+            }
+        }
+        
+        {
+            std::lock_guard<std::mutex> lock(AsyncTextureManager_QueueMutex);
+            AsyncTextureManager_ReadyQueue.push(res);
+        }
+    }
+}
+
+void AsyncTextureManager::Init(const std::string& gamedataPath) {
+    if (AsyncTextureManager_bIsRunning) return;
+    
+    AsyncTextureManager_GamedataPath = gamedataPath;
+    std::string uiPack = gamedataPath + "/UI.sanpack";
+    
+    memset(&AsyncTextureManager_UIArchive, 0, sizeof(AsyncTextureManager_UIArchive));
+    AsyncTextureManager_bArchiveOpen = mz_zip_reader_init_file(&AsyncTextureManager_UIArchive, uiPack.c_str(), 0);
+    
+    AsyncTextureManager_bIsRunning = true;
+    AsyncTextureManager_WorkerThread = std::thread(AsyncTextureManagerWorkerLoop);
+}
+
+void AsyncTextureManager::Shutdown() {
+    if (!AsyncTextureManager_bIsRunning) return;
+    
+    {
+        std::lock_guard<std::mutex> lock(AsyncTextureManager_QueueMutex);
+        AsyncTextureManager_bIsRunning = false;
+        AsyncTextureManager_QueueCond.notify_all();
+    }
+    
+    if (AsyncTextureManager_WorkerThread.joinable()) {
+        AsyncTextureManager_WorkerThread.join();
+    }
+    
+    if (AsyncTextureManager_bArchiveOpen) {
+        mz_zip_reader_end(&AsyncTextureManager_UIArchive);
+        AsyncTextureManager_bArchiveOpen = false;
+    }
+}
+
+void AsyncTextureManager::RequestUnitIcon(const std::string& typeName, const std::string& cacheKey) {
+    std::lock_guard<std::mutex> lock(AsyncTextureManager_QueueMutex);
+    if (AsyncTextureManager_RequestedKeys.find(cacheKey) == AsyncTextureManager_RequestedKeys.end()) {
+        AsyncTextureManager_RequestedKeys[cacheKey] = true;
+        AsyncTextureManager_RequestQueue.push({cacheKey, typeName});
+        AsyncTextureManager_QueueCond.notify_one();
+    }
+}
+
+void AsyncTextureManager::ProcessReadyQueue(SanmapGen::GenerationParams& params) {
+    if (!glCompressedTexImage2D_PTR) {
+        glCompressedTexImage2D_PTR = (PFNGLCOMPRESSEDTEXIMAGE2DPROC)wglGetProcAddress("glCompressedTexImage2D");
+    }
+
+    std::lock_guard<std::mutex> lock(AsyncTextureManager_QueueMutex);
+    while (!AsyncTextureManager_ReadyQueue.empty()) {
+        auto res = AsyncTextureManager_ReadyQueue.front();
+        AsyncTextureManager_ReadyQueue.pop();
+        
+        if (res.success && res.width > 0 && res.height > 0) {
+            GLuint textureID;
+            glGenTextures(1, &textureID);
+            glBindTexture(GL_TEXTURE_2D, textureID);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            
+            if (res.bIsCompressed && glCompressedTexImage2D_PTR) {
+                glCompressedTexImage2D_PTR(GL_TEXTURE_2D, 0, res.format, res.width, res.height, 0, res.buffer.size(), res.buffer.data());
+            } else {
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, res.width, res.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, res.buffer.data());
+            }
+            
+            params.IconCache[res.cacheKey] = textureID;
+        } else {
+            params.IconCache[res.cacheKey] = 0;
+        }
+    }
+}
 
 } // namespace SanmapGen

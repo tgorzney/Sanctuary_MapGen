@@ -39,4 +39,28 @@ public:
     static void ScanSanpackForMaterial(const std::string& zipPath, const std::string& environmentTheme, const std::string& materialName, SanmapGen::StratumSettings& stratum);
 };
 
+struct AsyncTextureRequest {
+    std::string cacheKey;
+    std::string typeName;
+};
+
+struct AsyncTextureResult {
+    std::string cacheKey;
+    bool success;
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+    uint32_t pixelFormat;
+    bool bIsCompressed;
+    std::vector<uint8_t> buffer;
+};
+
+class AsyncTextureManager {
+public:
+    static void Init(const std::string& gamedataPath);
+    static void Shutdown();
+    static void RequestUnitIcon(const std::string& typeName, const std::string& cacheKey);
+    static void ProcessReadyQueue(SanmapGen::GenerationParams& params);
+};
+
 } // namespace SanmapGen
