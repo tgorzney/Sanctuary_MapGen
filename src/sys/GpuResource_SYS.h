@@ -48,6 +48,13 @@ public:
     // directory — never a hardcoded absolute path. Invalid handle on failure (logged).
     GpuProgramHandle GetOrCompileProgram(const std::string& shaderFileName,
                                          const std::string& shaderDefinitions = std::string());
+    // Same compile-once cache for a kernel whose source spans SEVERAL GLSL files (a kernel
+    // too large to keep one file inside the ARCH §1.5 ceiling). Each file is one GLSL
+    // compilation unit — exactly one declares main(), the others provide functions declared
+    // by prototype — and they are linked into a single compute program. Never #include:
+    // the files stay independently readable and are resolved under the shader directory.
+    GpuProgramHandle GetOrCompileProgramFromParts(const std::vector<std::string>& shaderFileNames,
+                                                  const std::string& shaderDefinitions = std::string());
     int CompileCount() const { return compileCount; }
 
     // Persistent buffer keyed by name: allocated on first use, reallocated ONLY when the
@@ -72,6 +79,9 @@ private:
     struct PersistentBuffer { std::string name; unsigned buffer; size_t byteSize; };
 
     unsigned CompileProgramFromSource(const std::string& source, const std::string& label);
+    unsigned CompileShaderUnit(const std::string& source, const std::string& label);
+    std::string LoadShaderSource(const std::string& shaderFileName, const std::string& shaderDefinitions,
+                                 bool& bLoaded);
     PersistentBuffer* FindBuffer(const std::string& name);
 
     std::string shaderDirectory;

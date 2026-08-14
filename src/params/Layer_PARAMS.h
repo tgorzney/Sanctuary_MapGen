@@ -20,8 +20,18 @@ struct Layer {
     float       frequency        = 0.005f;
     int         octaves          = 5;
     float       gain             = 0.5f;   // persistence
+    float       lacunarity       = 2.0f;   // per-octave frequency multiplier (was a hardcoded
+                                           // 2.0 inside the kernels — Constitution §8)
+    float       weightedStrength = 0.0f;   // octave amplitude weighting
     float       pingPongStrength = 2.0f;   // PingPong fractal only
     float       cellularJitter   = 1.0f;   // Cellular noise only
+
+    // Post-noise density shaping (NOISE_BLEND_SPEC "density" group). 0.5 land density is
+    // the identity (the reshape scales by landDensity * 2); 0 disables the others.
+    float landDensity     = 0.5f;
+    float mountainDensity = 0.0f;
+    float plateauDensity  = 0.0f;   // terracing
+    float rampDensity     = 0.0f;
 
     // Post-noise reshaping (Photoshop "Levels")
     float levelsShadows     = 0.0f;
