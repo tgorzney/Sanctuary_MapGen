@@ -10,8 +10,9 @@ spec(s) a question needs — never the whole pack.
 | map scripting & events, lua sandbox, Tags, AI system, modding, validators | `specs/MODDING_SCRIPTING_SPEC.md` |
 | data model (GenerationParams), generation pipeline, GPU toggles, enums | `specs/PARAMS_PIPELINE_SPEC.md` |
 | height/material layers, GeoLayers, sim layers, thickness model, baking, stratum masks | `specs/LAYER_SYSTEM_SPEC.md` |
+| erosion (hydraulic droplet), thermal/talus, flow/accumulation, CPU-vs-GPU parity | `specs/SIM_ALGORITHMS_SPEC.md` |
 
-**Planned specs** (created as the ARCH Expert populates the pack): per-module code
-specs for noise/blend, erosion sims (hydraulic/thermal/fluvial/glacial/snow-melt),
-flow/accumulation, masking, placement/scatter, math/SIMD, CPU-GPU dispatch, UI
-imgui-bypass, preview compositing; and a deep AI / host-client pass.
+**Planned specs** (created as the ARCH Expert populates the pack): noise/blend,
+masking, placement/scatter, math/SIMD, CPU-GPU dispatch interface, UI imgui-bypass,
+preview compositing; the future sim types (fluvial/glacial/snow-melt); and a deep
+AI / host-client pass.

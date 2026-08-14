@@ -26,9 +26,11 @@ Where the pack stands and what to do next. (Read the Setup Plan + CONSTITUTION
      owner): author-in-height / simulate-in-thickness, GeoLayers (Material vs
      Shaper mode), sim layers per sim type, additive-thickness volume, baking,
      stratum masks (8 masks + base). Erosion becomes its own layer type in v2.
-   - TODO: noise/blend, erosion sims (hydraulic/thermal/fluvial/glacial/snow-melt),
-     flow/accumulation, masking, placement/scatter, math/SIMD (Sanmath_*), CPU-GPU
-     dispatch (the .glsl compute paths), UI imgui-bypass, preview compositing.
+   - DONE: SIM_ALGORITHMS_SPEC (hydraulic droplet, thermal talus, flow; already
+     layer/material-aware; CPU/GPU diverge — parity is the rework).
+   - TODO: noise/blend, masking, placement/scatter, math/SIMD (Sanmath_*), the unified
+     CPU-GPU dispatch interface, UI imgui-bypass, preview compositing; future sim types
+     (fluvial/glacial/snow-melt).
 
 ## Open design items (from LAYER_SYSTEM_SPEC)
 - tint_geometry.tga channel layout (login-walled resource — owner to supply).
