@@ -37,8 +37,8 @@ folder (§2). Descriptive-name first, layer last:
 | Suffix | Layer | Example files |
 | --- | --- | --- |
 | `_MATH` | MATH / SIMD | `Vector_MATH.h`, `Noise_MATH.h`, `Morton_MATH.h`, `Spatial_MATH.h` |
-| `_DATA` | DATA / SoA state | `Heightfield_DATA.h`, `Layers_DATA.h`, `Props_DATA.h`, `Markers_DATA.h` |
-| `_PARAMS` | DATA config / tunables | `Geometry_PARAMS.h`, `ErosionFlow_PARAMS.h`, `Enums_PARAMS.h` |
+| `_DATA` | DATA — computed output | `Heightfield_DATA.h`, `MaterialMasks_DATA.h`, `FlowMap_DATA.h`, `Props_DATA.h` |
+| `_PARAMS` | PARAMS — adjustable settings | `Layers_PARAMS.h`, `MarkerRules_PARAMS.h`, `Geometry_PARAMS.h`, `Enums_PARAMS.h` |
 | `_PROC` | PROC processors | `Noise_PROC.cpp`, `Erosion_PROC.cpp`, `Mask_PROC.cpp`, `Placement_PROC.cpp` |
 | `_PIPELINE` | PIPELINE (conductor) | `Generation_PIPELINE.cpp`, `StageGraph_PIPELINE.h`, `DirtyHash_PIPELINE.h` |
 | `_IO` | IO / BRIDGE | `SanmapImport_IO.cpp`, `SanmapExport_IO.cpp`, `SanpackReader_IO.cpp` |
@@ -86,8 +86,8 @@ retired.
 ```
 src/
   math/     *_MATH                 pure stateless math (SIMD, noise, vector, morton, spatial)
-  data/     *_DATA                 SoA map state (heightfield, layers, props, markers, armies, water)
-  params/   *_PARAMS               config / tunables (separate from state)
+  data/     *_DATA                 computed SoA output (heightfield, masks, flow, resolved prop/marker/unit instances)
+  params/   *_PARAMS               adjustable settings / the recipe (layer stack, rules, constants, seed) — serializes to mapGeneratorData
   proc/     *_PROC  +  *.glsl      processors; each CPU .cpp paired with its GPU .glsl
   pipeline/ *_PIPELINE             the conductor — dirty-hash DAG, stage order, backend policy
   io/       *_IO                   .sanmap / SupCom import-export, sanpack reader — the platform seam
@@ -95,8 +95,8 @@ src/
   sys/      *_SYS                  runtime primitives — threads, allocation, GPU resources, dispatch mechanism, logging
 ```
 
-- **DATA vs PARAMS are separate folders** — state (`data/`) never mixes with config
-  (`params/`).
+- **DATA vs PARAMS are separate folders** — computed output (`data/`) never mixes with
+  the adjustable settings/recipe (`params/`). Input (PARAMS) vs output (DATA).
 - **GPU lives beside its CPU twin** in `proc/`, not a separate `gpu/` tree.
 - A large class's split files stay in their layer folder (`PreviewRenderer_*_UI.cpp`).
 
@@ -142,8 +142,8 @@ The canonical call chain: **`UI → PIPELINE → PROC → SYS`** (with PROC/PIPE
 - **`PROC` owns the kernels** — one math source per stage, CPU `.cpp` + GPU `.glsl`
   pair; declares its inputs/outputs (so `PIPELINE` can build the DAG and the two-tier
   dirty flags) and its accuracy class; requests a backend, never selects one.
-- **`DATA`/`PARAMS` own state/config** — plain SoA data and tunables, no behavior, no
-  GPU handles.
+- **`DATA`/`PARAMS` own output/settings** — DATA = plain SoA computed arrays; PARAMS =
+  the adjustable recipe (serializes to `mapGeneratorData`). No behavior, no GPU handles.
 - **`IO` owns the format seam** — `.sanmap` + `mapGeneratorData` round-trip, sanpack
   ingestion, asset validation (Constitution §6). The swappable port boundary (§5).
 - **`UI` owns presentation** — tabs, the universal widget library, the preview
@@ -202,4 +202,45 @@ preview *samples* that bake; it never re-simulates (§3.2).
 bit-identical across machines (heightmap incl. erosion, flow, placement/markers,
 collidable props). Visual-class outputs stay on the fast Gpu path and may differ per
 machine. Experimental until the cross-machine bit-exact gate passes (`DETERMINISM_SPEC`).
+
+---
+
+## 5. God-object dismemberment (hit-list #1–2)
+
+Applying §3 boundaries and the input/output split (settings → `PARAMS`, computed arrays
+→ `DATA`). Four offenders and where their pieces land.
+
+### 5.1 `GenerationParams` → typed modules
+- **settings → `PARAMS`:** `Layers_PARAMS` (the editable layer stack), `Stratums_PARAMS`,
+  `MarkerRules_PARAMS`, `PropRules_PARAMS`, `Water_PARAMS`, `Atmosphere_PARAMS`,
+  `Geometry_PARAMS` (dimensions + seed), `ErosionFlow_PARAMS`, `Symmetry_PARAMS`,
+  `Environment_PARAMS`, `Enums_PARAMS`.
+- **computed arrays → `DATA`:** `Heightfield_DATA`, `BlendedMap_DATA`,
+  `MaterialMasks_DATA`, `FlowMap_DATA`, `AccumulationMap_DATA`, `Markers_DATA`,
+  `Props_DATA`, `Units_DATA`, `Areas_DATA`, `EntityIdBuffer_DATA`, `SpatialGrid_DATA`,
+  cached noise.
+- **dispatch toggles → `DispatchPolicy`** (PIPELINE sets, SYS reads).
+- **dirty flags + hashes → `DirtyHash_PIPELINE`.**
+- **GPU buffers / GL handles → `GpuResource_SYS`.**
+
+### 5.2 `NoiseLayer` (~90 fields) → `Layers_PARAMS`
+Keeps only identity + noise + blend + stratum-index. Evicted: image-bake state → a bake
+concern in `PROC`; per-layer erosion → `ErosionFlow_PARAMS`; placement fields
+(`AvoidWater`, `NearCliffs`, blueprint) → `PropRules_PARAMS`; physics tags → material/
+stratum physics. Its computed noise output → the `DATA` cache.
+
+### 5.3 `Widget_MapCanvas` (~720 lines) → `MapCanvas_UI`
+Keeps draw + input only. Evicted: triangle height-interpolation → `Interpolation_MATH`;
+unit-grid / symmetry **spawning + army creation** → `Placement_PROC` (UI only requests
+it via `PIPELINE`); picking → reads `EntityIdBuffer_DATA` produced by `SYS`.
+
+### 5.4 `PreviewRenderer` (~300 lines) → `PreviewComposite_UI`
+Keeps pass ordering only. Evicted: GL load / shader compile / SSBO packing →
+`GpuResource_SYS`; gradient LUT bake → `Gradient_PROC`; **sim/rule re-filtering →
+deleted** (samples the bake, §3.2); picking readback → `Picking_UI`.
+
+### 5.5 Retire outright
+`TerrainGenerator` god + the `main.cpp` regen loop → `Generation_PIPELINE`. The dead
+`core/data/*` + `GenParams_*` duplicate family → deleted (hit-list #1). Every hardcoded
+GPU constant (erosion `0.3`, thermal `/2.0`) → a `PARAMS` field (Constitution §8).
 

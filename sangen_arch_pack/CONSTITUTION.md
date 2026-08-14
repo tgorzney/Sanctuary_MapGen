@@ -9,9 +9,13 @@ it has read the code.
 SanGen is divided by technical layer, not by feature:
 
 - **MATH / SIMD** — pure, stateless math (noise, vector, gradient, PRNG).
-- **DATA / SOA** — struct-of-arrays map state (heightfield, layers, markers, props,
-  armies/units, areas, water, atmosphere), plus `PARAMS` config/tunables in a
-  separate folder. Holds no GPU/GL state.
+- **DATA / SOA** — the struct-of-arrays *computed output* of generation (heightfield,
+  blended map, material masks, flow/accumulation, resolved marker/prop/unit instance
+  arrays, entity-id buffer, spatial grid, cached noise). Holds no GPU/GL state.
+- **PARAMS** — the *adjustable settings* (the recipe): the layer stack, stratum/
+  marker/prop rules, seed, dimensions, erosion/flow/thermal constants, symmetry,
+  environment, enums. Its own folder. This is what `mapGeneratorData` serializes; DATA
+  is regenerated from it (input vs output).
 - **PROC** — applied processors (terrain synthesis, erosion, masking, placement);
   each CPU processor paired with its GPU kernel.
 - **PIPELINE** — the conductor: owns the dirty-hash dependency DAG, the PROC stage
