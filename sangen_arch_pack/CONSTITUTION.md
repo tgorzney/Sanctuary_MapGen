@@ -9,15 +9,25 @@ it has read the code.
 SanGen is divided by technical layer, not by feature:
 
 - **MATH / SIMD** — pure, stateless math (noise, vector, gradient, PRNG).
-- **DATA / SOA** — struct-of-arrays map data (heightfield, layers, markers,
-  props, armies/units, areas, water, atmosphere).
-- **PROC** — applied processors (terrain synthesis, erosion, masking, placement).
-- **IO / BRIDGE** — .sanmap import/export, SupCom/official-map import; the
-  platform seam.
-- **UI** — imgui-bypass rendering and the tabs; 100k+ entity preview.
-- **SYS** — threading, allocation, orchestration, CPU/GPU dispatch.
+- **DATA / SOA** — struct-of-arrays map state (heightfield, layers, markers, props,
+  armies/units, areas, water, atmosphere), plus `PARAMS` config/tunables in a
+  separate folder. Holds no GPU/GL state.
+- **PROC** — applied processors (terrain synthesis, erosion, masking, placement);
+  each CPU processor paired with its GPU kernel.
+- **PIPELINE** — the conductor: owns the dirty-hash dependency DAG, the PROC stage
+  order, and the per-stage backend policy (preview vs output); drives PROC via SYS
+  dispatch. The only layer that knows the whole pipeline shape.
+- **IO / BRIDGE** — .sanmap import/export, SupCom/official-map import, sanpack
+  reading; the platform seam. Loads/saves only — never simulates.
+- **UI** — imgui-bypass rendering and the tabs; 100k+ entity preview. Owns no sim
+  logic; sets params, trips dirty flags, composites/samples baked results.
+- **SYS** — runtime primitives only: threading, allocation, GPU resources, the
+  CPU/GPU dispatch *mechanism* (router), logging. Orchestration is NOT here — it is
+  PIPELINE.
 
-GPU/GL state never lives in the DATA layer.
+GPU/GL state never lives in the DATA layer (only SYS + the `.glsl` kernels).
+Dependencies flow downward only, no cycles: UI → PIPELINE → PROC → {DATA, PARAMS,
+MATH} and SYS; IO → {DATA, PARAMS}; nothing depends upward.
 
 ## 2. Naming law
 Literal, procedural, deterministic names. Observed precedents to formalize:
