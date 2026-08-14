@@ -17,8 +17,15 @@ spec(s) a question needs — never the whole pack.
 | UI framework — imgui-bypass, universal widgets, 100k-entity lists/preview, picking, dirty flags | `specs/UI_FRAMEWORK_SPEC.md` |
 | asset loading — single-pass sanpack ingestion, icon atlases, on-disk icon cache | `specs/ASSET_LOADING_SPEC.md` |
 | gamedata layout — folder map (units/props/stratum/icons), sprite pairs, sizes | `specs/GAMEDATA_LAYOUT_SPEC.md` |
+| noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
+| height/slope masks, the unified MaterialMasks weight field, stored-stratum merge modes | `specs/MASKING_SPEC.md` |
+| marker/prop/unit scatter, rules & gates, symmetry, prop SoA, scatter determinism | `specs/PLACEMENT_SCATTER_SPEC.md` |
+| the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
+| preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix | `specs/PREVIEW_COMPOSITING_SPEC.md` |
+| core math library — SIMD/fast-math/Morton/spatial internals (stub reality + v2 target) | `specs/MATH_SIMD_SPEC.md` |
+| future sim passes — fluvial/glacial/snow-melt design on the shared sim framework | `specs/FUTURE_SIM_TYPES_SPEC.md` |
+| map AI-analyzability invariants + host/client shared-generation protocol | `specs/AI_HOSTCLIENT_SPEC.md` |
 
-**Planned specs** (created as the ARCH Expert populates the pack): noise/blend,
-masking, placement/scatter, math/SIMD, CPU-GPU dispatch interface, UI imgui-bypass,
-preview compositing; the future sim types (fluvial/glacial/snow-melt); and a deep
-AI / host-client pass.
+All planned specs are now written. The pack covers the full pipeline end-to-end; the
+remaining depth is deep-read follow-ups noted inside individual specs (AI/host/client
+lua internals in `AI_HOSTCLIENT_SPEC`; open verification items flagged per spec).

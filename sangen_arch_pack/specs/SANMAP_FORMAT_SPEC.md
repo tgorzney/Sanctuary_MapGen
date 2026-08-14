@@ -58,6 +58,21 @@ farNearBlend; diffuseRemap / farColorRemap (Color); maskRemapMin / Max (Vector4)
   (origin top-left); Sanctuary markers/entities use world coords (origin
   bottom-left). Transform: `world = (x, y, length - z - 1)`
   (`TextureToWorldOrigin`). Export applies it; import must invert it.
+- **Entity position encoding (confirmed by dev):** entity transform positions
+  (props/units/markers) are **absolute world units = game units** — a prop's Y is a
+  world-space elevation, stored and used directly (no normalization at the format
+  level). The map's `height` (e.g. 128) is the **vertical extent of the terrain**, so
+  an entity with **Y > height sits above every terrain point** on the map (a prop at
+  Y = 200 on a height-128 map floats above all terrain). The hardcoded `128` in
+  `MASKING_SPEC` / `PLACEMENT_SCATTER_SPEC` is the terrain's vertical scale and must
+  be **read from the map's max height, not baked**.
+  - *Authoring aside:* if a UI exposes a normalized 0–1 height, it converts to world
+    units by `fraction × maxHeight` (0.5 × 50 = 25) — but the value stored/used is the
+    resulting world-unit Y, not the fraction.
+  - *Not coordinate math:* the "1 game unit ≈ 10 meters" ratio is an **arbitrary
+    authoring convention** for sizing a unit's *scale* (a unit the team calls ~10 m
+    tall gets scale ≈ 1). It never enters position math; the engine only uses game
+    units.
 - Marker/area names are fixed constants: `Spawn` (resource=false), `Alloys`
   (resource=true), area `PlayableArea`.
 - Export defaults: each army written as `faction=0, alloys=500, energy=500`,

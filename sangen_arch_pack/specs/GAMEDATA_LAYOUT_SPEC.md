@@ -17,8 +17,9 @@ describes it.
 - `Sprites/` = `Backgrounds, Bars, Cursors, Encyclopedia, Frames, Icons, Panels,
   Portraits`.
 - `Sprites/Icons/` = `Encyclopedia, Orders, Resources, Units, UnitSymbols`:
-  - **`Units/`** — the per-unit build icons, keyed by tpId (`ucl3001.dds`).
-    **231 icons, ~4 KB each (32²).**
+  - **`Units/`** — per-unit **rendered thumbnails** (64² DXT5, ~4 KB compressed /
+    ~16 KB decoded), keyed by tpId (`ucl3001.dds`). 231 of them — a stored render
+    of the unit model on transparent bg. **Load directly; NO unit rendering needed.**
   - `Orders/` ~28 (~72 KB ea), `UnitSymbols/` 12 (~32 KB), `Resources/` 8
     (alloy/plasma variants), `Encyclopedia/` (unit encyclopedia art).
 - `Sprites/Portraits/` — ~16 character portraits (100–680 KB DDS).
@@ -31,8 +32,9 @@ etc.).
 ## Units — `Units/Units/<tpId>/`
 ~230 unit folders (+`default`), each with `LOD0/` (and further LODs): the 3D
 assets — `<tpId>_lod0_albedo_team.dds` (~5.6 MB), `_mask.dds`, `_normal_alpha.dds`,
-`.sanmaterial`, `.sanmodel` (~1.3 MB), plus `.sananimation`, `.sanskeleton`. **No
-thumbnail here** — thumbnails must be rendered.
+`.sanmaterial`, `.sanmodel` (~1.3 MB), plus `.sananimation`, `.sanskeleton`. The
+unit's UI thumbnail is NOT here — it is the stored
+`UI/Sprites/Icons/Units/<tpId>.dds`.
 
 ## Environment — `Environment/Environment/<Biome>/`
 Biomes: `01_Highlands, 02_Evergreen, 03_Desert, 04_Baikal, 09_Industrial,
