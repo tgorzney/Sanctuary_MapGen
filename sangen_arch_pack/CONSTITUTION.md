@@ -46,7 +46,11 @@ and equivalence. **Preview** and **Output** are separate contexts
 (idle-refinement: fast path during interaction, escalate to the accurate pass
 on idle, fan to both). Exact field names and per-calculation defaults: **(TBD)**.
 Roles: **CPU is the accuracy path; GPU is the speed path** — usable either as a
-preview-only fast approximation or as the baked/exported output.
+preview-only fast approximation or as the baked/exported output. A **Deterministic**
+sub-mode of the CPU Exact path makes the *gameplay-authoritative* outputs
+bit-identical across machines (competitive shared generation from settings+seed,
+no file transfer) — CPU-only, portable transcendentals, ordered reductions. See
+`DETERMINISM_SPEC.md`.
 
 ## 5. Portability
 Optimize maximally for the standalone target. Do not limit the program for
