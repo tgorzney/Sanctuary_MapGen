@@ -19,10 +19,21 @@ Where the pack stands and what to do next. (Read the Setup Plan + CONSTITUTION
   CPU/GPU twins, preview shadow logic).
 
 ## Next (deep passes still needed)
-1. Per-module code specs from `core/` + `gui/` + `shaders/`: terrain synth,
-   erosion (hydraulic/thermal/flow), masking, placement/scatter, math/SIMD,
-   CPU-GPU dispatch, UI imgui-bypass, preview, and the PARAMS/GenerationParams
-   model (reconcile the two data-model families).
+1. Per-module code specs from `core/` + `gui/` + `shaders/`:
+   - DONE: PARAMS_PIPELINE_SPEC (data model + Blend→Erosion→Flow→Placement
+     pipeline; live model = params/Params_*, dead = data/*).
+   - DONE: LAYER_SYSTEM_SPEC — the v2 height/material layer design (authored with
+     owner): author-in-height / simulate-in-thickness, GeoLayers (Material vs
+     Shaper mode), sim layers per sim type, additive-thickness volume, baking,
+     stratum masks (8 masks + base). Erosion becomes its own layer type in v2.
+   - TODO: noise/blend, erosion sims (hydraulic/thermal/fluvial/glacial/snow-melt),
+     flow/accumulation, masking, placement/scatter, math/SIMD (Sanmath_*), CPU-GPU
+     dispatch (the .glsl compute paths), UI imgui-bypass, preview compositing.
+
+## Open design items (from LAYER_SYSTEM_SPEC)
+- tint_geometry.tga channel layout (login-walled resource — owner to supply).
+- Stratum chosen by an Add/raise Shaper GeoLayer (confirm).
+- (Resolved: multi-Material-GeoLayer combine = the global Separate/Unified sim toggle.)
 2. Deep AI/host/client/systems read (AIFunctions 233KB, platoon functions 614KB)
    — only if pursuing custom AI; tangential to core map-gen.
 
