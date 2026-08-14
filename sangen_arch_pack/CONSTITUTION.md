@@ -45,6 +45,8 @@ else the global CPU/GPU setting, else highest performance given data residency
 and equivalence. **Preview** and **Output** are separate contexts
 (idle-refinement: fast path during interaction, escalate to the accurate pass
 on idle, fan to both). Exact field names and per-calculation defaults: **(TBD)**.
+Roles: **CPU is the accuracy path; GPU is the speed path** — usable either as a
+preview-only fast approximation or as the baked/exported output.
 
 ## 5. Portability
 Optimize maximally for the standalone target. Do not limit the program for
@@ -66,3 +68,11 @@ problem; target file(s); layer & accuracy class; backend policy; ARCH rules
 invoked; solution + benchmark-backed performance estimate (with basis);
 optional lossy alternative + accuracy-loss estimate; acceptance test; explicit
 out-of-scope list.
+
+## 8. Total tweakability (creative control)
+Every value is exposable as a parameter — including physical and algorithmic
+"constants" (erosion/deposition rates, thermal divisors, capacity multipliers,
+inertia, thresholds, iteration counts). Ship sane defaults, but nothing is
+hardcoded beyond a designer's reach: **any variable can be changed — even
+constants — for interesting creative results.** (The current hardcoded GPU
+constants — erosion `0.3`, thermal `/2.0` — are a direct violation to fix.)
