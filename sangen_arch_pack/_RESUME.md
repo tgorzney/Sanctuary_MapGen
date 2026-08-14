@@ -28,9 +28,10 @@ Where the pack stands and what to do next. (Read the Setup Plan + CONSTITUTION
      stratum masks (8 masks + base). Erosion becomes its own layer type in v2.
    - DONE: SIM_ALGORITHMS_SPEC (hydraulic droplet, thermal talus, flow; already
      layer/material-aware; CPU/GPU diverge — parity is the rework).
-   - TODO: noise/blend, masking, placement/scatter, math/SIMD (Sanmath_*), the unified
-     CPU-GPU dispatch interface, UI imgui-bypass, preview compositing; future sim types
-     (fluvial/glacial/snow-melt).
+   - DONE: OPTIMIZATION_REVIEW + OPTIMIZATION_PILLARS (HPC law), DETERMINISM_SPEC
+     (optional cross-machine competitive gen), UI_FRAMEWORK_SPEC (imgui-bypass).
+   - TODO: noise/blend, masking, placement/scatter, the unified CPU-GPU dispatch
+     interface, preview compositing; future sim types (fluvial/glacial/snow-melt).
 
 ## Open design items (from LAYER_SYSTEM_SPEC)
 - tint_geometry.tga channel layout (login-walled resource — owner to supply).

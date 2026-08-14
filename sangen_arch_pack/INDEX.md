@@ -14,6 +14,7 @@ spec(s) a question needs — never the whole pack.
 | performance review — hardware-math (SIMD/FMA/reciprocal/LUT) & memory (Morton/SoA/FP16) gaps | `specs/OPTIMIZATION_REVIEW.md` |
 | optimization pillars — the realized SoA/AoSoA/SIMD/tiling/GPU technique law | `specs/OPTIMIZATION_PILLARS.md` |
 | cross-machine deterministic generation (competitive shared-gen from settings+seed) | `specs/DETERMINISM_SPEC.md` |
+| UI framework — imgui-bypass, 100k-entity lists/preview, picking, dirty flags | `specs/UI_FRAMEWORK_SPEC.md` |
 
 **Planned specs** (created as the ARCH Expert populates the pack): noise/blend,
 masking, placement/scatter, math/SIMD, CPU-GPU dispatch interface, UI imgui-bypass,
