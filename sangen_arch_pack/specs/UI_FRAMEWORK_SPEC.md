@@ -48,6 +48,14 @@ entities responsively; imgui is used, but bypassed on the hot paths.
   `bNeedsPreviewRender` when they actually change sim inputs). Formalize which flag
   each parameter sets (ideally derive it from the dependency DAG, not by hand).
 
+## Universal widget library
+The bypass toolkit above is not per-tab copy-paste — it is **one shared widget
+library** every tab draws from: RangeSlider, VirtualList<T>, DraggableList<T>,
+gradient editor, icon-grid / atlas-thumbnail button, labelled dial, RT-toggle
+wrapper, etc. One optimized implementation, consistent look, DRY. New tabs compose
+these; they do not hand-roll imgui. Widgets that show icons/thumbnails read from
+the resident atlas (ASSET_LOADING_SPEC), never from files.
+
 ## v2 guidance
 - Keep the bypass toolkit (1–7); make it the standard, not ad-hoc per tab.
 - Formalize the two-tier dirty flags off the dependency DAG (PARAMS_PIPELINE_SPEC).
