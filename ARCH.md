@@ -244,3 +244,38 @@ deleted** (samples the bake, §3.2); picking readback → `Picking_UI`.
 `core/data/*` + `GenParams_*` duplicate family → deleted (hit-list #1). Every hardcoded
 GPU constant (erosion `0.3`, thermal `/2.0`) → a `PARAMS` field (Constitution §8).
 
+---
+
+## 6. v2 rebuild order (dependency-ordered milestones)
+
+Bottom-up along §3.1; each milestone independently testable.
+
+- **M0 — Foundation** (no deps): the real `MATH` library (portable SIMD abstraction,
+  minimax transcendentals with declared accuracy classes, 2D/3D Morton + block-linear,
+  spatial) + `SYS` primitives (`ArenaAllocator_SYS`, `ThreadPool_SYS`, `Log_SYS`,
+  `GpuResource_SYS`, `Dispatch_SYS` router). `MATH_SIMD_SPEC`, `DISPATCH_INTERFACE_SPEC`.
+- **M1 — Data model** (hit-list #1): define `*_DATA` (computed) + `*_PARAMS` (settings)
+  replacing `GenerationParams`; delete dead `core/data/*` + `GenParams_*`;
+  `mapGeneratorData` round-trip through `IO` (`SANMAP_FORMAT_SPEC`).
+- **M2 — Dispatch + PIPELINE skeleton** (hit-list #3): `DispatchPolicy`, `Dispatch_SYS`
+  resolution, `Generation_PIPELINE` (DAG + dirty-hash). **Vertical slice on one stage
+  (noise), both backends**, to prove the whole spine before fanning out.
+- **M3 — PROC stages**: Noise/Blend → Mask → Erosion → Thermal → Flow/Accumulation →
+  Placement → Bake. **Each stage built as a complete CPU + GPU pair and parity-checked
+  together — a stage is "done" only when both backends produce in-class-equivalent
+  results.** Not all-CPU-then-GPU; finish the pair, then the next stage.
+- **M4 — Preview / WYSIWYG** (hit-list #4): `PreviewComposite_UI` samples the bake
+  (shadow-sim deleted), `Picking_UI`, two-tier dirty flags derived from the DAG.
+- **M5 — UI**: universal imgui-bypass widget library, tabs, `MapCanvas_UI`, and the
+  asset pipeline (sanpack ingest → atlas → disk cache; `ASSET_LOADING_SPEC`).
+- **M6 — Advanced / optional**: determinism mode + cross-machine bit-exact gate
+  (`DETERMINISM_SPEC`); then future sim types (fluvial/glacial/snow-melt,
+  `FUTURE_SIM_TYPES_SPEC`); then AI-analyzability validation + host/client
+  (`AI_HOSTCLIENT_SPEC`).
+
+### 6.1 Definition of done (per PROC stage)
+A stage is complete only when: CPU **and** GPU implemented and parity-verified within the
+stage's accuracy class; wired into `PIPELINE` + `Dispatch_SYS` (no rival toggle); all its
+constants exposed as `PARAMS` (§8); files within the §1.5 ceilings; and its work-order
+acceptance test (Constitution §7) passes.
+

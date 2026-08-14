@@ -34,10 +34,12 @@ Dependencies flow downward only, no cycles: UI → PIPELINE → PROC → {DATA, 
 MATH} and SYS; IO → {DATA, PARAMS}; nothing depends upward.
 
 ## 2. Naming law
-Literal, procedural, deterministic names. Observed precedents to formalize:
-`Sanmath_*` (MATH), `Gen_*` (PROC), `Tab_*` / `Widget_*` (UI), `*Compute` +
-`.glsl` (GPU), `Params_*` (data/config). Full suffix system and file-size
-ceilings: **(TBD)**.
+Literal, fully-spelled, deterministic names — **no abbreviations**. The layer tag is a
+**suffix** (`_MATH`, `_DATA`, `_PARAMS`, `_PROC`, `_PIPELINE`, `_IO`, `_UI`, `_SYS`;
+`*Compute`/`.glsl` for GPU kernels), TGUE-style. The full suffix system, the
+no-abbreviation rule + its exceptions (`tpId`, extensions, `Cpu`/`Gpu`), CPU/GPU
+pairing, and file-size ceilings (soft 100 / hard 150 lines, functions ≤40) are
+**resolved in ARCH §1–2**.
 
 ## 3. Optimization pillars
 Maximum performance is law. Confirmed rules: prefer multiplying a precomputed
@@ -58,7 +60,8 @@ Backend choice is a dispatcher decision: explicit per-calculation override,
 else the global CPU/GPU setting, else highest performance given data residency
 and equivalence. **Preview** and **Output** are separate contexts
 (idle-refinement: fast path during interaction, escalate to the accurate pass
-on idle, fan to both). Exact field names and per-calculation defaults: **(TBD)**.
+on idle, fan to both). Exact field names (`DispatchPolicy`, `ComputeBackend`,
+`GenerationContext`, `AccuracyClass`) and per-stage defaults are **resolved in ARCH §4**.
 Roles: **CPU is the accuracy path; GPU is the speed path** — usable either as a
 preview-only fast approximation or as the baked/exported output. A **Deterministic**
 sub-mode of the CPU Exact path makes the *gameplay-authoritative* outputs

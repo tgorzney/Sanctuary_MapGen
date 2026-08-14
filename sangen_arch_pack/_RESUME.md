@@ -3,10 +3,14 @@
 Where the pack stands and what to do next. (Read CONSTITUTION + INDEX first; the
 Setup Plan holds Appendix A's code hit-list.)
 
-## Status: pack COMPLETE
-All planned specs are written and committed to the repo working tree
-(`sangen_arch_pack/`). The ARCH Expert charter is live at
-`.claude/agents/sangen-arch-expert.md`. Next step is authoring `ARCH.md` itself.
+## Status: pack + ARCH COMPLETE
+All planned specs are written and committed to the repo (`sangen_arch_pack/`). The
+ARCH Expert charter is live at `.claude/agents/sangen-arch-expert.md`. **`ARCH.md` is
+now fully authored and ratified** (6 sections: naming law/suffixes, layer→dir map,
+module boundaries, dispatch contract, god-object dismemberment, rebuild order).
+Constitution updated (7th layer `PIPELINE`; SYS slimmed to runtime primitives; DATA =
+computed output vs PARAMS = adjustable settings; TBD markers resolved). Next step is
+**implementing M0** (the foundation milestone).
 
 ## Specs in the pack (20, all current)
 - Format/data: `SANMAP_FORMAT_SPEC`, `UNIT_PROP_MARKER_DATA_SPEC`,
@@ -45,8 +49,13 @@ All planned specs are written and committed to the repo working tree
 - tint_geometry.tga channel layout (was login-walled).
 - Deep AI/host/client/systems lua read — only if pursuing custom AI/shared-gen depth.
 
-## Then: author ARCH.md (the interactive, decision-heavy step)
-Work Appendix A's hit-list + this pack into `ARCH.md`: the naming law, file-size
-ceilings, module/layer boundaries, the CPU/GPU dispatch field names + defaults, the
-god-object dismemberment plan (`NoiseLayer`, `Widget_MapCanvas`, `PreviewRenderer`),
-and the v2 rebuild order (foundation: math/dispatch/resource-manager first).
+## Next: implement the v2 rebuild (ARCH §6 milestones)
+ARCH is authored — the work is now execution, bottom-up:
+- **M0 Foundation**: `MATH` library + `SYS` primitives (`Dispatch_SYS`, `GpuResource_SYS`).
+- **M1 Data model**: `*_DATA`/`*_PARAMS` replacing `GenerationParams`; delete dead
+  `core/data/*`; `mapGeneratorData` round-trip.
+- **M2 Dispatch + PIPELINE skeleton**: vertical slice on noise, both backends.
+- **M3 PROC stages**: each built as a complete CPU+GPU pair, parity-checked together.
+- **M4 Preview/WYSIWYG**, **M5 UI + assets**, **M6 determinism/future-sims/AI-host**.
+Coders execute schema-valid work-orders (Constitution §7); the ARCH Expert owns any
+further ARCH changes.
