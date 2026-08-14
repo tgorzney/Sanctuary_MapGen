@@ -23,5 +23,15 @@ enum class ImportedMaskMode {
     Disabled, ProceduralStart, StaticOverride
 };
 
+// A GeoLayer either contributes material (owns a stratum) or only reshapes height.
+enum class GeoLayerMode {
+    Material, Shaper
+};
+
+// Whether GeoLayers are simulated apart or as one combined stack (LAYER_SYSTEM_SPEC).
+enum class SimulationGrouping {
+    Separate, Unified
+};
+
 } // namespace Params
 } // namespace SanmapGen
