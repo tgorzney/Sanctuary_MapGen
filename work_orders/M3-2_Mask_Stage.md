@@ -1,38 +1,56 @@
-# Work-Order M3-2 — Mask stage (`Mask_PROC`), CPU + GPU pair
+# Work-Order M3-2 (REWORK) — Mask stage (`Mask_PROC`), CPU + GPU pair
 
-*Constitution §7. Milestone M3. Executor: SanGen Coder (CPU+GPU parity, GL needed).
-Independent of other M3 stages (own files) — parallel-safe with worktrees.*
+*Constitution §7. Milestone M3. **Supersedes the prior M3-2** — rebuild against the
+ratified ARCH §7.2/§7.4 + MASKING_SPEC Part 1. Executor: SanGen Coder (CPU+GPU parity,
+GL needed). Depends only on the updated `MapFields_DATA` (already in main).*
 
 ## Title
-Slope masking + stored-stratum-mask merge into the material-mask weight field.
+Resolve `surfaceStratumWeights` from `materialProportions` + slope gate + stored art.
 
-## Root problem
-`MASKING_SPEC`: slope-mask generation and the stored-mask merge are dead/inline today,
-the slope unit is ambiguous (degrees vs gradient²), there's no smoothstep/feather/invert,
-and the merge uses nearest-neighbor. Build it clean.
+## What changed vs the old M3-2 (why this is a rework)
+The old stage wrote into the single `materialMasks` field and deferred the remap to Bake.
+Ratified model: **two fields** — the sims own `materialProportions` (physical), the **Mask
+stage exclusively writes `surfaceStratumWeights`** (visible) and never touches proportions.
 
 ## Target files
-`src/proc/Mask_PROC.h` / `.cpp` / `.glsl` / `_Test.cpp`.
+`src/proc/Mask_PROC.h` / `.cpp` / `.glsl` / `_Test.cpp`. **Delete** `src/params/
+StratumMask_PARAMS.h` (ARCH §7.1 violation) — its settings fold into `Params::Stratum`.
 
 ## Layer & accuracy
-`PROC`. Preview Visual (Gpu) / Output Accurate (Cpu).
+`PROC`. Preview Visual (Gpu) / **Output Exact (Cpu)** — Mask is in the Exact chain because
+Placement (Exact) consumes its output (ARCH §4.6).
 
-## Inputs / outputs
-In: `Data::MapFields.heightfield`, the per-stratum stored masks + `ImportedMaskMode`
-(from PARAMS), slope-gate settings, `Geometry.terrainMaxHeight`. Out: `MapFields
-.materialMasks` (slope-gated + stored-mask-merged).
+## Inputs / outputs (single-writer, §3.4)
+In: `heightfield`, `materialProportions[0..8]`, `Params::Stratum[]`. Out:
+`surfaceStratumWeights[0..8]` — **only** field written. Pure + idempotent (re-runnable).
 
-## Contract
-- Pin the slope unit (document it); derive slope from the heightfield gradient using
-  `terrainMaxHeight` read from the map (not 128).
-- Add smoothstep / feather / invert as tweakable ops (§8).
-- Merge stored masks per `ImportedMaskMode` (Disabled / ProceduralStart additive /
-  StaticOverride replace); one resampler (bilinear), not nearest.
-- One math source CPU/GPU; dispatch via `Sys::Dispatch`; register as a pipeline stage.
+## The combine (MASKING_SPEC 1.2 — Mask does the multiply itself)
+```
+slopeGradient = |grad(heightfield)| * terrainMaxHeight / cellSize
+gate_s        = SlopeGateWeight(slopeGradient, stratum_s)     // 0..1, smoothstep/feather/invert
+procedural_s  = materialProportions[s] * gate_s
+merged_s      = Merge(procedural_s, storedArt_s, importedMaskMode_s)
+surfaceStratumWeights[s] = Remap_s(merged_s)                  // clamp [maskMin,maskMax]
+```
+`Merge`: Disabled = gated procedural; ProceduralStart = `clamp(procedural + stored)`;
+StaticOverride = replace with stored art, **not slope-gated**. (Can't be a deferred
+multiply — StaticOverride replaces; §7.2.4.)
+
+## Hard rules
+- Never write `materialProportions`. **Remap happens once, here** — Bake's remap is
+  deleted (that's M3-8's concern; note it). Slope **designer settings in degrees**,
+  converted to gradient **once** in config flattening; `terrainMaxHeight` read from map;
+  **one resampler: bilinear**. All mask settings live in `Params::Stratum`
+  (`Stratum_PARAMS.h`); loaded TGA pixels are `Data::FloatField`, never PARAMS.
+- Approximation in force (MASKING_SPEC 1.9): Mask consumes `materialProportions` as its
+  surface-exposure stand-in; document at the call site; do **not** attempt the thickness-
+  stack fix here (deferred, ARCH §7.5) — the kernel won't change when it lands.
+- One math source CPU/GPU; dispatch via `Sys::Dispatch`; register per M3-8's order.
 
 ## Acceptance
-CPU/GPU parity within Visual tolerance; each merge mode correct on a hand-checked case;
-smoothstep vs hard-clamp visibly differ; dirty-hash skip/re-run; builds clean.
+CPU/GPU parity within Visual tolerance; each merge mode correct on a hand case
+(StaticOverride ignores slope); Mask leaves `materialProportions` byte-identical (single-
+writer); idempotent (run twice = same); degrees→gradient converted once; builds clean.
 
 ## Out of scope
-Noise/blend's initial occlusion fill (owned by M3-1); erosion.
+Bake remap deletion + std430 re-pad (M3-8 / Bake); the thickness-stack fix (M6).

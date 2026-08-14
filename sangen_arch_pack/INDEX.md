@@ -18,7 +18,7 @@ spec(s) a question needs — never the whole pack.
 | asset loading — single-pass sanpack ingestion, icon atlases, on-disk icon cache | `specs/ASSET_LOADING_SPEC.md` |
 | gamedata layout — folder map (units/props/stratum/icons), sprite pairs, sizes | `specs/GAMEDATA_LAYOUT_SPEC.md` |
 | noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
-| height/slope masks, the unified MaterialMasks weight field, stored-stratum merge modes | `specs/MASKING_SPEC.md` |
+| the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights` | `specs/MASKING_SPEC.md` |
 | marker/prop/unit scatter, rules & gates, symmetry, prop SoA, scatter determinism | `specs/PLACEMENT_SCATTER_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
 | preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix | `specs/PREVIEW_COMPOSITING_SPEC.md` |
@@ -29,3 +29,7 @@ spec(s) a question needs — never the whole pack.
 All planned specs are now written. The pack covers the full pipeline end-to-end; the
 remaining depth is deep-read follow-ups noted inside individual specs (AI/host/client
 lua internals in `AI_HOSTCLIENT_SPEC`; open verification items flagged per spec).
+
+**Standing deferred ruling:** persistent ordered thickness columns + true surface-exposure
+derivation (ARCH §7.5, `LAYER_SYSTEM_SPEC` "Known gap") — an M6 DATA-shape work order.
+Do not patch it inside a mask or sim work-order.

@@ -3,6 +3,9 @@
 // the 9 per-stratum material-mask weight fields, all as FloatFields. Replaces the
 // scattered cached maps of the old GenerationResult. DATA-pure: depends only on
 // FloatField (MATH-adjacent DATA), takes plain ints for sizing (no PARAMS coupling).
+// NOTE (ARCH §7.2): the reshape to materialProportions[9] + surfaceStratumWeights[9]
+// is performed ATOMICALLY in the M3 mask rework (M3-8), together with renaming the
+// field references in the sim stages — not piecemeal here.
 #pragma once
 #include "FloatField_DATA.h"
 

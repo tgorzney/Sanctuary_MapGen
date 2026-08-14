@@ -8,6 +8,23 @@
 namespace SanmapGen {
 namespace Proc {
 
+// The kernel runs the same program twice: one pass fills a single layer's raw noise (so the
+// two-level dirty hash works on the Gpu as well), the other blends the whole stack.
+namespace NoiseBlendPassMode {
+    constexpr int Noise = 0;
+    constexpr int Blend = 1;
+}
+
+// std430 binding points, declared here once and injected into the GLSL as #defines so the
+// C++ BindBuffer calls and the shader layout qualifiers can never disagree.
+namespace NoiseBlendBinding {
+    constexpr unsigned layerConfigurations = 0;
+    constexpr unsigned rawNoise            = 1;
+    constexpr unsigned heightField         = 2;
+    constexpr unsigned materialMasks       = 3;
+    constexpr unsigned layerThickness      = 4;   // blend-pass scratch (see NoiseBlend_PROC.glsl)
+}
+
 // Stage constants — defaults only; every one is settable per project (§8).
 struct NoiseBlendConstants {
     float landDensityScale       = 2.0f;    // reshape: value *= landDensity * this
@@ -19,7 +36,11 @@ struct NoiseBlendConstants {
     float heightMaximum          = 1.0f;
     float occlusionWindowEpsilon = 0.001f;  // MASKING_SPEC swap guard on an empty window
     int   layerSeedStride        = 1;       // layer seed = geometry.seed + index * this
-    int   maximumGpuLayerCount   = 32;      // per-invocation thickness bound in the shader
+    int   maximumGpuLayerCount   = 32;      // deeper stacks fall back to the Cpu; also bounds the
+                                            // blend pass's per-layer scratch buffer
+    int   gpuFenceMaximumPollCount = 2000000; // fence-wait budget; the poll loop YIELDS between
+                                             // polls, never busy-spins (a hot spin starves the
+                                             // ThreadPool workers sharing the cores)
 };
 
 // One flattened layer, ready for either backend. 32 scalars = 128 bytes; the trailing

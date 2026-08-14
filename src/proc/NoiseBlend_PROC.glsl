@@ -22,10 +22,12 @@ struct LayerConfiguration {
     float heightMinimum;      float heightMaximum;       float padding;
 };
 
-layout(std430, binding = 0) readonly buffer LayerConfigurations { LayerConfiguration layerConfigurations[]; };
-layout(std430, binding = 1) buffer RawNoiseField { float rawNoiseValues[]; };
-layout(std430, binding = 2) buffer HeightField   { float heightValues[]; };
-layout(std430, binding = 3) buffer MaterialMasks { float maskValues[]; };
+layout(std430, binding = NOISE_BLEND_BINDING_LAYERS) readonly buffer LayerConfigurations {
+    LayerConfiguration layerConfigurations[]; };
+layout(std430, binding = NOISE_BLEND_BINDING_RAW_NOISE) buffer RawNoiseField { float rawNoiseValues[]; };
+layout(std430, binding = NOISE_BLEND_BINDING_HEIGHT)    buffer HeightField   { float heightValues[]; };
+layout(std430, binding = NOISE_BLEND_BINDING_MASKS)     buffer MaterialMasks { float maskValues[]; };
+layout(std430, binding = NOISE_BLEND_BINDING_THICKNESS) buffer LayerThickness { float thicknessValues[]; };
 
 uniform int vertexSize;
 uniform int layerCount;
@@ -83,15 +85,18 @@ void runNoisePass(ivec2 cell, int cellIndex, int cellCount) {
     rawNoiseValues[activeLayerIndex * cellCount + cellIndex] = rawValue;
 }
 
+// Per-layer thickness lives in a scratch SSBO, not a per-thread array: a local
+// float[maximumLayerCount] spills to local memory and collapses occupancy for EVERY
+// invocation (measured ~30% of the blend pass), while the scratch buffer is a coalesced
+// write-then-read of the same cells the pass already touches.
 void runBlendPass(int cellIndex, int cellCount) {
-    float thickness[NOISE_BLEND_MAXIMUM_LAYER_COUNT];
     float height = layerConfigurations[0].heightMinimum;
     for (int layer = 0; layer < layerCount; ++layer) {
         LayerConfiguration configuration = layerConfigurations[layer];
         float shaped = reshapeLayerValue(rawNoiseValues[layer * cellCount + cellIndex], configuration);
         float blended = applyLayerToHeight(height, shaped, configuration.blendMode, configuration.opacity,
                                            configuration.heightMinimum, configuration.heightMaximum);
-        thickness[layer] = blended - height;
+        thicknessValues[layer * cellCount + cellIndex] = blended - height;
         height = blended;
     }
     heightValues[cellIndex] = height;
@@ -101,9 +106,10 @@ void runBlendPass(int cellIndex, int cellCount) {
     float remainingVisibility = 1.0;
     for (int layer = layerCount - 1; layer >= 0; --layer) {
         if (remainingVisibility <= 0.0) break;
-        if (thickness[layer] <= 0.0) continue;
+        float layerThickness = thicknessValues[layer * cellCount + cellIndex];
+        if (layerThickness <= 0.0) continue;
         LayerConfiguration configuration = layerConfigurations[layer];
-        float alpha = occlusionAlpha(thickness[layer], configuration.heightBlendContrast,
+        float alpha = occlusionAlpha(layerThickness, configuration.heightBlendContrast,
                                      configuration.occlusionWindowLow, configuration.occlusionWindowHigh,
                                      configuration.opacity);
         float contribution = min(max(alpha, 0.0), remainingVisibility);

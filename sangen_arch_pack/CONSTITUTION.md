@@ -10,8 +10,9 @@ SanGen is divided by technical layer, not by feature:
 
 - **MATH / SIMD** — pure, stateless math (noise, vector, gradient, PRNG).
 - **DATA / SOA** — the struct-of-arrays *computed output* of generation (heightfield,
-  blended map, material masks, flow/accumulation, resolved marker/prop/unit instance
-  arrays, entity-id buffer, spatial grid, cached noise). Holds no GPU/GL state.
+  blended map, material proportions, surface stratum weights, flow/accumulation, resolved
+  marker/prop/unit instance arrays, entity-id buffer, spatial grid, cached noise). Holds no
+  GPU/GL state.
 - **PARAMS** — the *adjustable settings* (the recipe): the layer stack, stratum/
   marker/prop rules, seed, dimensions, erosion/flow/thermal constants, symmetry,
   environment, enums. Its own folder. This is what `mapGeneratorData` serializes; DATA
@@ -33,13 +34,17 @@ GPU/GL state never lives in the DATA layer (only SYS + the `.glsl` kernels).
 Dependencies flow downward only, no cycles: UI → PIPELINE → PROC → {DATA, PARAMS,
 MATH} and SYS; IO → {DATA, PARAMS}; nothing depends upward.
 
+Every DATA field has **exactly one writing stage**, and every PROC stage is a **pure,
+re-runnable function** of its declared inputs — no stage read-modify-writes a field it
+does not own (ARCH §3.4; a sim owning and evolving its own field is the one exception).
+
 ## 2. Naming law
 Literal, fully-spelled, deterministic names — **no abbreviations**. The layer tag is a
 **suffix** (`_MATH`, `_DATA`, `_PARAMS`, `_PROC`, `_PIPELINE`, `_IO`, `_UI`, `_SYS`;
-`*Compute`/`.glsl` for GPU kernels), TGUE-style. The full suffix system, the
-no-abbreviation rule + its exceptions (`tpId`, extensions, `Cpu`/`Gpu`), CPU/GPU
-pairing, and file-size ceilings (soft 100 / hard 150 lines, functions ≤40) are
-**resolved in ARCH §1–2**.
+`*Compute`/`.glsl` for GPU kernels), TGUE-style. A name states the **quantity**, not the
+role. The full suffix system, the no-abbreviation rule + its exceptions (`tpId`,
+extensions, `Cpu`/`Gpu`), CPU/GPU pairing, and file-size ceilings (soft 100 / hard 150
+lines, functions ≤40) are **resolved in ARCH §1–2**.
 
 ## 3. Optimization pillars
 Maximum performance is law. Confirmed rules: prefer multiplying a precomputed
@@ -67,7 +72,8 @@ preview-only fast approximation or as the baked/exported output. A **Determinist
 sub-mode of the CPU Exact path makes the *gameplay-authoritative* outputs
 bit-identical across machines (competitive shared generation from settings+seed,
 no file transfer) — CPU-only, portable transcendentals, ordered reductions. See
-`DETERMINISM_SPEC.md`.
+`DETERMINISM_SPEC`. In the Output context the guarantee closes over the whole
+**Exact chain** — every stage feeding an Exact stage (ARCH §4.6).
 
 ## 5. Portability
 Optimize maximally for the standalone target. Do not limit the program for

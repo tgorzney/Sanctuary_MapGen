@@ -62,8 +62,15 @@ private:
     std::size_t ComputeBlendHash() const;
     void GenerateLayerNoiseCpu(std::size_t layerIndex);   // NoiseBlend_Noise_PROC.cpp
     void BlendLayersCpu();                                // NoiseBlend_Blend_PROC.cpp
-    bool EnsureGpuResources();                            // NoiseBlend_Gpu_PROC.cpp
     void ClearMaterialMasks();
+    bool EnsureGpuResources();                            // NoiseBlend_GpuProgram_PROC.cpp
+    bool EnsureGpuBuffers(std::size_t cellCount);         // NoiseBlend_GpuBuffers_PROC.cpp
+    void UploadLayerConfigurationsGpu();                  // NoiseBlend_GpuBuffers_PROC.cpp
+    void ReadbackFieldsGpu(std::size_t cellCount);        // NoiseBlend_GpuBuffers_PROC.cpp
+    void DispatchNoisePassGpu(int layerIndex, int vertexSize);  // NoiseBlend_Gpu_PROC.cpp
+    void DispatchBlendPassGpu(int vertexSize);            // NoiseBlend_Gpu_PROC.cpp
+    void RegenerateChangedLayersGpu(int vertexSize);      // NoiseBlend_Gpu_PROC.cpp
+    bool WaitForGpuFence();                               // NoiseBlend_Gpu_PROC.cpp
 
     const Params::Geometry&   geometry;
     const Params::LayerStack& layerStack;

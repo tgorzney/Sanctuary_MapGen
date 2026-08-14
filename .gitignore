@@ -41,3 +41,6 @@ Thumbs.db
 /Sanctuary-Map-Generation-develop/
 /Sanctuary_MapGen-master (Broken)/
 /Sanctuary_MapGen-master (Old)/
+
+# Claude Code agent worktrees (transient)
+.claude/worktrees/

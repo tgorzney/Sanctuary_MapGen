@@ -18,7 +18,8 @@ layers; it is the design the ARCH and work-orders should target.
 mask), the shader height, and **soil physics** (hardness, friction, cohesion,
 capacityMult, absorptionRate) — today's `StratumSettings` keyed by index. A
 material layer points at a stratum index and inherits all of it. Sims look up
-soil physics by a column's current stratum. **Do not change this.**
+soil physics by a column's current stratum. **Do not change this.** (In v2 this is
+the one `Params::Stratum` type — ARCH §7.1.)
 
 ## Layer hierarchy
 - **GeoLayer** = a group/container. Owns its own **blend mode** and **erode-below**
@@ -100,7 +101,7 @@ spire) go in the **same GeoLayer's stack**; use **separate GeoLayers** for
 
 ## Stratum mask output
 - After sims, each pixel's surface material = topmost layer with thickness > 0;
-  transitions are a **soft blend**, not a hard pick.
+  transitions are a **soft blend**, not a hard pick. This is **surface exposure**.
 - Each stratum's mask channel = summed surface-exposure of every layer sharing
   that StratumIndex. **Stratum 0 = the always-present base (no mask).** Strata
   1–8 get masks.
@@ -113,9 +114,30 @@ spire) go in the **same GeoLayer's stack**; use **separate GeoLayers** for
   sharpen transitions. So the mask says "how much this material shows"; the shader
   decides the crisp boundary.
 
+### Where this lands in the v2 field model (ARCH §7.2)
+The exported stratum masks are **surface weights**, and they are produced by the
+**Mask stage**, which writes `surfaceStratumWeights[0..8]`. The physical field the sims
+own is `materialProportions[0..8]` — how much of each stratum is in the column. These are
+two different DATA fields with two different single writers; see `MASKING_SPEC` Part 1.
+
+> **Known gap — surface exposure is not yet implemented (ARCH §7.5).** Today the sims
+> collapse the thickness stack back to a **volume fraction** (`ticks / totalTicks`) on exit
+> and the Mask stage consumes that as a stand-in for exposure. Volume fraction ≠ surface
+> exposure: thin topsoil over deep bedrock reads ~0% coverage under volume fraction when it
+> should visually cover the surface. The true derivation needs the **ordered** thickness
+> column — a proportion vector carries no stratigraphic order, so you cannot tell which
+> stratum is on top — and the stack is currently reconstructed and discarded at each stage
+> boundary rather than persisted as DATA. Both are deferred to a single M6 DATA-shape
+> ruling + work order; do not patch either inside a mask or sim work-order. The interface
+> is stable across the fix (9 × `FloatField`, 0..1), so the Mask kernel will not change —
+> only its input binding.
+
 ## Open / advanced items
 - `tint_geometry.tga` channel layout — the resource is login-walled; owner to
   supply.
 - The exact stratum assigned by an Add/raise Shaper (contributing layer's
   material vs base) — confirm.
+- **Persistent ordered thickness columns as DATA** (layout, fixed-point width, memory
+  cost at 4096², ownership across stage boundaries) + the surface-exposure derivation
+  built on them — ARCH §7.5, scheduled M6. `FUTURE_SIM_TYPES_SPEC` depends on this.
 - *(Resolved: multi-Material-GeoLayer combining = the Unified sim-mode toggle above.)*

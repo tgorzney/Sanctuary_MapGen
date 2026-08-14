@@ -9,6 +9,7 @@
 #include "LayerStack_PARAMS.h"
 #include "MarkerRule_PARAMS.h"
 #include "ScatterRule_PARAMS.h"
+#include "Symmetry_PARAMS.h"
 #include "Water_PARAMS.h"
 
 namespace SanmapGen {
@@ -20,8 +21,9 @@ struct MapRecipe {
     std::vector<MarkerRule> markerRules;
     std::vector<PropRule>   propRules;
     std::vector<DecalRule>  decalRules;
+    std::vector<UnitRule>   unitRules;
     Water                   water;
-    int                     globalSymmetryMask = 0;
+    int                     globalSymmetryMask = SymmetryAxis::None;
 
     bool IsValid() const { return geometry.IsValid(); }
 };

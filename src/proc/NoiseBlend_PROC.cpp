@@ -91,8 +91,11 @@ std::size_t NoiseBlendStage::ComputeParameterHash() const {
 }
 
 Sys::ComputeBackend NoiseBlendStage::Run() {
-    lastBackend = Sys::Dispatch(*this, dispatchPolicy, generationContext, globalBackend,
-                                Sys::DataResidency::Either);
+    // Dispatch returns the backend it ROUTED to; RunOnCpu/RunOnGpu record the one that
+    // actually ran (the Gpu path falls back to the Cpu when no GL program is available),
+    // so lastBackend — not the routing decision — is what callers observe.
+    Sys::Dispatch(*this, dispatchPolicy, generationContext, globalBackend,
+                  Sys::DataResidency::Either);
     return lastBackend;
 }
 

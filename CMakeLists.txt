@@ -130,3 +130,118 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(stb)
 target_include_directories(SanmapGenerator PRIVATE ${stb_SOURCE_DIR})
+
+# ---------------------------------------------------------------------------
+# SanGen v2 (src/) — the ARCH-conformant rebuild: math / data / params / proc /
+# pipeline / sys / io. Built as one static library plus one executable per
+# acceptance test (Constitution §7). The legacy core/ + gui/ tree above is
+# untouched until the M4/M5 UI work-orders replace it.
+# ---------------------------------------------------------------------------
+enable_testing()
+
+file(GLOB_RECURSE SANGEN_V2_SOURCES CONFIGURE_DEPENDS
+    "src/math/*.cpp"     "src/math/*.h"
+    "src/data/*.cpp"     "src/data/*.h"
+    "src/params/*.cpp"   "src/params/*.h"
+    "src/proc/*.cpp"     "src/proc/*.h"
+    "src/pipeline/*.cpp" "src/pipeline/*.h"
+    "src/sys/*.cpp"      "src/sys/*.h"
+    "src/io/*.cpp"       "src/io/*.h"
+)
+# Test translation units are compiled into their own executables, never the library.
+list(FILTER SANGEN_V2_SOURCES EXCLUDE REGEX "_Test\\.cpp$")
+
+# The GPU twins (ARCH §1.4) are compiled by the driver at run time, not by MSVC — they are
+# listed so each .glsl sits beside its CPU .cpp in the IDE and any divergence is visible.
+file(GLOB_RECURSE SANGEN_V2_SHADERS CONFIGURE_DEPENDS "src/proc/*.glsl")
+set_source_files_properties(${SANGEN_V2_SHADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
+
+add_library(SanGenV2 STATIC ${SANGEN_V2_SOURCES} ${SANGEN_V2_SHADERS})
+target_include_directories(SanGenV2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# Vendored third-party headers only (FastNoiseLite, fetched by the download rule above).
+# This is NOT a dependency on the legacy core/ layer tree — no src/ file includes a core/
+# project header. Where vendored headers live once core/ is retired (ARCH §5.5) is an open
+# question for the ARCH Expert.
+target_include_directories(SanGenV2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
+target_compile_features(SanGenV2 PUBLIC cxx_std_17)
+if(MSVC)
+    # /permissive- for conforming lookup; the GPU seam resolves GL entry points itself.
+    target_compile_options(SanGenV2 PRIVATE /permissive- /W3)
+endif()
+if(WIN32)
+    target_link_libraries(SanGenV2 PUBLIC opengl32)
+endif()
+
+# The GPU-backed stages load their .glsl twins from a shader directory at run time;
+# every stage's kernels live beside their CPU twin in src/proc (ARCH §1.4/§2).
+set(SANGEN_V2_SHADER_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/proc")
+
+# add_sangen_test(<name> <source>...) — one acceptance-test executable, registered
+# with CTest and handed the shader directory as argv[1] (ignored by tests that do
+# not need a GL context).
+function(add_sangen_test testName)
+    add_executable(${testName} ${ARGN})
+    target_link_libraries(${testName} PRIVATE SanGenV2)
+    add_test(NAME ${testName} COMMAND ${testName} "${SANGEN_V2_SHADER_DIRECTORY}")
+    set_property(TARGET ${testName} PROPERTY FOLDER "SanGenV2 Tests")
+endfunction()
+
+# MATH
+add_sangen_test(FloatVector_MATH_Test           src/math/FloatVector_MATH_Test.cpp)
+add_sangen_test(JumpFloodDistanceField_MATH_Test src/math/JumpFloodDistanceField_MATH_Test.cpp)
+add_sangen_test(Morton_MATH_Test                src/math/Morton_MATH_Test.cpp)
+add_sangen_test(RadialClearance_MATH_Test       src/math/RadialClearance_MATH_Test.cpp)
+add_sangen_test(Reciprocal_MATH_Test            src/math/Reciprocal_MATH_Test.cpp)
+add_sangen_test(Trigonometry_MATH_Test          src/math/Trigonometry_MATH_Test.cpp)
+
+# DATA
+add_sangen_test(FloatField_DATA_Test            src/data/FloatField_DATA_Test.cpp)
+add_sangen_test(MapFields_DATA_Test             src/data/MapFields_DATA_Test.cpp)
+
+# PARAMS
+add_sangen_test(Geometry_PARAMS_Test            src/params/Geometry_PARAMS_Test.cpp)
+add_sangen_test(LayerStack_PARAMS_Test          src/params/LayerStack_PARAMS_Test.cpp)
+add_sangen_test(MapRecipe_PARAMS_Test           src/params/MapRecipe_PARAMS_Test.cpp)
+add_sangen_test(PlacementRules_PARAMS_Test      src/params/PlacementRules_PARAMS_Test.cpp)
+
+# SYS
+add_sangen_test(ArenaAllocator_SYS_Test         src/sys/ArenaAllocator_SYS_Test.cpp)
+add_sangen_test(Dispatch_SYS_Test               src/sys/Dispatch_SYS_Test.cpp)
+add_sangen_test(GpuResource_SYS_Test            src/sys/GpuResource_SYS_Test.cpp)
+add_sangen_test(ThreadPool_SYS_Test             src/sys/ThreadPool_SYS_Test.cpp)
+
+# PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
+# each group below is ONE binary whose main() lives in the first file listed.
+add_sangen_test(NoiseBlend_PROC_Test
+    src/proc/NoiseBlend_PROC_Test.cpp
+    src/proc/NoiseBlend_GpuParity_PROC_Test.cpp
+    src/proc/NoiseBlend_GpuBlend_PROC_Test.cpp)
+add_sangen_test(Mask_PROC_Test
+    src/proc/Mask_PROC_Test.cpp
+    src/proc/Mask_Slope_PROC_Test.cpp
+    src/proc/Mask_Merge_PROC_Test.cpp
+    src/proc/Mask_DirtyHash_PROC_Test.cpp
+    src/proc/Mask_Parity_PROC_Test.cpp)
+add_sangen_test(Erosion_PROC_Test               src/proc/Erosion_PROC_Test.cpp)
+add_sangen_test(Erosion_Gpu_PROC_Test           src/proc/Erosion_Gpu_PROC_Test.cpp)
+add_sangen_test(Thermal_PROC_Test
+    src/proc/Thermal_PROC_Test.cpp
+    src/proc/Thermal_Params_PROC_Test.cpp
+    src/proc/Thermal_Gpu_PROC_Test.cpp)
+add_sangen_test(FlowAccumulation_PROC_Test
+    src/proc/FlowAccumulation_PROC_Test.cpp
+    src/proc/FlowAccumulation_Pipeline_PROC_Test.cpp
+    src/proc/FlowAccumulation_Parity_PROC_Test.cpp)
+add_sangen_test(Placement_PROC_Test             src/proc/Placement_PROC_Test.cpp)
+add_sangen_test(Placement_Symmetry_PROC_Test    src/proc/Placement_Symmetry_PROC_Test.cpp)
+add_sangen_test(Placement_Gpu_PROC_Test         src/proc/Placement_Gpu_PROC_Test.cpp)
+add_sangen_test(Bake_PROC_Test
+    src/proc/Bake_PROC_Test.cpp
+    src/proc/Bake_Gpu_PROC_Test.cpp)
+
+# PIPELINE
+add_sangen_test(Generation_PIPELINE_Test          src/pipeline/Generation_PIPELINE_Test.cpp)
+add_sangen_test(GenerationAssembler_PIPELINE_Test
+    src/pipeline/GenerationAssembler_PIPELINE_Test.cpp
+    src/pipeline/GenerationAssembler_Outputs_PIPELINE_Test.cpp
+    src/pipeline/GenerationAssembler_Dirty_PIPELINE_Test.cpp)
