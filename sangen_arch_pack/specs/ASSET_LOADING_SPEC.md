@@ -50,9 +50,21 @@ and re-inflates repeatedly — slow and stally.
 - Pillars: single-pass/async I/O, texture-array packing, arena buffers, validation.
 - Feeds UI_FRAMEWORK_SPEC (the 100k lists) and respects the accuracy/asset rules.
 
-## Open decisions
-1. **Cache location & invalidation:** SanGen cache dir vs beside the sanpack;
-   fingerprint = path+size+mtime(+hash)? (hash is safest but costs a full read once).
-2. **Atlas budget:** icon resolution (e.g. 64²/128²) and max pages / VRAM cap.
-3. **Ingestion scope:** extract *all* icons up-front (true single pass) vs lazy
-   per-category. Owner leans all-up-front ("get what the app needs, be done").
+## Decisions (owner) & measured footprint
+- **Cache location:** user-selectable via a **"Cache folder" picker button** in the
+  UI (not auto-placed). Rebuild-vs-load decided by a sanpack fingerprint
+  (path + size + mtime; optional content hash).
+- **Ingestion scope:** extract **everything** up-front in the single pass.
+- **Atlas budget:** tuned for performance, with a **configurable max VRAM / atlas
+  cap**; if the icon set exceeds the cap, icons are **adaptively downscaled** (or
+  spilled to more pages) rather than failing to load.
+- **Measured (real files):** `Gameplay.sanpack` = **592 strategic icons, ~112²
+  uncompressed DDS ≈ 29.5 MB decoded** (one 4096² RGBA page = 64 MB holds ~1,300).
+  `icons_cache.json` = ~47 UI order/symbol/resource icons (tiny). **Conclusion:
+  memory is not a serious concern at native res** — even a few thousand icons ≈
+  100–200 MB = a handful of atlas pages; the cap is a low-VRAM safety valve.
+- **Still to count on-device:** per-unit `iconUI` images + prop thumbnails live in
+  `UI.sanpack` (159 MB, stageable) and `Units`/`Environment.sanpack`
+  (1.35 GB / 2.28 GB — too big to pull to the cloud). Prop "thumbnails" may be
+  **rendered on demand, not stored**. Exact totals need an on-device enumeration
+  or a UI.sanpack pull.
