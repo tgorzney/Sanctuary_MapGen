@@ -16,6 +16,7 @@ spec(s) a question needs — never the whole pack.
 | cross-machine deterministic generation (competitive shared-gen from settings+seed) | `specs/DETERMINISM_SPEC.md` |
 | UI framework — imgui-bypass, universal widgets, 100k-entity lists/preview, picking, dirty flags | `specs/UI_FRAMEWORK_SPEC.md` |
 | asset loading — single-pass sanpack ingestion, icon atlases, on-disk icon cache | `specs/ASSET_LOADING_SPEC.md` |
+| gamedata layout — folder map (units/props/stratum/icons), sprite pairs, sizes | `specs/GAMEDATA_LAYOUT_SPEC.md` |
 
 **Planned specs** (created as the ARCH Expert populates the pack): noise/blend,
 masking, placement/scatter, math/SIMD, CPU-GPU dispatch interface, UI imgui-bypass,

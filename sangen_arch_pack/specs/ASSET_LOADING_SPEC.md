@@ -58,13 +58,14 @@ and re-inflates repeatedly — slow and stally.
 - **Atlas budget:** tuned for performance, with a **configurable max VRAM / atlas
   cap**; if the icon set exceeds the cap, icons are **adaptively downscaled** (or
   spilled to more pages) rather than failing to load.
-- **Measured (real files):** `Gameplay.sanpack` = **592 strategic icons, ~112²
-  uncompressed DDS ≈ 29.5 MB decoded** (one 4096² RGBA page = 64 MB holds ~1,300).
-  `icons_cache.json` = ~47 UI order/symbol/resource icons (tiny). **Conclusion:
-  memory is not a serious concern at native res** — even a few thousand icons ≈
-  100–200 MB = a handful of atlas pages; the cap is a low-VRAM safety valve.
-- **Still to count on-device:** per-unit `iconUI` images + prop thumbnails live in
-  `UI.sanpack` (159 MB, stageable) and `Units`/`Environment.sanpack`
-  (1.35 GB / 2.28 GB — too big to pull to the cloud). Prop "thumbnails" may be
-  **rendered on demand, not stored**. Exact totals need an on-device enumeration
-  or a UI.sanpack pull.
+- **Measured (real files, now exact):** stored icons total **≈ 37 MB across a few
+  hundred files** — 231 unit build icons (32², ~4 KB ea, keyed by tpId), 592
+  strategic icons (112² ≈ 29.5 MB), ~28 orders + 12 symbols + 8 resources + ~16
+  portraits (~6 MB). **→ 1–2 atlas pages; memory is a non-issue.** The cap is only
+  a low-VRAM safety valve. (Full layout: `GAMEDATA_LAYOUT_SPEC.md`.)
+- **Prop & unit thumbnails are NOT stored** — unit/prop folders are heavy 3D assets
+  (`.sanmodel` + multi-MB `.dds`). SanGen must **render thumbnails on demand and
+  cache them to disk** (a thumbnail render pass writing into the same disk atlas).
+  This — not memory — is the real work.
+- Sprites are **`.dds` + `.sansprite`** pairs; load the `.dds`, the `.sansprite`
+  is a small descriptor.
