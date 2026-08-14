@@ -1,52 +1,52 @@
 # ARCH Expert — resume notes
 
-Where the pack stands and what to do next. (Read the Setup Plan + CONSTITUTION
-+ INDEX first.)
+Where the pack stands and what to do next. (Read CONSTITUTION + INDEX first; the
+Setup Plan holds Appendix A's code hit-list.)
 
-## Done
-- **Constitution** seeded (layers, naming precedents, GPU/accuracy standard,
-  input/asset-safety pillar, work-order schema). TBD items marked inside.
-- **Specs written:**
-  - `SANMAP_FORMAT_SPEC` — .sanmap JSON (v3, 9 strata), entities, validated on
-    ~23 official maps; terrain lives in `Textures/` not the JSON; `mapGeneratorData`
-    round-trips the full generator state (= GenerationParams on disk).
-  - `UNIT_PROP_MARKER_DATA_SPEC` — factions Chosen/Guard/EDA (army 0/1/2),
-    authoritative 7-char tpId scheme, unit template model, `.san*` formats,
-    asset-validation requirement.
-  - `MODDING_SCRIPTING_SPEC` — lua sandbox, map lifecycle/event API, Tags system,
-    AI mods (`AI/mods/<name>`), AIMarkerGenerator invariants.
-- **Code survey** captured in Setup Plan Appendix A (god object, dead data model,
-  CPU/GPU twins, preview shadow logic).
+## Status: pack COMPLETE
+All planned specs are written and committed to the repo working tree
+(`sangen_arch_pack/`). The ARCH Expert charter is live at
+`.claude/agents/sangen-arch-expert.md`. Next step is authoring `ARCH.md` itself.
 
-## Next (deep passes still needed)
-1. Per-module code specs from `core/` + `gui/` + `shaders/`:
-   - DONE: PARAMS_PIPELINE_SPEC (data model + Blend→Erosion→Flow→Placement
-     pipeline; live model = params/Params_*, dead = data/*).
-   - DONE: LAYER_SYSTEM_SPEC — the v2 height/material layer design (authored with
-     owner): author-in-height / simulate-in-thickness, GeoLayers (Material vs
-     Shaper mode), sim layers per sim type, additive-thickness volume, baking,
-     stratum masks (8 masks + base). Erosion becomes its own layer type in v2.
-   - DONE: SIM_ALGORITHMS_SPEC (hydraulic droplet, thermal talus, flow; already
-     layer/material-aware; CPU/GPU diverge — parity is the rework).
-   - DONE: OPTIMIZATION_REVIEW + OPTIMIZATION_PILLARS (HPC law), DETERMINISM_SPEC
-     (optional cross-machine competitive gen), UI_FRAMEWORK_SPEC (imgui-bypass).
-   - TODO: noise/blend, masking, placement/scatter, the unified CPU-GPU dispatch
-     interface, preview compositing; future sim types (fluvial/glacial/snow-melt).
+## Specs in the pack (20, all current)
+- Format/data: `SANMAP_FORMAT_SPEC`, `UNIT_PROP_MARKER_DATA_SPEC`,
+  `GAMEDATA_LAYOUT_SPEC`, `ASSET_LOADING_SPEC`, `MODDING_SCRIPTING_SPEC`.
+- Pipeline: `PARAMS_PIPELINE_SPEC`, `LAYER_SYSTEM_SPEC`, `NOISE_BLEND_SPEC`,
+  `MASKING_SPEC`, `SIM_ALGORITHMS_SPEC`, `PLACEMENT_SCATTER_SPEC`,
+  `PREVIEW_COMPOSITING_SPEC`.
+- Systems/perf: `OPTIMIZATION_REVIEW`, `OPTIMIZATION_PILLARS`, `MATH_SIMD_SPEC`,
+  `DISPATCH_INTERFACE_SPEC`, `UI_FRAMEWORK_SPEC`, `DETERMINISM_SPEC`.
+- Future: `FUTURE_SIM_TYPES_SPEC` (fluvial/glacial/snow-melt), `AI_HOSTCLIENT_SPEC`.
 
-## Open design items (from LAYER_SYSTEM_SPEC)
-- tint_geometry.tga channel layout (login-walled resource — owner to supply).
-- Stratum chosen by an Add/raise Shaper GeoLayer (confirm).
-- (Resolved: multi-Material-GeoLayer combine = the global Separate/Unified sim toggle.)
-2. Deep AI/host/client/systems read (AIFunctions 233KB, platoon functions 614KB)
-   — only if pursuing custom AI; tangential to core map-gen.
+## Key facts locked this pass
+- **Entity positions = absolute world/game units** (not fractions). Map `height` =
+  terrain vertical extent; a prop with Y > height floats above all terrain. A 0–1 UI
+  height converts via `× maxHeight` before storage. `maxHeight` must be read from the
+  map, never the hardcoded `128`. The "1 unit ≈ 10 m" ratio is an arbitrary
+  scale-authoring convention, NOT coordinate math. (See `SANMAP_FORMAT_SPEC`.)
+- **Unit thumbnails ARE stored** (`UI/Sprites/Icons/Units/<tpId>.dds`, 64² DXT5,
+  load direct); only **prop** thumbnails must be rendered on demand + cached.
+- **Cross-cutting v2 theme (the ARCH's spine):** the compute layer is doubled and
+  divergent — CPU vs GPU write each kernel twice with different math, the preview
+  re-simulates instead of sampling the bake, `core/data/*` is a dead duplicate
+  island, and several `Gen_*` bodies are declared-but-unimplemented. Fix = one kernel
+  per stage + one dispatch contract (`DISPATCH_INTERFACE_SPEC`) + one source of truth.
 
-## Known fix-targets (from import/export)
-- Exporter writes identity quaternions — rotation conversion is unimplemented.
-- Props export is disabled (outdated prop formats fail loading) — needs fixing.
-- Coordinate flip `world.z = length - z - 1` must be applied on export / inverted
-  on import.
+## Known fix-targets (from import/export & surveys)
+- Exporter writes identity quaternions — rotation conversion unimplemented.
+- Props export disabled (outdated prop formats fail loading) — needs fixing.
+- Coordinate flip `world.z = length - z - 1` on export / inverted on import.
+- Hardcoded absolute shader paths (`D:/Projects/...`); per-dispatch shader recompile;
+  N ad-hoc `UseGPUx` bools; `rand()` non-determinism; mislabeled AoS-as-SoA props.
 
-## Then: author the ARCH
-With the user, work Appendix A's hit-list into `ARCH.md`: naming law + file-size
-ceilings, the layer boundaries, the CPU/GPU dispatch field names/defaults, and
-the god-object dismemberment plan. This is the interactive, decision-heavy step.
+## Open items to confirm with dev
+- Whether the ×10 (game-unit↔meters) or any scaling touches the heightmap texture
+  itself, or only entity scale/placement (leaning: only scale authoring).
+- tint_geometry.tga channel layout (was login-walled).
+- Deep AI/host/client/systems lua read — only if pursuing custom AI/shared-gen depth.
+
+## Then: author ARCH.md (the interactive, decision-heavy step)
+Work Appendix A's hit-list + this pack into `ARCH.md`: the naming law, file-size
+ceilings, module/layer boundaries, the CPU/GPU dispatch field names + defaults, the
+god-object dismemberment plan (`NoiseLayer`, `Widget_MapCanvas`, `PreviewRenderer`),
+and the v2 rebuild order (foundation: math/dispatch/resource-manager first).
