@@ -71,6 +71,13 @@ void GenerationAssembler::SetThreadPool(Sys::ThreadPool* pool) {
     bakeStage.SetThreadPool(pool);
 }
 
+// Evaluating a stage's own hash costs a walk of its settings, never a stage run — so the two-tier
+// dirty derivation can ask every stage "is this parameter yours?" between two user keystrokes.
+std::size_t GenerationAssembler::ComputeStageParameterHash(std::size_t stageIndex) const {
+    if (stageIndex >= stageParameterHashFunctions.size()) return 0;
+    return stageParameterHashFunctions[stageIndex]();
+}
+
 RegenerationTier GenerationAssembler::TierOfStage(const std::string& stageName) const {
     for (const StageDescription& description : stageDescriptions)
         if (description.name == stageName) return description.tier;

@@ -10,6 +10,7 @@
 // FINAL proportions, and Placement/Bake must see resolved surface weights. Any future sim
 // (FUTURE_SIM_TYPES_SPEC) is inserted into the sim block, BEFORE Mask — a standing rule.
 #include "GenerationAssembler_PIPELINE.h"
+#include <cstdint>
 
 namespace SanmapGen {
 namespace Pipeline {
@@ -18,7 +19,23 @@ void GenerationAssembler::AddStage(const std::string& stageName, RegenerationTie
                                    std::function<std::size_t()> computeParameterHash,
                                    std::function<void()> run) {
     stageDescriptions.push_back(StageDescription{ stageName, tier });
+    stageParameterHashFunctions.push_back(computeParameterHash);
     pipeline.AddStage(stageName, std::move(computeParameterHash), std::move(run));
+}
+
+// ARCH §8.3: the spatial grid is a derived INDEX over the resolved markers, not a new physical
+// quantity, so it gets no PROC stage of its own — PIPELINE is its single writer (§3.4.1) and
+// builds it immediately after Placement, inside the same registered run. A refresh that does not
+// re-run Placement therefore cannot move it, which is exactly what the preview tier relies on.
+// The horizontal pair is positionX/positionZ; positionY is terrain HEIGHT (PlacementInstance_DATA),
+// and the picker compares against those same two columns (Picking_UI).
+void GenerationAssembler::BuildMarkerSpatialGrid() {
+    const Data::PlacementInstances& markers = placementResults.markers;
+    markerSpatialGrid.Configure(static_cast<float>(recipe.geometry.mapSize) * WorldUnitsPerCell(),
+                                spatialGridChunkResolution);
+    markerSpatialGrid.Build(markers.positionX.data(), markers.positionZ.data(),
+                            static_cast<std::int32_t>(markers.Count()));
+    ++spatialGridBuildCount;
 }
 
 void GenerationAssembler::RegisterStages() {
@@ -35,7 +52,7 @@ void GenerationAssembler::RegisterStages() {
     AddStage("Mask", full, [this] { return maskStage.ComputeParameterHash(); },
              [this] { maskStage.Run(); });
     AddStage("Placement", full, [this] { return placementStage.ComputeParameterHash(); },
-             [this] { placementStage.Run(); });
+             [this] { placementStage.Run(); BuildMarkerSpatialGrid(); });
     AddStage("Bake", RegenerationTier::PreviewOnly, [this] { return bakeStage.ComputeParameterHash(); },
              [this] { bakeStage.Run(); });
 }

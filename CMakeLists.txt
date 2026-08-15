@@ -145,6 +145,7 @@ file(GLOB_RECURSE SANGEN_V2_SOURCES CONFIGURE_DEPENDS
     "src/params/*.cpp"   "src/params/*.h"
     "src/proc/*.cpp"     "src/proc/*.h"
     "src/pipeline/*.cpp" "src/pipeline/*.h"
+    "src/ui/*.cpp"       "src/ui/*.h"
     "src/sys/*.cpp"      "src/sys/*.h"
     "src/io/*.cpp"       "src/io/*.h"
 )
@@ -153,7 +154,9 @@ list(FILTER SANGEN_V2_SOURCES EXCLUDE REGEX "_Test\\.cpp$")
 
 # The GPU twins (ARCH §1.4) are compiled by the driver at run time, not by MSVC — they are
 # listed so each .glsl sits beside its CPU .cpp in the IDE and any divergence is visible.
-file(GLOB_RECURSE SANGEN_V2_SHADERS CONFIGURE_DEPENDS "src/proc/*.glsl")
+# They live beside their CPU twin in the OWNING layer's folder: the PROC stage kernels in
+# src/proc, the preview composite's kernel in src/ui (ARCH §8.1 — the composite is UI).
+file(GLOB_RECURSE SANGEN_V2_SHADERS CONFIGURE_DEPENDS "src/proc/*.glsl" "src/ui/*.glsl")
 set_source_files_properties(${SANGEN_V2_SHADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
 
 add_library(SanGenV2 STATIC ${SANGEN_V2_SOURCES} ${SANGEN_V2_SHADERS})
@@ -172,9 +175,18 @@ if(WIN32)
     target_link_libraries(SanGenV2 PUBLIC opengl32)
 endif()
 
-# The GPU-backed stages load their .glsl twins from a shader directory at run time;
-# every stage's kernels live beside their CPU twin in src/proc (ARCH §1.4/§2).
-set(SANGEN_V2_SHADER_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/proc")
+# The GPU-backed units load their .glsl twins from ONE shader directory at run time
+# (Sys::GpuResourceManager resolves `<shaderDirectory>/<fileName>` — a single directory, never an
+# absolute path). Their sources deliberately live in the OWNING layer's folder (src/proc for the
+# PROC stages, src/ui for the preview composite), so the build stages every kernel into one
+# directory the manager can be pointed at. ARCH §1.1/§1.4 give every kernel a layer-suffixed
+# name, so the staged directory is collision-free. configure_file registers each source as a
+# configure dependency: editing a .glsl re-runs CMake and re-stages it.
+set(SANGEN_V2_SHADER_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/sangen_shaders")
+foreach(shaderFile ${SANGEN_V2_SHADERS})
+    get_filename_component(shaderName "${shaderFile}" NAME)
+    configure_file("${shaderFile}" "${SANGEN_V2_SHADER_DIRECTORY}/${shaderName}" COPYONLY)
+endforeach()
 
 # add_sangen_test(<name> <source>...) — one acceptance-test executable, registered
 # with CTest and handed the shader directory as argv[1] (ignored by tests that do
@@ -195,11 +207,14 @@ add_sangen_test(Reciprocal_MATH_Test            src/math/Reciprocal_MATH_Test.cp
 add_sangen_test(Trigonometry_MATH_Test          src/math/Trigonometry_MATH_Test.cpp)
 
 # DATA
+add_sangen_test(EntityIdBuffer_DATA_Test        src/data/EntityIdBuffer_DATA_Test.cpp)
 add_sangen_test(FloatField_DATA_Test            src/data/FloatField_DATA_Test.cpp)
 add_sangen_test(MapFields_DATA_Test             src/data/MapFields_DATA_Test.cpp)
+add_sangen_test(SpatialGrid_DATA_Test           src/data/SpatialGrid_DATA_Test.cpp)
 
 # PARAMS
 add_sangen_test(Geometry_PARAMS_Test            src/params/Geometry_PARAMS_Test.cpp)
+add_sangen_test(GradientRamp_PARAMS_Test        src/params/GradientRamp_PARAMS_Test.cpp)
 add_sangen_test(LayerStack_PARAMS_Test          src/params/LayerStack_PARAMS_Test.cpp)
 add_sangen_test(MapRecipe_PARAMS_Test           src/params/MapRecipe_PARAMS_Test.cpp)
 add_sangen_test(PlacementRules_PARAMS_Test      src/params/PlacementRules_PARAMS_Test.cpp)
@@ -247,3 +262,15 @@ add_sangen_test(GenerationAssembler_PIPELINE_Test
     src/pipeline/GenerationAssembler_PIPELINE_Test.cpp
     src/pipeline/GenerationAssembler_Outputs_PIPELINE_Test.cpp
     src/pipeline/GenerationAssembler_Dirty_PIPELINE_Test.cpp)
+
+# UI — each composite acceptance test declares its own main(), so each is its own binary; the
+# M4-5 integration test is one binary spanning three translation units.
+add_sangen_test(GradientLut_UI_Test               src/ui/GradientLut_UI_Test.cpp)
+add_sangen_test(Picking_UI_Test                   src/ui/Picking_UI_Test.cpp)
+add_sangen_test(PreviewComposite_UI_Test          src/ui/PreviewComposite_UI_Test.cpp)
+add_sangen_test(PreviewComposite_Wysiwyg_UI_Test  src/ui/PreviewComposite_Wysiwyg_UI_Test.cpp)
+add_sangen_test(PreviewComposite_Gpu_UI_Test      src/ui/PreviewComposite_Gpu_UI_Test.cpp)
+add_sangen_test(PreviewIntegration_UI_Test
+    src/ui/PreviewIntegration_UI_Test.cpp
+    src/ui/PreviewIntegration_DirtyTier_UI_Test.cpp
+    src/ui/PreviewIntegration_Picking_UI_Test.cpp)

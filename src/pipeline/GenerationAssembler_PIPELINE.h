@@ -17,6 +17,7 @@
 #include "Generation_PIPELINE.h"
 #include "../data/MapFields_DATA.h"
 #include "../data/PlacementResults_DATA.h"
+#include "../data/SpatialGrid_DATA.h"
 #include "../data/StratumArt_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../proc/Bake_PROC.h"
@@ -60,7 +61,27 @@ public:
     Data::MapFields&        Fields()        { return mapFields; }
     const Data::MapFields&  Fields() const  { return mapFields; }
     Data::PlacementResults& Placements()    { return placementResults; }
+    const Data::PlacementResults& Placements() const { return placementResults; }
     Proc::BakedTextureSet&  BakedTextures() { return bakedTextures; }
+
+    // The marker hit-test index (ARCH §8.3). PIPELINE is its SINGLE writer (§3.4.1): it is
+    // rebuilt inside the Placement stage's registered run, so a refresh that does not re-run
+    // Placement cannot move it, and no other layer may write it — Picking_UI only reads.
+    const Data::SpatialGrid& MarkerSpatialGrid() const { return markerSpatialGrid; }
+    int SpatialGridBuildCount() const { return spatialGridBuildCount; }
+    // Chunk count of that index — a tweakable (Constitution §8), applied on the next build.
+    void SetSpatialGridChunkResolution(int resolution) { spatialGridChunkResolution = resolution; }
+
+    // Heightfield cell -> game units (X/Z): the ONE value Placement emitted its instance
+    // positions with. The preview composite needs the same number to map an instance onto a
+    // pixel, and UI may not include a PROC header (ARCH §3.1), so it reads it here.
+    float WorldUnitsPerCell() const { return placementStage.Constants().worldUnitsPerCell; }
+
+    // One stage's own parameter hash, evaluated WITHOUT running anything. This is what makes
+    // the two-tier dirty derivation (PreviewDriver_PIPELINE) a function of stage ownership —
+    // a parameter belongs to whichever stage's declared hash it moves — instead of a
+    // hand-maintained per-widget list.
+    std::size_t ComputeStageParameterHash(std::size_t stageIndex) const;
 
     // The stages themselves — the tweakable constants each one owns (Constitution §8) are
     // reached through these until the remaining *_PARAMS homes exist (UI wiring is M4/M5).
@@ -84,6 +105,7 @@ public:
 
 private:
     void RegisterStages();                // GenerationAssembler_Stages_PIPELINE.cpp
+    void BuildMarkerSpatialGrid();        // GenerationAssembler_Stages_PIPELINE.cpp
     void AddStage(const std::string& stageName, RegenerationTier tier,
                   std::function<std::size_t()> computeParameterHash, std::function<void()> run);
 
@@ -93,6 +115,7 @@ private:
     Data::MapFields        mapFields;          // declared before the stages that reference them
     Data::PlacementResults placementResults;
     Proc::BakedTextureSet  bakedTextures;
+    Data::SpatialGrid      markerSpatialGrid;  // derived index over placementResults.markers
 
     Proc::NoiseBlendStage       noiseBlendStage;
     Proc::ErosionStage          erosionStage;
@@ -105,6 +128,11 @@ private:
     GenerationPipeline            pipeline;
     std::vector<StageDescription> stageDescriptions;
     std::vector<std::string>      stagesThatRan;
+    // The same hash closures the conductor holds, kept so a caller can ask "did any stage's
+    // own parameters move?" without running the pipeline to find out.
+    std::vector<std::function<std::size_t()>> stageParameterHashFunctions;
+    int spatialGridChunkResolution = Data::SpatialGrid::defaultChunkResolution;
+    int spatialGridBuildCount      = 0;
 };
 
 } // namespace Pipeline
