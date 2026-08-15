@@ -222,7 +222,10 @@ add_sangen_test(PlacementRules_PARAMS_Test      src/params/PlacementRules_PARAMS
 # SYS
 add_sangen_test(ArenaAllocator_SYS_Test         src/sys/ArenaAllocator_SYS_Test.cpp)
 add_sangen_test(Dispatch_SYS_Test               src/sys/Dispatch_SYS_Test.cpp)
-add_sangen_test(GpuResource_SYS_Test            src/sys/GpuResource_SYS_Test.cpp)
+add_sangen_test(GpuResource_SYS_Test
+    src/sys/GpuResource_SYS_Test.cpp
+    src/sys/GpuResource_Texture_SYS_Test.cpp
+    src/sys/GpuResource_ShaderPath_SYS_Test.cpp)
 add_sangen_test(ThreadPool_SYS_Test             src/sys/ThreadPool_SYS_Test.cpp)
 
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);

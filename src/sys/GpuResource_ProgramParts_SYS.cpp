@@ -2,36 +2,14 @@
 // for GpuResourceManager (SYS). A compute kernel too large for one file under the ARCH §1.5
 // ceiling ships as several GLSL compilation units (one declares main(), the rest provide
 // prototyped functions); this file compiles each and links them into one program, keeping
-// the same compile-once cache and the same "resolved path, never hardcoded" rule.
+// the same compile-once cache. Source loading and search-path resolution ("resolved path,
+// never hardcoded") live beside it in GpuResource_ShaderPath_SYS.cpp.
 #include "GpuResource_SYS.h"
 #include "GpuGlFunctions_SYS.h"
-#include <fstream>
-#include <sstream>
 #include <iostream>
 
 namespace SanmapGen {
 namespace Sys {
-
-std::string GpuResourceManager::LoadShaderSource(const std::string& shaderFileName,
-                                                 const std::string& shaderDefinitions, bool& bLoaded) {
-    std::ifstream file(shaderDirectory + "/" + shaderFileName);
-    if (!file.is_open()) {
-        std::cerr << "GpuResourceManager: cannot open shader '" << shaderFileName
-                  << "' under '" << shaderDirectory << "'.\n";
-        bLoaded = false;
-        return std::string();
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string source = buffer.str();
-    if (!shaderDefinitions.empty()) {
-        size_t afterVersion = source.find('\n');            // definitions go below #version
-        if (afterVersion == std::string::npos) afterVersion = source.size() - 1;
-        source.insert(afterVersion + 1, shaderDefinitions + "\n");
-    }
-    bLoaded = true;
-    return source;
-}
 
 unsigned GpuResourceManager::CompileShaderUnit(const std::string& source, const std::string& label) {
     GLuint shader = glCreateShaderPointer(kGlComputeShader);

@@ -38,6 +38,15 @@ enum : GLenum {
     kGlAlreadySignaled         = 0x911A,
     kGlConditionSatisfied      = 0x911C,
     kGlSyncFlushCommandsBit    = 0x00000001,
+    // Texture / image-unit tokens (the managed textures in GpuResource_Texture_SYS.cpp).
+    kGlRgba8                       = 0x8058,
+    kGlClampToEdge                 = 0x812F,
+    kGlTextureUnitZero             = 0x84C0,
+    kGlReadOnly                    = 0x88B8,
+    kGlWriteOnly                   = 0x88B9,
+    kGlReadWrite                   = 0x88BA,
+    kGlShaderImageAccessBarrierBit = 0x00000020,
+    kGlTextureUpdateBarrierBit     = 0x00000100,
 };
 
 // Function-pointer typedefs.
@@ -65,6 +74,10 @@ typedef void   (APIENTRYP FnGlDispatchCompute)(GLuint, GLuint, GLuint);
 typedef void   (APIENTRYP FnGlMemoryBarrier)(GLbitfield);
 typedef GLint  (APIENTRYP FnGlGetUniformLocation)(GLuint, const GpuGlChar*);
 typedef void   (APIENTRYP FnGlUniform1i)(GLint, GLint);
+// Texture entry points past GL 1.1 (glGenTextures/glTexImage2D/glGetTexImage are core 1.1
+// and are called directly through opengl32; only these two must be resolved).
+typedef void   (APIENTRYP FnGlActiveTexture)(GLenum);
+typedef void   (APIENTRYP FnGlBindImageTexture)(GLuint, GLuint, GLint, GLboolean, GLint, GLenum, GLenum);
 typedef GpuGlSync (APIENTRYP FnGlFenceSync)(GLenum, GLbitfield);
 typedef GLenum (APIENTRYP FnGlClientWaitSync)(GpuGlSync, GLbitfield, GpuGlUnsigned64);
 typedef void   (APIENTRYP FnGlDeleteSync)(GpuGlSync);
@@ -96,6 +109,8 @@ typedef void   (APIENTRYP FnGlDeleteSync)(GpuGlSync);
     ENTRY(FnGlMemoryBarrier,     glMemoryBarrierPointer,     "glMemoryBarrier") \
     ENTRY(FnGlGetUniformLocation,glGetUniformLocationPointer,"glGetUniformLocation") \
     ENTRY(FnGlUniform1i,         glUniform1iPointer,         "glUniform1i") \
+    ENTRY(FnGlActiveTexture,     glActiveTexturePointer,     "glActiveTexture") \
+    ENTRY(FnGlBindImageTexture,  glBindImageTexturePointer,  "glBindImageTexture") \
     ENTRY(FnGlFenceSync,         glFenceSyncPointer,         "glFenceSync") \
     ENTRY(FnGlClientWaitSync,    glClientWaitSyncPointer,    "glClientWaitSync") \
     ENTRY(FnGlDeleteSync,        glDeleteSyncPointer,        "glDeleteSync")

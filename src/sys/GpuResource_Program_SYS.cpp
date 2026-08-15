@@ -1,18 +1,13 @@
 // GpuResource_Program_SYS.cpp — program lifecycle, dispatch, and async fences for
 // GpuResourceManager (SYS). Compile-once caching lives here; the buffer side is in
-// GpuResource_Buffer_SYS.cpp behind the same header.
+// GpuResource_Buffer_SYS.cpp and GpuResource_Texture_SYS.cpp behind the same header; the
+// shader search path lives in GpuResource_ShaderPath_SYS.cpp.
 #include "GpuResource_SYS.h"
 #include "GpuGlFunctions_SYS.h"
-#include <fstream>
-#include <sstream>
 #include <iostream>
-#include <utility>
 
 namespace SanmapGen {
 namespace Sys {
-
-GpuResourceManager::GpuResourceManager(std::string shaderDirectoryPath)
-    : shaderDirectory(std::move(shaderDirectoryPath)) {}
 
 GpuResourceManager::~GpuResourceManager() {
     if (!bInitialized) return;
@@ -20,6 +15,8 @@ GpuResourceManager::~GpuResourceManager() {
         if (entry.program) glDeleteProgramPointer(entry.program);
     for (const PersistentBuffer& entry : buffers)
         if (entry.buffer) glDeleteBuffersPointer(1, &entry.buffer);
+    for (const ManagedTexture& entry : textures)
+        if (entry.texture) glDeleteTextures(1, &entry.texture);
 }
 
 bool GpuResourceManager::Initialize() {
@@ -64,20 +61,9 @@ GpuProgramHandle GpuResourceManager::GetOrCompileProgram(const std::string& shad
     for (size_t i = 0; i < programs.size(); ++i)
         if (programs[i].key == key) return GpuProgramHandle{ static_cast<int>(i) };
 
-    std::ifstream file(shaderDirectory + "/" + shaderFileName);
-    if (!file.is_open()) {
-        std::cerr << "GpuResourceManager: cannot open shader '" << shaderFileName
-                  << "' under '" << shaderDirectory << "'.\n";
-        return GpuProgramHandle{};
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string source = buffer.str();
-    if (!shaderDefinitions.empty()) {
-        size_t afterVersion = source.find('\n');
-        if (afterVersion == std::string::npos) afterVersion = source.size() - 1;
-        source.insert(afterVersion + 1, shaderDefinitions + "\n");
-    }
+    bool bLoaded = false;
+    const std::string source = LoadShaderSource(shaderFileName, shaderDefinitions, bLoaded);
+    if (!bLoaded) return GpuProgramHandle{};
 
     GLuint program = CompileProgramFromSource(source, shaderFileName);
     ++compileCount;
