@@ -22,7 +22,7 @@ void PlacementStage::AcceptCandidates(std::size_t configurationIndex,
     spacingGrid.Configure(bSpacingActive ? configuration.spacingMinimum : constants.candidateCellSizeMinimum,
                           vertexSize);
     Data::PlacementInstances& collection = CollectionFor(configuration.collectionIndex);
-    const float cellReciprocal = 1.0f / constants.worldUnitsPerCell;
+    const float cellReciprocal = 1.0f / recipe.geometry.worldUnitsPerCell;
     for (std::size_t index = 0; index < collection.Count(); ++index)
         spacingGrid.Insert(collection.positionX[index] * cellReciprocal,
                            collection.positionZ[index] * cellReciprocal);

@@ -14,11 +14,12 @@ namespace SanmapGen {
 namespace Ui {
 
 // Which BAKED field a layer colorizes. Every entry names a field `Data::MapFields` actually
-// carries. There is deliberately NO slope entry: no slope field is baked, and deriving one
-// here would be exactly the shadow-sim this milestone deletes (ARCH §3.2,
-// PREVIEW_COMPOSITING_SPEC "the shadow-sim problem"). A slope layer needs a baked slope
-// field first — a DATA work-order, not a shader.
-enum class PreviewLayerKind { HeightRamp, StratumSplat, Flow, Accumulation, Water };
+// carries. `Slope` colorizes the field the MASK stage bakes (M5-0c) — the composite SAMPLES it
+// like any other baked field and derives no gradient of its own, which is what keeps the
+// shadow-sim deleted (ARCH §3.2, PREVIEW_COMPOSITING_SPEC "the shadow-sim problem"). Slope is in
+// the pinned unit (gradient magnitude = rise/run), so a slope layer's domain is stated in that
+// unit; mapping it onto the ramp's 0..1 is the consumer's job as for every other field (§8.2).
+enum class PreviewLayerKind { HeightRamp, StratumSplat, Flow, Accumulation, Water, Slope };
 
 // The preview-only Z-order blend (PREVIEW_COMPOSITING_SPEC). Distinct from the geometry
 // `Params::HeightBlendMode`, which blends terrain height, not pixels.
@@ -76,8 +77,8 @@ struct PreviewCompositeSettings {
     float entityMarkColor[4]     = {1.0f, 0.85f, 0.1f, 1.0f};
 
     // Heightfield cell -> game units (X/Z), the same quantity Placement emitted its instance
-    // positions with (`Proc::PlacementConstants::worldUnitsPerCell`). UI may not include a
-    // PROC header (ARCH §3.1), so PIPELINE sets both from one recipe value (M4-5).
+    // positions with (`Params::Geometry::worldUnitsPerCell` — map geometry, M5-0a). PIPELINE
+    // sets this mirror and Placement's reader from that one recipe value (M4-5).
     float worldUnitsPerCell = 1.0f;
 };
 

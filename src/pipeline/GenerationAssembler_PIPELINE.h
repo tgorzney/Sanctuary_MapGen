@@ -72,10 +72,11 @@ public:
     // Chunk count of that index — a tweakable (Constitution §8), applied on the next build.
     void SetSpatialGridChunkResolution(int resolution) { spatialGridChunkResolution = resolution; }
 
-    // Heightfield cell -> game units (X/Z): the ONE value Placement emitted its instance
-    // positions with. The preview composite needs the same number to map an instance onto a
-    // pixel, and UI may not include a PROC header (ARCH §3.1), so it reads it here.
-    float WorldUnitsPerCell() const { return placementStage.Constants().worldUnitsPerCell; }
+    // Heightfield cell -> game units (X/Z): map geometry (`Params::Geometry`, M5-0a), the ONE
+    // value Placement emitted its instance positions with. The preview composite needs the same
+    // number to map an instance onto a pixel; it reads it here so caller and stage can never
+    // read two different values.
+    float WorldUnitsPerCell() const { return recipe.geometry.worldUnitsPerCell; }
 
     // One stage's own parameter hash, evaluated WITHOUT running anything. This is what makes
     // the two-tier dirty derivation (PreviewDriver_PIPELINE) a function of stage ownership —

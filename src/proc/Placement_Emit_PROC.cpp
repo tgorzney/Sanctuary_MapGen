@@ -44,7 +44,7 @@ void PlacementStage::EmitInstance(std::size_t configurationIndex, const Symmetry
         const Data::FloatField& heightfield = mapFields.heightfield;
         const int lowX = ClampCell(cellX - 1, vertexSize), highX = ClampCell(cellX + 1, vertexSize);
         const int lowY = ClampCell(cellY - 1, vertexSize), highY = ClampCell(cellY + 1, vertexSize);
-        const float heightScale = recipe.geometry.terrainMaxHeight / constants.worldUnitsPerCell;
+        const float heightScale = recipe.geometry.terrainMaxHeight / recipe.geometry.worldUnitsPerCell;
         const float gradientX = (heightfield.Get(highX, cellY) - heightfield.Get(lowX, cellY))
                               * heightScale / static_cast<float>(highX - lowX > 0 ? highX - lowX : 1);
         const float gradientZ = (heightfield.Get(cellX, highY) - heightfield.Get(cellX, lowY))
@@ -57,8 +57,8 @@ void PlacementStage::EmitInstance(std::size_t configurationIndex, const Symmetry
                                 point.yawScale, point.yawOffsetRadians, normalX, normalY, normalZ);
 
     Data::PlacementInstance instance;
-    instance.positionX = point.positionX * constants.worldUnitsPerCell;
-    instance.positionZ = point.positionY * constants.worldUnitsPerCell;
+    instance.positionX = point.positionX * recipe.geometry.worldUnitsPerCell;
+    instance.positionZ = point.positionY * recipe.geometry.worldUnitsPerCell;
     instance.positionY = mapFields.heightfield.SampleBilinear(point.positionX, point.positionY)
                        * recipe.geometry.terrainMaxHeight;
     instance.rotationX = sampled.rotationX; instance.rotationY = sampled.rotationY;

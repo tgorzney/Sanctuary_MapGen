@@ -1,5 +1,9 @@
-// Placement_Fields_PROC.cpp — the derived fields every rule reads: the squared height
-// gradient (slope), the Jump-Flood exclusion distance field, and the per-rule gate field.
+// Placement_Fields_PROC.cpp — the derived fields every rule reads: the Jump-Flood exclusion
+// distance field and the per-rule gate field.
+// Slope is NOT among them: `MapFields.slope` is baked by the Mask stage, the single writer of
+// the one slope formula (ARCH §3.4.1, M5-0c). This stage reads that field and squares it at the
+// read site, because the gate compares against a squared tangent — the unit and the gate math
+// are unchanged; only the shadow recompute is gone.
 // The gate field is the Cpu twin of Placement_PROC.glsl — same ScatterGateWeight call, so
 // the preview gate and the authoritative bake evaluate one expression, not two.
 #include "Placement_PROC.h"
@@ -22,40 +26,19 @@ bool NeedsObstacleDistanceField(const std::vector<ScatterRuleConfiguration>& con
 
 } // namespace
 
-// Squared height gradient in game units per cell — squared because every slope gate compares
-// against a squared tangent, so neither backend ever needs a square root or an arc-tangent.
-void PlacementStage::BuildSlopeGradientField() {
-    const int vertexSize = mapFields.VertexSize();
-    const Data::FloatField& heightfield = mapFields.heightfield;
-    const float heightScale = recipe.geometry.terrainMaxHeight;
-    const float cellReciprocal = 1.0f / constants.worldUnitsPerCell;         // one-sided edge
-    const float spanReciprocal = 0.5f * cellReciprocal;                      // central difference
-    const int lastIndex = vertexSize - 1;
-
-    auto computeSlopeRow = [&](int y) {
-        const int lowY = y > 0 ? y - 1 : 0;
-        const int highY = y < lastIndex ? y + 1 : lastIndex;
-        const float reciprocalY = (highY - lowY) == 2 ? spanReciprocal : cellReciprocal;
-        for (int x = 0; x < vertexSize; ++x) {
-            const int lowX = x > 0 ? x - 1 : 0;
-            const int highX = x < lastIndex ? x + 1 : lastIndex;
-            const float reciprocalX = (highX - lowX) == 2 ? spanReciprocal : cellReciprocal;
-            const float gradientX = (heightfield.Get(highX, y) - heightfield.Get(lowX, y))
-                                  * heightScale * reciprocalX;
-            const float gradientY = (heightfield.Get(x, highY) - heightfield.Get(x, lowY))
-                                  * heightScale * reciprocalY;
-            slopeGradientField.Set(x, y, gradientX * gradientX + gradientY * gradientY);
-        }
-    };
-    if (threadPool != nullptr) threadPool->ParallelFor(0, vertexSize, computeSlopeRow);
-    else for (int y = 0; y < vertexSize; ++y) computeSlopeRow(y);
+// The baked slope at one vertex, squared for the gate. The unsized case answers a flat 0 rather
+// than reading past a field the Mask stage never wrote (Constitution §6).
+float PlacementStage::SampleSlopeGradientSquared(int cellX, int cellY) const {
+    if (!bSlopeFieldAvailable) return 0.0f;
+    const float slopeGradient = mapFields.slope.Get(cellX, cellY);
+    return slopeGradient * slopeGradient;
 }
 
 void PlacementStage::BuildDerivedFields() {
     const int vertexSize = mapFields.VertexSize();
-    slopeGradientField.Resize(vertexSize, vertexSize, 0.0f);
     gateWeightField.Resize(vertexSize, vertexSize, 0.0f);
-    BuildSlopeGradientField();
+    bSlopeFieldAvailable = mapFields.slope.Width() == vertexSize
+                        && mapFields.slope.Height() == vertexSize;
 
     // The Jump-Flood exclusion field is only paid for when some rule actually gates on it.
     if (!NeedsObstacleDistanceField(ruleConfigurations)) return;
@@ -96,7 +79,7 @@ void PlacementStage::BuildGateFieldCpu(std::size_t configurationIndex) {
                 const float obstacleDistance = bObstacleFieldBuilt ? obstacleDistanceField.Get(x, y)
                                                                    : defaultObstacleDistance;
                 weight = ScatterGateWeight(configuration, mapFields.heightfield.Get(x, y),
-                                           slopeGradientField.Get(x, y),
+                                           SampleSlopeGradientSquared(x, y),
                                            SampleSurfaceStratumWeight(configuration.maskStratumIndex, x, y),
                                            obstacleDistance, focusDistance);
             }

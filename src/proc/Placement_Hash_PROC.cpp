@@ -99,6 +99,7 @@ std::size_t PlacementStage::ComputeParameterHash() const {
     std::size_t hash = HashInteger(hashBasis, recipe.geometry.mapSize);
     hash = HashInteger(hash, static_cast<int>(recipe.geometry.seed));
     hash = HashFloat(hash, recipe.geometry.terrainMaxHeight);
+    hash = HashFloat(hash, recipe.geometry.worldUnitsPerCell);  // emitted positions scale with it
     hash = HashInteger(hash, recipe.globalSymmetryMask);
     hash = HashInteger(hash, recipe.water.bEnabled ? 1 : 0);
     hash = HashFloat(hash, recipe.water.waterLevelMaximum);
