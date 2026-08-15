@@ -1,0 +1,106 @@
+-- ShatterHole_01.santp
+--
+-- WHY THIS EXISTS
+--   Proof-of-concept terrain hole. The engine can already cut holes in the terrain
+--   render -- 75 shipped structure templates use it so buildings sit flush in the
+--   ground (see ugs1511.santp:208-221). Nothing has ever used it on a PROP.
+--   This template is the smallest possible prop that does nothing except punch a
+--   hole: no mesh, no collider, no selection bracket, no economy.
+--
+-- HOW IT WORKS
+--   common/loading/propTemplateLoader.lua:183-202 reads `visuals.holes` and builds
+--   one HoleTemplate per entry, then attaches them as a single HolesTemplate to the
+--   prefab's LOCAL template (the client-side half). Because LoadAllTemplates runs
+--   before the IsHost/IsClient branch in script.lua:90-91, host and client register
+--   byte-identical prefabs, so prefab IDs stay aligned. The host instantiates; the
+--   engine pairs a local entity on every client; the hole renders for everyone.
+--
+--   Omitting `visuals.lods` is deliberate. propTemplateLoader.lua:60 nil-guards it,
+--   so with no LODs no mesh is ever created -> an invisible entity that is nothing
+--   but a hole. That is exactly what a shatter wants.
+--
+--   Omitting `collider` is deliberate too. propTemplateLoader.lua:145 nil-guards
+--   `tp.collisionInfo`, so we get no selection volume and no selection bracket quad.
+--
+--   Omitting `visuals.skeleton` is deliberate. propTemplateLoader.lua:13 tests
+--   `~= nil`, and the shipped Pandemonium props set it to "" -- which still calls
+--   Engine.GetSkeletonBones(""). Leaving the key out skips that branch entirely.
+--
+-- DIALECT
+--   Root key is lowercase `propTemplate` -- required. Map props are loaded by
+--   common/mapUtils.lua:85 via `propFileString:gsub("propTemplate =", "return", 1)`.
+--   A capital `PropTemplate` (the engine-lua dialect used under
+--   common/props/propsTemplates/) will NOT match that gsub and the file will fail
+--   to load. See the two-dialect note in project memory.
+--
+-- WHERE IT GOES
+--   Inside Environment.sanpack, at:
+--     Environment/Pandemonium/Props/ShatterHole_01/ShatterHole_01.santp
+--   The zip-internal path IS the blueprintPath. Matches the per-tpId folder
+--   convention used by CrystCluster_B1.
+--
+-- TUNING
+--   holeSize is the raw float2 handed to EngineClasses.HoleTemplate. For scale
+--   reference, ugs1511 (a mid-size structure) uses 4.3 and 6.0. 40 is deliberately
+--   large so it is unmistakable on a 2048 map during the first test.
+--
+--   Prop holes are FORCED to rotation 0 at propTemplateLoader.lua:191 -- per-hole
+--   rotation is not authorable through a prop. Whether the instance quaternion
+--   rotates the hole is untested. `circle = true` sidesteps the question for now.
+--
+--   Prop holes ship ENABLED (propTemplateLoader.lua:201 passes disabled = false),
+--   unlike unit holes which ship disabled and are switched on by fog-of-war.
+--   So this appears immediately at map load with no scripting.
+--
+-- KNOWN LIMIT
+--   propTemplateLoader.lua:4 hardcodes PropRenderDistance = 80, passed at :192.
+--   The hole only renders within 80 world units of the camera. On a 2048 map that
+--   is close. If the first test looks like nothing happened, ZOOM IN before
+--   concluding it failed. (Units get 100 for mobiles / 160 for structures.)
+
+propTemplate = {
+
+    -- REQUIRED. propTemplateLoader.lua:22-27 indexes defence.health.value/.max/.regen
+    -- without nil-guarding the health table. Omitting this hard-errors on load.
+    -- Values are irrelevant -- nothing can damage this entity.
+    defence = {
+        health = {
+            max   = 1.0,
+            value = 1.0
+        }
+    },
+
+    -- REQUIRED. general.tpId is passed as the prefab name at propTemplateLoader.lua:213.
+    -- `class` is unused on the sanmap path (map props never get a Lua object -- see
+    -- mapUtils.lua:98, which calls InstantiatePrefab directly and discards the id),
+    -- but it is included so this same template also works via _G.CreateProp, which
+    -- resolves a class through propsUtilities.lua:7.
+    general = {
+        class = {
+            "propBaseClass",
+            "Prop"
+        },
+        name = "Shatter Hole (test)",
+        tpId = "ShatterHole_01"
+    },
+
+    -- No tags. Nothing should target, harvest, or filter this.
+    tags = {},
+
+    visuals = {
+        -- propTemplateLoader.lua:31 gates the ray-collider on this. False = skip.
+        isWreckage = false,
+
+        -- The entire point of the file.
+        -- Each entry -> one HoleTemplate(holeSize, holeOffset, 0, 80, true, circle).
+        -- Multiple entries are allowed on one entity (ugs1511 ships two), which is
+        -- how an irregular shatter footprint would eventually be built.
+        holes = {
+            {
+                circle   = true,
+                holeSize = { x = 40.0, y = 40.0 }
+                -- holeOffset defaults to (0,0) at propTemplateLoader.lua:190
+            }
+        }
+    }
+}

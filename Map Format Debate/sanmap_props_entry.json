@@ -1,0 +1,114 @@
+PASTE TARGET
+============
+File:  E:\...\Sanctuary_Data\Maps\Pandemonium Isthmus\Pandemonium Isthmus.sanmap
+Line:  6145 is `    "props": [`
+
+Your props array currently holds 2 entries. Paste the block below as a THIRD entry:
+put a comma after the closing `}` of the CrystCluster_B1 entry, then paste.
+
+Indentation below matches the file's existing style exactly.
+
+
+        {
+            "blueprintPath": "Environment/Pandemonium/Props/ShatterHole_01/ShatterHole_01.santp",
+            "transforms": [
+                {
+                  "position": {
+                    "x": 1024.0,
+                    "y": 84.232421875,
+                    "z": 1024.0
+                  },
+                  "rotation": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
+                    "w": 1.0
+                  },
+                  "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                  }
+                }
+            ]
+        }
+
+
+WHY THESE NUMBERS
+=================
+
+position (1024, 84.232421875, 1024)
+    x/z = exact map centre. Map is 2048 x 2048.
+    Also the centre of your PlayableArea, which is 356 x 356 at (846, 846),
+    so it spans 846..1202 on both axes.
+    y is copied verbatim from your existing edbm0149 prop, which already sits at
+    map centre -- so that IS the terrain height there, already measured.
+    Note: prop positions are absolute world elevation. RunMapSetup does NOT snap
+    props to terrain (mapUtils.lua:94-100). Only alloy markers get snapped
+    (mapUtils.lua:130-136). So y must be correct going in.
+
+rotation = identity
+    Prop holes are forced to rotation 0 at propTemplateLoader.lua:191 regardless.
+
+scale = 1.0  <-- THE ONE THAT WILL BITE YOU
+    Your existing centre prop (edbm0149) uses scale 50.0. If you copy that habit
+    here, and instance scale DOES propagate to the hole, a 40-unit hole becomes
+    2000 units -- larger than the entire 2048 map. It would read as either
+    "nothing happened" or "the terrain broke", and you would not know which.
+    Keep scale at 1.0 for the first run so you are measuring holeSize directly.
+    Whether instance scale affects hole size is UNVERIFIED -- this test answers it.
+
+
+BEFORE YOU LAUNCH
+=================
+
+Back up the .sanmap. You already have `Pandemonium Isthmus.sanmap.bak` from
+2026-08-13; make a fresh one.
+
+Reason, from your own project notes:
+
+    "A BAD blueprintPath ABORTS THE REST OF MAP LOAD (confirmed in-game 2026-08).
+     Props that DO resolve still render, but everything parsed after props --
+     alloy/resource markers especially -- silently never spawns."
+
+mapUtils.lua:107 calls Engine.Error() on an unreadable blueprint, which kills
+RunMapSetup before the alloy block at :113.
+
+So: if the .santp is not where the blueprintPath says it is, ALL 282 OF YOUR
+ALLOYS DISAPPEAR, and the symptom points at markers, not at props.
+
+
+PASS / FAIL, IN ORDER
+=====================
+
+1. Do your alloys still spawn?
+       NO  -> the path is wrong. Nothing else below matters. Fix the path first.
+       YES -> the .santp resolved and parsed. That alone is the main risk cleared.
+
+2. Zoom the camera in close to map centre.
+       PropRenderDistance is hardcoded to 80 (propTemplateLoader.lua:4).
+       The hole only renders within 80 world units. On a 2048 map that is TIGHT.
+       Do not conclude failure from a wide shot.
+
+3. Is there a hole?
+       YES -> holes work on props. The whole shatter feature is now unblocked
+              and everything after this is placement and triggering.
+       NO, but alloys spawned -> the template loaded but the hole did not render.
+              Most likely causes, in order:
+                a) still outside the 80-unit render distance
+                b) holeSize semantics differ from what shipped structures imply
+                   (try 6.0 to match ugs1511's circle hole exactly)
+                c) y is wrong -- the hole may need to be at or just under terrain
+                d) holes genuinely need a mesh present to render against; if so,
+                   add a `visuals.lods` block borrowed from CrystCluster_B1
+
+
+NEXT TEST AFTER IT WORKS
+========================
+
+Duplicate the entry with scale 2.0 instead of 1.0, at a different position.
+If the second hole is twice the size, instance scale drives hole size -- which
+means one prefab covers every hole size you will ever want, and random scale is
+free. If it is identical, you need a ladder of fixed-size prefabs instead.
+
+That single comparison decides the whole random-scale design.
