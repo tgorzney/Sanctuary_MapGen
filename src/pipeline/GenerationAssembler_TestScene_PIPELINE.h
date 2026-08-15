@@ -1,8 +1,8 @@
 // GenerationAssembler_TestScene_PIPELINE.h — test-only scaffolding for the M3-8 end-to-end
 // acceptance test (not part of the layer graph; nothing in src/ includes it outside a
-// *_Test.cpp). Builds the MapRecipe the whole pipeline runs on — a two-layer stack, a
-// slope-gated stratum, one enabled erosion layer, marker + prop scatter rules and tinted bake
-// strata — plus the small field probes the assertions read.
+// *_Test.cpp). Builds the MapRecipe the whole pipeline runs on — a two-layer stack, the ONE
+// per-stratum settings array (slope gate + tints, ARCH 7.1), one enabled erosion layer and
+// marker + prop scatter rules — plus the small field probes the assertions read.
 #pragma once
 #include "GenerationAssembler_PIPELINE.h"
 #include <cstring>
@@ -46,12 +46,28 @@ inline void AddLayerStack(Params::MapRecipe& recipe) {
     recipe.layerStack.geoLayers.push_back(group);
 }
 
+// The one per-stratum settings array the Mask and Bake stages both read (no rival arrays).
+inline void AddStrata(Params::MapRecipe& recipe) {
+    recipe.strata.assign(static_cast<std::size_t>(Data::MapFields::stratumCount), Params::Stratum());
+    Params::Stratum& detailStratum = recipe.strata[detailStratumIndex];
+    detailStratum.bSlopeGateEnabled       = true;
+    detailStratum.maximumSlopeDegrees     = 25.0f;
+    detailStratum.bUseSmoothstep          = true;
+    detailStratum.slopeFeatherDegreesHigh = 5.0f;
+    for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum) {
+        recipe.strata[stratum].tintRed   = 0.1f + 0.1f * static_cast<float>(stratum);
+        recipe.strata[stratum].tintGreen = 1.0f - 0.1f * static_cast<float>(stratum);
+        recipe.strata[stratum].tintBlue  = 0.5f;
+    }
+}
+
 inline Params::MapRecipe MakeRecipe(unsigned int seed) {
     Params::MapRecipe recipe;
     recipe.geometry.mapSize          = mapSize;
     recipe.geometry.seed             = seed;
     recipe.geometry.terrainMaxHeight = 128.0f;
     AddLayerStack(recipe);
+    AddStrata(recipe);
 
     Params::MarkerRule spawnRule;            // hashed selection: no clearance scoring needed
     spawnRule.category         = Params::MarkerCategory::Spawn;
@@ -71,26 +87,13 @@ inline Params::MapRecipe MakeRecipe(unsigned int seed) {
     return recipe;
 }
 
-// The stage-owned settings (still PROC-local structs until their *_PARAMS homes exist).
+// The stage-owned constants (the per-stratum settings live in the recipe, ARCH 7.1).
 inline void ConfigureStages(Pipeline::GenerationAssembler& assembler) {
-    Params::StratumMask& detailMask = assembler.StratumMaskSettings()[detailStratumIndex];
-    detailMask.bSlopeGateEnabled   = true;
-    detailMask.maximumSlopeDegrees = 25.0f;
-    detailMask.bUseSmoothstep      = true;
-    detailMask.slopeFeatherDegreesHigh = 5.0f;
-
     Proc::ErosionLayerSettings& erosionLayer = assembler.Erosion().LayerSettings(0);
     erosionLayer.bEnabled     = true;
     erosionLayer.dropletCount = erosionDropletCount;
 
     assembler.Thermal().Constants().iterationCount = thermalIterationCount;
-
-    for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum) {
-        Proc::StratumBakeSource& source = assembler.Bake().Stratum(stratum);
-        source.tintRed   = 0.1f + 0.1f * static_cast<float>(stratum);
-        source.tintGreen = 1.0f - 0.1f * static_cast<float>(stratum);
-        source.tintBlue  = 0.5f;
-    }
 }
 
 inline unsigned long long FieldChecksum(const Data::FloatField& field) {

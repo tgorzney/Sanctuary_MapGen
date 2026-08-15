@@ -1,7 +1,7 @@
 #version 430 core
 // Thermal_PROC.glsl — Gpu speed path of the talus-relaxation stage; twin of Thermal_PROC.cpp.
 // Two passes over the same program, mirroring the Cpu sweep exactly: THERMAL_PASS_PREPARE
-// publishes each cell's talus threshold (blended from its material masks) and its spread
+// publishes each cell's talus threshold (blended from its material proportions) and its spread
 // factor; THERMAL_PASS_APPLY gathers — every cell subtracts what it owes and adds what each
 // neighbour owes it, reading heightRead and writing heightWrite (ping-pong, so no invocation
 // ever writes a cell another invocation reads this pass). That retires the legacy
@@ -11,8 +11,8 @@ layout(local_size_x = THERMAL_TILE_WIDTH, local_size_y = THERMAL_TILE_HEIGHT) in
 
 layout(std430, binding = 0) readonly  buffer HeightRead      { float heightRead[]; };
 layout(std430, binding = 1) writeonly buffer HeightWrite     { float heightWrite[]; };
-layout(std430, binding = 2) readonly  buffer MaskRead        { float maskRead[]; };
-layout(std430, binding = 3) writeonly buffer MaskWrite       { float maskWrite[]; };
+layout(std430, binding = 2) readonly  buffer ProportionRead   { float proportionRead[]; };
+layout(std430, binding = 3) writeonly buffer ProportionWrite  { float proportionWrite[]; };
 layout(std430, binding = 4)           buffer SpreadFactor    { float cellSpreadFactor[]; };
 layout(std430, binding = 5)           buffer TalusThreshold  { float cellTalusThreshold[]; };
 // Sized, not unsized: the talus slots are read at THERMAL_SLOT_TALUS_BASE + stratum, and a
@@ -21,7 +21,7 @@ layout(std430, binding = 6) readonly  buffer KernelConstants { float kernelConst
 
 uniform int vertexSize;
 uniform int passMode;
-uniform int transportMaterialMasks;
+uniform int transportMaterialProportions;
 
 // Visit order is load-bearing: it must match thermalNeighbourOffsetX/Y in Thermal_Kernel_PROC.h
 // so both backends accumulate the same floats in the same order. Spelled as a function, not a
@@ -48,11 +48,11 @@ float blendCellTalusThreshold(int cellIndex, int cellCount) {
     float weightSum = 0.0;
     float weightedThreshold = 0.0;
     for (int stratum = 0; stratum < THERMAL_STRATUM_COUNT; ++stratum) {
-        float weight = maskRead[stratum * cellCount + cellIndex];
+        float weight = proportionRead[stratum * cellCount + cellIndex];
         weightSum += weight;
         weightedThreshold += weight * kernelConstants[THERMAL_SLOT_TALUS_BASE + stratum];
     }
-    if (weightSum > kernelConstants[THERMAL_SLOT_MASK_EPSILON])
+    if (weightSum > kernelConstants[THERMAL_SLOT_PROPORTION_EPSILON])
         return weightedThreshold * (1.0 / weightSum);
     return kernelConstants[THERMAL_SLOT_TALUS_BASE];
 }
@@ -78,8 +78,8 @@ void runApplyPass(ivec2 cell, int cellIndex, int cellCount) {
     float height = heightRead[cellIndex];
     float threshold = cellTalusThreshold[cellIndex];
     float spreadFactor = cellSpreadFactor[cellIndex];
-    float donorMask[THERMAL_STRATUM_COUNT];
-    for (int stratum = 0; stratum < THERMAL_STRATUM_COUNT; ++stratum) donorMask[stratum] = 0.0;
+    float donorProportion[THERMAL_STRATUM_COUNT];
+    for (int stratum = 0; stratum < THERMAL_STRATUM_COUNT; ++stratum) donorProportion[stratum] = 0.0;
     float outflow = 0.0;
     float totalInflow = 0.0;
     for (int step = 0; step < THERMAL_NEIGHBOUR_COUNT; ++step) {
@@ -91,24 +91,24 @@ void runApplyPass(ivec2 cell, int cellIndex, int cellCount) {
         float received = cellSpreadFactor[index]
                        * excessDrop(neighbourHeight, height, cellTalusThreshold[index]);
         totalInflow += received;
-        if (transportMaterialMasks != 0)
+        if (transportMaterialProportions != 0)
             for (int stratum = 0; stratum < THERMAL_STRATUM_COUNT; ++stratum)
-                donorMask[stratum] += received * maskRead[stratum * cellCount + index];
+                donorProportion[stratum] += received * proportionRead[stratum * cellCount + index];
     }
     heightWrite[cellIndex] = height - outflow + totalInflow;
 
-    if (transportMaterialMasks == 0) return;
+    if (transportMaterialProportions == 0) return;
     if (totalInflow <= kernelConstants[THERMAL_SLOT_MOVEMENT_EPSILON]) {
         for (int stratum = 0; stratum < THERMAL_STRATUM_COUNT; ++stratum)
-            maskWrite[stratum * cellCount + cellIndex] = maskRead[stratum * cellCount + cellIndex];
+            proportionWrite[stratum * cellCount + cellIndex] = proportionRead[stratum * cellCount + cellIndex];
         return;
     }
     float minimumColumnDepth = kernelConstants[THERMAL_SLOT_MINIMUM_COLUMN_DEPTH];
     float columnDepth = height > minimumColumnDepth ? height : minimumColumnDepth;
     float inverseTotal = 1.0 / (columnDepth + totalInflow);
     for (int stratum = 0; stratum < THERMAL_STRATUM_COUNT; ++stratum)
-        maskWrite[stratum * cellCount + cellIndex] =
-            (maskRead[stratum * cellCount + cellIndex] * columnDepth + donorMask[stratum]) * inverseTotal;
+        proportionWrite[stratum * cellCount + cellIndex] =
+            (proportionRead[stratum * cellCount + cellIndex] * columnDepth + donorProportion[stratum]) * inverseTotal;
 }
 
 void main() {

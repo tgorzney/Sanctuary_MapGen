@@ -8,7 +8,7 @@
 //   slope = |grad(height * terrainMaxHeight)| over a cellSize grid
 // The heightfield is the normalized 0..1 field the noise/blend stage wrote; `heightScale` is
 // Geometry.terrainMaxHeight READ FROM THE MAP (never the old hardcoded 128). Degrees are the
-// designer-facing unit only (StratumMask_PARAMS) and are converted to gradient — via tan() on
+// designer-facing unit only (Stratum_PARAMS) and are converted to gradient — via tan() on
 // the host, once per run — before either backend ever sees them, so no tan() runs per cell and
 // the two backends cannot disagree about the unit.
 #pragma once

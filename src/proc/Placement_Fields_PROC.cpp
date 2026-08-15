@@ -69,11 +69,14 @@ void PlacementStage::BuildDerivedFields() {
     bObstacleFieldBuilt = true;
 }
 
-float PlacementStage::SampleMaskWeight(int stratumIndex, int cellX, int cellY) const {
+// The stratum gate is a VISIBILITY statement — "scatter trees where the grass shows" — so it
+// reads the Mask stage's surface weights, never the physical proportions (ARCH §7.2.6). This
+// is what makes placement WYSIWYG with the preview.
+float PlacementStage::SampleSurfaceStratumWeight(int stratumIndex, int cellX, int cellY) const {
     if (stratumIndex < 0 || stratumIndex >= Data::MapFields::stratumCount) return 1.0f;
-    const Data::FloatField& mask = mapFields.materialMasks[stratumIndex];
-    if (mask.IsEmpty()) return 0.0f;
-    return mask.Get(cellX, cellY);
+    const Data::FloatField& stratumWeights = mapFields.surfaceStratumWeights[stratumIndex];
+    if (stratumWeights.IsEmpty()) return 0.0f;
+    return stratumWeights.Get(cellX, cellY);
 }
 
 void PlacementStage::BuildGateFieldCpu(std::size_t configurationIndex) {
@@ -94,7 +97,7 @@ void PlacementStage::BuildGateFieldCpu(std::size_t configurationIndex) {
                                                                    : defaultObstacleDistance;
                 weight = ScatterGateWeight(configuration, mapFields.heightfield.Get(x, y),
                                            slopeGradientField.Get(x, y),
-                                           SampleMaskWeight(configuration.maskStratumIndex, x, y),
+                                           SampleSurfaceStratumWeight(configuration.maskStratumIndex, x, y),
                                            obstacleDistance, focusDistance);
             }
             gateWeightField.Set(x, y, weight);

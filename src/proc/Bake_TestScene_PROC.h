@@ -2,6 +2,8 @@
 // counter, RGBA8 expectations, and the one two-stratum scene both halves (Cpu in
 // Bake_PROC_Test.cpp, Gpu in Bake_Gpu_PROC_Test.cpp) bake, so the two backends are compared
 // on IDENTICAL inputs. Test-only support; not compiled into the application.
+// The scene fills `surfaceStratumWeights` directly — that is the Mask stage's product and the
+// only weight field the bake reads (ARCH §7.2).
 #pragma once
 #include "Bake_PROC.h"
 #include <vector>
@@ -31,15 +33,27 @@ inline bool HasVariedTexels(const std::vector<unsigned int>& texels) {
     return false;
 }
 
-// A red base stratum at mask weight 0.25 and a blue stratum at 0.75, baked at 1:1.
-inline void BuildTwoStratumScene(Params::Geometry& geometry, Data::MapFields& fields, BakeStage& stage) {
+// The settings + loaded art the stage reads, owned by the test the way the recipe and the
+// asset loader own them in the application.
+struct BakeSceneInputs {
+    std::vector<Params::Stratum>  strata;
+    std::vector<Data::StratumArt> stratumArt;
+
+    BakeSceneInputs()
+        : strata(static_cast<std::size_t>(Data::MapFields::stratumCount)),
+          stratumArt(static_cast<std::size_t>(Data::MapFields::stratumCount)) {}
+};
+
+// A red base stratum at surface weight 0.25 and a blue stratum at 0.75, baked at 1:1.
+inline void BuildTwoStratumScene(Params::Geometry& geometry, Data::MapFields& fields,
+                                 BakeSceneInputs& scene, BakeStage& stage) {
     fields.Resize(geometry.VertexSize(), 0.0f);
-    fields.materialMasks[0].Fill(0.25f);
-    fields.materialMasks[1].Fill(0.75f);
+    fields.surfaceStratumWeights[0].Fill(0.25f);
+    fields.surfaceStratumWeights[1].Fill(0.75f);
     stage.Constants().outputResolutionMultiplier = 1;
     stage.Constants().minimumOutputResolution = 4;
-    stage.Stratum(0).tintRed = 1.0f; stage.Stratum(0).tintGreen = 0.0f; stage.Stratum(0).tintBlue = 0.0f;
-    stage.Stratum(1).tintRed = 0.0f; stage.Stratum(1).tintGreen = 0.0f; stage.Stratum(1).tintBlue = 1.0f;
+    scene.strata[0].tintRed = 1.0f; scene.strata[0].tintGreen = 0.0f; scene.strata[0].tintBlue = 0.0f;
+    scene.strata[1].tintRed = 0.0f; scene.strata[1].tintGreen = 0.0f; scene.strata[1].tintBlue = 1.0f;
 }
 
 inline Sys::DispatchPolicy CpuVisualPolicy() {

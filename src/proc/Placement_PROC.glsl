@@ -27,7 +27,7 @@ struct ScatterRuleConfiguration {
 layout(std430, binding = 0) readonly buffer RuleConfigurations { ScatterRuleConfiguration rules[]; };
 layout(std430, binding = 1) readonly buffer HeightField        { float heightValues[]; };
 layout(std430, binding = 2) readonly buffer SlopeGradientField { float slopeGradientValues[]; };
-layout(std430, binding = 3) readonly buffer MaskField          { float maskValues[]; };
+layout(std430, binding = 3) readonly buffer StratumWeightField { float surfaceWeightValues[]; };
 layout(std430, binding = 4) readonly buffer ObstacleField      { float obstacleValues[]; };
 layout(std430, binding = 5) writeonly buffer GateWeightField   { float gateWeights[]; };
 
@@ -79,7 +79,7 @@ void main() {
     float mapCenter = float(vertexSize - 1) * 0.5;
     vec2 offset = vec2(float(cell.x) - mapCenter, float(cell.y) - mapCenter);
     float focusDistance = sqrt(dot(offset, offset));
-    float maskWeight = bMaskFieldPresent != 0 ? maskValues[index] : 1.0;
+    float maskWeight = bMaskFieldPresent != 0 ? surfaceWeightValues[index] : 1.0;
     float obstacleDistance = bObstacleFieldPresent != 0 ? obstacleValues[index]
                                                         : PLACEMENT_OBSTACLE_DISTANCE_DEFAULT;
     gateWeights[index] = scatterGateWeight(rule, heightValues[index], slopeGradientValues[index],

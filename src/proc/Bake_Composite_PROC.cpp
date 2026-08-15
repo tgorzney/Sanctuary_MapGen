@@ -1,8 +1,9 @@
-// Bake_Composite_PROC.cpp — the CPU twin of the bake kernel: for every output texel, remap
-// each stratum's material-mask weight, sample that stratum's tiled albedo (or its flat
-// preview tint when it has no texture), and accumulate the weighted composite. Mirrors
-// Bake_PROC.glsl expression for expression — same tiling, same bilinear filters, same
-// round-to-nearest quantization — so the Visual-class backends agree (ARCH §6.1).
+// Bake_Composite_PROC.cpp — the CPU twin of the bake kernel: for every output texel, sample
+// each stratum's SURFACE weight, sample that stratum's tiled albedo (or its flat preview tint
+// when it has no texture), and accumulate the weighted composite. Mirrors Bake_PROC.glsl
+// expression for expression — same tiling, same bilinear filters, same round-to-nearest
+// quantization — so the Visual-class backends agree (ARCH §6.1).
+// No remap here: the weights arrive already remapped from the Mask stage (ARCH §7.2.5).
 #include "Bake_PROC.h"
 #include "Bake_Sampling_PROC.h"
 #include "../sys/ThreadPool_SYS.h"
@@ -15,29 +16,29 @@ namespace {
 // stays a pure function of its inputs (and short enough to read, ARCH §1.5).
 struct TexelKernelInputs {
     const StratumKernelConfiguration* configurations;
-    const StratumBakeSource*          sources;
-    const Data::FloatField*           materialMasks;
+    const unsigned int* const*        albedoTexels;      // one borrowed pointer per stratum
+    const Data::FloatField*           surfaceStratumWeights;
     const BakeConstants*              constants;
-    float maskScale;
+    float weightScale;
     int   baseStratumIndex;
 };
 
-// One texel of the composite: remapped weights out, weighted colour out. Twin of
-// compositeTexel() in Bake_PROC.glsl.
+// One texel of the composite: weights out, weighted colour out. Twin of compositeTexel() in
+// Bake_PROC.glsl.
 void CompositeTexel(const TexelKernelInputs& inputs, float mapU, float mapV,
                     float* weights, float& red, float& green, float& blue) {
     float weightTotal = 0.0f;
     red = 0.0f; green = 0.0f; blue = 0.0f;
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum) {
         const StratumKernelConfiguration& configuration = inputs.configurations[stratum];
-        const float rawWeight = configuration.bEnabled != 0
-            ? inputs.materialMasks[stratum].SampleBilinear(mapU * inputs.maskScale, mapV * inputs.maskScale)
+        const float weight = configuration.bEnabled != 0
+            ? inputs.surfaceStratumWeights[stratum].SampleBilinear(mapU * inputs.weightScale,
+                                                                   mapV * inputs.weightScale)
             : 0.0f;
-        const float weight = configuration.bEnabled != 0 ? RemapMaskWeight(rawWeight, configuration) : 0.0f;
         weights[stratum] = weight;
         if (weight > 0.0f) {
             float stratumRed = 0.0f, stratumGreen = 0.0f, stratumBlue = 0.0f;
-            SampleStratumColor(configuration, inputs.sources[stratum].albedoPixels,
+            SampleStratumColor(configuration, inputs.albedoTexels[stratum],
                                mapU, mapV, stratumRed, stratumGreen, stratumBlue);
             red += weight * stratumRed; green += weight * stratumGreen; blue += weight * stratumBlue;
         }
@@ -45,7 +46,7 @@ void CompositeTexel(const TexelKernelInputs& inputs, float mapU, float mapV,
     }
     if (weightTotal <= inputs.constants->weightEpsilon) {
         const int base = inputs.baseStratumIndex;
-        SampleStratumColor(inputs.configurations[base], inputs.sources[base].albedoPixels,
+        SampleStratumColor(inputs.configurations[base], inputs.albedoTexels[base],
                            mapU, mapV, red, green, blue);
     } else if (inputs.constants->bNormalizeWeights) {
         const float weightReciprocal = 1.0f / weightTotal;
@@ -64,12 +65,17 @@ void BakeStage::CompositeCpu() {
     const int resolution = bakedTextures.resolution;
     if (resolution <= 0 || !mapFields.IsSized() || stratumConfigurations.empty()) return;
     const int stratumCount = Data::MapFields::stratumCount;
+    const unsigned int* albedoTexels[Data::MapFields::stratumCount] = {};
+    for (int stratum = 0; stratum < stratumCount; ++stratum)
+        albedoTexels[stratum] = static_cast<std::size_t>(stratum) < stratumArt.size()
+                              ? stratumArt[stratum].albedoTexels : nullptr;
+
     TexelKernelInputs inputs;
-    inputs.configurations = stratumConfigurations.data();
-    inputs.sources        = stratumSources;
-    inputs.materialMasks  = mapFields.materialMasks;
-    inputs.constants      = &constants;
-    inputs.maskScale      = static_cast<float>(mapFields.VertexSize() - 1);
+    inputs.configurations         = stratumConfigurations.data();
+    inputs.albedoTexels           = albedoTexels;
+    inputs.surfaceStratumWeights  = mapFields.surfaceStratumWeights;
+    inputs.constants              = &constants;
+    inputs.weightScale            = static_cast<float>(mapFields.VertexSize() - 1);
     inputs.baseStratumIndex = constants.baseStratumIndex < 0 || constants.baseStratumIndex >= stratumCount
                             ? 0 : constants.baseStratumIndex;
     const float resolutionReciprocal = 1.0f / static_cast<float>(resolution);

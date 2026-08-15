@@ -1,7 +1,7 @@
 // NoiseBlend_PROC.cpp — stage lifecycle: the two-level dirty hash, the flattened layer
 // configurations both backends consume, and the dispatch hand-off. The per-backend work
 // lives in NoiseBlend_Noise_PROC.cpp (CPU noise), NoiseBlend_Blend_PROC.cpp (CPU blend +
-// masks) and NoiseBlend_Gpu_PROC.cpp (the GPU speed path).
+// proportions) and NoiseBlend_Gpu_PROC.cpp (the GPU speed path).
 #include "NoiseBlend_PROC.h"
 #include "../math/HeightOcclusion_MATH.h"
 #include <cstring>
@@ -99,9 +99,9 @@ Sys::ComputeBackend NoiseBlendStage::Run() {
     return lastBackend;
 }
 
-void NoiseBlendStage::ClearMaterialMasks() {
+void NoiseBlendStage::ClearMaterialProportions() {
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
-        mapFields.materialMasks[stratum].Fill(0.0f);
+        mapFields.materialProportions[stratum].Fill(0.0f);
 }
 
 } // namespace Proc

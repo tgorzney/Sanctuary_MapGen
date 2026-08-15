@@ -58,8 +58,8 @@ private:
     void CommitIterationCpu();      // Thermal_Transport_PROC.cpp — scratch -> live fields
     bool EnsureGpuResources();      // Thermal_Gpu_PROC.cpp — compile-once program
     void UploadFieldsToGpu();       // Thermal_Gpu_PROC.cpp — persistent buffers + upload
-    void RunGpuSweeps(std::string& heightReadName, std::string& maskReadName);
-    void ReadbackFieldsFromGpu(const std::string& heightReadName, const std::string& maskReadName);
+    void RunGpuSweeps(std::string& heightReadName, std::string& proportionReadName);
+    void ReadbackFieldsFromGpu(const std::string& heightReadName, const std::string& proportionReadName);
 
     const Params::Geometry& geometry;
     Data::MapFields&        mapFields;
@@ -77,7 +77,7 @@ private:
     Data::FloatField   cellSpreadFactor;
     Data::FloatField   cellTalusThreshold;
     Data::FloatField   heightScratch;
-    Data::FloatField   materialMaskScratch[Data::MapFields::stratumCount];
+    Data::FloatField   materialProportionScratch[Data::MapFields::stratumCount];
 
     Sys::ComputeBackend lastBackend = Sys::ComputeBackend::Cpu;
     int  completedIterationCount = 0;

@@ -26,8 +26,8 @@ struct MarkerRule {
     float maxHeight = 1.0f;
 
     // Biome / mask gate — absent in v1 (filtering was height+slope+clearance only).
-    int   maskStratumIndex  = -1;    // -1 = no mask gate; else index into materialMasks
-    float maskWeightMinimum = 0.0f;  // required weight of that stratum at the position
+    int   maskStratumIndex  = -1;    // -1 = no gate; else an index into surfaceStratumWeights
+    float maskWeightMinimum = 0.0f;  // required VISIBLE weight of that stratum at the position
 
     // Exclusion from obstacles/boundaries via the Jump-Flood distance field.
     float obstacleDistanceMinimum = 0.0f;

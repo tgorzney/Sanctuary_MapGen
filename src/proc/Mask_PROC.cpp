@@ -35,47 +35,49 @@ std::size_t HashConstants(std::size_t seed, const MaskConstants& constants) {
     return HashFloat(seed, constants.centralDifferenceSpan);
 }
 
-std::size_t HashSlopeGate(std::size_t seed, const Params::StratumMask& stratumMask) {
-    seed = HashInteger(seed, stratumMask.bSlopeGateEnabled ? 1 : 0);
-    seed = HashInteger(seed, stratumMask.bUseSmoothstep ? 1 : 0);
-    seed = HashInteger(seed, stratumMask.bInvertSlopeGate ? 1 : 0);
-    seed = HashFloat(seed, stratumMask.minimumSlopeDegrees);
-    seed = HashFloat(seed, stratumMask.maximumSlopeDegrees);
-    seed = HashFloat(seed, stratumMask.slopeFeatherDegreesLow);
-    seed = HashFloat(seed, stratumMask.slopeFeatherDegreesHigh);
-    return HashFloat(seed, stratumMask.slopeGateStrength);
+std::size_t HashStratumSettings(std::size_t seed, const Params::Stratum& stratum) {
+    seed = HashInteger(seed, stratum.bSlopeGateEnabled ? 1 : 0);
+    seed = HashInteger(seed, stratum.bUseSmoothstep ? 1 : 0);
+    seed = HashInteger(seed, stratum.bInvertSlopeGate ? 1 : 0);
+    seed = HashFloat(seed, stratum.minimumSlopeDegrees);
+    seed = HashFloat(seed, stratum.maximumSlopeDegrees);
+    seed = HashFloat(seed, stratum.slopeFeatherDegreesLow);
+    seed = HashFloat(seed, stratum.slopeFeatherDegreesHigh);
+    seed = HashFloat(seed, stratum.slopeGateStrength);
+    seed = HashInteger(seed, static_cast<int>(stratum.importedMaskMode));
+    seed = HashFloat(seed, stratum.maskRemapMinimum);
+    return HashFloat(seed, stratum.maskRemapMaximum);
 }
 
-// The stored art is an input, so its CONTENT is hashed — otherwise re-importing different art
-// under the same settings would silently reuse the cached masks. Only walked when the art is
-// actually in use, so the common (no stored mask) case stays free.
-std::size_t HashStoredMask(std::size_t seed, const Params::StratumMask& stratumMask) {
-    seed = HashInteger(seed, static_cast<int>(stratumMask.importedMaskMode));
-    seed = HashFloat(seed, stratumMask.maskRemapMinimum);
-    seed = HashFloat(seed, stratumMask.maskRemapMaximum);
-    if (!stratumMask.HasStoredMask()) return seed;
-    seed = HashInteger(seed, stratumMask.importedMaskWidth);
-    seed = HashInteger(seed, stratumMask.importedMaskHeight);
-    for (float value : stratumMask.importedMaskData) seed = HashFloat(seed, value);
+// The stored art is a loaded input (Data::StratumArt), so its CONTENT is hashed — otherwise
+// re-importing different art under the same settings would silently reuse the cached weights.
+std::size_t HashStoredArt(std::size_t seed, const Data::StratumArt& art) {
+    if (!art.HasImportedMask()) return HashInteger(seed, 0);
+    seed = HashInteger(seed, art.importedMask.Width());
+    seed = HashInteger(seed, art.importedMask.Height());
+    const float* values = art.importedMask.Data();
+    for (std::size_t index = 0; index < art.importedMask.CellCount(); ++index)
+        seed = HashFloat(seed, values[index]);
     return seed;
 }
 
 } // namespace
 
 MaskStage::MaskStage(const Params::Geometry& geometrySettings,
-                     const std::vector<Params::StratumMask>& stratumMaskSettings,
+                     const std::vector<Params::Stratum>& stratumSettings,
+                     const std::vector<Data::StratumArt>& stratumArtInput,
                      Data::MapFields& outputFields)
-    : geometry(geometrySettings), stratumMasks(stratumMaskSettings), mapFields(outputFields) {}
+    : geometry(geometrySettings), strata(stratumSettings), stratumArt(stratumArtInput),
+      mapFields(outputFields) {}
 
 std::size_t MaskStage::ComputeParameterHash() const {
     std::size_t hash = HashInteger(hashBasis, geometry.mapSize);
     hash = HashFloat(hash, geometry.terrainMaxHeight);
     hash = HashConstants(hash, constants);
-    hash = HashInteger(hash, static_cast<int>(stratumMasks.size()));
-    for (const Params::StratumMask& stratumMask : stratumMasks) {
-        hash = HashSlopeGate(hash, stratumMask);
-        hash = HashStoredMask(hash, stratumMask);
-    }
+    hash = HashInteger(hash, static_cast<int>(strata.size()));
+    for (const Params::Stratum& stratum : strata) hash = HashStratumSettings(hash, stratum);
+    hash = HashInteger(hash, static_cast<int>(stratumArt.size()));
+    for (const Data::StratumArt& art : stratumArt) hash = HashStoredArt(hash, art);
     return hash;
 }
 

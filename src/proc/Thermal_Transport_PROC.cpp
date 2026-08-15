@@ -57,12 +57,12 @@ void MixCellMaterial(const Data::MapFields& fields, Data::FloatField* scratch,
                      int x, int y, float columnDepth, float totalInflow) {
     const float inverseTotal = Math::Reciprocal(columnDepth + totalInflow);
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum) {
-        float donorMask = 0.0f;   // donors first, in neighbour order, exactly as the shader does
+        float donorProportion = 0.0f;   // donors first, in neighbour order, exactly as the shader does
         for (int entry = 0; entry < inflowCount; ++entry)
-            donorMask += inflows[entry].amount
-                       * fields.materialMasks[stratum].Get(inflows[entry].x, inflows[entry].y);
+            donorProportion += inflows[entry].amount
+                       * fields.materialProportions[stratum].Get(inflows[entry].x, inflows[entry].y);
         scratch[stratum].Set(x, y,
-            (fields.materialMasks[stratum].Get(x, y) * columnDepth + donorMask) * inverseTotal);
+            (fields.materialProportions[stratum].Get(x, y) * columnDepth + donorProportion) * inverseTotal);
     }
 }
 
@@ -73,7 +73,7 @@ void ThermalStage::ApplyIterationCpu() {
     const RelaxContext context{ mapFields.heightfield, cellSpreadFactor, cellTalusThreshold, vertexSize };
     const float movementEpsilon    = kernelConstantBlock[ThermalConstantSlot::movementEpsilon];
     const float minimumColumnDepth = kernelConstantBlock[ThermalConstantSlot::minimumColumnDepth];
-    const bool bTransport = constants.bTransportMaterialMasks;
+    const bool bTransport = constants.bTransportMaterialProportions;
 
     const auto applyRow = [&](int y) {
         NeighbourInflow inflows[thermalNeighbourCount];
@@ -85,11 +85,11 @@ void ThermalStage::ApplyIterationCpu() {
             if (!bTransport) continue;
             if (totalInflow <= movementEpsilon) {
                 for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
-                    materialMaskScratch[stratum].Set(x, y, mapFields.materialMasks[stratum].Get(x, y));
+                    materialProportionScratch[stratum].Set(x, y, mapFields.materialProportions[stratum].Get(x, y));
                 continue;
             }
             const float columnDepth = height > minimumColumnDepth ? height : minimumColumnDepth;
-            MixCellMaterial(mapFields, materialMaskScratch, inflows, inflowCount,
+            MixCellMaterial(mapFields, materialProportionScratch, inflows, inflowCount,
                             x, y, columnDepth, totalInflow);
         }
     };
@@ -102,9 +102,9 @@ void ThermalStage::ApplyIterationCpu() {
 void ThermalStage::CommitIterationCpu() {
     const std::size_t byteCount = mapFields.heightfield.CellCount() * sizeof(float);
     std::memcpy(mapFields.heightfield.Data(), heightScratch.Data(), byteCount);
-    if (!constants.bTransportMaterialMasks) return;
+    if (!constants.bTransportMaterialProportions) return;
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
-        std::memcpy(mapFields.materialMasks[stratum].Data(), materialMaskScratch[stratum].Data(), byteCount);
+        std::memcpy(mapFields.materialProportions[stratum].Data(), materialProportionScratch[stratum].Data(), byteCount);
 }
 
 } // namespace Proc

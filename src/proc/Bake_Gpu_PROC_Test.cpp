@@ -14,6 +14,7 @@ using namespace SanmapGen;
 namespace {
 
 using Proc::AllTexelsEqual;
+using Proc::BakeSceneInputs;
 using Proc::BuildTwoStratumScene;
 using Proc::CpuVisualPolicy;
 using Proc::ExpectedTexel;
@@ -60,16 +61,16 @@ bool CreateHiddenGlContext(HWND& outWindow, HDC& outDeviceContext, HGLRC& outGlC
 }
 
 // The same two-stratum scene as the Cpu test, plus a 2x2 tiled texture on stratum 1, baked
-// at 4x the map size so the mask is bilinearly upsampled (the real bake path).
+// at 4x the map size so the surface weights are bilinearly upsampled (the real bake path).
 void BuildGpuScene(Proc::BakeStage& stage, Params::Geometry& geometry, Data::MapFields& fields,
-                   const unsigned int* texels) {
-    BuildTwoStratumScene(geometry, fields, stage);
+                   BakeSceneInputs& scene, const unsigned int* texels) {
+    BuildTwoStratumScene(geometry, fields, scene, stage);
     stage.Constants().outputResolutionMultiplier = 4;
-    stage.Stratum(1).albedoPixels = texels;
-    stage.Stratum(1).albedoWidth = 2;
-    stage.Stratum(1).albedoHeight = 2;
-    stage.Stratum(1).tileCount = 3.0f;
-    stage.Stratum(1).tintRed = 1.0f; stage.Stratum(1).tintGreen = 1.0f; stage.Stratum(1).tintBlue = 1.0f;
+    scene.stratumArt[1].albedoTexels = texels;
+    scene.stratumArt[1].albedoWidth = 2;
+    scene.stratumArt[1].albedoHeight = 2;
+    scene.strata[1].tileCount = 3.0f;
+    scene.strata[1].tintRed = 1.0f; scene.strata[1].tintGreen = 1.0f; scene.strata[1].tintBlue = 1.0f;
 }
 
 // The textured scene on both backends: the Gpu path must be chosen by the DEFAULT policy and
@@ -77,11 +78,12 @@ void BuildGpuScene(Proc::BakeStage& stage, Params::Geometry& geometry, Data::Map
 void CheckGpuPathAndParity(Sys::GpuResourceManager& manager, const unsigned int* checkerTexels) {
     Params::Geometry geometry; geometry.mapSize = 16;
     Data::MapFields gpuFields, cpuFields;
+    BakeSceneInputs gpuScene, cpuScene;
     Proc::BakedTextureSet gpuTextures, cpuTextures;
-    Proc::BakeStage gpuStage(geometry, gpuFields, gpuTextures);
-    Proc::BakeStage cpuStage(geometry, cpuFields, cpuTextures);
-    BuildGpuScene(gpuStage, geometry, gpuFields, checkerTexels);
-    BuildGpuScene(cpuStage, geometry, cpuFields, checkerTexels);
+    Proc::BakeStage gpuStage(geometry, gpuScene.strata, gpuScene.stratumArt, gpuFields, gpuTextures);
+    Proc::BakeStage cpuStage(geometry, cpuScene.strata, cpuScene.stratumArt, cpuFields, cpuTextures);
+    BuildGpuScene(gpuStage, geometry, gpuFields, gpuScene, checkerTexels);
+    BuildGpuScene(cpuStage, geometry, cpuFields, cpuScene, checkerTexels);
     gpuStage.SetGpuResourceManager(&manager);          // policy left at the ARCH §4.2 default
     cpuStage.SetDispatchPolicy(CpuVisualPolicy());
 
@@ -96,15 +98,21 @@ void CheckGpuPathAndParity(Sys::GpuResourceManager& manager, const unsigned int*
           "Gpu composite matches the Cpu twin within the Visual tolerance (1/255 per channel)");
     check(TexelsWithinTolerance(gpuTextures.stratumMaskLow, cpuTextures.stratumMaskLow),
           "Gpu packed stratum masks match the Cpu twin");
+    // The std430 record was re-padded to 48 bytes after the two remap floats were deleted; a
+    // stride mismatch would scramble every stratum past the first, so this parity result is
+    // also the layout check (DISPATCH_INTERFACE_SPEC §4).
+    check(sizeof(Proc::StratumKernelConfiguration) % 16 == 0,
+          "StratumKernelConfiguration is a 16-byte multiple (std430 array stride)");
 }
 
 // The hand-checked flat-tint blend, on the Gpu: 0.25 * red + 0.75 * blue.
 void CheckGpuFlatBlend(Sys::GpuResourceManager& manager) {
     Params::Geometry geometry; geometry.mapSize = 16;
     Data::MapFields fields;
+    BakeSceneInputs scene;
     Proc::BakedTextureSet textures;
-    Proc::BakeStage stage(geometry, fields, textures);
-    BuildTwoStratumScene(geometry, fields, stage);
+    Proc::BakeStage stage(geometry, scene.strata, scene.stratumArt, fields, textures);
+    BuildTwoStratumScene(geometry, fields, scene, stage);
     stage.SetGpuResourceManager(&manager);
     check(stage.Run() == Sys::ComputeBackend::Gpu, "flat-tint bake also runs on the Gpu");
     check(AllTexelsEqual(textures.compositeAlbedo, ExpectedTexel(64, 0, 191, 255)),

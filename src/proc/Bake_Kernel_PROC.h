@@ -1,11 +1,12 @@
 // Bake_Kernel_PROC.h — the one bake kernel contract shared by both backends.
 // Layer: PROC. Declares (a) every tweakable stage constant (Constitution §8 — nothing the
-// kernels use is baked into code or shader), (b) the per-stratum settings the caller
-// supplies, (c) the flattened per-stratum record whose field order/type IS the std430
-// layout the GLSL twin mirrors EXACTLY (DISPATCH_INTERFACE_SPEC §4), and (d) the baked
-// texture set the stage writes.
-// The stratum settings live here (not in PARAMS) only because `Stratum_PARAMS` is owned by
-// another work-order; StratumBakeSource is the record it will populate, field for field.
+// kernels use is baked into code or shader), (b) the flattened per-stratum record whose field
+// order/type IS the std430 layout the GLSL twin mirrors EXACTLY (DISPATCH_INTERFACE_SPEC §4),
+// and (c) the baked texture set the stage writes.
+// There is NO per-stratum settings type here: the settings live in `Params::Stratum` and the
+// loaded pixels in `Data::StratumArt` (ARCH §7.1). Only the flattened GPU-layout record stays
+// in PROC. Bake also has no remap of its own — the ONE remap happened in Mask (ARCH §7.2.5);
+// Bake consumes `surfaceStratumWeights` verbatim.
 #pragma once
 #include <vector>
 #include <cstddef>
@@ -24,28 +25,11 @@ struct BakeConstants {
     float compositeAlphaValue        = 1.0f;    // alpha written into the composite albedo
 };
 
-// One stratum's bake settings: its albedo texture, preview tint, tiling and mask remap.
-// `albedoPixels` is RGBA8 packed little-endian (red in bits 0..7); null = flat tint only.
-// `textureVersion` is bumped by the asset loader when the pixels change — the parameter
-// hash reads it instead of walking megabytes of texels every Run().
-struct StratumBakeSource {
-    const unsigned int* albedoPixels     = nullptr;
-    int   albedoWidth                    = 0;
-    int   albedoHeight                   = 0;
-    int   textureVersion                 = 0;
-    float tintRed                        = 1.0f;   // previewColor / diffuseRemap
-    float tintGreen                      = 1.0f;
-    float tintBlue                       = 1.0f;
-    float tileCount                      = 1.0f;   // texture repeats across the map (tileSize)
-    float maskRemapMinimum               = 0.0f;   // maskRemapMin (SANMAP_FORMAT_SPEC, .x channel)
-    float maskRemapMaximum               = 1.0f;   // maskRemapMax
-    bool  bEnabled                       = true;
-};
-
-// One flattened stratum, ready for either backend. 12 scalars = 48 bytes; that is a
-// 16-byte multiple, so the std430 array stride matches without trailing padding. Order is
-// load-bearing. The stage-wide floats are copied into every record because the SYS seam
-// exposes integer uniforms only.
+// One flattened stratum, ready for either backend. 10 live scalars + 2 explicit padding words
+// = 48 bytes, a 16-byte multiple, so the std430 array stride matches the C++ layout with no
+// implicit trailing padding (the pad replaces the two deleted remap floats, ARCH §7.2.5).
+// Order is load-bearing. The stage-wide floats are copied into every record because the SYS
+// seam exposes integer uniforms only.
 struct StratumKernelConfiguration {
     int   albedoPixelOffset        = 0;    // first texel of this stratum in the shared texel buffer
     int   albedoWidth              = 0;    // 0 = no texture, use the tint as a flat color
@@ -55,10 +39,10 @@ struct StratumKernelConfiguration {
     float tintGreen                = 1.0f;
     float tintBlue                 = 1.0f;
     float tileCount                = 1.0f;
-    float maskRemapMinimum         = 0.0f;
-    float maskRemapRangeReciprocal = 1.0f; // 1/(max-min); reciprocal multiply, never divide
     float weightEpsilon            = 0.0001f;
     int   bNormalizeWeights        = 1;
+    int   paddingFirst             = 0;    // std430 stride pad: 40 -> 48 bytes (16-byte multiple)
+    int   paddingSecond            = 0;
 };
 
 // The baked output set: the composite albedo plus the two packed stratum-mask textures the

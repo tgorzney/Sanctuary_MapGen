@@ -10,14 +10,14 @@ namespace Pipeline {
 
 GenerationAssembler::GenerationAssembler(const Params::MapRecipe& recipeSettings)
     : recipe(recipeSettings),
-      stratumMaskSettings(static_cast<std::size_t>(Data::MapFields::stratumCount)),
+      stratumArt(static_cast<std::size_t>(Data::MapFields::stratumCount)),
       noiseBlendStage(recipeSettings.geometry, recipeSettings.layerStack, mapFields),
-      maskStage(recipeSettings.geometry, stratumMaskSettings, mapFields),
       erosionStage(recipeSettings.geometry, mapFields),
       thermalStage(recipeSettings.geometry, mapFields),
       flowAccumulationStage(recipeSettings.geometry, mapFields),
+      maskStage(recipeSettings.geometry, recipeSettings.strata, stratumArt, mapFields),
       placementStage(recipeSettings, mapFields, placementResults),
-      bakeStage(recipeSettings.geometry, mapFields, bakedTextures) {
+      bakeStage(recipeSettings.geometry, recipeSettings.strata, stratumArt, mapFields, bakedTextures) {
     RegisterStages();
 }
 
@@ -32,30 +32,30 @@ std::vector<std::string> GenerationAssembler::Run() {
 
 void GenerationAssembler::SetGenerationContext(Sys::GenerationContext context) {
     noiseBlendStage.SetGenerationContext(context);
-    maskStage.SetGenerationContext(context);
     erosionStage.SetGenerationContext(context);
     thermalStage.SetGenerationContext(context);
     flowAccumulationStage.SetGenerationContext(context);
+    maskStage.SetGenerationContext(context);
     placementStage.SetGenerationContext(context);
     bakeStage.SetGenerationContext(context);
 }
 
 void GenerationAssembler::SetGlobalBackend(Sys::ComputeBackend backend) {
     noiseBlendStage.SetGlobalBackend(backend);
-    maskStage.SetGlobalBackend(backend);
     erosionStage.SetGlobalBackend(backend);
     thermalStage.SetGlobalBackend(backend);
     flowAccumulationStage.SetGlobalBackend(backend);
+    maskStage.SetGlobalBackend(backend);
     placementStage.SetGlobalBackend(backend);
     bakeStage.SetGlobalBackend(backend);
 }
 
 void GenerationAssembler::SetGpuResourceManager(Sys::GpuResourceManager* manager) {
     noiseBlendStage.SetGpuResourceManager(manager);
-    maskStage.SetGpuResourceManager(manager);
     erosionStage.SetGpuResourceManager(manager);
     thermalStage.SetGpuResourceManager(manager);
     flowAccumulationStage.SetGpuResourceManager(manager);
+    maskStage.SetGpuResourceManager(manager);
     placementStage.SetGpuResourceManager(manager);
     bakeStage.SetGpuResourceManager(manager);
 }
@@ -64,9 +64,9 @@ void GenerationAssembler::SetGpuResourceManager(Sys::GpuResourceManager* manager
 // feedback is order-dependent, DETERMINISM_SPEC), so it is deliberately absent here.
 void GenerationAssembler::SetThreadPool(Sys::ThreadPool* pool) {
     noiseBlendStage.SetThreadPool(pool);
-    maskStage.SetThreadPool(pool);
     thermalStage.SetThreadPool(pool);
     flowAccumulationStage.SetThreadPool(pool);
+    maskStage.SetThreadPool(pool);
     placementStage.SetThreadPool(pool);
     bakeStage.SetThreadPool(pool);
 }

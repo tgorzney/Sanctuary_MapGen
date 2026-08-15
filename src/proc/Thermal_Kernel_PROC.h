@@ -33,8 +33,8 @@ struct ThermalConstants {
     float cellWorldSize      = 1.0f;   // horizontal spacing between heightfield vertices
     float minimumColumnDepth = 0.05f;  // remix depth floor for material transport
     float movementEpsilon    = 1.0e-7f;// below this a cell counts as stable / receives nothing
-    float maskWeightEpsilon  = 1.0e-6f;// below this the material masks are treated as empty
-    bool  bTransportMaterialMasks = true;  // carry the donor's material where material moves
+    float proportionWeightEpsilon  = 1.0e-6f;// below this the material proportions are empty
+    bool  bTransportMaterialProportions = true;  // carry the donor's material where material moves
     float talusAngleDegrees[Data::MapFields::stratumCount] = {
         35.0f, 35.0f, 35.0f, 35.0f, 35.0f, 35.0f, 35.0f, 35.0f, 35.0f };
 };
@@ -46,7 +46,7 @@ namespace ThermalConstantSlot {
     constexpr int spreadFactorActive = 0;   // relaxationRate * thermalInverseNeighbourCount
     constexpr int movementEpsilon    = 1;
     constexpr int minimumColumnDepth = 2;
-    constexpr int maskWeightEpsilon  = 3;
+    constexpr int proportionWeightEpsilon  = 3;
     constexpr int talusThresholdBase = 4;   // + stratumIndex
     constexpr int totalCount         = talusThresholdBase + Data::MapFields::stratumCount;
 }

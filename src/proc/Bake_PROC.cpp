@@ -23,25 +23,30 @@ inline std::size_t HashFloat(std::size_t seed, float value) {
     return HashMix(seed, static_cast<std::size_t>(bits));
 }
 
-std::size_t HashStratumSource(std::size_t seed, const StratumBakeSource& stratum) {
+std::size_t HashStratumAppearance(std::size_t seed, const Params::Stratum& stratum) {
     seed = HashInteger(seed, stratum.bEnabled ? 1 : 0);
-    seed = HashInteger(seed, stratum.albedoPixels != nullptr ? 1 : 0);
-    seed = HashInteger(seed, stratum.albedoWidth);
-    seed = HashInteger(seed, stratum.albedoHeight);
-    seed = HashInteger(seed, stratum.textureVersion);
     seed = HashFloat(seed, stratum.tintRed);
     seed = HashFloat(seed, stratum.tintGreen);
     seed = HashFloat(seed, stratum.tintBlue);
-    seed = HashFloat(seed, stratum.tileCount);
-    seed = HashFloat(seed, stratum.maskRemapMinimum);
-    return HashFloat(seed, stratum.maskRemapMaximum);
+    return HashFloat(seed, stratum.tileCount);
+}
+
+// The texels themselves are megabytes, so the loader's version counter stands in for them.
+std::size_t HashStratumArt(std::size_t seed, const Data::StratumArt& art) {
+    seed = HashInteger(seed, art.HasAlbedo() ? 1 : 0);
+    seed = HashInteger(seed, art.albedoWidth);
+    seed = HashInteger(seed, art.albedoHeight);
+    return HashInteger(seed, art.albedoVersion);
 }
 
 } // namespace
 
-BakeStage::BakeStage(const Params::Geometry& geometrySettings, const Data::MapFields& inputFields,
-                     BakedTextureSet& outputTextures)
-    : geometry(geometrySettings), mapFields(inputFields), bakedTextures(outputTextures) {
+BakeStage::BakeStage(const Params::Geometry& geometrySettings,
+                     const std::vector<Params::Stratum>& stratumSettings,
+                     const std::vector<Data::StratumArt>& stratumArtInput,
+                     const Data::MapFields& inputFields, BakedTextureSet& outputTextures)
+    : geometry(geometrySettings), strata(stratumSettings), stratumArt(stratumArtInput),
+      mapFields(inputFields), bakedTextures(outputTextures) {
     // ARCH §4.2: the bake is Gpu/Visual in BOTH contexts — decorative, determinism-exempt.
     dispatchPolicy.previewBackend  = Sys::ComputeBackend::Gpu;
     dispatchPolicy.outputBackend   = Sys::ComputeBackend::Gpu;
@@ -65,8 +70,10 @@ std::size_t BakeStage::ComputeParameterHash() const {
     hash = HashFloat(hash, constants.weightEpsilon);
     hash = HashInteger(hash, constants.bNormalizeWeights ? 1 : 0);
     hash = HashFloat(hash, constants.compositeAlphaValue);
-    for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
-        hash = HashStratumSource(hash, stratumSources[stratum]);
+    hash = HashInteger(hash, static_cast<int>(strata.size()));
+    for (const Params::Stratum& stratum : strata) hash = HashStratumAppearance(hash, stratum);
+    hash = HashInteger(hash, static_cast<int>(stratumArt.size()));
+    for (const Data::StratumArt& art : stratumArt) hash = HashStratumArt(hash, art);
     return hash;
 }
 
@@ -74,27 +81,28 @@ void BakeStage::PrepareRun() {
     const int resolution = OutputResolution();
     if (bakedTextures.resolution != resolution) bakedTextures.Resize(resolution);
 
+    static const Params::Stratum defaultStratum;
+    static const Data::StratumArt defaultArt;
     stratumConfigurations.assign(Data::MapFields::stratumCount, StratumKernelConfiguration());
     int texelOffset = 0;
-    for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum) {
-        const StratumBakeSource& source = stratumSources[stratum];
-        StratumKernelConfiguration& configuration = stratumConfigurations[stratum];
-        const bool bHasTexture = source.albedoPixels != nullptr
-                              && source.albedoWidth > 0 && source.albedoHeight > 0;
+    for (int index = 0; index < Data::MapFields::stratumCount; ++index) {
+        const Params::Stratum& stratum = static_cast<std::size_t>(index) < strata.size()
+                                       ? strata[index] : defaultStratum;
+        const Data::StratumArt& art = static_cast<std::size_t>(index) < stratumArt.size()
+                                    ? stratumArt[index] : defaultArt;
+        StratumKernelConfiguration& configuration = stratumConfigurations[index];
+        const bool bHasTexture = art.HasAlbedo();
         configuration.albedoPixelOffset = texelOffset;
-        configuration.albedoWidth  = bHasTexture ? source.albedoWidth : 0;
-        configuration.albedoHeight = bHasTexture ? source.albedoHeight : 0;
-        configuration.bEnabled     = source.bEnabled ? 1 : 0;
-        configuration.tintRed      = source.tintRed;
-        configuration.tintGreen    = source.tintGreen;
-        configuration.tintBlue     = source.tintBlue;
-        configuration.tileCount    = source.tileCount > 0.0f ? source.tileCount : 1.0f;
-        configuration.maskRemapMinimum = source.maskRemapMinimum;
-        configuration.maskRemapRangeReciprocal = source.maskRemapMaximum > source.maskRemapMinimum
-            ? 1.0f / (source.maskRemapMaximum - source.maskRemapMinimum) : 0.0f;
+        configuration.albedoWidth  = bHasTexture ? art.albedoWidth : 0;
+        configuration.albedoHeight = bHasTexture ? art.albedoHeight : 0;
+        configuration.bEnabled     = stratum.bEnabled ? 1 : 0;
+        configuration.tintRed      = stratum.tintRed;
+        configuration.tintGreen    = stratum.tintGreen;
+        configuration.tintBlue     = stratum.tintBlue;
+        configuration.tileCount    = stratum.tileCount > 0.0f ? stratum.tileCount : 1.0f;
         configuration.weightEpsilon     = constants.weightEpsilon;
         configuration.bNormalizeWeights = constants.bNormalizeWeights ? 1 : 0;
-        if (bHasTexture) texelOffset += source.albedoWidth * source.albedoHeight;
+        if (bHasTexture) texelOffset += art.albedoWidth * art.albedoHeight;
     }
 }
 

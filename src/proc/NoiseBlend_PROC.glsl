@@ -3,7 +3,7 @@
 // Two passes over the same program: PASS_NOISE fills one layer's cached raw noise (so the
 // two-level dirty hash works on the Gpu too — only layers whose structure changed are
 // re-dispatched), PASS_BLEND reshapes, blends the whole stack into the heightfield, and
-// writes the per-stratum material masks by top-down occlusion.
+// writes the per-stratum material proportions by top-down occlusion.
 // This unit owns the std430 LayerConfiguration block, declared ONCE, mirroring
 // Proc::LayerKernelConfiguration field for field (DISPATCH_INTERFACE_SPEC §4). Every tile
 // size, enum value and stratum count arrives as a #define built from the C++ constants —
@@ -26,7 +26,7 @@ layout(std430, binding = NOISE_BLEND_BINDING_LAYERS) readonly buffer LayerConfig
     LayerConfiguration layerConfigurations[]; };
 layout(std430, binding = NOISE_BLEND_BINDING_RAW_NOISE) buffer RawNoiseField { float rawNoiseValues[]; };
 layout(std430, binding = NOISE_BLEND_BINDING_HEIGHT)    buffer HeightField   { float heightValues[]; };
-layout(std430, binding = NOISE_BLEND_BINDING_MASKS)     buffer MaterialMasks { float maskValues[]; };
+layout(std430, binding = NOISE_BLEND_BINDING_PROPORTIONS)     buffer MaterialProportions { float proportionValues[]; };
 layout(std430, binding = NOISE_BLEND_BINDING_THICKNESS) buffer LayerThickness { float thicknessValues[]; };
 
 uniform int vertexSize;
@@ -102,7 +102,7 @@ void runBlendPass(int cellIndex, int cellCount) {
     heightValues[cellIndex] = height;
 
     for (int stratum = 0; stratum < NOISE_BLEND_STRATUM_COUNT; ++stratum)
-        maskValues[stratum * cellCount + cellIndex] = 0.0;
+        proportionValues[stratum * cellCount + cellIndex] = 0.0;
     float remainingVisibility = 1.0;
     for (int layer = layerCount - 1; layer >= 0; --layer) {
         if (remainingVisibility <= 0.0) break;
@@ -113,11 +113,11 @@ void runBlendPass(int cellIndex, int cellCount) {
                                      configuration.occlusionWindowLow, configuration.occlusionWindowHigh,
                                      configuration.opacity);
         float contribution = min(max(alpha, 0.0), remainingVisibility);
-        maskValues[configuration.stratumIndex * cellCount + cellIndex] += contribution;
+        proportionValues[configuration.stratumIndex * cellCount + cellIndex] += contribution;
         remainingVisibility -= contribution;
     }
     if (remainingVisibility > 0.0)
-        maskValues[layerConfigurations[0].stratumIndex * cellCount + cellIndex] += remainingVisibility;
+        proportionValues[layerConfigurations[0].stratumIndex * cellCount + cellIndex] += remainingVisibility;
 }
 
 void main() {

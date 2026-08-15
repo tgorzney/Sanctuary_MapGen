@@ -58,10 +58,10 @@ void CheckStackParity(Sys::GpuResourceManager& manager) {
                     && !gpuStage.LayerConfigurations().empty(), "both backends got the same layer count");
     Proc::CheckFieldHasSignal(cpuFields.heightfield, "the Cpu heightfield varies", NoiseBlendCheck);
     Proc::CheckFieldHasSignal(gpuFields.heightfield, "the Gpu heightfield varies", NoiseBlendCheck);
-    Proc::CheckFieldHasSignal(cpuFields.materialMasks[1], "materialMask[1] varies", NoiseBlendCheck);
+    Proc::CheckFieldHasSignal(cpuFields.materialProportions[1], "materialProportion[1] varies", NoiseBlendCheck);
     Proc::CompareFields(cpuFields.heightfield, gpuFields.heightfield, "heightfield", NoiseBlendCheck);
-    Proc::CompareFields(cpuFields.materialMasks[0], gpuFields.materialMasks[0], "materialMask[0]", NoiseBlendCheck);
-    Proc::CompareFields(cpuFields.materialMasks[1], gpuFields.materialMasks[1], "materialMask[1]", NoiseBlendCheck);
+    Proc::CompareFields(cpuFields.materialProportions[0], gpuFields.materialProportions[0], "materialProportion[0]", NoiseBlendCheck);
+    Proc::CompareFields(cpuFields.materialProportions[1], gpuFields.materialProportions[1], "materialProportion[1]", NoiseBlendCheck);
     // The Gpu keeps the same two-level cache: an unchanged re-run touches nothing at all.
     gpuStage.RunOnGpu();
     NoiseBlendCheck(gpuStage.WasLastRunSkipped(), "an unchanged Gpu re-run is skipped");

@@ -1,7 +1,7 @@
-// HeightOcclusion_MATH.h — top-down occlusion weighting for the MaterialMasks field.
+// HeightOcclusion_MATH.h — top-down occlusion weighting for the MaterialProportions field.
 // Layer: MATH — pure, stateless, plain floats only (no PARAMS/DATA/GPU dependency), so
-// every stage that writes `MaterialMasks` shares ONE copy of this math: NoiseBlend_PROC
-// today, Mask_PROC (height/slope/stored-mask merge) next. Realizes MASKING_SPEC "Height
+// every stage that writes `MaterialProportions` shares ONE copy of this math: NoiseBlend_PROC
+// today (ARCH §7.2 makes it the field's single writer). Realizes MASKING_SPEC Part 2 "Height
 // mask (top-down occlusion)" verbatim: alpha = thickness * contrast, hard-clamped to the
 // swap-guarded [minimum, maximum] window, times opacity; the contribution is capped by the
 // visibility still left above. Hard clamp only — no smoothstep, no feather, no invert.

@@ -33,8 +33,8 @@ void RunDirtyHashChecks(Pipeline::GenerationAssembler& assembler, Params::MapRec
                    "a skipped run leaves the heightfield untouched");
 
     // --- one layer's frequency moves: the FIRST stage owns it, so the whole pipeline re-runs.
-    static const char* const allStages[7] = { "NoiseBlend", "Mask", "Erosion", "Thermal",
-                                              "FlowAccumulation", "Placement", "Bake" };
+    static const char* const allStages[7] = { "NoiseBlend", "Erosion", "Thermal",
+                                              "FlowAccumulation", "Mask", "Placement", "Bake" };
     recipe.layerStack.geoLayers[0].layers[0].frequency = 0.035f;
     const std::vector<std::string> frequencyRun = assembler.Run();
     AssemblerCheck(RanExactly(frequencyRun, allStages, 7),
@@ -44,15 +44,24 @@ void RunDirtyHashChecks(Pipeline::GenerationAssembler& assembler, Params::MapRec
     AssemblerCheck(assembler.DidLastRunRegenerate(), "a terrain change is a full regeneration");
 
     // --- a mid-pipeline constant moves: that stage and everything BELOW it, nothing above.
-    static const char* const flowOnward[3] = { "FlowAccumulation", "Placement", "Bake" };
+    static const char* const flowOnward[4] = { "FlowAccumulation", "Mask", "Placement", "Bake" };
     assembler.FlowAccumulation().Constants().cellWeight = 2.0f;
     const std::vector<std::string> flowRun = assembler.Run();
-    AssemblerCheck(RanExactly(flowRun, flowOnward, 3),
-                   "a flow constant re-runs flow, placement and bake only");
+    AssemblerCheck(RanExactly(flowRun, flowOnward, 4),
+                   "a flow constant re-runs flow, mask, placement and bake only");
+
+    // --- a MASK parameter moves: mask + its consumers, and NO sim re-runs. This is the proof
+    // of ARCH 7.2/3.4 purity — the gate lives in its own output field, so nothing upstream of
+    // Mask has to be replayed to keep the physical proportions correct.
+    static const char* const maskOnward[3] = { "Mask", "Placement", "Bake" };
+    recipe.strata[detailStratumIndex].maximumSlopeDegrees = 40.0f;
+    const std::vector<std::string> maskRun = assembler.Run();
+    AssemblerCheck(RanExactly(maskRun, maskOnward, 3),
+                   "a mask parameter re-runs mask, placement and bake only (no sim replay)");
 
     // --- the last stage moves: only the bake, and the two-tier stub calls it preview-only.
     static const char* const bakeOnly[1] = { "Bake" };
-    assembler.Bake().Stratum(0).tintRed = 0.9f;
+    assembler.Bake().Constants().compositeAlphaValue = 0.9f;
     const std::vector<std::string> bakeRun = assembler.Run();
     AssemblerCheck(RanExactly(bakeRun, bakeOnly, 1), "a bake constant re-runs the bake only");
     AssemblerCheck(assembler.WasLastRunPreviewOnly(), "a bake-only refresh is preview-only");

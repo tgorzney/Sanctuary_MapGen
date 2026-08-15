@@ -28,8 +28,13 @@ inline void BuildTestFields(Data::MapFields& fields) {
             float height = plainHeight;
             if (distance < coneRadius) height = plainHeight + 0.5f * (1.0f - distance / coneRadius);
             fields.heightfield.Set(x, y, height);
-            fields.materialMasks[maskStratumIndex].Set(x, y, x < vertexSize / 2 ? 1.0f : 0.0f);
-            fields.materialMasks[0].Set(x, y, x < vertexSize / 2 ? 0.0f : 1.0f);
+            // Placement gates on the VISIBLE weights the Mask stage resolves (ARCH 7.2.6), so
+            // the scene authors those; the proportions behind them are deliberately the mirror
+            // image, so a stage reading the wrong field fails every gate assertion.
+            fields.surfaceStratumWeights[maskStratumIndex].Set(x, y, x < vertexSize / 2 ? 1.0f : 0.0f);
+            fields.surfaceStratumWeights[0].Set(x, y, x < vertexSize / 2 ? 0.0f : 1.0f);
+            fields.materialProportions[maskStratumIndex].Set(x, y, x < vertexSize / 2 ? 0.0f : 1.0f);
+            fields.materialProportions[0].Set(x, y, x < vertexSize / 2 ? 1.0f : 0.0f);
         }
 }
 

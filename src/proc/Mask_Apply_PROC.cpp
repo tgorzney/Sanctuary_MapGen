@@ -1,6 +1,9 @@
-// Mask_Apply_PROC.cpp — the CPU accuracy path: slope-gate every stratum's procedural mask and
-// merge the stored art into the same MaterialMasks field. Twin of Mask_PROC.glsl, expression
-// for expression, through the shared Mask_Slope_PROC.h / Mask_Merge_PROC.h math.
+// Mask_Apply_PROC.cpp — the CPU accuracy path: slope-gate each stratum's material proportion,
+// merge the stored art, remap once, and write the result into `surfaceStratumWeights`. Twin of
+// Mask_PROC.glsl, expression for expression, through the shared Mask_Slope_PROC.h /
+// Mask_Merge_PROC.h math.
+// The proportion field is READ ONLY here (ARCH §7.2.3): input and output are different fields,
+// which is what makes this stage idempotent under a lone re-run (ARCH §3.4.2).
 #include "Mask_PROC.h"
 #include "Mask_Slope_PROC.h"
 #include "Mask_Merge_PROC.h"
@@ -10,16 +13,18 @@ namespace SanmapGen {
 namespace Proc {
 namespace {
 
-// One cell of one stratum: gate -> merge -> remap, written back in place. The stored art is
-// sampled ONLY when a merge mode wants it (Disabled never pays for a resample).
-void ApplyStratumCell(const MaskStratumConfiguration& configuration, const float* storedValues,
-                      Data::FloatField& materialMask, float slopeGradient, int x, int y) {
+// One cell of one stratum: gate -> merge -> remap. The stored art is sampled ONLY when a merge
+// mode wants it (Disabled never pays for a resample).
+// NOTE (MASKING_SPEC 1.9 / ARCH §7.5): `materialProportion` is a VOLUME FRACTION standing in
+// for surface exposure until the ordered thickness stack lands in M6. Same shape, same kernel.
+float ResolveStratumCell(const MaskStratumConfiguration& configuration, const float* storedValues,
+                         float materialProportion, float slopeGradient, int x, int y) {
     const float gateWeight = SlopeGateWeight(slopeGradient, configuration);
-    const float proceduralWeight = materialMask.Get(x, y) * gateWeight;
+    const float proceduralWeight = materialProportion * gateWeight;
     const float storedWeight = configuration.mergeMode == kMergeModeDisabled
                              ? 0.0f : SampleStoredMaskBilinear(storedValues, configuration, x, y);
     const float mergedWeight = MergeStoredMask(proceduralWeight, storedWeight, configuration);
-    materialMask.Set(x, y, RemapMaskValue(mergedWeight, configuration));
+    return RemapMaskValue(mergedWeight, configuration);
 }
 
 } // namespace
@@ -36,8 +41,10 @@ void MaskStage::RunOnCpu() {
         for (int x = 0; x < vertexSize; ++x) {
             const float slopeGradient = SlopeGradientMagnitude(heightValues, x, y, vertexSize, slopeConfiguration);
             for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
-                ApplyStratumCell(stratumConfigurations[stratum], storedValues,
-                                 mapFields.materialMasks[stratum], slopeGradient, x, y);
+                mapFields.surfaceStratumWeights[stratum].Set(x, y,
+                    ResolveStratumCell(stratumConfigurations[stratum], storedValues,
+                                       mapFields.materialProportions[stratum].Get(x, y),
+                                       slopeGradient, x, y));
         }
     };
     if (threadPool != nullptr) threadPool->ParallelFor(0, vertexSize, maskRow);

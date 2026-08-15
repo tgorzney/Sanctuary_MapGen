@@ -57,7 +57,7 @@ std::string BuildStageDefinitions(const NoiseBlendConstants& constants) {
          + IntegerDefinition("NOISE_BLEND_BINDING_LAYERS", static_cast<int>(NoiseBlendBinding::layerConfigurations))
          + IntegerDefinition("NOISE_BLEND_BINDING_RAW_NOISE", static_cast<int>(NoiseBlendBinding::rawNoise))
          + IntegerDefinition("NOISE_BLEND_BINDING_HEIGHT", static_cast<int>(NoiseBlendBinding::heightField))
-         + IntegerDefinition("NOISE_BLEND_BINDING_MASKS", static_cast<int>(NoiseBlendBinding::materialMasks))
+         + IntegerDefinition("NOISE_BLEND_BINDING_PROPORTIONS", static_cast<int>(NoiseBlendBinding::materialProportions))
          + IntegerDefinition("NOISE_BLEND_BINDING_THICKNESS", static_cast<int>(NoiseBlendBinding::layerThickness))
          + FloatDefinition("NOISE_BLEND_RAW_OFFSET", constants.rawNoiseOffset)
          + FloatDefinition("NOISE_BLEND_RAW_SCALE",  constants.rawNoiseScale);

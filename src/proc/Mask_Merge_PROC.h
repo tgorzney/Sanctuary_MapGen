@@ -4,9 +4,10 @@
 //
 // Resampling is BILINEAR everywhere (MASKING_SPEC "Resample inconsistency": import used
 // nearest-neighbour while the GUI resize of the same data used bilinear — unified here).
-// Merge modes are MASKING_SPEC verbatim: Disabled keeps the procedural mask, ProceduralStart
-// is additive (procedural + stored, clamped), StaticOverride replaces with the stored art and
-// therefore is NOT slope-gated — it is locked to what the artist shipped.
+// Merge modes are MASKING_SPEC 1.5 verbatim: Disabled keeps the gated procedural weight,
+// ProceduralStart is additive (procedural + stored, clamped), StaticOverride replaces with the
+// stored art and therefore is NOT slope-gated — it is locked to what the artist shipped.
+// The remap here is the ONE remap in the pipeline (ARCH §7.2.5); Bake has none.
 #pragma once
 #include "Mask_Kernel_PROC.h"
 

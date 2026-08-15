@@ -29,8 +29,8 @@ inline void BuildTestTerrain(Data::MapFields& fields, int vertexSize) {
             const float bump = Proc::HashRandomUnitFloat(Proc::HashRandomCombine(
                 static_cast<unsigned int>(x / 4), static_cast<unsigned int>(y / 4))) * 0.08f;
             fields.heightfield.Set(x, y, cone + bump < 0.02f ? 0.02f : cone + bump);
-            fields.materialMasks[0].Set(x, y, 0.7f);
-            fields.materialMasks[3].Set(x, y, 0.3f);
+            fields.materialProportions[0].Set(x, y, 0.7f);
+            fields.materialProportions[3].Set(x, y, 0.3f);
         }
 }
 

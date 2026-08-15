@@ -104,7 +104,6 @@ int main() {
     Check(!InstancesEqual(resultsFirst.markers, resultsOtherSeed.markers), "different seed -> different map");
     Check(stageFirst.ComputeParameterHash() != stageOtherSeed.ComputeParameterHash(),
           "seed change dirties the stage hash");
-
     const Data::PlacementInstances& markers = resultsFirst.markers;
     const Data::PlacementInstances& props = resultsFirst.props;
     std::printf("markers=%zu props=%zu candidates=%d accepted=%d\nchecksum markers=%016llx props=%016llx\n",
@@ -117,20 +116,21 @@ int main() {
     Check(PlacementTest::MinimumSeparation(markers) >= 20.0f - 1e-3f, "marker spacing >= 20 cells");
     Check(PlacementTest::MinimumSeparation(props) >= 6.0f - 1e-3f, "prop spacing >= 6 cells");
 
-    // --- gates honoured (height / slope / edge padding / biome mask / collision flag).
+    // --- gates honoured (height / slope / edge padding / biome / collision flag).
     Check(PlacementTest::AllWithinGates(markers, fields, stageFirst, 0.4f, 0.6f, 10.0f, 8),
           "markers honour height, slope and edge padding");
     Check(PlacementTest::AllWithinGates(props, fields, stageFirst, 0.4f, 0.6f, 20.0f, 4),
           "props honour the same gates");
     bool bMaskGateHeld = true, bCollidableSet = true;
+    const Data::FloatField& gateField = fields.surfaceStratumWeights[PlacementTest::maskStratumIndex];
     for (std::size_t index = 0; index < props.Count(); ++index) {
         const int cellX = static_cast<int>(props.positionX[index] + 0.5f);
         const int cellY = static_cast<int>(props.positionZ[index] + 0.5f);
-        if (fields.materialMasks[PlacementTest::maskStratumIndex].Get(cellX, cellY) < 0.5f) bMaskGateHeld = false;
+        if (gateField.Get(cellX, cellY) < 0.5f) bMaskGateHeld = false;
         if (props.bCollidable[index] == 0) bCollidableSet = false;
         if (props.scaleX[index] < 0.8f - 1e-4f || props.scaleX[index] > 1.4f + 1e-4f) bCollidableSet = false;
     }
-    Check(bMaskGateHeld, "prop biome/mask gate honoured");
+    Check(bMaskGateHeld, "prop biome gate honoured (surfaceStratumWeights, not proportions)");
     Check(bCollidableSet, "prop collision flag and scale range round-trip");
     // --- the stage plugs into the dirty-hash conductor as-is (M3-8 does the real wiring).
     Pipeline::GenerationPipeline pipeline;

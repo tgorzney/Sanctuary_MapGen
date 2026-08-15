@@ -81,16 +81,30 @@ void CheckSimulationChangedTerrain(const Pipeline::GenerationAssembler& assemble
 }
 
 // The mask stage's slope gate is the only difference between these two pipelines, so a
-// different stratum field is proof the gate reached the output rather than being overwritten.
+// different SURFACE-WEIGHT field is proof the gate reached the output — while an IDENTICAL
+// PROPORTION field is proof the gate never touched the physical field the sims own. That
+// second assertion is the regression guard for the in-place-overwrite defect (ARCH §7.2).
 void CheckMaskGateReachedOutput(const Pipeline::GenerationAssembler& assembler,
                                 const Params::MapRecipe& recipe) {
-    Pipeline::GenerationAssembler control(recipe);
+    Params::MapRecipe controlRecipe = recipe;
+    controlRecipe.strata[detailStratumIndex].bSlopeGateEnabled = false;
+    Pipeline::GenerationAssembler control(controlRecipe);
     ConfigureStages(control);
-    control.StratumMaskSettings()[detailStratumIndex].bSlopeGateEnabled = false;
     control.Run();
-    const unsigned long long gated = FieldChecksum(assembler.Fields().materialMasks[detailStratumIndex]);
-    const unsigned long long ungated = FieldChecksum(control.Fields().materialMasks[detailStratumIndex]);
-    AssemblerCheck(gated != ungated, "the mask stage's slope gate changed the stratum weights");
+
+    const unsigned long long gatedWeights =
+        FieldChecksum(assembler.Fields().surfaceStratumWeights[detailStratumIndex]);
+    const unsigned long long ungatedWeights =
+        FieldChecksum(control.Fields().surfaceStratumWeights[detailStratumIndex]);
+    AssemblerCheck(gatedWeights != ungatedWeights,
+                   "the mask stage's slope gate changed the surface stratum weights");
+
+    const unsigned long long gatedProportions =
+        FieldChecksum(assembler.Fields().materialProportions[detailStratumIndex]);
+    const unsigned long long ungatedProportions =
+        FieldChecksum(control.Fields().materialProportions[detailStratumIndex]);
+    AssemblerCheck(gatedProportions == ungatedProportions,
+                   "the slope gate left materialProportions identical (single writer)");
 }
 
 } // namespace

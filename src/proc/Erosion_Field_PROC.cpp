@@ -1,8 +1,8 @@
 // Erosion_Field_PROC.cpp — the DATA round-trip: MapFields <-> the fixed-point thickness stack.
 // Layer: PROC. LAYER_SYSTEM_SPEC simulates in THICKNESS, not in height: the authored stack
-// arrives as a heightfield plus per-stratum surface weights, is split into per-material
+// arrives as a heightfield plus per-stratum material proportions, split into per-material
 // thickness columns (thickness_s = height * weight_s, so the column sums back to the height
-// exactly), eroded mass-conservingly, then read back as height + refreshed stratum masks.
+// exactly), eroded mass-conservingly, then read back as height + refreshed material proportions.
 // Converting on the way in/out is what lets the sim move material instead of just height.
 #include "Erosion_PROC.h"
 
@@ -18,10 +18,10 @@ void ErosionStage::ReadThicknessFromFields() {
             const float height = mapFields.heightfield.Get(x, y);
             float weightSum = 0.0f;
             for (int stratum = 0; stratum < stratumCount; ++stratum)
-                weightSum += mapFields.materialMasks[stratum].Get(x, y);
+                weightSum += mapFields.materialProportions[stratum].Get(x, y);
 
             if (height <= 0.0f) continue;
-            if (weightSum <= 0.0f) {   // no mask authored yet: the whole column is the base
+            if (weightSum <= 0.0f) {   // nothing authored yet: the column is all base
                 thicknessFixedPoint[cellIndex] = HeightToFixedPoint(height, fixedPointScale);
                 continue;
             }
@@ -31,7 +31,7 @@ void ErosionStage::ReadThicknessFromFields() {
             const float weightReciprocal = 1.0f / weightSum;
             int assignedTicks = 0;
             for (int stratum = stratumCount - 1; stratum >= 1; --stratum) {
-                const float share = mapFields.materialMasks[stratum].Get(x, y) * weightReciprocal;
+                const float share = mapFields.materialProportions[stratum].Get(x, y) * weightReciprocal;
                 const int ticks = HeightToFixedPoint(height * share, fixedPointScale);
                 const int clamped = ticks > totalTicks - assignedTicks ? totalTicks - assignedTicks : ticks;
                 thicknessFixedPoint[stratum * cellCount + cellIndex] = clamped < 0 ? 0 : clamped;
@@ -52,15 +52,15 @@ void ErosionStage::WriteThicknessToFields() {
             const float height = FixedPointToHeight(totalTicks, fixedPointInverse);
             mapFields.heightfield.Set(x, y, height);
             if (totalTicks <= 0) {
-                mapFields.materialMasks[0].Set(x, y, 1.0f);
+                mapFields.materialProportions[0].Set(x, y, 1.0f);
                 for (int stratum = 1; stratum < stratumCount; ++stratum)
-                    mapFields.materialMasks[stratum].Set(x, y, 0.0f);
+                    mapFields.materialProportions[stratum].Set(x, y, 0.0f);
                 continue;
             }
             const float totalReciprocal = 1.0f / static_cast<float>(totalTicks);
             for (int stratum = 0; stratum < stratumCount; ++stratum) {
                 const int ticks = thicknessFixedPoint[stratum * cellCount + cellIndex];
-                mapFields.materialMasks[stratum].Set(x, y, static_cast<float>(ticks) * totalReciprocal);
+                mapFields.materialProportions[stratum].Set(x, y, static_cast<float>(ticks) * totalReciprocal);
             }
         }
     }

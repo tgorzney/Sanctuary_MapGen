@@ -65,7 +65,7 @@ private:
     void BuildDerivedFields();
     void BuildSlopeGradientField();
     void BuildGateFieldCpu(std::size_t configurationIndex);
-    float SampleMaskWeight(int stratumIndex, int cellX, int cellY) const;
+    float SampleSurfaceStratumWeight(int stratumIndex, int cellX, int cellY) const;
     float SampleClearanceRadius(const ScatterRuleConfiguration& configuration, int cellX, int cellY) const;
     float SampleHeightVariance(int cellX, int cellY) const;
     // Placement_Scatter_PROC.cpp — the Poisson-disk candidate pass.

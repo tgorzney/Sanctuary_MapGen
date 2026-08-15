@@ -11,18 +11,18 @@
 namespace SanmapGen {
 namespace Proc {
 
-// Talus threshold for one cell: its material masks weight the per-stratum thresholds. With no
-// mask coverage at all the cell falls back to stratum 0 (MASKING_SPEC's bottom-layer fallback).
+// Talus threshold for one cell: its material proportions weight the per-stratum thresholds.
+// With no coverage at all the cell falls back to stratum 0 (the always-present base).
 static float BlendCellTalusThreshold(const Data::MapFields& fields, const std::vector<float>& thresholds,
-                                     int x, int y, float maskWeightEpsilon) {
+                                     int x, int y, float proportionWeightEpsilon) {
     float weightSum = 0.0f;
     float weightedThreshold = 0.0f;
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum) {
-        const float weight = fields.materialMasks[stratum].Get(x, y);
+        const float weight = fields.materialProportions[stratum].Get(x, y);
         weightSum += weight;
         weightedThreshold += weight * thresholds[stratum];
     }
-    if (weightSum > maskWeightEpsilon) return weightedThreshold * Math::Reciprocal(weightSum);
+    if (weightSum > proportionWeightEpsilon) return weightedThreshold * Math::Reciprocal(weightSum);
     return thresholds[0];
 }
 
@@ -30,12 +30,12 @@ void ThermalStage::PrepareIterationCpu() {
     const int vertexSize = mapFields.VertexSize();
     const float spreadFactorActive = kernelConstantBlock[ThermalConstantSlot::spreadFactorActive];
     const float movementEpsilon    = kernelConstantBlock[ThermalConstantSlot::movementEpsilon];
-    const float maskWeightEpsilon  = kernelConstantBlock[ThermalConstantSlot::maskWeightEpsilon];
+    const float proportionWeightEpsilon  = kernelConstantBlock[ThermalConstantSlot::proportionWeightEpsilon];
 
     const auto prepareRow = [&](int y) {
         for (int x = 0; x < vertexSize; ++x) {
             const float threshold = BlendCellTalusThreshold(mapFields, resolvedTalusThresholds,
-                                                            x, y, maskWeightEpsilon);
+                                                            x, y, proportionWeightEpsilon);
             cellTalusThreshold.Set(x, y, threshold);
             const float height = mapFields.heightfield.Get(x, y);
             float totalExcess = 0.0f;

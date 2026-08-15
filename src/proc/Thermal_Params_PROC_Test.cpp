@@ -27,8 +27,8 @@ void CheckThreadPoolIsBitIdentical() {
 
     float difference = MaximumFieldDifference(serialFields.heightfield, pooledFields.heightfield);
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
-        difference += MaximumFieldDifference(serialFields.materialMasks[stratum],
-                                             pooledFields.materialMasks[stratum]);
+        difference += MaximumFieldDifference(serialFields.materialProportions[stratum],
+                                             pooledFields.materialProportions[stratum]);
     Check(difference == 0.0f, "the thread-pooled Cpu sweep is bit-identical to the serial one");
 }
 

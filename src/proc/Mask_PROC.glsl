@@ -1,7 +1,8 @@
 #version 430 core
 // Mask_PROC.glsl — GPU speed path of the mask stage; twin of Mask_Apply_PROC.cpp.
-// Slope-gates every stratum's procedural mask and merges the stored art into the same
-// MaterialMasks field, one invocation per heightfield vertex.
+// Slope-gates every stratum's material proportion, merges the stored art and remaps once,
+// writing `surfaceStratumWeights` — one invocation per heightfield vertex. The proportion
+// buffer is READONLY: input and output are different fields (ARCH §7.2/§3.4).
 // This unit owns the std430 MaskConfiguration block, declared ONCE, mirroring
 // Proc::MaskStratumConfiguration field for field (DISPATCH_INTERFACE_SPEC §4). The two
 // functions that read a buffer (the slope gradient and the stored-art resample) live here
@@ -19,10 +20,11 @@ struct MaskConfiguration {
     float maskMinimum;        float maskMaximum;        float storedSampleScaleX; float storedSampleScaleY;
 };
 
-layout(std430, binding = 0) readonly buffer MaskConfigurations { MaskConfiguration maskConfigurations[]; };
-layout(std430, binding = 1) readonly buffer HeightField        { float heightValues[]; };
-layout(std430, binding = 2) buffer MaterialMasks               { float maskValues[]; };
-layout(std430, binding = 3) readonly buffer StoredMasks        { float storedValues[]; };
+layout(std430, binding = 0) readonly  buffer MaskConfigurations   { MaskConfiguration maskConfigurations[]; };
+layout(std430, binding = 1) readonly  buffer HeightField          { float heightValues[]; };
+layout(std430, binding = 2) readonly  buffer MaterialProportions   { float proportionValues[]; };
+layout(std430, binding = 3) readonly  buffer StoredArt             { float storedValues[]; };
+layout(std430, binding = 4) writeonly buffer SurfaceStratumWeights { float surfaceWeightValues[]; };
 
 uniform int vertexSize;
 
@@ -87,12 +89,12 @@ void main() {
                                            configuration.inverseFeatherHigh, configuration.bSmoothstepEnabled,
                                            configuration.bInvertEnabled, configuration.gateStrength,
                                            configuration.smoothstepShoulder, configuration.smoothstepScale);
-        float proceduralWeight = maskValues[stratum * cellCount + cellIndex] * gateWeight;
+        float proceduralWeight = proportionValues[stratum * cellCount + cellIndex] * gateWeight;
         float storedWeight = configuration.mergeMode == MASK_MERGE_DISABLED
                            ? 0.0 : sampleStoredMaskBilinear(configuration, cell.x, cell.y);
         float mergedWeight = mergeStoredMask(proceduralWeight, storedWeight, configuration.mergeMode,
                                              configuration.maskMinimum, configuration.maskMaximum);
-        maskValues[stratum * cellCount + cellIndex] =
+        surfaceWeightValues[stratum * cellCount + cellIndex] =
             remapMaskValue(mergedWeight, configuration.remapMinimum, configuration.inverseRemapRange,
                            configuration.maskMinimum, configuration.maskMaximum);
     }

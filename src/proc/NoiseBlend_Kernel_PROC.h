@@ -21,7 +21,7 @@ namespace NoiseBlendBinding {
     constexpr unsigned layerConfigurations = 0;
     constexpr unsigned rawNoise            = 1;
     constexpr unsigned heightField         = 2;
-    constexpr unsigned materialMasks       = 3;
+    constexpr unsigned materialProportions = 3;
     constexpr unsigned layerThickness      = 4;   // blend-pass scratch (see NoiseBlend_PROC.glsl)
 }
 

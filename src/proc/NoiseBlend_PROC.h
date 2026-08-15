@@ -1,5 +1,5 @@
 // NoiseBlend_PROC.h — the noise/blend stage: per-layer noise, density/levels reshape, the
-// height-blend stack, and the per-stratum material masks. Layer: PROC — the FIRST stage of
+// height-blend stack, and the per-stratum material proportions. Layer: PROC — the FIRST stage of
 // generation; everything downstream reads what it writes (NOISE_BLEND_SPEC).
 // One kernel, two backends: RunOnCpu() is the accuracy path, RunOnGpu() the speed path, and
 // both carry the SAME full layer configuration (the old GPU config omitted blend/fractal/
@@ -62,7 +62,7 @@ private:
     std::size_t ComputeBlendHash() const;
     void GenerateLayerNoiseCpu(std::size_t layerIndex);   // NoiseBlend_Noise_PROC.cpp
     void BlendLayersCpu();                                // NoiseBlend_Blend_PROC.cpp
-    void ClearMaterialMasks();
+    void ClearMaterialProportions();
     bool EnsureGpuResources();                            // NoiseBlend_GpuProgram_PROC.cpp
     bool EnsureGpuBuffers(std::size_t cellCount);         // NoiseBlend_GpuBuffers_PROC.cpp
     void UploadLayerConfigurationsGpu();                  // NoiseBlend_GpuBuffers_PROC.cpp

@@ -220,6 +220,7 @@ add_sangen_test(Mask_PROC_Test
     src/proc/Mask_PROC_Test.cpp
     src/proc/Mask_Slope_PROC_Test.cpp
     src/proc/Mask_Merge_PROC_Test.cpp
+    src/proc/Mask_Purity_PROC_Test.cpp
     src/proc/Mask_DirtyHash_PROC_Test.cpp
     src/proc/Mask_Parity_PROC_Test.cpp)
 add_sangen_test(Erosion_PROC_Test               src/proc/Erosion_PROC_Test.cpp)
@@ -237,6 +238,7 @@ add_sangen_test(Placement_Symmetry_PROC_Test    src/proc/Placement_Symmetry_PROC
 add_sangen_test(Placement_Gpu_PROC_Test         src/proc/Placement_Gpu_PROC_Test.cpp)
 add_sangen_test(Bake_PROC_Test
     src/proc/Bake_PROC_Test.cpp
+    src/proc/Bake_Weights_PROC_Test.cpp
     src/proc/Bake_Gpu_PROC_Test.cpp)
 
 # PIPELINE

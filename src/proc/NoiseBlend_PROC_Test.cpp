@@ -48,8 +48,8 @@ void CheckBlendModes() {
     Data::MapFields fields;
     Proc::NoiseBlendStage stage(geometry, stack, fields);
     stage.RunOnCpu();
-    NoiseBlendCheck(std::fabs(fields.materialMasks[0].Get(3, 5) - 0.6f) < 1e-6f, "stratum 0 mask = 0.6");
-    NoiseBlendCheck(std::fabs(fields.materialMasks[1].Get(3, 5) - 0.4f) < 1e-6f, "stratum 1 mask = 0.4");
+    NoiseBlendCheck(std::fabs(fields.materialProportions[0].Get(3, 5) - 0.6f) < 1e-6f, "stratum 0 mask = 0.6");
+    NoiseBlendCheck(std::fabs(fields.materialProportions[1].Get(3, 5) - 0.4f) < 1e-6f, "stratum 1 mask = 0.4");
 }
 
 // Item 3 — the stage as a PIPELINE stage: unchanged settings skip it, a structural change

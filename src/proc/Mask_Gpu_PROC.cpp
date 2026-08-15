@@ -3,6 +3,8 @@
 // full configuration record as the CPU path — the backends differ only by accuracy class
 // (DISPATCH_INTERFACE_SPEC §1/§3). If no GL resource manager is available the stage falls back
 // to the CPU accuracy path rather than silently producing nothing (the old UseGPUFlowMap bug).
+// The proportion buffer is uploaded read-only and the surface-weight buffer is a separate,
+// write-only output — the GPU twin honours the single-writer rule exactly like the CPU twin.
 #include "Mask_PROC.h"
 #include "Mask_Merge_PROC.h"
 #include "../sys/GpuResource_SYS.h"
@@ -13,10 +15,11 @@ namespace SanmapGen {
 namespace Proc {
 namespace {
 
-const char* const kConfigurationBuffer = "maskStratumConfigurations";
-const char* const kHeightBuffer        = "maskHeightField";
-const char* const kMaterialMaskBuffer  = "maskMaterialMasks";
-const char* const kStoredMaskBuffer    = "maskStoredMasks";
+const char* const kConfigurationBuffer   = "maskStratumConfigurations";
+const char* const kHeightBuffer          = "maskHeightField";
+const char* const kProportionBuffer      = "maskMaterialProportions";
+const char* const kSurfaceWeightBuffer   = "maskSurfaceStratumWeights";
+const char* const kStoredMaskBuffer      = "maskStoredArt";
 
 // Every literal the shader needs comes from the C++ side — nothing is hardcoded in GLSL (§8).
 std::string BuildShaderDefinitions() {
@@ -28,18 +31,18 @@ std::string BuildShaderDefinitions() {
          + "\n#define MASK_MERGE_STATIC_OVERRIDE " + std::to_string(kMergeModeStaticOverride);
 }
 
-// The 9 mask fields are packed stratum-major into one buffer, matching the shader's
+// The 9 fields of a family are packed stratum-major into one buffer, matching the shader's
 // `stratum * cellCount + cellIndex` addressing.
-void PackMaterialMasks(const Data::MapFields& fields, std::vector<float>& transfer, std::size_t cellCount) {
+void PackStratumFields(const Data::FloatField* fields, std::vector<float>& transfer, std::size_t cellCount) {
     transfer.resize(cellCount * Data::MapFields::stratumCount);
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
-        std::memcpy(transfer.data() + stratum * cellCount, fields.materialMasks[stratum].Data(),
+        std::memcpy(transfer.data() + stratum * cellCount, fields[stratum].Data(),
                     cellCount * sizeof(float));
 }
 
-void UnpackMaterialMasks(const std::vector<float>& transfer, Data::MapFields& fields, std::size_t cellCount) {
+void UnpackStratumFields(const std::vector<float>& transfer, Data::FloatField* fields, std::size_t cellCount) {
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
-        std::memcpy(fields.materialMasks[stratum].Data(), transfer.data() + stratum * cellCount,
+        std::memcpy(fields[stratum].Data(), transfer.data() + stratum * cellCount,
                     cellCount * sizeof(float));
 }
 
@@ -65,22 +68,25 @@ void MaskStage::RunOnGpu() {
 
     const std::size_t cellCount = static_cast<std::size_t>(vertexSize) * vertexSize;
     const std::size_t configurationBytes = stratumConfigurations.size() * sizeof(MaskStratumConfiguration);
-    const std::size_t maskBytes = cellCount * Data::MapFields::stratumCount * sizeof(float);
+    const std::size_t fieldBytes = cellCount * Data::MapFields::stratumCount * sizeof(float);
     const std::size_t storedBytes = packedStoredMaskValues.size() * sizeof(float);
-    PackMaterialMasks(mapFields, gpuTransferBuffer, cellCount);
+    PackStratumFields(mapFields.materialProportions, gpuProportionBuffer, cellCount);
+    gpuSurfaceWeightBuffer.assign(cellCount * Data::MapFields::stratumCount, 0.0f);
 
     gpuResourceManager->EnsureBuffer(kConfigurationBuffer, configurationBytes);
     gpuResourceManager->EnsureBuffer(kHeightBuffer, cellCount * sizeof(float));
-    gpuResourceManager->EnsureBuffer(kMaterialMaskBuffer, maskBytes);
+    gpuResourceManager->EnsureBuffer(kProportionBuffer, fieldBytes);
+    gpuResourceManager->EnsureBuffer(kSurfaceWeightBuffer, fieldBytes);
     gpuResourceManager->EnsureBuffer(kStoredMaskBuffer, storedBytes);
     gpuResourceManager->UploadBuffer(kConfigurationBuffer, stratumConfigurations.data(), configurationBytes);
     gpuResourceManager->UploadBuffer(kHeightBuffer, mapFields.heightfield.Data(), cellCount * sizeof(float));
-    gpuResourceManager->UploadBuffer(kMaterialMaskBuffer, gpuTransferBuffer.data(), maskBytes);
+    gpuResourceManager->UploadBuffer(kProportionBuffer, gpuProportionBuffer.data(), fieldBytes);
     gpuResourceManager->UploadBuffer(kStoredMaskBuffer, packedStoredMaskValues.data(), storedBytes);
     gpuResourceManager->BindBuffer(kConfigurationBuffer, 0);
     gpuResourceManager->BindBuffer(kHeightBuffer, 1);
-    gpuResourceManager->BindBuffer(kMaterialMaskBuffer, 2);
+    gpuResourceManager->BindBuffer(kProportionBuffer, 2);
     gpuResourceManager->BindBuffer(kStoredMaskBuffer, 3);
+    gpuResourceManager->BindBuffer(kSurfaceWeightBuffer, 4);
 
     const Sys::GpuProgramHandle program{ gpuProgramIndex };
     gpuResourceManager->SetUniformInt(program, "vertexSize", vertexSize);
@@ -91,8 +97,8 @@ void MaskStage::RunOnGpu() {
     Sys::GpuFenceHandle fence = gpuResourceManager->InsertFence();
     for (int spin = 0; spin < 1000000 && !gpuResourceManager->IsFenceSignaled(fence); ++spin) {}
     gpuResourceManager->DeleteFence(fence);
-    gpuResourceManager->ReadbackBuffer(kMaterialMaskBuffer, gpuTransferBuffer.data(), maskBytes);
-    UnpackMaterialMasks(gpuTransferBuffer, mapFields, cellCount);
+    gpuResourceManager->ReadbackBuffer(kSurfaceWeightBuffer, gpuSurfaceWeightBuffer.data(), fieldBytes);
+    UnpackStratumFields(gpuSurfaceWeightBuffer, mapFields.surfaceStratumWeights, cellCount);
     lastBackend = Sys::ComputeBackend::Gpu;
 }
 

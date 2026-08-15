@@ -21,9 +21,16 @@ int main() {
         { std::printf("FAIL heightfield sized\n"); ++failures; }
     if (fields.flow.Width() != 257 || fields.accumulation.Width() != 257)
         { std::printf("FAIL flow/accum sized\n"); ++failures; }
-    for (int index = 0; index < Data::MapFields::stratumCount; ++index)
-        if (fields.materialMasks[index].CellCount() != 257ull * 257ull)
-            { std::printf("FAIL mask %d sized\n", index); ++failures; break; }
+    // Two distinct per-stratum families, both sized, both independently addressable: the
+    // physical proportions the sims own and the visible weights the Mask stage owns (ARCH 7.2).
+    for (int index = 0; index < Data::MapFields::stratumCount; ++index) {
+        if (fields.materialProportions[index].CellCount() != 257ull * 257ull
+         || fields.surfaceStratumWeights[index].CellCount() != 257ull * 257ull)
+            { std::printf("FAIL stratum field %d sized\n", index); ++failures; break; }
+    }
+    fields.materialProportions[3].Fill(0.5f);
+    if (fields.surfaceStratumWeights[3].Get(1, 1) != 0.0f)
+        { std::printf("FAIL proportions and surface weights alias\n"); ++failures; }
     if (!fields.IsSized()) { std::printf("FAIL sized flag\n"); ++failures; }
 
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }

@@ -1,8 +1,10 @@
 // Bake_Sampling_PROC.h — the bake stage's scalar sampling math, CPU side.
-// Layer: PROC. Mask remap, RGBA8 pack/unpack, and the tiled wrapped bilinear albedo fetch —
-// the three expressions the GPU twin repeats in Bake_Sampling_PROC.glsl. Kept in one small
-// header so the pair can be diffed side by side (ARCH §1.4) and so both the compositor and
-// the parity test share ONE definition (Constitution §4: one math source, two backends).
+// Layer: PROC. RGBA8 pack/unpack and the tiled wrapped bilinear albedo fetch — the expressions
+// the GPU twin repeats in Bake_PROC.glsl. Kept in one small header so the pair can be diffed
+// side by side (ARCH §1.4) and so both the compositor and the parity test share ONE definition
+// (Constitution §4: one math source, two backends).
+// There is deliberately NO weight remap here: the surface weights arrive already remapped from
+// the Mask stage, which owns the one and only remap (ARCH §7.2.5).
 #pragma once
 #include "Bake_Kernel_PROC.h"
 #include <cmath>
@@ -12,16 +14,6 @@ namespace Proc {
 
 constexpr float bakeByteScale           = 255.0f;
 constexpr float bakeByteScaleReciprocal = 1.0f / 255.0f;
-
-// Remapped visibility: maskRemapMin/Max stretched onto 0..1 (MASKING_SPEC consumption).
-// A degenerate window (max <= min) collapses to a hard threshold at the minimum.
-inline float RemapMaskWeight(float rawWeight, const StratumKernelConfiguration& configuration) {
-    if (configuration.maskRemapRangeReciprocal <= 0.0f)
-        return rawWeight >= configuration.maskRemapMinimum ? 1.0f : 0.0f;
-    const float remapped = (rawWeight - configuration.maskRemapMinimum)
-                         * configuration.maskRemapRangeReciprocal;
-    return remapped < 0.0f ? 0.0f : (remapped > 1.0f ? 1.0f : remapped);
-}
 
 inline int WrapTexelIndex(int value, int size) {
     const int wrapped = value % size;

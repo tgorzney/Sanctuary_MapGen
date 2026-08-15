@@ -18,13 +18,15 @@ inline int ClampCell(int cell, int vertexSize) {
 
 } // namespace
 
+// The biome stamped on an instance is the stratum most VISIBLE under it, so this reads the
+// surface weights for the same reason the gate does (ARCH §7.2.6).
 int PlacementStage::DominantStratumIndex(int cellX, int cellY) const {
     int dominantIndex = 0;
     float dominantWeight = -1.0f;
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum) {
-        const Data::FloatField& mask = mapFields.materialMasks[stratum];
-        if (mask.IsEmpty()) continue;
-        const float weight = mask.Get(cellX, cellY);
+        const Data::FloatField& stratumWeights = mapFields.surfaceStratumWeights[stratum];
+        if (stratumWeights.IsEmpty()) continue;
+        const float weight = stratumWeights.Get(cellX, cellY);
         if (weight > dominantWeight) { dominantWeight = weight; dominantIndex = stratum; }
     }
     return dominantIndex;

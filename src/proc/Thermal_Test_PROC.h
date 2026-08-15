@@ -43,7 +43,7 @@ inline void BuildRoughField(Data::MapFields& fields, int vertexSize) {
             state ^= state << 13; state ^= state >> 17; state ^= state << 5;
             fields.heightfield.Set(x, y, static_cast<float>(state % 1000u) * 0.001f);
             const int stratum = (x / 4 + y / 4) % Data::MapFields::stratumCount;
-            fields.materialMasks[stratum].Set(x, y, 1.0f);
+            fields.materialProportions[stratum].Set(x, y, 1.0f);
         }
 }
 
@@ -91,7 +91,7 @@ inline SpikeResult RelaxSpike(float angleDegrees, int iterationCount, int stratu
     if (stratumIndex >= 0)
         for (int y = 0; y < testVertexSize; ++y)
             for (int x = 0; x < testVertexSize; ++x)
-                fields.materialMasks[stratumIndex].Set(x, y, 1.0f);
+                fields.materialProportions[stratumIndex].Set(x, y, 1.0f);
 
     const Params::Geometry geometry = MakeGeometry(testVertexSize);
     const double massBefore = TotalHeight(fields.heightfield);

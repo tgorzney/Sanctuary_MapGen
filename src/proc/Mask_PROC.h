@@ -1,7 +1,23 @@
-// Mask_PROC.h — the mask stage: slope masking + the stored-stratum-mask merge into the one
-// MaterialMasks weight field. Layer: PROC — runs after noise/blend, which owns the top-down
-// occlusion fill of MaterialMasks (M3-1); this stage GATES that field by slope and merges the
-// imported art into the SAME field (MASKING_SPEC "Stored stratum masks are the SAME system").
+// Mask_PROC.h — the Mask stage: resolve `surfaceStratumWeights` from `materialProportions`,
+// the slope gate, and the stored .sanmap stratum art (ARCH §7.2, MASKING_SPEC Part 1).
+// Layer: PROC. Runs AFTER every sim (ARCH §7.4), so the gate sees the FINAL slope and the
+// FINAL proportions, and before Placement/Bake, which consume the resolved weights.
+//
+//   gate_s        = SlopeGateWeight(slopeGradient, stratum_s)
+//   procedural_s  = materialProportions[s] * gate_s
+//   merged_s      = Merge(procedural_s, storedArt_s, importedMaskMode_s)
+//   surfaceStratumWeights[s] = Remap_s(merged_s)
+//
+// Single-writer + purity (ARCH §3.4): the ONLY field this stage writes is
+// `surfaceStratumWeights`. It never writes `materialProportions` — gating the physical field
+// in place let a renormalizing sim undo the gate and made the stage a non-idempotent
+// read-modify-write. Inputs are read-only, so the dirty-hash conductor may re-run Mask alone,
+// twice, and get the same answer.
+//
+// APPROXIMATION IN FORCE (MASKING_SPEC 1.9 / ARCH §7.5): `materialProportions` is a volume
+// fraction, not surface exposure; until the persistent ordered thickness stack lands (M6) it
+// stands in for exposure. The kernel does not change when that lands — only its input binding.
+//
 // One kernel, two backends: RunOnCpu() is the accuracy path, RunOnGpu() the speed path, both
 // driven from the identical MaskStratumConfiguration records. The stage never picks a backend:
 // it hands itself to Sys::Dispatch with the policy PIPELINE gave it (ARCH §4).
@@ -10,8 +26,9 @@
 #include <vector>
 #include "Mask_Kernel_PROC.h"
 #include "../data/MapFields_DATA.h"
+#include "../data/StratumArt_DATA.h"
 #include "../params/Geometry_PARAMS.h"
-#include "../params/StratumMask_PARAMS.h"
+#include "../params/Stratum_PARAMS.h"
 #include "../sys/Dispatch_SYS.h"
 
 namespace SanmapGen {
@@ -22,10 +39,12 @@ namespace Proc {
 class MaskStage {
 public:
     MaskStage(const Params::Geometry& geometrySettings,
-              const std::vector<Params::StratumMask>& stratumMaskSettings,
+              const std::vector<Params::Stratum>& stratumSettings,
+              const std::vector<Data::StratumArt>& stratumArtInput,
               Data::MapFields& outputFields);
 
-    // Configuration (all optional; ARCH §4.2 Mask defaults = Gpu/Visual preview, Cpu/Accurate output).
+    // Configuration (all optional; ARCH §4.2 Mask defaults = Gpu/Visual preview, Cpu/Accurate
+    // output — and Mask sits in the Output Exact chain because Placement consumes it, §4.6).
     MaskConstants& Constants() { return constants; }
     const MaskConstants& Constants() const { return constants; }
     void SetDispatchPolicy(const Sys::DispatchPolicy& policy) { dispatchPolicy = policy; }
@@ -35,9 +54,9 @@ public:
     void SetThreadPool(Sys::ThreadPool* pool) { threadPool = pool; }
 
     // Hash of everything this stage consumes that is its OWN: geometry scale, the stage
-    // constants, and every per-stratum mask setting including the stored art's content. The
-    // heightfield this stage reads belongs to the UPSTREAM stage, so it is deliberately not
-    // hashed here — Generation_PIPELINE mixes the upstream hash forward, which is what makes
+    // constants, every per-stratum mask setting, and the stored art's content. The heightfield
+    // and the proportions this stage reads belong to UPSTREAM stages, so they are deliberately
+    // not hashed here — Generation_PIPELINE mixes the upstream hash forward, which is what makes
     // "upstream changed => mask re-runs" work without this stage knowing the pipeline shape.
     std::size_t ComputeParameterHash() const;
 
@@ -59,10 +78,11 @@ private:
     void PrepareRun();
     bool EnsureGpuResources();   // Mask_Gpu_PROC.cpp
 
-    const Params::Geometry&                  geometry;
-    const std::vector<Params::StratumMask>&  stratumMasks;
-    Data::MapFields&                         mapFields;
-    MaskConstants                            constants;
+    const Params::Geometry&               geometry;
+    const std::vector<Params::Stratum>&   strata;
+    const std::vector<Data::StratumArt>&  stratumArt;
+    Data::MapFields&                      mapFields;
+    MaskConstants                         constants;
 
     Sys::DispatchPolicy      dispatchPolicy;                                   // ARCH §4.2 defaults
     Sys::GenerationContext   generationContext  = Sys::GenerationContext::Output;
@@ -72,7 +92,8 @@ private:
 
     std::vector<MaskStratumConfiguration> stratumConfigurations;
     std::vector<float>                    packedStoredMaskValues;   // every stratum's art, one buffer
-    std::vector<float>                    gpuTransferBuffer;
+    std::vector<float>                    gpuProportionBuffer;      // upload staging (read-only input)
+    std::vector<float>                    gpuSurfaceWeightBuffer;   // readback staging (the output)
 
     Sys::ComputeBackend lastBackend      = Sys::ComputeBackend::Cpu;
     bool                bGpuProgramReady = false;

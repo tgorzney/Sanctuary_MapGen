@@ -21,7 +21,7 @@ struct PropRule {
 
     float spacingMinimum          = 0.0f;   // Poisson-disk radius, in cells
     int   mapEdgePadding          = 0;
-    int   maskStratumIndex        = -1;     // -1 = no biome/mask gate
+    int   maskStratumIndex        = -1;     // -1 = no biome gate; else a surfaceStratumWeights index
     float maskWeightMinimum       = 0.0f;
     float obstacleDistanceMinimum = 0.0f;   // Jump-Flood exclusion
     float nearCliffDistanceMaximum = 0.0f;  // bNearCliffs: max distance to a steep cell

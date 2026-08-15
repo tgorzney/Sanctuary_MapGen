@@ -2,6 +2,8 @@
 // (gradient = rise/run, with terrainMaxHeight read from the map), hard clamp vs smoothstep,
 // feather, invert, and gate strength. Expected values are derived from a ramp whose gradient is
 // known exactly by hand, not from the kernel headers under test.
+// The gate weight is read as surfaceStratumWeights / materialProportions — the input field is
+// still intact after the run, which is precisely the point of the two-field model.
 #include "Mask_TestSupport_PROC.h"
 #include "Mask_PROC.h"
 #include <vector>
@@ -17,20 +19,21 @@ void FillRampHeightfield(Data::MapFields& fields, int vertexSize, float risePerC
             fields.heightfield.Set(x, y, static_cast<float>(x) * risePerCell);
 }
 
-std::vector<Params::StratumMask> MakeGateSettings(float minimumDegrees, float maximumDegrees,
-                                                  bool bSmoothstep, float featherDegrees) {
-    Params::StratumMask stratumMask;
-    stratumMask.bSlopeGateEnabled = true;
-    stratumMask.minimumSlopeDegrees = minimumDegrees;
-    stratumMask.maximumSlopeDegrees = maximumDegrees;
-    stratumMask.bUseSmoothstep = bSmoothstep;
-    stratumMask.slopeFeatherDegreesLow = featherDegrees;
-    stratumMask.slopeFeatherDegreesHigh = featherDegrees;
-    return std::vector<Params::StratumMask>(Data::MapFields::stratumCount, stratumMask);
+std::vector<Params::Stratum> MakeGateSettings(float minimumDegrees, float maximumDegrees,
+                                              bool bSmoothstep, float featherDegrees) {
+    Params::Stratum stratum;
+    stratum.bSlopeGateEnabled = true;
+    stratum.minimumSlopeDegrees = minimumDegrees;
+    stratum.maximumSlopeDegrees = maximumDegrees;
+    stratum.bUseSmoothstep = bSmoothstep;
+    stratum.slopeFeatherDegreesLow = featherDegrees;
+    stratum.slopeFeatherDegreesHigh = featherDegrees;
+    return std::vector<Params::Stratum>(Data::MapFields::stratumCount, stratum);
 }
 
-// Runs the CPU path once and returns the resulting gate weight per cell (output / procedural).
-std::vector<float> RunGate(const std::vector<Params::StratumMask>& stratumMasks, int mapSize,
+// Runs the CPU path once and returns the resulting gate weight per cell
+// (surface weight / the untouched proportion that produced it).
+std::vector<float> RunGate(const std::vector<Params::Stratum>& strata, int mapSize,
                            float terrainMaxHeight, bool bRamp, float risePerCell) {
     Params::Geometry geometry;
     geometry.mapSize = mapSize;
@@ -40,16 +43,17 @@ std::vector<float> RunGate(const std::vector<Params::StratumMask>& stratumMasks,
     fields.Resize(vertexSize);
     if (bRamp) FillRampHeightfield(fields, vertexSize, risePerCell);
     else       FillTestHeightfield(fields, vertexSize);
-    FillTestProceduralMasks(fields, vertexSize);
-    Data::MapFields expected = fields;
-    Proc::MaskStage stage(geometry, stratumMasks, fields);
+    FillTestMaterialProportions(fields, vertexSize);
+    const std::vector<Data::StratumArt> stratumArt = NoStratumArt();
+    Proc::MaskStage stage(geometry, strata, stratumArt, fields);
     stage.RunOnCpu();
     std::vector<float> gateWeights;
     gateWeights.reserve(static_cast<std::size_t>(vertexSize) * vertexSize);
     for (int y = 0; y < vertexSize; ++y)
         for (int x = 0; x < vertexSize; ++x) {
-            const float procedural = expected.materialMasks[0].Get(x, y);
-            gateWeights.push_back(procedural > 0.0f ? fields.materialMasks[0].Get(x, y) / procedural : -1.0f);
+            const float proportion = fields.materialProportions[0].Get(x, y);
+            gateWeights.push_back(proportion > 0.0f
+                ? fields.surfaceStratumWeights[0].Get(x, y) / proportion : -1.0f);
         }
     return gateWeights;
 }
@@ -95,8 +99,8 @@ void CheckSmoothstepVersusHardClamp() {
 // 4. Invert flips the window exactly; strength scales the rejection depth.
 void CheckInvertAndStrength() {
     const std::vector<float> invertedWeights = [] {
-        std::vector<Params::StratumMask> settings = MakeGateSettings(10.0f, 30.0f, false, 0.0f);
-        for (Params::StratumMask& stratumMask : settings) stratumMask.bInvertSlopeGate = true;
+        std::vector<Params::Stratum> settings = MakeGateSettings(10.0f, 30.0f, false, 0.0f);
+        for (Params::Stratum& stratum : settings) stratum.bInvertSlopeGate = true;
         return RunGate(settings, 64, 128.0f, false, 0.0f);
     }();
     const std::vector<float> plainWeights = RunGate(MakeGateSettings(10.0f, 30.0f, false, 0.0f), 64, 128.0f, false, 0.0f);
@@ -107,8 +111,8 @@ void CheckInvertAndStrength() {
     Check(bComplementary, "invert is the exact complement of the gate");
 
     const std::vector<float> halfStrength = [] {
-        std::vector<Params::StratumMask> settings = MakeGateSettings(10.0f, 30.0f, false, 0.0f);
-        for (Params::StratumMask& stratumMask : settings) stratumMask.slopeGateStrength = 0.5f;
+        std::vector<Params::Stratum> settings = MakeGateSettings(10.0f, 30.0f, false, 0.0f);
+        for (Params::Stratum& stratum : settings) stratum.slopeGateStrength = 0.5f;
         return RunGate(settings, 64, 128.0f, false, 0.0f);
     }();
     bool bHalved = true;

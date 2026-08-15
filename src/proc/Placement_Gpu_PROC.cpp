@@ -92,12 +92,13 @@ bool PlacementStage::BuildGateFieldGpu(std::size_t configurationIndex) {
         bGpuFieldsUploaded = true;
     }
 
+    // Same visibility gate as the Cpu twin: the surface weights, not the proportions (§7.2.6).
     const bool bMaskPresent = configuration.maskStratumIndex >= 0
                            && configuration.maskStratumIndex < Data::MapFields::stratumCount
-                           && !mapFields.materialMasks[configuration.maskStratumIndex].IsEmpty();
+                           && !mapFields.surfaceStratumWeights[configuration.maskStratumIndex].IsEmpty();
     if (bMaskPresent)
         gpuResourceManager->UploadBuffer(maskBufferName,
-                                         mapFields.materialMasks[configuration.maskStratumIndex].Data(),
+                                         mapFields.surfaceStratumWeights[configuration.maskStratumIndex].Data(),
                                          fieldBytes);
     gpuResourceManager->EnsureBuffer(configurationBufferName, sizeof(ScatterRuleConfiguration));
     gpuResourceManager->UploadBuffer(configurationBufferName, &configuration,

@@ -1,7 +1,8 @@
 // NoiseBlend_Blend_PROC.cpp — the CPU accuracy path: reshape each cached layer, blend the
 // stack into the heightfield per Params::HeightBlendMode, and turn each layer's thickness
-// into per-stratum coverage by top-down occlusion (MASKING_SPEC, via HeightOcclusion_MATH —
-// the same helper the coming Mask_PROC calls). Twin of the blend pass in NoiseBlend_PROC.glsl.
+// into per-stratum material proportions by top-down occlusion (LAYER_SYSTEM_SPEC, via
+// HeightOcclusion_MATH). Twin of the blend pass in NoiseBlend_PROC.glsl. This stage SEEDS the
+// physical field; the visible surface weights are the Mask stage's output (ARCH §7.2).
 #include "NoiseBlend_PROC.h"
 #include "NoiseBlend_Shape_PROC.h"
 #include "../math/HeightOcclusion_MATH.h"
@@ -28,7 +29,7 @@ float BlendCell(const std::vector<LayerKernelConfiguration>& configurations,
 
 // Top-down occlusion: the topmost layer claims coverage first, each layer takes only what is
 // still visible, and any leftover falls through to the bottom layer's stratum.
-void AccumulateCellMasks(const std::vector<LayerKernelConfiguration>& configurations,
+void AccumulateCellProportions(const std::vector<LayerKernelConfiguration>& configurations,
                          const std::vector<float>& thickness, Data::MapFields& fields, int x, int y) {
     float remainingVisibility = 1.0f;
     for (std::size_t reverse = configurations.size(); reverse > 0; --reverse) {
@@ -40,17 +41,17 @@ void AccumulateCellMasks(const std::vector<LayerKernelConfiguration>& configurat
                                                  configuration.occlusionWindowLow,
                                                  configuration.occlusionWindowHigh, configuration.opacity);
         const float contribution = Math::OcclusionContribution(alpha, remainingVisibility);
-        fields.materialMasks[configuration.stratumIndex].At(x, y) += contribution;
+        fields.materialProportions[configuration.stratumIndex].At(x, y) += contribution;
         remainingVisibility -= contribution;
     }
     if (remainingVisibility > 0.0f)
-        fields.materialMasks[configurations[0].stratumIndex].At(x, y) += remainingVisibility;
+        fields.materialProportions[configurations[0].stratumIndex].At(x, y) += remainingVisibility;
 }
 
 } // namespace
 
 void NoiseBlendStage::BlendLayersCpu() {
-    ClearMaterialMasks();
+    ClearMaterialProportions();
     const int vertexSize = geometry.VertexSize();
     if (layerConfigurations.empty()) {
         mapFields.heightfield.Fill(constants.heightMinimum);
@@ -62,7 +63,7 @@ void NoiseBlendStage::BlendLayersCpu() {
         for (int x = 0; x < vertexSize; ++x) {
             const float height = BlendCell(layerConfigurations, cachedRawNoiseCpu, x, y, startHeight, thickness);
             mapFields.heightfield.Set(x, y, height);
-            AccumulateCellMasks(layerConfigurations, thickness, mapFields, x, y);
+            AccumulateCellProportions(layerConfigurations, thickness, mapFields, x, y);
         }
     };
     if (threadPool != nullptr) threadPool->ParallelFor(0, vertexSize, blendRow);

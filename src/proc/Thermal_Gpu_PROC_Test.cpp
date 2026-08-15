@@ -43,27 +43,27 @@ bool CreateHiddenGlContext(HWND& outWindow, HDC& outDeviceContext, HGLRC& outGlC
 }
 
 // A different talus angle per stratum, so the mask-weighted threshold really varies cell to cell.
-void ConfigureStage(Proc::ThermalStage& stage, bool bTransportMaterialMasks) {
+void ConfigureStage(Proc::ThermalStage& stage, bool bTransportMaterialProportions) {
     stage.Constants().iterationCount = parityIterationCount;
-    stage.Constants().bTransportMaterialMasks = bTransportMaterialMasks;
+    stage.Constants().bTransportMaterialProportions = bTransportMaterialProportions;
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
         stage.Constants().talusAngleDegrees[stratum] = 20.0f + static_cast<float>(stratum) * 5.0f;
 }
 
 // One identical rough field down each backend. Also asserts the dispatch policy resolved the way
 // ARCH §4.2 says it should for this stage.
-void RunBothBackends(Sys::GpuResourceManager& resourceManager, bool bTransportMaterialMasks,
+void RunBothBackends(Sys::GpuResourceManager& resourceManager, bool bTransportMaterialProportions,
                      Data::MapFields& cpuFields, Data::MapFields& gpuFields) {
     const Params::Geometry geometry = MakeGeometry(parityVertexSize);
     BuildRoughField(cpuFields, parityVertexSize);
     BuildRoughField(gpuFields, parityVertexSize);
 
     Proc::ThermalStage cpuStage(geometry, cpuFields);
-    ConfigureStage(cpuStage, bTransportMaterialMasks);
+    ConfigureStage(cpuStage, bTransportMaterialProportions);
     CheckParity(cpuStage.Run() == Sys::ComputeBackend::Cpu, "Output context resolves to the Cpu path");
 
     Proc::ThermalStage gpuStage(geometry, gpuFields);
-    ConfigureStage(gpuStage, bTransportMaterialMasks);
+    ConfigureStage(gpuStage, bTransportMaterialProportions);
     gpuStage.SetGpuResourceManager(&resourceManager);
     gpuStage.SetGenerationContext(Sys::GenerationContext::Preview);
     CheckParity(gpuStage.Run() == Sys::ComputeBackend::Gpu, "Preview context resolves to the Gpu speed path");
@@ -74,8 +74,8 @@ void CompareBackendResults(const Data::MapFields& cpuFields, const Data::MapFiel
     const float heightDifference = MaximumFieldDifference(cpuFields.heightfield, gpuFields.heightfield);
     float maskDifference = 0.0f;
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum) {
-        const float difference = MaximumFieldDifference(cpuFields.materialMasks[stratum],
-                                                        gpuFields.materialMasks[stratum]);
+        const float difference = MaximumFieldDifference(cpuFields.materialProportions[stratum],
+                                                        gpuFields.materialProportions[stratum]);
         if (difference > maskDifference) maskDifference = difference;
     }
     std::printf("parity: max height difference %.3e, max material-mask difference %.3e\n",
@@ -97,9 +97,9 @@ void CheckTransportDisabled(Sys::GpuResourceManager& resourceManager) {
                 "transport disabled: Cpu and Gpu heightfields still agree");
     float leftoverDifference = 0.0f;
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum) {
-        const Data::FloatField& original = untouchedFields.materialMasks[stratum];
-        leftoverDifference += MaximumFieldDifference(cpuFields.materialMasks[stratum], original);
-        leftoverDifference += MaximumFieldDifference(gpuFields.materialMasks[stratum], original);
+        const Data::FloatField& original = untouchedFields.materialProportions[stratum];
+        leftoverDifference += MaximumFieldDifference(cpuFields.materialProportions[stratum], original);
+        leftoverDifference += MaximumFieldDifference(gpuFields.materialProportions[stratum], original);
     }
     CheckParity(leftoverDifference == 0.0f,
                 "transport disabled: material masks are untouched on both backends");

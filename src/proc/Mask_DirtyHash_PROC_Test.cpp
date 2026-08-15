@@ -17,24 +17,26 @@ bool Ran(const std::vector<std::string>& stageNames, const char* name) {
     return false;
 }
 
-// The mask stage wired behind a mock upstream stage, exactly as PIPELINE will wire it.
+// The mask stage wired behind a mock upstream stage, exactly as PIPELINE wires it.
 struct DirtyHashHarness {
     Params::Geometry geometry;
     Data::MapFields fields;
-    std::vector<Params::StratumMask> stratumMasks;
+    std::vector<Params::Stratum> strata;
+    std::vector<Data::StratumArt> stratumArt;
     Proc::MaskStage stage;
     Pipeline::GenerationPipeline pipeline;
     std::size_t upstreamHeightParameter = 1;
     int maskRunCount = 0;
 
     DirtyHashHarness()
-        : stratumMasks(Data::MapFields::stratumCount), stage(geometry, stratumMasks, fields) {
+        : strata(Data::MapFields::stratumCount), stratumArt(Data::MapFields::stratumCount),
+          stage(geometry, strata, stratumArt, fields) {
         geometry.mapSize = 32;
         fields.Resize(geometry.VertexSize());
         FillTestHeightfield(fields, geometry.VertexSize());
-        FillTestProceduralMasks(fields, geometry.VertexSize());
-        stratumMasks[0].bSlopeGateEnabled = true;
-        stratumMasks[0].maximumSlopeDegrees = 30.0f;
+        FillTestMaterialProportions(fields, geometry.VertexSize());
+        strata[0].bSlopeGateEnabled = true;
+        strata[0].maximumSlopeDegrees = 30.0f;
         Sys::DispatchPolicy cpuOnlyPolicy;
         cpuOnlyPolicy.previewBackend = Sys::ComputeBackend::Cpu;
         cpuOnlyPolicy.outputBackend  = Sys::ComputeBackend::Cpu;
@@ -52,12 +54,12 @@ void CheckSettingsDirtying(DirtyHashHarness& harness) {
     ran = harness.pipeline.Run();
     Check(ran.empty() && harness.maskRunCount == 1, "unchanged settings skip the mask stage");
 
-    harness.stratumMasks[0].maximumSlopeDegrees = 35.0f;
+    harness.strata[0].maximumSlopeDegrees = 35.0f;
     ran = harness.pipeline.Run();
     Check(ran.size() == 1 && Ran(ran, "Mask") && harness.maskRunCount == 2,
           "changing a slope-gate setting re-runs only the mask stage");
 
-    harness.stratumMasks[3].maskRemapMaximum = 0.9f;
+    harness.strata[3].maskRemapMaximum = 0.9f;
     ran = harness.pipeline.Run();
     Check(ran.size() == 1 && harness.maskRunCount == 3,
           "changing another stratum's remap re-runs the mask stage");
@@ -70,15 +72,14 @@ void CheckSettingsDirtying(DirtyHashHarness& harness) {
 
 // Stored art is an input like any other: both its arrival and its pixels are part of the hash.
 void CheckStoredArtDirtying(DirtyHashHarness& harness) {
-    harness.stratumMasks[1].importedMaskMode = Params::ImportedMaskMode::StaticOverride;
-    harness.stratumMasks[1].importedMaskWidth = 2;
-    harness.stratumMasks[1].importedMaskHeight = 2;
-    harness.stratumMasks[1].importedMaskData = { 0.0f, 0.25f, 0.5f, 0.75f };
+    const float artPixels[4] = { 0.0f, 0.25f, 0.5f, 0.75f };
+    harness.strata[1].importedMaskMode = Params::ImportedMaskMode::StaticOverride;
+    SetImportedMask(harness.stratumArt[1], artPixels, 2, 2);
     std::vector<std::string> ran = harness.pipeline.Run();
     Check(ran.size() == 1 && harness.maskRunCount == 5, "importing stored art re-runs the mask stage");
 
     const std::size_t hashBeforeEdit = harness.stage.ComputeParameterHash();
-    harness.stratumMasks[1].importedMaskData[2] = 0.6f;
+    harness.stratumArt[1].importedMask.Set(0, 1, 0.6f);
     Check(harness.stage.ComputeParameterHash() != hashBeforeEdit, "stored-art CONTENT is part of the hash");
     ran = harness.pipeline.Run();
     Check(ran.size() == 1 && harness.maskRunCount == 6, "editing stored-art pixels re-runs the mask stage");

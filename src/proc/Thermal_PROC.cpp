@@ -32,12 +32,12 @@ std::size_t ThermalStage::ComputeParameterHash() const {
     std::size_t hash = HashInteger(hashBasis, geometry.mapSize);
     hash = HashFloat(hash, geometry.terrainMaxHeight);
     hash = HashInteger(hash, constants.iterationCount);
-    hash = HashInteger(hash, constants.bTransportMaterialMasks ? 1 : 0);
+    hash = HashInteger(hash, constants.bTransportMaterialProportions ? 1 : 0);
     hash = HashFloat(hash, constants.relaxationRate);
     hash = HashFloat(hash, constants.cellWorldSize);
     hash = HashFloat(hash, constants.minimumColumnDepth);
     hash = HashFloat(hash, constants.movementEpsilon);
-    hash = HashFloat(hash, constants.maskWeightEpsilon);
+    hash = HashFloat(hash, constants.proportionWeightEpsilon);
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
         hash = HashFloat(hash, constants.talusAngleDegrees[stratum]);
     return hash;
@@ -60,7 +60,7 @@ void ThermalStage::PrepareRun() {
         relaxationRate * thermalInverseNeighbourCount;
     kernelConstantBlock[ThermalConstantSlot::movementEpsilon]    = constants.movementEpsilon;
     kernelConstantBlock[ThermalConstantSlot::minimumColumnDepth] = constants.minimumColumnDepth;
-    kernelConstantBlock[ThermalConstantSlot::maskWeightEpsilon]  = constants.maskWeightEpsilon;
+    kernelConstantBlock[ThermalConstantSlot::proportionWeightEpsilon]  = constants.proportionWeightEpsilon;
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
         kernelConstantBlock[ThermalConstantSlot::talusThresholdBase + stratum] =
             resolvedTalusThresholds[stratum];
@@ -72,7 +72,7 @@ void ThermalStage::PrepareRun() {
     cellTalusThreshold.Resize(vertexSize, vertexSize, 0.0f);
     heightScratch.Resize(vertexSize, vertexSize, 0.0f);
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
-        materialMaskScratch[stratum].Resize(vertexSize, vertexSize, 0.0f);
+        materialProportionScratch[stratum].Resize(vertexSize, vertexSize, 0.0f);
 }
 
 Sys::ComputeBackend ThermalStage::Run() {
