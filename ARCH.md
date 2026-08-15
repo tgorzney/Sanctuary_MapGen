@@ -286,8 +286,9 @@ it via `PIPELINE`); picking → reads `EntityIdBuffer_DATA` produced by `SYS`.
 
 ### 5.4 `PreviewRenderer` (~300 lines) → `PreviewComposite_UI`
 Keeps pass ordering only. Evicted: GL load / shader compile / SSBO packing →
-`GpuResource_SYS`; gradient LUT bake → `Gradient_PROC`; **sim/rule re-filtering →
-deleted** (samples the bake, §3.2); picking readback → `Picking_UI`.
+`GpuResource_SYS`; gradient LUT bake → **`GradientLut_UI`** (a UI-layer colorization
+helper — **not** a PROC stage; corrected in §8.1); **sim/rule re-filtering → deleted**
+(samples the bake, §3.2); picking readback → `Picking_UI`.
 
 ### 5.5 Retire outright
 `TerrainGenerator` god + the `main.cpp` regen loop → `Generation_PIPELINE`. The dead
@@ -428,6 +429,17 @@ Consequences, all binding:
    The word "mask" is reserved for the on-disk `.sanmap` stratum art and for the
    `surfaceStratumWeights` that produce it. `SANMAP_FORMAT_SPEC` is unaffected — the
    on-disk masks are, and always were, surface weights.
+9. **Clarifications (M3 mask-rework coder judgment calls, ratified).** Two decisions the
+   rework made within the spirit of §7.2 but not previously named:
+   - **`strata` (the per-stratum `Params::Stratum[]`) lives on `MapRecipe`**, not as an
+     assembler side-vector. Stratum settings are PARAMS (§7.1) and must round-trip in the
+     `.sanmap`; `MapRecipe` is the PARAMS aggregate, so they belong on it.
+   - **Placement's `DominantStratumIndex` (biome tag) is computed from
+     `surfaceStratumWeights`, not `materialProportions`.** Placement is the
+     visibility-consistent consumer (§7.2.6, "scatter where it shows"); its biome tag must
+     match the rendered surface for WYSIWYG, and Placement reads exactly one stratum field.
+     (If a future gameplay consumer needs the *physical* dominant material, it reads
+     proportions directly — a separate consumer, not a change here.)
 
 ### 7.3 Vendored third-party headers
 Third-party vendored code (`FastNoiseLite.h`, `miniz`, `stb_*`) does **not** belong in a
@@ -499,3 +511,120 @@ persistent DATA before true surface exposure can be computed.
 - Anyone raising this again: it needs a DATA-shape ruling (ordered thickness columns:
   layout, fixed-point width, memory cost at 4096², and which stage owns the stack across
   stage boundaries), not a patch.
+
+---
+
+## 8. M4 design resolutions (ARCH rulings)
+
+Questions surfaced while dispatching the M4 (Preview / WYSIWYG) work-orders, ruled here
+so they are binding. §8.1 **corrects** a token in §5.4; §8.2–§8.3 create the two missing
+supporting types; §8.4 states the standing scope law those two questions exposed.
+
+### 8.1 The gradient LUT bake is `UI`, not `PROC` (corrects §5.4)
+**Ruling: the color-ramp LUT bake lives at `src/ui/GradientLut_UI.h/.cpp`.
+`Gradient_PROC` is retired as a name and never existed as a file.**
+
+§5.4's original "gradient LUT bake → `Gradient_PROC`" was written before §6.1 and §7.4
+existed, and it is wrong under both:
+
+- **PROC has a definition of done that a color ramp cannot satisfy.** §6.1 requires every
+  PROC unit to be a CPU + GPU pair, parity-checked, wired into `PIPELINE` + `Dispatch_SYS`,
+  with a declared accuracy class and declared DATA inputs/outputs. A 256-entry color LUT
+  has no GPU twin worth writing, no DAG node, and produces no DATA field any stage reads.
+- **It is not a pipeline stage.** §7.4 enumerates the stage order exhaustively; a color
+  ramp is not in it and must not be smuggled in.
+- **It is presentation, by the layer definitions.** Constitution §1: PROC is *applied
+  processors* (terrain synthesis, erosion, masking, placement); UI *"composites/samples
+  baked results."* Turning a designer-chosen ramp into a sampled table is colorization —
+  the definitional UI job.
+- **§3.2's "UI never simulates" is not violated.** That rule forbids the UI re-deriving a
+  *simulated quantity* (slope, flow, rule filtering) — the shadow-sim, hit-list #4. A LUT
+  is built from PARAMS alone; it reads no DATA field and duplicates no stage. Building a
+  presentation resource from settings is not simulating.
+- **Direction check (§3.1).** UI → PARAMS is legal and downward. The reverse would not be:
+  nothing in PROC may include a `_UI` header, so if a future **bake/export** path ever
+  needs to sample a designer ramp, the LUT builder moves to `MATH` (a pure ramp→table
+  function, `GradientLut_MATH`) and UI calls it there. It does **not** become PROC. As of
+  today no PROC stage consumes a color ramp (Bake composites stratum art, not ramps), so
+  `UI` is correct and is the least-privilege home.
+
+`PreviewComposite_UI` (M4-3) owns the GPU upload of the baked LUT via `GpuResource_SYS`;
+`GradientLut_UI` stays pure CPU and sandbox-testable with no GL.
+
+### 8.2 `GradientRamp_PARAMS` — the missing v2 settings type
+A color ramp is an **adjustable setting**, so it is PARAMS, and `src/` may never include a
+`core/` header. The type therefore has to exist in the v2 tree before M4-2 can compile.
+
+**Ruling: `src/params/GradientRamp_PARAMS.h`, type `Params::GradientRamp` (with its member
+`Params::GradientStop`).** Naming follows §1.1/§7.1 precedent (`Params::Water`,
+`Params::Stratum`): the namespace already says "settings", so the type states the
+**quantity** — `GradientRamp` — and the legacy role-word name `GradientSettings` is
+**not** carried over. M4-2's signature becomes
+`BakeGradientLut(const Params::GradientRamp&, int resolution)`.
+
+Binding shape decisions (they are ARCH rulings, not coder preference):
+- `stops` is a `std::vector<GradientStop>`; `GradientStop` holds `location` + `color[4]`.
+- **`location` is normalized 0..1** along the ramp. The legacy field was "0.0 to 100.0
+  (or mapped to degrees 0–90)" — a domain-dependent scale baked into the settings type,
+  which is exactly the "name/quantity ambiguity" §1.1 forbids. Domain mapping (slope
+  degrees, flow range, height range) belongs to the **consumer**, which normalizes its own
+  domain before sampling the LUT. Verified safe: gradients are **not** serialized in
+  `mapGeneratorData` today (no `Gradient` key in `core/export/`), so no round-trip breaks.
+- `bSmoothInterpolation` keeps the `b` prefix (§1.1) and selects smoothstep vs linear.
+- One ramp **per colorized field** — slope, flow, accumulation, height, water each own
+  theirs. The legacy "accumulation reuses the flow gradient" aliasing is retired
+  (`PREVIEW_COMPOSITING_SPEC`).
+- Resolution is a tweakable (Constitution §8), defaulted to 256, not hardcoded at the
+  call site.
+
+### 8.3 `SpatialGrid_DATA` vs `Placement_SpacingGrid_PROC` — two different structures
+**Ruling: they are unrelated and both stay. `Placement_SpacingGrid_PROC`'s header comment
+is correct** and is not to be "reconciled" with §5.1.
+
+| | `Proc::SpacingGrid` (`src/proc/Placement_SpacingGrid_PROC.h`) | `Data::SpatialGrid` (`src/data/SpatialGrid_DATA.h`, new) |
+| --- | --- | --- |
+| Purpose | Poisson **min-spacing rejection** during scatter | **Hit-test** acceleration for the UI cursor |
+| Cell size | the rule's spacing radius (varies per rule) | the map divided into a fixed chunk count |
+| Lifetime | transient, inside one Placement run | persistent DATA, survives to the UI |
+| Contents | accepted candidate positions | indices into the resolved instance arrays |
+| Layer | PROC (a scatter accelerator) | DATA (a computed index) |
+
+`SpatialGrid_DATA` is the §5.1 replacement for the v1 `GenerationParams::MarkerSpatialGrid`
+(32×32 `MarkerChunk`s). M4-4's `PickMarker` takes **`const Data::SpatialGrid&`**; the
+legacy name `MarkerSpatialGrid` does not appear anywhere in `src/`.
+
+Binding shape decisions:
+- **Indices, not string keys.** The v1 chunk stored `std::vector<std::string> MarkerKeys`;
+  v2 stores `std::int32_t` indices into `Data::PlacementInstances` (the resolved SoA).
+  A pick returns an index; the caller reads the SoA columns it needs. String keys in a hot
+  hit-test path are a cache-coherence defect, and `PlacementInstances` is already the SoA
+  of record.
+- **Flat CSR buckets, not `vector<vector<>>`** — `bucketStart[cellCount + 1]` +
+  `instanceIndex[total]`, two contiguous arrays. Same reason the instance buffer is a real
+  SoA: one allocation, one cache line per chunk query.
+- **The cell hash lives on the DATA type** as a pure accessor
+  (`CellIndexAt(worldX, worldY)`), so the builder and the picker share exactly one
+  world→cell mapping. Two copies of that arithmetic is how a picker silently drifts from
+  its index.
+- **Chunk resolution is a tweakable** (Constitution §8), defaulted to 32, carried on the
+  grid — not a hardcoded 32 in two places as in v1.
+- **Single writer (§3.4.1): `Generation_PIPELINE`, immediately after the Placement stage.**
+  The grid is a derived index over `PlacementInstances`, not a new physical quantity, so it
+  needs no PROC stage of its own; the container exposes a mechanical `Build(...)` exactly as
+  `EntityIdBuffer_DATA` exposes `Set(...)`, and PIPELINE is its only caller. `Picking_UI`
+  is strictly a reader.
+
+### 8.4 Scope law — a coder never invents a missing type
+Standing rule, generalized from §8.2/§8.3 (both were caught only because the dispatcher
+diffed the work-orders against the tree):
+
+> **A work-order's target-file list is exhaustive.** A coder that discovers it needs a type
+> which does not exist **stops and reports**; it does not create that type in a folder its
+> work-order does not name, and it does not substitute a legacy `core/` type to get a
+> build. A missing type is a missing work-order.
+
+Rationale: a type created as a side effect of another task gets its shape from whatever the
+one caller happened to need, in whatever layer that caller lived — which is precisely how
+the v1 duplicate `StratumSettings` families (hit-list #1) came to exist. New types get a
+work-order and, where the shape is not obvious, an ARCH ruling (§8.2, §8.3 are those
+rulings).
