@@ -3,8 +3,13 @@
 // Builds a deliberately symmetric probe terrain: a flat, pathable plain with one steep cone
 // in the middle, plus a stratum mask that covers the left half — so slope, height, mask and
 // symmetry gates all have something to bite on.
+// The scene stands in for the UPSTREAM Mask stage, so it authors both of Mask's outputs:
+// `surfaceStratumWeights` and the baked `slope` field Placement now reads (M5-0c). The slope is
+// produced by the one authority, `Proc::SlopeGradientMagnitude`, never a second formula.
 #pragma once
 #include "Placement_PROC.h"
+#include "Mask_Kernel_PROC.h"
+#include "Mask_Slope_PROC.h"     // the ONE slope formula; the scene stands in for the Mask stage
 #include <cmath>
 
 namespace PlacementTest {
@@ -16,6 +21,23 @@ constexpr int vertexSize       = mapSize + 1;
 constexpr int maskStratumIndex = 3;
 constexpr float plainHeight    = 0.5f;
 constexpr float coneRadius     = 18.0f;
+constexpr float terrainMaxHeight = 128.0f;   // the value every placement test's recipe carries
+
+// Mask's slope output, authored by the scene through the ONE slope authority
+// (Proc::SlopeGradientMagnitude) with Mask's own default constants, so the fixture can never
+// drift from the stage that writes this field in a real run.
+inline void BakeSlopeField(Data::MapFields& fields) {
+    const Proc::MaskConstants constants;
+    Proc::MaskStratumConfiguration configuration;
+    configuration.heightScale       = terrainMaxHeight;
+    configuration.inverseSingleSpan = 1.0f / constants.cellSize;
+    configuration.inverseDoubleSpan = 1.0f / (constants.centralDifferenceSpan * constants.cellSize);
+    const float* const heightValues = fields.heightfield.Data();
+    for (int y = 0; y < vertexSize; ++y)
+        for (int x = 0; x < vertexSize; ++x)
+            fields.slope.Set(x, y, Proc::SlopeGradientMagnitude(heightValues, x, y, vertexSize,
+                                                                configuration));
+}
 
 inline void BuildTestFields(Data::MapFields& fields) {
     fields.Resize(vertexSize, 0.0f);
@@ -36,6 +58,7 @@ inline void BuildTestFields(Data::MapFields& fields) {
             fields.materialProportions[maskStratumIndex].Set(x, y, x < vertexSize / 2 ? 0.0f : 1.0f);
             fields.materialProportions[0].Set(x, y, x < vertexSize / 2 ? 1.0f : 0.0f);
         }
+    BakeSlopeField(fields);          // Mask's other output, which Placement now READS (M5-0c)
 }
 
 inline Params::ScatterTransform MakeTransform(const char* templateIdentifier,
@@ -61,8 +84,10 @@ inline float MinimumSeparation(const Data::PlacementInstances& instances) {
     return minimum;
 }
 
+// The slope check reads the BAKED field and squares it exactly as the gate does — the stage no
+// longer exposes a slope field of its own, because it no longer owns one (M5-0c).
 inline bool AllWithinGates(const Data::PlacementInstances& instances, const Data::MapFields& fields,
-                           const Proc::PlacementStage& stage, float heightMinimum, float heightMaximum,
+                           float heightMinimum, float heightMaximum,
                            float maxSlopeDegrees, int mapEdgePadding) {
     const float tangent = std::tan(maxSlopeDegrees * 3.14159265f / 180.0f);
     const float gradientLimitSquared = tangent * tangent;
@@ -73,7 +98,8 @@ inline bool AllWithinGates(const Data::PlacementInstances& instances, const Data
         if (cellX >= vertexSize - mapEdgePadding || cellY >= vertexSize - mapEdgePadding) return false;
         const float height = fields.heightfield.Get(cellX, cellY);
         if (height < heightMinimum || height > heightMaximum) return false;
-        if (stage.SlopeGradientField().Get(cellX, cellY) > gradientLimitSquared * 1.001f) return false;
+        const float slopeGradient = fields.slope.Get(cellX, cellY);
+        if (slopeGradient * slopeGradient > gradientLimitSquared * 1.001f) return false;
     }
     return true;
 }

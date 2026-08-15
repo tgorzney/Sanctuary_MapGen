@@ -3,8 +3,9 @@
 // full configuration record as the CPU path — the backends differ only by accuracy class
 // (DISPATCH_INTERFACE_SPEC §1/§3). If no GL resource manager is available the stage falls back
 // to the CPU accuracy path rather than silently producing nothing (the old UseGPUFlowMap bug).
-// The proportion buffer is uploaded read-only and the surface-weight buffer is a separate,
-// write-only output — the GPU twin honours the single-writer rule exactly like the CPU twin.
+// The proportion buffer is uploaded read-only and the surface-weight and slope buffers are
+// separate, write-only outputs — the GPU twin honours the single-writer rule exactly like the
+// CPU twin, and bakes the same `slope` field (M5-0c).
 #include "Mask_PROC.h"
 #include "Mask_Merge_PROC.h"
 #include "../sys/GpuResource_SYS.h"
@@ -20,6 +21,7 @@ const char* const kHeightBuffer          = "maskHeightField";
 const char* const kProportionBuffer      = "maskMaterialProportions";
 const char* const kSurfaceWeightBuffer   = "maskSurfaceStratumWeights";
 const char* const kStoredMaskBuffer      = "maskStoredArt";
+const char* const kSlopeBuffer           = "maskSlopeField";
 
 // Every literal the shader needs comes from the C++ side — nothing is hardcoded in GLSL (§8).
 std::string BuildShaderDefinitions() {
@@ -78,6 +80,7 @@ void MaskStage::RunOnGpu() {
     gpuResourceManager->EnsureBuffer(kProportionBuffer, fieldBytes);
     gpuResourceManager->EnsureBuffer(kSurfaceWeightBuffer, fieldBytes);
     gpuResourceManager->EnsureBuffer(kStoredMaskBuffer, storedBytes);
+    gpuResourceManager->EnsureBuffer(kSlopeBuffer, cellCount * sizeof(float));
     gpuResourceManager->UploadBuffer(kConfigurationBuffer, stratumConfigurations.data(), configurationBytes);
     gpuResourceManager->UploadBuffer(kHeightBuffer, mapFields.heightfield.Data(), cellCount * sizeof(float));
     gpuResourceManager->UploadBuffer(kProportionBuffer, gpuProportionBuffer.data(), fieldBytes);
@@ -87,6 +90,7 @@ void MaskStage::RunOnGpu() {
     gpuResourceManager->BindBuffer(kProportionBuffer, 2);
     gpuResourceManager->BindBuffer(kStoredMaskBuffer, 3);
     gpuResourceManager->BindBuffer(kSurfaceWeightBuffer, 4);
+    gpuResourceManager->BindBuffer(kSlopeBuffer, 5);
 
     const Sys::GpuProgramHandle program{ gpuProgramIndex };
     gpuResourceManager->SetUniformInt(program, "vertexSize", vertexSize);
@@ -99,6 +103,7 @@ void MaskStage::RunOnGpu() {
     gpuResourceManager->DeleteFence(fence);
     gpuResourceManager->ReadbackBuffer(kSurfaceWeightBuffer, gpuSurfaceWeightBuffer.data(), fieldBytes);
     UnpackStratumFields(gpuSurfaceWeightBuffer, mapFields.surfaceStratumWeights, cellCount);
+    gpuResourceManager->ReadbackBuffer(kSlopeBuffer, mapFields.slope.Data(), cellCount * sizeof(float));
     lastBackend = Sys::ComputeBackend::Gpu;
 }
 

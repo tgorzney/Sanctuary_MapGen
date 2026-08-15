@@ -12,6 +12,7 @@
 #include "../sys/GpuResource_SYS.h"
 #include "../sys/GpuGlFunctions_SYS.h"
 #include <cstdio>
+#include <cstring>
 #include <string>
 
 using namespace SanmapGen;
@@ -89,6 +90,7 @@ int main(int argc, char** argv) {
     const std::string shaderDirectory = (argc > 1) ? argv[1] : ".";
     Data::MapFields fields;
     PlacementTest::BuildTestFields(fields);
+    const Data::FloatField bakedSlope = fields.slope;      // Mask owns it; Placement only reads
     const Params::MapRecipe recipe = MakeParityRecipe();
 
     Data::PlacementResults cpuResults;
@@ -118,6 +120,17 @@ int main(int argc, char** argv) {
     Check(InstancesEqual(cpuResults.markers, gpuResults.markers), "Cpu/Gpu parity: markers identical");
     Check(InstancesEqual(cpuResults.props, gpuResults.props), "Cpu/Gpu parity: props identical");
     Check(manager.CompileCount() == 1, "the gate program compiles exactly once");
+    // The gate really consumes the bake: a scene whose slope field was never written would gate
+    // as flat ground and quietly accept the cone, so the input is asserted non-trivial first.
+    float largestSlope = 0.0f;
+    for (std::size_t cell = 0; cell < bakedSlope.CellCount(); ++cell)
+        largestSlope = bakedSlope.Data()[cell] > largestSlope ? bakedSlope.Data()[cell] : largestSlope;
+    Check(largestSlope > 1.0f, "the scene's baked slope field is non-trivial (the cone is steep)");
+    // Single writer (ARCH §3.4.1, M5-0c): neither backend of Placement may touch MapFields.slope.
+    Check(fields.slope.CellCount() == bakedSlope.CellCount()
+          && std::memcmp(fields.slope.Data(), bakedSlope.Data(),
+                         bakedSlope.CellCount() * sizeof(float)) == 0,
+          "Placement leaves the baked slope field byte-identical");
 
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);

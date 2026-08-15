@@ -1,8 +1,10 @@
 #version 430 core
 // Mask_PROC.glsl — GPU speed path of the mask stage; twin of Mask_Apply_PROC.cpp.
 // Slope-gates every stratum's material proportion, merges the stored art and remaps once,
-// writing `surfaceStratumWeights` — one invocation per heightfield vertex. The proportion
-// buffer is READONLY: input and output are different fields (ARCH §7.2/§3.4).
+// writing `surfaceStratumWeights` and the baked `slope` field — one invocation per heightfield
+// vertex. The proportion buffer is READONLY: input and output are different fields
+// (ARCH §7.2/§3.4). Both outputs are this stage's own (§3.4.1); the slope write is the same
+// gradient the gate consumes, so the two backends bake identical values (M5-0c).
 // This unit owns the std430 MaskConfiguration block, declared ONCE, mirroring
 // Proc::MaskStratumConfiguration field for field (DISPATCH_INTERFACE_SPEC §4). The two
 // functions that read a buffer (the slope gradient and the stored-art resample) live here
@@ -25,6 +27,7 @@ layout(std430, binding = 1) readonly  buffer HeightField          { float height
 layout(std430, binding = 2) readonly  buffer MaterialProportions   { float proportionValues[]; };
 layout(std430, binding = 3) readonly  buffer StoredArt             { float storedValues[]; };
 layout(std430, binding = 4) writeonly buffer SurfaceStratumWeights { float surfaceWeightValues[]; };
+layout(std430, binding = 5) writeonly buffer SlopeField            { float slopeValues[]; };
 
 uniform int vertexSize;
 
@@ -82,6 +85,7 @@ void main() {
     float slopeGradient = slopeGradientMagnitude(cell.x, cell.y, slopeConfiguration.heightScale,
                                                  slopeConfiguration.inverseSingleSpan,
                                                  slopeConfiguration.inverseDoubleSpan);
+    slopeValues[cellIndex] = slopeGradient;          // the baked field, in the pinned unit
     for (int stratum = 0; stratum < MASK_STRATUM_COUNT; ++stratum) {
         MaskConfiguration configuration = maskConfigurations[stratum];
         float gateWeight = slopeGateWeight(slopeGradient, configuration.slopeGradientLow,

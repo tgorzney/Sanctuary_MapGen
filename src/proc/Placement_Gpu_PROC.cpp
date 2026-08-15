@@ -14,7 +14,7 @@ namespace {
 
 const char* const gateProgramFileName    = "Placement_PROC.glsl";
 const char* const heightBufferName       = "PlacementHeightField";
-const char* const slopeBufferName        = "PlacementSlopeGradientField";
+const char* const slopeBufferName        = "PlacementSlopeField";   // the BAKED gradient magnitude
 const char* const maskBufferName         = "PlacementMaskField";
 const char* const obstacleBufferName     = "PlacementObstacleField";
 const char* const gateBufferName         = "PlacementGateWeightField";
@@ -27,7 +27,7 @@ void UploadSharedFields(Sys::GpuResourceManager& manager, const float* heightVal
     manager.EnsureBuffer(heightBufferName, fieldBytes);
     manager.UploadBuffer(heightBufferName, heightValues, fieldBytes);
     manager.EnsureBuffer(slopeBufferName, fieldBytes);
-    manager.UploadBuffer(slopeBufferName, slopeValues, fieldBytes);
+    if (slopeValues != nullptr) manager.UploadBuffer(slopeBufferName, slopeValues, fieldBytes);
     manager.EnsureBuffer(obstacleBufferName, fieldBytes);
     if (obstacleValues != nullptr) manager.UploadBuffer(obstacleBufferName, obstacleValues, fieldBytes);
     manager.EnsureBuffer(maskBufferName, fieldBytes);
@@ -87,7 +87,11 @@ bool PlacementStage::BuildGateFieldGpu(std::size_t configurationIndex) {
     const std::size_t fieldBytes = cellCount * sizeof(float);
 
     if (!bGpuFieldsUploaded) {
-        UploadSharedFields(*gpuResourceManager, mapFields.heightfield.Data(), slopeGradientField.Data(),
+        // The Mask stage's baked slope goes up verbatim; the shader squares it at its read site,
+        // exactly as the Cpu twin does (M5-0c). A run with no baked slope uploads nothing and the
+        // shader reads the zero-initialized buffer — the flat-terrain answer the Cpu twin gives.
+        UploadSharedFields(*gpuResourceManager, mapFields.heightfield.Data(),
+                           bSlopeFieldAvailable ? mapFields.slope.Data() : nullptr,
                            bObstacleFieldBuilt ? obstacleDistanceField.Data() : nullptr, fieldBytes);
         bGpuFieldsUploaded = true;
     }

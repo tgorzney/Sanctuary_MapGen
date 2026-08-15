@@ -55,15 +55,15 @@ public:
     int  EvaluatedCandidateCount() const { return evaluatedCandidateCount; }
     int  AcceptedCandidateCount() const { return acceptedCandidateCount; }
     const std::vector<ScatterRuleConfiguration>& RuleConfigurations() const { return ruleConfigurations; }
-    const Data::FloatField& SlopeGradientField() const { return slopeGradientField; }
     const Data::FloatField& ObstacleDistanceField() const { return obstacleDistanceField; }
 
 private:
     // Placement_Rules_PROC.cpp — flattens every enabled rule into the shared kernel record.
     void BuildRuleConfigurations();
-    // Placement_Fields_PROC.cpp — derived slope, the Jump-Flood exclusion field, the gate field.
+    // Placement_Fields_PROC.cpp — the Jump-Flood exclusion field and the gate field. Slope is
+    // NOT derived here: it is read from the Mask stage's baked `MapFields.slope` (M5-0c).
     void BuildDerivedFields();
-    void BuildSlopeGradientField();
+    float SampleSlopeGradientSquared(int cellX, int cellY) const;
     void BuildGateFieldCpu(std::size_t configurationIndex);
     float SampleSurfaceStratumWeight(int stratumIndex, int cellX, int cellY) const;
     float SampleClearanceRadius(const ScatterRuleConfiguration& configuration, int cellX, int cellY) const;
@@ -101,7 +101,6 @@ private:
 
     std::vector<ScatterRuleConfiguration>    ruleConfigurations;
     std::vector<Data::TemplateIdentifier>    ruleTemplateIdentifiers;
-    Data::FloatField                         slopeGradientField;      // squared height gradient
     Data::FloatField                         obstacleDistanceField;   // Jump-Flood distance
     Data::FloatField                         gateWeightField;         // per-rule, reused
     std::vector<float>                       gpuGateTransferBuffer;
@@ -110,6 +109,7 @@ private:
     bool bGpuGateUsed      = false;
     bool bGpuProgramReady  = false;
     bool bObstacleFieldBuilt = false;
+    bool bSlopeFieldAvailable = false;   // the Mask stage baked MapFields.slope at this size
     bool bGpuFieldsUploaded  = false;   // height/slope/obstacle are per-run, not per-rule
     int  gpuProgramIndex   = -1;
     int  evaluatedCandidateCount = 0;

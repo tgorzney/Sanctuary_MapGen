@@ -8,11 +8,13 @@
 //   merged_s      = Merge(procedural_s, storedArt_s, importedMaskMode_s)
 //   surfaceStratumWeights[s] = Remap_s(merged_s)
 //
-// Single-writer + purity (ARCH §3.4): the ONLY field this stage writes is
-// `surfaceStratumWeights`. It never writes `materialProportions` — gating the physical field
-// in place let a renormalizing sim undo the gate and made the stage a non-idempotent
-// read-modify-write. Inputs are read-only, so the dirty-hash conductor may re-run Mask alone,
-// twice, and get the same answer.
+// Single-writer + purity (ARCH §3.4): the ONLY fields this stage writes are
+// `surfaceStratumWeights` and `slope` — the gradient magnitude the gate already needs, baked so
+// Placement and the preview composite SAMPLE one slope instead of each deriving their own
+// (M5-0c). It never writes `materialProportions` — gating the physical field in place let a
+// renormalizing sim undo the gate and made the stage a non-idempotent read-modify-write. Inputs
+// are read-only, so the dirty-hash conductor may re-run Mask alone, twice, and get the same
+// answer.
 //
 // APPROXIMATION IN FORCE (MASKING_SPEC 1.9 / ARCH §7.5): `materialProportions` is a volume
 // fraction, not surface exposure; until the persistent ordered thickness stack lands (M6) it

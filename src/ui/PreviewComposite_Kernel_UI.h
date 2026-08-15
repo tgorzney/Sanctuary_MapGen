@@ -35,6 +35,7 @@ constexpr unsigned kCompositeTexels        = 7;   // the RGBA8 image, one packed
 constexpr unsigned kConfiguration          = 8;
 constexpr unsigned kLayerConfigurations    = 9;
 constexpr unsigned kStratumConfigurations  = 10;
+constexpr unsigned kSlope                  = 11;  // the Mask stage's baked slope (M5-0c)
 } // namespace CompositeBinding
 
 // The names the persistent SSBOs are keyed by in GpuResourceManager. They are part of the
@@ -52,6 +53,7 @@ constexpr const char* kCompositeTexels       = "previewCompositeTexels";
 constexpr const char* kConfiguration         = "previewCompositeConfiguration";
 constexpr const char* kLayerConfigurations   = "previewCompositeLayerConfigurations";
 constexpr const char* kStratumConfigurations = "previewCompositeStratumConfigurations";
+constexpr const char* kSlope                 = "previewCompositeSlope";
 } // namespace CompositeBufferName
 
 // Every `*RangeReciprocal` field below is precomputed with this, so the kernels multiply and

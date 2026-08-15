@@ -93,6 +93,11 @@ void MaskStage::PrepareRun() {
         ConfigureStoredArt(configuration, strata[index], art, packedStoredMaskValues, vertexSize);
     }
     if (packedStoredMaskValues.empty()) packedStoredMaskValues.push_back(0.0f);   // never a null binding
+
+    // The stage sizes its OWN output field (§3.4.1) so a caller that sized MapFields before this
+    // field existed still gets a valid slope bake instead of an out-of-range write.
+    if (mapFields.IsSized() && mapFields.slope.Width() != mapFields.VertexSize())
+        mapFields.slope.Resize(mapFields.VertexSize(), mapFields.VertexSize(), 0.0f);
 }
 
 } // namespace Proc

@@ -4,6 +4,9 @@
 // Mask_Merge_PROC.h math.
 // The proportion field is READ ONLY here (ARCH §7.2.3): input and output are different fields,
 // which is what makes this stage idempotent under a lone re-run (ARCH §3.4.2).
+// It writes TWO outputs, both its own (§3.4.1): `surfaceStratumWeights` and the `slope` field —
+// the very gradient the gate already needs, baked so Placement and the preview SAMPLE it rather
+// than each deriving a private copy (M5-0c).
 #include "Mask_PROC.h"
 #include "Mask_Slope_PROC.h"
 #include "Mask_Merge_PROC.h"
@@ -40,6 +43,7 @@ void MaskStage::RunOnCpu() {
     const auto maskRow = [&](int y) {
         for (int x = 0; x < vertexSize; ++x) {
             const float slopeGradient = SlopeGradientMagnitude(heightValues, x, y, vertexSize, slopeConfiguration);
+            mapFields.slope.Set(x, y, slopeGradient);      // the baked field, in the pinned unit
             for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
                 mapFields.surfaceStratumWeights[stratum].Set(x, y,
                     ResolveStratumCell(stratumConfigurations[stratum], storedValues,

@@ -117,9 +117,9 @@ int main() {
     Check(PlacementTest::MinimumSeparation(props) >= 6.0f - 1e-3f, "prop spacing >= 6 cells");
 
     // --- gates honoured (height / slope / edge padding / biome / collision flag).
-    Check(PlacementTest::AllWithinGates(markers, fields, stageFirst, 0.4f, 0.6f, 10.0f, 8),
+    Check(PlacementTest::AllWithinGates(markers, fields, 0.4f, 0.6f, 10.0f, 8),
           "markers honour height, slope and edge padding");
-    Check(PlacementTest::AllWithinGates(props, fields, stageFirst, 0.4f, 0.6f, 20.0f, 4),
+    Check(PlacementTest::AllWithinGates(props, fields, 0.4f, 0.6f, 20.0f, 4),
           "props honour the same gates");
     bool bMaskGateHeld = true, bCollidableSet = true;
     const Data::FloatField& gateField = fields.surfaceStratumWeights[PlacementTest::maskStratumIndex];

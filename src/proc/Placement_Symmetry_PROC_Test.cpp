@@ -51,11 +51,10 @@ static bool HasInstanceAt(const Data::PlacementInstances& instances, float targe
 }
 
 // The basic AI-analyzability probe (AI_HOSTCLIENT_SPEC §A): flood-fill the pathable region
-// (slope under the limit, above water) from the first spawn and require every other spawn to
-// be inside it — a map that seals a spawn off is not playable, however pretty it is. The full
-// validation pass is a later work-order; this is the acceptance-level check.
+// (slope under the limit, above water) from the first spawn and require every other spawn to be
+// inside it — a map that seals a spawn off is not playable. Full validation is a later work-order.
 static bool AllSpawnsReachable(const Data::PlacementInstances& markers,
-                               const Proc::PlacementStage& stage, float maxSlopeDegrees) {
+                               const Data::MapFields& fields, float maxSlopeDegrees) {
     if (markers.Count() == 0) return false;
     const int side = PlacementTest::vertexSize;
     const float tangent = std::tan(maxSlopeDegrees * 3.14159265f / 180.0f);
@@ -76,7 +75,8 @@ static bool AllSpawnsReachable(const Data::PlacementInstances& markers,
             if (nextX < 0 || nextY < 0 || nextX >= side || nextY >= side) continue;
             const int nextCell = nextY * side + nextX;
             if (bVisited[nextCell] != 0u) continue;
-            if (stage.SlopeGradientField().Get(nextX, nextY) > gradientLimitSquared) continue;
+            const float slopeGradient = fields.slope.Get(nextX, nextY);   // the Mask stage's bake
+            if (slopeGradient * slopeGradient > gradientLimitSquared) continue;
             bVisited[nextCell] = 1u;
             stack.push_back(nextCell);
         }
@@ -128,7 +128,7 @@ int main() {
     }
 
     // --- basic AI-analyzability: every spawn is in one connected pathable region.
-    Check(AllSpawnsReachable(markers, stage, 20.0f), "all spawns are mutually reachable");
+    Check(AllSpawnsReachable(markers, fields, 20.0f), "all spawns are mutually reachable");
 
     // --- point symmetry: a 2-member orbit, so a count of 4 yields two groups.
     Data::PlacementResults pointResults;
@@ -142,7 +142,7 @@ int main() {
         if (!HasInstanceAt(pointResults.markers, extent - pointResults.markers.positionX[index],
                            extent - pointResults.markers.positionZ[index])) bClosedUnderRotation = false;
     Check(bClosedUnderRotation, "half-turn clones are exact point reflections");
-    Check(AllSpawnsReachable(pointResults.markers, pointStage, 20.0f), "half-turn spawns reachable");
+    Check(AllSpawnsReachable(pointResults.markers, fields, 20.0f), "half-turn spawns reachable");
 
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);

@@ -2,9 +2,9 @@
 // PreviewComposite_Sampling_UI.glsl — reading the BAKED fields and turning one of them into a
 // color: bilinear field sampling, the ramp-table lookup, and the surface-weight splat.
 // GPU twin of the sampling half of PreviewComposite_Cpu_UI.cpp / PreviewComposite_Color_UI.h.
-// Every value here is a sample of a field some PROC stage already wrote. Nothing is derived
-// from a neighbourhood (no gradient, no slope), nothing is re-filtered, nothing is re-run —
-// that is the WYSIWYG rule this milestone exists to enforce (ARCH §3.2).
+// Every value here is a sample of a field some PROC stage already wrote — slope included, from
+// the Mask stage's bake (M5-0c). Nothing is derived from a neighbourhood (no gradient is
+// computed here), nothing is re-filtered, nothing is re-run — the WYSIWYG rule (ARCH §3.2).
 // One compilation unit of the PreviewComposite program (linked, never #included); the unit that
 // declares main() is PreviewComposite_UI.glsl. This unit owns the layer + stratum + field
 // buffers, so they are declared exactly once; the pass unit reaches them through the accessors
@@ -32,6 +32,7 @@ struct StratumConfiguration {
 layout(std430, binding = PREVIEW_BINDING_HEIGHTFIELD)    readonly buffer Heightfield   { float heightValues[]; };
 layout(std430, binding = PREVIEW_BINDING_FLOW)           readonly buffer FlowField     { float flowValues[]; };
 layout(std430, binding = PREVIEW_BINDING_ACCUMULATION)   readonly buffer AccumulationField { float accumulationValues[]; };
+layout(std430, binding = PREVIEW_BINDING_SLOPE)          readonly buffer SlopeField    { float slopeValues[]; };
 layout(std430, binding = PREVIEW_BINDING_SURFACE_WEIGHTS) readonly buffer SurfaceWeights { float surfaceWeightValues[]; };
 layout(std430, binding = PREVIEW_BINDING_GRADIENT_TABLES) readonly buffer GradientTables { float gradientLookupValues[]; };
 layout(std430, binding = PREVIEW_BINDING_CONFIGURATION)  readonly buffer Configuration  { CompositeConfiguration configuration[]; };
@@ -64,6 +65,7 @@ float bilinearBlend(float topLeft, float topRight, float bottomLeft, float botto
 float fieldValueAt(int layerKind, int valueIndex) {
     if (layerKind == PREVIEW_LAYER_FLOW)         return flowValues[valueIndex];
     if (layerKind == PREVIEW_LAYER_ACCUMULATION) return accumulationValues[valueIndex];
+    if (layerKind == PREVIEW_LAYER_SLOPE)        return slopeValues[valueIndex];   // BAKED by Mask
     return heightValues[valueIndex];                       // the height ramp and the water depth
 }
 
@@ -125,8 +127,7 @@ vec4 splatSurfaceStrata(float sampleX, float sampleY) {
     return splat;
 }
 
-// The pass unit reaches the layer records only through these three, so the layer buffer is
-// declared in exactly one compilation unit.
+// The pass unit reaches the layer records only through these, so the buffer is declared once.
 int   layerBlendMode(int layerIndex) { return layerConfigurations[layerIndex].blendMode; }
 float layerOpacity(int layerIndex)   { return layerConfigurations[layerIndex].opacity; }
 

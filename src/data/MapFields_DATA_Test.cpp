@@ -21,6 +21,10 @@ int main() {
         { std::printf("FAIL heightfield sized\n"); ++failures; }
     if (fields.flow.Width() != 257 || fields.accumulation.Width() != 257)
         { std::printf("FAIL flow/accum sized\n"); ++failures; }
+    // The baked slope field (M5-0c) is sized with the others and starts at the fill value.
+    if (fields.slope.Width() != 257 || fields.slope.CellCount() != 257ull * 257ull
+        || fields.slope.Get(3, 4) != 0.0f)
+        { std::printf("FAIL slope sized\n"); ++failures; }
     // Two distinct per-stratum families, both sized, both independently addressable: the
     // physical proportions the sims own and the visible weights the Mask stage owns (ARCH 7.2).
     for (int index = 0; index < Data::MapFields::stratumCount; ++index) {

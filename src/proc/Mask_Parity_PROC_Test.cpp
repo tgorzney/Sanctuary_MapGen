@@ -126,6 +126,13 @@ void RunParityTests(const char* shaderDirectory) {
     std::printf("CPU/GPU largest surface-weight difference: %.9f (Visual tolerance %.6f)\n",
                 largestDifference, kVisualTolerance);
     Check(largestDifference <= kVisualTolerance, "CPU and GPU agree within the Visual tolerance");
+    float largestSlopeDifference = 0.0f;                       // the second output, M5-0c
+    for (int y = 0; y < geometry.VertexSize(); ++y)
+        for (int x = 0; x < geometry.VertexSize(); ++x) {
+            const float difference = std::fabs(cpuFields.slope.Get(x, y) - gpuFields.slope.Get(x, y));
+            largestSlopeDifference = difference > largestSlopeDifference ? difference : largestSlopeDifference;
+        }
+    Check(largestSlopeDifference <= kVisualTolerance, "CPU and GPU bake the same slope field");
     CheckProportionsUntouched(gpuFields, untouchedFields,
                               "the Gpu path leaves materialProportions untouched");
 

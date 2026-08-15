@@ -10,6 +10,12 @@
 //                            Single writer: the Mask stage, exclusively. Read by Placement,
 //                            Bake, the preview and the .sanmap export.
 //
+//   slope                    The terrain gradient magnitude (rise/run, dimensionless) the Mask
+//                            stage computes for its own gate, baked so nobody recomputes it.
+//                            Single writer: the Mask stage. Read by Placement (which squares it
+//                            for its squared-gradient gate) and by the preview composite, which
+//                            SAMPLES it instead of deriving one (ARCH §3.2, the shadow-sim).
+//
 // The legacy single `materialMasks` field is retired: it named a role, not a quantity, and
 // gating it in place let a renormalizing sim undo the gate (ARCH §1.1/§7.2).
 // DATA-pure: depends only on FloatField, takes plain ints for sizing (no PARAMS coupling).
@@ -26,6 +32,7 @@ public:
     FloatField heightfield;
     FloatField flow;
     FloatField accumulation;
+    FloatField slope;                    // gradient magnitude; single writer: the Mask stage
     FloatField materialProportions[stratumCount];
     FloatField surfaceStratumWeights[stratumCount];
 
@@ -34,6 +41,7 @@ public:
         heightfield.Resize(vertexSize, vertexSize, fillValue);
         flow.Resize(vertexSize, vertexSize, fillValue);
         accumulation.Resize(vertexSize, vertexSize, fillValue);
+        slope.Resize(vertexSize, vertexSize, fillValue);
         for (int index = 0; index < stratumCount; ++index) {
             materialProportions[index].Resize(vertexSize, vertexSize, fillValue);
             surfaceStratumWeights[index].Resize(vertexSize, vertexSize, fillValue);

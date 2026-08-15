@@ -1,10 +1,11 @@
 // PreviewComposite_UI_Test.cpp — acceptance test, part 1: the composited colors of a spot cell,
-// the entity-id buffer, the pass ordering and the resolution tweakable.
+// the entity-id buffer, the pass ordering, the resolution tweakable and the slope layer (M5-0c).
 //   cl /std:c++17 /EHsc PreviewComposite_UI.cpp PreviewComposite_Prepare_UI.cpp
 //      PreviewComposite_Cpu_UI.cpp GradientLut_UI.cpp PreviewComposite_UI_Test.cpp
-// Runs the composite's Cpu twin, so it needs no GL context; the Gpu twin's parity against these
-// same numbers is PreviewComposite_Gpu_UI_Test.cpp, which does need one.
+// Runs the Cpu twin, so it needs no GL context; the Gpu twin's parity against these same numbers
+// is PreviewComposite_Gpu_UI_Test.cpp, which does need one.
 #include "PreviewComposite_TestScene_UI.h"
+#include <cstring>
 
 using namespace SanmapGen;
 
@@ -15,9 +16,9 @@ using Ui::ChannelNear;
 using Ui::QuantizeChannel;
 void check(bool bCondition, const char* label) { Ui::CheckPreviewExpectation(bCondition, label); }
 
-// The expected spot-cell color, re-derived here from the scene's numbers alone: the height ramp
-// at 0.25, then a half-weight splat of the stratum tint, then the constant flow ramp added at
-// its own 0.4 alpha. Written out per layer, including the byte round-trip between passes.
+// The expected spot-cell color, re-derived from the scene's numbers alone: the height ramp at
+// 0.25, a half-weight splat of the stratum tint, then the constant flow ramp added at its own
+// 0.4 alpha — per layer, including the byte round-trip between passes.
 float ExpectedSpotChannel(float stratumTint, float flowSource) {
     const float heightGrey = QuantizeChannel(0.25f);
     const float splatted = QuantizeChannel(heightGrey + (stratumTint - heightGrey) * 0.5f);
@@ -41,13 +42,11 @@ void TestSpotCellColors() {
     check(ChannelNear(spotTexel, 1, ExpectedSpotChannel(0.2f, 0.0f)), "spot cell green channel");
     check(ChannelNear(spotTexel, 2, ExpectedSpotChannel(0.1f, 1.0f)), "spot cell blue channel");
     check(ChannelByte(spotTexel, 3) == 255, "the composite image stays opaque");
-    // The fields are uniform, so every pixel the entity does not cover matches the spot cell.
     check(composite.CompositeTexels()[3] == spotTexel && composite.CompositeTexels()[12] == spotTexel,
-          "uniform baked fields composite uniformly");
+          "uniform baked fields composite uniformly");   // every unmarked pixel matches the spot
 }
 
-// The 4x4 preview maps the instance at world (2, 2) to pixel centre (1.5, 1.5); a 0.9-pixel mark
-// covers exactly the four middle pixels.
+// The 4x4 preview maps world (2, 2) to pixel centre (1.5, 1.5); a 0.9-pixel mark covers four.
 void TestEntityIdentifierBuffer() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
@@ -55,7 +54,6 @@ void TestEntityIdentifierBuffer() {
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Compose();
-
     check(scene.entityIdentifiers.Width() == 4 && scene.entityIdentifiers.Height() == 4,
           "the entity-id buffer is resized to the preview");
     for (int pixelY = 0; pixelY < 4; ++pixelY)
@@ -89,7 +87,6 @@ void TestPassOrderingAndClear() {
               "with no layers the image is the clear color");
     check(scene.entityIdentifiers.Get(1, 1) == Data::EntityIdBuffer::emptySentinel,
           "entities disabled -> no id is written");
-
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Settings().fieldLayers[1].bEnabled = false;       // disabled layers cost no pass
     composite.Compose();
@@ -104,12 +101,39 @@ void TestResolutionIsTweakable() {
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Settings().previewResolution = 16;                // escalate on idle (ARCH §4.4)
     composite.Compose();
-    check(composite.Resolution() == 16 && composite.CompositeTexels().size() == 256u,
-          "the preview resolution is a tweakable, not a fixed full-resolution pass");
-    check(scene.entityIdentifiers.CellCount() == 256u, "the id buffer follows the resolution");
+    check(composite.Resolution() == 16 && composite.CompositeTexels().size() == 256u
+          && scene.entityIdentifiers.CellCount() == 256u,
+          "the preview resolution is a tweakable and the id buffer follows it");
     composite.Settings().previewResolution = 0;                 // nonsense clamps, never divides by 0
     composite.Compose();
     check(composite.Resolution() == Ui::kMinimumPreviewResolution, "a nonsense resolution clamps");
+}
+
+// M5-0c: a slope layer colorizes the BAKED slope through the M4-2 LUT. Slope 1.5 over a [0,2]
+// domain is 0.75 of the black->white ramp; re-baking must move the pixel, and the composite must
+// leave the field it samples byte-identical (Mask is the only writer, §3.4.1).
+void TestSlopeLayerSamplesTheBakedField() {
+    Ui::PreviewTestScene scene;
+    Ui::BuildPreviewTestScene(scene);
+    scene.fields.slope.Fill(1.5f);                       // gradient magnitude, the pinned unit
+    const Data::FloatField bakedSlope = scene.fields.slope;   // Mask's output, read-only here
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+                                   scene.instances, scene.entityIdentifiers);
+    composite.Settings().previewResolution = 4;
+    composite.Settings().bEntitiesEnabled = false;
+    composite.Settings().gradientRamps.push_back(Ui::MakeBlackToWhiteRamp());
+    composite.Settings().fieldLayers.push_back(
+        Ui::MakeLayer(Ui::PreviewLayerKind::Slope, Ui::PreviewBlendMode::Replace, 0, 0.0f, 2.0f));
+    composite.Compose();
+    check(ChannelNear(composite.CompositeTexels()[0], 0, 0.75f)
+          && ChannelNear(composite.CompositeTexels()[0], 2, 0.75f),
+          "the slope layer colorizes the baked slope through the LUT");
+    check(std::memcmp(scene.fields.slope.Data(), bakedSlope.Data(),
+                      bakedSlope.CellCount() * sizeof(float)) == 0,
+          "the composite leaves the slope field it samples byte-identical");
+    scene.fields.slope.Fill(0.5f);                       // a different bake -> a different pixel
+    composite.Compose();
+    check(ChannelNear(composite.CompositeTexels()[0], 0, 0.25f), "the layer samples the live bake");
 }
 
 } // namespace
@@ -119,6 +143,7 @@ int main() {
     TestEntityIdentifierBuffer();
     TestPassOrderingAndClear();
     TestResolutionIsTweakable();
+    TestSlopeLayerSamplesTheBakedField();
     if (Ui::previewTestFailureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", Ui::previewTestFailureCount);
     return 1;

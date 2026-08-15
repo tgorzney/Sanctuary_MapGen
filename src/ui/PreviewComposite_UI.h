@@ -5,8 +5,9 @@
 // the fallback when no GL context exists.
 //
 // It SAMPLES `Data::MapFields` and nothing else: height, the nine `surfaceStratumWeights`,
-// flow, accumulation. It never recomputes slope, never re-filters a marker/prop rule, never
-// re-runs a sim — that is the whole point of M4 (ARCH §3.2, §5.4, hit-list #4;
+// flow, accumulation, and the Mask stage's baked `slope` (M5-0c). It never recomputes slope,
+// never re-filters a marker/prop rule, never re-runs a sim — that is the whole point of M4
+// (ARCH §3.2, §5.4, hit-list #4;
 // PREVIEW_COMPOSITING_SPEC "the shadow-sim problem"). It therefore takes no sim parameter of
 // any kind: changing one without re-baking cannot move a pixel here.
 //

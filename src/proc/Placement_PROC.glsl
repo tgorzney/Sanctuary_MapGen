@@ -2,6 +2,8 @@
 // Placement_PROC.glsl — GPU preview density gate; twin of the Cpu gate in
 // Placement_Fields_PROC.cpp. It evaluates ONE rule's per-cell gate weight (height, slope,
 // biome mask, obstacle distance, water, edge padding, focus gradient) into a weight field.
+// Slope arrives as the Mask stage's BAKED field (MapFields.slope) — this kernel derives no
+// gradient of its own, exactly like its Cpu twin (ARCH §3.4.1, M5-0c).
 // It deliberately does NOT scatter: placement stays Cpu-authoritative and the Cpu acceptance
 // samples this field, so the preview can never re-filter its own version of the map
 // (PLACEMENT_SCATTER_SPEC "CPU vs GPU", ARCH §3.2). Every tile size and flag bit arrives as
@@ -26,7 +28,7 @@ struct ScatterRuleConfiguration {
 
 layout(std430, binding = 0) readonly buffer RuleConfigurations { ScatterRuleConfiguration rules[]; };
 layout(std430, binding = 1) readonly buffer HeightField        { float heightValues[]; };
-layout(std430, binding = 2) readonly buffer SlopeGradientField { float slopeGradientValues[]; };
+layout(std430, binding = 2) readonly buffer SlopeField          { float slopeValues[]; };
 layout(std430, binding = 3) readonly buffer StratumWeightField { float surfaceWeightValues[]; };
 layout(std430, binding = 4) readonly buffer ObstacleField      { float obstacleValues[]; };
 layout(std430, binding = 5) writeonly buffer GateWeightField   { float gateWeights[]; };
@@ -82,6 +84,9 @@ void main() {
     float maskWeight = bMaskFieldPresent != 0 ? surfaceWeightValues[index] : 1.0;
     float obstacleDistance = bObstacleFieldPresent != 0 ? obstacleValues[index]
                                                         : PLACEMENT_OBSTACLE_DISTANCE_DEFAULT;
-    gateWeights[index] = scatterGateWeight(rule, heightValues[index], slopeGradientValues[index],
+    // The slope buffer carries the Mask stage's BAKED gradient magnitude; the gate wants it
+    // squared, so it is squared here at the read site — the same thing the Cpu twin does (M5-0c).
+    float slopeGradient = slopeValues[index];
+    gateWeights[index] = scatterGateWeight(rule, heightValues[index], slopeGradient * slopeGradient,
                                            maskWeight, obstacleDistance, focusDistance);
 }

@@ -26,11 +26,12 @@ void FieldRange(const Data::FloatField& field, float& minimum, float& maximum) {
 
 // Which baked field a layer colorizes. Water reads the heightfield (its depth is measured
 // against the water level in game units); the splat reads all nine weight fields, so it names
-// none here. There is no slope entry because no slope field is baked (ARCH §3.2).
+// none here. Slope names the field the Mask stage baked — it is SAMPLED, never derived (M5-0c).
 const Data::FloatField* PreviewComposite::LayerSourceField(PreviewLayerKind kind) const {
     switch (kind) {
         case PreviewLayerKind::Flow:         return &mapFields.flow;
         case PreviewLayerKind::Accumulation: return &mapFields.accumulation;
+        case PreviewLayerKind::Slope:        return &mapFields.slope;
         case PreviewLayerKind::StratumSplat: return nullptr;
         default:                             return &mapFields.heightfield;
     }

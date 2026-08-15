@@ -52,9 +52,36 @@ void BuildInputs(Data::MapFields& fields, int vertexSize) {
     FillTestMaterialProportions(fields, vertexSize);
 }
 
+// M5-0c: the baked slope field, checked against the analytic gradient of a heightfield whose
+// slope is known by hand. A plane of rise `risePerCell` per cell in x and `2*risePerCell` in y
+// has |grad(height * terrainMaxHeight)| = terrainMaxHeight * risePerCell * sqrt(5) everywhere,
+// edges included (the one-sided difference of a plane is the central one).
+void CheckSlopeFieldMatchesAnalyticGradient() {
+    Params::Geometry geometry;
+    geometry.mapSize = 16;
+    geometry.terrainMaxHeight = 64.0f;
+    const int vertexSize = geometry.VertexSize();
+    const float risePerCell = 0.003f;
+    Data::MapFields fields;
+    fields.Resize(vertexSize);
+    for (int y = 0; y < vertexSize; ++y)
+        for (int x = 0; x < vertexSize; ++x)
+            fields.heightfield.Set(x, y, risePerCell * static_cast<float>(x + 2 * y));
+
+    const std::vector<Params::Stratum> strata(Data::MapFields::stratumCount);
+    const std::vector<Data::StratumArt> stratumArt = NoStratumArt();
+    Proc::MaskStage stage(geometry, strata, stratumArt, fields);
+    stage.RunOnCpu();
+
+    const float expectedSlope = geometry.terrainMaxHeight * risePerCell * std::sqrt(5.0f);
+    CheckNear(fields.slope.Get(9, 6), expectedSlope, 1e-5f, "baked slope at a spot cell is the analytic gradient");
+    CheckNear(fields.slope.Get(0, 0), expectedSlope, 1e-5f, "the one-sided edge cell matches it too");
+}
+
 } // namespace
 
 void RunPurityTests() {
+    CheckSlopeFieldMatchesAnalyticGradient();
     Params::Geometry geometry;
     geometry.mapSize = kMapSize;
     const int vertexSize = geometry.VertexSize();
@@ -87,6 +114,8 @@ void RunPurityTests() {
                                     firstRun.surfaceStratumWeights[stratum]))
             bIdempotent = false;
     Check(bIdempotent, "running Mask twice gives the identical surfaceStratumWeights (idempotent)");
+    Check(FieldsAreByteIdentical(fields.slope, firstRun.slope),
+          "running Mask twice gives the identical slope field (idempotent)");
 
     // 3. A fresh stage over the same inputs lands on the same answer — the stage carries no
     // state that would make a re-run from a clean conductor differ.

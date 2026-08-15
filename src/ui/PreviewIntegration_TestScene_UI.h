@@ -37,8 +37,8 @@ struct PreviewIntegrationScene {
     // ONE colorized layer (height through a black->white ramp, Replace) so every pixel the marks
     // do not cover is exactly the ramp applied to the baked height — that is what makes
     // "the preview matches the bake" an exact assertion rather than an eyeball.
-    // worldUnitsPerCell comes from PIPELINE: it is Placement's own value, and UI may not include
-    // a PROC header to read it (ARCH §3.1).
+    // worldUnitsPerCell comes from PIPELINE: it is the recipe's map geometry (M5-0a), the same
+    // value Placement emitted its positions with.
     void ConfigureCompositeSettings() {
         PreviewCompositeSettings& settings = composite.Settings();
         settings.previewResolution = previewIntegrationResolution;

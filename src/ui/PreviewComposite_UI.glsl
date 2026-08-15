@@ -2,9 +2,9 @@
 // PreviewComposite_UI.glsl — GPU twin of the Cpu composite (PreviewComposite_Cpu_UI.cpp), and
 // the unit that declares main(). One program, four passes over the same RGBA8 image buffer,
 // selected by `passIndex`: clear -> one dispatch per enabled field layer -> overlay -> entity id.
-// It SAMPLES the baked fields and colorizes them (PreviewComposite_Sampling_UI.glsl); there is
-// deliberately NO slope derivation, NO marker/prop rule test and NO sim step anywhere in this
-// program. Those existed here in v1 and are exactly the "preview truth != bake truth" defect M4
+// It SAMPLES the baked fields and colorizes them (PreviewComposite_Sampling_UI.glsl) — slope
+// included, read from the Mask stage's bake; there is deliberately NO slope derivation, NO
+// marker/prop rule test and NO sim step anywhere in this program. Those existed here in v1 and are exactly the "preview truth != bake truth" defect M4
 // deletes (ARCH §3.2, §5.4; PREVIEW_COMPOSITING_SPEC).
 // Tile size, pass ids, blend modes, binding indices and the empty-entity sentinel all arrive as
 // #defines built from the C++ constants — nothing is hardcoded here (Constitution §8).

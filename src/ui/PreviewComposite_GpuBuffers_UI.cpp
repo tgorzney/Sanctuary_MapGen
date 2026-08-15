@@ -57,6 +57,7 @@ void PreviewComposite::BindComposeBuffers(Sys::GpuResourceManager& manager) {
     EnsureAndBindField(manager, CompositeBufferName::kFlow, mapFields.flow, CompositeBinding::kFlow);
     EnsureAndBindField(manager, CompositeBufferName::kAccumulation, mapFields.accumulation,
                        CompositeBinding::kAccumulation);
+    EnsureAndBindField(manager, CompositeBufferName::kSlope, mapFields.slope, CompositeBinding::kSlope);
     EnsureAndBind(manager, CompositeBufferName::kSurfaceStratumWeights, packedSurfaceWeights.data(),
                   packedSurfaceWeights.size() * sizeof(float),
                   CompositeBinding::kSurfaceStratumWeights);
