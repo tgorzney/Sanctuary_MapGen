@@ -329,6 +329,17 @@ add_sangen_test(RtToggleWidget_UI_Test         src/ui/RtToggleWidget_UI_Test.cpp
 add_sangen_test(CoreInputWidgets_LiveFrame_UI_Test src/ui/CoreInputWidgets_LiveFrame_UI_Test.cpp)
 target_link_libraries(CoreInputWidgets_LiveFrame_UI_Test PRIVATE imgui)
 
+# M5-6 parameter tabs. One binary over four translation units: the PARAMS-edit checks per tab and
+# the two-tier dirty contract driven through a real GenerationAssembler + PreviewDriver. Every
+# check drives the widgets' PURE interaction functions with a synthetic pointer sequence, so the
+# test needs no imgui frame, no window and no GL context — the tabs' draw paths are the only part
+# that touches imgui, and they are verified by eye against a live frame as the widgets are.
+add_sangen_test(ParameterTabs_UI_Test
+    src/ui/ParameterTabs_UI_Test.cpp
+    src/ui/ParameterTabs_Layers_UI_Test.cpp
+    src/ui/ParameterTabs_Rules_UI_Test.cpp
+    src/ui/ParameterTabs_DirtyTier_UI_Test.cpp)
+
 # M5-2 list widgets. Both widgets are header-only templates, so the test binary is the only
 # translation unit that instantiates them — and ImGuiListClipper plus the drag-drop payload path
 # need a live imgui context.
