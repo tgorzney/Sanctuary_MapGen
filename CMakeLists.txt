@@ -312,3 +312,11 @@ add_sangen_test(RtToggleWidget_UI_Test         src/ui/RtToggleWidget_UI_Test.cpp
 # recipe on purpose; the final imgui wiring belongs to the app shell (M5-7).
 add_sangen_test(CoreInputWidgets_LiveFrame_UI_Test src/ui/CoreInputWidgets_LiveFrame_UI_Test.cpp)
 target_link_libraries(CoreInputWidgets_LiveFrame_UI_Test PRIVATE imgui)
+
+# M5-2 list widgets. Both widgets are header-only templates, so the test binary is the only
+# translation unit that instantiates them — and ImGuiListClipper plus the drag-drop payload path
+# need a live imgui context.
+add_sangen_test(ListWidgets_UI_Test
+    src/ui/VirtualListWidget_UI_Test.cpp
+    src/ui/DraggableListWidget_UI_Test.cpp)
+target_link_libraries(ListWidgets_UI_Test PRIVATE imgui)
