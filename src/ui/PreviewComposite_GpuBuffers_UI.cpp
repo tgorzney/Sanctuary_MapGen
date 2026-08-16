@@ -45,8 +45,24 @@ void PreviewComposite::PackSurfaceStratumWeights() {
     }
 }
 
+// The composited image is a real GL_RGBA8 texture bound to an image unit, not an SSBO of packed
+// uints: the canvas samples this exact surface (M5-5), so the composite writes it once instead of
+// producing bytes someone else re-uploads. `EnsureTexture` reallocates only when the preview
+// resolution changes, and the passes read-modify-write it, so the access is ReadWrite.
+bool PreviewComposite::EnsureCompositeTexture(Sys::GpuResourceManager& manager) {
+    compositeTexture = manager.EnsureTexture(CompositeTextureName::kCompositeImage,
+                                             configuration.previewResolution,
+                                             configuration.previewResolution,
+                                             Sys::GpuTextureFormat::Rgba8);
+    if (!compositeTexture.IsValid()) return false;
+    manager.BindTextureImage(compositeTexture, CompositeImageUnit::kCompositeImage,
+                             Sys::GpuImageAccess::ReadWrite);
+    return true;
+}
+
 // Three baked inputs, the weight pack, the ramp tables, the entity points and the three record
-// buffers in; the image and the entity ids out. Binding indices are the kernel contract.
+// buffers in; the entity ids out (the image goes to the texture above). Binding indices are the
+// kernel contract.
 void PreviewComposite::BindComposeBuffers(Sys::GpuResourceManager& manager) {
     PackSurfaceStratumWeights();
     EnsureAndBind(manager, CompositeBufferName::kEntityIdentifiers, nullptr,
@@ -66,8 +82,6 @@ void PreviewComposite::BindComposeBuffers(Sys::GpuResourceManager& manager) {
                   CompositeBinding::kGradientLookupTables);
     EnsureAndBind(manager, CompositeBufferName::kEntityPoints, entityPoints.data(),
                   entityPoints.size() * sizeof(PreviewEntityPoint), CompositeBinding::kEntityPoints);
-    EnsureAndBind(manager, CompositeBufferName::kCompositeTexels, nullptr,
-                  compositeTexels.size() * sizeof(unsigned int), CompositeBinding::kCompositeTexels);
     EnsureAndBind(manager, CompositeBufferName::kConfiguration, &configuration,
                   sizeof(PreviewCompositeConfiguration), CompositeBinding::kConfiguration);
     EnsureAndBind(manager, CompositeBufferName::kLayerConfigurations, layerConfigurations.data(),

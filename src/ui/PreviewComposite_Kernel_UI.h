@@ -23,6 +23,8 @@ constexpr int kPassKindCount    = 4;
 } // namespace CompositePass
 
 // Buffer binding indices. Binding 0 stays the entity-id buffer, as in the legacy layout.
+// Index 7 is deliberately vacant: it was the packed-uint image SSBO before the composite began
+// writing a real GL texture (M5-5), and leaving the hole keeps every other index stable.
 namespace CompositeBinding {
 constexpr unsigned kEntityIdentifiers      = 0;
 constexpr unsigned kHeightfield            = 1;
@@ -31,12 +33,19 @@ constexpr unsigned kAccumulation           = 3;
 constexpr unsigned kSurfaceStratumWeights  = 4;   // the 9 baked weight fields, concatenated
 constexpr unsigned kGradientLookupTables   = 5;   // every baked ramp table, concatenated
 constexpr unsigned kEntityPoints           = 6;
-constexpr unsigned kCompositeTexels        = 7;   // the RGBA8 image, one packed uint per pixel
 constexpr unsigned kConfiguration          = 8;
 constexpr unsigned kLayerConfigurations    = 9;
 constexpr unsigned kStratumConfigurations  = 10;
 constexpr unsigned kSlope                  = 11;  // the Mask stage's baked slope (M5-0c)
 } // namespace CompositeBinding
+
+// IMAGE units are their own binding namespace in GL — an image unit never collides with an SSBO
+// binding of the same number — so the composited RGBA8 image starts its own numbering at zero
+// instead of borrowing the retired SSBO index. It is the surface the canvas samples (M5-5), so
+// it is a real GL_RGBA8 texture, not a packed-uint buffer.
+namespace CompositeImageUnit {
+constexpr unsigned kCompositeImage = 0;
+} // namespace CompositeImageUnit
 
 // The names the persistent SSBOs are keyed by in GpuResourceManager. They are part of the
 // kernel contract (the manager reallocates only when a named buffer's byte size changes), so
@@ -49,12 +58,17 @@ constexpr const char* kAccumulation          = "previewCompositeAccumulation";
 constexpr const char* kSurfaceStratumWeights = "previewCompositeSurfaceStratumWeights";
 constexpr const char* kGradientLookupTables  = "previewCompositeGradientLookupTables";
 constexpr const char* kEntityPoints          = "previewCompositeEntityPoints";
-constexpr const char* kCompositeTexels       = "previewCompositeTexels";
 constexpr const char* kConfiguration         = "previewCompositeConfiguration";
 constexpr const char* kLayerConfigurations   = "previewCompositeLayerConfigurations";
 constexpr const char* kStratumConfigurations = "previewCompositeStratumConfigurations";
 constexpr const char* kSlope                 = "previewCompositeSlope";
 } // namespace CompositeBufferName
+
+// The name the composited image texture is keyed by in GpuResourceManager — same lifecycle rule
+// as the buffers above: the manager reallocates it only when the preview resolution changes.
+namespace CompositeTextureName {
+constexpr const char* kCompositeImage = "previewCompositeImage";
+} // namespace CompositeTextureName
 
 // Every `*RangeReciprocal` field below is precomputed with this, so the kernels multiply and
 // never divide inside a per-pixel loop (Constitution §3). A degenerate span answers zero,

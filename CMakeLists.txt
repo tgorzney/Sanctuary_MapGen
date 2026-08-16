@@ -167,9 +167,10 @@ target_include_directories(SanGenV2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # question for the ARCH Expert.
 target_include_directories(SanGenV2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
 # The M5 widget layer draws through Dear ImGui, so the library needs imgui's HEADERS to compile
-# those translation units. Link libraries are deliberately NOT touched here — M5-7 owns final
-# assembly — and a static library only pulls the objects an executable actually references, so
-# the imgui-free acceptance tests below still link against SanGenV2 alone.
+# those translation units. A static library only pulls the objects an executable actually
+# references, so the imgui-free acceptance tests below still link against SanGenV2 alone even
+# though imgui is now linked (below) for the widgets that call real imgui functions (ImGui::Image
+# and friends), not just its headers.
 target_include_directories(SanGenV2 PRIVATE ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 target_compile_features(SanGenV2 PUBLIC cxx_std_17)
 if(MSVC)
@@ -179,6 +180,11 @@ endif()
 if(WIN32)
     target_link_libraries(SanGenV2 PUBLIC opengl32)
 endif()
+# The UI layer draws through Dear ImGui (UI_FRAMEWORK_SPEC: "imgui is used, but bypassed on the
+# hot paths"), so the v2 library links the same imgui target the legacy executable does. PUBLIC:
+# a consumer that draws a v2 widget (the app shell, and each widget's acceptance test) needs the
+# headers too. imgui itself pulls in glfw for its backends.
+target_link_libraries(SanGenV2 PUBLIC imgui)
 
 # The GPU-backed units load their .glsl twins from ONE shader directory at run time
 # (Sys::GpuResourceManager resolves `<shaderDirectory>/<fileName>` — a single directory, never an
@@ -283,6 +289,11 @@ add_sangen_test(Picking_UI_Test                   src/ui/Picking_UI_Test.cpp)
 add_sangen_test(PreviewComposite_UI_Test          src/ui/PreviewComposite_UI_Test.cpp)
 add_sangen_test(PreviewComposite_Wysiwyg_UI_Test  src/ui/PreviewComposite_Wysiwyg_UI_Test.cpp)
 add_sangen_test(PreviewComposite_Gpu_UI_Test      src/ui/PreviewComposite_Gpu_UI_Test.cpp)
+add_sangen_test(MapCanvas_UI_Test
+    src/ui/MapCanvas_UI_Test.cpp
+    src/ui/MapCanvas_Render_UI_Test.cpp
+    src/ui/MapCanvas_View_UI_Test.cpp
+    src/ui/MapCanvas_Picking_UI_Test.cpp)
 add_sangen_test(PreviewIntegration_UI_Test
     src/ui/PreviewIntegration_UI_Test.cpp
     src/ui/PreviewIntegration_DirtyTier_UI_Test.cpp

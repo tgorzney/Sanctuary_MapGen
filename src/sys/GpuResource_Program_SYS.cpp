@@ -83,7 +83,11 @@ void GpuResourceManager::Dispatch(GpuProgramHandle program, unsigned groupsX, un
     if (!program.IsValid()) return;
     glUseProgramPointer(programs[program.programIndex].program);
     glDispatchComputePointer(groupsX, groupsY, groupsZ);
-    glMemoryBarrierPointer(kGlShaderStorageBarrierBit);
+    // Both write targets a kernel can own: SSBOs and image-unit textures. A multi-pass kernel
+    // that read-modify-writes its image between dispatches (the preview composite) is only
+    // correct if the image writes are visible to the next dispatch, so the barrier covers both
+    // kinds rather than the buffer kind alone.
+    glMemoryBarrierPointer(kGlShaderStorageBarrierBit | kGlShaderImageAccessBarrierBit);
 }
 
 GpuFenceHandle GpuResourceManager::InsertFence() {

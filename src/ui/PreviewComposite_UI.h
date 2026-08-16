@@ -12,9 +12,10 @@
 // any kind: changing one without re-baking cannot move a pixel here.
 //
 // Pass ordering: clear -> one pass per enabled field layer -> overlay -> entity id.
-// The output image is a packed RGBA8 texel per pixel (`Ui::PackRgba8`): the SYS seam carries
-// buffers, not GL images, so the composite writes the exact bytes a GL_RGBA8 upload wants
-// and hands them to the caller. Uploading that image as a texture is M4-5/M5.
+// On the Gpu the image IS a real GL_RGBA8 texture, owned by `Sys::GpuResourceManager` and written
+// through an image unit, so `MapCanvas_UI` (M5-5) samples it directly instead of re-uploading a
+// buffer every composite. The same pixels are also read back into `CompositeTexels()` as packed
+// RGBA8 (`Ui::PackRgba8`) — that is the Cpu twin's output format and the parity reference.
 #pragma once
 #include <vector>
 #include "PreviewComposite_Color_UI.h"
@@ -26,10 +27,9 @@
 #include "../params/Geometry_PARAMS.h"
 #include "../params/Stratum_PARAMS.h"
 #include "../params/Water_PARAMS.h"
+#include "../sys/GpuResource_SYS.h"
 
 namespace SanmapGen {
-namespace Sys { class GpuResourceManager; }
-
 namespace Ui {
 
 class PreviewComposite {
@@ -53,6 +53,9 @@ public:
 
     // The composited image: `Resolution()` squared packed RGBA8 texels, row-major.
     const std::vector<unsigned int>& CompositeTexels() const { return compositeTexels; }
+    // The same image as the GL texture the last Gpu run wrote — what a canvas draws. Invalid
+    // until a Gpu compose has run (the Cpu twin has only the texels above).
+    Sys::GpuTextureHandle CompositeTexture() const { return compositeTexture; }
     int Resolution() const { return configuration.previewResolution; }
     bool LastRunUsedGpu() const { return bLastRunUsedGpu; }
     // Passes executed in the last run: clear + one per enabled layer + overlay + entity id.
@@ -74,7 +77,8 @@ private:
     const Data::FloatField* LayerSourceField(PreviewLayerKind kind) const;
     bool EnsureGpuResources();                               // PreviewComposite_GpuProgram_UI.cpp
     void PackSurfaceStratumWeights();                        // PreviewComposite_GpuBuffers_UI.cpp
-    void BindComposeBuffers(Sys::GpuResourceManager& manager);   // PreviewComposite_GpuBuffers_UI.cpp
+    bool EnsureCompositeTexture(Sys::GpuResourceManager& manager);  // PreviewComposite_GpuBuffers_UI.cpp
+    void BindComposeBuffers(Sys::GpuResourceManager& manager);      // PreviewComposite_GpuBuffers_UI.cpp
 
     // The four passes of the Cpu twin (PreviewComposite_Cpu_UI.cpp).
     void ClearPassCpu();
@@ -102,6 +106,7 @@ private:
     std::vector<unsigned int>                compositeTexels;
 
     Sys::GpuResourceManager* gpuResourceManager = nullptr;
+    Sys::GpuTextureHandle    compositeTexture;
     bool bLastRunUsedGpu  = false;
     bool bGpuProgramReady = false;
     int  gpuProgramIndex  = -1;

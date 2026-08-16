@@ -114,6 +114,13 @@ void GpuResourceManager::BindTextureImage(GpuTextureHandle texture, unsigned ima
                               static_cast<GLenum>(LayoutOfFormat(target->format).internalFormat));
 }
 
+// The presentation identifier a UI toolkit draws with. It is handed out as a plain value so no
+// GL type crosses the seam, and the manager keeps owning the texture it names.
+unsigned long long GpuResourceManager::TexturePresentationIdentifier(GpuTextureHandle texture) {
+    ManagedTexture* target = ResolveTexture(texture);
+    return target == nullptr ? 0ull : static_cast<unsigned long long>(target->texture);
+}
+
 void GpuResourceManager::BindTextureSampler(GpuTextureHandle texture, unsigned textureUnit) {
     ManagedTexture* target = ResolveTexture(texture);
     if (target == nullptr) return;

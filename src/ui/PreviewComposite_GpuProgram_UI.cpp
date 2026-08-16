@@ -57,7 +57,7 @@ std::string BuildBindingDefinitions() {
          + IntegerDefinition("PREVIEW_BINDING_SURFACE_WEIGHTS",    static_cast<int>(CompositeBinding::kSurfaceStratumWeights))
          + IntegerDefinition("PREVIEW_BINDING_GRADIENT_TABLES",    static_cast<int>(CompositeBinding::kGradientLookupTables))
          + IntegerDefinition("PREVIEW_BINDING_ENTITY_POINTS",      static_cast<int>(CompositeBinding::kEntityPoints))
-         + IntegerDefinition("PREVIEW_BINDING_COMPOSITE_TEXELS",   static_cast<int>(CompositeBinding::kCompositeTexels))
+         + IntegerDefinition("PREVIEW_IMAGE_COMPOSITE",            static_cast<int>(CompositeImageUnit::kCompositeImage))
          + IntegerDefinition("PREVIEW_BINDING_CONFIGURATION",      static_cast<int>(CompositeBinding::kConfiguration))
          + IntegerDefinition("PREVIEW_BINDING_LAYERS",             static_cast<int>(CompositeBinding::kLayerConfigurations))
          + IntegerDefinition("PREVIEW_BINDING_STRATA",             static_cast<int>(CompositeBinding::kStratumConfigurations));

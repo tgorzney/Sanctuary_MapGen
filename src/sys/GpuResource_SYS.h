@@ -94,6 +94,13 @@ public:
     void BindTextureImage(GpuTextureHandle texture, unsigned imageUnit, GpuImageAccess access);
     void BindTextureSampler(GpuTextureHandle texture, unsigned textureUnit);
 
+    // The toolkit-facing identifier of a managed texture, for a UI image draw (this is what
+    // imgui calls an ImTextureID). It is an opaque 64-bit VALUE, not a GL handle: the UI hands
+    // it straight back to the toolkit and never calls GL with it, so creation, storage,
+    // resizing and destruction all stay behind this seam (ARCH §3.2). Zero when the handle
+    // does not resolve, which a caller reads as "nothing to draw yet".
+    unsigned long long TexturePresentationIdentifier(GpuTextureHandle texture);
+
     void SetUniformInt(GpuProgramHandle program, const char* uniformName, int value);
     void Dispatch(GpuProgramHandle program, unsigned groupsX, unsigned groupsY, unsigned groupsZ);
 

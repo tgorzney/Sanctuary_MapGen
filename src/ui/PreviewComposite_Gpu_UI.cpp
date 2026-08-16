@@ -39,6 +39,7 @@ void PreviewComposite::ComposeOnGpu() {
 
     Sys::GpuResourceManager& manager = *gpuResourceManager;
     const Sys::GpuProgramHandle program{ gpuProgramIndex };
+    if (!EnsureCompositeTexture(manager)) { ComposeOnCpu(); return; }   // no image -> the Cpu twin
     BindComposeBuffers(manager);
 
     const unsigned pixelGroupsX = TileGroupCount(resolution, Sys::WorkgroupSize::kFieldTileWidth);
@@ -71,8 +72,11 @@ void PreviewComposite::ComposeOnGpu() {
     }
 
     WaitForCompletion(manager);
-    manager.ReadbackBuffer(CompositeBufferName::kCompositeTexels, compositeTexels.data(),
-                           compositeTexels.size() * sizeof(unsigned int));
+    // The canvas draws the texture itself; this readback exists so the Cpu twin stays the parity
+    // reference and a headless caller still gets bytes. RGBA8 texels come back R,G,B,A per pixel,
+    // which is exactly the byte order `Ui::PackRgba8` packs into one unsigned int.
+    manager.ReadbackTexture(compositeTexture, compositeTexels.data(),
+                            compositeTexels.size() * sizeof(unsigned int));
     manager.ReadbackBuffer(CompositeBufferName::kEntityIdentifiers, entityIdentifierBuffer.Data(),
                            entityIdentifierBuffer.CellCount() * sizeof(unsigned int));
     bLastRunUsedGpu = true;

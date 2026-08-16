@@ -1,6 +1,6 @@
 #version 430 core
 // PreviewComposite_UI.glsl — GPU twin of the Cpu composite (PreviewComposite_Cpu_UI.cpp), and
-// the unit that declares main(). One program, four passes over the same RGBA8 image buffer,
+// the unit that declares main(). One program, four passes over the same RGBA8 image TEXTURE,
 // selected by `passIndex`: clear -> one dispatch per enabled field layer -> overlay -> entity id.
 // It SAMPLES the baked fields and colorizes them (PreviewComposite_Sampling_UI.glsl) — slope
 // included, read from the Mask stage's bake; there is deliberately NO slope derivation, NO
@@ -26,27 +26,31 @@ struct EntityPoint { float pixelX; float pixelY; uint entityIdentifier; int padd
 
 layout(std430, binding = PREVIEW_BINDING_ENTITY_IDENTIFIERS)        buffer EntityIdentifiers { uint entityIdentifiers[]; };
 layout(std430, binding = PREVIEW_BINDING_ENTITY_POINTS)    readonly buffer EntityPoints      { EntityPoint entityPoints[]; };
-layout(std430, binding = PREVIEW_BINDING_COMPOSITE_TEXELS)          buffer CompositeTexels   { uint compositeTexels[]; };
 layout(std430, binding = PREVIEW_BINDING_CONFIGURATION)    readonly buffer Configuration     { CompositeConfiguration configuration[]; };
+
+// The composited image is a real GL_RGBA8 texture bound to an IMAGE UNIT (its own binding
+// namespace, unrelated to the SSBO numbers above), so the canvas samples this surface directly
+// instead of an uploaded copy. rgba8 quantizes each store to a byte exactly as the Cpu twin's
+// PackRgba8 does, so the passes still round-trip through 8 bits between blends. The passes
+// read-modify-write it, so it carries no readonly/writeonly qualifier.
+layout(rgba8, binding = PREVIEW_IMAGE_COMPOSITE) uniform image2D compositeImage;
 
 uniform int passIndex;
 uniform int layerIndex;
 
 // Provided by PreviewComposite_Color_UI.glsl and PreviewComposite_Sampling_UI.glsl.
 vec4  blendPreviewColor(vec4 destination, vec4 source, int blendMode, float amount);
-uint  packRgba8(vec4 color);
-vec4  unpackRgba8(uint packedTexel);
 vec4  layerColorAtPixel(int layerIndex, float sampleX, float sampleY);
 int   layerBlendMode(int layerIndex);
 float layerOpacity(int layerIndex);
 
 void clearPass(ivec2 pixel) {
-    int texelIndex = pixel.y * configuration[0].previewResolution + pixel.x;
-    compositeTexels[texelIndex] = packRgba8(vec4(configuration[0].clearColorRed,
-                                                 configuration[0].clearColorGreen,
-                                                 configuration[0].clearColorBlue,
-                                                 configuration[0].clearColorAlpha));
-    entityIdentifiers[texelIndex] = PREVIEW_EMPTY_ENTITY_SENTINEL;
+    imageStore(compositeImage, pixel, vec4(configuration[0].clearColorRed,
+                                           configuration[0].clearColorGreen,
+                                           configuration[0].clearColorBlue,
+                                           configuration[0].clearColorAlpha));
+    entityIdentifiers[pixel.y * configuration[0].previewResolution + pixel.x] =
+        PREVIEW_EMPTY_ENTITY_SENTINEL;
 }
 
 // The pixel -> cell mapping is the same pixel-center form the bake uses, so the preview and the
@@ -56,10 +60,9 @@ void fieldLayerPass(ivec2 pixel) {
     float cellsPerPixel = float(configuration[0].vertexSize - 1) / float(resolution);
     vec4 layerColor = layerColorAtPixel(layerIndex, (float(pixel.x) + 0.5) * cellsPerPixel,
                                                     (float(pixel.y) + 0.5) * cellsPerPixel);
-    int texelIndex = pixel.y * resolution + pixel.x;
-    compositeTexels[texelIndex] =
-        packRgba8(blendPreviewColor(unpackRgba8(compositeTexels[texelIndex]), layerColor,
-                                    layerBlendMode(layerIndex), layerOpacity(layerIndex) * layerColor.a));
+    imageStore(compositeImage, pixel,
+               blendPreviewColor(imageLoad(compositeImage, pixel), layerColor,
+                                 layerBlendMode(layerIndex), layerOpacity(layerIndex) * layerColor.a));
 }
 
 // One thread per RESOLVED instance. The mark is DRAWN, never re-tested against a placement rule
@@ -81,11 +84,14 @@ void entityPass(int entityIndex, bool bWriteIdentifier) {
             float offsetX = float(pixelX) - point.pixelX;
             float offsetY = float(pixelY) - point.pixelY;
             if (offsetX * offsetX + offsetY * offsetY > radiusSquared) continue;
-            int texelIndex = pixelY * resolution + pixelX;
-            if (bWriteIdentifier) { entityIdentifiers[texelIndex] = point.entityIdentifier; continue; }
-            compositeTexels[texelIndex] =
-                packRgba8(blendPreviewColor(unpackRgba8(compositeTexels[texelIndex]), markColor,
-                                            PREVIEW_BLEND_ALPHA, markColor.a));
+            if (bWriteIdentifier) {
+                entityIdentifiers[pixelY * resolution + pixelX] = point.entityIdentifier;
+                continue;
+            }
+            ivec2 markPixel = ivec2(pixelX, pixelY);
+            imageStore(compositeImage, markPixel,
+                       blendPreviewColor(imageLoad(compositeImage, markPixel), markColor,
+                                         PREVIEW_BLEND_ALPHA, markColor.a));
         }
     }
 }
