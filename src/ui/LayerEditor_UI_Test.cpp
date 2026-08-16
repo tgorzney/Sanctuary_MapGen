@@ -52,6 +52,28 @@ void RunEditorStateChecks() {
                      "while a RAW heightmap passes");
     CheckLayerEditor(state.soilPresetIndex == -1, "no soil preset is picked to begin with");
 
+    // WO B2: the per-layer name and the rules the header row edits it under.
+    const TextInputRules layerNameRules = LayerEditorNameRules("Layer");
+    CheckLayerEditor(!layerNameRules.bAllowEmpty && layerNameRules.maximumLength == 48,
+                     "a layer name is capped and may not be left empty");
+    CheckLayerEditor(SanitizeTextInput(std::string("   "), layerNameRules) == "Layer",
+                     "an emptied name settles back to its fallback");
+    CheckLayerEditor(SanitizeTextInput(std::string("Ridge\tline "), layerNameRules) == "Ridgeline",
+                     "control characters are stripped and the name is trimmed on commit");
+    CheckLayerEditor(LayerEditorNameRules("GeoLayer").fallbackText == std::string("GeoLayer"),
+                     "the group header reuses the same rules with its own fallback");
+
+    Params::Layer namedLayer;
+    CheckLayerEditor(namedLayer.name == "Layer", "a new layer carries the default name");
+    CheckLayerEditor(LayerEditorRowLabel(namedLayer) == std::string("Layer"),
+                     "which is what its list row shows");
+    namedLayer.name = "Bedrock base";
+    CheckLayerEditor(LayerEditorRowLabel(namedLayer) == std::string("Bedrock base"),
+                     "a renamed layer relabels its own row");
+    namedLayer.name.clear();
+    CheckLayerEditor(LayerEditorRowLabel(namedLayer) == std::string("Layer"),
+                     "and a recipe written before the field existed still draws a labelled row");
+
     // Two editors on screen at once must not share a drag — the v1 function-static defect.
     LayerEditorState secondEditor;
     secondEditor.selectedLayerIndex = 4;

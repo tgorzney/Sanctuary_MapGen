@@ -3,6 +3,7 @@
 // Every control is a batch-A shared widget composed through LayerEditor_Draw_UI.h; the only raw
 // imgui is the label vocabulary and the section body layout.
 #include "LayerEditor_Draw_UI.h"
+#include "TextInput_UI.h"
 #include "imgui.h"
 
 namespace SanmapGen {
@@ -82,6 +83,11 @@ void DrawHeightBlendSection(Params::Layer& layer, LayerEditorState& state,
 void DrawLayerEditorLayerSections(Params::Layer& layer, LayerEditorState& state,
                                   Pipeline::PreviewDriver* previewDriver) {
     ImGui::PushID("layerSections");
+    // The name is pure metadata no stage hashes, so a commit is NOT routed to the driver: asking
+    // for a regeneration a rename cannot affect would be the "cheap tweak triggers a full regen"
+    // defect UI_FRAMEWORK_SPEC lists. It is the DraggableList row's label, so it is edited here
+    // and read there (LayerEditor_Group_UI.cpp).
+    DrawTextInput("Name", layer.name, LayerEditorNameRules("Layer"));
     DrawLayerEditorIntegerRow(LayerEditorScalar::StratumIndex, layer.stratumIndex, state, previewDriver);
     DrawNoiseSection(layer, state, previewDriver);
     DrawDensitySection(layer, state, previewDriver);

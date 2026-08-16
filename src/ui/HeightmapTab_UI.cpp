@@ -3,6 +3,7 @@
 // the shared Layer Editor. Every control is a batch-A shared widget; the only raw imgui here is
 // the label vocabulary.
 #include "HeightmapTab_UI.h"
+#include "Checkbox_UI.h"
 #include "Combo_UI.h"
 #include "LayerEditor_Erosion_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -35,6 +36,11 @@ void DrawMapSettings(Params::Geometry& geometry, HeightmapTabState& state,
     change = DrawCombo("Map Size", state.mapSizeIndex, mapSizeOptions);
     if (change.bValueChanged) StoreHeightmapTabValues(state, geometry);
     NotifyChange(change.bCommitted, previewDriver);
+
+    // Sits directly under Map Size because it only means anything relative to it: the NoiseBlend
+    // stage hashes the frequency this toggle produces, so flipping it re-rolls the noise.
+    NotifyChange(DrawCheckbox("Scale Features to Map Size", geometry.bScaleFeaturesToMapSize).bCommitted,
+                 previewDriver);
 
     change = DrawSliderScalar("Terrain Max Height", geometry.terrainMaxHeight,
                               state.terrainMaxHeightRange, state.terrainMaxHeightToggle,

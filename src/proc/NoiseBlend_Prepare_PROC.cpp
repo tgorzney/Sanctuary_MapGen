@@ -38,7 +38,9 @@ void NoiseBlendStage::PrepareRun() {
         configuration.layerSeed        = static_cast<int>(geometry.seed)
                                        + static_cast<int>(index) * constants.layerSeedStride;
         configuration.octaves          = layer.octaves > 1 ? layer.octaves : 1;
-        configuration.frequency        = layer.frequency;
+        configuration.frequency        = EffectiveLayerFrequency(
+            layer.frequency, geometry.mapSize, geometry.bScaleFeaturesToMapSize,
+            constants.featureScaleReferenceMapSize);
         configuration.gain             = layer.gain;
         configuration.lacunarity       = layer.lacunarity;
         configuration.weightedStrength = layer.weightedStrength;

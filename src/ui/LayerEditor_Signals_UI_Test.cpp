@@ -17,6 +17,7 @@ Params::LayerStack TwoGroupStack() {
     layerStack.geoLayers[0].name = "Bedrock";
     layerStack.geoLayers[0].layers.resize(3);
     layerStack.geoLayers[0].layers[1].stratumIndex = 5;
+    layerStack.geoLayers[0].layers[1].name = "Ridges";
     layerStack.geoLayers[1].name = "Mountains";
     layerStack.geoLayers[1].layers.resize(1);
     return layerStack;
@@ -35,6 +36,9 @@ void RunRowActionChecks() {
     CheckLayerEditor(layerStack.geoLayers[0].layers[1].stratumIndex == 5
                      && layerStack.geoLayers[0].layers[2].stratumIndex == 5,
                      "the copy lands directly above its source");
+    CheckLayerEditor(layerStack.geoLayers[0].layers[1].name == "Ridges"
+                     && layerStack.geoLayers[0].layers[2].name == "Ridges",
+                     "and the duplicate carries the source's name (WO B2)");
     CheckLayerEditor(selectedLayer == 1, "and the selection follows the copy");
 
     LayerEditorAction addLayer;

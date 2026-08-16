@@ -58,6 +58,10 @@ public:
 private:
     // Flattens the enabled layers into LayerKernelConfiguration records and sizes the caches.
     void PrepareRun();
+    // The frequency the kernels are handed for one layer — `Params::Geometry::
+    // bScaleFeaturesToMapSize` applied to the layer's own (NoiseBlend_Kernel_PROC.h). Resolved in
+    // ONE place so the flatten and the dirty hash can never disagree about it.
+    float EffectiveFrequencyOfLayer(const Params::Layer& layer) const;
     std::size_t ComputeStructuralNoiseHash(std::size_t layerIndex) const;
     std::size_t ComputeBlendHash() const;
     void GenerateLayerNoiseCpu(std::size_t layerIndex);   // NoiseBlend_Noise_PROC.cpp

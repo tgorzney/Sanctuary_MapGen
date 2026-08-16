@@ -28,6 +28,13 @@ int main() {
     band.terrainMinHeight = 200.0f;
     if (band.IsValid()) { std::printf("FAIL floor above ceiling is invalid\n"); ++failures; }
 
+    // WO B2: the v1 "Scale features to Map Size" flag, defaulting ON exactly as v1 did. It is
+    // settings only here; the NoiseBlend stage owns what it MEANS.
+    Geometry featureScale;
+    if (!featureScale.bScaleFeaturesToMapSize) { std::printf("FAIL scale-features default\n"); ++failures; }
+    featureScale.bScaleFeaturesToMapSize = false;
+    if (!featureScale.IsValid()) { std::printf("FAIL scale-features does not affect validity\n"); ++failures; }
+
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

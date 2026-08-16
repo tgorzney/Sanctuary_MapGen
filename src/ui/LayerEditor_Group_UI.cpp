@@ -18,11 +18,10 @@ const char* const groupBlendModeLabels[] = { "Add", "Subtract", "Multiply", "Ove
 // The group's own settings: rename, role, blend into the stack, erode-below, owned stratum.
 void DrawGroupSettings(Params::GeoLayer& group, LayerEditorState& state,
                        Pipeline::PreviewDriver* previewDriver) {
-    TextInputRules nameRules;
-    nameRules.maximumLength = 48;
-    nameRules.bAllowEmpty   = false;
-    nameRules.fallbackText  = "GeoLayer";
-    NotifyLayerEditorChange(DrawTextInput("Name", group.name, nameRules).bCommitted, previewDriver);
+    // A group rename is metadata no stage hashes, so — like the per-layer name — it does NOT
+    // notify the driver; asking for a regeneration a rename cannot affect is the "cheap tweak
+    // triggers a full regen" defect (UI_FRAMEWORK_SPEC "Known issues").
+    DrawTextInput("Name", group.name, LayerEditorNameRules("GeoLayer"));
     DrawLayerEditorEnumRow("Mode", group.mode, geoLayerModeLabels,
                            IM_ARRAYSIZE(geoLayerModeLabels), previewDriver);
     DrawLayerEditorEnumRow("Group Blend Mode", group.blendMode, groupBlendModeLabels,
@@ -59,13 +58,15 @@ void DrawGroupLayerList(Params::GeoLayer& group, int groupIndex, LayerEditorStat
                         LayerEditorFrameSignals& signals) {
     if (ImGui::SmallButton("Add Layer"))
         RecordLayerEditorAction(signals.action, LayerEditorActionKind::AddLayer, groupIndex);
-    char rowLabel[48] = { 0 };   // borrowed by describeRow for the duration of this Render only
+    // Borrowed by describeRow for the duration of this Render only. Wide enough for a full-length
+    // name plus the stratum suffix; snprintf truncates rather than overruns either way.
+    char rowLabel[72] = { 0 };
     const DraggableListSignal signal = DraggableList<Params::Layer>::Render(
         "layers", group.layers,
         [&](int rowIndex) {
             const Params::Layer& layer = group.layers[static_cast<std::size_t>(rowIndex)];
-            std::snprintf(rowLabel, sizeof(rowLabel), "Layer %d (stratum %d)", rowIndex,
-                          layer.stratumIndex);
+            std::snprintf(rowLabel, sizeof(rowLabel), "%s (stratum %d)",
+                          LayerEditorRowLabel(layer), layer.stratumIndex);
             DraggableListRow row;
             row.label    = rowLabel;
             row.bVisible = layer.bEnabled;

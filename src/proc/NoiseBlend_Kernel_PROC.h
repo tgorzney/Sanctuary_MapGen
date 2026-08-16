@@ -35,6 +35,9 @@ struct NoiseBlendConstants {
     float heightMinimum          = 0.0f;    // blended-height clamp window
     float heightMaximum          = 1.0f;
     float occlusionWindowEpsilon = 0.001f;  // MASKING_SPEC swap guard on an empty window
+    float featureScaleReferenceMapSize = 512.0f;  // the map size "Scale Features to Map Size"
+                                            // measures against — v1's hardcoded 512, now a
+                                            // setting like every other number here (§8)
     int   layerSeedStride        = 1;       // layer seed = geometry.seed + index * this
     int   maximumGpuLayerCount   = 32;      // deeper stacks fall back to the Cpu; also bounds the
                                             // blend pass's per-layer scratch buffer
@@ -42,6 +45,24 @@ struct NoiseBlendConstants {
                                              // polls, never busy-spins (a hot spin starves the
                                              // ThreadPool workers sharing the cores)
 };
+
+// The frequency a layer actually samples at. v1 parity ("Scale features to Map Size",
+// Gen_NoiseAndBlend.cpp): with the toggle ON a layer samples at
+// frequency * (referenceMapSize / mapSize), so a feature keeps the same RELATIVE size when the
+// map is resized — double the map and you get the same landscape at twice the resolution rather
+// than twice as many hills.
+//
+// Applied EXACTLY ONCE, in NoiseBlend_Prepare_PROC.cpp, onto the single `frequency` field both
+// backends read out of LayerKernelConfiguration — so the Cpu accuracy path and the Gpu speed path
+// cannot disagree about it, and neither kernel needs to know the toggle exists. A nonsense map
+// size or reference passes the frequency through untouched rather than dividing by it
+// (Constitution §6). One division per layer at setup, never inside a cell loop.
+inline float EffectiveLayerFrequency(float layerFrequency, int mapSize,
+                                     bool bScaleFeaturesToMapSize, float referenceMapSize) {
+    if (!bScaleFeaturesToMapSize) return layerFrequency;
+    if (mapSize <= 0 || !(referenceMapSize > 0.0f)) return layerFrequency;
+    return layerFrequency * (referenceMapSize / static_cast<float>(mapSize));
+}
 
 // One flattened layer, ready for either backend. 32 scalars = 128 bytes; the trailing
 // padding keeps the std430 array stride a 16-byte multiple. Order is load-bearing.

@@ -283,6 +283,10 @@ add_sangen_test(NoiseBlend_PROC_Test
     src/proc/NoiseBlend_PROC_Test.cpp
     src/proc/NoiseBlend_GpuParity_PROC_Test.cpp
     src/proc/NoiseBlend_GpuBlend_PROC_Test.cpp)
+# WO B2 "Scale Features to Map Size". Its own binary rather than a fourth translation unit of the
+# group above, so landing it needed no edit to that binary's main(): it drives only the flatten and
+# the dirty hash, so it needs neither a GL context nor the parity fixtures those files carry.
+add_sangen_test(NoiseBlend_FeatureScale_PROC_Test src/proc/NoiseBlend_FeatureScale_PROC_Test.cpp)
 add_sangen_test(Mask_PROC_Test
     src/proc/Mask_PROC_Test.cpp
     src/proc/Mask_Slope_PROC_Test.cpp

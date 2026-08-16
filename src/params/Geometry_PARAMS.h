@@ -22,6 +22,13 @@ struct Geometry {
                                              // work-order binds it. It is settings, not a
                                              // second height scale: nothing may derive an
                                              // extent from it without that work-order.
+    bool bScaleFeaturesToMapSize = true;     // v1 parity: when set, a layer samples noise at a
+                                             // frequency scaled by the map size, so a feature
+                                             // keeps the same RELATIVE size when the map is
+                                             // resized. Consumed by exactly one stage —
+                                             // NoiseBlend (EffectiveLayerFrequency) — which is
+                                             // why it lives here beside mapSize rather than on
+                                             // the layer it modifies.
     float        worldUnitsPerCell = 1.0f;   // one heightfield cell -> game units (X/Z). Map
                                              // geometry, not a placement constant: Placement
                                              // emits positions with it, the preview maps an

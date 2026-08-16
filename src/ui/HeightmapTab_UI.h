@@ -7,9 +7,9 @@
 // from the stage hashes, never a per-widget decision here.
 //
 // SCOPE NOTES (ARCH §8.4 — a coder never invents a missing field; reported, not invented):
-//  1. "Scale Features to Map Size" has no settings home: no `Params::Geometry` flag and no layer
-//     field scales frequency by map size in the v2 tree. The checkbox is NOT drawn — a control
-//     bound to nothing is worse than a missing one.
+//  1. (CLOSED by WO B2) "Scale Features to Map Size" now has a settings home —
+//     `Params::Geometry::bScaleFeaturesToMapSize` — and the NoiseBlend stage consumes it through
+//     `Proc::EffectiveLayerFrequency`, so the checkbox is drawn and it does something.
 //  2. GLOBAL GRAVITY is not a `Params::Geometry` field either. Gravity is per-stratum
 //     (`Proc::ErosionLayerSettings::gravity`, reached through PIPELINE), and no
 //     `bUseGlobalGravity` opt-in flag exists, so the tab's slider is caller-owned UI state that

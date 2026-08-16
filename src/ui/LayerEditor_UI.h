@@ -14,9 +14,9 @@
 // accessor. It never includes a PROC stage, never picks a backend and never simulates (ARCH §3.1).
 //
 // SCOPE NOTES (ARCH §8.4 — a coder never invents a missing field; these are reported, not invented):
-//  1. `Params::Layer` has no `name`, no per-layer symmetry (`bUseGlobalSymmetry` + axis mask), no
-//     blend SHARPNESS and no image BRIGHTNESS. The plan asks for all four; none exists in the tree,
-//     so none is drawn. GeoLayer rename works — `Params::GeoLayer::name` does exist.
+//  1. `Params::Layer` has no per-layer symmetry (`bUseGlobalSymmetry` + axis mask), no blend
+//     SHARPNESS and no image BRIGHTNESS, so none of the three is drawn. (The per-layer `name`
+//     this note used to list was landed by WO B2 and IS drawn, in the layer header row.)
 //  2. Import RAW / Bake are detected, never applied — see LayerEditor_Action_UI.h.
 //  3. "Base Absorption" is per-MATERIAL in v2 (soil physics), not per-erosion-layer, so it is
 //     exposed exactly once, in Soil Physics. A second copy would be a rival control (ARCH §4).
@@ -29,6 +29,7 @@
 #include "Levels_UI.h"
 #include "RangeSliderWidget_UI.h"
 #include "Section_UI.h"
+#include "TextInput_UI.h"
 
 namespace SanmapGen {
 namespace Pipeline { class GenerationAssembler; class PreviewDriver; }
@@ -71,6 +72,23 @@ struct LayerEditorState {
     int selectedLayerIndex    = 0;
     int soilPresetIndex       = -1;           // -1 = no preset picked since the last edit
 };
+
+// What a legal name is, for BOTH the GeoLayer group header and the per-layer header row —
+// declared once so a group and a layer cannot disagree about the cap or the empty-name fallback.
+// `fallbackText` is what an emptied field settles back to (TextInput_UI.h).
+inline TextInputRules LayerEditorNameRules(const char* fallbackText) {
+    TextInputRules rules;
+    rules.maximumLength = 48;
+    rules.bAllowEmpty   = false;
+    rules.fallbackText  = fallbackText;
+    return rules;
+}
+
+// The label a list row shows for one layer: its name, or the fallback when a recipe written
+// before the field existed left it empty (Constitution §6 — never draw an empty row).
+inline const char* LayerEditorRowLabel(const Params::Layer& layer) {
+    return layer.name.empty() ? "Layer" : layer.name.c_str();
+}
 
 // recipe -> widget mirrors. Run whenever no edit is pending, so a layer selected in another tab or
 // a recipe loaded from disk is picked up without the caller refreshing anything by hand.

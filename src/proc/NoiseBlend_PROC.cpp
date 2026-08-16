@@ -26,13 +26,19 @@ inline std::size_t HashFloat(std::size_t seed, float value) {
 
 // Structural noise identity ONLY — levels, density, opacity and blend are deliberately
 // excluded so cheap reshaping reuses the cached raw noise (NOISE_BLEND_SPEC "Cache").
-std::size_t HashLayerStructure(std::size_t seed, const Params::Layer& layer, int layerSeed, int vertexSize) {
+// `layer.name` is excluded for the same reason in reverse: it is pure metadata no kernel reads,
+// so renaming a layer must not re-roll its noise (WO B2).
+// It hashes the EFFECTIVE frequency, not the layer's own: "Scale Features to Map Size" changes
+// what the kernel samples at, so toggling it has to invalidate the cached noise exactly as
+// editing the frequency would.
+std::size_t HashLayerStructure(std::size_t seed, const Params::Layer& layer, int layerSeed,
+                               int vertexSize, float effectiveFrequency) {
     seed = HashInteger(seed, static_cast<int>(layer.noiseType));
     seed = HashInteger(seed, static_cast<int>(layer.fractalType));
     seed = HashInteger(seed, layer.octaves);
     seed = HashInteger(seed, layerSeed);
     seed = HashInteger(seed, vertexSize);
-    seed = HashFloat(seed, layer.frequency);
+    seed = HashFloat(seed, effectiveFrequency);
     seed = HashFloat(seed, layer.gain);
     seed = HashFloat(seed, layer.lacunarity);
     seed = HashFloat(seed, layer.weightedStrength);
@@ -66,12 +72,21 @@ NoiseBlendStage::NoiseBlendStage(const Params::Geometry& geometrySettings,
                                  Data::MapFields& outputFields)
     : geometry(geometrySettings), layerStack(layerStackSettings), mapFields(outputFields) {}
 
+// The frequency the kernels will actually be handed for `layer` (NoiseBlend_Kernel_PROC.h) —
+// resolved here so the hash and NoiseBlend_Prepare_PROC.cpp can never disagree about it.
+float NoiseBlendStage::EffectiveFrequencyOfLayer(const Params::Layer& layer) const {
+    return EffectiveLayerFrequency(layer.frequency, geometry.mapSize,
+                                   geometry.bScaleFeaturesToMapSize,
+                                   constants.featureScaleReferenceMapSize);
+}
+
 std::size_t NoiseBlendStage::ComputeStructuralNoiseHash(std::size_t layerIndex) const {
     const std::vector<const Params::Layer*> flatLayers = layerStack.GetFlatLayers();
     if (layerIndex >= flatLayers.size()) return hashBasis;
     const int layerSeed = static_cast<int>(geometry.seed)
                         + static_cast<int>(layerIndex) * constants.layerSeedStride;
-    return HashLayerStructure(hashBasis, *flatLayers[layerIndex], layerSeed, geometry.VertexSize());
+    return HashLayerStructure(hashBasis, *flatLayers[layerIndex], layerSeed, geometry.VertexSize(),
+                              EffectiveFrequencyOfLayer(*flatLayers[layerIndex]));
 }
 
 std::size_t NoiseBlendStage::ComputeBlendHash() const { return ComputeParameterHash(); }
@@ -84,7 +99,8 @@ std::size_t NoiseBlendStage::ComputeParameterHash() const {
     for (std::size_t index = 0; index < flatLayers.size(); ++index) {
         const int layerSeed = static_cast<int>(geometry.seed)
                             + static_cast<int>(index) * constants.layerSeedStride;
-        hash = HashLayerStructure(hash, *flatLayers[index], layerSeed, geometry.VertexSize());
+        hash = HashLayerStructure(hash, *flatLayers[index], layerSeed, geometry.VertexSize(),
+                                  EffectiveFrequencyOfLayer(*flatLayers[index]));
         hash = HashLayerShaping(hash, *flatLayers[index]);
     }
     return hash;

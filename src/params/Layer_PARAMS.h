@@ -3,6 +3,7 @@
 // per ARCH §5.2 the god-object's image-bake state, per-layer erosion, placement
 // fields, and physics tags are evicted elsewhere. No behavior, no computed data.
 #pragma once
+#include <string>
 #include "GenerationEnums_PARAMS.h"
 
 namespace SanmapGen {
@@ -10,6 +11,9 @@ namespace Params {
 
 struct Layer {
     // Identity / stack control
+    std::string name = "Layer";  // designer-facing label only. Pure metadata: NO stage consumes
+                                 // it, so it is deliberately absent from every parameter hash —
+                                 // renaming a layer must not re-run generation (WO B2).
     bool bEnabled      = true;
     bool bLocked       = false;
     int  stratumIndex  = 0;      // 0..8

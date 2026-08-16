@@ -2,6 +2,7 @@
 // (seed, map size, the terrain height band) and hosts one Layer Editor. Pure checks driven with
 // synthetic values — no imgui frame, no window, no GL context.
 #include "HeightmapTab_UI.h"
+#include "Checkbox_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cstdio>
 
@@ -81,6 +82,32 @@ void RunHeightBandChecks() {
           "and a collapsed ceiling is raised back to its limit");
 }
 
+// WO B2: the tab is the one place "Scale Features to Map Size" is edited. It is a plain boolean
+// on the geometry, so the checkbox drives it directly with no mirror.
+void RunScaleFeaturesChecks() {
+    Params::MapRecipe recipe;
+    Check(recipe.geometry.bScaleFeaturesToMapSize, "the tab opens with the v1 default (on)");
+
+    bool bScaleFeatures = recipe.geometry.bScaleFeaturesToMapSize;
+    WidgetChange change = StepCheckboxInteraction(bScaleFeatures, true);
+    Check(change.bValueChanged && change.bCommitted,
+          "a click flips it and commits on the same frame - a boolean has no drag to defer");
+    Check(!bScaleFeatures, "and the value follows");
+
+    change = StepCheckboxInteraction(bScaleFeatures, false);
+    Check(!change.bValueChanged && !change.bCommitted, "an untouched frame costs nothing");
+    StepCheckboxInteraction(bScaleFeatures, true);
+    Check(bScaleFeatures, "a second click restores it");
+
+    // The tab's mirror store must not disturb it: it is not one of the mirrored settings.
+    HeightmapTabState state;
+    recipe.geometry.bScaleFeaturesToMapSize = false;
+    LoadHeightmapTabValues(recipe.geometry, state);
+    StoreHeightmapTabValues(state, recipe.geometry);
+    Check(!recipe.geometry.bScaleFeaturesToMapSize,
+          "the seed/size mirror round trip leaves the toggle alone");
+}
+
 // The tab HOSTS the Layer Editor rather than re-implementing a stack editor.
 void RunHostedLayerEditorChecks() {
     Params::MapRecipe recipe;
@@ -105,6 +132,7 @@ int main() {
     RunMapSizeChecks();
     RunGeometryMirrorChecks();
     RunHeightBandChecks();
+    RunScaleFeaturesChecks();
     RunHostedLayerEditorChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
