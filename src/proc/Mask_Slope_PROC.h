@@ -5,7 +5,7 @@
 // .cpp to keep in step.
 //
 // PINNED SLOPE UNIT: gradient magnitude, rise/run (= tan of the terrain angle), dimensionless.
-//   slope = |grad(height * terrainMaxHeight)| over a cellSize grid
+//   slope = |grad(height * terrainMaxHeight)| over a worldUnitsPerCell grid
 // The heightfield is the normalized 0..1 field the noise/blend stage wrote; `heightScale` is
 // Geometry.terrainMaxHeight READ FROM THE MAP (never the old hardcoded 128). Degrees are the
 // designer-facing unit only (Stratum_PARAMS) and are converted to gradient — via tan() on

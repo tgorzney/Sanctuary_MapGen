@@ -91,6 +91,7 @@ inline void CheckWeightsAreResolved(const Data::MapFields& fields, int vertexSiz
 }
 
 void RunSlopeGateTests();   // Mask_Slope_PROC_Test.cpp
+void RunWorldScaleTests();  // Mask_WorldScale_PROC_Test.cpp
 void RunMergeTests();       // Mask_Merge_PROC_Test.cpp
 void RunPurityTests();      // Mask_Purity_PROC_Test.cpp
 void RunDirtyHashTests();   // Mask_DirtyHash_PROC_Test.cpp

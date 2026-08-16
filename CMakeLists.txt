@@ -237,6 +237,7 @@ add_sangen_test(NoiseBlend_PROC_Test
 add_sangen_test(Mask_PROC_Test
     src/proc/Mask_PROC_Test.cpp
     src/proc/Mask_Slope_PROC_Test.cpp
+    src/proc/Mask_WorldScale_PROC_Test.cpp
     src/proc/Mask_Merge_PROC_Test.cpp
     src/proc/Mask_Purity_PROC_Test.cpp
     src/proc/Mask_DirtyHash_PROC_Test.cpp

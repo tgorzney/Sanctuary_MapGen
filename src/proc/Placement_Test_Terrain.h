@@ -25,13 +25,16 @@ constexpr float terrainMaxHeight = 128.0f;   // the value every placement test's
 
 // Mask's slope output, authored by the scene through the ONE slope authority
 // (Proc::SlopeGradientMagnitude) with Mask's own default constants, so the fixture can never
-// drift from the stage that writes this field in a real run.
-inline void BakeSlopeField(Data::MapFields& fields) {
+// drift from the stage that writes this field in a real run. The gradient's run is the caller's
+// `worldUnitsPerCell` — the same `Params::Geometry` value the recipe carries (ARCH §7.1, M5-0d),
+// so a scaled fixture and the Placement stage reading it cannot disagree about cell world-size.
+inline void BakeSlopeField(Data::MapFields& fields, float worldUnitsPerCell = 1.0f) {
     const Proc::MaskConstants constants;
+    const float cellWorldSize = worldUnitsPerCell > 0.0f ? worldUnitsPerCell : 1.0f;
     Proc::MaskStratumConfiguration configuration;
     configuration.heightScale       = terrainMaxHeight;
-    configuration.inverseSingleSpan = 1.0f / constants.cellSize;
-    configuration.inverseDoubleSpan = 1.0f / (constants.centralDifferenceSpan * constants.cellSize);
+    configuration.inverseSingleSpan = 1.0f / cellWorldSize;
+    configuration.inverseDoubleSpan = 1.0f / (constants.centralDifferenceSpan * cellWorldSize);
     const float* const heightValues = fields.heightfield.Data();
     for (int y = 0; y < vertexSize; ++y)
         for (int x = 0; x < vertexSize; ++x)
@@ -39,7 +42,7 @@ inline void BakeSlopeField(Data::MapFields& fields) {
                                                                 configuration));
 }
 
-inline void BuildTestFields(Data::MapFields& fields) {
+inline void BuildTestFields(Data::MapFields& fields, float worldUnitsPerCell = 1.0f) {
     fields.Resize(vertexSize, 0.0f);
     const float center = static_cast<float>(vertexSize - 1) * 0.5f;
     for (int y = 0; y < vertexSize; ++y)
@@ -58,7 +61,7 @@ inline void BuildTestFields(Data::MapFields& fields) {
             fields.materialProportions[maskStratumIndex].Set(x, y, x < vertexSize / 2 ? 0.0f : 1.0f);
             fields.materialProportions[0].Set(x, y, x < vertexSize / 2 ? 1.0f : 0.0f);
         }
-    BakeSlopeField(fields);          // Mask's other output, which Placement now READS (M5-0c)
+    BakeSlopeField(fields, worldUnitsPerCell);   // Mask's other output, which Placement READS (M5-0c)
 }
 
 inline Params::ScatterTransform MakeTransform(const char* templateIdentifier,
@@ -86,14 +89,19 @@ inline float MinimumSeparation(const Data::PlacementInstances& instances) {
 
 // The slope check reads the BAKED field and squares it exactly as the gate does — the stage no
 // longer exposes a slope field of its own, because it no longer owns one (M5-0c).
+// Instances carry WORLD positions, so they are divided back to cells by the same
+// `worldUnitsPerCell` the stage multiplied by (Placement_Accept_PROC does the identical
+// conversion) — one owner of cell world-size on both sides of the check (M5-0d).
 inline bool AllWithinGates(const Data::PlacementInstances& instances, const Data::MapFields& fields,
                            float heightMinimum, float heightMaximum,
-                           float maxSlopeDegrees, int mapEdgePadding) {
+                           float maxSlopeDegrees, int mapEdgePadding,
+                           float worldUnitsPerCell = 1.0f) {
     const float tangent = std::tan(maxSlopeDegrees * 3.14159265f / 180.0f);
     const float gradientLimitSquared = tangent * tangent;
+    const float cellReciprocal = 1.0f / (worldUnitsPerCell > 0.0f ? worldUnitsPerCell : 1.0f);
     for (std::size_t index = 0; index < instances.Count(); ++index) {
-        const int cellX = static_cast<int>(instances.positionX[index] + 0.5f);
-        const int cellY = static_cast<int>(instances.positionZ[index] + 0.5f);
+        const int cellX = static_cast<int>(instances.positionX[index] * cellReciprocal + 0.5f);
+        const int cellY = static_cast<int>(instances.positionZ[index] * cellReciprocal + 0.5f);
         if (cellX < mapEdgePadding || cellY < mapEdgePadding) return false;
         if (cellX >= vertexSize - mapEdgePadding || cellY >= vertexSize - mapEdgePadding) return false;
         const float height = fields.heightfield.Get(cellX, cellY);

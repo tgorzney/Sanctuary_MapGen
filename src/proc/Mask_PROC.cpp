@@ -25,7 +25,6 @@ inline std::size_t HashFloat(std::size_t seed, float value) {
 
 // Every tweakable of the stage itself (Constitution §8 values are inputs like any other).
 std::size_t HashConstants(std::size_t seed, const MaskConstants& constants) {
-    seed = HashFloat(seed, constants.cellSize);
     seed = HashFloat(seed, constants.degreesToRadians);
     seed = HashFloat(seed, constants.maximumSlopeDegreesLimit);
     seed = HashFloat(seed, constants.smoothstepShoulder);
@@ -73,6 +72,7 @@ MaskStage::MaskStage(const Params::Geometry& geometrySettings,
 std::size_t MaskStage::ComputeParameterHash() const {
     std::size_t hash = HashInteger(hashBasis, geometry.mapSize);
     hash = HashFloat(hash, geometry.terrainMaxHeight);
+    hash = HashFloat(hash, geometry.worldUnitsPerCell);   // the gradient's run (M5-0d)
     hash = HashConstants(hash, constants);
     hash = HashInteger(hash, static_cast<int>(strata.size()));
     for (const Params::Stratum& stratum : strata) hash = HashStratumSettings(hash, stratum);
