@@ -166,6 +166,11 @@ target_include_directories(SanGenV2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # project header. Where vendored headers live once core/ is retired (ARCH §5.5) is an open
 # question for the ARCH Expert.
 target_include_directories(SanGenV2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
+# The M5 widget layer draws through Dear ImGui, so the library needs imgui's HEADERS to compile
+# those translation units. Link libraries are deliberately NOT touched here — M5-7 owns final
+# assembly — and a static library only pulls the objects an executable actually references, so
+# the imgui-free acceptance tests below still link against SanGenV2 alone.
+target_include_directories(SanGenV2 PRIVATE ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 target_compile_features(SanGenV2 PUBLIC cxx_std_17)
 if(MSVC)
     # /permissive- for conforming lookup; the GPU seam resolves GL entry points itself.
@@ -270,6 +275,10 @@ add_sangen_test(GenerationAssembler_PIPELINE_Test
 # UI — each composite acceptance test declares its own main(), so each is its own binary; the
 # M4-5 integration test is one binary spanning three translation units.
 add_sangen_test(GradientLut_UI_Test               src/ui/GradientLut_UI_Test.cpp)
+add_sangen_test(GradientEditorWidget_UI_Test      src/ui/GradientEditorWidget_UI_Test.cpp)
+add_sangen_test(IconGridWidget_UI_Test
+    src/ui/IconGridWidget_UI_Test.cpp
+    src/ui/IconGridWidget_Virtualization_UI_Test.cpp)
 add_sangen_test(Picking_UI_Test                   src/ui/Picking_UI_Test.cpp)
 add_sangen_test(PreviewComposite_UI_Test          src/ui/PreviewComposite_UI_Test.cpp)
 add_sangen_test(PreviewComposite_Wysiwyg_UI_Test  src/ui/PreviewComposite_Wysiwyg_UI_Test.cpp)
