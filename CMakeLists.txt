@@ -166,6 +166,11 @@ target_include_directories(SanGenV2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # project header. Where vendored headers live once core/ is retired (ARCH §5.5) is an open
 # question for the ARCH Expert.
 target_include_directories(SanGenV2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
+# miniz is a vendored third-party library that happens to sit in core/ beside FastNoiseLite —
+# NOT legacy core/ project code. src/io/SanpackReader_Inflate_IO.cpp is the only translation
+# unit that talks to it (ASSET_LOADING_SPEC: the sanpack is a zip), so its amalgamated .c is
+# compiled into the v2 library rather than pulled from the legacy executable's object set.
+target_sources(SanGenV2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core/miniz.c)
 # The M5 widget layer draws through Dear ImGui, so the library needs imgui's HEADERS to compile
 # those translation units. A static library only pulls the objects an executable actually
 # references, so the imgui-free acceptance tests below still link against SanGenV2 alone even
@@ -238,6 +243,17 @@ add_sangen_test(GpuResource_SYS_Test
     src/sys/GpuResource_Texture_SYS_Test.cpp
     src/sys/GpuResource_ShaderPath_SYS_Test.cpp)
 add_sangen_test(ThreadPool_SYS_Test             src/sys/ThreadPool_SYS_Test.cpp)
+add_sangen_test(AtlasResidency_SYS_Test         src/sys/AtlasResidency_SYS_Test.cpp)
+
+# IO — the M5-4 asset pipeline. One binary whose main() lives in SanpackReader_IO_Test.cpp; the
+# synthetic sanpack it runs against is written with the miniz WRITER, so this target (unlike the
+# library, which only needs miniz to inflate) also needs the vendored header on its include path.
+add_sangen_test(AssetPipeline_IO_Test
+    src/io/SanpackReader_IO_Test.cpp
+    src/io/AssetAtlasCache_IO_Test.cpp
+    src/io/AssetPipeline_TestSupport_IO_Test.cpp
+    src/io/AssetPipeline_TestDamage_IO_Test.cpp)
+target_include_directories(AssetPipeline_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
 # each group below is ONE binary whose main() lives in the first file listed.
