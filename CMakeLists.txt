@@ -149,8 +149,11 @@ file(GLOB_RECURSE SANGEN_V2_SOURCES CONFIGURE_DEPENDS
     "src/sys/*.cpp"      "src/sys/*.h"
     "src/io/*.cpp"       "src/io/*.h"
 )
-# Test translation units are compiled into their own executables, never the library.
+# Test translation units are compiled into their own executables, never the library. The app's
+# entry point is excluded for the same reason: a main() in a static library is only ever pulled in
+# by accident, and every acceptance binary declares its own (M5-7).
 list(FILTER SANGEN_V2_SOURCES EXCLUDE REGEX "_Test\\.cpp$")
+list(FILTER SANGEN_V2_SOURCES EXCLUDE REGEX "ApplicationMain_UI\\.cpp$")
 
 # The GPU twins (ARCH §1.4) are compiled by the driver at run time, not by MSVC — they are
 # listed so each .glsl sits beside its CPU .cpp in the IDE and any divergence is visible.
@@ -203,6 +206,25 @@ foreach(shaderFile ${SANGEN_V2_SHADERS})
     get_filename_component(shaderName "${shaderFile}" NAME)
     configure_file("${shaderFile}" "${SANGEN_V2_SHADER_DIRECTORY}/${shaderName}" COPYONLY)
 endforeach()
+
+# ---------------------------------------------------------------------------
+# The v2 application (M5-7). `Ui::Application` and its aspect translation units live in the library
+# with the rest of src/ui; only the entry point is compiled here, so the acceptance tests drive the
+# very same shell code the shipped binary runs. imgui + glfw + opengl32 arrive transitively:
+# SanGenV2 links imgui PUBLIC (M5-5) and imgui links glfw PUBLIC, so the app declares neither.
+# ---------------------------------------------------------------------------
+add_executable(SanGenV2App src/ui/ApplicationMain_UI.cpp)
+target_link_libraries(SanGenV2App PRIVATE SanGenV2)
+set_property(TARGET SanGenV2App PROPERTY FOLDER "SanGenV2")
+
+# The kernels ship BESIDE the executable: ApplicationMain_UI.cpp resolves `<exeDir>/sangen_shaders`
+# when no explicit directory is given, so a copied-out build finds its .glsl twins with no absolute
+# path anywhere (ARCH §4 / GpuResource_SYS.h "never a hardcoded absolute path"). The staged
+# directory above stays the single source: the tests are handed it directly, the app gets a copy.
+add_custom_command(TARGET SanGenV2App POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${SANGEN_V2_SHADER_DIRECTORY}" "$<TARGET_FILE_DIR:SanGenV2App>/sangen_shaders"
+    COMMENT "Staging SanGen v2 GPU kernels beside the application")
 
 # add_sangen_test(<name> <source>...) — one acceptance-test executable, registered
 # with CTest and handed the shader directory as argv[1] (ignored by tests that do
@@ -347,3 +369,22 @@ add_sangen_test(ListWidgets_UI_Test
     src/ui/VirtualListWidget_UI_Test.cpp
     src/ui/DraggableListWidget_UI_Test.cpp)
 target_link_libraries(ListWidgets_UI_Test PRIVATE imgui)
+
+# M5-7 app shell, headless. One binary over three translation units driving a REAL Ui::Application
+# (its default recipe, its injected composite callback, its canvas binding, its atlas bridge) on the
+# Cpu twin: no window, no GL, so it asserts the SHELL's assembly rather than a replica of it. The
+# two IO translation units are the M5-4 synthetic-sanpack writer, reused so the icon-bridge check
+# runs against a genuine zip rather than a stub — which is also why it needs vendored miniz.
+add_sangen_test(ApplicationShell_UI_Test
+    src/ui/ApplicationShell_UI_Test.cpp
+    src/ui/ApplicationShell_DirtyTier_UI_Test.cpp
+    src/ui/ApplicationShell_IconBridge_UI_Test.cpp
+    src/io/AssetPipeline_TestSupport_IO_Test.cpp
+    src/io/AssetPipeline_TestDamage_IO_Test.cpp)
+target_include_directories(ApplicationShell_UI_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
+
+# M5-7 launch check. The one SanGen test that opens a real GLFW window and a real GL 4.3 context and
+# runs the shell's actual frame loop. Kept non-interactive by creating the window HIDDEN and closing
+# it after a fixed frame count; it SKIPS (exit 0, with a message) on a machine that has no context,
+# exactly as the GPU parity tests do.
+add_sangen_test(ApplicationShell_Window_UI_Test src/ui/ApplicationShell_Window_UI_Test.cpp)
