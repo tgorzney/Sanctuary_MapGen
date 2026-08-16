@@ -388,3 +388,28 @@ target_include_directories(ApplicationShell_UI_Test PRIVATE ${CMAKE_CURRENT_SOUR
 # it after a fixed frame count; it SKIPS (exit 0, with a message) on a machine that has no context,
 # exactly as the GPU parity tests do.
 add_sangen_test(ApplicationShell_Window_UI_Test src/ui/ApplicationShell_Window_UI_Test.cpp)
+
+# Tab-rebuild batch A — the shared widget library every rebuilt tab is assembled from. As with the
+# M5-1 core inputs, each test drives its widget's PURE logic (clamping, commit/cancel, the collapse
+# and picker state machines, the Levels transfer curve) with synthetic input, so none needs an imgui
+# frame, a window or a GL context. Each declares its own main(), so each is its own binary.
+add_sangen_test(Checkbox_UI_Test         src/ui/Checkbox_UI_Test.cpp)
+add_sangen_test(Combo_UI_Test            src/ui/Combo_UI_Test.cpp)
+add_sangen_test(SliderScalar_UI_Test     src/ui/SliderScalar_UI_Test.cpp)
+add_sangen_test(TextInput_UI_Test        src/ui/TextInput_UI_Test.cpp)
+add_sangen_test(ColorSwatch_UI_Test      src/ui/ColorSwatch_UI_Test.cpp)
+add_sangen_test(FilePathPicker_UI_Test   src/ui/FilePathPicker_UI_Test.cpp)
+add_sangen_test(Levels_UI_Test           src/ui/Levels_UI_Test.cpp)
+add_sangen_test(Section_UI_Test          src/ui/Section_UI_Test.cpp)
+
+# Tab-rebuild batch B — the Layer Editor and the Heightmap tab that hosts it. The editor's draw
+# path is split across five translation units under the ARCH §1.5 ceilings, but everything the
+# tests assert on (the scalar catalogue, the value mirrors, the row actions, the one-frame signal
+# order, the soil presets and the gravity bulk write) is PURE, so neither binary needs an imgui
+# frame, a window or a GL context. The erosion checks drive a real Pipeline::GenerationAssembler
+# (they edit constants reached through it) without ever running it.
+add_sangen_test(LayerEditor_UI_Test
+    src/ui/LayerEditor_UI_Test.cpp
+    src/ui/LayerEditor_Signals_UI_Test.cpp
+    src/ui/LayerEditor_Erosion_UI_Test.cpp)
+add_sangen_test(HeightmapTab_UI_Test      src/ui/HeightmapTab_UI_Test.cpp)

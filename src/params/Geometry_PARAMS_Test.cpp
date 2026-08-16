@@ -18,6 +18,16 @@ int main() {
     geometry.mapSize = 512; geometry.terrainMaxHeight = 0.0f;
     if (geometry.IsValid()) { std::printf("FAIL invalid height\n"); ++failures; }
 
+    // Tab rebuild B: terrainMinHeight is the promoted vertical floor (Constitution §8).
+    Geometry band;
+    if (band.terrainMinHeight != 0.0f) { std::printf("FAIL terrainMinHeight default\n"); ++failures; }
+    if (band.TerrainHeightSpan() != 128.0f) { std::printf("FAIL default span\n"); ++failures; }
+    band.terrainMinHeight = 32.0f;
+    if (band.TerrainHeightSpan() != 96.0f) { std::printf("FAIL raised floor span\n"); ++failures; }
+    if (!band.IsValid()) { std::printf("FAIL floor under ceiling is valid\n"); ++failures; }
+    band.terrainMinHeight = 200.0f;
+    if (band.IsValid()) { std::printf("FAIL floor above ceiling is invalid\n"); ++failures; }
+
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

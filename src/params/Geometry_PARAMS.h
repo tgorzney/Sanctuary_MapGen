@@ -12,6 +12,16 @@ struct Geometry {
     unsigned int seed             = 0u;      // generation seed
     float        terrainMaxHeight = 128.0f;  // vertical extent in game units (read from the
                                              // map, not hardcoded; entity Y is absolute)
+    float        terrainMinHeight = 0.0f;    // vertical FLOOR in game units — the height a
+                                             // normalized 0 maps to. Promoted to a settable
+                                             // parameter by the tab rebuild (Constitution §8);
+                                             // v1 carried it and never exposed it. NOTE: no
+                                             // generation stage consumes it yet — every stage
+                                             // still scales by terrainMaxHeight alone — so
+                                             // moving it is presentation-only until a stage
+                                             // work-order binds it. It is settings, not a
+                                             // second height scale: nothing may derive an
+                                             // extent from it without that work-order.
     float        worldUnitsPerCell = 1.0f;   // one heightfield cell -> game units (X/Z). Map
                                              // geometry, not a placement constant: Placement
                                              // emits positions with it, the preview maps an
@@ -25,7 +35,11 @@ struct Geometry {
         std::size_t side = static_cast<std::size_t>(VertexSize());
         return side * side;
     }
-    bool IsValid() const { return mapSize > 0 && terrainMaxHeight > 0.0f; }
+    // The band a normalized 0..1 height occupies, in game units.
+    float TerrainHeightSpan() const { return terrainMaxHeight - terrainMinHeight; }
+    bool IsValid() const {
+        return mapSize > 0 && terrainMaxHeight > 0.0f && terrainMaxHeight > terrainMinHeight;
+    }
 };
 
 } // namespace Params
