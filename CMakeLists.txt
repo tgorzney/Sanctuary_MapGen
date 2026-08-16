@@ -287,3 +287,17 @@ add_sangen_test(PreviewIntegration_UI_Test
     src/ui/PreviewIntegration_UI_Test.cpp
     src/ui/PreviewIntegration_DirtyTier_UI_Test.cpp
     src/ui/PreviewIntegration_Picking_UI_Test.cpp)
+
+# M5-1 core input widgets. Each test drives the widget's PURE logic (clamping, snapping, the
+# press/drag/release state machine) with a synthetic pointer sequence, so none of them needs an
+# imgui frame, a window, or a GL context — nor to link imgui. The ImDrawList draw path in the
+# matching .cpp is checked by eye against a live frame.
+add_sangen_test(RangeSliderWidget_UI_Test      src/ui/RangeSliderWidget_UI_Test.cpp)
+add_sangen_test(LabelledDialWidget_UI_Test     src/ui/LabelledDialWidget_UI_Test.cpp)
+add_sangen_test(RtToggleWidget_UI_Test         src/ui/RtToggleWidget_UI_Test.cpp)
+# The one test that closes the loop on the draw path: it runs the widgets in a real imgui frame
+# with synthetic mouse events and inspects the draw data — still no window, no GL, no backend. It
+# is therefore the ONLY SanGen test that links imgui. Kept out of add_sangen_test()'s uniform
+# recipe on purpose; the final imgui wiring belongs to the app shell (M5-7).
+add_sangen_test(CoreInputWidgets_LiveFrame_UI_Test src/ui/CoreInputWidgets_LiveFrame_UI_Test.cpp)
+target_link_libraries(CoreInputWidgets_LiveFrame_UI_Test PRIVATE imgui)
