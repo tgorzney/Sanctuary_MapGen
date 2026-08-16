@@ -15,6 +15,8 @@
 // configuration flattening, so producer and consumer can never drift.
 #pragma once
 #include "GenerationEnums_PARAMS.h"
+#include "StratumAppearance_PARAMS.h"
+#include "StratumSoilPhysics_PARAMS.h"
 
 namespace SanmapGen {
 namespace Params {
@@ -47,6 +49,15 @@ struct Stratum {
     float tintGreen  = 1.0f;
     float tintBlue   = 1.0f;
     float tileCount  = 1.0f;    // texture repeats across the map (tileSize)
+
+    // --- The member sub-structs (ARCH §7.1 "composition is allowed"). Split into their own
+    // headers only because one flat stratum type cannot stay inside the §1.5 ceiling; neither is a
+    // settings type a stage may reach on its own.
+    // Material identity, texture paths and the shader appearance the `.sanmap` round-trips.
+    StratumAppearance  appearance;
+    // The soil the sims run on. THE settings home for the five soil numbers (ARCH §7.1);
+    // `Proc::MaterialPhysics` is the runtime record they are pushed onto, not a rival store.
+    StratumSoilPhysics soilPhysics;
 };
 
 } // namespace Params

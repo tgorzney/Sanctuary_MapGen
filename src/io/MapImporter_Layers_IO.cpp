@@ -1,0 +1,95 @@
+// MapImporter_Layers_IO.cpp — `mapGeneratorData.GeoLayers` -> `Params::LayerStack`.
+// Layer: IO. The exact inverse of MapExporter_Layers_IO.cpp, key for key. Enum values are fenced
+// to their declared range (GenerationEnums_PARAMS.h), so a document from a newer build degrades to
+// the default member rather than casting a wild integer into an enum (Constitution §6).
+#include "MapImporter_Recipe_IO.h"
+#include "../params/MapRecipe_PARAMS.h"
+
+namespace SanmapGen {
+namespace Io {
+namespace {
+
+// The declared value counts of the enums this file reads — the fence, in one place.
+constexpr int noiseTypeCount        = 7;   // OpenSimplex2 .. None
+constexpr int fractalTypeCount      = 4;   // None .. PingPong
+constexpr int heightBlendModeCount  = 6;   // Add .. Minimum
+constexpr int geoLayerModeCount     = 2;   // Material, Shaper
+constexpr int simulationGroupingCount = 2; // Separate, Unified
+
+void ReadLayerJson(const nlohmann::json& json, Params::Layer& layer) {
+    ReadJsonText(json, "Name", layer.name);
+    ReadJsonBoolean(json, "Enabled", layer.bEnabled);
+    ReadJsonBoolean(json, "Locked", layer.bLocked);
+    ReadJsonInteger(json, "StratumIndex", layer.stratumIndex);
+
+    int enumerationValue = static_cast<int>(layer.noiseType);
+    if (ReadJsonEnumeration(json, "NoiseType", noiseTypeCount, enumerationValue))
+        layer.noiseType = static_cast<Params::NoiseType>(enumerationValue);
+    enumerationValue = static_cast<int>(layer.fractalType);
+    if (ReadJsonEnumeration(json, "FractalType", fractalTypeCount, enumerationValue))
+        layer.fractalType = static_cast<Params::FractalType>(enumerationValue);
+
+    ReadJsonFloat(json, "Frequency", layer.frequency);
+    ReadJsonInteger(json, "Octaves", layer.octaves);
+    ReadJsonFloat(json, "Gain", layer.gain);
+    ReadJsonFloat(json, "Lacunarity", layer.lacunarity);
+    ReadJsonFloat(json, "WeightedStrength", layer.weightedStrength);
+    ReadJsonFloat(json, "PingPongStrength", layer.pingPongStrength);
+    ReadJsonFloat(json, "CellularJitter", layer.cellularJitter);
+
+    ReadJsonFloat(json, "LandDensity", layer.landDensity);
+    ReadJsonFloat(json, "MountainDensity", layer.mountainDensity);
+    ReadJsonFloat(json, "PlateauDensity", layer.plateauDensity);
+    ReadJsonFloat(json, "RampDensity", layer.rampDensity);
+
+    ReadJsonFloat(json, "LevelsShadows", layer.levelsShadows);
+    ReadJsonFloat(json, "LevelsMidtones", layer.levelsMidtones);
+    ReadJsonFloat(json, "LevelsHighlights", layer.levelsHighlights);
+    ReadJsonFloat(json, "LevelsOutputBlack", layer.levelsOutputBlack);
+    ReadJsonFloat(json, "LevelsOutputWhite", layer.levelsOutputWhite);
+
+    enumerationValue = static_cast<int>(layer.blendMode);
+    if (ReadJsonEnumeration(json, "BlendMode", heightBlendModeCount, enumerationValue))
+        layer.blendMode = static_cast<Params::HeightBlendMode>(enumerationValue);
+    ReadJsonFloat(json, "Opacity", layer.opacity);
+    ReadJsonFloat(json, "HeightBlendContrast", layer.heightBlendContrast);
+    ReadJsonFloat(json, "HeightBlendMinimum", layer.heightBlendMinimum);
+    ReadJsonFloat(json, "HeightBlendMaximum", layer.heightBlendMaximum);
+}
+
+void ReadGeoLayerJson(const nlohmann::json& json, Params::GeoLayer& geoLayer) {
+    ReadJsonText(json, "Name", geoLayer.name);
+    ReadJsonBoolean(json, "Enabled", geoLayer.bEnabled);
+    int enumerationValue = static_cast<int>(geoLayer.mode);
+    if (ReadJsonEnumeration(json, "Mode", geoLayerModeCount, enumerationValue))
+        geoLayer.mode = static_cast<Params::GeoLayerMode>(enumerationValue);
+    ReadJsonBoolean(json, "ErodeBelow", geoLayer.bErodeBelow);
+    enumerationValue = static_cast<int>(geoLayer.blendMode);
+    if (ReadJsonEnumeration(json, "BlendMode", heightBlendModeCount, enumerationValue))
+        geoLayer.blendMode = static_cast<Params::HeightBlendMode>(enumerationValue);
+    ReadJsonInteger(json, "StratumIndex", geoLayer.stratumIndex);
+    if (!json.contains("Layers") || !json["Layers"].is_array()) return;
+    for (const nlohmann::json& layerJson : json["Layers"]) {
+        Params::Layer layer;
+        if (layerJson.is_object()) ReadLayerJson(layerJson, layer);
+        geoLayer.layers.push_back(layer);
+    }
+}
+
+} // namespace
+
+void ReadLayerStackJson(const nlohmann::json& generatorData, Params::LayerStack& outLayerStack) {
+    int groupingValue = static_cast<int>(outLayerStack.simulationGrouping);
+    if (ReadJsonEnumeration(generatorData, "SimulationGrouping", simulationGroupingCount, groupingValue))
+        outLayerStack.simulationGrouping = static_cast<Params::SimulationGrouping>(groupingValue);
+    if (!generatorData.contains("GeoLayers") || !generatorData["GeoLayers"].is_array()) return;
+    outLayerStack.geoLayers.clear();
+    for (const nlohmann::json& geoLayerJson : generatorData["GeoLayers"]) {
+        Params::GeoLayer geoLayer;
+        if (geoLayerJson.is_object()) ReadGeoLayerJson(geoLayerJson, geoLayer);
+        outLayerStack.geoLayers.push_back(geoLayer);
+    }
+}
+
+} // namespace Io
+} // namespace SanmapGen

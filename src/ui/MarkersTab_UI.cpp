@@ -1,8 +1,9 @@
-// MarkersTab_UI.cpp — the imgui composition of the marker-rule tab. Layer: UI.
-// Shared widgets only: VirtualList for the rule list, RangeSlider/LabelledDial for every scalar,
-// IconGrid for the picker. No ImGui::SliderFloat/DragFloat/VSliderFloat in this file.
+// MarkersTab_UI.cpp — the imgui composition of the marker tab. Layer: UI.
+// Shared widgets only: DraggableList for the procedural rule stack, VirtualList for the placed
+// markers, IconGrid for the pickers, Section/Checkbox/Combo/RangeSlider/Dial for the scalars.
+// No ImGui::SliderFloat / DragFloat / VSliderFloat in this file.
 #include "MarkersTab_UI.h"
-#include "VirtualListWidget_UI.h"
+#include "DraggableListWidget_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
 #include "imgui.h"
@@ -12,48 +13,56 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-// The ONE thing a tab does with a commit. WHICH tier it becomes is the driver's derivation from
-// the stage parameter hashes, never this call site's decision.
-void NotifyChange(bool bCommitted, Pipeline::PreviewDriver* previewDriver) {
-    if (bCommitted && previewDriver != nullptr) previewDriver->NotifyParametersChanged();
-}
-
-// Checkboxes and dropdowns have no shared-library equivalent to compose from (M5-1/2/3 built
-// scalars, ranges, lists, ramps, icon grids). Neither has a drag to defer: both commit at once.
-void DrawBooleanSetting(const char* label, bool& value, Pipeline::PreviewDriver* previewDriver) {
-    bool bValue = value;
-    if (!ImGui::Checkbox(label, &bValue)) return;
-    value = bValue;
-    NotifyChange(true, previewDriver);
-}
-
-const char* const categoryNames[] = { "Generic", "Spawn", "Alloys", "Expansion" };
-
-// The rule list. Selecting a row reloads the mirrors, so the detail controls below always show
-// the rule the list highlights.
-void DrawRuleList(std::vector<Params::MarkerRule>& markerRules, MarkersTabState& state,
-                  Pipeline::PreviewDriver* previewDriver) {
-    char rowLabel[40] = { 0 };
-    VirtualList<Params::MarkerRule>::Render(
-        "markerRules", markerRules, state.ruleRowHeight, state.ruleListHeight,
-        [&](int rowIndex, const Params::MarkerRule& rule) {
-            ImGui::PushID(rowIndex);
-            DrawBooleanSetting("##enabled", markerRules[static_cast<std::size_t>(rowIndex)].bEnabled,
-                               previewDriver);
-            ImGui::SameLine();
+// The procedural rule STACK. It is a DraggableList, not a VirtualList: rule order decides which
+// rule claims a contested position first, so every row is a drop target (and the set is tens of
+// rows, not tens of thousands — that is what the placed-marker list is for).
+// MUTATES NOTHING while drawing: the signal is applied after the list has closed.
+DraggableListSignal DrawRuleList(const std::vector<Params::MarkerRule>& markerRules,
+                                 const MarkersTabState& state) {
+    char rowLabel[56] = { 0 };
+    return DraggableList<Params::MarkerRule>::Render(
+        "markerRules", markerRules,
+        [&](int rowIndex) {
+            const Params::MarkerRule& rule = markerRules[static_cast<std::size_t>(rowIndex)];
             std::snprintf(rowLabel, sizeof(rowLabel), "%d: %s x%d", rowIndex,
-                          categoryNames[static_cast<int>(rule.category)], rule.count);
-            if (ImGui::Selectable(rowLabel, rowIndex == state.selectedRuleIndex)) {
-                state.selectedRuleIndex = rowIndex;
-                LoadMarkerRuleValues(rule, state);
-            }
-            ImGui::PopID();
-        });
+                          MarkerCategoryLabel(rule.category), rule.count);
+            DraggableListRow row;
+            row.label    = rowLabel;
+            row.bVisible = rule.bEnabled;
+            row.bLocked  = rule.bHidden;
+            return row;
+        },
+        [](int) {},                       // header-only rows: the detail sections are below
+        state.selectedRuleIndex);
 }
 
-// Add / remove, applied AFTER the list is drawn so the vector never moves under the clipper.
-void DrawRuleListButtons(std::vector<Params::MarkerRule>& markerRules, MarkersTabState& state,
-                         Pipeline::PreviewDriver* previewDriver) {
+// Applies one frame of list traffic. Reorder and Delete are the shared structural appliers; the
+// two toggles belong to fields this tab owns, and Select is pure tab state.
+bool ApplyRuleListSignal(std::vector<Params::MarkerRule>& markerRules, MarkersTabState& state,
+                         const DraggableListSignal& signal) {
+    const int rowIndex = signal.sourceRowIndex;
+    const bool bRowValid = rowIndex >= 0 && rowIndex < static_cast<int>(markerRules.size());
+    if (signal.kind == DraggableListSignalKind::Select && bRowValid) {
+        state.selectedRuleIndex = rowIndex;
+        LoadMarkerRuleValues(markerRules[static_cast<std::size_t>(rowIndex)], state);
+        LoadMarkerRuleEnumIndices(markerRules[static_cast<std::size_t>(rowIndex)], state.ruleDetail);
+        return false;
+    }
+    if (signal.kind == DraggableListSignalKind::ToggleVisibility && bRowValid) {
+        markerRules[static_cast<std::size_t>(rowIndex)].bEnabled =
+            !markerRules[static_cast<std::size_t>(rowIndex)].bEnabled;
+        return true;
+    }
+    if (signal.kind == DraggableListSignalKind::ToggleLock && bRowValid) {
+        markerRules[static_cast<std::size_t>(rowIndex)].bHidden =
+            !markerRules[static_cast<std::size_t>(rowIndex)].bHidden;
+        return true;
+    }
+    return ApplyDraggableListSignal(markerRules, signal);
+}
+
+// Add / remove, applied AFTER the list is drawn so the vector never moves under a live row.
+bool DrawRuleListButtons(std::vector<Params::MarkerRule>& markerRules, MarkersTabState& state) {
     bool bRecipeMoved = false;
     if (ImGui::Button("Add Rule")) { markerRules.push_back(Params::MarkerRule()); bRecipeMoved = true; }
     ImGui::SameLine();
@@ -62,59 +71,38 @@ void DrawRuleListButtons(std::vector<Params::MarkerRule>& markerRules, MarkersTa
         bRecipeMoved = true;
     }
     if (bRecipeMoved) state.selectedRuleIndex = static_cast<int>(markerRules.size()) - 1;
-    NotifyChange(bRecipeMoved, previewDriver);
+    return bRecipeMoved;
 }
 
-// The gates: what terrain a marker may land on, and how many land.
-void DrawRuleGates(Params::MarkerRule& rule, MarkersTabState& state,
-                   Pipeline::PreviewDriver* previewDriver) {
-    int categoryIndex = static_cast<int>(rule.category);
-    if (ImGui::Combo("Category", &categoryIndex, categoryNames, IM_ARRAYSIZE(categoryNames))) {
-        rule.category = static_cast<Params::MarkerCategory>(categoryIndex);
-        NotifyChange(true, previewDriver);
-    }
-    DrawBooleanSetting("Hidden (still generated for clearance/fairness)", rule.bHidden, previewDriver);
-    WidgetChange change = DrawRangeSlider("Slope Gate (degrees)", state.slopeValues, state.slopeBounds,
-                                          state.slopeToggle, WidgetStyle(), "%.1f");
-    if (change.bValueChanged) StoreMarkerRuleValues(state, rule);
-    NotifyChange(change.bCommitted, previewDriver);
-    change = DrawRangeSlider("Height Gate (normalized)", state.heightValues, state.heightBounds,
-                             state.heightToggle);
-    if (change.bValueChanged) StoreMarkerRuleValues(state, rule);
-    NotifyChange(change.bCommitted, previewDriver);
-    NotifyChange(DrawLabelledDial("Obstacle Distance Minimum", rule.obstacleDistanceMinimum,
-                                  state.obstacleDistanceRange, state.obstacleDistanceToggle,
-                                  WidgetStyle(), "%.2f").bCommitted, previewDriver);
-}
-
-void DrawRuleQuantity(Params::MarkerRule& rule, MarkersTabState& state,
-                      Pipeline::PreviewDriver* previewDriver) {
-    DrawBooleanSetting("Use Density (off = fixed count)", rule.bUseDensity, previewDriver);
-    WidgetChange change = DrawLabelledDial("Count", state.countValue, state.countRange,
-                                           state.countToggle, WidgetStyle(), "%.0f");
-    if (change.bValueChanged) StoreMarkerRuleValues(state, rule);
-    NotifyChange(change.bCommitted, previewDriver);
-    NotifyChange(DrawLabelledDial("Density", rule.density, state.densityRange, state.densityToggle,
-                                  WidgetStyle(), "%.4f").bCommitted, previewDriver);
-    NotifyChange(DrawLabelledDial("Clearance Spacing", rule.clearanceSpacing, state.clearanceSpacingRange,
-                                  state.clearanceSpacingToggle, WidgetStyle(), "%.2f").bCommitted, previewDriver);
-    DrawBooleanSetting("Use Global Symmetry", rule.bSymmetryUseGlobal, previewDriver);
-}
-
-// The template (`tpId`) the rule spawns: typed here, browsed in the resident atlas beside it.
-void DrawTemplatePicker(Params::MarkerRule& rule, MarkersTabState& state,
-                        Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
-    // The field writes the tpId live and commits when it is left — the RT-toggle contract, in the
-    // one control the library has no widget for.
-    ImGui::InputText("Template Id (tpId)", rule.transform.templateIdentifier,
-                     IM_ARRAYSIZE(rule.transform.templateIdentifier));
-    NotifyChange(ImGui::IsItemDeactivatedAfterEdit(), previewDriver);
-    if (iconManifest == nullptr) {
-        ImGui::TextUnformatted("No resident icon atlas: type the template id above.");
+// The whole procedural stack: the list, its buttons, and the selected rule's sections.
+void DrawRuleStack(Params::MapRecipe& recipe, MarkersTabState& state,
+                   Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
+    if (!DrawSectionBegin("Procedural Rules", state.ruleStackSection)) return;
+    const DraggableListSignal signal = DrawRuleList(recipe.markerRules, state);
+    bool bRecipeMoved = signal.bHasSignal() && ApplyRuleListSignal(recipe.markerRules, state, signal);
+    bRecipeMoved = DrawRuleListButtons(recipe.markerRules, state) || bRecipeMoved;
+    NotifyPlacementChange(bRecipeMoved, previewDriver);
+    ImGui::Separator();
+    Params::MarkerRule* const rule = SelectedMarkerRule(recipe.markerRules, state);
+    if (rule == nullptr) {
+        ImGui::TextUnformatted("Select a marker rule to edit it.");
+        DrawSectionEnd();
         return;
     }
-    DrawIconGrid("Template Atlas", *iconManifest, state.iconGridState, state.iconGridHeight);
-    ImGui::Text("Selected icon id: %d", state.iconGridState.selectedIconId);
+    if (!state.slopeToggle.IsCommitDeferred() && !state.heightToggle.IsCommitDeferred()
+        && !state.countToggle.IsCommitDeferred()) LoadMarkerRuleValues(*rule, state);
+    DrawMarkerRuleGates(*rule, state, previewDriver);
+    DrawMarkerRuleQuantity(*rule, state, previewDriver);
+    DrawMarkerRuleArea(*rule, state.ruleDetail, previewDriver);
+    DrawMarkerRuleFocus(*rule, state.ruleDetail, previewDriver);
+    DrawPlacementGateSection(rule->maskStratumIndex, rule->maskWeightMinimum, rule->mapEdgePadding,
+                             state.gate, previewDriver);
+    DrawPlacementSymmetryAxes("markerSymmetry", rule->bSymmetryUseGlobal, rule->symmetryMask,
+                              previewDriver);
+    DrawPlacementTransformSection(rule->transform, state.transform, previewDriver);
+    DrawPlacementTemplatePicker(rule->transform, state.iconGridState, state.iconGridHeight,
+                                iconManifest, previewDriver);
+    DrawSectionEnd();
 }
 
 } // namespace
@@ -127,22 +115,12 @@ Params::MarkerRule* SelectedMarkerRule(std::vector<Params::MarkerRule>& markerRu
 }
 
 void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
-                    Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
+                    Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                    const Data::PlacementInstances* placedMarkers) {
     ImGui::PushID("markersTab");
-    DrawRuleList(recipe.markerRules, state, previewDriver);
-    DrawRuleListButtons(recipe.markerRules, state, previewDriver);
-    ImGui::Separator();
-    Params::MarkerRule* const rule = SelectedMarkerRule(recipe.markerRules, state);
-    if (rule == nullptr) {
-        ImGui::TextUnformatted("Select a marker rule to edit its gates.");
-        ImGui::PopID();
-        return;
-    }
-    if (!state.slopeToggle.IsCommitDeferred() && !state.heightToggle.IsCommitDeferred()
-        && !state.countToggle.IsCommitDeferred()) LoadMarkerRuleValues(*rule, state);
-    DrawRuleGates(*rule, state, previewDriver);
-    DrawRuleQuantity(*rule, state, previewDriver);
-    DrawTemplatePicker(*rule, state, previewDriver, iconManifest);
+    DrawMarkersTabGlobals(state.globals, iconManifest);
+    DrawRuleStack(recipe, state, previewDriver, iconManifest);
+    DrawPlacedMarkerList(placedMarkers, state.placedList);
     ImGui::PopID();
 }
 
