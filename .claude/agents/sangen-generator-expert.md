@@ -39,8 +39,10 @@ making it fast.
   the Separate/Unified sim toggle; per-material soil physics; additive-thickness
   volume; baking; stratum masks (8-in-2-TGA + base). Erosion is per-layer
   (`ErodeBeneath`), not one global pass.
-- The unified `MaterialMasks` weight field; the dirty-hash dependency order (noise →
-  blend → mask → erosion → thermal → flow → placement → bake).
+- The two split weight fields, `materialProportions` and `surfaceStratumWeights` (§7.2
+  retired the single `MaterialMasks`/"mask" name); the dirty-hash dependency order
+  (noise → blend → erosion → thermal → flow → **mask** → placement → bake — §7.4 moved
+  Mask to run after the sims, not between blend and erosion).
 - Each stage is ONE kernel with a CPU+GPU pair sharing one math source; you specify
   the algorithm and accuracy class, the Compute Optimization Expert realizes the
   backends. Placement/markers must stay AI-analyzable (`AI_HOSTCLIENT_SPEC`).

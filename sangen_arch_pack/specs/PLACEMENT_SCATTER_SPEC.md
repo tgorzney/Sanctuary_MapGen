@@ -84,6 +84,18 @@ planned resource type (ruled, `SANMAP_FORMAT_SPEC` Correction 7) — not the v1
 invention flagged at `IO_PARITY_REPORT.md` Decision #5 (D-9); keep all three
 Plasma-named fields.
 
+**C++ shape (ARCH §11): `Params::GlobalMarkerSettings`**, `GlobalMarkerSettings_PARAMS.h`
+— a new standalone file, sibling of `MarkerRule_PARAMS.h` (map-wide default, not a
+member of `MarkerRule`, matching the global-vs-per-rule split above). Fields:
+`iconNameAlloy`/`iconNamePlasma`/`iconNameSpawn` (atlas-manifest name keys,
+`ASSET_LOADING_SPEC`), `colorAlloy`/`colorPlasma`/`colorSpawn` (`float[4]`),
+`scaleAlloy`/`scalePlasma`/`scaleSpawn` — see `SANMAP_FORMAT_SPEC`'s
+`GlobalMarkerSettings` paragraph and ARCH §11 for the full shape and naming
+derivation. `MapRecipe_PARAMS.h` gains `GlobalMarkerSettings globalMarkerSettings;`
+as a flat sibling of `markerRules` (shape only — wiring is a separate coder
+work-order); the future `MarkersStack` Group/Layer wrapper may fold this inside it
+later, not designed here.
+
 ## Transform & symmetry
 `MarkerType_Transform.h` (orphan copy) shows the intended model: `Position[3]`,
 `Rotation[4]` quaternion, `Scale[3]`, `Color[4]`, plus `SymmetryId`. `MarkerSymmetry`

@@ -24,9 +24,11 @@ words**. No abbreviations, no truncations, no single-letter names.
   `frequency` (not `freq`), `config` (not `cfg`), `blueprintPath` (not `bp`),
   `radiusSeed` (not `rSeed`).
 - **Only exceptions:** file extensions (`.sanmap`, `.dds`, `.glsl`); identifiers the
-  file format or game dictates (`tpId`, `.sanmap` JSON keys, stratum names) — verbatim
-  so import/export round-trips; and the universally-standard hardware acronyms `Cpu`
-  and `Gpu`. Our own code around them spells fully.
+  file format or game dictates — `.sanmap` JSON keys, stratum names, and the
+  format-derived PARAMS fields §1.8 governs — verbatim so import/export round-trips
+  (§1.8 also lists its own named exceptions, e.g. `tpId` → `templateIdentifier`, the
+  spelling actually used everywhere in `src/`); and the universally-standard hardware
+  acronyms `Cpu` and `Gpu`. Our own code around them spells fully.
 - **Booleans keep the `b` prefix** (`bNeedsMapUpdate`) — retained precedent; the word
   after it is still fully spelled.
 - **A name must state the quantity, not the role.** A field holding a physical
@@ -95,8 +97,9 @@ naming law: **camelCase top-level key = game-native field** (`width`, `armies`,
 - This governs `.sanmap` **top-level JSON keys and format-collection member keys
   only**. It does not change §1.1 (identifiers the format/game dictates stay
   verbatim) or the C++ naming law inside `src/`; a PARAMS type's C++ member name
-  still follows §1.1 (`camelCase`/`b` prefix) regardless of how the same value is
-  spelled at the JSON top level.
+  still follows §1.1/§1.8 (`camelCase`/`b` prefix, and §1.8's data-kind rule for
+  format-derived fields) regardless of how the same value is spelled at the JSON
+  top level.
 
 ### 1.7 IO migration file naming — schema version steps (ratifies `IO_MIGRATION_SPEC`)
 A `.sanmap` schema version bump (`SanGenVersion`, `SANMAP_FORMAT_SPEC`) is carried
@@ -111,6 +114,40 @@ JSON-transform primitive) is pure addition. **No self-registration** — static-
 is a real failure mode and an explicit manifest line beats implicit discovery
 (AI-legibility). Full contract, the runner, and the shared `JsonPrimitives_IO.h`
 toolkit: `IO_MIGRATION_SPEC`.
+
+### 1.8 PARAMS field naming for format-derived types — governed by data KIND, not by key presence
+Ratified alongside `ENTITY_AUTHORING_PARAMS_SPEC` (`Params::Army`/`UnitGroup`/`UnitTransform`/
+`MapArea`). A PARAMS field's naming is governed by **what kind of data it is**, not by whether a
+`.sanmap` format key of a similar name happens to exist.
+
+- **Pass-through, human-authored, verbatim entity data.** No PROC stage computes or reinterprets
+  the value — round-trip fidelity is the field's entire purpose. Such a field uses **the format's
+  own spelling by default**, converted only for case (`camelCase`) and the §1.1 `b`-boolean
+  prefix. Governs `Army`, `UnitGroup`, `UnitTransform`, `MapArea`
+  (`ENTITY_AUTHORING_PARAMS_SPEC`) and any future type in that same hand-authored-entity family.
+- **SanGen's own generative recipe/setting.** A PROC stage computes, derives, or reshapes the
+  value, so the field keeps **SanGen's own descriptive name** even where a format key of similar
+  meaning exists — already the practice (`Params::Water::waterLevelMaximum` vs. the format's
+  `waterLevel`; `Params::Geometry::worldUnitsPerCell`, which has no format analog at all) and does
+  not change here.
+- **Named exceptions inside the pass-through bucket** — verbatim would collide with an established
+  SanGen quantity, or is too generic to stay AI-legible:
+  - **`Area.height` → `length`.** The format's `height` here means Z-extent/depth, not
+    elevation — "height" is otherwise universally elevation in this codebase.
+  - **`Area.x`/`Area.y` → `originX`/`originZ`.** The format's 2D texture-space origin vs.
+    SanGen's `positionX/Y/Z` world convention, where `y` reads as elevation.
+  - **`Army.faction` keeps the word but becomes `enum class Faction`**, not a raw `int` —
+    matches the existing `MarkerCategory`/`MarkerPriority` pattern of retyping a format-style
+    category int at the JSON boundary (`MarkerRule_PARAMS.h`).
+  - **`tpId`/`tpid` → `templateIdentifier`.** Already the established spelling everywhere it is
+    actually used as a C++ member (`ScatterTransform_PARAMS.h`, `PlacementInstance_DATA.h`).
+    This **supersedes** §1.1's naming of `tpId` itself as the verbatim exception — the literal
+    spelling `tpId` has never actually shipped as a C++ member anywhere in `src/`.
+- **A `Dictionary<string, X>` becomes `std::vector<X>` with the dictionary key folded in as a
+  `name` field on `X`.** Not new design — the existing choice for `Area`
+  (`AreasTab_List_UI.h`'s `MapAreaRectangle`); applied one level deeper for `Army.groups` and
+  `UnitGroup.units`/`UnitGroup.groups` (`ENTITY_AUTHORING_PARAMS_SPEC`). A PARAMS-shape
+  consequence of the naming decision above, not a separate rule.
 
 ---
 
@@ -665,3 +702,109 @@ one caller happened to need, in whatever layer that caller lived — which is pr
 the v1 duplicate `StratumSettings` families (hit-list #1) came to exist. New types get a
 work-order and, where the shape is not obvious, an ARCH ruling (§8.2, §8.3 are those
 rulings).
+
+---
+
+## 9. `Params::Army` / `UnitGroup` / `UnitTransform` / `MapArea` (ARCH ruling, ratifies `ENTITY_AUTHORING_PARAMS_SPEC`)
+
+Fills the gap standing since M1: `MapRecipe` has always held procedural placement RULES
+(`MarkerRule`/`PropRule`/`DecalRule`/`UnitRule`, §7.1-adjacent, `PLACEMENT_SCATTER_SPEC`) but
+had no PARAMS home for **manually-placed, human-authored** entity data — pre-placed army
+units and named areas — even though `.sanmap` has real, live sections for both (`armies`,
+`areas`) and v1 round-tripped both. Confirmed by `work_orders/RECIPE_PARITY_BACKLOG.md` Tier 1
+and the standing §8.4-compliant scope notes in `ArmiesTab_UI.h` / `AreasTab_UI.h`.
+
+- **Naming derivation:** §1.8 (new naming law this ruling also adds).
+- **Full field lists, the recursive-tree structural ruling, the `legacyTypeTag`
+  passthrough ruling, and the live-engine out-of-scope note:** `ENTITY_AUTHORING_PARAMS_SPEC`.
+- **These are pass-through types, not procedural rules** — no PROC stage computes or
+  reinterprets any field on `Army`/`UnitGroup`/`UnitTransform`/`MapArea`; they exist purely
+  for round-trip fidelity through `IO` and direct authoring through `UI`. They are therefore
+  distinct from, and additive to, `Params::UnitRule` (which remains the procedural scatter
+  rule for armies) — both are legal producers into the same `armies[]` roster.
+- **Shape only, not wiring.** This ruling and its spec fix the C++ shape of the four new
+  types. Adding `std::vector<Army> armies;` / `std::vector<MapArea> areas;` to
+  `MapRecipe_PARAMS.h`, the matching `IO` round-trip, and retiring the two UI scope notes
+  are a separate coder work-order (`ENTITY_AUTHORING_PARAMS_SPEC` "Where these land").
+
+---
+
+## 10. `Params::Atmosphere` (ARCH ruling, ratifies `ATMOSPHERE_PARAMS_SPEC`)
+
+Realizes the `Atmosphere_PARAMS` placeholder §5.1 already named in the `GenerationParams`
+dismemberment list, by promoting the already-field-complete, 49-field `Ui::AtmosphereSettings`
+(`src/ui/AtmosphereSettings_UI.h`) to a real recipe type. Confirmed against
+`SANMAP_FORMAT_SPEC` "Top-level map fields" (Lighting / Background-fog / Global-wind) and the
+legacy exporter (`Export_Metadata.cpp:149-221`): every field is an existing, live, camelCase,
+format-native `.sanmap` key (or its already-established legible expansion, e.g. `sunRA` →
+`sunRightAscension`) — **not** a new SanGen-owned schema-v3 section, so §1.6 does not apply and
+no `IO_MIGRATION_SPEC` version gate is needed (the keys already round-trip today; this only
+gives them a `Params::` home).
+
+- **Shape:** one `Params::Atmosphere` aggregator (`sun`, `skylight`, `exposureSkybox`,
+  `legacyFog`, `backgroundFog`, `heightFog`, `linearFog`, `globalWind`) composed of 8 named
+  sub-structs — composition per §7.1 ("composition is allowed; rival top-level types are not"),
+  the same pattern as `Stratum`/`StratumAppearance`/`StratumSoilPhysics`.
+- **File split — RULED: all 8 sub-structs get their own `_PARAMS` header, none merged into
+  the aggregator**, even the 2-3 field ones (`AtmosphereSkylight_PARAMS.h`,
+  `AtmosphereGlobalWind_PARAMS.h`). `Water_PARAMS.h` (4 fields, its own file) is standing
+  precedent that a small struct still gets its own file in this codebase; uniform
+  one-struct-per-file beats an asymmetric "some inlined, some not" layout. Full reasoning:
+  `ATMOSPHERE_PARAMS_SPEC`.
+- **The one retype:** `skyboxIntensityModeIndex` (raw `int`) becomes
+  `skyboxIntensityMode : SkyboxIntensityMode`
+  (`enum class SkyboxIntensityMode { Exposure, Lux, Multiplier }`, added to
+  `GenerationEnums_PARAMS.h`) — a §1.8 "retype a format-style category int" call, same
+  precedent as `Army::faction`/`MarkerRule::category`. The `Index` suffix is dropped on
+  retype, matching how `faction`/`category` are named (not `factionIndex`/`categoryIndex`).
+  Every other field name is copied **verbatim** from `AtmosphereSettings_UI.h` — this is the
+  only rename in the whole promotion.
+- **Not promoted:** the UI-only dropdown label array (`skyboxIntensityModeLabels`) and the
+  slot-addressing helpers (`AtmosphereColorAt`/`AtmosphereVectorAt`/`AtmosphereTextAt` and
+  their slot enums) are `Ui::AtmosphereSettings`-specific widget-table plumbing, not settings
+  — they stay in `UI` (Constitution §1) and are not ported.
+- **Shape only, not wiring.** `MapRecipe_PARAMS.h` gaining `Atmosphere atmosphere;` (flat
+  sibling of `water`), the `GenerationEnums_PARAMS.h` edit, the matching `IO` round-trip
+  against the already-live `mapdef["sun*"]`/`["skylight*"]`/`["skybox*"]`/`["fog*"]`/
+  `["background*"]`/`["heightFog*"]`/`["linearFog*"]`/`["windSpeed"/"windDirection"]` keys,
+  and retiring `AtmosphereSettings_UI.h`'s promotion scope note are a separate coder
+  work-order (`ATMOSPHERE_PARAMS_SPEC` "Where these land").
+
+## 11. `Params::GlobalMarkerSettings` (ARCH ruling, completes `SANMAP_FORMAT_SPEC` Correction 7)
+
+Fills the C++-shape gap in the already-ratified `.sanmap` `GlobalMarkerSettings` sub-key
+(`SANMAP_FORMAT_SPEC` Correction 7, `PLACEMENT_SCATTER_SPEC` "IO wrapping") — map-wide default
+icon/color/scale for the three resource marker kinds (Alloy/Plasma/Spawn), distinct in scope
+from any single `Params::MarkerRule` (the same global-vs-per-rule distinction as
+`Symmetry`/`SlopeDefaults` vs. their per-rule overrides). Confirmed against the legacy
+reference `core/Parameters.h:79-87`.
+
+- **New standalone file, `GlobalMarkerSettings_PARAMS.h`, sibling of `MarkerRule_PARAMS.h`**
+  — not a member of `MarkerRule`, because it is map-scoped, not per-rule.
+- **Shape:**
+  ```cpp
+  struct GlobalMarkerSettings {
+      std::string iconNameAlloy  = "Alloy";
+      std::string iconNamePlasma = "Plasma";
+      std::string iconNameSpawn  = "Spawn";
+      float colorAlloy[4]  = {0.8f, 0.8f, 0.2f, 1.0f};
+      float colorPlasma[4] = {0.2f, 0.8f, 0.8f, 1.0f};
+      float colorSpawn[4]  = {0.8f, 0.2f, 0.2f, 1.0f};
+      float scaleAlloy  = 0.17f;
+      float scalePlasma = 0.17f;
+      float scaleSpawn  = 0.17f;
+  };
+  ```
+- **Naming:** icon fields are `iconName*`, not `icon*Path` — they are atlas-manifest name
+  keys (`name → { page, uv-rect }`, `ASSET_LOADING_SPEC`), not file paths. Color/scale fields
+  drop the redundant `Marker` prefix the legacy globals (`MarkerColorAlloy`,
+  `MarkerScaleAlloy`, …) carried — the type's own name already scopes them, and the bare
+  `color*`/`scale*` reads cleanly as `Params::GlobalMarkerSettings::colorAlloy`.
+- **`Plasma` = Energy, a real planned resource type** (already ruled, `SANMAP_FORMAT_SPEC`
+  Correction 7) — not the v1 invention `IO_PARITY_REPORT.md` Decision #5 flagged; keep all
+  three Plasma-named fields.
+- **Shape only, not wiring.** `MapRecipe_PARAMS.h` gaining
+  `GlobalMarkerSettings globalMarkerSettings;` (flat sibling of `markerRules`, for now — the
+  future `MarkersStack` Group/Layer wrapper, `PLACEMENT_SCATTER_SPEC`/`SANMAP_FORMAT_SPEC`
+  Correction 7, may fold this inside it later; not designed here) and the matching `IO`
+  round-trip are a separate coder work-order.

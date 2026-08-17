@@ -22,6 +22,10 @@ layer's import/export must target this exactly.
   volumetrics, position), skylight*, skybox* (TextureLoader + intensity mode),
   fog* volumetrics, exposure.
 - **Global wind:** windSpeed, windDirection.
+- **`Params::Atmosphere` (`ATMOSPHERE_PARAMS_SPEC`)** is the C++ recipe home
+  for the whole Lighting / Background-fog / Global-wind field set above
+  (sun/skylight/exposure+skybox/legacy fog/background fog/height fog/linear
+  fog/global wind) — a field-level promotion, not a new schema section.
 
 ## Entity collections (the distinct domains)
 - `areas`: Dictionary<string, Area{ x, y, width, height }>
@@ -305,6 +309,17 @@ work-order.
 **Ruled: `Plasma` = Energy, a real planned resource type, not the v1 invention
 flagged in `IO_PARITY_REPORT.md` Decision #5** — keep all three Plasma-named
 fields.
+
+**C++ shape (ARCH §11): `Params::GlobalMarkerSettings`**, a new standalone
+`GlobalMarkerSettings_PARAMS.h`, sibling of `MarkerRule_PARAMS.h` (map-wide, not
+per-rule — same global-vs-per-rule scope split as `Symmetry`/`SlopeDefaults`
+above). Field naming diverges from the raw JSON key spelling above:
+`GlobalIconAlloy`/`Plasma`/`Spawn` → `iconNameAlloy`/`iconNamePlasma`/`iconNameSpawn`
+(atlas-manifest name keys, `ASSET_LOADING_SPEC` — not file paths, hence not
+`icon*Path`); `MarkerColorAlloy`/`Plasma`/`Spawn` → `colorAlloy`/`colorPlasma`/
+`colorSpawn` and `MarkerScaleAlloy`/`Plasma`/`Spawn` → `scaleAlloy`/`scalePlasma`/
+`scaleSpawn` (the redundant `Marker` prefix is dropped — the type's own name
+already scopes them). Full shape and rationale: ARCH §11.
 
 ### `DetailNormal` — Correction 8
 ```

@@ -32,8 +32,9 @@ inside the ARCH.
 3. The target code.
 
 ## How you code (non-negotiable, from the ARCH)
-- **Naming law (§1):** fully-spelled, no abbreviations (except `tpId`, extensions,
-  `Cpu`/`Gpu`); layer **suffix** matches the folder (`_MATH`/`_DATA`/`_PARAMS`/`_PROC`/
+- **Naming law (§1):** fully-spelled, no abbreviations (except extensions, `Cpu`/`Gpu`;
+  a game/format-dictated identifier spells out as `templateIdentifier`, never `tpId` —
+  §1.8); layer **suffix** matches the folder (`_MATH`/`_DATA`/`_PARAMS`/`_PROC`/
   `_PIPELINE`/`_IO`/`_UI`/`_SYS`); `b`-prefixed booleans; math `Math_<Domain>`; CPU/GPU
   paired by shared base name (`Erosion_PROC.cpp` + `Erosion_PROC.glsl`).
 - **Size ceilings (§1.5):** soft 100 / hard 150 lines, functions ≤40, one primary type

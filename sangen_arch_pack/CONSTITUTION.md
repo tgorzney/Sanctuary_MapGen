@@ -42,9 +42,11 @@ does not own (ARCH §3.4; a sim owning and evolving its own field is the one exc
 Literal, fully-spelled, deterministic names — **no abbreviations**. The layer tag is a
 **suffix** (`_MATH`, `_DATA`, `_PARAMS`, `_PROC`, `_PIPELINE`, `_IO`, `_UI`, `_SYS`;
 `*Compute`/`.glsl` for GPU kernels), TGUE-style. A name states the **quantity**, not the
-role. The full suffix system, the no-abbreviation rule + its exceptions (`tpId`,
-extensions, `Cpu`/`Gpu`), CPU/GPU pairing, and file-size ceilings (soft 100 / hard 150
-lines, functions ≤40 lines) are **resolved in ARCH §1–2**.
+role. The full suffix system, the no-abbreviation rule + its exceptions (format-dictated
+identifiers, extensions, `Cpu`/`Gpu`), CPU/GPU pairing, and file-size ceilings (soft 100 /
+hard 150 lines, functions ≤40 lines) are **resolved in ARCH §1–2** — including the
+data-KIND-governed naming rule for format-derived PARAMS types (ARCH §1.8) and its own
+named exceptions (e.g. the format's `tpId` is spelled `templateIdentifier` in C++).
 
 ## 3. Optimization pillars
 Maximum performance is law. Confirmed rules: prefer multiplying a precomputed
