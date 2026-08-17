@@ -2,7 +2,8 @@
 // placement tabs SHARE. This is the test that earns the shared file: the symmetry mask arithmetic
 // and the transform mirrors are asserted ONCE, so Markers / Armies / Props / Areas cannot drift
 // apart the way the v1 per-tab duplicates did. Pure logic only — no imgui frame, window or GL.
-// NOT YET REGISTERED IN CMake — WO C4 does not own CMakeLists.txt (gate CD-int registers it).
+// Registered with CTest as its own binary by gate CD-int (CMakeLists.txt "Tab-rebuild batch C4"):
+// it is nobody's tab, so it is nobody's translation unit either.
 #include "PlacementRuleSections_UI.h"
 #include <cstdio>
 

@@ -56,9 +56,12 @@ inline void MarkerCursorPosition(Application& application, std::size_t markerInd
     cursorY = (static_cast<float>(pixelY) + 0.5f) * regionPerPixel;
 }
 
-// Defined in the sibling test translation units.
+// Defined in the sibling test translation units. Each binary below links only the ones its own
+// main() calls — a declaration pulls nothing in.
 void RunShellDirtyTierChecks(Application& application);   // ApplicationShell_DirtyTier_UI_Test.cpp
 void RunShellIconBridgeChecks();                          // ApplicationShell_IconBridge_UI_Test.cpp
+void RunShellVisibilityChecks();                          // ApplicationShell_Visibility_UI_Test.cpp
+void RunShellExecutionChecks();                           // ApplicationShell_Execution_UI_Test.cpp
 
 } // namespace Ui
 } // namespace SanmapGen

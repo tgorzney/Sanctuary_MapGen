@@ -5,28 +5,30 @@
 // what the composite baked. It knows no stage order and holds no rival backend toggle.
 //
 // It is the one unit that legally sees IO and UI at once, which is why the sanpack -> atlas ->
-// residency -> `Ui::IconAtlasManifest` bridge lives here and in no tab (Application_Assets_UI.cpp;
-// the gap M5-6 flagged). GL objects reach it only through `Sys::GpuResourceManager` (ARCH §3.2).
+// residency -> `Ui::IconAtlasManifest` bridge lives here and in no tab. GL objects reach it only
+// through `Sys::GpuResourceManager` (ARCH §3.2).
 //
-// Aspect translation units behind this one header (ARCH §1.5):
-//   Application_UI.cpp               construction, callback wiring, the dirty-tier service
-//   Application_Window_UI.cpp        GLFW window + GL context + imgui bring-up and teardown
-//   Application_Frame_UI.cpp         the frame loop and the imgui frame begin/end
-//   Application_Draw_UI.cpp          the chrome: the panel switcher, the panels, the canvas
-//   Application_Assets_UI.cpp        the sanpack/atlas load and the icon-id -> template-id bridge
-//   Application_AssetPanel_UI.cpp    the asset panel and the per-frame icon-selection resolution
-//   Application_Recipe_UI.cpp        the default MapRecipe and its stage constants
-//   Application_PreviewSetup_UI.cpp  the default preview composition (ramps + field layers)
-// Member headers (the ARCH §7.1 composition rule, split out for the §1.5 ceiling — neither is a
-// type any other unit reaches):
-//   Application_Settings_UI.h        every value the shell runs on (Constitution §8)
-//   Application_TabState_UI.h        the caller-owned state of each hosted panel
-//   ApplicationMain_UI.cpp           the thin entry point (NOT part of the library)
+// Aspect translation units behind this one header, each tagged at its own top (ARCH §1.5):
+// _UI / _Window_UI / _Frame_UI (assembly, bring-up, the frame loop) · _Draw_UI / _LeftColumn_UI
+// (the two panes; the v1 column and its `[O]`/`[ ]`) · _Panel{Terrain,Environment,System}_UI (the
+// three groups' bodies) · _Execution_UI (the Performance toggles -> per-stage DispatchPolicy) ·
+// _Assets_UI / _AssetPanel_UI (the sanpack -> atlas -> `tpId` bridge) · _Recipe_UI /
+// _PreviewSetup_UI / _PreviewRamps_UI (the launch defaults).
+// Member headers (the ARCH §7.1 composition rule, split for the §1.5 ceiling — none is a type any
+// other unit reaches): _Settings_UI.h (every value the shell runs on, Constitution §8) ·
+// _Panels_UI.h (the panel catalogue: groups, order, which rows toggle) · _Visibility_UI.h (the
+// `[O]`/`[ ]` state and its mapping onto the composite) · _Execution_UI.h · _HostedSettings_UI.h
+// (the tab settings with no `Params::MapRecipe` home yet) · _TabState_UI.h · _Defaults_UI.h (the
+// launch defaults and the atlas bridge, as free functions).
+// ApplicationMain_UI.cpp is the thin entry point, and is NOT part of the library.
 #pragma once
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
+#include "Application_Defaults_UI.h"
+#include "Application_Execution_UI.h"
+#include "Application_HostedSettings_UI.h"
 #include "Application_Settings_UI.h"
 #include "Application_TabState_UI.h"
 #include "MapCanvas_UI.h"
@@ -55,11 +57,14 @@ public:
     bool IsWindowOpen() const;
     void RequestClose();
 
-    // --- the two per-frame steps the acceptance test drives directly ---
+    // --- the three per-frame steps the acceptance test drives directly ---
     // Services whichever dirty tier is pending and re-points the canvas at the result.
     Pipeline::RefreshTier ServiceDirtyTier();          // Application_UI.cpp
     // Turns a NEW icon-grid selection into the selected rule's template id (`tpId`).
     void ResolveIconSelections();                      // Application_Assets_UI.cpp
+    // Pushes the Performance toggles onto every stage's policy; true = one moved and a regeneration
+    // was requested. Runs every frame, not only while that panel is on screen.
+    bool ApplyExecutionPolicy();                       // Application_UI.cpp
 
     // --- assets (Application_Assets_UI.cpp) ---
     void SetSanpackPath(const std::string& path);
@@ -78,6 +83,8 @@ public:
     PreviewComposite&              Composite() { return composite; }
     MapCanvas&                     Canvas()    { return canvas; }
     ApplicationTabState&           TabState()  { return tabState; }
+    ApplicationExecutionSettings&  ExecutionSettings() { return executionSettings; }
+    Sys::DispatchPolicy&           ActiveDispatchPolicy() { return dispatchPolicy; }
     Data::EntityIdBuffer&          EntityIdentifiers() { return entityIdentifiers; }
     std::uint32_t LastSelectedEntityIdentifier() const { return lastSelectedEntityIdentifier; }
     int FrameCount() const { return frameCount; }
@@ -92,11 +99,14 @@ private:
     void BeginImguiFrame();                  // Application_Frame_UI.cpp
     void EndImguiFrame();                    // Application_Frame_UI.cpp
     void DrawSettingsWindow();               // Application_Draw_UI.cpp
-    void DrawPanelSwitcher();                // Application_Draw_UI.cpp
     void DrawActivePanel();                  // Application_Draw_UI.cpp
-    void DrawPreviewPanel();                 // Application_Draw_UI.cpp
-    void DrawSystemPanel();                  // Application_Draw_UI.cpp
     void DrawCanvasWindow();                 // Application_Draw_UI.cpp
+    void DrawPanelSwitcher();                // Application_LeftColumn_UI.cpp
+    void DrawTerrainGroupPanel();            // Application_PanelTerrain_UI.cpp
+    void DrawHeightRampSection();            // Application_PanelTerrain_UI.cpp
+    void DrawEnvironmentGroupPanel();        // Application_PanelEnvironment_UI.cpp
+    void DrawSystemGroupPanel();             // Application_PanelSystem_UI.cpp
+    void DrawPerformancePanel();             // Application_PanelSystem_UI.cpp
     bool UploadAtlasPages();                 // Application_Assets_UI.cpp
     void DrawAssetPanel();                   // Application_AssetPanel_UI.cpp
     bool ServiceAssetLoadRequest();          // Application_AssetPanel_UI.cpp
@@ -112,6 +122,8 @@ private:
     Pipeline::PreviewDriver       previewDriver;
     MapCanvas                     canvas;
     ApplicationTabState           tabState;
+    ApplicationHostedSettings     hostedSettings;   // the tab settings with no recipe home yet
+    ApplicationExecutionSettings  executionSettings;
     Sys::DispatchPolicy           dispatchPolicy;   // the SystemTab's determinism/backend home
     Sys::ThreadPool               threadPool;
     std::unique_ptr<Sys::GpuResourceManager> gpuResourceManager;   // created with the context
@@ -128,20 +140,6 @@ private:
     bool bAssetLoadAnnounced  = false;
     bool bImguiReady          = false;
 };
-
-// The shell's defaults, in their own translation unit so the class file stays small.
-Params::MapRecipe MakeDefaultMapRecipe();                          // Application_Recipe_UI.cpp
-void ConfigureDefaultStages(Pipeline::GenerationAssembler& assembler);
-void ConfigureDefaultPreview(PreviewCompositeSettings& previewSettings, int previewResolution,
-                             float worldUnitsPerCell);
-
-// The atlas-id bridge itself, as a free function so it is drivable without a window: assigns each
-// `Io::AtlasEntry` its index in Entries() as the `iconId` the grid emits, carries the uv rect
-// across, and fills the id -> template-identifier side table.  (Application_Assets_UI.cpp)
-void BuildIconAtlasManifest(const Io::AssetAtlas& atlas, const Sys::AtlasResidency& atlasResidency,
-                            Sys::GpuResourceManager* gpuResourceManager,
-                            IconAtlasManifest& outManifest,
-                            std::vector<std::string>& outTemplateIdentifiers);
 
 } // namespace Ui
 } // namespace SanmapGen

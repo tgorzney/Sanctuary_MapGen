@@ -36,6 +36,16 @@ E). This is the deliberate "wire settings into the recipe + save/load" phase tha
 ## Tier 3 — add a control (data exists, no UI)
 - **Stratum slope-gate fields** — consumed by the Mask stage but reachable from no UI.
 
+## Tier 2 additions (from WO E)
+- **Six non-painting overlays** — the `[O]` toggles for Symmetry, Detail Normal, Tint, Holes,
+  Smoothness, Atmosphere are held for column parity but drive nothing; `PreviewLayerKind` only
+  has {HeightRamp, StratumSplat, Flow, Accumulation, Water, Slope}. Each needs an overlay
+  composite stage before its toggle paints.
+
+## Cleanup (from WO E)
+- **Dead tabs** — old `LayersTab_UI` / `TerrainTab_UI` are no longer mounted but still compile
+  and test. Delete once nothing references them.
+
 ## ARCH Expert calls (not blocking)
 - **UI → IO dependency** — not in the ARCH §3.1 table, but already practiced (`FilesTab_UI`
   includes IO; `Application_Settings_UI` includes `AssetAtlasCache_IO`). Add an IO entry for UI,

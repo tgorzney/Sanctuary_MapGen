@@ -4,10 +4,12 @@
 //   1 events        2 begin frame        3 the pending asset load (announced, then performed)
 //   4 the panels    - a committed edit calls PreviewDriver::NotifyParametersChanged(), which
 //                     DERIVES bNeedsMapUpdate vs bNeedsPreviewRender from the stages' own hashes
-//   5 icon bridge   - a new atlas pick becomes the selected rule's template id
-//   6 service tier  - Refresh() runs the pipeline OR only the composite, then re-points the canvas
-//   7 the canvas    - drawn AFTER the service, so an edit is visible in the SAME frame
-//   8 end frame
+//   5 execution     - the Performance toggles onto every stage's DispatchPolicy; a policy no
+//                     parameter hash can see asks for a map update outright
+//   6 icon bridge   - a new atlas pick becomes the selected rule's template id
+//   7 service tier  - Refresh() runs the pipeline OR only the composite, then re-points the canvas
+//   8 the canvas    - drawn AFTER the service, so an edit is visible in the SAME frame
+//   9 end frame
 #include "Application_UI.h"
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -39,6 +41,7 @@ bool Application::RunOneFrame() {
         return IsWindowOpen();
     }
     DrawSettingsWindow();
+    ApplyExecutionPolicy();
     ResolveIconSelections();
     ServiceDirtyTier();
     DrawCanvasWindow();

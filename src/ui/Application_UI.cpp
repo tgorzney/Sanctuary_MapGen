@@ -32,6 +32,10 @@ Application::Application(ApplicationSettings applicationSettings)
       threadPool(settings.workerThreadCount) {
     ConfigureDefaultPreview(composite.Settings(), settings.previewResolution,
                             assembler.WorldUnitsPerCell());
+    // The left column's `[O]`/`[ ]` rows are the composite's layer flags from the first frame on,
+    // so the column and the image agree before anything is clicked (Application_Visibility_UI.h).
+    ApplyPanelVisibility(tabState.visibility, composite.Settings());
+    LoadExecutionSettings(assembler, executionSettings);
     assembler.SetThreadPool(&threadPool);
     WireCallbacks();
 }
@@ -78,6 +82,17 @@ Sys::GpuTextureHandle Application::UploadCompositeTexels() {
         gpuResourceManager->UploadTexture(mirrorTexture, texels.data(),
                                           texels.size() * sizeof(unsigned int));
     return mirrorTexture;
+}
+
+// The Performance panel's fan-out, run every frame rather than only while that panel is drawn: a
+// backend or determinism choice has to keep holding once the user moves to another tab. An
+// execution change is invisible to every stage's parameter hash — the recipe did not move — so the
+// driver's door for it is RequestMapUpdate (SystemTab_UI.cpp states the same reasoning).
+bool Application::ApplyExecutionPolicy() {
+    if (!ApplyExecutionSettings(executionSettings, tabState.system.bDeterministic, assembler))
+        return false;
+    previewDriver.RequestMapUpdate();
+    return true;
 }
 
 const IconAtlasManifest* Application::ActiveIconManifest() const {

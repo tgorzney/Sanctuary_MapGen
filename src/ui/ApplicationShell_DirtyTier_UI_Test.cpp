@@ -11,23 +11,22 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-// A layer control: NoiseBlend owns the octave count, so the whole pipeline re-runs and the image
-// must move — "adjusting a layer regenerates and updates the view".
+// A layer control, driven through the tab the rebuilt shell actually mounts: the Heightmap panel
+// hosts the batch-B Layer Editor, so the edit goes through THAT editor's mirrors. NoiseBlend hashes
+// the layer's levels, so the whole pipeline re-runs and the image must move — "adjusting a layer
+// regenerates and updates the view".
 void RunLayerRegenerationChecks(Application& application) {
     const unsigned long long settledImage = CompositeImageChecksum(application);
     const int settledPipelineRuns = application.Driver().PipelineRunCount();
-    LayersTabState& layersState = application.TabState().layers;
-    Params::Layer* const layer = SelectedLayer(application.Recipe().layerStack, layersState);
+    LayerEditorState& editorState = application.TabState().heightmap.layerEditor;
+    Params::Layer* const layer =
+        SelectedLayerEditorLayer(application.Recipe().layerStack, editorState);
     Check(layer != nullptr, "the default recipe has a layer to adjust");
     if (layer == nullptr) return;
 
-    LoadLayerTabValues(*layer, layersState);
-    StepDialInteraction(layersState.octaveCountToggle, layersState.octaveCountValue,
-                        layersState.octaveCountRange, DialDrag(-60.0f));
-    Check(StepDialInteraction(layersState.octaveCountToggle, layersState.octaveCountValue,
-                              layersState.octaveCountRange, DialRelease()).bCommitted,
-          "the octave dial commits on release");
-    Check(StoreLayerTabValues(layersState, *layer), "the layer moved");
+    LoadLayerEditorValues(*layer, editorState);
+    editorState.levelsValues.inputShadows = editorState.levelsValues.inputShadows + 0.25f;
+    Check(StoreLayerEditorValues(editorState, *layer), "the layer moved");
 
     Check(application.Driver().NotifyParametersChanged() == Pipeline::RefreshTier::MapUpdate,
           "a layer control is stage-owned, so it trips bNeedsMapUpdate");

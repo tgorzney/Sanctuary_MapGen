@@ -38,6 +38,7 @@ public:
     BakeConstants& Constants() { return constants; }
     const BakeConstants& Constants() const { return constants; }
     void SetDispatchPolicy(const Sys::DispatchPolicy& policy) { dispatchPolicy = policy; }
+    const Sys::DispatchPolicy& ActiveDispatchPolicy() const { return dispatchPolicy; }
     void SetGenerationContext(Sys::GenerationContext context) { generationContext = context; }
     void SetGlobalBackend(Sys::ComputeBackend backend) { globalBackend = backend; }
     void SetGpuResourceManager(Sys::GpuResourceManager* manager) { gpuResourceManager = manager; }
