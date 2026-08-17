@@ -156,6 +156,14 @@ and the current-v2 (`NoiseType`/`FractalType`/`BlendMode`/`Lacunarity`/
 generation (`IO_PARITY_REPORT.md` §3.3, Step 5). An absent or old version must
 produce a **loud, logged fallback** — never a silent default (Constitution §6).
 
+**The mechanism that does this gating is `IO_MIGRATION_SPEC`** — the
+per-(domain, version-step) migration files, the one-file `Sanmap_MigrationManifest_IO`
+wiring point, and the `Sanmap_MigrationRunner_IO` that resolves a document's
+version, walks it forward, and refuses outright on a version newer than this
+build understands. This section states *what* changed at v3; `IO_MIGRATION_SPEC`
+states *how* an old document is carried forward to it (and how every future bump
+repeats the pattern).
+
 ### `GeneralMapSettings` — Correction 2
 ```
 Seed                    (confirmed live, MapExporter_Recipe_IO.cpp)

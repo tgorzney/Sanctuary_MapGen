@@ -98,11 +98,25 @@ naming law: **camelCase top-level key = game-native field** (`width`, `armies`,
   still follows §1.1 (`camelCase`/`b` prefix) regardless of how the same value is
   spelled at the JSON top level.
 
+### 1.7 IO migration file naming — schema version steps (ratifies `IO_MIGRATION_SPEC`)
+A `.sanmap` schema version bump (`SanGenVersion`, `SANMAP_FORMAT_SPEC`) is carried
+forward by one small file per (domain, version-step): `<Domain>_Migrate_V<N>_IO.h/.cpp`,
+migrating a V*N*-shaped JSON fragment to V*N*+1 shape — an instance of the §1.5
+`Type_Aspect_LAYER` split-file pattern (`Domain` = Type, `Migrate_V<N>` = Aspect), never
+a direct N→M jumper. Each migration is paired with a literal-fixture
+`<Domain>_Migrate_V<N>_IO_Test.cpp` and, once green and shipped, is **append-only** —
+never edited again. Exactly one file, `Sanmap_MigrationManifest_IO`, is touched to wire a
+new version step's ordered migration list; everything else (migrations, tests, any new
+JSON-transform primitive) is pure addition. **No self-registration** — static-init order
+is a real failure mode and an explicit manifest line beats implicit discovery
+(AI-legibility). Full contract, the runner, and the shared `JsonPrimitives_IO.h`
+toolkit: `IO_MIGRATION_SPEC`.
+
 ---
 
 ## 2. Layer → directory map (Constitution §1/§2)
 
-One directory per layer; the folder and the file suffix always agree, so a misplaced
+One directory per layer, the folder and the file suffix always agree, so a misplaced
 file is visible instantly. The `core/` + `gui/` split and the dead `core/data/` are
 retired.
 
@@ -170,8 +184,9 @@ The canonical call chain: **`UI → PIPELINE → PROC → SYS`** (with PROC/PIPE
 - **`DATA`/`PARAMS` own output/settings** — DATA = plain SoA computed arrays; PARAMS =
   the adjustable recipe (serializes to the schema v3 PascalCase sections, §1.6). No
   behavior, no GPU handles.
-- **`IO` owns the format seam** — `.sanmap` schema v3 round-trip, sanpack
-  ingestion, asset validation (Constitution §6). The swappable port boundary (§5).
+- **`IO` owns the format seam** — `.sanmap` schema v3 round-trip (`SANMAP_FORMAT_SPEC`,
+  `IO_MIGRATION_SPEC`), sanpack ingestion, asset validation (Constitution §6). The
+  swappable port boundary (§5).
 - **`UI` owns presentation** — tabs, the universal widget library, the preview
   composite; reads baked results and the resident atlas, writes params.
 
@@ -328,7 +343,7 @@ Bottom-up along §3.1; each milestone independently testable.
   `GpuResource_SYS`, `Dispatch_SYS` router). `MATH_SIMD_SPEC`, `DISPATCH_INTERFACE_SPEC`.
 - **M1 — Data model** (hit-list #1): define `*_DATA` (computed) + `*_PARAMS` (settings)
   replacing `GenerationParams`; delete dead `core/data/*` + `GenParams_*`;
-  `.sanmap` schema v3 round-trip through `IO` (`SANMAP_FORMAT_SPEC`).
+  `.sanmap` schema v3 round-trip through `IO` (`SANMAP_FORMAT_SPEC`, `IO_MIGRATION_SPEC`).
 - **M2 — Dispatch + PIPELINE skeleton** (hit-list #3): `DispatchPolicy`, `Dispatch_SYS`
   resolution, `Generation_PIPELINE` (DAG + dirty-hash). **Vertical slice on one stage
   (noise), both backends**, to prove the whole spine before fanning out.

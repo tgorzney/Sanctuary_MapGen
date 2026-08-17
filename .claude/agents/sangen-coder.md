@@ -41,6 +41,15 @@ inside the ARCH.
 - **Boundaries (§3):** downward-only deps; GPU handles only in SYS; UI never simulates;
   no layer knows the pipeline shape but PIPELINE.
 - **Dispatch (§4):** read the `DispatchPolicy`; never add a rival toggle.
+- **IO-layer conventions (`IO_MIGRATION_SPEC.md`):** one file pair per `.sanmap`
+  domain — `MapExporter_<Domain>_IO`/`MapImporter_<Domain>_IO` — never a file
+  spanning multiple top-level sections. A version migration is
+  `<Domain>_Migrate_V<N>_IO`, moving a V**N**-shaped fragment to V**N+1** only, never
+  a direct jump; append-only once tested — never edit an existing migration file.
+  Compose `JsonPrimitives_IO`'s primitives (`RenameKey`/`MoveKey`/
+  `WrapScalarAsVector`/`DefaultIfMissing`/`DeleteKeyIfPresent`/`ReadJson*`) instead
+  of hand-rolled `nlohmann::json` surgery. When unsure, consult the IO Architecture
+  Expert rather than inventing a shape.
 - **Per-stage done (§6.1):** CPU **and** GPU implemented and parity-checked within the
   accuracy class; wired into PIPELINE + Dispatch_SYS; all constants exposed as PARAMS
   (§8); files within ceilings; the acceptance test passes.

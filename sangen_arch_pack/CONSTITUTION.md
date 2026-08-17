@@ -15,8 +15,8 @@ SanGen is divided by technical layer, not by feature:
   GPU/GL state.
 - **PARAMS** — the *adjustable settings* (the recipe): the layer stack, stratum/
   marker/prop rules, seed, dimensions, erosion/flow/thermal constants, symmetry,
-  environment, enums. Its own folder. This is what `mapGeneratorData` serializes; DATA
-  is regenerated from it (input vs output).
+  environment, enums. Its own folder. This is what the `.sanmap`'s SanGen-owned schema v3
+  sections (`SANMAP_FORMAT_SPEC`) serialize; DATA is regenerated from it (input vs output).
 - **PROC** — applied processors (terrain synthesis, erosion, masking, placement);
   each CPU processor paired with its GPU kernel.
 - **PIPELINE** — the conductor: owns the dirty-hash dependency DAG, the PROC stage
@@ -30,7 +30,7 @@ SanGen is divided by technical layer, not by feature:
   CPU/GPU dispatch *mechanism* (router), logging. Orchestration is NOT here — it is
   PIPELINE.
 
-GPU/GL state never lives in the DATA layer (only SYS + the `.glsl` kernels).
+GPU/GL state never lives in the DATA layer (only SYS + the `.glsl` kernels). 
 Dependencies flow downward only, no cycles: UI → PIPELINE → PROC → {DATA, PARAMS,
 MATH} and SYS; IO → {DATA, PARAMS}; nothing depends upward.
 
@@ -44,7 +44,7 @@ Literal, fully-spelled, deterministic names — **no abbreviations**. The layer 
 `*Compute`/`.glsl` for GPU kernels), TGUE-style. A name states the **quantity**, not the
 role. The full suffix system, the no-abbreviation rule + its exceptions (`tpId`,
 extensions, `Cpu`/`Gpu`), CPU/GPU pairing, and file-size ceilings (soft 100 / hard 150
-lines, functions ≤40) are **resolved in ARCH §1–2**.
+lines, functions ≤40 lines) are **resolved in ARCH §1–2**.
 
 ## 3. Optimization pillars
 Maximum performance is law. Confirmed rules: prefer multiplying a precomputed
@@ -87,7 +87,10 @@ maps) are validated before use: cap file size and image dimensions, sanity-check
 format headers, and fall back to a safe placeholder on any failure — never load
 an unverified or corrupt file into RAM or the UI. Mirror the game's own
 validate-then-default-then-log pattern (see MODDING_SCRIPTING_SPEC). This is the
-concrete form of "validate all input to avoid crashes."
+concrete form of "validate all input to avoid crashes." A `.sanmap`'s declared
+schema version is external input too: an absent/old version is a loud, logged
+fallback and a version newer than this build understands is a flat refusal, never
+a silent best-effort (`IO_MIGRATION_SPEC`).
 
 ## 7. Work-order schema
 Coders execute schema-valid work-orders only. Required fields: title; root

@@ -5,7 +5,8 @@ spec(s) a question needs — never the whole pack.
 
 | Topic | Spec(s) |
 | --- | --- |
-| .sanmap file format, import/export, coordinate flip, mapGeneratorData round-trip | `specs/SANMAP_FORMAT_SPEC.md` |
+| .sanmap file format, import/export, coordinate flip, schema v3 top-level sections | `specs/SANMAP_FORMAT_SPEC.md` |
+| .sanmap schema version migrations — SanGenVersion gating, the migration runner/manifest, JSON transform primitives | `specs/IO_MIGRATION_SPEC.md` |
 | units / props / markers, tpId scheme, factions, asset validation, .san* formats | `specs/UNIT_PROP_MARKER_DATA_SPEC.md` |
 | map scripting & events, lua sandbox, Tags, AI system, modding, validators | `specs/MODDING_SCRIPTING_SPEC.md` |
 | data model (GenerationParams), generation pipeline, GPU toggles, enums | `specs/PARAMS_PIPELINE_SPEC.md` |

@@ -43,8 +43,10 @@ the same validate→report discipline as the blueprint validators
 Extends `DETERMINISM_SPEC` into the multiplayer flow. The engine splits **`host/`
 (authoritative)** from **`client/` (presentation)**; the shared-gen protocol rides on
 that split.
-- **Protocol.** The host distributes only **settings + seed** (tiny — the serialized
-  `mapGeneratorData` block + seed, `SANMAP_FORMAT_SPEC`); every client runs the
+- **Protocol.** The host distributes only **settings + seed** (tiny — the recipe's
+  serialized `.sanmap` schema v3 SanGen-owned sections, `SANMAP_FORMAT_SPEC` —
+  `GeneralMapSettings`/`HeightmapStack`/`MarkersStack`/etc., not the legacy
+  `mapGeneratorData` blob those sections replaced — plus seed); every client runs the
   **identical deterministic generation locally** and arrives at a bit-identical
   gameplay map. No large heightmap/texture transfer.
 - **Authority boundary.** Only **gameplay-authoritative outputs** must match
@@ -57,9 +59,13 @@ that split.
   reductions, fixed-point for erosion/flow feedback state — exactly
   `DETERMINISM_SPEC`. GPU is disabled for the authoritative bake.
 - **Version pinning.** Because clients regenerate rather than download, the
-  generator **version + preset version** (`PresetVersion`, `FORMAT_VERSION`) must be
-  pinned and checked across all clients — a mismatched SanGen build could produce a
-  divergent map from the same seed. The protocol must reject version-skewed clients.
+  generator **version + preset version** (`PresetVersion`, `FORMAT_VERSION`, and now
+  `SanGenVersion` — `SANMAP_FORMAT_SPEC`/`IO_MIGRATION_SPEC`, the field that actually
+  gates which schema shape the distributed settings are in) must be pinned and
+  checked across all clients — a mismatched SanGen build could produce a divergent
+  map from the same seed, or (post `IO_MIGRATION_SPEC`) silently migrate the
+  distributed settings differently on an out-of-date client. The protocol must
+  reject version-skewed clients rather than let one silently migrate on its own.
 - **Verification gate.** Shared-gen stays experimental until the cross-machine
   bit-exact test (`DETERMINISM_SPEC`) passes on all gameplay outputs, erosion tested
   hardest. Until then, fall back to transferring the baked map.
@@ -83,5 +89,5 @@ shared-gen handshake before implementation.
 ## Ties
 Builds on `MODDING_SCRIPTING_SPEC` (AI system, validators, host/client), extends
 `DETERMINISM_SPEC` (shared-gen), and constrains `PLACEMENT_SCATTER_SPEC` (markers must
-be AI-analyzable) and `SANMAP_FORMAT_SPEC` (settings+seed = the `mapGeneratorData`
-round-trip).
+be AI-analyzable) and `SANMAP_FORMAT_SPEC`/`IO_MIGRATION_SPEC` (settings+seed = the
+schema v3 SanGen-owned sections, version-pinned via `SanGenVersion`).
