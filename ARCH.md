@@ -513,6 +513,42 @@ Consequences, all binding:
      match the rendered surface for WYSIWYG, and Placement reads exactly one stratum field.
      (If a future gameplay consumer needs the *physical* dominant material, it reads
      proportions directly — a separate consumer, not a change here.)
+10. **Amendment — `maskRemapMinimum`/`maskRemapMaximum` are genuine 4-component fields,
+    not a scalar** (ratified in a dedicated `Params::Stratum`-IO session; confirmed against
+    the C# ground truth `SanMap.Types.cs` — `Stratum.maskRemapMin`/`maskRemapMax` are both
+    real `Vector4`, defaulting to `(0,0,0,0)`/`(1,1,1,1)` — and against a real shipped map).
+    `Params::Stratum::maskRemapMinimum`/`maskRemapMaximum` (`src/params/Stratum_PARAMS.h`)
+    currently collapse this to a single `float` each, losing real format data for a
+    pass-through field — the same fidelity principle §1.8 already states for hand-authored
+    entity data, applied here to a format-native per-stratum field.
+    - **This does NOT reopen item 5 above, or §7.1's "no rival per-stratum settings type."**
+      Both of those rulings are about *where* the remap runs (exactly once, in Mask, never
+      doubled in Bake) and about not inventing a **second per-stratum settings type** that
+      duplicates `Params::Stratum` (the double-remap defect was two rival *arrays*, not one
+      field with the wrong width). Widening one field's own shape on the *same* single
+      `Params::Stratum` struct is neither of those things — it corrects that field to match
+      what the format actually carries. A future reader must not conflate "one remap site"
+      (still true, unchanged) with "one scalar channel" (never true — the format always
+      modeled 4).
+    - **Shape:** `float maskRemapMinimum[kStratumColorChannelCount]` /
+      `float maskRemapMaximum[kStratumColorChannelCount]` — the same 4-wide convention
+      `StratumAppearance::diffuseRemapColor`/`farColorRemapColor` already use
+      (`kStratumColorChannelCount`, defined in `StratumAppearance_PARAMS.h`, which
+      `Stratum_PARAMS.h` already includes — reused rather than a second magic `4` or a new
+      constant). Defaults become `{0,0,0,0}` / `{1,1,1,1}` — the same numeric values the
+      scalar fields already carried, now per-channel, matching the C# defaults exactly.
+    - **Presentation is separate from shape.** The Stratum tab may expose this as up to 4
+      per-channel inputs (`StratumsTab_Appearance_UI.cpp`'s `DrawMaskRemapWindow`) — a UI
+      decision, not a PARAMS one; not designed here.
+    - **Shape only, not wiring.** Widening the field, updating its `IO` read/write (see
+      `SANMAP_FORMAT_SPEC` Correction 13), and updating its own in-code comment ("the ONE
+      surface-weight remap ... Identity by default" — the mechanism is still true, but the
+      comment must show the widened type) are separate coder work. **How the Mask kernel's
+      existing single-scalar-per-cell surface weight consumes a 4-component remap window is
+      undecided and is NOT resolved by this amendment.** A coder who reaches that question
+      stops and reports it for a dedicated ARCH ruling before implementing (§8.4 scope law:
+      a coder never invents missing design) — it does not silently pick channel 0, or
+      average the four, or any other guess.
 
 ### 7.3 Vendored third-party headers
 Third-party vendored code (`FastNoiseLite.h`, `miniz`, `stb_*`) does **not** belong in a

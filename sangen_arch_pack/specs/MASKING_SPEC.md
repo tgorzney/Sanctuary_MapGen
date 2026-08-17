@@ -87,6 +87,10 @@ ground, rock on cliffs). There is **no** `StratumMask_PARAMS` and no `StratumBak
 settings surface in PROC; rival per-stratum arrays are what created the double remap.
 Loaded TGA **pixels** are `Data::FloatField` in `src/data/`, never PARAMS. ARCH §7.1.
 
+*The remap itself is a 4-component field (`maskRemapMinimum`/`maskRemapMaximum`), not a
+scalar — ARCH §7.2 item 10 (amendment). That amendment is a field-shape correction, not a
+change to this section's "one remap type, evaluated once per stratum" contract.*
+
 **Default/override split (`SANMAP_FORMAT_SPEC` `SlopeDefaults`, ratified by work-order
 `SPEC-4` Correction 5).** Per-stratum slope gates remain **ground truth** — the mechanism
 above is unchanged. A flat global window is not a simplification of it; deleting per-stratum
@@ -112,6 +116,11 @@ together. Instead:
 - No new rival settings type is created (ARCH §7.1 still holds): `SlopeDefaults` is a single
   global record read by the flattening step alongside each stratum's own fields, not a
   per-stratum type a stage reaches independently.
+- **Where these fields (plus the per-stratum soil physics) round-trip on disk:**
+  `SANMAP_FORMAT_SPEC` Correction 12, `StratumGenerationSettings` — a new top-level array,
+  index-aligned with `stratumLayers[9]`, carrying `bSlopeUseGlobal`, the 7 slope-gate
+  fields above, and `Params::Stratum::soilPhysics`'s 6 fields. This section (§1.7) states
+  only the PARAMS-side mechanism; Correction 12 states the IO shape.
 
 ## 1.8 Pinned units and resamplers
 - **Designer-facing slope settings are in DEGREES** (matching the 0/29/30 visualization

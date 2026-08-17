@@ -19,14 +19,27 @@ router that points at the law and the experts.
   demand, never all at once).
 
 ## Experts (consult when)
-- **SanGen ARCH Expert** — `.claude/agents/sangen-arch-expert.md` — anything
-  about SanGen architecture, coding law, module boundaries, naming, the
-  optimization pillars, the CPU/GPU dispatch standard, or ARCH conformance.
-  Sole writer of the ARCH.
-
-*More experts — Map File Format, Unit/Prop Data, Optimization, UI Framework,
-the Map Generator (SanGen) sub-experts, and the coder tier — are added after
-the ARCH is ratified, per the Setup Plan build order.*
+The ARCH is ratified; the full expert team is in place:
+- **SanGen ARCH Expert** — `.claude/agents/sangen-arch-expert.md` — architecture,
+  coding law, module boundaries, naming, the optimization pillars, the CPU/GPU
+  dispatch standard, ARCH conformance. Sole writer of the ARCH.
+- **SanGen Format Expert** — `.claude/agents/sangen-format-expert.md` — the
+  `.sanmap` format, import/export, unit/prop/marker data, sanpack ingestion.
+- **SanGen IO Architecture Expert** — `.claude/agents/sangen-io-architecture-expert.md`
+  — how SanGen's own IO/BRIDGE code is structured (per-domain files, migration
+  versioning). Distinct from the Format Expert's format-truth domain.
+- **SanGen Generator Expert** — `.claude/agents/sangen-generator-expert.md` —
+  the generation pipeline (noise, blend, erosion, thermal, flow, mask, placement, bake).
+- **SanGen Compute Optimization Expert** — `.claude/agents/sangen-compute-optimization-expert.md`
+  — MATH/SYS performance, SIMD, CPU/GPU dispatch, determinism.
+- **SanGen UI Expert** — `.claude/agents/sangen-ui-expert.md` — UI framework,
+  layouts, the widget library, tabs, preview/WYSIWYG design.
+- **SanGen UI Optimization Expert** — `.claude/agents/sangen-ui-optimization-expert.md`
+  — UI-side performance to the metal, 100k+ entity throughput.
+- **SanGen Unit/Strategist Expert** — `.claude/agents/sangen-unit-strategist-expert.md`
+  — in-game unit stats, balance, strategy — not SanGen's own code.
+- **SanGen Coder** — `.claude/agents/sangen-coder.md` — the only agent that
+  writes program code, strictly from ratified work-orders.
 
 ## Agent-pack consistency audit
 Agent charters (`.claude/agents/*.md`) can go stale after an ARCH ratification —

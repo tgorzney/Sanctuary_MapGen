@@ -55,6 +55,26 @@ name; albedo / normal / mask TextureLoader{ path }; tileSize / tileSizeFar
 (Vector2); triplanar tile sizes; normalScale (+Far); normal/height
 farNearBlend; diffuseRemap / farColorRemap (Color); maskRemapMin / Max (Vector4).
 
+Confirmed field-for-field against `SanMap.Types.cs::Stratum` (ground truth):
+```
+string name;
+TextureLoader albedo;            // { path }
+NormalTextureLoader normal;      // { path }
+MaskTextureLoader mask;          // { path }
+Vector2 tileSize;                // default (1,1)
+Vector2 tileSizeFar;             // default (1,1)
+float   tileSizeTriplanar;       // default 12 — a SCALAR, not a Vector2
+float   tileSizeFarTriplanar;    // default 36 — a SCALAR
+float   normalScale;             // default 1
+float   normalScaleFar;          // default 1
+float   normalFarNearBlend;      // default 0.5
+float   heightFarNearBlend;      // default 0.5
+Color   diffuseRemap;            // default gray (0.5,0.5,0.5,1)
+Color   farColorRemap;           // default (1,1,1,0)
+Vector4 maskRemapMin;            // default (0,0,0,0) — {x,y,z,w}
+Vector4 maskRemapMax;            // default (1,1,1,1) — {x,y,z,w}
+```
+
 ## Notes for the ARCH
 - **Reclaim is not a format concept** — `resource` is a flag on `MarkerType`
   (resource markers). Confirms the code survey.
@@ -243,6 +263,9 @@ global. The seven fields above are **shared defaults**, consumed by a new
 `bSlopeUseGlobal` flag on `Params::Stratum` (default `true`) — see
 `MASKING_SPEC` §1.7 for the full default/override contract and where it
 resolves (the Mask stage's existing config-flattening step; no PROC change).
+**Where the per-stratum override values for these same seven fields (plus the
+per-stratum soil physics) round-trip on disk: Correction 12,
+`StratumGenerationSettings`, below.**
 
 Do not confuse this section with the real map's `SlopeSettingsParams`, an
 unrelated single-field physics-parity toggle (`bUseEngineParityMath`) — that
@@ -359,6 +382,188 @@ note above for the schema locations:
 - `markers[key]` gains **`alias`**.
 - The old global `Aliases` block (formerly `mapGeneratorData.Aliases`) is
   **deleted** once both land.
+
+### `StratumGenerationSettings` — Correction 12 (per-stratum soil physics + slope-gate overrides)
+Ratified alongside the ARCH §7.2 item 10 remap-shape amendment and
+`MASKING_SPEC` §1.7's `SlopeDefaults`/`bSlopeUseGlobal` amendment, which this
+correction gives an IO home to. New top-level key (ARCH §1.6: single-token
+PascalCase, no spaces), sibling of `stratumLayers` — **not** nested inside it,
+and **not named `StratumSettings`** — that name is claimed by the legacy v1
+duplicate type multiple specs already flag for deletion (`MASKING_SPEC` Part 2
+"Known issues"; ARCH hit-list #1, `src/params/StratumMask_PARAMS.h`/ARCH §7.1
+"Standing violations to clear"); reusing it here would recreate exactly the
+two-`StratumSettings` confusion those specs exist to end.
+
+**No new C++ type.** Every field below already is (or, for `SlopeUseGlobal`,
+will be once `MASKING_SPEC` §1.7 is implemented) a direct member of the single
+`Params::Stratum` — `StratumSoilPhysics soilPhysics` (6 fields, already live)
+plus the 7 slope-gate fields already on `Params::Stratum` and the new
+`bSlopeUseGlobal` flag. This section is purely a new IO surface serializing
+fields that already have a PARAMS home (ARCH §7.1) — it creates no rival
+per-stratum settings type and no rival top-level array.
+
+**Shape:** an array of exactly 9 objects, index-aligned with `stratumLayers[9]`
+(same convention, same cardinality rule as below — **not** a dictionary):
+```
+StratumGenerationSettings: [ 9 × {
+    Hardware fields (Params::Stratum::soilPhysics, 6 fields — NEW writes):
+        Hardness                (float)
+        Friction                (float)
+        Cohesion                (float)
+        CapacityMultiplier      (float)
+        AbsorptionRate          (float)
+        Erodable                (bool)   // bErodable, "b" dropped per this
+                                          // section's own casing convention
+
+    Slope-gate fields (Params::Stratum, 1 NEW + 7 relocated):
+        SlopeUseGlobal          (bool)   // NEW — Stratum::bSlopeUseGlobal
+        SlopeGateEnabled        (bool)   // relocated, verbatim key
+        MinimumSlopeDegrees     (float)  // relocated, verbatim key
+        MaximumSlopeDegrees     (float)  // relocated, verbatim key
+        SlopeFeatherDegreesLow  (float)  // relocated, verbatim key
+        SlopeFeatherDegreesHigh (float)  // relocated, verbatim key
+        UseSmoothstep           (bool)   // relocated, verbatim key
+        InvertSlopeGate         (bool)   // relocated, verbatim key
+        SlopeGateStrength       (float)  // relocated, verbatim key
+} ]
+```
+The 8 slope-gate keys (`SlopeGateEnabled` … `SlopeGateStrength`) are carried
+over **verbatim** from the doomed `mapGeneratorData.Stratums` block's
+`BuildStratumJson` and its importer counterpart
+(`src/io/MapExporter_Layers_IO.cpp:62-81`, `src/io/MapImporter_Recipe_IO.cpp:57-76`)
+— a **zero-cost relocation** of an already-working read/write pair; only the
+container these keys live in changes (from `mapGeneratorData.Stratums[]` to
+this new top-level `StratumGenerationSettings[]`). `SlopeUseGlobal` and the 6
+soil-physics keys are genuinely new writes: the fields exist on
+`StratumSoilPhysics`/`Stratum` today, but nothing currently serializes them
+(soil physics has been write-only-to-nothing since the type was created;
+`bSlopeUseGlobal` does not exist in `src/` yet — it is `MASKING_SPEC` §1.7's
+field, pending its own coder work-order).
+
+Field-name casing follows this section's own established convention for
+SanGen-owned array entries — PascalCase, `b`-prefix dropped — the same
+convention `GeneralMapSettings` (Correction 2) and the doomed block's own
+`BuildStratumJson`/`MaskRemapMinimum`/`Enabled`/`TintRed` keys already use.
+(ARCH §1.6 governs top-level keys and *format-native* collection members; a
+SanGen-owned section's own internal field spelling is unconstrained by that
+rule and follows established sibling-section precedent instead.)
+
+**Cardinality rule:** always write exactly 9 entries, padding past
+`recipe.strata.size()` with `Params::Stratum()` defaults — the same pattern
+`BuildStratumLayersJson` already uses for `stratumLayers`
+(`src/io/MapExporter_Recipe_IO.cpp:14-16`). A length mismatch between
+`stratumLayers` and `StratumGenerationSettings` on import is a **loud, logged
+warning** (Constitution §6) — never silent truncation, and never a hard
+refusal (this is generator recipe state, not a version gate).
+
+**Cross-reference:** `MASKING_SPEC` §1.7 states the PARAMS-side
+default/override *mechanism* (`bSlopeUseGlobal`, config-flattening step); this
+correction states where those fields, plus soil physics, actually round-trip
+on disk.
+
+### `stratumLayers` appearance wiring — Correction 13 (closes "appearance is write-only")
+Confirmed: every `StratumAppearance_PARAMS.h` field maps 1:1 onto a real,
+already-format-native `stratumLayers[9]` key (the "Stratum" section above,
+confirmed field-for-field against `SanMap.Types.cs::Stratum`) — this is a
+**bug-fix / completion of existing wiring, not a new schema section.**
+
+**Confirmed gap: v2 has no importer for `stratumLayers` at all today.**
+Grepping `src/io/MapImporter_Recipe_IO.cpp` (and all of `src/io/`) for
+`stratumLayers` finds zero matches — appearance never round-trips on load,
+on top of being written mostly blank on export.
+
+**Export fixes** (`BuildStratumLayersJson`, `src/io/MapExporter_Recipe_IO.cpp:12-31`):
+```
+layer["albedo"]["path"]       <- stratum.appearance.albedoTexturePath      (BUG: currently always "")
+layer["normal"]["path"]       <- stratum.appearance.normalTexturePath     (BUG: currently always "")
+layer["mask"]["path"]         <- stratum.appearance.compositeTexturePath  (BUG: currently always "")
+layer["tileSize"]             = { x: stratum.tileCount, y: stratum.tileCount }         (unchanged — correct)
+layer["tileSizeFar"]          <- appearance.farTileCount                  (BUG: currently reuses
+                                                                             stratum.tileCount, the
+                                                                             NEAR tile size)
+layer["tileSizeTriplanar"]    <- appearance.triplanarTileCount            (currently never written)
+layer["tileSizeFarTriplanar"] <- appearance.farTriplanarTileCount         (currently never written)
+layer["normalScale"]          <- appearance.normalScale                   (currently never written)
+layer["normalScaleFar"]       <- appearance.farNormalScale                (currently never written)
+layer["normalFarNearBlend"]   <- appearance.normalFarNearBlend            (currently never written)
+layer["heightFarNearBlend"]   <- appearance.heightFarNearBlend            (currently never written)
+layer["diffuseRemap"]         = { r: tintRed, g: tintGreen, b: tintBlue, a: 1.0 }  (unchanged — correct;
+                                                                             see the dead-field note below
+                                                                             for why this is NOT
+                                                                             appearance.diffuseRemapColor)
+layer["farColorRemap"]        <- appearance.farColorRemapColor[4]         (currently never written; this
+                                                                             field has no scalar collapse
+                                                                             elsewhere on Stratum, so it is
+                                                                             the correct, sole consumer of
+                                                                             the format's farColorRemap key)
+layer["maskRemapMin"/"Max"]   <- stratum.maskRemapMinimum/Maximum[4]      (once ARCH §7.2 item 10 lands,
+                                                                             writes the full 4-component
+                                                                             object, {x,y,z,w} — flagged
+                                                                             here only so the two
+                                                                             corrections are not
+                                                                             implemented out of order
+                                                                             against the same field)
+```
+
+**Import — a NEW reader is needed** (a `stratumLayers` reader added to
+`src/io/MapImporter_Recipe_IO.cpp`, the mirror of `BuildStratumLayersJson`),
+populating, per index `0..8`:
+```
+Params::Stratum::appearance.albedoTexturePath     <- layer["albedo"]["path"]
+Params::Stratum::appearance.normalTexturePath     <- layer["normal"]["path"]
+Params::Stratum::appearance.compositeTexturePath  <- layer["mask"]["path"]
+Params::Stratum::tileCount                        <- layer["tileSize"]["x"]   (y ignored — Params::Stratum
+                                                                                 has no anisotropic tile field)
+Params::Stratum::appearance.farTileCount          <- layer["tileSizeFar"]["x"]
+Params::Stratum::appearance.triplanarTileCount    <- layer["tileSizeTriplanar"]
+Params::Stratum::appearance.farTriplanarTileCount <- layer["tileSizeFarTriplanar"]
+Params::Stratum::appearance.normalScale           <- layer["normalScale"]
+Params::Stratum::appearance.farNormalScale        <- layer["normalScaleFar"]
+Params::Stratum::appearance.normalFarNearBlend    <- layer["normalFarNearBlend"]
+Params::Stratum::appearance.heightFarNearBlend    <- layer["heightFarNearBlend"]
+Params::Stratum::tintRed/tintGreen/tintBlue       <- layer["diffuseRemap"]["r"/"g"/"b"] (alpha dropped —
+                                                                                            Stratum has no
+                                                                                            tint-alpha field)
+Params::Stratum::appearance.farColorRemapColor[4] <- layer["farColorRemap"]["r"/"g"/"b"/"a"]
+Params::Stratum::maskRemapMinimum/Maximum[4]      <- layer["maskRemapMin"/"Max"]["x"/"y"/"z"/"w"]
+                                                       (per ARCH §7.2 item 10's widened shape)
+```
+Same cardinality/mismatch handling as Correction 12: `stratumLayers` shorter
+or longer than 9 is a loud, logged warning (Constitution §6) —
+`stratumLayers[9]` is otherwise already a fixed-size format invariant
+(confirmed `STRATUM_COUNT = 9` above).
+
+**Not part of this correction, noted only:** `layer["name"]` currently writes
+a generated placeholder (`"Stratum " + index`) rather than
+`stratum.appearance.name`. Real, but not in the ratified scope of this
+correction — flagged for a future pass, not fixed here.
+
+**Flagged, not fixed — a real defect for the coder to resolve when
+implementing:** `StratumAppearance::diffuseRemapColor`
+(`src/params/StratumAppearance_PARAMS.h:40`) is dead and self-contradictory.
+The file's own header comment states `diffuseRemap` is deliberately **not**
+duplicated here because `tintRed/Green/Blue` is the source of truth — and the
+export mapping above (unchanged, already correct) bears that out:
+`diffuseRemap` writes from `tintRGB`, never from `diffuseRemapColor`. Yet
+`diffuseRemapColor` still exists as a live field, is wired into the Stratum tab
+as its own "Diffuse Remap" swatch (`StratumsTab_Appearance_UI.cpp:53`,
+distinct from the separate "Preview Base Color" swatch that edits `tintRGB`),
+and would round-trip **nothing** even after this correction's import lands,
+since `diffuseRemap` maps to `tintRGB`, not to it. The coder implementing this
+correction should **delete `diffuseRemapColor` and its UI row** rather than
+wire it — wiring it would recreate a second, competing color source for the
+same shader key. (`farColorRemapColor` is not this defect — it has no
+competing scalar field and is the correct, sole consumer of `farColorRemap`.)
+
+**Flagged, not resolved — two more fields with no ratified format home:**
+`importedMaskMode` and `bEnabled` (`Params::Stratum`) have no `stratumLayers`
+equivalent; today they are exported only into the doomed
+`mapGeneratorData.Stratums` blob (`BuildStratumJson`'s `"ImportedMaskMode"` and
+`"Enabled"` keys, `src/io/MapExporter_Layers_IO.cpp:72,75`) and lose their only
+home once that blob is deleted (per "Verified deletions" below). This is an
+**open follow-up**, out of this correction's scope — do not invent a home for
+them here; a future correction (possibly `StratumGenerationSettings` itself,
+if that turns out to be the right container) must rule on it explicitly.
 
 ### Verified deletions (pure duplicates — delete outright)
 Confirmed line-for-line against a real map — no replacement needed, each

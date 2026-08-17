@@ -8,7 +8,9 @@ All planned specs are written and committed to the repo (`sangen_arch_pack/`). T
 ARCH Expert charter is live at `.claude/agents/sangen-arch-expert.md`. **`ARCH.md` is
 now fully authored and ratified** (7 naming-law subsections incl. the schema v3 casing
 law §1.6 and the IO migration-file naming law §1.7; layer→dir map; module boundaries;
-dispatch contract; god-object dismemberment; rebuild order; M3/M4 rulings).
+dispatch contract; god-object dismemberment; rebuild order; M3/M4 rulings; §9/§10/§11
+add `Params::Army`/`UnitGroup`/`UnitTransform`/`MapArea`, `Params::Atmosphere`, and
+`Params::GlobalMarkerSettings`).
 Constitution updated (7th layer `PIPELINE`; SYS slimmed to runtime primitives; DATA =
 computed output vs PARAMS = adjustable settings; TBD markers resolved).
 
@@ -16,27 +18,61 @@ Work-order `SPEC-4` (`work_orders/SPEC-4_SanmapSchemaV3_DOCS.md`) is **ratified*
 `.sanmap` format's `mapGeneratorData` blob is replaced by independently-versioned,
 top-level, format-sibling SanGen-owned sections (`GeneralMapSettings`,
 `HeightmapStack`, `Symmetry`, `SlopeDefaults`, `Flow`, `Accumulation`, `MarkersStack`/
-`PropsStack`/`DecalsStack`/`UnitsStack`, `DetailNormal`, `SanGenVersion`) — see
-`SANMAP_FORMAT_SPEC`'s "SanGen-owned sections (schema v3)". The `.sanmap` version-gating
-migration mechanism (`SanGenVersion`, per-(domain,version-step) migration files, the
-manifest, the runner, `JsonPrimitives_IO`) is ratified in the new `IO_MIGRATION_SPEC`.
-**Both are docs-only rulings** — `src/io/*`/`src/params/*` still implement the old
-`mapGeneratorData` shape; implementing the schema v3 change (and the migration
-mechanism that gates it) is coder-tier work for a **future** work-order, not done yet.
+`PropsStack`/`DecalsStack`/`UnitsStack`, `DetailNormal`, `SanGenVersion`,
+`StratumGenerationSettings`) — see `SANMAP_FORMAT_SPEC`'s "SanGen-owned sections
+(schema v3)" (Corrections 1-13). The `.sanmap` version-gating migration mechanism
+(`SanGenVersion`, per-(domain,version-step) migration files, the manifest, the runner,
+`JsonPrimitives_IO`) is ratified in the new `IO_MIGRATION_SPEC`.
+**All are docs-only rulings** — `src/io/*`/`src/params/*` still implement the old
+`mapGeneratorData` shape (plus the current, incomplete `stratumLayers` write); the
+schema v3 change (and the migration mechanism that gates it) is coder-tier work for a
+**future** work-order, not done yet.
+
+## Latest ratified session — `Params::Stratum` IO ruling (3 parts, ARCH.md + 2 specs)
+- **ARCH §7.2 item 10 (amendment):** `maskRemapMinimum`/`maskRemapMaximum` widen from
+  `float` to `float[kStratumColorChannelCount]` (4-component) — confirmed against
+  `SanMap.Types.cs::Stratum.maskRemapMin/Max` (both `Vector4`). Explicitly does NOT
+  reopen item 5 ("remap runs once, in Mask") or §7.1 ("no rival per-stratum settings
+  type") — this is a field-*shape* correction on the one existing field, not a new
+  type. How the Mask kernel's scalar-per-cell surface weight consumes a 4-channel
+  window is **left open** — a coder who reaches it stops and reports (§8.4 spirit).
+- **`SANMAP_FORMAT_SPEC` Correction 12:** new top-level `StratumGenerationSettings[9]`
+  (index-aligned with `stratumLayers[9]`) carrying `Params::Stratum::soilPhysics`'s 6
+  fields + `bSlopeUseGlobal` + the 7 slope-gate fields — no new C++ type, a zero-cost
+  relocation of the doomed `mapGeneratorData.Stratums` block's already-working 8-field
+  read/write, plus 7 new writes (soil physics + `SlopeUseGlobal`) for fields that exist
+  on `Params::Stratum` today but nothing serializes yet.
+- **`SANMAP_FORMAT_SPEC` Correction 13:** `stratumLayers` appearance wiring fix — v2
+  currently has **zero** `stratumLayers` importer, and the exporter writes empty
+  albedo/normal/mask paths, a wrong `tileSizeFar` (reuses the near `tileCount`), and
+  omits 7 fields entirely (`tileSizeTriplanar`, `tileSizeFarTriplanar`, `normalScale`,
+  `normalScaleFar`, `normalFarNearBlend`, `heightFarNearBlend`, `farColorRemap`).
+  Flags (does not fix) a dead/contradictory `StratumAppearance::diffuseRemapColor`
+  field for coder deletion, and flags (does not resolve) `importedMaskMode`/`bEnabled`
+  as fields with no ratified format home once `mapGeneratorData` is deleted.
+- **`MASKING_SPEC` §1.7** gained a one-line cross-reference to Correction 12 (states
+  the PARAMS-side default/override *mechanism*; Correction 12 states the IO shape).
+- **Still docs-only** — `src/params/Stratum_PARAMS.h`, `src/io/MapExporter_*_IO.cpp`,
+  `src/io/MapImporter_Recipe_IO.cpp` are unchanged; implementing all three parts is
+  coder-tier work for a future work-order.
 
 Next step remains **implementing M0** (the foundation milestone) — or, if SPEC-4's
 schema is prioritized first, a new coder work-order against `src/io/*`/`src/params/*`
-built from `SANMAP_FORMAT_SPEC` + `IO_MIGRATION_SPEC`.
+built from `SANMAP_FORMAT_SPEC` + `IO_MIGRATION_SPEC` (now including this session's
+Corrections 12-13 and the ARCH §7.2 item 10 field-shape amendment).
 
-## Specs in the pack (21, all current)
+## Specs in the pack (24, all current)
 - Format/data: `SANMAP_FORMAT_SPEC`, `IO_MIGRATION_SPEC`, `UNIT_PROP_MARKER_DATA_SPEC`,
-  `GAMEDATA_LAYOUT_SPEC`, `ASSET_LOADING_SPEC`, `MODDING_SCRIPTING_SPEC`.
+  `GAMEDATA_LAYOUT_SPEC`, `ASSET_LOADING_SPEC`, `MODDING_SCRIPTING_SPEC`,
+  `ENTITY_AUTHORING_PARAMS_SPEC`, `ATMOSPHERE_PARAMS_SPEC`.
 - Pipeline: `PARAMS_PIPELINE_SPEC`, `LAYER_SYSTEM_SPEC`, `NOISE_BLEND_SPEC`,
   `MASKING_SPEC`, `SIM_ALGORITHMS_SPEC`, `PLACEMENT_SCATTER_SPEC`,
   `PREVIEW_COMPOSITING_SPEC`.
 - Systems/perf: `OPTIMIZATION_REVIEW`, `OPTIMIZATION_PILLARS`, `MATH_SIMD_SPEC`,
   `DISPATCH_INTERFACE_SPEC`, `UI_FRAMEWORK_SPEC`, `DETERMINISM_SPEC`.
 - Future: `FUTURE_SIM_TYPES_SPEC` (fluvial/glacial/snow-melt), `AI_HOSTCLIENT_SPEC`.
+(See `INDEX.md` for the authoritative, currently-maintained topic → spec map; the list
+above is a coarse inventory, not a substitute for it.)
 
 ## Key facts locked this pass
 - **Entity positions = absolute world/game units** (not fractions). Map `height` =
@@ -67,12 +103,17 @@ built from `SANMAP_FORMAT_SPEC` + `IO_MIGRATION_SPEC`.
   N ad-hoc `UseGPUx` bools; `rand()` non-determinism; mislabeled AoS-as-SoA props.
 - `mapGeneratorData` (~40 keys, ~60% duplicate, two incompatible dialects, no working
   version gate) — superseded by the schema v3 sections; not yet implemented in `src/io/*`.
+- `stratumLayers[9]` appearance data — exporter writes it mostly blank (see Correction
+  13); **no importer exists at all**. Fix targets are itemized field-by-field there.
 
 ## Open items to confirm with dev
 - Whether the ×10 (game-unit↔meters) or any scaling touches the heightmap texture
   itself, or only entity scale/placement (leaning: only scale authoring).
 - tint_geometry.tga channel layout (was login-walled).
 - Deep AI/host/client/systems lua read — only if pursuing custom AI/shared-gen depth.
+- How the Mask kernel's per-cell scalar surface weight should consume the newly
+  4-component `maskRemapMinimum`/`maskRemapMaximum` (ARCH §7.2 item 10) — left open,
+  flagged for a future ARCH ruling once a coder actually reaches it.
 
 ## Next: implement the v2 rebuild (ARCH §6 milestones)
 ARCH is authored — the work is now execution, bottom-up:
