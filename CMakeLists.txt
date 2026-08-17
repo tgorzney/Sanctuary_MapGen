@@ -193,6 +193,11 @@ endif()
 # a consumer that draws a v2 widget (the app shell, and each widget's acceptance test) needs the
 # headers too. imgui itself pulls in glfw for its backends.
 target_link_libraries(SanGenV2 PUBLIC imgui)
+# The `.sanmap` document is JSON (tab-rebuild WO D): src/io/MapExporter_Recipe_IO.h and
+# MapImporter_Recipe_IO.h include <nlohmann/json.hpp>, and both are INTERNAL headers reached only
+# from src/io/*.cpp — no test, no public v2 header, and nothing outside src/io sees the type. So the
+# header-only target is PRIVATE: consumers of SanGenV2 neither need nor inherit the json headers.
+target_link_libraries(SanGenV2 PRIVATE nlohmann_json::nlohmann_json)
 
 # The GPU-backed units load their .glsl twins from ONE shader directory at run time
 # (Sys::GpuResourceManager resolves `<shaderDirectory>/<fileName>` — a single directory, never an
@@ -417,3 +422,51 @@ add_sangen_test(LayerEditor_UI_Test
     src/ui/LayerEditor_Signals_UI_Test.cpp
     src/ui/LayerEditor_Erosion_UI_Test.cpp)
 add_sangen_test(HeightmapTab_UI_Test      src/ui/HeightmapTab_UI_Test.cpp)
+
+# Tab-rebuild batch C1 — the four terrain view tabs. Each test drives its tab's PURE logic (the
+# scalar catalogue, the gradient mirrors, the PARAMS edits) with synthetic input and declares its
+# own main(), so each is its own binary and none needs an imgui frame, a window or a GL context.
+add_sangen_test(SymmetryTab_UI_Test       src/ui/SymmetryTab_UI_Test.cpp)
+add_sangen_test(SlopeTab_UI_Test          src/ui/SlopeTab_UI_Test.cpp)
+add_sangen_test(FlowTab_UI_Test           src/ui/FlowTab_UI_Test.cpp)
+add_sangen_test(AccumulationTab_UI_Test   src/ui/AccumulationTab_UI_Test.cpp)
+
+# Tab-rebuild batch C2 — the material and mask tabs. The Stratums binary spans two translation
+# units under the ARCH §1.5 ceilings (main() lives in StratumsTab_UI_Test.cpp; the soil half drives
+# a real Pipeline::GenerationAssembler without ever running it). The four mask-layer tabs share one
+# binary because they are one show-toggle-over-a-Layer-Editor contract asserted once. The PARAMS
+# half is its own binary in the PARAMS block's spirit: it asserts `Params::Stratum` (ARCH §7.1)
+# with no UI type in sight, so it must not be linked into a tab's test.
+add_sangen_test(Stratum_PARAMS_Test       src/params/Stratum_PARAMS_Test.cpp)
+add_sangen_test(StratumsTab_UI_Test
+    src/ui/StratumsTab_UI_Test.cpp
+    src/ui/StratumsTab_Soil_UI_Test.cpp)
+add_sangen_test(MaskLayerTabs_UI_Test     src/ui/MaskLayerTabs_UI_Test.cpp)
+
+# Tab-rebuild batch C3 — the environment tabs. Pure section/scalar checks, own main() each.
+add_sangen_test(WaterTab_UI_Test          src/ui/WaterTab_UI_Test.cpp)
+add_sangen_test(AtmosphereTab_UI_Test     src/ui/AtmosphereTab_UI_Test.cpp)
+
+# Tab-rebuild batch C4 — the four placement tabs plus the blocks they SHARE. The shared-section
+# test is its own binary rather than a translation unit of one tab's: it asserts the symmetry mask
+# arithmetic and the transform mirrors ONCE, for all four tabs, so no tab owns it.
+add_sangen_test(MarkersTab_UI_Test        src/ui/MarkersTab_UI_Test.cpp)
+add_sangen_test(ArmiesTab_UI_Test         src/ui/ArmiesTab_UI_Test.cpp)
+add_sangen_test(PropsTab_UI_Test          src/ui/PropsTab_UI_Test.cpp)
+add_sangen_test(AreasTab_UI_Test          src/ui/AreasTab_UI_Test.cpp)
+add_sangen_test(PlacementRuleSections_UI_Test src/ui/PlacementRuleSections_UI_Test.cpp)
+
+# Tab-rebuild batch D — Files/Save and the `.sanmap` IO behind it. The importer binary spans three
+# translation units (main() in MapImporter_IO_Test.cpp): the JSON round trip, the Constitution §6
+# refusal checks, and the baked-field half that reads a REAL exported map back off disk. The Files
+# tab binary spans two (main() in FilesTab_UI_Test.cpp): tab state, then the Export All -> Open
+# Sanmap round trip through a scratch folder. All headless — no imgui frame, no window, no GL.
+add_sangen_test(FileDialog_IO_Test        src/io/FileDialog_IO_Test.cpp)
+add_sangen_test(MapExporter_IO_Test       src/io/MapExporter_IO_Test.cpp)
+add_sangen_test(MapImporter_IO_Test
+    src/io/MapImporter_IO_Test.cpp
+    src/io/MapImporter_Validation_IO_Test.cpp
+    src/io/MapImporter_Fields_IO_Test.cpp)
+add_sangen_test(FilesTab_UI_Test
+    src/ui/FilesTab_UI_Test.cpp
+    src/ui/FilesTab_Roundtrip_UI_Test.cpp)
