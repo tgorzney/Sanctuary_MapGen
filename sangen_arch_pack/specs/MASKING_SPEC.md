@@ -78,13 +78,40 @@ from them as the best available approximation at import time, recording that it 
   (`DISPATCH_INTERFACE_SPEC` §4).*
 - **Preview** samples the bake. It never re-runs the mask math (ARCH §3.2).
 
-## 1.7 Settings live in ONE per-stratum type
+## 1.7 Settings live in ONE per-stratum type — plus a shared-default layer (SPEC-4 Correction 5)
 All mask settings — slope window, feathers, smoothstep/hard-clamp, invert, strength, the
 stored-art merge mode, and the single remap — are members of `Params::Stratum`
-(`src/params/Stratum_PARAMS.h`). There is **no** `StratumMask_PARAMS` and no
-`StratumBakeSource` settings surface in PROC; rival per-stratum arrays are what created the
-double remap. Loaded TGA **pixels** are `Data::FloatField` in `src/data/`, never PARAMS.
-ARCH §7.1.
+(`src/params/Stratum_PARAMS.h`), evaluated once per stratum by design — that mechanism is
+the entire reason different strata can occupy different slope bands (grass on shallow
+ground, rock on cliffs). There is **no** `StratumMask_PARAMS` and no `StratumBakeSource`
+settings surface in PROC; rival per-stratum arrays are what created the double remap.
+Loaded TGA **pixels** are `Data::FloatField` in `src/data/`, never PARAMS. ARCH §7.1.
+
+**Default/override split (`SANMAP_FORMAT_SPEC` `SlopeDefaults`, ratified by work-order
+`SPEC-4` Correction 5).** Per-stratum slope gates remain **ground truth** — the mechanism
+above is unchanged. A flat global window is not a simplification of it; deleting per-stratum
+control would delete the feature, since every stratum's gate would then open and close
+together. Instead:
+
+- A new top-level `.sanmap` section, **`SlopeDefaults`**, carries the same seven fields
+  (`bSlopeGateEnabled`, `minimumSlopeDegrees`, `maximumSlopeDegrees`,
+  `slopeFeatherDegreesLow/High`, `bUseSmoothstep`, `bInvertSlopeGate`, `slopeGateStrength`)
+  as **shared defaults only** — it does not gate anything itself and is not a per-stratum
+  type.
+- `Params::Stratum` gains one new field, **`bSlopeUseGlobal`** (default `true`):
+  - `bSlopeUseGlobal == true` (the default for a newly created stratum) → the stratum's
+    slope-gate fields are populated from `SlopeDefaults` at config-flattening time. New
+    strata inherit shared defaults for free.
+  - `bSlopeUseGlobal == false` → the stratum's own slope-gate fields (already on
+    `Params::Stratum`) override the defaults. A stratum that needs its own window flips
+    one bool.
+- This is resolved entirely in the Mask stage's **existing** config-flattening step (§1.8)
+  — default-vs-override is a **config source** decision, not a PROC change. The per-stratum
+  kernel (§1.2) is unaffected: it still reads one resolved `Params::Stratum` per stratum and
+  has no knowledge of whether a value came from a default or an override.
+- No new rival settings type is created (ARCH §7.1 still holds): `SlopeDefaults` is a single
+  global record read by the flattening step alongside each stratum's own fields, not a
+  per-stratum type a stage reaches independently.
 
 ## 1.8 Pinned units and resamplers
 - **Designer-facing slope settings are in DEGREES** (matching the 0/29/30 visualization

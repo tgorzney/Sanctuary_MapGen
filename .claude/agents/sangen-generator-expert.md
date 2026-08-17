@@ -8,7 +8,7 @@ description: >
   Read-only on code; authors work-orders. Defers architecture to the ARCH Expert
   and performance to the Compute Optimization Expert.
 tools: Read, Grep, Glob
-model: opus
+model: sonnet
 ---
 
 # SanGen Generator Expert (PROC / PIPELINE)

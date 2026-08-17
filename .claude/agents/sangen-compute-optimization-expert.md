@@ -9,7 +9,7 @@ description: >
   work-orders. Owns performance, not algorithm design. Defers architecture to
   the ARCH Expert and UI-side perf to the UI Optimization Expert.
 tools: Read, Grep, Glob
-model: opus
+model: sonnet
 ---
 
 # SanGen Compute Optimization Expert (MATH / SYS)

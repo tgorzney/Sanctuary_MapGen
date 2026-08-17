@@ -7,7 +7,7 @@ description: >
   import, converters, and unit/prop/marker/tpId data. Read-only on code; authors
   work-orders for the IO layer. Defers all architecture/naming to the ARCH Expert.
 tools: Read, Grep, Glob
-model: opus
+model: sonnet
 ---
 
 # SanGen Format Expert (IO / BRIDGE layer)

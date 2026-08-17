@@ -40,6 +40,50 @@ clearance only. `PropRule`: `Density, MinSlope/MaxSlope/MinHeight/MaxHeight,
 AvoidWater, NearCliffs`. `DecalRule`: same shape (but decals aren't previewed —
 `PREVIEW_COMPOSITING_SPEC`).
 
+## IO wrapping — `MarkersStack`/`PropsStack`/`DecalsStack`/`UnitsStack` (companion note, work-order SPEC-4)
+`.sanmap` schema v3 (`SANMAP_FORMAT_SPEC` Correction 7) wraps each rule type above
+under a new top-level section, for now as a **flat array** — the shared Group/Layer/
+LayerType hierarchy for these four Stacks is deferred to a future conversation.
+**Flagged finding, carried from `SPEC-4`:** `HeightmapStack`'s structure (flat,
+physics-ordered, exactly two layer types, `LAYER_SYSTEM_SPEC`) is likely **not** the
+same DATA shape as these four Stacks' (organizational, arbitrary grouping) — the
+future design may need to converge on shared *editing conventions* rather than one
+shared *data model*. Do not build the Group container against `HeightmapStack`'s
+shape by assumption.
+```
+MarkersStack → Params::MarkerRule   (this page, "Rules — MarkerRule")
+PropsStack   → Params::PropRule     (this page, "PropRule")
+DecalsStack  → Params::DecalRule    (this page, "DecalRule")
+UnitsStack   → Params::UnitRule     (NEW type — see below)
+```
+Each of `MarkerRule`/`PropRule`/`DecalRule` gains a **`name`** field (author-facing
+identity, distinct from any format key) and, once the Group container design lands,
+Group membership — reserved by this correction, not built.
+
+**`Params::UnitRule` (new type)** — the fourth rule type, wrapped by `UnitsStack`.
+Already exported today ahead of any schema (`MapExporter_Rules_IO.cpp:91-105,117,
+122`); its absence from the first schema draft would have regressed what v2 ships
+today. Shape follows the same rule-filter pattern as `MarkerRule`/`PropRule`/
+`DecalRule` on this page (gates + spacing + selection + symmetry) — see the live
+exporter for its current field set; this page does not re-derive it.
+
+**New per-layer fields on `Params::MarkerRule`** (moved from v1 **global** scalars to
+**per-layer** fields — a cardinality change, a genuine addition, not a relocation):
+```
+HydroMultiplier   ReclaimDensity   MexDensity   SpawnPointCount
+```
+v1 wrote all four as map-wide scalars and exposed **none** of them in any UI
+(`IO_PARITY_REPORT.md` §5.B) — do not port the "unreachable global" shape forward;
+they now live per-`MarkerRule`, alongside its other gates.
+
+**`GlobalMarkerSettings`** — a sub-key inside `MarkersStack`, map-wide (not
+per-rule): `GlobalIconAlloy`, `GlobalIconPlasma`, `GlobalIconSpawn`,
+`MarkerColorAlloy`/`MarkerColorPlasma`/`MarkerColorSpawn`,
+`MarkerScaleAlloy`/`MarkerScalePlasma`/`MarkerScaleSpawn`. `Plasma` = Energy, a real
+planned resource type (ruled, `SANMAP_FORMAT_SPEC` Correction 7) — not the v1
+invention flagged at `IO_PARITY_REPORT.md` Decision #5 (D-9); keep all three
+Plasma-named fields.
+
 ## Transform & symmetry
 `MarkerType_Transform.h` (orphan copy) shows the intended model: `Position[3]`,
 `Rotation[4]` quaternion, `Scale[3]`, `Color[4]`, plus `SymmetryId`. `MarkerSymmetry`

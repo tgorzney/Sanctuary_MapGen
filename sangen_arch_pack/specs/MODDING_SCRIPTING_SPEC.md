@@ -1,9 +1,10 @@
 # MODDING_SCRIPTING_SPEC — map scripting, AI, modding
 
-Source: `engine/LJ/lua/{maps,AI,documentation,common}`. **Scope note: only
-partially read so far** — the map lifecycle, sandbox, and validators are
-covered; `AI/` (huge), `host/`, `client/`, `systems/`, `examples/`, and `mods/`
-still need a deep pass (see end).
+Source: `engine/LJ/lua/{maps,AI,documentation,common,host}`. **Scope note: only
+partially read so far** — the map lifecycle (now including the confirmed
+`script.lua`→`hostMain.lua Start()` sequencing, see below), sandbox, and
+validators are covered; `AI/` (huge), the rest of `host/`, `client/`,
+`systems/`, `examples/`, and `mods/` still need a deep pass (see end).
 
 ## Lua runtime & sandbox
 - LuaJIT / Lua 5.1 (`_VERSION = "Lua 5.1"`). Modules loaded via `Import("path")`.
@@ -14,7 +15,55 @@ still need a deep pass (see end).
 ## Map scripting (events)
 - Each map folder under `lua/maps/<MapName>/` holds `<MapName>_data.lua` (and a
   `_debug` variant); templates: `defaultMap_script.lua`, `showcase_script.lua`.
-- **Lifecycle hooks:** `MapPopulate()`, `MapStart()`, `Start()`.
+- **Dual-path trap (confirmed live):** a map's *script* folder
+  (`LJ/lua/maps/<name>/` — the path `LoadMapData()` actually builds from
+  `libPath`) is not necessarily where its *asset* folder lives
+  (`Sanctuary_Data/Maps/<name>/`, sitting next to the `.sanmap`/Props/Textures).
+  A whole feature was live-tested against the wrong copy for several matches
+  with zero error. Verify which `_data.lua` the engine actually loaded via the
+  F1 console (below) before trusting an edit will take effect.
+- **Lifecycle (confirmed, traced through `script.lua`, `common/mapUtils.lua`,
+  `common/gameUtils.lua`, `host/hostMain.lua`) — `MapPopulate()`/`MapStart()`
+  are dead, no caller found anywhere.** The real call chain, host side, before
+  any simulation tick unless noted:
+  1. `script.lua`'s `init()` → `InitLobby(lobbyData, argString)`.
+  2. `mapUtils.LoadMapData(lobbyData.mapPath)` — loads the `.sanmap`,
+     `Import()`s the per-map `<mapName>_data.lua` (its top-level code runs
+     synchronously here; any `NewThread()` it queues is deferred, not run
+     yet).
+  3. `gameUtils.CreateArmies()` — creates every army from
+     `GameInfo.MapData.armies`; **armies fully exist by the end of this step,
+     still before any tick.** Also calls `SpawnInitialUnits()`: for every
+     non-empty army with a `Spawn` marker, spawns exactly one hardcoded
+     commander (`CreateUnit(armyIndex,
+     Factions.FactionsData[army.faction].initialUnit, startingPos)`) — not
+     data-driven.
+  4. `host/hostMain.lua`'s `Start()` → simulation tick 0 →
+     `mapUtils.RunMapSetup(true)` (props/decals/alloy resource spots) → THEN
+     any `NewThread()` coroutine queued in step 2 fires.
+- **A per-map `_data.lua` can spawn units itself — no shared-engine edit
+  needed:** because its `NewThread` (queued in step 2) fires after
+  `CreateArmies()` has already run (step 3), its callback already has
+  `Armies`, `CreateUnit`, `GetMarker`/`MarkerToPosition`,
+  `SpawnGroup`/`SpawnGroupUnit` available with no `Import()` — all are
+  native/global by that point. **Constraint confirmed live (2p/4p/8p): only
+  ONE `NewThread()` call per script is honored** — a second, separate call
+  silently never runs. A script with more than one host-deferred job must
+  merge them into a single `NewThread` callback.
+- **Worked pattern (confirmed working live 2026-08-17):** "spawn tpId X for
+  every army, at their own spawn point" from a single `NewThread` — loop
+  `Armies`, skip empty slots, read each army's spawn position via
+  `GameInfo.MapData.markers.Spawn.transforms[army.name]` (proven safer than
+  `GetMarker`/`MarkerToPosition`, whose reachability from arbitrary file scope
+  was never formally verified), call `CreateUnit(armyIndex, tpId,
+  spawnMarker.position)` inside its own `pcall` per army so one army's error
+  doesn't abort the rest, log a placed/skipped summary.
+- **Debugging: use the F1 in-game console, not `game_logs/*.txt`.** The disk
+  logs are confirmed unreliable — stayed empty across a full session even
+  while confirmed-running code's `Log()` calls were firing. F1 opens a
+  scrolling console showing live `[Host]`/`[Client]` `[DEBUG]`/`[ERROR]`
+  lines, every `Import:` file load, and the script's own `Log()`/`Warn()`
+  output — point future debugging first here.
 - **Scripting API seen:** `NewThread(fn, ...)`, `WaitSeconds(n)`, `WaitTicks(n)`;
   `CreateUnit(armyId, tpId, position)`; `Orders.IssueOrder{ order="Move",
   units={u}, targetPosition=... }`; `Armies[armyId]:GetListOfUnits(tagExpr)`;
@@ -55,7 +104,10 @@ with defaults, logging each change. Entry points: `ValidateUnitBlueprints`,
 SanGen: validate → default → log, never trust a pre-alpha file blindly.
 
 ## Still to read (deep pass for the ARCH Expert)
-`AI/*` internals; `host/` and `client/` (authoritative vs presentation split);
-`systems/`; `examples/`; `mods/` (how mods are declared/loaded); the full
-`builtInDocumentation.lua` engine API surface. Needed for: custom map AI, event
-scripting depth, and shipping SanGen-authored maps/mods.
+`AI/*` internals; the rest of `host/` and all of `client/` (authoritative vs
+presentation split — `host/hostMain.lua`'s `Start()` is now traced and
+confirmed for map-lifecycle sequencing, see "Map scripting" above; the broader
+split is still open); `systems/`; `examples/`; `mods/` (how mods are
+declared/loaded); the full `builtInDocumentation.lua` engine API surface.
+Needed for: custom map AI, event scripting depth, and shipping SanGen-authored
+maps/mods.

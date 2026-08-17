@@ -78,6 +78,26 @@ its `_PROC` twin. Divergence between the pair is visible at a glance (Constituti
 - Exceeding a ceiling requires a **documented work-order exception** (Constitution §7)
   — a deliberate ratchet, never silent drift.
 
+### 1.6 `.sanmap` top-level key casing — game-native vs SanGen-owned (ratifies work-order SPEC-4 Correction 0)
+The `.sanmap` format already had a live, useful split, formalized here as binding
+naming law: **camelCase top-level key = game-native field** (`width`, `armies`,
+`markers`, …); **PascalCase top-level key = SanGen-owned section**
+(`GeneralMapSettings`, `HeightmapStack`, `Symmetry`, `SlopeDefaults`, `Flow`,
+`Accumulation`, `MarkersStack`, `PropsStack`, `DecalsStack`, `UnitsStack`,
+`DetailNormal`, `SanGenVersion` — the ratified schema v3, `SANMAP_FORMAT_SPEC`).
+
+- Every SanGen-owned top-level key is **single-token PascalCase, no spaces** —
+  `GeneralMapSettings`, never `"General Map Settings"`.
+- A field **merged into an existing format-native collection** (e.g. `armies[key]`)
+  stays **lowerCamelCase** to match its siblings — `armyColor`, `alias`, never
+  `"Army Color"`. It does not become a new SanGen section just because SanGen added
+  it; it is a sibling field inside the format's own dictionary.
+- This governs `.sanmap` **top-level JSON keys and format-collection member keys
+  only**. It does not change §1.1 (identifiers the format/game dictates stay
+  verbatim) or the C++ naming law inside `src/`; a PARAMS type's C++ member name
+  still follows §1.1 (`camelCase`/`b` prefix) regardless of how the same value is
+  spelled at the JSON top level.
+
 ---
 
 ## 2. Layer → directory map (Constitution §1/§2)
@@ -90,7 +110,7 @@ retired.
 src/
   math/     *_MATH                 pure stateless math (SIMD, noise, vector, morton, spatial)
   data/     *_DATA                 computed SoA output (heightfield, masks, flow, resolved prop/marker/unit instances)
-  params/   *_PARAMS               adjustable settings / the recipe (layer stack, rules, constants, seed) — serializes to mapGeneratorData
+  params/   *_PARAMS               adjustable settings / the recipe (layer stack, rules, constants, seed) — serializes to the schema v3 PascalCase sections (§1.6, `SANMAP_FORMAT_SPEC`)
   proc/     *_PROC  +  *.glsl      processors; each CPU .cpp paired with its GPU .glsl
   pipeline/ *_PIPELINE             the conductor — dirty-hash DAG, stage order, backend policy
   io/       *_IO                   .sanmap / SupCom import-export, sanpack reader — the platform seam
@@ -148,8 +168,9 @@ The canonical call chain: **`UI → PIPELINE → PROC → SYS`** (with PROC/PIPE
   pair; declares its inputs/outputs (so `PIPELINE` can build the DAG and the two-tier
   dirty flags) and its accuracy class; requests a backend, never selects one.
 - **`DATA`/`PARAMS` own output/settings** — DATA = plain SoA computed arrays; PARAMS =
-  the adjustable recipe (serializes to `mapGeneratorData`). No behavior, no GPU handles.
-- **`IO` owns the format seam** — `.sanmap` + `mapGeneratorData` round-trip, sanpack
+  the adjustable recipe (serializes to the schema v3 PascalCase sections, §1.6). No
+  behavior, no GPU handles.
+- **`IO` owns the format seam** — `.sanmap` schema v3 round-trip, sanpack
   ingestion, asset validation (Constitution §6). The swappable port boundary (§5).
 - **`UI` owns presentation** — tabs, the universal widget library, the preview
   composite; reads baked results and the resident atlas, writes params.
@@ -307,7 +328,7 @@ Bottom-up along §3.1; each milestone independently testable.
   `GpuResource_SYS`, `Dispatch_SYS` router). `MATH_SIMD_SPEC`, `DISPATCH_INTERFACE_SPEC`.
 - **M1 — Data model** (hit-list #1): define `*_DATA` (computed) + `*_PARAMS` (settings)
   replacing `GenerationParams`; delete dead `core/data/*` + `GenParams_*`;
-  `mapGeneratorData` round-trip through `IO` (`SANMAP_FORMAT_SPEC`).
+  `.sanmap` schema v3 round-trip through `IO` (`SANMAP_FORMAT_SPEC`).
 - **M2 — Dispatch + PIPELINE skeleton** (hit-list #3): `DispatchPolicy`, `Dispatch_SYS`
   resolution, `Generation_PIPELINE` (DAG + dirty-hash). **Vertical slice on one stage
   (noise), both backends**, to prove the whole spine before fanning out.
@@ -568,8 +589,9 @@ Binding shape decisions (they are ARCH rulings, not coder preference):
   (or mapped to degrees 0–90)" — a domain-dependent scale baked into the settings type,
   which is exactly the "name/quantity ambiguity" §1.1 forbids. Domain mapping (slope
   degrees, flow range, height range) belongs to the **consumer**, which normalizes its own
-  domain before sampling the LUT. Verified safe: gradients are **not** serialized in
-  `mapGeneratorData` today (no `Gradient` key in `core/export/`), so no round-trip breaks.
+  domain before sampling the LUT. Verified safe: gradients are **not** part of any
+  SanGen-owned schema v3 section (no `Gradient` key anywhere in `SANMAP_FORMAT_SPEC`), so
+  no round-trip breaks.
 - `bSmoothInterpolation` keeps the `b` prefix (§1.1) and selects smoothstep vs linear.
 - One ramp **per colorized field** — slope, flow, accumulation, height, water each own
   theirs. The legacy "accumulation reuses the flow gradient" aliasing is retired

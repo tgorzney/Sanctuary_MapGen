@@ -8,7 +8,7 @@ description: >
   as a subagent; authoring/maintenance of the ARCH happens in its dedicated
   setup conversation.
 tools: Read, Grep, Glob, Write
-model: opus
+model: sonnet
 ---
 
 # SanGen ARCH Expert

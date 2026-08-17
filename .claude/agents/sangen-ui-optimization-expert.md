@@ -8,7 +8,7 @@ description: >
   Read-only on code; authors work-orders. Defers architecture to the ARCH Expert
   and UI structure/design to the UI Expert.
 tools: Read, Grep, Glob
-model: opus
+model: sonnet
 ---
 
 # SanGen UI Optimization Expert (UI performance)

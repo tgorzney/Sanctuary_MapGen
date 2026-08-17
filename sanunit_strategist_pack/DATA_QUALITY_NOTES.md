@@ -29,6 +29,33 @@ balance. **uga3011** is a standalone case: tpId slot suggests low tier but its
 cost/HP/DPS (900/18000, 6000 HP, 250 DPS) matches T3 heavy-gunship siblings
 while its tag says TECH1 — treat it as unfinished, not a real T1 unit.
 
+## Confirmed: no T5-tier unit exists anywhere in this build, any faction (verified 2026-08-17)
+A live game-testing session exhaustively checked for a `T5`/`5xxx` tpId and
+found zero, anywhere:
+- `common/units/availableUnits.lua` — the authoritative playability list.
+- `common/units/unitsTemplates/` (loose per-tpId folders) — every
+  faction/domain (Chosen `ucl`/`uca`, Guard `ugl`/`uga`, EDA `uel`/`uea`, plus
+  structures `ucs`/`ugs`/`ues`) tops out at a `4xxx` tpId. No `5xxx` directory
+  exists for any faction.
+- `Gamedata/UnitsTemplates.sanpack` — confirmed genuinely empty (0
+  central-directory entries), not a hidden source of higher-tier templates.
+- `Gamedata/Gameplay.sanpack` (592 entries, fully inspected) — zero `t5`
+  string matches; strategic-icon tiers only go up to `_t3_`.
+- Not checked: `Gamedata/Units.sanpack` (1.35GB) — likely models/animations
+  rather than Lua templates given the dedicated (empty) template pack above,
+  so very unlikely to change the conclusion, but it's the one gap short of
+  100% certainty.
+
+**Highest validated tier is T4, every faction.** This also resolves the
+"Tier 5" displayNames noted elsewhere in this pack: **ucl4005** (ChosenT4BotMega,
+see `UNITS_CHOSEN.md`) and **uga4001** (GuardT4MothershipShatterer, see
+`UNITS_GUARD.md`) both display "Tier 5" but are TECH4-tagged `4xxx` tpIds with
+`NO_MODEL` status — an instance of the tier tag/displayName mismatch pattern
+above, not evidence of a real T5 tier. Three known-good T4 tpIds for
+spawn/matchup testing (already `true`/OK per `UNITS_STATUS.md`, no need to
+duplicate their full records here): Chosen `ucl4004` (ChosenT4BotBig), Guard
+`ugl4001` (GuardT4Bot), EDA `uel4001` (EDAT4RailgunSniper).
+
 ## Structures with combat-implying names/tags but NO `weapons` table
 These read as weapon-bearing structures by name and tag, but their `.santp`
 has no `weapons` array at all — treat any "expected" damage/range figure for

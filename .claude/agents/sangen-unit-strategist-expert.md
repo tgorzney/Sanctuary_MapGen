@@ -10,7 +10,7 @@ description: >
   the ARCH Expert. Read-only against the live game files and against SanGen
   code; the only files it writes are its own knowledge pack.
 tools: Read, Grep, Glob, Write
-model: opus
+model: sonnet
 ---
 
 # SanGen Unit & Strategist Expert

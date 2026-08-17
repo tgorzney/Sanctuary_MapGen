@@ -6,7 +6,7 @@ description: >
   ARCH rules. Use to implement a ratified work-order. Writes code, builds, and
   tests; never amends the ARCH or Constitution; never commits to git.
 tools: Read, Grep, Glob, Write, Edit, Bash
-model: opus
+model: sonnet
 ---
 
 # SanGen Coder (execution)

@@ -132,6 +132,34 @@ two different DATA fields with two different single writers; see `MASKING_SPEC` 
 > is stable across the fix (9 × `FloatField`, 0..1), so the Mask kernel will not change —
 > only its input binding.
 
+## `HeightmapStack` IO shape (companion note, work-order SPEC-4)
+`.sanmap` schema v3's `HeightmapStack` (`SANMAP_FORMAT_SPEC` Correction 3) round-trips
+the model on this page **exactly as designed — confirmed, not redesigned**: a flat,
+ordered `LayerStack` of `GeoLayer` (composition bands), each a flat, ordered stack of
+`Layer` (Material or Simulation type). **Neither level nests or groups.** `GeoLayer`
+cannot currently contain another `GeoLayer` — the recursive-`GeoLayer` grouping this
+page's "GeoLayers: composition bands & sim mode" section gestures toward (arbitrary
+nesting) is a **future, separate** internal redesign, out of scope for `SPEC-4` and
+unbuilt today. `SimulationGrouping` (the Separate/Unified sim-mode toggle, "Sim mode"
+above) nests inside `HeightmapStack` in the schema, matching this page's model of it as
+a `LayerStack`-level setting, not a per-`GeoLayer` one.
+
+**Named gap, carried forward unfixed by SPEC-4:** a real shipped map's
+`GeoLayers.Layers[]` carries per-layer `MinHeight`/`MaxHeight`/`MinSlope`/`MaxSlope`
+gates. v2's current `Layer` PARAMS has **no equivalent field** — dropped in the v1→v2
+port, not merely unbuilt. `SPEC-4` carries v2's current `Layer` field set through the
+schema unchanged and defers the fix to the same future internal-layer-redesign
+conversation named above.
+
+**New, in scope now (SPEC-4 Correction 4):** `GeoLayer` and `Layer` each gain a local
+`bSymmetryUseGlobal` + `symmetryMask` override — the same override pattern already live
+on every placement rule type (`PLACEMENT_SCATTER_SPEC`). This is additive to the model
+on this page and does not change layer/stack structure.
+
+**Forward reference:** when the recursive-`GeoLayer` grouping design lands, it must
+extend `HeightmapStack`'s IO shape to match — a versioned schema change (a new
+`SanGenVersion`), not a silent reinterpretation of the existing flat shape.
+
 ## Open / advanced items
 - `tint_geometry.tga` channel layout — the resource is login-walled; owner to
   supply.
@@ -141,3 +169,9 @@ two different DATA fields with two different single writers; see `MASKING_SPEC` 
   cost at 4096², ownership across stage boundaries) + the surface-exposure derivation
   built on them — ARCH §7.5, scheduled M6. `FUTURE_SIM_TYPES_SPEC` depends on this.
 - *(Resolved: multi-Material-GeoLayer combining = the Unified sim-mode toggle above.)*
+- **The shared Group/Layer/LayerType hierarchy for the four scatter Stacks**
+  (`MarkersStack`/`PropsStack`/`DecalsStack`/`UnitsStack`) is a *separate* deferred
+  design from the recursive-`GeoLayer` grouping above — `SANMAP_FORMAT_SPEC`
+  Correction 7 flags that `HeightmapStack`'s shape (flat, physics-ordered, exactly
+  two layer types) is likely not the same DATA shape as those four Stacks'
+  (organizational, arbitrary grouping). Do not conflate the two future designs.
