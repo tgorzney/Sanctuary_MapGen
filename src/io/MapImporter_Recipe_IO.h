@@ -71,5 +71,14 @@ void ReadPropsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
 void ReadDecalGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadDecalsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
 
+// MapImporter_Atmosphere_IO.cpp — ~49 top-level `.sanmap` keys -> `recipe.atmosphere`
+// (ATMOSPHERE_PARAMS_SPEC). Same tier and calling contract as `areas`/`armies` above: takes the
+// top-level `document` directly, called unconditionally BEFORE the `mapGeneratorData` presence
+// gate. `result` is needed here (unlike Areas/Armies/Markers/Chains) solely to log the one
+// fail-safe fallback in this domain: an unrecognized `skyboxIntensityMode` string defaults to
+// `Exposure` with a warning, never a crash.
+void ReadAtmosphereJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
+                       MapImportResult& result);
+
 } // namespace Io
 } // namespace SanmapGen

@@ -472,6 +472,10 @@ add_sangen_test(MapImporter_IO_Test
     src/io/MapImporter_IO_Test.cpp
     src/io/MapImporter_Validation_IO_Test.cpp
     src/io/MapImporter_Fields_IO_Test.cpp)
+# STEP9_Atmosphere_PARAMS_IO's unrecognized-skyboxIntensityMode-string check calls
+# Io::ReadAtmosphereJson directly against a hand-built nlohmann::json fixture, so this target now
+# needs nlohmann's headers directly too — same reasoning as the MapExporter_IO_Test note above.
+target_link_libraries(MapImporter_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 # STEP4_PropsDecals_IO: the pure (disk-free) props/decals JSON round trip, deliberately kept OUT of
 # MapImporter_IO_Test.exe — it calls BuildPropsJson/BuildDecalsJson/BuildPropGroupsJson/
 # BuildDecalGroupsJson and their reader inverses directly, bypassing BuildSanmapJsonText/

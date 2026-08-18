@@ -16,8 +16,9 @@
 //     real `recipe.*` content (STEP2/STEP3/STEP4; blueprintPath validation added by STEP5). An
 //     unresolved `props`/`decals` blueprintPath is reported, never dropped, never used to block the
 //     export (`ValidatePropAndDecalBlueprintPaths` below) — this builder stays disk-free.
-//  2. ATMOSPHERE has no `_PARAMS` home in the v2 tree, so the lighting/fog block is written from
-//     the format's own defaults, not settings that do not exist.
+//  2. RETIRED: ATMOSPHERE now has a `_PARAMS` home (`Params::Atmosphere`, ATMOSPHERE_PARAMS_SPEC)
+//     and round-trips real `recipe.atmosphere` content via `BuildAtmosphereJson`
+//     (MapExporter_Atmosphere_IO.cpp) — no longer written from the format's own defaults.
 #pragma once
 #include <cstddef>
 #include <string>

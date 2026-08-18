@@ -105,6 +105,9 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     ReadPropsJson(document, outRecipe, result);
     ReadDecalGroupsJson(document, outRecipe);
     ReadDecalsJson(document, outRecipe, result);
+    // ATMOSPHERE_PARAMS_SPEC: ~49 flat top-level keys, same tier/ordering rule as the entity
+    // domains above — unconditional, before the mapGeneratorData gate below.
+    ReadAtmosphereJson(document, outRecipe, result);
 
     if (!document.contains("mapGeneratorData") || !document["mapGeneratorData"].is_object()) {
         result.Warn("No mapGeneratorData block: only the map's own dimensions were recovered.");

@@ -59,5 +59,12 @@ nlohmann::ordered_json BuildPropGroupsJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildDecalsJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildDecalGroupsJson(const Params::MapRecipe& recipe);
 
+// MapExporter_Atmosphere_IO.cpp — `recipe.atmosphere` -> ~49 FLAT top-level `.sanmap` document
+// keys (ATMOSPHERE_PARAMS_SPEC). SHAPE DIFFERENCE from every `Build*Json` above: this one takes
+// `document` BY REFERENCE and writes directly into it instead of returning one self-contained
+// object — there is no single `atmosphere` sub-object on the wire to return (see the .cpp's own
+// header comment for the full field-name-mismatch table).
+void BuildAtmosphereJson(const Params::MapRecipe& recipe, nlohmann::ordered_json& document);
+
 } // namespace Io
 } // namespace SanmapGen

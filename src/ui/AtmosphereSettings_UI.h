@@ -1,12 +1,11 @@
 // AtmosphereSettings_UI.h — the atmosphere/lighting settings the Atmosphere tab edits.
 // Layer: UI. Accuracy class: Visual. TAB_REBUILD_PLAN "ENVIRONMENT / Atmosphere".
 //
-// SCOPE NOTE (ARCH §8.4 — a coder never invents a missing type): v2 has NO atmosphere PARAMS
-// type and no stage that consumes one, so these are caller-owned PRESENTATION settings in the UI
-// layer, exactly like `PreviewCompositeSettings` — they do not serialize into the recipe and no
-// generation stage reads them. Every value the v1 Atmosphere tab could set is present and named
-// in full, so promoting the whole struct to `Params::Atmosphere` later is a mechanical move.
-// That promotion needs its own work-order; this file does not make one up.
+// RETIRED SCOPE NOTE: the promotion this file used to flag as deferred has landed —
+// `Params::Atmosphere` now exists (ATMOSPHERE_PARAMS_SPEC.md, STEP9_Atmosphere_PARAMS_IO), with a
+// full `.sanmap` IO round-trip of its own. `Ui::AtmosphereSettings` itself is UNCHANGED and still
+// caller-owned PRESENTATION state, same as `PreviewCompositeSettings` — retyping the Atmosphere
+// tab onto `Params::Atmosphere` is a separate, not-yet-done UI-wiring ticket.
 //
 // Storage is the house convention: linear RGBA colors as four floats (byte-compatible with
 // Ui::kColorSwatchChannelCount and Params::GradientStop::color) and vectors as plain float

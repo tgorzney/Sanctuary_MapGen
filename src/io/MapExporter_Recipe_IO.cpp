@@ -99,6 +99,11 @@ std::string MapExporter::BuildSanmapJsonText(const Params::MapRecipe& recipe,
     document["PropGroups"]  = BuildPropGroupsJson(recipe);
     document["DecalGroups"] = BuildDecalGroupsJson(recipe);
 
+    // ATMOSPHERE_PARAMS_SPEC: ~49 flat top-level keys (`sunRA`, `skylightIntensity`, `windSpeed`,
+    // ...), same tier as the entity domains above — writes directly into `document`, see
+    // MapExporter_Atmosphere_IO.cpp's own header comment for the shape difference.
+    BuildAtmosphereJson(recipe, document);
+
     document["mapGeneratorData"] = BuildMapGeneratorDataJson(recipe);
     const int indent = options.jsonIndentSpaceCount > 0 ? options.jsonIndentSpaceCount : -1;
     return document.dump(indent);

@@ -4,6 +4,7 @@
 // The validation and baked-field halves live in the two sibling units (MapFormat_TestSupport_IO.h).
 #include "MapFormat_TestSupport_IO.h"
 #include "MapImporter_IO.h"
+#include "MapImporter_Recipe_IO.h"
 #include "MapExporter_IO.h"
 
 namespace SanmapGen {
@@ -222,6 +223,116 @@ void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRec
     }
 }
 
+// ATMOSPHERE_PARAMS_SPEC / STEP9_Atmosphere_PARAMS_IO: exercises the wrapper-object path fields
+// (sunCookiePath/skyboxPath), the {r,g,b,a} colors (sunTint/skylightTint/backgroundColor), and the
+// string-typed skyboxIntensityMode (a non-Exposure value, so the round trip actually proves the
+// string mapping rather than just surviving the default).
+void CheckAtmosphere(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    const Params::AtmosphereSun& originalSun = original.atmosphere.sun;
+    const Params::AtmosphereSun& loadedSun = loaded.atmosphere.sun;
+    Check(NearlyEqual(loadedSun.sunRightAscension, originalSun.sunRightAscension)
+          && NearlyEqual(loadedSun.sunDeclination, originalSun.sunDeclination)
+          && NearlyEqual(loadedSun.sunIntensity, originalSun.sunIntensity)
+          && NearlyEqual(loadedSun.sunTemperature, originalSun.sunTemperature)
+          && NearlyEqual(loadedSun.sunAngularDiameter, originalSun.sunAngularDiameter)
+          && NearlyEqual(loadedSun.sunVolumetricMultiplier, originalSun.sunVolumetricMultiplier)
+          && NearlyEqual(loadedSun.sunVolumetricShadowDimmer, originalSun.sunVolumetricShadowDimmer),
+          "the sun's scalar fields survive (sunRA/sunDA and the sunVolumetrics* mismatched keys)");
+    Check(NearlyEqual(loadedSun.sunTint[0], originalSun.sunTint[0])
+          && NearlyEqual(loadedSun.sunTint[1], originalSun.sunTint[1])
+          && NearlyEqual(loadedSun.sunTint[2], originalSun.sunTint[2])
+          && NearlyEqual(loadedSun.sunTint[3], originalSun.sunTint[3]),
+          "sunTint survives as {r,g,b,a}, all four components");
+    Check(NearlyEqual(loadedSun.sunPosition[0], originalSun.sunPosition[0])
+          && NearlyEqual(loadedSun.sunPosition[1], originalSun.sunPosition[1])
+          && NearlyEqual(loadedSun.sunPosition[2], originalSun.sunPosition[2]),
+          "sunPosition survives as {x,y,z}");
+    Check(NearlyEqual(loadedSun.sunCookieSize[0], originalSun.sunCookieSize[0])
+          && NearlyEqual(loadedSun.sunCookieSize[1], originalSun.sunCookieSize[1]),
+          "sunCookieSize survives as {x,y}");
+    Check(loadedSun.sunCookiePath == originalSun.sunCookiePath,
+          "sunCookiePath survives through the {\"path\":...} wrapper object");
+
+    const Params::AtmosphereSkylight& originalSkylight = original.atmosphere.skylight;
+    const Params::AtmosphereSkylight& loadedSkylight = loaded.atmosphere.skylight;
+    Check(NearlyEqual(loadedSkylight.skylightIntensity, originalSkylight.skylightIntensity)
+          && NearlyEqual(loadedSkylight.skylightTemperature, originalSkylight.skylightTemperature),
+          "skylight scalars survive");
+    Check(NearlyEqual(loadedSkylight.skylightTint[0], originalSkylight.skylightTint[0])
+          && NearlyEqual(loadedSkylight.skylightTint[1], originalSkylight.skylightTint[1])
+          && NearlyEqual(loadedSkylight.skylightTint[2], originalSkylight.skylightTint[2])
+          && NearlyEqual(loadedSkylight.skylightTint[3], originalSkylight.skylightTint[3]),
+          "skylightTint survives as {r,g,b,a}, all four components");
+
+    const Params::AtmosphereExposureSkybox& originalExposure = original.atmosphere.exposureSkybox;
+    const Params::AtmosphereExposureSkybox& loadedExposure = loaded.atmosphere.exposureSkybox;
+    Check(NearlyEqual(loadedExposure.exposure, originalExposure.exposure)
+          && NearlyEqual(loadedExposure.exposureCompensation, originalExposure.exposureCompensation)
+          && NearlyEqual(loadedExposure.skyboxRotation, originalExposure.skyboxRotation)
+          && NearlyEqual(loadedExposure.skyboxExposure, originalExposure.skyboxExposure)
+          && NearlyEqual(loadedExposure.skyboxMultiplier, originalExposure.skyboxMultiplier)
+          && NearlyEqual(loadedExposure.skyboxLuxValue, originalExposure.skyboxLuxValue),
+          "exposure/skybox scalars survive");
+    Check(loadedExposure.skyboxPath == originalExposure.skyboxPath,
+          "skyboxPath survives through the {\"path\":...} wrapper object");
+    Check(loadedExposure.skyboxIntensityMode == originalExposure.skyboxIntensityMode
+          && originalExposure.skyboxIntensityMode == Params::SkyboxIntensityMode::Lux,
+          "the non-Exposure skyboxIntensityMode survives its string round-trip");
+
+    const Params::AtmosphereLegacyFog& originalLegacyFog = original.atmosphere.legacyFog;
+    const Params::AtmosphereLegacyFog& loadedLegacyFog = loaded.atmosphere.legacyFog;
+    Check(NearlyEqual(loadedLegacyFog.legacyFogAttenuationDistance, originalLegacyFog.legacyFogAttenuationDistance)
+          && NearlyEqual(loadedLegacyFog.legacyFogBaseHeight, originalLegacyFog.legacyFogBaseHeight)
+          && NearlyEqual(loadedLegacyFog.legacyFogMaximumHeight, originalLegacyFog.legacyFogMaximumHeight)
+          && NearlyEqual(loadedLegacyFog.legacyFogMaximumDistance, originalLegacyFog.legacyFogMaximumDistance)
+          && NearlyEqual(loadedLegacyFog.legacyFogAnisotropy, originalLegacyFog.legacyFogAnisotropy),
+          "the legacyFog* fields survive through their mismatched fog* JSON keys");
+
+    const Params::AtmosphereBackgroundFog& originalBackgroundFog = original.atmosphere.backgroundFog;
+    const Params::AtmosphereBackgroundFog& loadedBackgroundFog = loaded.atmosphere.backgroundFog;
+    Check(NearlyEqual(loadedBackgroundFog.backgroundFogIntensity, originalBackgroundFog.backgroundFogIntensity)
+          && NearlyEqual(loadedBackgroundFog.backgroundFogRange, originalBackgroundFog.backgroundFogRange)
+          && NearlyEqual(loadedBackgroundFog.backgroundFogMinimum, originalBackgroundFog.backgroundFogMinimum)
+          && NearlyEqual(loadedBackgroundFog.backgroundSkyColorIntensity, originalBackgroundFog.backgroundSkyColorIntensity)
+          && NearlyEqual(loadedBackgroundFog.backgroundColorIntensity, originalBackgroundFog.backgroundColorIntensity)
+          && NearlyEqual(loadedBackgroundFog.backgroundColorFadeoutRange, originalBackgroundFog.backgroundColorFadeoutRange)
+          && NearlyEqual(loadedBackgroundFog.backgroundColorFadeoutPower, originalBackgroundFog.backgroundColorFadeoutPower),
+          "backgroundFog scalars survive");
+    Check(NearlyEqual(loadedBackgroundFog.backgroundColor[0], originalBackgroundFog.backgroundColor[0])
+          && NearlyEqual(loadedBackgroundFog.backgroundColor[1], originalBackgroundFog.backgroundColor[1])
+          && NearlyEqual(loadedBackgroundFog.backgroundColor[2], originalBackgroundFog.backgroundColor[2])
+          && NearlyEqual(loadedBackgroundFog.backgroundColor[3], originalBackgroundFog.backgroundColor[3]),
+          "backgroundColor survives as {r,g,b,a}, all four components");
+
+    const Params::AtmosphereHeightFog& originalHeightFog = original.atmosphere.heightFog;
+    const Params::AtmosphereHeightFog& loadedHeightFog = loaded.atmosphere.heightFog;
+    Check(NearlyEqual(loadedHeightFog.heightFogIntensity, originalHeightFog.heightFogIntensity)
+          && NearlyEqual(loadedHeightFog.heightFogStart, originalHeightFog.heightFogStart)
+          && NearlyEqual(loadedHeightFog.heightFogEnd, originalHeightFog.heightFogEnd)
+          && NearlyEqual(loadedHeightFog.heightFogPower, originalHeightFog.heightFogPower),
+          "heightFog scalars survive");
+    Check(NearlyEqual(loadedHeightFog.heightFogRange[0], originalHeightFog.heightFogRange[0])
+          && NearlyEqual(loadedHeightFog.heightFogRange[1], originalHeightFog.heightFogRange[1]),
+          "heightFogRange survives as {x,y}");
+
+    const Params::AtmosphereLinearFog& originalLinearFog = original.atmosphere.linearFog;
+    const Params::AtmosphereLinearFog& loadedLinearFog = loaded.atmosphere.linearFog;
+    Check(NearlyEqual(loadedLinearFog.linearFogIntensity, originalLinearFog.linearFogIntensity)
+          && NearlyEqual(loadedLinearFog.linearFogStart, originalLinearFog.linearFogStart)
+          && NearlyEqual(loadedLinearFog.linearFogEnd, originalLinearFog.linearFogEnd)
+          && NearlyEqual(loadedLinearFog.linearFogPower, originalLinearFog.linearFogPower)
+          && NearlyEqual(loadedLinearFog.linearFogCameraIntensity, originalLinearFog.linearFogCameraIntensity)
+          && NearlyEqual(loadedLinearFog.linearFogCameraStart, originalLinearFog.linearFogCameraStart)
+          && NearlyEqual(loadedLinearFog.linearFogCameraEnd, originalLinearFog.linearFogCameraEnd),
+          "linearFog scalars survive");
+
+    const Params::AtmosphereGlobalWind& originalGlobalWind = original.atmosphere.globalWind;
+    const Params::AtmosphereGlobalWind& loadedGlobalWind = loaded.atmosphere.globalWind;
+    Check(NearlyEqual(loadedGlobalWind.globalWindSpeed, originalGlobalWind.globalWindSpeed)
+          && NearlyEqual(loadedGlobalWind.globalWindDirection, originalGlobalWind.globalWindDirection),
+          "globalWind* fields survive through their mismatched wind* JSON keys");
+}
+
 void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     Params::GeoLayer geoLayer;
     geoLayer.name = "Ridges";
@@ -382,6 +493,77 @@ void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
     recipe.decals.push_back(decalGroup);
 }
 
+// Non-default values across all eight sub-structs, including a non-Exposure skyboxIntensityMode
+// (STEP9_Atmosphere_PARAMS_IO's acceptance test).
+void FillFixtureAtmosphere(Params::MapRecipe& recipe) {
+    Params::AtmosphereSun& sun = recipe.atmosphere.sun;
+    sun.sunRightAscension = 45.0f;
+    sun.sunDeclination = -12.5f;
+    sun.sunIntensity = 22000.0f;
+    sun.sunTint[0] = 0.9f; sun.sunTint[1] = 0.8f; sun.sunTint[2] = 0.7f; sun.sunTint[3] = 0.6f;
+    sun.sunTemperature = 5500.0f;
+    sun.sunAngularDiameter = 0.75f;
+    sun.sunVolumetricMultiplier = 3.2f;
+    sun.sunVolumetricShadowDimmer = 0.9f;
+    sun.sunPosition[0] = 100.0f; sun.sunPosition[1] = 50.0f; sun.sunPosition[2] = 200.0f;
+    sun.sunCookiePath = "Textures/SunCookie.tga";
+    sun.sunCookieSize[0] = 512.0f; sun.sunCookieSize[1] = 256.0f;
+
+    Params::AtmosphereSkylight& skylight = recipe.atmosphere.skylight;
+    skylight.skylightIntensity = 1.5f;
+    skylight.skylightTint[0] = 0.5f; skylight.skylightTint[1] = 0.6f;
+    skylight.skylightTint[2] = 0.7f; skylight.skylightTint[3] = 0.8f;
+    skylight.skylightTemperature = 8500.0f;
+
+    Params::AtmosphereExposureSkybox& exposureSkybox = recipe.atmosphere.exposureSkybox;
+    exposureSkybox.exposure = 10.0f;
+    exposureSkybox.exposureCompensation = 1.5f;
+    exposureSkybox.skyboxPath = "Textures/Skybox.hdr";
+    exposureSkybox.skyboxRotation = 90.0f;
+    exposureSkybox.skyboxIntensityMode = Params::SkyboxIntensityMode::Lux;   // non-default
+    exposureSkybox.skyboxExposure = 11.0f;
+    exposureSkybox.skyboxMultiplier = 2.0f;
+    exposureSkybox.skyboxLuxValue = 8000.0f;
+
+    Params::AtmosphereLegacyFog& legacyFog = recipe.atmosphere.legacyFog;
+    legacyFog.legacyFogAttenuationDistance = 300.0f;
+    legacyFog.legacyFogBaseHeight = 20.0f;
+    legacyFog.legacyFogMaximumHeight = 150.0f;
+    legacyFog.legacyFogMaximumDistance = 2000.0f;
+    legacyFog.legacyFogAnisotropy = 0.7f;
+
+    Params::AtmosphereBackgroundFog& backgroundFog = recipe.atmosphere.backgroundFog;
+    backgroundFog.backgroundFogIntensity = 0.8f;
+    backgroundFog.backgroundFogRange = 2048.0f;
+    backgroundFog.backgroundFogMinimum = 0.2f;
+    backgroundFog.backgroundSkyColorIntensity = 0.9f;
+    backgroundFog.backgroundColor[0] = 0.1f; backgroundFog.backgroundColor[1] = 0.2f;
+    backgroundFog.backgroundColor[2] = 0.3f; backgroundFog.backgroundColor[3] = 0.4f;
+    backgroundFog.backgroundColorIntensity = 0.5f;
+    backgroundFog.backgroundColorFadeoutRange = 200000.0f;
+    backgroundFog.backgroundColorFadeoutPower = 0.6f;
+
+    Params::AtmosphereHeightFog& heightFog = recipe.atmosphere.heightFog;
+    heightFog.heightFogIntensity = 0.9f;
+    heightFog.heightFogRange[0] = -20.0f; heightFog.heightFogRange[1] = 200.0f;
+    heightFog.heightFogStart = -20.0f;
+    heightFog.heightFogEnd = 600.0f;
+    heightFog.heightFogPower = 7.0f;
+
+    Params::AtmosphereLinearFog& linearFog = recipe.atmosphere.linearFog;
+    linearFog.linearFogIntensity = 0.5f;
+    linearFog.linearFogStart = 200.0f;
+    linearFog.linearFogEnd = 6000.0f;
+    linearFog.linearFogPower = 1.5f;
+    linearFog.linearFogCameraIntensity = 0.3f;
+    linearFog.linearFogCameraStart = 600.0f;
+    linearFog.linearFogCameraEnd = 6000.0f;
+
+    Params::AtmosphereGlobalWind& globalWind = recipe.atmosphere.globalWind;
+    globalWind.globalWindSpeed = 0.6f;
+    globalWind.globalWindDirection = 220.0f;
+}
+
 } // namespace
 
 Params::MapRecipe BuildPopulatedRecipe() {
@@ -402,6 +584,7 @@ Params::MapRecipe BuildPopulatedRecipe() {
     FillFixtureArmiesAndAreas(recipe);
     FillFixtureMarkersAndChains(recipe);
     FillFixturePropsAndDecals(recipe);
+    FillFixtureAtmosphere(recipe);
     return recipe;
 }
 
@@ -418,6 +601,23 @@ void RunRoundTripTests() {
     CheckArmiesAndAreas(original, loaded);
     CheckMarkersAndChains(original, loaded);
     CheckPropsAndDecals(original, loaded);
+    CheckAtmosphere(original, loaded);
+}
+
+// A pure-reader check, deliberately NOT routed through ParseSanmapJsonText/RunRoundTripTests
+// (which asserts warningCount == 0 on a clean document) — an unrecognized skyboxIntensityMode
+// string must fall back to Exposure with a LOGGED warning, never a crash (STEP9_
+// Atmosphere_PARAMS_IO's acceptance test).
+void CheckUnrecognizedSkyboxIntensityModeFallsBackSafely() {
+    nlohmann::json document;
+    document["skyboxIntensityMode"] = "NotARealMode";
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Io::ReadAtmosphereJson(document, loaded, result);
+    Check(loaded.atmosphere.exposureSkybox.skyboxIntensityMode == Params::SkyboxIntensityMode::Exposure,
+          "an unrecognized skyboxIntensityMode string falls back to Exposure");
+    Check(result.warningCount > 0,
+          "the unrecognized skyboxIntensityMode fallback is logged as a warning, not silent");
 }
 
 } // namespace MapFormatTest
@@ -425,6 +625,7 @@ void RunRoundTripTests() {
 
 int main() {
     SanmapGen::MapFormatTest::RunRoundTripTests();
+    SanmapGen::MapFormatTest::CheckUnrecognizedSkyboxIntensityModeFallsBackSafely();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

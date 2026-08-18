@@ -6,6 +6,7 @@
 #pragma once
 #include <vector>
 #include "Army_PARAMS.h"
+#include "Atmosphere_PARAMS.h"
 #include "Geometry_PARAMS.h"
 #include "LayerStack_PARAMS.h"
 #include "MapArea_PARAMS.h"
@@ -33,6 +34,9 @@ struct MapRecipe {
     std::vector<DecalRule>  decalRules;
     std::vector<UnitRule>   unitRules;
     Water                   water;
+    // Sun/sky/fog/wind rendering-presentation recipe (ATMOSPHERE_PARAMS_SPEC) — a flat sibling of
+    // `water`, no PROC/PIPELINE stage reads it yet (see the spec's own "Where these land").
+    Atmosphere              atmosphere;
     int                     globalSymmetryMask = SymmetryAxis::None;
     // Hand-placed, pass-through entity data (ENTITY_AUTHORING_PARAMS_SPEC) — round-trip fidelity
     // through the `.sanmap` `armies`/`areas`/`markers`/`chains` dictionaries is their entire

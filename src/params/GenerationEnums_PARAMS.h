@@ -33,5 +33,13 @@ enum class SimulationGrouping {
     Separate, Unified
 };
 
+// Which quantity the skybox's intensity is stated in (ATMOSPHERE_PARAMS_SPEC's one retype —
+// ARCH §1.8 — of the UI's raw `skyboxIntensityModeIndex`). NOTE: unlike every other enum in this
+// file, the `.sanmap` format serializes this one as a JSON STRING ("Exposure"/"Lux"/"Multiplier"),
+// not an int — see MapExporter_Atmosphere_IO.cpp/MapImporter_Atmosphere_IO.cpp.
+enum class SkyboxIntensityMode {
+    Exposure, Lux, Multiplier
+};
+
 } // namespace Params
 } // namespace SanmapGen
