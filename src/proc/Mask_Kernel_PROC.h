@@ -27,6 +27,10 @@ struct MaskConstants {
 // bytes, a multiple of 16 so the std430 array stride needs no extra padding. The float
 // copies of the stage-wide values exist because the SYS seam exposes int uniforms only —
 // the shader therefore reads every float from this block. Order is load-bearing.
+// `paddingThird`/`paddingFourth` replace the former remapMinimum/inverseRemapRange fields:
+// per-stratum output remap is material/appearance pass-through data, NOT a Mask-stage input
+// (Generator Expert ruling) — but the two scalars stay reserved so the std430 stride holds at
+// 96 bytes rather than shrinking to a non-multiple-of-16 layout.
 struct MaskStratumConfiguration {
     int   mergeMode           = 0;   // Params::ImportedMaskMode as int
     int   storedMaskOffset    = 0;   // first element of this stratum's art in the packed buffer
@@ -41,8 +45,8 @@ struct MaskStratumConfiguration {
     float inverseFeatherLow   = 0.0f;   // 1/feather; 0 marks a hard (unfeathered) edge
     float inverseFeatherHigh  = 0.0f;
     float gateStrength        = 0.0f;   // 0 = gate disabled (weight stays 1)
-    float remapMinimum        = 0.0f;
-    float inverseRemapRange   = 1.0f;   // 1/(max-min); 0 marks a degenerate remap window
+    float paddingThird        = 0.0f;
+    float paddingFourth       = 0.0f;
     float heightScale         = 1.0f;   // Geometry.terrainMaxHeight — read from the map, not 128
     float inverseSingleSpan   = 1.0f;   // 1/(1*worldUnitsPerCell) — edge cells, one-sided difference
     float inverseDoubleSpan   = 0.5f;   // 1/(2*worldUnitsPerCell) — interior cells, central difference

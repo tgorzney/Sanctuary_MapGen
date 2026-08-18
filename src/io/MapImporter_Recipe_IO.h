@@ -51,6 +51,21 @@ inline bool ReadJsonEnumeration(const nlohmann::json& parent, const char* key, i
     return true;
 }
 
+// A 4-component field stored as `{"x":.., "y":.., "z":.., "w":..}` (ARCH §7.2 item 10's Vector4
+// shape). Each component is read independently, same as the scalar readers above, so a partial
+// object still updates the components it has instead of discarding the whole field.
+inline bool ReadJsonFloatVector4(const nlohmann::json& parent, const char* key,
+                                 float destination[4]) {
+    if (!parent.contains(key) || !parent[key].is_object()) return false;
+    const nlohmann::json& vector = parent[key];
+    bool bAnyComponentRead = false;
+    bAnyComponentRead |= ReadJsonFloat(vector, "x", destination[0]);
+    bAnyComponentRead |= ReadJsonFloat(vector, "y", destination[1]);
+    bAnyComponentRead |= ReadJsonFloat(vector, "z", destination[2]);
+    bAnyComponentRead |= ReadJsonFloat(vector, "w", destination[3]);
+    return bAnyComponentRead;
+}
+
 // --- The block readers (MapImporter_Recipe_IO.cpp / MapImporter_Layers_IO.cpp). -----------------
 void ReadGeometryJson(const nlohmann::json& generatorData, const MapImportOptions& options,
                       Params::MapRecipe& outRecipe, MapImportResult& result);

@@ -74,8 +74,11 @@ knows the pipeline shape (ARCH §3.2).
   per-layer, lives inside `HeightmapStack`'s Simulation-layer entries.
   Distinct from the reserved `Flow`/`Accumulation` sections above.
 - **`Params::Stratum`** (`Stratum_PARAMS.h`) — the sole per-stratum settings
-  type (ARCH §7.1): appearance, soil physics, mask slope gate + the new
-  `bSlopeUseGlobal` flag, stored-mask merge mode, remap.
+  type (ARCH §7.1): mask slope gate + the new `bSlopeUseGlobal` flag,
+  stored-mask merge mode, appearance (albedo/tint/tiling, plus the
+  `maskRemapMinimum`/`maskRemapMaximum` mask-texture remap window — pure
+  material/appearance pass-through, not part of the mask gate/merge mechanism
+  and read by no generation stage, ARCH §7.2 item 5), and soil physics.
 - **`Params::MarkerRule` / `PropRule` / `DecalRule` / `UnitRule`**
   (`MarkerRule_PARAMS.h`, `ScatterRule_PARAMS.h`) — placement filters; see
   `PLACEMENT_SCATTER_SPEC` for the full field list and the `MarkersStack`/

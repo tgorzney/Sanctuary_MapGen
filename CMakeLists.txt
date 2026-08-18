@@ -463,6 +463,10 @@ add_sangen_test(PlacementRuleSections_UI_Test src/ui/PlacementRuleSections_UI_Te
 # Sanmap round trip through a scratch folder. All headless — no imgui frame, no window, no GL.
 add_sangen_test(FileDialog_IO_Test        src/io/FileDialog_IO_Test.cpp)
 add_sangen_test(MapExporter_IO_Test       src/io/MapExporter_IO_Test.cpp)
+# This test parses the exported document's raw JSON text itself (the Vector4/int-shape acceptance
+# checks, STEP1_ShippingBugFixes), so it needs nlohmann's headers directly — unlike every other
+# consumer of SanGenV2, which never sees the type (see the PRIVATE link note on SanGenV2 above).
+target_link_libraries(MapExporter_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 add_sangen_test(MapImporter_IO_Test
     src/io/MapImporter_IO_Test.cpp
     src/io/MapImporter_Validation_IO_Test.cpp

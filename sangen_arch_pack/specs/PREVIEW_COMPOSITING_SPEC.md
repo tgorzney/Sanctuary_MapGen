@@ -31,19 +31,29 @@ SSBO layout: `0=EntityIDBuffer` · `1=heightmap` · `2=FlowMap` · `3=Accumulati
   `.SmoothInterpolation`; `GradientStop.Location/.Color`) into a 256×4 LUT (SSBO 7) —
   slope / flow / accumulation / water. (Accumulation currently **reuses the flow
   gradient** — "legacy"; give it its own ramp in v2.)
-- **Stratum splat**: `stratColors` from `Stratums[i].previewColor`, remapped by
-  `maskRemapMin/maskRemapMax`, multiplied by the stratum's `MaterialMasks` weight —
-  splat weight × preview tint. Stratum cap **9** is hardcoded everywhere.
+- **Stratum splat**: `stratColors` from `Stratums[i].previewColor`, multiplied by
+  the stratum's `MaterialMasks` weight — splat weight × preview tint. A single
+  global `stratumRemaps` uniform (`loc_stratumRemaps`) is also uploaded, but it is
+  **not** a per-stratum remap: the code builds one `[maskRemapMin[0], maskRemapMax[0]]`
+  pair per stratum and then only ever reads stratum **0**'s pair, applying it
+  identically to the whole splat blend. It is a legacy, ad-hoc, global contrast knob
+  — not evidence of a real per-stratum remap mechanism (that reading was
+  investigated and withdrawn, ARCH §7.2 item 5 / `MASKING_SPEC` §1.6, Part 2
+  "Consumption (legacy)"). v2 does not carry this uniform forward. Stratum cap
+  **9** is hardcoded everywhere.
 - **Water**: `Water.WaterLevelMax/DeepWaterDepthMin/DeepWaterDepthMax`,
   `FlowMapColor`.
 - The real albedo/mask blend is baked upstream (`Gen_Tex_Albedo::ApplyAlbedoMask`,
   impl absent from the snapshot); the preview receives finished weights.
 
 ## Stratum & decals
-`StratumSettings` supplies the tile/normal/remap/physics fields (see `MASKING_SPEC`,
-`GAMEDATA_LAYOUT_SPEC`). **Decals are never composited** — `DecalRule` exists and is
-imported (`ImportedDecalsJSON`) but the preview has no decal SSBO or pass. A silent
-feature gap to close in v2.
+`StratumSettings` supplies the tile/normal/physics fields (see `MASKING_SPEC`,
+`GAMEDATA_LAYOUT_SPEC`); its `maskRemapMin`/`maskRemapMax` fields are per-stratum
+material/appearance pass-through data consumed only by the game's own renderer
+against the stratum's composite texture — no SanGen stage, preview included,
+computes with them (`MASKING_SPEC` §1.6). **Decals are never composited** —
+`DecalRule` exists and is imported (`ImportedDecalsJSON`) but the preview has no
+decal SSBO or pass. A silent feature gap to close in v2.
 
 ## The shadow-sim problem (the central hit-list item)
 The preview **re-derives** results instead of sampling the bake:
@@ -98,6 +108,10 @@ Visual class for scrubbing, escalate on idle).
 - **Duplicate/empty types**: two `StratumSettings`, empty `TerrainType_Decal.h`.
 - **Decals never previewed**; **accumulation has no own ramp**; **global mutable
   statics** (single-context, resize-keyed reallocation misses format changes).
+- **`loc_stratumRemaps` uniform is dropped, not ported** — it was a global,
+  stratum-0-only contrast knob (see "Coloring" above), not a real per-stratum
+  mechanism; v2's stratum splat is `surfaceStratumWeights × tint` only
+  (`MASKING_SPEC` §1.2).
 
 ## v2 guidance
 Preview = composite + colorize + pick over the **single baked result**; never

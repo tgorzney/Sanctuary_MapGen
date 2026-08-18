@@ -4,6 +4,7 @@
 // control it wants and never repeats a bound. The slider itself is the batch-A shared widget;
 // nothing is drawn here directly.
 #include "StratumsTab_Draw_UI.h"
+#include <cstdio>
 #include "../pipeline/PreviewDriver_PIPELINE.h"
 
 namespace SanmapGen {
@@ -37,6 +38,14 @@ WidgetChange DrawStratumsTabScalar(StratumsTabScalar scalar, float& value, Strat
     const StratumsTabScalarDescription& description = StratumsTabScalarDescriptionOf(scalar);
     return DrawSliderScalar(description.label, value, RangeOf(scalar, state), ToggleOf(scalar, row),
                             WidgetStyle(), description.valueFormat);
+}
+
+WidgetChange DrawStratumsTabScalarChannel(StratumsTabScalar scalar, int channel, const char* channelSuffix,
+                                          float& value, RealtimeToggle& toggle, StratumsTabState& state) {
+    const StratumsTabScalarDescription& description = StratumsTabScalarDescriptionOf(scalar);
+    char label[48];
+    std::snprintf(label, sizeof(label), "%s %s", description.label, channelSuffix);
+    return DrawSliderScalar(label, value, RangeOf(scalar, state), toggle, WidgetStyle(), description.valueFormat);
 }
 
 } // namespace Ui

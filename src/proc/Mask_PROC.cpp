@@ -44,8 +44,10 @@ std::size_t HashStratumSettings(std::size_t seed, const Params::Stratum& stratum
     seed = HashFloat(seed, stratum.slopeFeatherDegreesHigh);
     seed = HashFloat(seed, stratum.slopeGateStrength);
     seed = HashInteger(seed, static_cast<int>(stratum.importedMaskMode));
-    seed = HashFloat(seed, stratum.maskRemapMinimum);
-    return HashFloat(seed, stratum.maskRemapMaximum);
+    // `maskRemapMinimum`/`maskRemapMaximum` are per-stratum material/appearance pass-through
+    // data, NOT a Mask-stage input (Generator Expert ruling) — hashing an unconsumed input
+    // would itself be an ARCH §3.4 purity violation the other direction, so they stay out.
+    return seed;
 }
 
 // The stored art is a loaded input (Data::StratumArt), so its CONTENT is hashed — otherwise

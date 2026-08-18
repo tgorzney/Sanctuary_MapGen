@@ -4,6 +4,28 @@ Where the pack stands and what to do next. (Read CONSTITUTION + INDEX first; the
 Setup Plan holds Appendix A's code hit-list.)
 
 ## Status: pack + ARCH COMPLETE; SPEC-4 (.sanmap schema v3) ratified
+
+## CORRECTION (post-hoc, supersedes the "Latest ratified session" entry below)
+**ARCH §7.2 item 5 was wrong and has been corrected.** The Generator Expert, after
+independently verifying the evidence against the real code, ruled that there is **no**
+per-stratum surface-weight remap in the Mask stage — or anywhere in SanGen generation.
+`Params::Stratum::maskRemapMinimum`/`maskRemapMaximum` is per-stratum material/
+appearance **pass-through data**, consumed only by the game's own renderer against the
+stratum's composite/"mask" texture — a real texture asset distinct from the
+`stratums_1_4/5_8.tga` splat-weight files the Mask stage produces. No SanGen generation
+stage reads or writes it today. See `ARCH.md` §7.2 item 5 (rewritten) and
+`MASKING_SPEC` §1.6/§1.7 (corrected). Two direct consequences for the entries below,
+both already applied at the cited locations:
+- The "Explicitly does NOT reopen item 5 ('remap runs once, in Mask')" framing in the
+  session entry just below is **stale** — item 5 no longer says that. §7.2 item 10's
+  field-*shape* ruling (4-component, not scalar) is unaffected and still stands.
+- The "Open items to confirm with dev" bullet about how the Mask kernel should consume
+  a 4-component remap window is **CLOSED**, not open: the Mask kernel does not consume
+  this field at all, so there is nothing to wire.
+A future work-order may eventually wire `maskRemapMinimum`/`maskRemapMaximum` to a real
+consumer (most plausibly composite/mask-texture processing inside Bake); not designed
+yet.
+
 All planned specs are written and committed to the repo (`sangen_arch_pack/`). The
 ARCH Expert charter is live at `.claude/agents/sangen-arch-expert.md`. **`ARCH.md` is
 now fully authored and ratified** (7 naming-law subsections incl. the schema v3 casing
@@ -31,11 +53,15 @@ schema v3 change (and the migration mechanism that gates it) is coder-tier work 
 ## Latest ratified session — `Params::Stratum` IO ruling (3 parts, ARCH.md + 2 specs)
 - **ARCH §7.2 item 10 (amendment):** `maskRemapMinimum`/`maskRemapMaximum` widen from
   `float` to `float[kStratumColorChannelCount]` (4-component) — confirmed against
-  `SanMap.Types.cs::Stratum.maskRemapMin/Max` (both `Vector4`). Explicitly does NOT
-  reopen item 5 ("remap runs once, in Mask") or §7.1 ("no rival per-stratum settings
-  type") — this is a field-*shape* correction on the one existing field, not a new
-  type. How the Mask kernel's scalar-per-cell surface weight consumes a 4-channel
-  window is **left open** — a coder who reaches it stops and reports (§8.4 spirit).
+  `SanMap.Types.cs::Stratum.maskRemapMin/Max` (both `Vector4`). At the time of this
+  session, believed to not reopen item 5 ("remap runs once, in Mask") or §7.1 ("no
+  rival per-stratum settings type") — a field-*shape* correction on the one existing
+  field, not a new type. **[SUPERSEDED by the CORRECTION note at the top of this file:
+  item 5 itself was later found wrong and rewritten — there is no remap site at all.
+  This amendment's field-shape ruling (4-component, not scalar) is unaffected and still
+  stands.]** How the Mask kernel's scalar-per-cell surface weight consumes a 4-channel
+  window was left open here — **now CLOSED**: the Mask kernel does not consume this
+  field, full stop.
 - **`SANMAP_FORMAT_SPEC` Correction 12:** new top-level `StratumGenerationSettings[9]`
   (index-aligned with `stratumLayers[9]`) carrying `Params::Stratum::soilPhysics`'s 6
   fields + `bSlopeUseGlobal` + the 7 slope-gate fields — no new C++ type, a zero-cost
@@ -111,9 +137,10 @@ above is a coarse inventory, not a substitute for it.)
   itself, or only entity scale/placement (leaning: only scale authoring).
 - tint_geometry.tga channel layout (was login-walled).
 - Deep AI/host/client/systems lua read — only if pursuing custom AI/shared-gen depth.
-- How the Mask kernel's per-cell scalar surface weight should consume the newly
-  4-component `maskRemapMinimum`/`maskRemapMaximum` (ARCH §7.2 item 10) — left open,
-  flagged for a future ARCH ruling once a coder actually reaches it.
+- ~~How the Mask kernel's per-cell scalar surface weight should consume the newly
+  4-component `maskRemapMinimum`/`maskRemapMaximum` (ARCH §7.2 item 10)~~ — **CLOSED**
+  by the CORRECTION at the top of this file: the Mask kernel does not consume this
+  field at all. Removed as an open item.
 
 ## Next: implement the v2 rebuild (ARCH §6 milestones)
 ARCH is authored — the work is now execution, bottom-up:

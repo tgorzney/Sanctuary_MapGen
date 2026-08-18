@@ -59,15 +59,27 @@ void CheckSettingsDirtying(DirtyHashHarness& harness) {
     Check(ran.size() == 1 && Ran(ran, "Mask") && harness.maskRunCount == 2,
           "changing a slope-gate setting re-runs only the mask stage");
 
-    harness.strata[3].maskRemapMaximum = 0.9f;
+    harness.strata[3].slopeGateStrength = 0.5f;
     ran = harness.pipeline.Run();
     Check(ran.size() == 1 && harness.maskRunCount == 3,
-          "changing another stratum's remap re-runs the mask stage");
+          "changing another stratum's gate strength re-runs the mask stage");
 
     harness.upstreamHeightParameter = 2;
     ran = harness.pipeline.Run();
     Check(ran.size() == 2 && Ran(ran, "Heightfield") && Ran(ran, "Mask") && harness.maskRunCount == 4,
           "an upstream change dirties the mask stage as well");
+
+    // `maskRemapMinimum`/`maskRemapMaximum` is per-stratum material/appearance pass-through
+    // data, NOT a Mask-stage input (Generator Expert ruling): editing it must not move the hash
+    // or re-run the stage.
+    const std::size_t hashBeforeAppearanceEdit = harness.stage.ComputeParameterHash();
+    harness.strata[2].maskRemapMinimum[0] = 0.4f;
+    harness.strata[2].maskRemapMaximum[1] = 0.6f;
+    Check(harness.stage.ComputeParameterHash() == hashBeforeAppearanceEdit,
+          "maskRemapMinimum/Maximum does not change the Mask parameter hash");
+    ran = harness.pipeline.Run();
+    Check(ran.empty() && harness.maskRunCount == 4,
+          "changing maskRemapMinimum/Maximum does not re-run the mask stage");
 }
 
 // Stored art is an input like any other: both its arrival and its pixels are part of the hash.

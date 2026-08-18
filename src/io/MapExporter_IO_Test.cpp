@@ -5,9 +5,11 @@
 #include "MapExporter_IO.h"
 #include "../data/MapFields_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <nlohmann/json.hpp>
 #include <vector>
 
 using namespace SanmapGen;
@@ -68,6 +70,61 @@ static void TestDocumentCarriesTheFormatsOwnFields() {
           "the format's fixed texture layer array is present");
     Check(documentText.find("\"props\"") != std::string::npos,
           "and the entity domains are written empty and valid, never omitted (SCOPE NOTE 1)");
+}
+
+// STEP1_ShippingBugFixes: `maskRemapMin`/`maskRemapMax` are real Vector4 objects (ARCH §7.2
+// item 10), not bare scalars, and `height` is always a whole number (SanMap.cs:24 types it int)
+// even when a designer's `terrainMaxHeight` is fractional.
+static void TestStratumLayersWriteVector4RemapAndIntegerHeight() {
+    Params::MapRecipe recipe;
+    recipe.geometry.mapSize = 4;
+    recipe.strata.resize(1);
+    recipe.strata[0].maskRemapMinimum[0] = 0.1f;
+    recipe.strata[0].maskRemapMinimum[1] = 0.2f;
+    recipe.strata[0].maskRemapMinimum[2] = 0.3f;
+    recipe.strata[0].maskRemapMinimum[3] = 0.4f;
+    recipe.strata[0].maskRemapMaximum[0] = 0.5f;
+    recipe.strata[0].maskRemapMaximum[1] = 0.6f;
+    recipe.strata[0].maskRemapMaximum[2] = 0.7f;
+    recipe.strata[0].maskRemapMaximum[3] = 0.9f;
+    recipe.geometry.terrainMaxHeight = 127.6f;   // a legal fractional Params::Geometry value
+
+    Io::MapExportOptions options;
+    options.mapName = "scratch";
+    const std::string documentText = Io::MapExporter::BuildSanmapJsonText(recipe, options);
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+    const nlohmann::json& stratumLayer = document.at("stratumLayers").at(0);
+
+    auto checkVector4 = [](const nlohmann::json& vector, float x, float y, float z, float w,
+                           const char* label) {
+        Check(vector.is_object(), (std::string(label) + " is an object, not a bare number").c_str());
+        const bool bHasAllComponents = vector.contains("x") && vector.contains("y")
+                                     && vector.contains("z") && vector.contains("w");
+        Check(bHasAllComponents, (std::string(label) + " carries all four Vector4 keys").c_str());
+        if (!bHasAllComponents) return;
+        const bool bComponentsMatch =
+            std::abs(vector.at("x").get<float>() - x) < 1e-5f
+            && std::abs(vector.at("y").get<float>() - y) < 1e-5f
+            && std::abs(vector.at("z").get<float>() - z) < 1e-5f
+            && std::abs(vector.at("w").get<float>() - w) < 1e-5f;
+        Check(bComponentsMatch,
+              (std::string(label) + " round-trips the stratum's own 4 components").c_str());
+    };
+    checkVector4(stratumLayer.at("maskRemapMin"), 0.1f, 0.2f, 0.3f, 0.4f, "maskRemapMin");
+    checkVector4(stratumLayer.at("maskRemapMax"), 0.5f, 0.6f, 0.7f, 0.9f, "maskRemapMax");
+
+    Check(document.at("height").is_number_integer(),
+          "a fractional terrainMaxHeight still writes height as a whole number");
+    Check(document.at("height").get<int>() == 128,
+          "127.6 rounds up to 128 (rounds, does not truncate)");
+
+    recipe.geometry.terrainMaxHeight = 200.0f;   // already whole
+    const nlohmann::json wholeHeightDocument =
+        nlohmann::json::parse(Io::MapExporter::BuildSanmapJsonText(recipe, options));
+    Check(wholeHeightDocument.at("height").is_number_integer(),
+          "an already-integer terrainMaxHeight also writes height as a whole number");
+    Check(wholeHeightDocument.at("height").get<int>() == 200,
+          "and its value round-trips exactly");
 }
 
 static void TestAnInvalidRecipeIsRefusedBeforeAnythingIsWritten() {
@@ -134,6 +191,7 @@ int main() {
     TestQuantizersClampInsteadOfWrapping();
     TestPathJoinNeverDoublesASeparator();
     TestDocumentCarriesTheFormatsOwnFields();
+    TestStratumLayersWriteVector4RemapAndIntegerHeight();
     TestAnInvalidRecipeIsRefusedBeforeAnythingIsWritten();
     TestExportAllWritesEveryPayload();
     TestFolderPreparationIsTheOneDoorAboveIo();

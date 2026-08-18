@@ -31,16 +31,28 @@ void DrawRemapColor(const char* label, float color[kColorSwatchChannelCount],
                             previewDriver);
 }
 
-// The ONE surface-weight remap (ARCH §7.2.5), applied by the Mask stage. Held ordered here so a
-// window can never be inverted by a slider.
+constexpr const char* kMaskRemapChannelSuffixes[Params::kStratumColorChannelCount] = { "X", "Y", "Z", "W" };
+
+// The ONE surface-weight remap (ARCH §7.2.5), applied by the Mask stage. Held ordered here, per
+// channel, so a window can never be inverted by a slider. The field is a 4-component Vector4 to
+// match the `.sanmap` shape (StratumAppearance_PARAMS.h), so each channel gets its own row and its
+// own RealtimeToggle — a drag on one channel must not move or affect any other.
 void DrawMaskRemapWindow(Params::Stratum& stratum, StratumsTabState& state, StratumRowState& row,
                          Pipeline::PreviewDriver* previewDriver) {
-    DrawStratumsTabScalarRow(StratumsTabScalar::MaskRemapMinimum, stratum.maskRemapMinimum,
-                             state, row, previewDriver);
-    DrawStratumsTabScalarRow(StratumsTabScalar::MaskRemapMaximum, stratum.maskRemapMaximum,
-                             state, row, previewDriver);
-    if (stratum.maskRemapMaximum < stratum.maskRemapMinimum)
-        stratum.maskRemapMaximum = stratum.maskRemapMinimum;
+    for (int channel = 0; channel < Params::kStratumColorChannelCount; ++channel) {
+        NotifyStratumsTabChange(
+            DrawStratumsTabScalarChannel(StratumsTabScalar::MaskRemapMinimum, channel,
+                                         kMaskRemapChannelSuffixes[channel], stratum.maskRemapMinimum[channel],
+                                         row.maskRemapMinimumToggles[channel], state).bCommitted,
+            previewDriver);
+        NotifyStratumsTabChange(
+            DrawStratumsTabScalarChannel(StratumsTabScalar::MaskRemapMaximum, channel,
+                                         kMaskRemapChannelSuffixes[channel], stratum.maskRemapMaximum[channel],
+                                         row.maskRemapMaximumToggles[channel], state).bCommitted,
+            previewDriver);
+        if (stratum.maskRemapMaximum[channel] < stratum.maskRemapMinimum[channel])
+            stratum.maskRemapMaximum[channel] = stratum.maskRemapMinimum[channel];
+    }
 }
 
 } // namespace

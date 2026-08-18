@@ -18,7 +18,9 @@ using Proc::ExpectedTexel;
 void check(bool bCondition, const char* label) { Proc::CheckBakeExpectation(bCondition, label); }
 
 // The weight the Mask stage produced is what the bake composites and what it packs, byte for
-// byte. A remap window on the stratum settings is a MASK input; the bake must ignore it.
+// byte. `maskRemapMinimum`/`maskRemapMaximum` is per-stratum material/appearance pass-through
+// data (Generator Expert ruling) — neither a Mask nor a Bake input — so no stage in the current
+// pipeline consumes it; the bake must ignore it just like every other stage does today.
 void TestNoRivalRemap() {
     Params::Geometry geometry; geometry.mapSize = 4;
     Data::MapFields fields;
@@ -28,11 +30,11 @@ void TestNoRivalRemap() {
     BuildTwoStratumScene(geometry, fields, scene, stage);
     stage.SetDispatchPolicy(CpuVisualPolicy());
 
-    scene.strata[1].maskRemapMinimum = 0.5f;
-    scene.strata[1].maskRemapMaximum = 1.0f;
+    scene.strata[1].maskRemapMinimum[0] = 0.5f;
+    scene.strata[1].maskRemapMaximum[0] = 1.0f;
     stage.Run();
     check(AllTexelsEqual(textures.compositeAlbedo, ExpectedTexel(64, 0, 191, 255)),
-          "the bake ignores the stratum remap window (the ONE remap already happened in Mask)");
+          "the bake ignores the stratum appearance remap field (pure pass-through, no consumer yet)");
     check(AllTexelsEqual(textures.stratumMaskLow, ExpectedTexel(191, 0, 0, 0)),
           "the packed mask texture stores the surface weight verbatim");
 
@@ -45,7 +47,7 @@ void TestNoRivalRemap() {
 }
 
 // Dirty hash through the pipeline: first Run bakes, an unchanged Run skips, a changed
-// appearance setting re-runs, and a mask-only setting never enters this stage's hash.
+// appearance setting re-runs, and the appearance remap field never enters this stage's hash.
 void TestDirtyHashSkipAndReRun() {
     Params::Geometry geometry; geometry.mapSize = 4;
     Data::MapFields fields;
@@ -66,10 +68,10 @@ void TestDirtyHashSkipAndReRun() {
     check(AllTexelsEqual(textures.compositeAlbedo, ExpectedTexel(64, 191, 191, 255)),
           "the re-run picked up the new tint");
 
-    const std::size_t hashBeforeMaskEdit = stage.ComputeParameterHash();
-    scene.strata[1].maskRemapMinimum = 0.3f;
-    check(stage.ComputeParameterHash() == hashBeforeMaskEdit,
-          "a mask-only setting does not enter the bake's own parameter hash");
+    const std::size_t hashBeforeAppearanceEdit = stage.ComputeParameterHash();
+    scene.strata[1].maskRemapMinimum[0] = 0.3f;
+    check(stage.ComputeParameterHash() == hashBeforeAppearanceEdit,
+          "the appearance remap field (not a Mask or Bake input) does not enter the bake's parameter hash");
 }
 
 } // namespace

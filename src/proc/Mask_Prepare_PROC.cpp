@@ -59,11 +59,10 @@ void ConfigureSlopeGate(MaskStratumConfiguration& configuration, const Params::S
 
 // Appends this stratum's loaded art to the packed buffer. A mode of StaticOverride with no
 // usable art degrades to Disabled — replacing a weight with nothing would erase the stratum.
+// `maskRemapMinimum`/`maskRemapMaximum` are per-stratum material/appearance pass-through data
+// (Generator Expert ruling) — NOT a Mask-stage input — so this function never reads them.
 void ConfigureStoredArt(MaskStratumConfiguration& configuration, const Params::Stratum& stratum,
                         const Data::StratumArt* art, std::vector<float>& packedValues, int vertexSize) {
-    const float remapRange = stratum.maskRemapMaximum - stratum.maskRemapMinimum;
-    configuration.remapMinimum      = stratum.maskRemapMinimum;
-    configuration.inverseRemapRange = remapRange > 0.0f ? 1.0f / remapRange : 0.0f;
     if (stratum.importedMaskMode == Params::ImportedMaskMode::Disabled) return;
     if (art == nullptr || !art->HasImportedMask()) return;   // stays kMergeModeDisabled
 
@@ -88,10 +87,7 @@ void MaskStage::PrepareRun() {
         MaskStratumConfiguration& configuration = stratumConfigurations[index];
         ConfigureSharedFields(configuration, constants, geometry.terrainMaxHeight,
                               geometry.worldUnitsPerCell);
-        if (static_cast<std::size_t>(index) >= strata.size()) {
-            configuration.inverseRemapRange = 1.0f;   // unconfigured stratum: pass the weight through
-            continue;
-        }
+        if (static_cast<std::size_t>(index) >= strata.size()) continue;   // unconfigured: stays defaulted
         const Data::StratumArt* art = static_cast<std::size_t>(index) < stratumArt.size()
                                     ? &stratumArt[index] : nullptr;
         ConfigureSlopeGate(configuration, strata[index], constants);

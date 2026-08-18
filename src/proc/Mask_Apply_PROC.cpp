@@ -16,8 +16,10 @@ namespace SanmapGen {
 namespace Proc {
 namespace {
 
-// One cell of one stratum: gate -> merge -> remap. The stored art is sampled ONLY when a merge
-// mode wants it (Disabled never pays for a resample).
+// One cell of one stratum: gate -> merge. The stored art is sampled ONLY when a merge mode
+// wants it (Disabled never pays for a resample). The merged, clamped weight IS the output —
+// no further per-stratum remap (that field is material/appearance pass-through, not a Mask
+// input; Generator Expert ruling).
 // NOTE (MASKING_SPEC 1.9 / ARCH §7.5): `materialProportion` is a VOLUME FRACTION standing in
 // for surface exposure until the ordered thickness stack lands in M6. Same shape, same kernel.
 float ResolveStratumCell(const MaskStratumConfiguration& configuration, const float* storedValues,
@@ -26,8 +28,7 @@ float ResolveStratumCell(const MaskStratumConfiguration& configuration, const fl
     const float proceduralWeight = materialProportion * gateWeight;
     const float storedWeight = configuration.mergeMode == kMergeModeDisabled
                              ? 0.0f : SampleStoredMaskBilinear(storedValues, configuration, x, y);
-    const float mergedWeight = MergeStoredMask(proceduralWeight, storedWeight, configuration);
-    return RemapMaskValue(mergedWeight, configuration);
+    return MergeStoredMask(proceduralWeight, storedWeight, configuration);
 }
 
 } // namespace

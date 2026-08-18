@@ -69,8 +69,14 @@ void RunAppearanceDefaultChecks() {
 // remap, the one tint, the one tile count — no second copy anywhere).
 void RunExistingFieldChecks() {
     Params::Stratum stratum;
-    Check(stratum.maskRemapMinimum == 0.0f && stratum.maskRemapMaximum == 1.0f,
-          "the ONE surface-weight remap is still identity by default");
+    bool bRemapIsIdentity = true;
+    for (int channel = 0; channel < Params::kStratumColorChannelCount; ++channel) {
+        bRemapIsIdentity &= stratum.maskRemapMinimum[channel] == 0.0f;
+        bRemapIsIdentity &= stratum.maskRemapMaximum[channel] == 1.0f;
+    }
+    Check(bRemapIsIdentity,
+          "the ONE surface-weight remap is still identity by default, now across all 4 channels "
+          "(ARCH §7.2 item 10)");
     Check(stratum.tintRed == 1.0f && stratum.tintGreen == 1.0f && stratum.tintBlue == 1.0f,
           "the preview base color is still the stratum's own tint, not a second color");
     Check(stratum.tileCount == 1.0f, "the near tile count is still the stratum's own field");

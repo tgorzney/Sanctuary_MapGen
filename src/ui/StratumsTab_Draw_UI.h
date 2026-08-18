@@ -28,6 +28,12 @@ inline void DrawStratumsTabScalarRow(StratumsTabScalar scalar, float& value, Str
     NotifyStratumsTabChange(DrawStratumsTabScalar(scalar, value, state, row).bCommitted, previewDriver);
 }
 
+// One channel of a multi-channel catalogued scalar (currently only the mask remap window):
+// reuses the named scalar's shared label/range/format, but takes its RealtimeToggle from the
+// caller, since a multi-channel field cannot live in the single-slot scalarToggles array.
+WidgetChange DrawStratumsTabScalarChannel(StratumsTabScalar scalar, int channel, const char* channelSuffix,
+                                          float& value, RealtimeToggle& toggle, StratumsTabState& state);
+
 // The three per-stratum panels, one translation unit each. `generationAssembler` may be null.
 void DrawStratumMaterialPanel(Params::Stratum& stratum, StratumsTabState& state, StratumRowState& row,
                               Pipeline::PreviewDriver* previewDriver);

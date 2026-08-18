@@ -40,8 +40,12 @@ struct Stratum {
     // --- The ONE surface-weight remap (ARCH §7.2.5). Applied exactly once, in the Mask stage;
     // Bake consumes the remapped weight verbatim. Identity by default. The names match the
     // .sanmap `maskRemapMin`/`maskRemapMax` keys so the round-trip stays literal.
-    float maskRemapMinimum = 0.0f;
-    float maskRemapMaximum = 1.0f;
+    // Genuine 4-component fields (ARCH §7.2 item 10): the C# ground truth `SanMap.Types.cs`
+    // types `Stratum.maskRemapMin`/`maskRemapMax` as real `Vector4`, not a scalar. Shape only —
+    // how the Mask stage's single-scalar-per-cell kernel consumes a 4-component window is a
+    // separate, still-open ARCH question (§7.2 item 10's own text).
+    float maskRemapMinimum[kStratumColorChannelCount] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    float maskRemapMaximum[kStratumColorChannelCount] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
     // --- Appearance: how the bake composites this stratum (its albedo lives in Data::StratumArt).
     bool  bEnabled   = true;    // false = the stratum contributes nothing to the composite

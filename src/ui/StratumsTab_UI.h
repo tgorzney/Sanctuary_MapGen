@@ -59,6 +59,8 @@ struct StratumRowState {
     RealtimeToggle previewBaseColorToggle;
     RealtimeToggle diffuseRemapColorToggle;
     RealtimeToggle farColorRemapColorToggle;
+    RealtimeToggle maskRemapMinimumToggles[Params::kStratumColorChannelCount];
+    RealtimeToggle maskRemapMaximumToggles[Params::kStratumColorChannelCount];
 
     // The swatch widget speaks RGBA; the recipe stores the preview base color as three loose
     // floats (Params::Stratum::tintRed/Green/Blue), so the picker edits this mirror.

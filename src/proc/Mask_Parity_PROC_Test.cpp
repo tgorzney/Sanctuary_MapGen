@@ -1,8 +1,8 @@
 // Mask_Parity_PROC_Test.cpp — the CPU/GPU parity half of the M3-2 acceptance test. Runs both
 // backends from the SAME inputs over a settings mix that exercises every branch (hard clamp,
 // smoothstep+feather, invert, partial strength, all three merge modes, stored art at a different
-// resolution, a non-identity remap). Needs a real GL context, so it spins up a hidden-window WGL
-// one (test harness only, never app code).
+// resolution, a distinct per-stratum feather shape). Needs a real GL context, so it spins up a
+// hidden-window WGL one (test harness only, never app code).
 #include "Mask_TestSupport_PROC.h"
 #include "Mask_PROC.h"
 #include "../sys/GpuResource_SYS.h"
@@ -52,8 +52,8 @@ std::vector<Params::Stratum> MakeParitySettings() {
     }
     strata[2].importedMaskMode = Params::ImportedMaskMode::ProceduralStart;
     strata[5].importedMaskMode = Params::ImportedMaskMode::StaticOverride;
-    strata[7].maskRemapMinimum = 0.1f;
-    strata[7].maskRemapMaximum = 0.8f;
+    strata[7].slopeFeatherDegreesLow  = 11.0f;   // a distinct feather shape as strata[7]'s
+    strata[7].slopeFeatherDegreesHigh = 9.0f;    // non-identity differentiator
     return strata;
 }
 

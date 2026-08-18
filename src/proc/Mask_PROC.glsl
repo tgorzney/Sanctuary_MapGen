@@ -1,7 +1,7 @@
 #version 430 core
 // Mask_PROC.glsl — GPU speed path of the mask stage; twin of Mask_Apply_PROC.cpp.
-// Slope-gates every stratum's material proportion, merges the stored art and remaps once,
-// writing `surfaceStratumWeights` and the baked `slope` field — one invocation per heightfield
+// Slope-gates every stratum's material proportion and merges the stored art, writing
+// `surfaceStratumWeights` and the baked `slope` field — one invocation per heightfield
 // vertex. The proportion buffer is READONLY: input and output are different fields
 // (ARCH §7.2/§3.4). Both outputs are this stage's own (§3.4.1); the slope write is the same
 // gradient the gate consumes, so the two backends bake identical values (M5-0c).
@@ -17,7 +17,7 @@ struct MaskConfiguration {
     int   mergeMode;          int   storedMaskOffset;   int   storedMaskWidth;   int   storedMaskHeight;
     int   bSmoothstepEnabled; int   bInvertEnabled;     int   paddingFirst;      int   paddingSecond;
     float slopeGradientLow;   float slopeGradientHigh;  float inverseFeatherLow; float inverseFeatherHigh;
-    float gateStrength;       float remapMinimum;       float inverseRemapRange; float heightScale;
+    float gateStrength;       float paddingThird;       float paddingFourth;     float heightScale;
     float inverseSingleSpan;  float inverseDoubleSpan;  float smoothstepShoulder; float smoothstepScale;
     float maskMinimum;        float maskMaximum;        float storedSampleScaleX; float storedSampleScaleY;
 };
@@ -36,8 +36,6 @@ float slopeGateWeight(float slopeGradient, float gradientLow, float gradientHigh
                       float gateStrength, float smoothstepShoulder, float smoothstepScale);
 float mergeStoredMask(float proceduralWeight, float storedWeight, int mergeMode,
                       float maskMinimum, float maskMaximum);
-float remapMaskValue(float value, float remapMinimum, float inverseRemapRange,
-                     float maskMinimum, float maskMaximum);
 
 // Finite-difference gradient magnitude — the pinned slope unit (rise/run). Interior cells use
 // the central difference, edge cells the one-sided one; mirrors SlopeGradientMagnitude().
@@ -98,8 +96,6 @@ void main() {
                            ? 0.0 : sampleStoredMaskBilinear(configuration, cell.x, cell.y);
         float mergedWeight = mergeStoredMask(proceduralWeight, storedWeight, configuration.mergeMode,
                                              configuration.maskMinimum, configuration.maskMaximum);
-        surfaceWeightValues[stratum * cellCount + cellIndex] =
-            remapMaskValue(mergedWeight, configuration.remapMinimum, configuration.inverseRemapRange,
-                           configuration.maskMinimum, configuration.maskMaximum);
+        surfaceWeightValues[stratum * cellCount + cellIndex] = mergedWeight;
     }
 }

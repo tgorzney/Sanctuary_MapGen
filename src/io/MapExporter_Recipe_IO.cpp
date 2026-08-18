@@ -5,6 +5,7 @@
 #include "MapExporter_Recipe_IO.h"
 #include "MapExporter_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include <cmath>
 
 namespace SanmapGen {
 namespace Io {
@@ -23,8 +24,12 @@ nlohmann::ordered_json BuildStratumLayersJson(const Params::MapRecipe& recipe) {
         layer["tileSizeFar"] = { { "x", stratum.tileCount }, { "y", stratum.tileCount } };
         layer["diffuseRemap"] = { { "r", stratum.tintRed }, { "g", stratum.tintGreen },
                                   { "b", stratum.tintBlue }, { "a", 1.0f } };
-        layer["maskRemapMin"] = stratum.maskRemapMinimum;
-        layer["maskRemapMax"] = stratum.maskRemapMaximum;
+        // Real Vector4, matching the C# ground truth `SanMap.Types.cs` (ARCH §7.2 item 10) — not
+        // the bare scalar this line used to write.
+        layer["maskRemapMin"] = { {"x", stratum.maskRemapMinimum[0]}, {"y", stratum.maskRemapMinimum[1]},
+                                  {"z", stratum.maskRemapMinimum[2]}, {"w", stratum.maskRemapMinimum[3]} };
+        layer["maskRemapMax"] = { {"x", stratum.maskRemapMaximum[0]}, {"y", stratum.maskRemapMaximum[1]},
+                                  {"z", stratum.maskRemapMaximum[2]}, {"w", stratum.maskRemapMaximum[3]} };
         stratumLayers.push_back(layer);
     }
     return stratumLayers;
@@ -63,7 +68,9 @@ std::string MapExporter::BuildSanmapJsonText(const Params::MapRecipe& recipe,
     document["credits"]     = options.mapCredits;
     document["width"]       = geometry.mapSize;
     document["length"]      = geometry.mapSize;
-    document["height"]      = geometry.terrainMaxHeight;
+    // The format types `height` as a C# int (SanMap.cs:24). Round, don't truncate — a
+    // designer-set 127.6 must land on 128, not silently drop to 127 in Newtonsoft's coercion.
+    document["height"]      = static_cast<int>(std::lround(geometry.terrainMaxHeight));
     document["heightmapResolution"] = geometry.VertexSize();
 
     document["hasWater"]   = recipe.water.bEnabled;

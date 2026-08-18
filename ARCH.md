@@ -418,13 +418,14 @@ suffix, like every other setting.
 
 **There is exactly ONE per-stratum settings type: `Params::Stratum`, in
 `src/params/Stratum_PARAMS.h`.** Everything a stratum is configured with — the mask
-slope gate, the stored-mask merge mode, the single output remap (§7.2), the bake/appearance
-settings (albedo source, tint, tiling), and the soil physics — is reached through it.
+slope gate, the stored-mask merge mode, the bake/appearance settings (albedo source,
+tint, tiling, the material's own mask-texture remap window — §7.2 item 5), and the soil
+physics — is reached through it.
 
 - **No rival per-stratum settings type.** A stage takes `const std::vector<Params::Stratum>&`
   (or a span of it). It may **not** take its own private per-stratum array. Two rival arrays
   must be kept in sync by hand, and the same field appears twice — which is exactly how the
-  double-remap defect below was created.
+  double-remap code defect below was created.
 - **Composition is allowed; rival top-level types are not.** `Params::Stratum` aggregates
   small named sub-structs, and a sub-struct may be split into its own `_PARAMS` header
   when the §1.5 ceiling forces it. Such a header is a **member** file of `Stratum_PARAMS.h`,
@@ -451,7 +452,7 @@ settings (albedo source, tint, tiling), and the soil physics — is reached thro
 | DATA field | Meaning | Single writer (§3.4.1) | Read by |
 | --- | --- | --- | --- |
 | `materialProportions[0..8]` | **Physical.** How much of each stratum is present in the column, per cell. Sums to 1 where the column is non-empty. | the sim stages (NoiseBlend seeds it; Erosion/Thermal evolve and renormalize it) | the sims; the Mask stage |
-| `surfaceStratumWeights[0..8]` | **Visible.** The resolved 0..1 weight of each stratum at the surface after gating, stored-art merge, and remap. This is what the eye and the game shader see. | the **Mask stage**, exclusively | Placement (stratum gate), Bake (composite + stratum TGA export), preview |
+| `surfaceStratumWeights[0..8]` | **Visible.** The resolved 0..1 weight of each stratum at the surface after gating and stored-art merge. This is what the eye and the game shader see. | the **Mask stage**, exclusively | Placement (stratum gate), Bake (composite + stratum TGA export), preview |
 
 Consequences, all binding:
 
@@ -463,12 +464,15 @@ Consequences, all binding:
 3. **The Mask stage never writes `materialProportions`.** It reads them (plus the
    heightfield, for slope), and writes `surfaceStratumWeights`. It is therefore a pure,
    re-runnable function — a mask-parameter change may re-run Mask alone.
-4. **The Mask stage performs the combine itself**, and emits one resolved field:
+4. **The Mask stage performs the combine itself**, and emits one resolved field directly —
+   there is no separate per-stratum remap step after the merge:
    ```
    gate_s        = SlopeGateWeight(slopeGradient, stratum_s)          // 0..1
    procedural_s  = materialProportions[s] * gate_s
-   merged_s      = Merge(procedural_s, storedArt_s, importedMaskMode_s)
-   surfaceStratumWeights[s] = Remap_s(merged_s)                        // clamped to [maskMin, maskMax]
+   surfaceStratumWeights[s] = Merge(procedural_s, storedArt_s, importedMaskMode_s)
+                                                          // final value. The merge's own
+                                                          // output-clamp window is the only
+                                                          // rescale applied — see item 5.
    ```
    **This overrides the earlier "Mask emits a bare `visibilityWeight`, Bake multiplies"
    mechanism**, for a hard technical reason: `ImportedMaskMode` is **not** a multiplicative
@@ -479,15 +483,60 @@ Consequences, all binding:
    hand — inside Mask. The architectural property the original ruling was protecting
    (proportion never destroyed by the gate) is preserved in full by the *separate output
    field*, which is the part that actually mattered.
-5. **The remap happens exactly once, in the Mask stage.** Bake's rival remap
+5. **CORRECTED — there is no per-stratum surface-weight remap in the Mask stage, or
+   anywhere in SanGen generation.** This item originally read "the remap happens exactly
+   once, in the Mask stage." That claim is **wrong** and is withdrawn — ruled by the
+   Generator Expert after independently verifying the evidence directly against the real
+   code (not a summary). Nothing else in this section changes: the field split, item 4's
+   merge, the stage-order rulings (§7.4), and Bake consuming `surfaceStratumWeights`
+   verbatim all stand exactly as ratified.
+
+   `merged_s` from item 4's formula **is** `surfaceStratumWeights[s]`, unmodified. The
+   merge's own output-clamp window (`MergeStoredMask`'s `[maskMinimum, maskMaximum]`,
+   defaulting `[0,1]`) is a generic safety clamp on the merge result — it is a *different*
+   mechanism from, and must not be confused with, the field discussed below.
+
+   `Params::Stratum::maskRemapMinimum`/`maskRemapMaximum` is **per-stratum material/
+   appearance pass-through data**, not a Mask-stage input or output. Confirmed by:
+   - **Struct placement in the real C# format** (`SanMap.Types.cs`, ground truth): the
+     field sits beside `diffuseRemap`/`tileSize`/`normalScale` — the shader-appearance
+     fields — never near anything visibility-related.
+   - **v1 never computed with it.** Its one touch point,
+     `PreviewRenderer.cpp:426-427,505`, read channel `[0]` of stratum 0 only and applied
+     it as a single global preview-shader contrast uniform — an ad-hoc debug knob, never
+     wired to the real export/bake path, and code v2 explicitly supersedes.
+   - **The real per-stratum visibility mechanism is the wholly separate `stratums_1_4.tga`/
+     `stratums_5_8.tga` splat-weight export**, which `surfaceStratumWeights` feeds
+     directly and verbatim.
+   - `StratumAppearance_PARAMS.h`'s own existing scope note already buckets
+     `maskRemapMinimum`/`maskRemapMaximum` as appearance data "no generation stage reads
+     yet."
+
+   The field is consumed only by the **game's own renderer**, against the stratum's own
+   composite/"mask" texture (`StratumAppearance::compositeTexturePath`) — a real texture
+   asset, distinct from the `stratums_1_4/5_8.tga` files the Mask stage produces. **No
+   SanGen generation stage reads or writes it today.** Bake still consumes
+   `surfaceStratumWeights` verbatim — that conclusion is unchanged — but the *reason* Bake
+   has no remap of its own changes: it is not "the one remap lives upstream in Mask
+   instead," it is "there is no per-stratum surface-weight remap anywhere in SanGen
+   generation." Bake's former kernel fields for this
    (`StratumBakeSource::maskRemapMinimum/Maximum`,
-   `StratumKernelConfiguration::maskRemapMinimum/maskRemapRangeReciprocal`, and
-   `RemapMaskWeight`) is **deleted** — it is a double-remap on any `.sanmap` that sets both.
-   Bake consumes `surfaceStratumWeights` verbatim.
-   *Implementation constraint:* `StratumKernelConfiguration` is 12 scalars = 48 bytes
-   precisely so the std430 array stride needs no padding (`DISPATCH_INTERFACE_SPEC` §4).
-   Removing two floats breaks that; the record must be re-padded back to a 16-byte
-   multiple, in both the C++ struct and the GLSL block.
+   `StratumKernelConfiguration::maskRemapMinimum/maskRemapRangeReciprocal`,
+   `RemapMaskWeight`) stay deleted; `StratumKernelConfiguration` keeps the two now-unused
+   scalar slots as explicit padding so its std430 stride holds at a 16-byte multiple
+   (`DISPATCH_INTERFACE_SPEC` §4) — this was, and remains, the correct code shape, only the
+   stated reason for it has changed.
+
+   *Field placement (the Generator Expert leaves this open; not load-bearing either way):*
+   `maskRemapMinimum`/`maskRemapMaximum` **stay direct members of `Params::Stratum`**
+   rather than moving into `StratumAppearance` — there is no behavioral reason to churn the
+   file, and `StratumAppearance_PARAMS.h`'s existing "NOT DUPLICATED HERE" note already
+   documents the split for a reader who lands there first.
+
+   A future work-order may eventually wire this field to a real SanGen consumer — most
+   plausibly composite/mask-texture processing inside Bake (`MASKING_SPEC` §1.6). That
+   consumer does not exist yet and is not designed here; until then the field stays pure
+   round-trip data.
 6. **Placement's stratum gate reads `surfaceStratumWeights`,** not `materialProportions`.
    "Scatter trees where grass shows" is a *visibility* statement, and WYSIWYG (hit-list #4)
    requires props to follow what the preview shows. This places Mask upstream of Placement
@@ -521,15 +570,19 @@ Consequences, all binding:
     currently collapse this to a single `float` each, losing real format data for a
     pass-through field — the same fidelity principle §1.8 already states for hand-authored
     entity data, applied here to a format-native per-stratum field.
-    - **This does NOT reopen item 5 above, or §7.1's "no rival per-stratum settings type."**
-      Both of those rulings are about *where* the remap runs (exactly once, in Mask, never
-      doubled in Bake) and about not inventing a **second per-stratum settings type** that
-      duplicates `Params::Stratum` (the double-remap defect was two rival *arrays*, not one
-      field with the wrong width). Widening one field's own shape on the *same* single
-      `Params::Stratum` struct is neither of those things — it corrects that field to match
-      what the format actually carries. A future reader must not conflate "one remap site"
-      (still true, unchanged) with "one scalar channel" (never true — the format always
-      modeled 4).
+    - **Superseded framing note (added by the item 5 correction above).** This item's own
+      framing below — "where the remap runs," "one remap site" — predates and is superseded
+      by item 5's correction: there is no remap site at all, in Mask or anywhere else in
+      SanGen generation. The part of this amendment that remains binding, unaffected by that
+      correction, is purely the **field's shape**: `maskRemapMinimum`/`maskRemapMaximum` is a
+      4-component `Vector4` pass-through field, not a scalar, exactly as the format types it
+      — independent of whether, or where, any stage ever consumes it.
+    - **This does NOT reopen §7.1's "no rival per-stratum settings type."** That ruling is
+      about not inventing a **second per-stratum settings type** that duplicates
+      `Params::Stratum` (the double-remap code defect was two rival *arrays*, not one field
+      with the wrong width). Widening one field's own shape on the *same* single
+      `Params::Stratum` struct is not that — it corrects the field to match what the format
+      actually carries, regardless of consumption.
     - **Shape:** `float maskRemapMinimum[kStratumColorChannelCount]` /
       `float maskRemapMaximum[kStratumColorChannelCount]` — the same 4-wide convention
       `StratumAppearance::diffuseRemapColor`/`farColorRemapColor` already use
@@ -541,14 +594,14 @@ Consequences, all binding:
       per-channel inputs (`StratumsTab_Appearance_UI.cpp`'s `DrawMaskRemapWindow`) — a UI
       decision, not a PARAMS one; not designed here.
     - **Shape only, not wiring.** Widening the field, updating its `IO` read/write (see
-      `SANMAP_FORMAT_SPEC` Correction 13), and updating its own in-code comment ("the ONE
-      surface-weight remap ... Identity by default" — the mechanism is still true, but the
-      comment must show the widened type) are separate coder work. **How the Mask kernel's
-      existing single-scalar-per-cell surface weight consumes a 4-component remap window is
-      undecided and is NOT resolved by this amendment.** A coder who reaches that question
-      stops and reports it for a dedicated ARCH ruling before implementing (§8.4 scope law:
-      a coder never invents missing design) — it does not silently pick channel 0, or
-      average the four, or any other guess.
+      `SANMAP_FORMAT_SPEC` Correction 13), and updating its own in-code comment are separate
+      coder work. **CLOSED by the item 5 correction above:** the earlier open question of
+      "how does the Mask kernel's single-scalar-per-cell surface weight consume a
+      4-component remap window" no longer applies — the Mask kernel does not consume
+      `maskRemapMinimum`/`maskRemapMaximum` at all, and no coder needs to stop and report on
+      it for that reason. (A coder still stops and reports before inventing any *new*
+      consumer for this field — §8.4 — but the specific open question this amendment
+      originally flagged is resolved, not merely deferred.)
 
 ### 7.3 Vendored third-party headers
 Third-party vendored code (`FastNoiseLite.h`, `miniz`, `stb_*`) does **not** belong in a

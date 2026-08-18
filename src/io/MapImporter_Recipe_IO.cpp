@@ -72,8 +72,8 @@ void ReadStrataSettingsJson(const nlohmann::json& generatorData, Params::MapReci
         int maskMode = static_cast<int>(stratum.importedMaskMode);
         if (ReadJsonEnumeration(stratumJson, "ImportedMaskMode", 3, maskMode))
             stratum.importedMaskMode = static_cast<Params::ImportedMaskMode>(maskMode);
-        ReadJsonFloat(stratumJson, "MaskRemapMinimum", stratum.maskRemapMinimum);
-        ReadJsonFloat(stratumJson, "MaskRemapMaximum", stratum.maskRemapMaximum);
+        ReadJsonFloatVector4(stratumJson, "MaskRemapMinimum", stratum.maskRemapMinimum);
+        ReadJsonFloatVector4(stratumJson, "MaskRemapMaximum", stratum.maskRemapMaximum);
         ReadJsonBoolean(stratumJson, "Enabled", stratum.bEnabled);
         ReadJsonFloat(stratumJson, "TintRed", stratum.tintRed);
         ReadJsonFloat(stratumJson, "TintGreen", stratum.tintGreen);

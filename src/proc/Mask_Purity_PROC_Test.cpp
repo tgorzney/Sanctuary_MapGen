@@ -5,7 +5,7 @@
 //      because the dirty-hash conductor is entitled to re-run Mask alone (ARCH §3.4.2). An
 //      in-place read-modify-write would apply its gate/remap a second time.
 // Both are run with a settings mix that exercises the gate, both merge modes and a non-identity
-// remap, so a re-applied transform could not hide behind an identity case.
+// gate strength, so a re-applied transform could not hide behind an identity case.
 #include "Mask_TestSupport_PROC.h"
 #include "Mask_PROC.h"
 #include <cstring>
@@ -30,8 +30,7 @@ std::vector<Params::Stratum> MakePurityStrata() {
     }
     strata[1].importedMaskMode = Params::ImportedMaskMode::ProceduralStart;
     strata[4].importedMaskMode = Params::ImportedMaskMode::StaticOverride;
-    strata[6].maskRemapMinimum = 0.15f;   // a non-identity remap: applying it twice would show
-    strata[6].maskRemapMaximum = 0.85f;
+    strata[6].slopeGateStrength = 0.35f;   // a non-identity partial gate: applying it twice would show
     return strata;
 }
 

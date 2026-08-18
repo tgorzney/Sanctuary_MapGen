@@ -70,8 +70,12 @@ nlohmann::ordered_json BuildStratumJson(const Params::Stratum& stratum) {
     json["InvertSlopeGate"]        = stratum.bInvertSlopeGate;
     json["SlopeGateStrength"]      = stratum.slopeGateStrength;
     json["ImportedMaskMode"]       = static_cast<int>(stratum.importedMaskMode);
-    json["MaskRemapMinimum"]       = stratum.maskRemapMinimum;
-    json["MaskRemapMaximum"]       = stratum.maskRemapMaximum;
+    // Genuine Vector4 (ARCH §7.2 item 10) — mirrors the format-native `stratumLayers[].maskRemapMin/
+    // Max` shape so the two on-disk representations of the same setting never disagree.
+    json["MaskRemapMinimum"] = { {"x", stratum.maskRemapMinimum[0]}, {"y", stratum.maskRemapMinimum[1]},
+                                 {"z", stratum.maskRemapMinimum[2]}, {"w", stratum.maskRemapMinimum[3]} };
+    json["MaskRemapMaximum"] = { {"x", stratum.maskRemapMaximum[0]}, {"y", stratum.maskRemapMaximum[1]},
+                                 {"z", stratum.maskRemapMaximum[2]}, {"w", stratum.maskRemapMaximum[3]} };
     json["Enabled"]                = stratum.bEnabled;
     json["TintRed"]                = stratum.tintRed;
     json["TintGreen"]              = stratum.tintGreen;

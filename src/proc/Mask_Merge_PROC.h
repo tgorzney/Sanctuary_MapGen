@@ -1,13 +1,14 @@
-// Mask_Merge_PROC.h — CPU half of the stored-mask merge: the ONE resampler, the three
-// ImportedMaskMode merges, and the per-stratum output remap. Layer: PROC. Paired one-for-one
-// with Mask_Merge_PROC.glsl — same expressions, same order (Constitution §4).
+// Mask_Merge_PROC.h — CPU half of the stored-mask merge: the ONE resampler and the three
+// ImportedMaskMode merges. Layer: PROC. Paired one-for-one with Mask_Merge_PROC.glsl — same
+// expressions, same order (Constitution §4).
 //
 // Resampling is BILINEAR everywhere (MASKING_SPEC "Resample inconsistency": import used
 // nearest-neighbour while the GUI resize of the same data used bilinear — unified here).
 // Merge modes are MASKING_SPEC 1.5 verbatim: Disabled keeps the gated procedural weight,
 // ProceduralStart is additive (procedural + stored, clamped), StaticOverride replaces with the
 // stored art and therefore is NOT slope-gated — it is locked to what the artist shipped.
-// The remap here is the ONE remap in the pipeline (ARCH §7.2.5); Bake has none.
+// There is no per-stratum output remap: `maskRemapMinimum`/`maskRemapMaximum` is material/
+// appearance pass-through data, not a Mask-stage input (Generator Expert ruling).
 #pragma once
 #include "Mask_Kernel_PROC.h"
 
@@ -48,7 +49,10 @@ inline float SampleStoredMaskBilinear(const float* storedValues,
     return top + (bottom - top) * fractionY;
 }
 
-// The per-stratum merge. `proceduralWeight` is the slope-gated procedural mask.
+// The per-stratum merge. `proceduralWeight` is the slope-gated procedural mask. This is the
+// stage's final output value — already clamped, so no further remap is applied (per-stratum
+// `maskRemapMinimum`/`maskRemapMaximum` is material/appearance pass-through data consumed
+// downstream of Mask, never here — Generator Expert ruling).
 inline float MergeStoredMask(float proceduralWeight, float storedWeight,
                              const MaskStratumConfiguration& configuration) {
     if (configuration.mergeMode == kMergeModeProceduralStart)
@@ -56,14 +60,6 @@ inline float MergeStoredMask(float proceduralWeight, float storedWeight,
     if (configuration.mergeMode == kMergeModeStaticOverride)
         return ClampToMaskRange(storedWeight, configuration);
     return ClampToMaskRange(proceduralWeight, configuration);
-}
-
-// Final per-stratum remap (identity by default). A degenerate window is the same
-// zero-reciprocal sentinel the rest of the kernels use.
-inline float RemapMaskValue(float value, const MaskStratumConfiguration& configuration) {
-    if (configuration.inverseRemapRange <= 0.0f)
-        return value >= configuration.remapMinimum ? configuration.maskMaximum : configuration.maskMinimum;
-    return ClampToMaskRange((value - configuration.remapMinimum) * configuration.inverseRemapRange, configuration);
 }
 
 } // namespace Proc

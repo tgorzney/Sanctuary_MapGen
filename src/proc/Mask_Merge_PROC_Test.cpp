@@ -96,18 +96,21 @@ void CheckGateInteraction() {
                   "ProceduralStart adds onto a fully gated-out procedural weight");
 }
 
-// 5. The per-stratum remap is applied last, and it is the ONLY remap in the pipeline
-// (ARCH §7.2.5): [0.25,0.75] stretches the stored art.
-void CheckRemap() {
+// 5. `maskRemapMinimum`/`maskRemapMaximum` is per-stratum material/appearance pass-through
+// data, NOT a Mask-stage input (Generator Expert ruling): the merge output stays the plain
+// clamped merge, with no per-stratum window applied, regardless of what that field holds.
+void CheckMergeOutputIgnoresAppearanceRemapField() {
     std::vector<Params::Stratum> settings = MakeMergeSettings(Params::ImportedMaskMode::StaticOverride);
     for (Params::Stratum& stratum : settings) {
-        stratum.maskRemapMinimum = 0.25f;
-        stratum.maskRemapMaximum = 0.75f;
+        for (int channel = 0; channel < Params::kStratumColorChannelCount; ++channel) {
+            stratum.maskRemapMinimum[channel] = 0.25f;
+            stratum.maskRemapMaximum[channel] = 0.75f;
+        }
     }
     const std::vector<float> result = RunMerge(settings);
-    CheckNear(result[0], 0.0f, 1e-6f, "remap clamps 0.0 to the floor");
-    CheckNear(result[4], 0.5f, 1e-6f, "remap maps the mid value to 0.5");
-    CheckNear(result[2], 1.0f, 1e-6f, "remap clamps 1.0 to the ceiling");
+    for (int index = 0; index < 9; ++index)
+        CheckNear(result[index], kExpectedStoredSample[index], 1e-6f,
+                  "Mask output is unaffected by maskRemapMinimum/Maximum (not a Mask input)");
 }
 
 // 6. A merge mode with no imported art degrades to the gated procedural weight rather than
@@ -132,7 +135,7 @@ void CheckMissingArtDegradesSafely() {
 void RunMergeTests() {
     CheckMergeModes();
     CheckGateInteraction();
-    CheckRemap();
+    CheckMergeOutputIgnoresAppearanceRemapField();
     CheckMissingArtDegradesSafely();
 }
 
