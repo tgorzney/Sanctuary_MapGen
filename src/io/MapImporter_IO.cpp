@@ -111,6 +111,12 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     // STEP10_SlopeDefaults_Mechanism: one flat top-level object, same tier/ordering rule as the
     // entity domains above — unconditional, before the mapGeneratorData gate below.
     ReadSlopeDefaultsJson(document, outRecipe);
+    // SANMAP_FORMAT_SPEC Correction 13: `stratumLayers[9]`, same tier/ordering rule as the entity
+    // domains above — unconditional, before the mapGeneratorData gate below. NOT alongside
+    // `ReadStrataSettingsJson` below, which stays gated: that one reads the separate, legacy
+    // `mapGeneratorData.Stratums` blob and MERGES onto whatever this call already wrote (see
+    // MapImporter_Recipe_IO.cpp's own header comment on that reader).
+    ReadStratumLayersJson(document, outRecipe, result);
 
     if (!document.contains("mapGeneratorData") || !document["mapGeneratorData"].is_object()) {
         result.Warn("No mapGeneratorData block: only the map's own dimensions were recovered.");

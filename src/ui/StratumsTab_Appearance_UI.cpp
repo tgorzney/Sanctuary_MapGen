@@ -62,8 +62,6 @@ void DrawStratumAppearancePanel(Params::Stratum& stratum, StratumsTabState& stat
     Params::StratumAppearance& appearance = stratum.appearance;
     ImGui::PushID("appearance");
     DrawPreviewBaseColor(stratum, row, previewDriver);
-    DrawRemapColor("Diffuse Remap", appearance.diffuseRemapColor, row.diffuseRemapColorToggle,
-                   previewDriver);
     DrawRemapColor("Far Color Remap", appearance.farColorRemapColor, row.farColorRemapColorToggle,
                    previewDriver);
 

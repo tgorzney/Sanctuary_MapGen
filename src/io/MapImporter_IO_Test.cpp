@@ -46,7 +46,10 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
                   && NearlyEqual(layer.levelsMidtones, 1.4f), "and its noise/blend/levels scalars");
         }
     }
-    Check(loaded.strata.size() == 1 && loaded.strata[0].bSlopeGateEnabled
+    // Size is no longer 1 here: `ReadStratumLayersJson` (SANMAP_FORMAT_SPEC Correction 13) grows
+    // `strata` to the format's fixed 9 layers regardless of how many the fixture populated — see
+    // CheckStratumAppearance below, which asserts that cardinality directly.
+    Check(!loaded.strata.empty() && loaded.strata[0].bSlopeGateEnabled
           && NearlyEqual(loaded.strata[0].maximumSlopeDegrees, 55.0f)
           && NearlyEqual(loaded.strata[0].tileCount, 24.0f), "the stratum settings survive");
     Check(loaded.markerRules.size() == 1 && loaded.markerRules[0].count == 8
@@ -61,6 +64,48 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
           && loaded.unitRules[0].count == 5 && loaded.unitRules[0].bSymmetryUseGlobal == false
           && loaded.unitRules[0].symmetryMask == 4,
           "the unit rules survive, including the per-rule symmetry override");
+}
+
+// SANMAP_FORMAT_SPEC Correction 13: `BuildStratumLayersJson`'s real writes (albedo/normal/mask
+// paths, tileSizeFar no longer aliasing the near tileCount, the six fields that were never
+// written at all, farColorRemap) and `ReadStratumLayersJson`, the wholly new importer, both
+// exercised through the live `.sanmap` round trip for the first time.
+void CheckStratumAppearance(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    // `stratumLayers[9]` is a fixed format invariant — the importer grows `strata` to 9 regardless
+    // of how many entries the fixture itself populated (only 1, here).
+    Check(loaded.strata.size() == 9, "the importer grows strata to the format's fixed 9 layers");
+    if (loaded.strata.empty()) return;
+    const Params::Stratum& originalStratum = original.strata[0];
+    const Params::Stratum& loadedStratum = loaded.strata[0];
+    const Params::StratumAppearance& originalAppearance = originalStratum.appearance;
+    const Params::StratumAppearance& loadedAppearance = loadedStratum.appearance;
+    Check(NearlyEqual(loadedStratum.tintRed, originalStratum.tintRed)
+          && NearlyEqual(loadedStratum.tintGreen, originalStratum.tintGreen)
+          && NearlyEqual(loadedStratum.tintBlue, originalStratum.tintBlue),
+          "tintRed/Green/Blue survive through diffuseRemap");
+    Check(loadedAppearance.albedoTexturePath == originalAppearance.albedoTexturePath
+          && loadedAppearance.normalTexturePath == originalAppearance.normalTexturePath
+          && loadedAppearance.compositeTexturePath == originalAppearance.compositeTexturePath,
+          "the three texture paths survive through the albedo/normal/mask wrapper objects "
+          "(previously always hardcoded empty strings)");
+    Check(NearlyEqual(loadedAppearance.farTileCount, originalAppearance.farTileCount)
+          && !NearlyEqual(loadedAppearance.farTileCount, loadedStratum.tileCount),
+          "farTileCount survives distinct from tileCount (the original tileSizeFar/tileCount "
+          "aliasing bug is fixed)");
+    Check(NearlyEqual(loadedAppearance.triplanarTileCount, originalAppearance.triplanarTileCount)
+          && NearlyEqual(loadedAppearance.farTriplanarTileCount, originalAppearance.farTriplanarTileCount),
+          "the triplanar tile counts survive (previously never written)");
+    Check(NearlyEqual(loadedAppearance.normalScale, originalAppearance.normalScale)
+          && NearlyEqual(loadedAppearance.farNormalScale, originalAppearance.farNormalScale),
+          "normalScale/normalScaleFar survive (previously never written)");
+    Check(NearlyEqual(loadedAppearance.normalFarNearBlend, originalAppearance.normalFarNearBlend)
+          && NearlyEqual(loadedAppearance.heightFarNearBlend, originalAppearance.heightFarNearBlend),
+          "the normal/height far-near blends survive (previously never written)");
+    Check(NearlyEqual(loadedAppearance.farColorRemapColor[0], originalAppearance.farColorRemapColor[0])
+          && NearlyEqual(loadedAppearance.farColorRemapColor[1], originalAppearance.farColorRemapColor[1])
+          && NearlyEqual(loadedAppearance.farColorRemapColor[2], originalAppearance.farColorRemapColor[2])
+          && NearlyEqual(loadedAppearance.farColorRemapColor[3], originalAppearance.farColorRemapColor[3]),
+          "farColorRemapColor survives, all four components (previously never written)");
 }
 
 // Since `mapSize` never leaves the fixture, this asserts flip-then-unflip is the identity without
@@ -367,7 +412,29 @@ void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     stratum.bSlopeGateEnabled = true;
     stratum.maximumSlopeDegrees = 55.0f;
     stratum.tileCount = 24.0f;
-    stratum.tintRed = 0.4f;
+    stratum.tintRed   = 0.4f;
+    stratum.tintGreen = 0.5f;
+    stratum.tintBlue  = 0.6f;
+
+    // SANMAP_FORMAT_SPEC Correction 13: every real `StratumAppearance` field, non-default, so a
+    // round-trip bug in any single one is caught (CheckStratumAppearance).
+    Params::StratumAppearance& appearance = stratum.appearance;
+    appearance.albedoTexturePath    = "Textures/Grass_Albedo.dds";
+    appearance.normalTexturePath    = "Textures/Grass_Normal.dds";
+    appearance.compositeTexturePath = "Textures/Grass_Mask.dds";
+    appearance.farTileCount          = 8.0f;    // distinct from tileCount (24) — catches the
+                                                 // tileSizeFar/tileCount aliasing bug directly
+    appearance.triplanarTileCount    = 3.0f;
+    appearance.farTriplanarTileCount = 2.0f;
+    appearance.normalScale           = 1.5f;
+    appearance.farNormalScale        = 0.5f;
+    appearance.normalFarNearBlend    = 0.3f;
+    appearance.heightFarNearBlend    = 0.7f;
+    appearance.farColorRemapColor[0] = 0.2f;
+    appearance.farColorRemapColor[1] = 0.3f;
+    appearance.farColorRemapColor[2] = 0.4f;
+    appearance.farColorRemapColor[3] = 0.8f;
+
     recipe.strata.push_back(stratum);
 }
 
@@ -630,6 +697,7 @@ void RunRoundTripTests() {
     Check(result.warningCount == 0, "with no warning: the two halves agree key for key");
     CheckGeometryAndWater(original, loaded);
     CheckLayerStackAndRules(original, loaded);
+    CheckStratumAppearance(original, loaded);
     CheckArmiesAndAreas(original, loaded);
     CheckMarkersAndChains(original, loaded);
     CheckPropsAndDecals(original, loaded);
@@ -653,12 +721,37 @@ void CheckUnrecognizedSkyboxIntensityModeFallsBackSafely() {
           "the unrecognized skyboxIntensityMode fallback is logged as a warning, not silent");
 }
 
+// SANMAP_FORMAT_SPEC Correction 13's cardinality invariant: `stratumLayers[9]` is fixed by the
+// format. A document with the wrong array length is a LOGGED WARNING, never a crash and never a
+// silent truncation (Constitution §6) — a pure-reader check, deliberately NOT routed through
+// ParseSanmapJsonText/RunRoundTripTests (which asserts warningCount == 0 on a clean document),
+// mirroring CheckUnrecognizedSkyboxIntensityModeFallsBackSafely's own style above.
+void CheckStratumLayersCardinalityMismatchWarns() {
+    nlohmann::json document;
+    document["stratumLayers"] = nlohmann::json::array();
+    for (int index = 0; index < 5; ++index) {                  // wrong length: 5, not 9
+        nlohmann::json layer;
+        layer["albedo"] = { { "path", "Textures/Wrong.dds" } };
+        document["stratumLayers"].push_back(layer);
+    }
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Io::ReadStratumLayersJson(document, loaded, result);
+    Check(result.warningCount > 0,
+          "a stratumLayers array of the wrong length logs a warning, not a crash");
+    Check(loaded.strata.size() == 5,
+          "the entries actually present are still read in full, never silently truncated");
+    Check(loaded.strata[0].appearance.albedoTexturePath == "Textures/Wrong.dds",
+          "and the fields those entries carry still land");
+}
+
 } // namespace MapFormatTest
 } // namespace SanmapGen
 
 int main() {
     SanmapGen::MapFormatTest::RunRoundTripTests();
     SanmapGen::MapFormatTest::CheckUnrecognizedSkyboxIntensityModeFallsBackSafely();
+    SanmapGen::MapFormatTest::CheckStratumLayersCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

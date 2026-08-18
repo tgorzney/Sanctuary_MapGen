@@ -4,8 +4,9 @@
 //
 // Every field is a `.sanmap` stratum key (SANMAP_FORMAT_SPEC "Stratum"): name; albedo / normal /
 // mask TextureLoader paths; tileSize (+Far); triplanar tile sizes; normalScale (+Far); normal and
-// height farNearBlend; diffuseRemap / farColorRemap colors. Names are spelled in full (ARCH §1.1)
-// except where the format dictates the word.
+// height farNearBlend; farColorRemap color (`diffuseRemap` is written from Stratum::tint*, not a
+// field on this struct — see below). Names are spelled in full (ARCH §1.1) except where the format
+// dictates the word.
 //
 // NOT DUPLICATED HERE (they already live on `Params::Stratum` and stages consume them there —
 // a second copy is exactly the rival-array defect ARCH §7.2.5 was written about):
@@ -36,8 +37,10 @@ struct StratumAppearance {
     std::string normalTexturePath;
     std::string compositeTexturePath;      // the format's `mask` TextureLoader (v1 "Composite")
 
-    // --- Shader color remaps (the preview base color is Stratum::tint*, see the note above).
-    float diffuseRemapColor[kStratumColorChannelCount]   = { 1.0f, 1.0f, 1.0f, 1.0f };
+    // --- Shader color remap (the preview base color is Stratum::tint*, see the note above; the
+    // diffuseRemap shader key is written FROM tint*, not from a second color field here — the
+    // dead, round-tripping-nothing `diffuseRemapColor` field this comment used to describe was
+    // deleted per SANMAP_FORMAT_SPEC Correction 13).
     float farColorRemapColor[kStratumColorChannelCount]  = { 1.0f, 1.0f, 1.0f, 1.0f };
 
     // --- Tiling. The NEAR tile count is Stratum::tileCount; these are its far/triplanar partners.

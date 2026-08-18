@@ -16,15 +16,30 @@ nlohmann::ordered_json BuildStratumLayersJson(const Params::MapRecipe& recipe) {
     for (int stratumIndex = 0; stratumIndex < sanmapStratumCount; ++stratumIndex) {
         const bool bHasSettings = stratumIndex < static_cast<int>(recipe.strata.size());
         const Params::Stratum stratum = bHasSettings ? recipe.strata[stratumIndex] : Params::Stratum();
+        const Params::StratumAppearance& appearance = stratum.appearance;
         nlohmann::ordered_json layer;
         layer["name"]        = "Stratum " + std::to_string(stratumIndex);
-        layer["albedo"]      = { { "path", "" } };
-        layer["normal"]      = { { "path", "" } };
-        layer["mask"]        = { { "path", "" } };
+        // `name` still writes the generated placeholder, not `appearance.name` — real gap, flagged
+        // for a future pass, not this correction (SANMAP_FORMAT_SPEC Correction 13).
+        layer["albedo"]      = { { "path", appearance.albedoTexturePath } };
+        layer["normal"]      = { { "path", appearance.normalTexturePath } };
+        layer["mask"]        = { { "path", appearance.compositeTexturePath } };
         layer["tileSize"]    = { { "x", stratum.tileCount }, { "y", stratum.tileCount } };
-        layer["tileSizeFar"] = { { "x", stratum.tileCount }, { "y", stratum.tileCount } };
+        layer["tileSizeFar"] = { { "x", appearance.farTileCount }, { "y", appearance.farTileCount } };
+        layer["tileSizeTriplanar"]    = appearance.triplanarTileCount;
+        layer["tileSizeFarTriplanar"] = appearance.farTriplanarTileCount;
+        layer["normalScale"]          = appearance.normalScale;
+        layer["normalScaleFar"]       = appearance.farNormalScale;
+        layer["normalFarNearBlend"]   = appearance.normalFarNearBlend;
+        layer["heightFarNearBlend"]   = appearance.heightFarNearBlend;
+        // `diffuseRemap` is written FROM Stratum::tint* — not `appearance.diffuseRemapColor`, which
+        // was deleted (dead, round-tripped nothing; see StratumAppearance_PARAMS.h).
         layer["diffuseRemap"] = { { "r", stratum.tintRed }, { "g", stratum.tintGreen },
                                   { "b", stratum.tintBlue }, { "a", 1.0f } };
+        layer["farColorRemap"] = { { "r", appearance.farColorRemapColor[0] },
+                                   { "g", appearance.farColorRemapColor[1] },
+                                   { "b", appearance.farColorRemapColor[2] },
+                                   { "a", appearance.farColorRemapColor[3] } };
         // Real Vector4, matching the C# ground truth `SanMap.Types.cs` (ARCH §7.2 item 10) — not
         // the bare scalar this line used to write.
         layer["maskRemapMin"] = { {"x", stratum.maskRemapMinimum[0]}, {"y", stratum.maskRemapMinimum[1]},

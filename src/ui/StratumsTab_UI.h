@@ -57,7 +57,6 @@ struct StratumRowState {
     SectionState   section;                       // seeded CLOSED by the tab state's constructor
     RealtimeToggle scalarToggles[kStratumsTabScalarCount];
     RealtimeToggle previewBaseColorToggle;
-    RealtimeToggle diffuseRemapColorToggle;
     RealtimeToggle farColorRemapColorToggle;
     RealtimeToggle maskRemapMinimumToggles[Params::kStratumColorChannelCount];
     RealtimeToggle maskRemapMaximumToggles[Params::kStratumColorChannelCount];

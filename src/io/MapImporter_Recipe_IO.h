@@ -86,5 +86,16 @@ void ReadAtmosphereJson(const nlohmann::json& document, Params::MapRecipe& outRe
 // `mapGeneratorData` presence gate.
 void ReadSlopeDefaultsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 
+// MapImporter_StratumLayers_IO.cpp — the top-level `stratumLayers[9]` array -> `Params::Stratum::
+// appearance` (+ tileCount/tint*/maskRemap*, SANMAP_FORMAT_SPEC Correction 13), the mirror of
+// `BuildStratumLayersJson`. Same tier and calling contract as `areas`/`armies`/`atmosphere`/
+// `SlopeDefaults` above: takes the top-level `document` directly, called unconditionally BEFORE
+// the `mapGeneratorData` presence gate — NOT alongside `ReadStrataSettingsJson`, which stays gated
+// (it reads the separate, legacy `mapGeneratorData.Stratums` blob). `stratumLayers[9]` is a fixed
+// format invariant (`sanmapStratumCount`, MapExporter_IO.h); a document with a different array
+// length is a loud, logged warning via `result` — never a silent truncation, never a hard refusal.
+void ReadStratumLayersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
+                           MapImportResult& result);
+
 } // namespace Io
 } // namespace SanmapGen

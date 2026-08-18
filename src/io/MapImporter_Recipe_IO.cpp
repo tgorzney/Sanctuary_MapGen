@@ -53,14 +53,22 @@ void ReadWaterJson(const nlohmann::json& generatorData, Params::MapRecipe& outRe
     ReadJsonFloat(water, "DeepWaterDepthMax", outRecipe.water.deepWaterDepthMaximum);
 }
 
+// MERGES onto whatever `ReadStratumLayersJson` already populated, index for index, instead of
+// replacing the array outright: `stratumLayers` (read earlier, unconditionally — see
+// MapImporter_IO.cpp) is the ONLY `.sanmap` source for `Stratum::appearance`, and the legacy
+// `Stratums` blob this function reads has no appearance keys at all, so a clear-then-rebuild here
+// would silently discard the appearance a designer just imported. Growing only (never shrinking)
+// keeps a document with no `stratumLayers` section — hand-authored, or from before this ticket —
+// reading exactly as it did before.
 void ReadStrataSettingsJson(const nlohmann::json& generatorData, Params::MapRecipe& outRecipe) {
     if (!generatorData.contains("Stratums") || !generatorData["Stratums"].is_array()) return;
     const nlohmann::json& strataJson = generatorData["Stratums"];
-    outRecipe.strata.clear();
-    outRecipe.strata.reserve(strataJson.size());
-    for (const nlohmann::json& stratumJson : strataJson) {
-        Params::Stratum stratum;
-        if (!stratumJson.is_object()) { outRecipe.strata.push_back(stratum); continue; }
+    if (outRecipe.strata.size() < strataJson.size())
+        outRecipe.strata.resize(strataJson.size());
+    for (std::size_t index = 0; index < strataJson.size(); ++index) {
+        const nlohmann::json& stratumJson = strataJson[index];
+        if (!stratumJson.is_object()) continue;
+        Params::Stratum& stratum = outRecipe.strata[index];
         ReadJsonBoolean(stratumJson, "SlopeGateEnabled", stratum.bSlopeGateEnabled);
         ReadJsonFloat(stratumJson, "MinimumSlopeDegrees", stratum.minimumSlopeDegrees);
         ReadJsonFloat(stratumJson, "MaximumSlopeDegrees", stratum.maximumSlopeDegrees);
@@ -79,7 +87,6 @@ void ReadStrataSettingsJson(const nlohmann::json& generatorData, Params::MapReci
         ReadJsonFloat(stratumJson, "TintGreen", stratum.tintGreen);
         ReadJsonFloat(stratumJson, "TintBlue", stratum.tintBlue);
         ReadJsonFloat(stratumJson, "TileCount", stratum.tileCount);
-        outRecipe.strata.push_back(stratum);
     }
 }
 

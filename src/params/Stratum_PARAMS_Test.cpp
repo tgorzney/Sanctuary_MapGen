@@ -53,10 +53,8 @@ void RunAppearanceDefaultChecks() {
           && appearance.materialName.empty(), "an untouched stratum names nothing");
     Check(appearance.albedoTexturePath.empty() && appearance.normalTexturePath.empty()
           && appearance.compositeTexturePath.empty(), "and points at no texture");
-    for (int channel = 0; channel < Params::kStratumColorChannelCount; ++channel) {
-        Check(appearance.diffuseRemapColor[channel] == 1.0f, "the diffuse remap defaults to white");
-        Check(appearance.farColorRemapColor[channel] == 1.0f, "so does the far color remap");
-    }
+    for (int channel = 0; channel < Params::kStratumColorChannelCount; ++channel)
+        Check(appearance.farColorRemapColor[channel] == 1.0f, "the far color remap defaults to white");
     Check(appearance.farTileCount == 1.0f && appearance.triplanarTileCount == 1.0f
           && appearance.farTriplanarTileCount == 1.0f, "every tile count defaults to one repeat");
     Check(appearance.normalScale == 1.0f && appearance.farNormalScale == 1.0f,
