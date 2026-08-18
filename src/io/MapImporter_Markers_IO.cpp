@@ -44,7 +44,10 @@ void ReadMarkerTransformJson(const nlohmann::json& json, Params::MarkerTransform
     }
     if (json.contains("rotation") && json["rotation"].is_object()) {
         const nlohmann::json& rotation = json["rotation"];
-        // Rotation round-trips verbatim, no coordinate transform (finding 5, same ruling as Step 2).
+        // WATCH-ROTATION-FLIP: rotation round-trips verbatim, no coordinate transform (finding 5,
+        // same ruling as Step 2) — UNCONFIRMED whether this is correct. If in-game testing shows a
+        // placed marker facing the wrong direction, this is where the fix goes. See
+        // STEP3_MarkersChains_IO.md.
         ReadJsonFloat(rotation, "x", transform.rotationX);
         ReadJsonFloat(rotation, "y", transform.rotationY);
         ReadJsonFloat(rotation, "z", transform.rotationZ);

@@ -2,8 +2,8 @@
 // Layer: UI. Accuracy class: Visual. It edits exactly one recipe slice — `recipe.decalRules`.
 // TAB_REBUILD_PLAN "§ Props · Decal Rules stack".
 //
-// A decal rule is a prop rule without the water/cliff affinities and without symmetry
-// (`Params::DecalRule` carries neither), so the stack is drawn from the same shared blocks —
+// A decal rule is a prop rule without the water/cliff affinities
+// (`Params::DecalRule` carries neither field), so the stack is drawn from the same shared blocks —
 // DraggableList for the ordered stack, RangeSlider/Dial for the gates, and the shared gate,
 // transform and template blocks from PlacementRuleSections_UI.h.
 #pragma once

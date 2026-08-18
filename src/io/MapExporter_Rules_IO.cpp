@@ -84,6 +84,8 @@ nlohmann::ordered_json BuildDecalRuleJson(const Params::DecalRule& rule) {
     json["MapEdgePadding"] = rule.mapEdgePadding;
     json["MaskStratumIndex"] = rule.maskStratumIndex;
     json["MaskWeightMinimum"] = rule.maskWeightMinimum;
+    json["SymmetryUseGlobal"] = rule.bSymmetryUseGlobal;
+    json["SymmetryMask"] = rule.symmetryMask;
     json["Transform"] = BuildScatterTransformJson(rule.transform);
     return json;
 }

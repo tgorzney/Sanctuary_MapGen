@@ -26,7 +26,9 @@ nlohmann::ordered_json BuildPropTransformJson(const Params::PropTransform& propT
     // positionZ - 1`. positionX/positionY and rotation/scale are untouched by the flip.
     json["position"] = { { "x", transform.positionX }, { "y", transform.positionY },
                          { "z", static_cast<float>(mapSize) - transform.positionZ - 1.0f } };
-    // Rotation round-trips verbatim, no coordinate transform (finding 4, same ruling as Steps 2/3).
+    // WATCH-ROTATION-FLIP: rotation round-trips verbatim, no coordinate transform (finding 4, same
+    // ruling as Steps 2/3) — UNCONFIRMED whether this is correct. If in-game testing shows a
+    // placed prop facing the wrong direction, this is where the fix goes. See STEP4_PropsDecals_IO.md.
     json["rotation"] = { { "x", transform.rotationX }, { "y", transform.rotationY },
                          { "z", transform.rotationZ }, { "w", transform.rotationW } };
     json["scale"]    = { { "x", transform.scaleX }, { "y", transform.scaleY }, { "z", transform.scaleZ } };

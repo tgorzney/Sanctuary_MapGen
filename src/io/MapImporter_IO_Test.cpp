@@ -50,11 +50,16 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
           && NearlyEqual(loaded.strata[0].tileCount, 24.0f), "the stratum settings survive");
     Check(loaded.markerRules.size() == 1 && loaded.markerRules[0].count == 8
           && loaded.markerRules[0].symmetryMask == 1, "the marker rules survive");
-    Check(loaded.propRules.size() == 1 && loaded.propRules[0].bAvoidWater, "the prop rules survive");
-    Check(loaded.decalRules.size() == 1 && NearlyEqual(loaded.decalRules[0].spacingMinimum, 6.0f),
-          "the decal rules survive");
+    Check(loaded.propRules.size() == 1 && loaded.propRules[0].bAvoidWater
+          && loaded.propRules[0].bSymmetryUseGlobal == false && loaded.propRules[0].symmetryMask == 2,
+          "the prop rules survive, including the per-rule symmetry override");
+    Check(loaded.decalRules.size() == 1 && NearlyEqual(loaded.decalRules[0].spacingMinimum, 6.0f)
+          && loaded.decalRules[0].bSymmetryUseGlobal == false && loaded.decalRules[0].symmetryMask == 8,
+          "the decal rules survive, including the per-rule symmetry override");
     Check(loaded.unitRules.size() == 1 && loaded.unitRules[0].armyIndex == 2
-          && loaded.unitRules[0].count == 5, "the unit rules survive");
+          && loaded.unitRules[0].count == 5 && loaded.unitRules[0].bSymmetryUseGlobal == false
+          && loaded.unitRules[0].symmetryMask == 4,
+          "the unit rules survive, including the per-rule symmetry override");
 }
 
 // Since `mapSize` never leaves the fixture, this asserts flip-then-unflip is the identity without
@@ -248,13 +253,19 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     Params::PropRule propRule;
     propRule.density = 0.4f;
     propRule.bAvoidWater = true;
+    propRule.bSymmetryUseGlobal = false;
+    propRule.symmetryMask = 2;
     recipe.propRules.push_back(propRule);
     Params::DecalRule decalRule;
     decalRule.spacingMinimum = 6.0f;
+    decalRule.bSymmetryUseGlobal = false;
+    decalRule.symmetryMask = 8;
     recipe.decalRules.push_back(decalRule);
     Params::UnitRule unitRule;
     unitRule.armyIndex = 2;
     unitRule.count = 5;
+    unitRule.bSymmetryUseGlobal = false;
+    unitRule.symmetryMask = 4;
     recipe.unitRules.push_back(unitRule);
 }
 

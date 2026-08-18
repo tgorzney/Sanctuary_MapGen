@@ -90,6 +90,8 @@ void ReadDecalRuleJson(const nlohmann::json& json, Params::DecalRule& rule) {
     ReadSharedRuleGates(json, rule);
     ReadJsonFloat(json, "Density", rule.density);
     ReadJsonFloat(json, "SpacingMinimum", rule.spacingMinimum);
+    ReadJsonBoolean(json, "SymmetryUseGlobal", rule.bSymmetryUseGlobal);
+    ReadJsonInteger(json, "SymmetryMask", rule.symmetryMask);
 }
 
 void ReadUnitRuleJson(const nlohmann::json& json, Params::UnitRule& rule) {

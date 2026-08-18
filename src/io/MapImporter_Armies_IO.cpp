@@ -52,7 +52,10 @@ void ReadUnitTransformJson(const nlohmann::json& json, Params::UnitTransform& un
     }
     if (json.contains("rotation") && json["rotation"].is_object()) {
         const nlohmann::json& rotation = json["rotation"];
-        // Rotation round-trips verbatim, no coordinate transform (finding 4, ratified item 2).
+        // WATCH-ROTATION-FLIP: rotation round-trips verbatim, no coordinate transform (finding 4,
+        // ratified item 2) — UNCONFIRMED whether this is correct. If in-game testing shows a
+        // placed unit facing the wrong direction, this is where the fix goes. See
+        // STEP2_ArmiesAreas_IO.md "Open items".
         ReadJsonFloat(rotation, "x", unit.rotationX);
         ReadJsonFloat(rotation, "y", unit.rotationY);
         ReadJsonFloat(rotation, "z", unit.rotationZ);

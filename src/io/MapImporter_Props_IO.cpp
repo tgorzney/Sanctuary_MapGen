@@ -33,7 +33,10 @@ void ReadPropTransformJson(const nlohmann::json& json, Params::PropTransform& pr
     }
     if (json.contains("rotation") && json["rotation"].is_object()) {
         const nlohmann::json& rotation = json["rotation"];
-        // Rotation round-trips verbatim, no coordinate transform (finding 4, same ruling as Steps 2/3).
+        // WATCH-ROTATION-FLIP: rotation round-trips verbatim, no coordinate transform (finding 4,
+        // same ruling as Steps 2/3) — UNCONFIRMED whether this is correct. If in-game testing shows
+        // a placed prop facing the wrong direction, this is where the fix goes. See
+        // STEP4_PropsDecals_IO.md.
         ReadJsonFloat(rotation, "x", transform.rotationX);
         ReadJsonFloat(rotation, "y", transform.rotationY);
         ReadJsonFloat(rotation, "z", transform.rotationZ);

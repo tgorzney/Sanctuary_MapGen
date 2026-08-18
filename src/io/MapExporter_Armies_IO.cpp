@@ -24,7 +24,10 @@ nlohmann::ordered_json BuildUnitTransformJson(const Params::UnitTransform& unit,
     // positionZ - 1`. positionX/positionY and rotation/scale are untouched by the flip.
     json["position"] = { { "x", unit.positionX }, { "y", unit.positionY },
                          { "z", static_cast<float>(mapSize) - unit.positionZ - 1.0f } };
-    // Rotation round-trips verbatim, no coordinate transform (finding 4, human-ratified item 2).
+    // WATCH-ROTATION-FLIP: rotation round-trips verbatim, no coordinate transform (finding 4,
+    // human-ratified item 2) — UNCONFIRMED whether this is correct. If in-game testing shows a
+    // placed unit facing the wrong direction, this is where the fix goes (mirror rotationZ/W or
+    // whichever component the dev's answer identifies). See STEP2_ArmiesAreas_IO.md "Open items".
     json["rotation"] = { { "x", unit.rotationX }, { "y", unit.rotationY },
                          { "z", unit.rotationZ }, { "w", unit.rotationW } };
     json["scale"]    = { { "x", unit.scaleX }, { "y", unit.scaleY }, { "z", unit.scaleZ } };

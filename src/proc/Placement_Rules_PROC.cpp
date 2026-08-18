@@ -97,6 +97,8 @@ void AppendDecalRules(const PlacementConstants& constants, const Params::MapReci
         if (!rule.bEnabled) continue;
         ScatterRuleConfiguration configuration = MakeCommonConfiguration(
             constants, recipe.geometry, recipe.water, rule, static_cast<int>(index), 3);
+        configuration.symmetryMask = ResolveSymmetryMask(rule.bSymmetryUseGlobal, rule.symmetryMask,
+                                                         recipe.globalSymmetryMask);
         configuration.density        = rule.density;
         configuration.spacingMinimum = rule.spacingMinimum;
         configuration.selectionFlags |= ScatterSelectionFlag::UseDensity;

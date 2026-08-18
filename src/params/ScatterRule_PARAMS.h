@@ -45,6 +45,9 @@ struct DecalRule {
     int   maskStratumIndex = -1;
     float maskWeightMinimum = 0.0f;
 
+    bool  bSymmetryUseGlobal = true;
+    int   symmetryMask       = 0;
+
     ScatterTransform transform;
 };
 
