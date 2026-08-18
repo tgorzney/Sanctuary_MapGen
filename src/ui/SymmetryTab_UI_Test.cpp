@@ -1,9 +1,9 @@
-// SymmetryTab_UI_Test.cpp — WO C1 acceptance for the Symmetry tab. Drives the PURE option/mask
-// conversion and the two promoted detection settings with synthetic input, so no imgui frame, no
-// window and no GL context is needed.
-// NOT YET REGISTERED IN CMake — WO C1 does not own CMakeLists.txt; a later batch adds the
-// add_sangen_test line. The file is dormant until then (and the lib glob filters *_Test.cpp out).
+// SymmetryTab_UI_Test.cpp — WO C1 acceptance for the Symmetry tab, rewritten for STEP8: the tab
+// now edits `recipe.globalSymmetryMask` directly through the shared `DrawIndependentSymmetryAxes`
+// (`PlacementRuleSections_UI.h`), so these checks drive that pure bit-mask arithmetic instead of
+// the removed exclusive-option scheme. No imgui frame, window or GL context is needed.
 #include "SymmetryTab_UI.h"
+#include "PlacementRuleSections_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cstdio>
 
@@ -20,65 +20,79 @@ void Check(bool bCondition, const char* label) {
     ++failureCount;
 }
 
-// Five presentation options over a real bit mask in which XY is TWO bits.
+// Each of the 4 real axis bits toggles independently and round-trips through the same mask word
+// the tab now edits directly — no presentation word, no exclusivity.
 void RunAxisOptionChecks() {
-    Check(SymmetryAxisMaskOfOption(static_cast<int>(SymmetryAxisOption::Point))
-          == Params::SymmetryAxis::RotateHalfTurn, "Point is the half-turn bit");
-    Check(SymmetryAxisMaskOfOption(static_cast<int>(SymmetryAxisOption::MirrorXZ))
-          == (Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::MirrorAcrossZ),
-          "XY is BOTH mirror bits, which is why the row is not a raw bit group");
-    Check(SymmetryAxisMaskOfOption(static_cast<int>(SymmetryAxisOption::Radial))
-          == Params::SymmetryAxis::QuarterTurns, "Radial is the quarter-turn bit");
-    Check(SymmetryAxisMaskOfOption(-1) == Params::SymmetryAxis::None
-          && SymmetryAxisMaskOfOption(kSymmetryAxisOptionCount) == Params::SymmetryAxis::None,
-          "an option outside the row answers None, never a stray bit");
+    int symmetryMask = Params::SymmetryAxis::None;
+    for (int axisIndex = 0; axisIndex < kPlacementSymmetryAxisCount; ++axisIndex)
+        Check(!IsPlacementSymmetryAxisSet(symmetryMask, axisIndex), "a fresh mask sets no axis");
 
-    for (int optionIndex = 0; optionIndex < kSymmetryAxisOptionCount; ++optionIndex) {
-        const int axisMask = SymmetryAxisMaskOfOption(optionIndex);
-        Check(SymmetryAxisOptionOfMask(axisMask) == optionIndex,
-              "every option round-trips through the recipe's mask");
-        Check(SymmetryAxisMaskOfOptionBits(SymmetryOptionBitsOfMask(axisMask)) == axisMask,
-              "and through the presentation word the checkbox row edits");
-        Check(symmetryAxisOptionLabels[optionIndex] != nullptr, "every option is labelled");
+    // Toggle every axis on, one at a time, and confirm the others are left alone.
+    for (int axisIndex = 0; axisIndex < kPlacementSymmetryAxisCount; ++axisIndex) {
+        symmetryMask = PlacementSymmetryMaskAfterToggle(symmetryMask, axisIndex);
+        Check(IsPlacementSymmetryAxisSet(symmetryMask, axisIndex),
+              "toggling an axis on sets exactly that axis");
     }
+    for (int axisIndex = 0; axisIndex < kPlacementSymmetryAxisCount; ++axisIndex)
+        Check(IsPlacementSymmetryAxisSet(symmetryMask, axisIndex),
+              "all four axes coexist - the row the old exclusive scheme could never draw");
 
-    Check(SymmetryAxisOptionOfMask(Params::SymmetryAxis::None) == -1, "None ticks nothing");
-    const int unshowableMask = Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::QuarterTurns;
-    Check(SymmetryAxisOptionOfMask(unshowableMask) == -1,
-          "a combination the row cannot express ticks nothing rather than snapping to a neighbour");
-    Check(SymmetryOptionBitsOfMask(unshowableMask) == 0u, "and its presentation word is empty");
+    // A combination the old 5-option row could never show: Mirror X + Quarter Turns.
+    int combinationMask = Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::QuarterTurns;
+    Check(IsPlacementSymmetryAxisSet(combinationMask, 0) && IsPlacementSymmetryAxisSet(combinationMask, 3)
+          && !IsPlacementSymmetryAxisSet(combinationMask, 1) && !IsPlacementSymmetryAxisSet(combinationMask, 2),
+          "MirrorAcrossX | QuarterTurns shows exactly its two bits and nothing else");
+
+    // The actual regression case: Mirror X + Half Turn together, arrived at from OUTSIDE the tab
+    // (e.g. a per-rule override copied to global, or a hand-edited .sanmap) - showable as-is.
+    const int regressionMask = Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::RotateHalfTurn;
+    Check(IsPlacementSymmetryAxisSet(regressionMask, 0) && IsPlacementSymmetryAxisSet(regressionMask, 2),
+          "MirrorAcrossX | RotateHalfTurn is showable - the old exclusive row could not represent it");
+    Check(ResolvedPlacementSymmetryMask(regressionMask) == regressionMask,
+          "and it survives the Constitution Section 6 repair unchanged, since both bits are legal");
+
+    // Settable: ticking two boxes (simulated as two sequential toggles from empty) produces the OR
+    // of their bits, exactly as DrawIndependentSymmetryAxes's loop would leave it.
+    int settledMask = Params::SymmetryAxis::None;
+    settledMask = PlacementSymmetryMaskAfterToggle(settledMask, 0); // Mirror X
+    settledMask = PlacementSymmetryMaskAfterToggle(settledMask, 2); // Half Turn
+    Check(settledMask == regressionMask,
+          "ticking Mirror X then Half Turn from the tab produces their OR, matching the recipe mask");
+
+    // An out-of-range index changes nothing rather than shifting by an illegal amount.
+    const int beforeMask = settledMask;
+    Check(PlacementSymmetryMaskAfterToggle(settledMask, -1) == beforeMask
+          && PlacementSymmetryMaskAfterToggle(settledMask, kPlacementSymmetryAxisCount) == beforeMask,
+          "an out-of-range axis index is refused, not obeyed");
 }
 
-// The mirror must never become a second home for the mask.
+// The tab edits `recipe.globalSymmetryMask` directly - no mirror word, no separate load/store step.
 void RunMirrorChecks() {
     Params::MapRecipe recipe;
-    SymmetryTabState state;
     Check(recipe.globalSymmetryMask == Params::SymmetryAxis::None, "a new recipe carries no symmetry");
 
     recipe.globalSymmetryMask = Params::SymmetryAxis::MirrorAcrossZ;
-    LoadSymmetryTabValues(recipe.globalSymmetryMask, state);
-    Check(state.axisOptionBits == (1u << static_cast<int>(SymmetryAxisOption::MirrorZ)),
-          "the mirror loaded the recipe's option");
-    Check(!StoreSymmetryTabValues(state, recipe.globalSymmetryMask),
-          "an untouched round trip reports nothing moved");
+    Check(IsPlacementSymmetryAxisSet(recipe.globalSymmetryMask, 1), "the recipe's mask is read directly");
 
-    // One frame of the exclusive group: clicking XY replaces whatever was ticked.
-    WidgetChange change = StepExclusiveCheckboxInteraction(
-        state.axisOptionBits, kSymmetryAxisOptionCount,
-        static_cast<int>(SymmetryAxisOption::MirrorXZ), true);
-    Check(change.bValueChanged && change.bCommitted,
-          "a tick commits on the same frame - a boolean has no drag to defer");
-    Check(StoreSymmetryTabValues(state, recipe.globalSymmetryMask), "the store reports the move");
+    // Toggling Mirror X on the recipe's own mask ORs it in rather than replacing Mirror Z - the
+    // exact behaviour the old exclusive row could not offer.
+    recipe.globalSymmetryMask = PlacementSymmetryMaskAfterToggle(recipe.globalSymmetryMask, 0);
     Check(recipe.globalSymmetryMask
           == (Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::MirrorAcrossZ),
-          "and both mirror bits reached the recipe from one tick");
+          "ticking a second axis combines with the first rather than replacing it");
 
-    // Clicking the active option clears it: "no symmetry" is a legal recipe.
-    StepExclusiveCheckboxInteraction(state.axisOptionBits, kSymmetryAxisOptionCount,
-                                     static_cast<int>(SymmetryAxisOption::MirrorXZ), true);
-    StoreSymmetryTabValues(state, recipe.globalSymmetryMask);
+    // Clicking an active axis off again clears just that bit; "no symmetry" remains reachable.
+    recipe.globalSymmetryMask = PlacementSymmetryMaskAfterToggle(recipe.globalSymmetryMask, 0);
+    recipe.globalSymmetryMask = PlacementSymmetryMaskAfterToggle(recipe.globalSymmetryMask, 1);
     Check(recipe.globalSymmetryMask == Params::SymmetryAxis::None,
-          "clicking the ticked option clears the mask");
+          "toggling both active axes back off returns the recipe to no symmetry");
+
+    // A hand-edited recipe carrying a stray bit no v2 axis owns is repaired, never obeyed
+    // (Constitution Section 6) - the same repair `DrawIndependentSymmetryAxes` performs on draw.
+    const int strayBit = 1 << 20;
+    recipe.globalSymmetryMask = Params::SymmetryAxis::MirrorAcrossX | strayBit;
+    Check(ResolvedPlacementSymmetryMask(recipe.globalSymmetryMask) == Params::SymmetryAxis::MirrorAcrossX,
+          "a stray bit outside the four real axes is dropped by the repair");
 }
 
 // The two settings this work-order promoted into Symmetry_PARAMS.h.

@@ -13,23 +13,29 @@ void NotifyPlacementChange(bool bCommitted, Pipeline::PreviewDriver* previewDriv
     if (bCommitted && previewDriver != nullptr) previewDriver->NotifyParametersChanged();
 }
 
-// "Use Global Symmetry" plus the per-axis bits it hides. The mask is REPAIRED on the way in, so a
-// bit no v2 axis owns is dropped the moment the row is drawn rather than at the next click.
+// "Use Global Symmetry" plus the per-axis bits it hides.
 void DrawPlacementSymmetryAxes(const char* label, bool& bSymmetryUseGlobal, int& symmetryMask,
                                Pipeline::PreviewDriver* previewDriver) {
     ImGui::PushID(label);
     NotifyPlacementChange(DrawCheckbox("Use Global Symmetry", bSymmetryUseGlobal).bCommitted,
                           previewDriver);
+    if (bSymmetryUseGlobal) { ImGui::PopID(); return; }
+    DrawIndependentSymmetryAxes(symmetryMask, previewDriver);
+    ImGui::PopID();
+}
+
+// Four independent tick boxes over the real bit mask. The mask is REPAIRED on the way in, so a
+// bit no v2 axis owns is dropped the moment the row is drawn rather than at the next click
+// (Constitution §6) — for every caller, not just the per-rule override.
+void DrawIndependentSymmetryAxes(int& symmetryMask, Pipeline::PreviewDriver* previewDriver) {
     const int repairedMask = ResolvedPlacementSymmetryMask(symmetryMask);
     if (repairedMask != symmetryMask) symmetryMask = repairedMask;
-    if (bSymmetryUseGlobal) { ImGui::PopID(); return; }
     for (int axisIndex = 0; axisIndex < kPlacementSymmetryAxisCount; ++axisIndex) {
         bool bAxisSet = IsPlacementSymmetryAxisSet(symmetryMask, axisIndex);
         const WidgetChange change = DrawCheckbox(placementSymmetryAxisLabels[axisIndex], bAxisSet);
         if (change.bValueChanged) symmetryMask = PlacementSymmetryMaskAfterToggle(symmetryMask, axisIndex);
         NotifyPlacementChange(change.bCommitted, previewDriver);
     }
-    ImGui::PopID();
 }
 
 // The instance transform: the scale and yaw BANDS the scatter samples inside, plus the two

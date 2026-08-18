@@ -1,8 +1,10 @@
 // SymmetryTab_UI.cpp — the imgui composition of the Symmetry tab. Layer: UI.
-// Two sections: the global axis row (the batch-A exclusive checkbox group over the presentation
-// word) and Detection (the two settings this work-order promoted into Symmetry_PARAMS.h).
-// Every control is a shared widget; the only raw imgui here is the label vocabulary.
+// Two sections: the global axis row (four independent tick boxes over the real bit mask, shared
+// with the per-rule symmetry override via `DrawIndependentSymmetryAxes`) and Detection (the two
+// settings this work-order promoted into Symmetry_PARAMS.h). Every control is a shared widget; the
+// only raw imgui here is the label vocabulary.
 #include "SymmetryTab_UI.h"
+#include "PlacementRuleSections_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
 #include "imgui.h"
@@ -17,18 +19,8 @@ void NotifyChange(bool bCommitted, Pipeline::PreviewDriver* previewDriver) {
     if (bCommitted && previewDriver != nullptr) previewDriver->NotifyParametersChanged();
 }
 
-void DrawAxisRow(Params::MapRecipe& recipe, SymmetryTabState& state,
-                 Pipeline::PreviewDriver* previewDriver) {
-    LoadSymmetryTabValues(recipe.globalSymmetryMask, state);
-    // bAllowNone: "no symmetry" is a legal recipe, so clicking the active option clears it.
-    const WidgetChange change = DrawExclusiveCheckboxRow(
-        "Axis", state.axisOptionBits, symmetryAxisOptionLabels, kSymmetryAxisOptionCount, true);
-    if (change.bValueChanged) StoreSymmetryTabValues(state, recipe.globalSymmetryMask);
-    NotifyChange(change.bCommitted, previewDriver);
-    if (SymmetryAxisOptionOfMask(recipe.globalSymmetryMask) < 0
-        && recipe.globalSymmetryMask != Params::SymmetryAxis::None)
-        ImGui::Text("Recipe mask 0x%X is a combination this row cannot show.",
-                    static_cast<unsigned int>(recipe.globalSymmetryMask));
+void DrawAxisRow(Params::MapRecipe& recipe, Pipeline::PreviewDriver* previewDriver) {
+    DrawIndependentSymmetryAxes(recipe.globalSymmetryMask, previewDriver);
 }
 
 void DrawDetectionSettings(Params::SymmetryDetection& symmetryDetection, SymmetryTabState& state,
@@ -46,7 +38,7 @@ void DrawSymmetryTab(Params::MapRecipe& recipe, Params::SymmetryDetection& symme
                      SymmetryTabState& state, Pipeline::PreviewDriver* previewDriver) {
     ImGui::PushID("symmetryTab");
     if (DrawSectionBegin("Global Symmetry", state.globalSymmetrySection)) {
-        DrawAxisRow(recipe, state, previewDriver);
+        DrawAxisRow(recipe, previewDriver);
         DrawSectionEnd();
     }
     if (DrawSectionBegin("Detection", state.detectionSection)) {

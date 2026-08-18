@@ -111,6 +111,11 @@ void NotifyPlacementChange(bool bCommitted, Pipeline::PreviewDriver* previewDriv
 
 void DrawPlacementSymmetryAxes(const char* label, bool& bSymmetryUseGlobal, int& symmetryMask,
                                Pipeline::PreviewDriver* previewDriver);
+// Four independent tick boxes over the real bit mask — no "Use Global" wrapper, for callers
+// that ARE the global setting itself (unlike DrawPlacementSymmetryAxes's per-rule override use).
+// The mask is REPAIRED (Constitution §6) before the boxes are drawn, so both this function and
+// DrawPlacementSymmetryAxes give a hand-edited or otherwise-arrived-at mask identical treatment.
+void DrawIndependentSymmetryAxes(int& symmetryMask, Pipeline::PreviewDriver* previewDriver);
 void DrawPlacementTransformSection(Params::ScatterTransform& transform, PlacementTransformState& state,
                                    Pipeline::PreviewDriver* previewDriver);
 void DrawPlacementGateSection(int& maskStratumIndex, float& maskWeightMinimum, int& mapEdgePadding,
