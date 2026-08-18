@@ -86,7 +86,8 @@ naming law: **camelCase top-level key = game-native field** (`width`, `armies`,
 `markers`, …); **PascalCase top-level key = SanGen-owned section**
 (`GeneralMapSettings`, `HeightmapStack`, `Symmetry`, `SlopeDefaults`, `Flow`,
 `Accumulation`, `MarkersStack`, `PropsStack`, `DecalsStack`, `UnitsStack`,
-`DetailNormal`, `SanGenVersion` — the ratified schema v3, `SANMAP_FORMAT_SPEC`).
+`DetailNormal`, `SanGenVersion`, `PropGroups`, `DecalGroups` — the ratified schema
+v3, `SANMAP_FORMAT_SPEC`).
 
 - Every SanGen-owned top-level key is **single-token PascalCase, no spaces** —
   `GeneralMapSettings`, never `"General Map Settings"`.
@@ -148,6 +149,13 @@ Ratified alongside `ENTITY_AUTHORING_PARAMS_SPEC` (`Params::Army`/`UnitGroup`/`U
   (`AreasTab_List_UI.h`'s `MapAreaRectangle`); applied one level deeper for `Army.groups` and
   `UnitGroup.units`/`UnitGroup.groups` (`ENTITY_AUTHORING_PARAMS_SPEC`). A PARAMS-shape
   consequence of the naming decision above, not a separate rule.
+- **A format-native object gains a small SanGen field by direct injection when the field is
+  genuinely novel information with no competing home** (`armyColor`, `alias`, and — ARCH §12 —
+  `PropTransform`/`DecalTransform::layerIndex`); **a separate SanGen-owned array is used only
+  when the metadata is richer than a scalar AND no format-native group container already exists
+  to hold it** (`PropInstanceLayer`/`DecalInstanceLayer`, ARCH §12). This is one consistent rule
+  applied per-case, not two competing philosophies — it does not reopen `armyColor`/`alias` or
+  `MarkerTransform::alias`, all already-settled instances of the first branch.
 
 ---
 
@@ -897,3 +905,130 @@ reference `core/Parameters.h:79-87`.
   future `MarkersStack` Group/Layer wrapper, `PLACEMENT_SCATTER_SPEC`/`SANMAP_FORMAT_SPEC`
   Correction 7, may fold this inside it later; not designed here) and the matching `IO`
   round-trip are a separate coder work-order.
+
+## 12. Manual-layer authoring for props/decals — `layerIndex` + `PropGroups`/`DecalGroups` (ARCH ruling, revises `ENTITY_AUTHORING_PARAMS_SPEC`)
+
+Fills the gap `PropsTab_Manual_UI.h`'s SCOPE NOTE 1 named: v1's manual prop GROUPS (hand-placed
+props kept as named groups after import) had no `_PARAMS` home — `MapRecipe` carried scatter
+RULES only. **Ratifies Option B, direct field injection, over the alternative of contiguous
+index-ranges in a separate key.**
+
+- **Decisive rejection of the range-based alternative.** A contiguous index-range key (e.g.
+  "layer 0 owns `transforms[0..40)`") has a real silent-corruption failure mode: if any external
+  tool (hand-editing, or the real Unity map editor — both supported workflows for this format)
+  reorders an entry in `transforms[]` without changing the count, the ranges stay internally
+  self-consistent while silently misattributing instances to the wrong layer, undetectable by any
+  validation. `layerIndex` traveling directly with the instance has no such failure mode — external
+  reordering cannot desync it. Cost is trivial (~1 MB even at Forge's 63.5k prop instances,
+  `SANMAP_FORMAT_SPEC`'s 23-map survey) against the file's actual bulk, which is textures, not
+  JSON.
+- **`PropTransform`/`DecalTransform` become real, named wrapper types**, superseding
+  `ENTITY_AUTHORING_PARAMS_SPEC`'s earlier "props/decals need no wrapper type" ruling — that
+  ruling's premise (zero fields beyond `InstancedTransform`) no longer holds:
+  ```cpp
+  struct PropTransform  { InstancedTransform transform; int layerIndex = 0; };
+  struct DecalTransform { InstancedTransform transform; int layerIndex = 0; };
+  struct PropInstanceGroup  { std::string blueprintPath; std::vector<PropTransform>  transforms; };
+  struct DecalInstanceGroup { std::string blueprintPath; std::vector<DecalTransform> transforms; };
+  ```
+- **`layerIndex` does NOT go on shared `InstancedTransform`.** It would leak onto
+  `MarkerTransform`'s composed member and every future consumer of the base that has no concept
+  of a manual layer. JSON key `layerIndex`, lowerCamelCase, merged directly into the existing
+  transform object — the same rule already governing `armyColor`/`alias` (§1.6 Correction 0),
+  §1.8's format-derived-field data-KIND rule.
+- **Separate layer-metadata array**, one per domain, new top-level schema-v3 PascalCase keys
+  `PropGroups`/`DecalGroups` (`SANMAP_FORMAT_SPEC` Correction 14):
+  ```cpp
+  struct PropInstanceLayer  { std::string name; float color[4]; float iconScale = 1.0f; };
+  struct DecalInstanceLayer { std::string name; float color[4]; float iconScale = 1.0f; };
+  ```
+  Not `PropLayers`/`DecalLayers` — `PropsStack`/`DecalsStack`'s Group→Layer(rule) procedural
+  hierarchy (`SANMAP_FORMAT_SPEC` Correction 7) already uses "Layer" for something unrelated (a
+  rule inside a procedural Stack); reusing the word here would collide two different concepts.
+  `ManualPropGroup` is also the already-live identifier in `src/ui/PropsTab_Manual_UI.h`, so
+  `PropGroups`/`DecalGroups` picks up an existing name rather than inventing one.
+- **Import validation:** `layerIndex` out of range against the corresponding `PropGroups`/
+  `DecalGroups` array size is a loud, logged clamp to `0` (Constitution §6), never a hard refusal
+  — this is authoring-convenience metadata, not gameplay-authoritative data. A missing
+  `layerIndex` key on an older/foreign file degrades for free to `0` (the field's own default).
+- **General principle, binding beyond this ratification (also recorded in §1.8):** a
+  format-native object gains a small SanGen field by **direct injection** when the field is
+  genuinely novel information with no competing home (`armyColor`, `alias`, `layerIndex`); a
+  **separate SanGen-owned array** is used only when the metadata is richer than a scalar AND no
+  format-native group container already exists to hold it (`PropInstanceLayer`/
+  `DecalInstanceLayer`). One consistent rule, applied per case — it does not reopen `armyColor`/
+  `alias`/`MarkerTransform::alias`, all already-settled instances of the first branch.
+- **Shape only, not wiring.** `MapRecipe_PARAMS.h` gaining `std::vector<PropInstanceLayer>
+  propLayers;` / `std::vector<DecalInstanceLayer> decalLayers;`, the matching `IO` round-trip, and
+  reconciling `Ui::ManualPropGroup` (`PropsTab_Manual_UI.h`) against this new durable
+  `Params::PropInstanceLayer` home are separate coder/UI work-orders — not designed here. Full
+  detail: `ENTITY_AUTHORING_PARAMS_SPEC`.
+
+## 13. Radial N-fold symmetry — `SymmetryAxis::Radial` + `radialSymmetryRepeatCount` (ARCH ruling, amends `Symmetry_PARAMS.h`, `SANMAP_FORMAT_SPEC` Correction 4)
+
+- **New bit:** `constexpr int Radial = 1 << 4;` in the `SymmetryAxis` namespace
+  (`src/params/Symmetry_PARAMS.h`). Confirmed by direct code read
+  (`src/proc/Placement_Symmetry_PROC.h`'s `BuildSymmetryOrbit`) that every set bit in the mask is
+  already composed independently in sequence (`MirrorAcrossX` → `MirrorAcrossZ` →
+  `RotateHalfTurn` → `QuarterTurns`, each via its own `AppendTransformedSet`/`AppendQuarterTurns`
+  call) — arbitrary combination of `Radial` with the existing bits is therefore already
+  structurally supported by the orbit builder's shape; **no PROC combination-logic change is
+  needed for this ratification.** `Radial`'s own orbit-generation function (the N-way analog of
+  the existing `AppendQuarterTurns` helper, generalized from its hardcoded 3 turns to a
+  designer-chosen turn count) is new PROC work for a future coder work-order — not designed here.
+- **Companion count field**, a flat sibling wherever `symmetryMask` already lives (NOT a wrapper
+  struct — matches the existing `bSymmetryUseGlobal`/`symmetryMask` flat-sibling convention):
+  ```cpp
+  int radialSymmetryRepeatCount = 3;
+  ```
+  Each independently-overridable mask needs its own `N`: `MapRecipe::globalSymmetryMask`,
+  `MarkerRule::symmetryMask`, `PropRule::symmetryMask`, `UnitRule::symmetryMask`, and — once
+  Defect 1 below is fixed — `DecalRule::symmetryMask`, plus the future `HeightmapStack`
+  `GeoLayer`/`Layer` override (`SANMAP_FORMAT_SPEC` Correction 3). A local override with
+  `bSymmetryUseGlobal = false` but no local count would otherwise silently inherit the global `N`,
+  defeating the point of a local override.
+- **JSON key `RadialSymmetryRepeatCount`, PascalCase** — matches the confirmed-live
+  `SymmetryMask` key convention in `MapExporter_Rules_IO.cpp`. Lands in `SANMAP_FORMAT_SPEC`
+  Correction 4's `Symmetry` global-section field list beside `GlobalSymmetryMask`, and as a
+  per-rule sibling of `SymmetryMask` on each `MarkersStack`/`PropsStack`/`DecalsStack`/
+  `UnitsStack` rule entry.
+- **Default axis change:** `MapRecipe::globalSymmetryMask`'s default becomes
+  `SymmetryAxis::RotateHalfTurn` (was `SymmetryAxis::None`, `MapRecipe_PARAMS.h:31`) — the
+  existing "Point" bit; no new bit needed for this default.
+- **Default blend — forward-attached requirement on a standing reservation, not built now.**
+  `Params::SymAlgorithm` does not exist in `src/` yet (confirmed zero matches) — it remains
+  `SANMAP_FORMAT_SPEC` Correction 4's own reserved, deferred field. Whichever future work-order
+  defines `Params::SymAlgorithm{Fold, Blur, CrossFade, Superposition, Cylinder3D, Torus3D, ...}`
+  **must default it to `Superposition`.** Recorded here and in `SANMAP_FORMAT_SPEC` Correction 4
+  so the requirement is not lost between now and that work-order.
+
+**Two defects recorded this session, not fixed here** (out-of-scope code gaps for a future coder
+work-order; full detail in `SANMAP_FORMAT_SPEC` Correction 4 and `PLACEMENT_SCATTER_SPEC`'s
+"Known issues" addendum):
+1. **`DecalRule` has no `bSymmetryUseGlobal`/`symmetryMask` pair at all**
+   (`src/params/ScatterRule_PARAMS.h`) — contradicted `SANMAP_FORMAT_SPEC` Correction 4's prior
+   claim that the pattern was "already live and tested on `MarkerRule`/`PropRule`/`DecalRule`";
+   that claim was factually wrong for `DecalRule` and is corrected in this same session.
+   `AppendDecalRules` (`src/proc/Placement_Rules_PROC.cpp`) also never calls `ResolveSymmetryMask`
+   for decals, so decals currently generate with **no symmetry at all**, not even the global
+   default — a real functional gap, not merely a missing field.
+2. **Symmetry-clone buffer overflow risk.** `Params::symmetryOrbitMaximum = 16`
+   (`Symmetry_PARAMS.h`) backs a fixed-size stack array (`SymmetryOrbitPoint orbit[16]`,
+   `src/proc/Placement_Accept_PROC.cpp:33`) sized for the old maximum combination (mirror X ×
+   mirror Z × quarter turns). A designer-chosen `radialSymmetryRepeatCount` combined with mirrors
+   can now exceed 16 (e.g. 8-fold × MirrorX × MirrorZ → up to 32), and the buffer **silently drops
+   excess clones** rather than erroring — a real correctness gap this ratification creates by
+   making a larger orbit reachable from PARAMS/UI. Raising the cap and/or adding a loud validated
+   clamp on the designer-facing `N` (Constitution §6) is PROC/buffer-sizing work for a future
+   Compute Optimization Expert or Generator Expert work-order — not sized here.
+
+**UI finding, not ARCH's or this ratification's to fix — flagged for the UI Expert.**
+`src/ui/SymmetryTab_UI.h`'s existing `SymmetryAxisOption::Radial` option (part of the plan's five
+exclusive choices — Point/X/Z/XY/Radial) currently maps to `Params::SymmetryAxis::QuarterTurns`
+(confirmed by code read, `SymmetryAxisMaskOfOption`) — a stand-in used because no true N-fold bit
+existed yet. **This mapping is now stale**: it must be remapped to the real
+`SymmetryAxis::Radial` bit this ratification adds, or the tab's "Radial" checkbox will keep
+producing 4-fold `QuarterTurns` instead of the designer's chosen N-fold repeat. This is separate
+from, and additional to, the already-known finding that `SymmetryTab_UI.h`'s exclusive-checkbox
+row (unlike `PlacementRuleSections_UI.h`'s per-rule OR-able tick boxes) cannot express combined
+axes at all — both are UI-layer reconciliation work for the UI Expert, not decided here.

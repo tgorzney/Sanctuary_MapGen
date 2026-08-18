@@ -14,8 +14,9 @@
 //  1. RESOLVED ENTITIES (`Data::PlacementResults` markers/props/units) are not written: this
 //     module's inputs are the recipe and the fields, and the entity blocks of the format need
 //     the coordinate flip plus the rotation conversion SANMAP_FORMAT_SPEC lists as a known gap.
-//     `areas`/`armies`/`markers`/`chains`/`decals`/`props` are therefore written EMPTY and
-//     valid. Entity export is its own work-order.
+//     `areas`/`armies` now round-trip real, hand-authored content from `recipe.areas`/
+//     `recipe.armies` (STEP2_ArmiesAreas_IO). `markers`/`chains`/`decals`/`props` are still
+//     written EMPTY and valid — those four remain their own work-order.
 //  2. ATMOSPHERE has no `_PARAMS` home in the v2 tree, so the lighting/fog block is written from
 //     the format's own defaults rather than from settings that do not exist.
 #pragma once

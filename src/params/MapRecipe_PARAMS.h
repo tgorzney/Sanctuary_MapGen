@@ -5,8 +5,10 @@
 // concerns (dispatch/backend) — those are not reproducible-recipe content.
 #pragma once
 #include <vector>
+#include "Army_PARAMS.h"
 #include "Geometry_PARAMS.h"
 #include "LayerStack_PARAMS.h"
+#include "MapArea_PARAMS.h"
 #include "MarkerRule_PARAMS.h"
 #include "ScatterRule_PARAMS.h"
 #include "Stratum_PARAMS.h"
@@ -29,6 +31,11 @@ struct MapRecipe {
     std::vector<UnitRule>   unitRules;
     Water                   water;
     int                     globalSymmetryMask = SymmetryAxis::None;
+    // Hand-placed, pass-through entity data (ENTITY_AUTHORING_PARAMS_SPEC) — round-trip fidelity
+    // through the `.sanmap` `armies`/`areas` dictionaries is their entire purpose; no PROC stage
+    // computes or reinterprets them.
+    std::vector<Army>       armies;
+    std::vector<MapArea>    areas;
 
     bool IsValid() const { return geometry.IsValid(); }
 };

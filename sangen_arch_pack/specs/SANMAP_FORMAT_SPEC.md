@@ -43,8 +43,17 @@ layer's import/export must target this exactly.
   - **`alias` is a SanGen-added field (Correction 11)** — same lowerCamelCase
     rule as `armyColor` above.
 - `chains`: Dictionary<string, MarkerChain.Marker[]{ type, name }>
-- `decals`: DecalType[]{ blueprintPath, transforms: DecalTransform[] }
-- `props`: PropType[]{ blueprintPath, transforms: PropTransform[] }
+- `decals`: DecalType[]{ blueprintPath, transforms: DecalTransform[]{ ...,
+  layerIndex } }
+- `props`: PropType[]{ blueprintPath, transforms: PropTransform[]{ ...,
+  layerIndex } }
+  - **`layerIndex` (both domains) is a SanGen-added field (schema v3,
+    Correction 14 below)** — same lowerCamelCase merge rule as `armyColor`/
+    `alias` above, applied to an array-element object instead of a
+    dictionary-value object (`props`/`decals` are arrays, not dictionaries).
+    Companion metadata lives in the new top-level `PropGroups`/`DecalGroups`
+    sections (Correction 14) — a genuinely new SanGen-owned array, not a
+    merge, so it is PascalCase per the casing law below.
 
 ## Shared transform
 `InstancedTransform { Vector3 position, Quaternion rotation, Vector3 scale }`.
@@ -233,19 +242,85 @@ Global section:
 SymAlgorithm            SymSuperpositionBlend   SymmetryBlurRadius
 CrossFadeWidth           CylinderZScale          TorusMajorRadius
 TorusMinorRadius         SnapImperfectSymmetry   SymmetryDetectionTolerance
-GlobalSymmetryMask
+GlobalSymmetryMask       RadialSymmetryRepeatCount
 ```
 Per-rule/per-layer local override — `bSymmetryUseGlobal` + `symmetryMask` — is
-**confirmed already live and tested** on `MarkerRule`/`PropRule`/`DecalRule`
+**confirmed live** on `MarkerRule`/`PropRule`/`UnitRule`
 (`PlacementRules_PARAMS_Test.cpp:16`); those three carry a pure relocation of
 existing fields under this section's umbrella, not new work. **New** for
 `HeightmapStack`'s `GeoLayer`/`Layer` (Correction 3).
 
+**Correction, superseding this section's earlier claim (ARCH §13):** the
+original text of this correction additionally claimed the `bSymmetryUseGlobal`/
+`symmetryMask` pair is "already live and tested" on `DecalRule` as well. **That
+claim is factually wrong and is withdrawn.** `src/params/ScatterRule_PARAMS.h`'s
+`DecalRule` carries no `bSymmetryUseGlobal`/`symmetryMask` pair at all, and
+`AppendDecalRules` (`src/proc/Placement_Rules_PROC.cpp`) never calls
+`ResolveSymmetryMask` for decals — decals currently receive **no** symmetry at
+all on generation, not even the global default. This is a real implementation
+gap, flagged as Defect 1 in `PLACEMENT_SCATTER_SPEC`'s "Known issues" section
+for a future coder work-order (adding the missing pair and wiring it into
+`AppendDecalRules`, mirroring `AppendPropRules`) — not fixed by this
+ratification.
+
+**Radial N-fold symmetry (ARCH §13, ratified this session):**
+- **New bit:** `SymmetryAxis::Radial = 1 << 4` (`Symmetry_PARAMS.h`). Confirmed
+  via code read that `BuildSymmetryOrbit` (`Placement_Symmetry_PROC.h`) already
+  composes every set bit of the mask independently, so combining `Radial` with
+  the existing mirror/rotation bits already works structurally once the bit and
+  its own orbit-generation logic exist — no other PROC combination-logic change
+  is needed. The N-way rotation generator itself (the `Radial` analog of
+  `AppendQuarterTurns`, generalized from a hardcoded 3 turns to a designer
+  count) is new PROC work for a future coder work-order, not designed here.
+- **Companion count field**, a flat sibling wherever `symmetryMask` already
+  lives (not a wrapper struct, matching the existing `bSymmetryUseGlobal`/
+  `symmetryMask` flat-sibling convention):
+  ```
+  int radialSymmetryRepeatCount = 3;
+  ```
+  Each independently-overridable mask (`MapRecipe::globalSymmetryMask`,
+  `MarkerRule::symmetryMask`, `PropRule::symmetryMask`, `UnitRule::symmetryMask`,
+  and — once Defect 1 above is fixed — `DecalRule::symmetryMask`, plus the
+  future `HeightmapStack` `GeoLayer`/`Layer` override, Correction 3) needs its
+  own `N`: a local override with `bSymmetryUseGlobal = false` but no local count
+  would otherwise silently inherit the global `N`, defeating the point of a
+  local override.
+- **JSON key `RadialSymmetryRepeatCount`, PascalCase** — sibling of
+  `GlobalSymmetryMask` in this section's global field list above, and, per
+  rule, sibling of the confirmed-live `SymmetryMask` key
+  (`MapExporter_Rules_IO.cpp`) on each per-rule Stack entry.
+- **Default axis change:** `MapRecipe::globalSymmetryMask`'s default becomes
+  `SymmetryAxis::RotateHalfTurn` (was `SymmetryAxis::None`,
+  `MapRecipe_PARAMS.h:31`) — reuses the existing "Point" bit; no new bit needed
+  for this default.
+- **Default blend — forward-attached requirement, not built now.**
+  `Params::SymAlgorithm` does not exist anywhere in `src/` yet (confirmed zero
+  matches) — it remains this correction's own reserved, deferred field (see
+  the global field list above and "Ruled, not deferred" below). Whichever
+  future work-order actually defines
+  `Params::SymAlgorithm{Fold, Blur, CrossFade, Superposition, Cylinder3D,
+  Torus3D, ...}` **must default it to `Superposition`** — recorded here so the
+  requirement is not lost between now and that work-order.
+- **Known follow-up defect (ARCH §13, not fixed this session):**
+  `Params::symmetryOrbitMaximum = 16` (`Symmetry_PARAMS.h`) backs a fixed-size
+  stack array (`SymmetryOrbitPoint orbit[16]`,
+  `src/proc/Placement_Accept_PROC.cpp:33`) sized for the old maximum
+  combination (mirror X × mirror Z × quarter turns). A designer-chosen
+  `radialSymmetryRepeatCount` combined with mirrors can now exceed 16 (e.g.
+  8-fold × MirrorX × MirrorZ → up to 32), and the buffer **silently drops
+  excess clones** rather than erroring — a real correctness gap this
+  ratification creates by making a larger orbit reachable from the UI/PARAMS
+  layer. Flagged as Defect 2 in `PLACEMENT_SCATTER_SPEC`'s "Known issues"
+  section — raising the cap and/or adding a loud validated clamp on the
+  designer-facing `N` (Constitution §6) is PROC/buffer-sizing work for a
+  future Compute Optimization Expert or Generator Expert work-order, not
+  ratified here.
+
 **Ruled, not deferred:** heightmap symmetry is wanted immediately, in full —
-both the basic axis mechanism (`Params::SymmetryAxis` mirror/rotate) **and**
-the exotic `SymAlgorithm` group (Fold/Blur/CrossFade/Superposition/Cylinder3D/
-Torus3D). No v2 code implements a heightfield-symmetry PROC stage today
-(`IO_PARITY_REPORT.md` Decision #6). **This work-order reserves and
+both the basic axis mechanism (`Params::SymmetryAxis` mirror/rotate/radial)
+**and** the exotic `SymAlgorithm` group (Fold/Blur/CrossFade/Superposition/
+Cylinder3D/Torus3D). No v2 code implements a heightfield-symmetry PROC stage
+today (`IO_PARITY_REPORT.md` Decision #6). **This work-order reserves and
 round-trips the settings and adds the new override field to `GeoLayer`/`Layer`
 only.** Designing and building the actual heightfield-symmetry PROC stage is
 real, near-term, out-of-scope work for a separate generator-expert/ARCH
@@ -314,10 +389,18 @@ MarkersStack → Params::MarkerRule (MarkerRule_PARAMS.h) — field-complete for
 PropsStack   → Params::PropRule   (ScatterRule_PARAMS.h) — field-complete
 DecalsStack  → Params::DecalRule  (ScatterRule_PARAMS.h) — field-complete
 UnitsStack   → Params::UnitRule   (NEW — a fourth, fully-wired v2 rule type,
-               already exported today, MapExporter_Rules_IO.cpp:91-105,117,122,
-               absent from the first draft of this schema; omitting it would
-               regress what v2 ships today)
+               already exported today, MapExporter_Rules_IO.cpp:91-105,117,
+               122, absent from the first draft of this schema; omitting it
+               would regress what v2 ships today)
 ```
+**Not the same "Group" as Correction 14's `PropGroups`/`DecalGroups`.** This
+Stack's `Group` is an organizational container for procedural rule *Layers*
+(this correction); Correction 14's `PropGroups`/`DecalGroups` are metadata for
+hand-placed instance *layers* (a manual authoring concept). The two "Group"/
+"Layer" words are reused across genuinely different concepts in this format —
+`ENTITY_AUTHORING_PARAMS_SPEC`'s naming for the manual concept was chosen
+specifically (`PropGroups`, not `PropLayers`) to avoid colliding the two.
+
 **Confirmed cardinality change, new fields required:**
 ```
 HydroMultiplier   ReclaimDensity   MexDensity   SpawnPointCount
@@ -564,6 +647,46 @@ home once that blob is deleted (per "Verified deletions" below). This is an
 **open follow-up**, out of this correction's scope — do not invent a home for
 them here; a future correction (possibly `StratumGenerationSettings` itself,
 if that turns out to be the right container) must rule on it explicitly.
+
+### `PropGroups` / `DecalGroups` — Correction 14 (manual-layer metadata, ARCH §12)
+New top-level SanGen-owned keys (ARCH §1.6: single-token PascalCase, no
+spaces), siblings of `props`/`decals`. Companion metadata array for the
+`layerIndex` field this correction also adds to `props[].transforms[]`/
+`decals[].transforms[]` (see the Entity collections note above) — the
+`Params::PropInstanceLayer`/`DecalInstanceLayer` shape lives in
+`ENTITY_AUTHORING_PARAMS_SPEC`; this correction states only the wire-format
+placement and casing.
+
+**No new C++ type beyond what `ENTITY_AUTHORING_PARAMS_SPEC` already
+introduces.** `PropGroups`/`DecalGroups` each serialize a
+`std::vector<Params::PropInstanceLayer>`/`std::vector<Params::DecalInstanceLayer>`
+— array order is the layer's identity, and `PropTransform`/
+`DecalTransform::layerIndex` is a plain index into that array (see
+`ENTITY_AUTHORING_PARAMS_SPEC`'s "`layerIndex`" section for the full
+direct-field-injection-vs-index-range reasoning and the general principle it
+establishes).
+
+**Shape (mirrors `StratumGenerationSettings`'s array-of-objects convention,
+Correction 12, but with no fixed cardinality — this is designer-authored
+count, not a fixed format invariant like `STRATUM_COUNT`):**
+```
+PropGroups / DecalGroups: [ N × {
+    Name        (string)
+    Color       ({r,g,b,a})
+    IconScale   (float)
+} ]
+```
+Field-name casing follows this section's own established SanGen-owned-array
+convention (PascalCase, `b`-prefix dropped where relevant) — same convention
+as `StratumGenerationSettings`/`GeneralMapSettings`.
+
+**Import validation:** a `props[].transforms[].layerIndex`/
+`decals[].transforms[].layerIndex` at or beyond the corresponding
+`PropGroups`/`DecalGroups` array length is a **loud, logged clamp to `0`**
+(Constitution §6) — per-instance, not per-file, since different instances in
+the same file can carry different out-of-range values. Never a hard refusal —
+this is authoring-convenience metadata, not gameplay-authoritative data, and a
+missing/foreign file simply degrades every instance to layer `0`.
 
 ### Verified deletions (pure duplicates — delete outright)
 Confirmed line-for-line against a real map — no replacement needed, each

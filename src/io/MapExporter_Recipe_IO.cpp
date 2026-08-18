@@ -83,10 +83,11 @@ std::string MapExporter::BuildSanmapJsonText(const Params::MapRecipe& recipe,
     document["fadeStartDistance"] = 1.0f;
     document["stratumLayers"]     = BuildStratumLayersJson(recipe);
 
-    // SCOPE NOTE 1 (MapExporter_IO.h): the entity domains are written empty and VALID rather than
-    // omitted, so an importer that expects them never sees a missing key.
-    document["areas"]   = nlohmann::ordered_json::object();
-    document["armies"]  = nlohmann::ordered_json::object();
+    // SCOPE NOTE 1 (MapExporter_IO.h): `areas`/`armies` now round-trip real content; the remaining
+    // entity domains are still written empty and VALID rather than omitted, so an importer that
+    // expects them never sees a missing key.
+    document["areas"]   = BuildAreasJson(recipe);
+    document["armies"]  = BuildArmiesJson(recipe);
     document["markers"] = nlohmann::ordered_json::object();
     document["chains"]  = nlohmann::ordered_json::object();
     document["decals"]  = nlohmann::ordered_json::array();

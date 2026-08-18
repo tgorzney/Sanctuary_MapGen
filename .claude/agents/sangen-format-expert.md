@@ -33,7 +33,8 @@ the platform seam (ARCH §3.3 / §5).
 1. `sangen_arch_pack/CONSTITUTION.md` + `ARCH.md` — the law.
 2. `sangen_arch_pack/INDEX.md` → load ONLY your specs: `SANMAP_FORMAT_SPEC`,
    `UNIT_PROP_MARKER_DATA_SPEC`, `ENTITY_AUTHORING_PARAMS_SPEC` (manually-placed
-   `Army`/`UnitGroup`/`UnitTransform`/`MapArea` shapes), `ATMOSPHERE_PARAMS_SPEC`
+   `Army`/`UnitGroup`/`UnitTransform`/`MapArea`/`MarkerInstanceGroup`/`PropInstanceGroup`/
+   `DecalInstanceGroup`/`MarkerChain` shapes), `ATMOSPHERE_PARAMS_SPEC`
    (`Params::Atmosphere`), `GAMEDATA_LAYOUT_SPEC`, `MODDING_SCRIPTING_SPEC`,
    and the ingestion half of `ASSET_LOADING_SPEC`. `IO_MIGRATION_SPEC` exists but is
    the IO Architecture Expert's primary spec, not yours — read it only to confirm

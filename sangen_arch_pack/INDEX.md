@@ -20,8 +20,8 @@ spec(s) a question needs — never the whole pack.
 | gamedata layout — folder map (units/props/stratum/icons), sprite pairs, sizes | `specs/GAMEDATA_LAYOUT_SPEC.md` |
 | noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
 | the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights` | `specs/MASKING_SPEC.md` |
-| marker/prop/unit scatter, rules & gates, symmetry, prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
-| pass-through entity PARAMS — armies/unit groups/unit transforms/map areas (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`), distinct from procedural scatter rules | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
+| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
+| pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
 | preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix | `specs/PREVIEW_COMPOSITING_SPEC.md` |
@@ -38,8 +38,31 @@ later still, promoting the field-complete UI-only `Ui::AtmosphereSettings` to a 
 `Params::Atmosphere` recipe type; the same ratification session also filled in the
 `Params::GlobalMarkerSettings` C++ shape inside `SANMAP_FORMAT_SPEC`'s existing
 `GlobalMarkerSettings` paragraph (no new spec file needed — the shape was already fully
-named there).
+named there). `ENTITY_AUTHORING_PARAMS_SPEC` was extended again in a third session to
+ratify the remaining resolved/baked entity domains — `markers`/`props`/`decals`/`chains`
+(`Params::MarkerInstanceGroup`/`MarkerTransform`, `PropInstanceGroup`, `DecalInstanceGroup`,
+`MarkerChain`/`ChainMarker`, and the new shared `Params::InstancedTransform` base) — closing
+the last named pass-through-instance-data gap in that family. `ENTITY_AUTHORING_PARAMS_SPEC`
+was extended a fourth time (ARCH §12) to ratify manual-layer authoring for hand-placed
+props/decals — `PropTransform`/`DecalTransform::layerIndex` (direct field injection) plus
+the separate `PropInstanceLayer`/`DecalInstanceLayer` metadata arrays (`SANMAP_FORMAT_SPEC`
+Correction 14, new `PropGroups`/`DecalGroups` top-level keys) — which superseded that spec's
+earlier "props/decals need no wrapper transform type" ruling now that `layerIndex` is real
+per-instance data. The same session (ARCH §13) added Radial N-fold heightmap/entity symmetry
+(`SymmetryAxis::Radial`, `radialSymmetryRepeatCount`) to `SANMAP_FORMAT_SPEC` Correction 4 and
+corrected that correction's prior claim that `DecalRule` already carries the
+`bSymmetryUseGlobal`/`symmetryMask` override pair (it does not — recorded as a defect,
+`PLACEMENT_SCATTER_SPEC`'s "Known issues" addendum, alongside a second recorded defect: the
+16-slot symmetry-orbit buffer can now silently overflow under a large radial count).
 
 **Standing deferred ruling:** persistent ordered thickness columns + true surface-exposure
 derivation (ARCH §7.5, `LAYER_SYSTEM_SPEC` "Known gap") — an M6 DATA-shape work order.
 Do not patch it inside a mask or sim work-order.
+
+**Standing recorded defects awaiting a coder work-order (not yet fixed):**
+- `DecalRule` (`src/params/ScatterRule_PARAMS.h`) has no `bSymmetryUseGlobal`/`symmetryMask`
+  pair, and `AppendDecalRules` never resolves a symmetry mask for decals at all — see
+  `SANMAP_FORMAT_SPEC` Correction 4 and `PLACEMENT_SCATTER_SPEC`.
+- `Params::symmetryOrbitMaximum = 16` (`src/params/Symmetry_PARAMS.h`) can silently overflow
+  once a designer-chosen `radialSymmetryRepeatCount` combines with mirror axes — see the same
+  two specs.

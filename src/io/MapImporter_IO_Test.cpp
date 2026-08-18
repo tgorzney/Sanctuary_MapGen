@@ -57,6 +57,67 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
           && loaded.unitRules[0].count == 5, "the unit rules survive");
 }
 
+// Since `mapSize` never leaves the fixture, this asserts flip-then-unflip is the identity without
+// the test needing to know the map-size constant, per the work-order's acceptance test wording.
+void CheckArmiesAndAreas(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(loaded.areas.size() == 1, "one area survives");
+    if (!loaded.areas.empty()) {
+        const Params::MapArea& originalArea = original.areas[0];
+        const Params::MapArea& loadedArea = loaded.areas[0];
+        Check(loadedArea.name == originalArea.name, "the area's name (JSON key) survives");
+        Check(NearlyEqual(loadedArea.originX, originalArea.originX), "the area's originX survives");
+        // originZ round-trips VERBATIM — MapArea never gets the coordinate flip (finding 3).
+        Check(NearlyEqual(loadedArea.originZ, originalArea.originZ),
+              "the area's originZ survives UNFLIPPED");
+        Check(NearlyEqual(loadedArea.width, originalArea.width)
+              && NearlyEqual(loadedArea.length, originalArea.length),
+              "the area's width/length survive");
+    }
+
+    Check(loaded.armies.size() == 1, "one army survives");
+    if (loaded.armies.empty()) return;
+    const Params::Army& originalArmy = original.armies[0];
+    const Params::Army& loadedArmy = loaded.armies[0];
+    Check(loadedArmy.name == originalArmy.name && loadedArmy.faction == originalArmy.faction
+          && NearlyEqual(loadedArmy.alloys, originalArmy.alloys)
+          && NearlyEqual(loadedArmy.energy, originalArmy.energy)
+          && loadedArmy.alias == originalArmy.alias, "the army's own fields survive");
+    Check(NearlyEqual(loadedArmy.armyColor[0], originalArmy.armyColor[0])
+          && NearlyEqual(loadedArmy.armyColor[1], originalArmy.armyColor[1])
+          && NearlyEqual(loadedArmy.armyColor[2], originalArmy.armyColor[2])
+          && NearlyEqual(loadedArmy.armyColor[3], originalArmy.armyColor[3]),
+          "armyColor survives all four components");
+
+    Check(loadedArmy.groups.size() == 1, "one unit group survives");
+    if (loadedArmy.groups.empty()) return;
+    const Params::UnitGroup& originalGroup = originalArmy.groups[0];
+    const Params::UnitGroup& loadedGroup = loadedArmy.groups[0];
+    Check(loadedGroup.name == originalGroup.name, "the unit group's name survives");
+    Check(loadedGroup.units.size() == 1, "one unit transform survives");
+    if (loadedGroup.units.empty()) return;
+    const Params::UnitTransform& originalUnit = originalGroup.units[0];
+    const Params::UnitTransform& loadedUnit = loadedGroup.units[0];
+    Check(loadedUnit.name == originalUnit.name, "the unit's name survives");
+    Check(NearlyEqual(loadedUnit.positionX, originalUnit.positionX)
+          && NearlyEqual(loadedUnit.positionY, originalUnit.positionY),
+          "positionX/Y survive untouched by the flip");
+    // The flip (export) and its inverse (import) compose to the identity — this is what actually
+    // exercises the coordinate flip, without the test needing to know the map-size constant.
+    Check(NearlyEqual(loadedUnit.positionZ, originalUnit.positionZ),
+          "positionZ round-trips through the flip back to its original value");
+    Check(NearlyEqual(loadedUnit.rotationX, originalUnit.rotationX)
+          && NearlyEqual(loadedUnit.rotationY, originalUnit.rotationY)
+          && NearlyEqual(loadedUnit.rotationZ, originalUnit.rotationZ)
+          && NearlyEqual(loadedUnit.rotationW, originalUnit.rotationW),
+          "the non-identity rotation survives verbatim, with no flip applied");
+    Check(NearlyEqual(loadedUnit.scaleX, originalUnit.scaleX)
+          && NearlyEqual(loadedUnit.scaleY, originalUnit.scaleY)
+          && NearlyEqual(loadedUnit.scaleZ, originalUnit.scaleZ), "the non-unit scale survives");
+    Check(std::string(loadedUnit.templateIdentifier) == std::string(originalUnit.templateIdentifier),
+          "the bounded templateIdentifier (tpid) survives");
+    Check(loadedUnit.legacyTypeTag == originalUnit.legacyTypeTag, "legacyTypeTag survives verbatim");
+}
+
 void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     Params::GeoLayer geoLayer;
     geoLayer.name = "Ridges";
@@ -98,6 +159,44 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     recipe.unitRules.push_back(unitRule);
 }
 
+void FillFixtureArmiesAndAreas(Params::MapRecipe& recipe) {
+    Params::MapArea area;
+    area.name = "PlayableArea";
+    area.originX = 10.0f;
+    area.originZ = 20.0f;
+    area.width = 100.0f;
+    area.length = 150.0f;
+    recipe.areas.push_back(area);
+
+    Params::UnitTransform unit;
+    unit.name = "Unit One";
+    unit.positionX = 5.0f;
+    unit.positionY = 1.0f;
+    unit.positionZ = 17.0f;                        // non-zero: actually exercises the flip
+    unit.rotationX = 0.1f; unit.rotationY = 0.2f;
+    unit.rotationZ = 0.3f; unit.rotationW = 0.9f;   // non-identity
+    unit.scaleX = 2.0f; unit.scaleY = 3.0f; unit.scaleZ = 4.0f;   // non-unit
+    const char templateIdentifier[] = "UNIT001";    // 7 chars + NUL, fits char[8]
+    for (std::size_t index = 0; index < sizeof(unit.templateIdentifier); ++index)
+        unit.templateIdentifier[index] = index < sizeof(templateIdentifier) ? templateIdentifier[index] : '\0';
+    unit.legacyTypeTag = "LegacyUnit";
+
+    Params::UnitGroup group;
+    group.name = "Group One";
+    group.units.push_back(unit);
+
+    Params::Army army;
+    army.name = "Army One";
+    army.faction = Params::Faction::Guard;
+    army.alloys = 750.0f;
+    army.energy = 600.0f;
+    army.armyColor[0] = 0.2f; army.armyColor[1] = 0.4f;
+    army.armyColor[2] = 0.6f; army.armyColor[3] = 0.8f;
+    army.alias = "Blue Army";
+    army.groups.push_back(group);
+    recipe.armies.push_back(army);
+}
+
 } // namespace
 
 Params::MapRecipe BuildPopulatedRecipe() {
@@ -115,6 +214,7 @@ Params::MapRecipe BuildPopulatedRecipe() {
     recipe.water.deepWaterDepthMaximum = 17.0f;
     FillFixtureLayerStackAndStrata(recipe);
     FillFixturePlacementRules(recipe);
+    FillFixtureArmiesAndAreas(recipe);
     return recipe;
 }
 
@@ -128,6 +228,7 @@ void RunRoundTripTests() {
     Check(result.warningCount == 0, "with no warning: the two halves agree key for key");
     CheckGeometryAndWater(original, loaded);
     CheckLayerStackAndRules(original, loaded);
+    CheckArmiesAndAreas(original, loaded);
 }
 
 } // namespace MapFormatTest

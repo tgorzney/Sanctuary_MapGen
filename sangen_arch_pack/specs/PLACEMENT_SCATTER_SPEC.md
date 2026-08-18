@@ -8,6 +8,17 @@ gate), `Widget_MapCanvas.cpp` (unit spawn). The `core/data/*` copies
 compiled. Placement reads the mask/field outputs of `MASKING_SPEC` and feeds the
 entities in `UNIT_PROP_MARKER_DATA_SPEC` + `PREVIEW_COMPOSITING_SPEC`.
 
+**Staleness note (later addition, see "Current implementation status" at the end
+of this file):** everything above and below this note describes the **dead `core/`
+tree**, read at the spec's original authoring time. Much of the "Known issues to
+fix in v2" list is **already resolved** in the current `src/proc/Placement_*_PROC`
+family (`Placement_Accept_PROC.cpp`, `Placement_Symmetry_PROC.h`,
+`Placement_Rules_PROC.cpp`, `Placement_Hash_PROC.cpp`) — a full pass reconciling
+this spec's body against that current code is real work, out of scope for the
+session that added this note. Treat the body below as **historical v1/dead-code
+context**, and the final section as the current, authoritative addendum for
+anything symmetry-related.
+
 ## Three scatter mechanisms today (to unify in v2)
 1. **Procedural markers/resources (CPU, mostly declared-not-implemented).**
    `PlacementRules::{DetectSpawns,PlaceResources,PlaceProps}` score candidate spots
@@ -105,6 +116,14 @@ when their rule is off. **`Gen_Marker_Placement::CalculateMarkerSymmetryGroups` 
 declared, undefined, and never called → symmetry alignment is non-functional
 today.** v2 owns symmetry in the scatter/entity module, not the widget.
 
+**Superseded by the current `src/params/Symmetry_PARAMS.h`** (see the addendum at
+the end of this file): the live v2 axis set is `SymmetryAxis::{MirrorAcrossX,
+MirrorAcrossZ, RotateHalfTurn, QuarterTurns}`, plus the newly-ratified `Radial`
+(ARCH §13) — a different, smaller bit set than the `Symmetry_XY/XZ/YZ/XYZ`
+combinations quoted above from the dead `MarkerType_Transform.h`, because v2's set
+is OR-able (`XY` = `MirrorAcrossX | MirrorAcrossZ`, not its own bit) rather than
+enumerating every combination as a separate value.
+
 ## Prop data model
 Live SoA-intent struct `PropInstance` (`Parameters.h:105`): `X,Y,Z, TintColor
 (packed), IconScale, LayerIndex, GroupIndex, TransformIndex`. It is documented as
@@ -152,6 +171,22 @@ result, not re-filter (see the shadow-sim issue in `PREVIEW_COMPOSITING_SPEC`).
   absolute world/game units, and a Y above this floats above all terrain; see
   `SANMAP_FORMAT_SPEC` entity-position encoding), stratum loop bound 9.
 
+**Two current-tree defects (ARCH §13, recorded not fixed — see the addendum at the
+end of this file for full detail):**
+- **Defect 1 — `DecalRule` has no `bSymmetryUseGlobal`/`symmetryMask` pair**
+  (`src/params/ScatterRule_PARAMS.h`), and `AppendDecalRules`
+  (`src/proc/Placement_Rules_PROC.cpp`) never calls `ResolveSymmetryMask` for
+  decals — decals currently generate with **no symmetry at all**, not even the
+  global default. A future coder work-order must add the missing PARAMS pair and
+  wire it into `AppendDecalRules`, mirroring `AppendPropRules`.
+- **Defect 2 — `Params::symmetryOrbitMaximum = 16`** backs a fixed-size stack array
+  (`SymmetryOrbitPoint orbit[16]`, `src/proc/Placement_Accept_PROC.cpp:33`) that a
+  designer-chosen `radialSymmetryRepeatCount` (ARCH §13) combined with mirrors can
+  now exceed (e.g. 8-fold × MirrorX × MirrorZ → up to 32) — the buffer silently
+  drops excess clones rather than erroring. A future Compute Optimization Expert or
+  Generator Expert work-order must raise the cap and/or add a loud validated clamp
+  on the designer-facing count (Constitution §6).
+
 ## v2 guidance
 One scatter module: a seeded, position-hashed density/spacing sampler (Poisson-disk)
 consuming height/slope/mask fields (`MASKING_SPEC`) with per-rule scale/rotation/
@@ -159,3 +194,38 @@ align ranges and biome+mask gates; symmetry owned here; real SoA prop/entity buf
 with full round-trip fields; CPU authoritative, GPU preview samples the same result
 (`DISPATCH_INTERFACE_SPEC`); deterministic under the shared-gen mode
 (`DETERMINISM_SPEC`).
+
+---
+
+## Current implementation status (later addition — symmetry, ARCH §13)
+
+Everything above this line was written against the dead `core/` tree at the spec's
+original authoring time (see the staleness note under the title). This addendum is
+current against the live `src/` tree as of ARCH §13's ratification and takes
+precedence over the body above wherever the two disagree on symmetry specifically.
+
+**The scatter module described in "v2 guidance" above is substantially built.**
+`src/proc/Placement_PROC.h` + `Placement_Rules_PROC.cpp` (rule → `ScatterRuleConfiguration`),
+`Placement_Accept_PROC.cpp` (dart-throw acceptance: spacing + symmetry orbit + count
+limit), `Placement_Symmetry_PROC.h` (`BuildSymmetryOrbit`, the pure position→orbit
+function), and `Placement_Hash_PROC.cpp` (dirty-hash inputs) together implement CPU
+placement for markers/props/units/decals with real symmetry, superseding this
+spec's "Core placement is unimplemented" / "`CalculateMarkerSymmetryGroups`
+... never called" findings above for the current tree specifically (those findings
+remain historically accurate for the dead `core/` code they described).
+
+`Params::SymmetryAxis` (`src/params/Symmetry_PARAMS.h`) is the live bit set:
+`MirrorAcrossX (1<<0)`, `MirrorAcrossZ (1<<1)`, `RotateHalfTurn (1<<2)`,
+`QuarterTurns (1<<3)`, and — ratified this session — `Radial (1<<4)`.
+`BuildSymmetryOrbit` composes every set bit independently (confirmed by reading
+`Placement_Symmetry_PROC.h`), so combinations including `Radial` with any mirror/
+rotation bit already work structurally; `Radial`'s own N-way orbit generator (the
+generalization of the existing `AppendQuarterTurns` helper from a hardcoded 3 turns
+to a designer-chosen `radialSymmetryRepeatCount`) is new PROC work for a future
+work-order, not built by this ratification. Full field/JSON-key detail:
+`SANMAP_FORMAT_SPEC` Correction 4.
+
+Defects 1 and 2 above are the two items this session records for follow-up; both
+are real, current-tree, `src/` findings (not dead-code findings), confirmed by
+direct code read (`ScatterRule_PARAMS.h`, `Placement_Rules_PROC.cpp`,
+`Placement_Accept_PROC.cpp`).

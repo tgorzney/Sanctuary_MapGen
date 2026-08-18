@@ -1,4 +1,5 @@
-# ENTITY_AUTHORING_PARAMS_SPEC — pass-through entity PARAMS: armies, unit groups/transforms, map areas
+# ENTITY_AUTHORING_PARAMS_SPEC — pass-through entity PARAMS: armies, unit groups/transforms,
+# map areas, markers, props, decals, marker chains
 
 Source of truth: `SanMap.Types.cs` (`Sanmap File Format\SanMap.Types.cs`, the `EM.Map` namespace —
 confirmed byte-identical to `Sanctuary-Map-Generation-develop\Sanctuary\*.cs`; **NOT**
@@ -7,25 +8,33 @@ third-party tool — never read or cite that tree for this domain). `SANMAP_FORM
 collections" section documents the wire shape; this spec documents the concrete `Params::` C++
 shape and the naming derivation (ARCH §1.8) that produced it.
 
+This spec was ratified in three sessions. The first covered `Army`/`UnitGroup`/`UnitTransform`/
+`MapArea` — the hand-placed *army/unit* and *area-rectangle* domains. The second extended the exact
+same pass-through bucket to the four remaining resolved/baked entity domains: `markers`, `props`,
+`decals`, `chains`. The third (this revision, ARCH §12) adds **manual-layer authoring** for
+hand-placed props/decals — `PropTransform`/`DecalTransform::layerIndex` plus the separate
+`PropInstanceLayer`/`DecalInstanceLayer` metadata arrays — and, in doing so, **supersedes** the
+second session's "props/decals need no wrapper transform type" ruling (see that section below for
+the correction). All three sessions share one framing, one naming rule (ARCH §1.8), and one home
+file family — see the Scope section below.
+
 ## Scope — why this is a separate type family from `PLACEMENT_SCATTER_SPEC`
 `Params::MarkerRule`/`PropRule`/`DecalRule`/`UnitRule` (`PLACEMENT_SCATTER_SPEC`) are **procedural
 placement RULES** — a PROC stage (`Placement_PROC`) reads them and computes where entities land.
-`Params::Army`/`UnitGroup`/`UnitTransform`/`MapArea` (this spec) are the opposite kind of data:
-**manually-placed, human-authored entities** a designer positions directly (mouse clicks on the
-canvas, or values imported unchanged from an existing `.sanmap`). No PROC stage computes or
-reinterprets them — round-trip fidelity is their entire purpose (ARCH §1.8, "pass-through"
-bucket). The two mechanisms coexist: an `ArmiesTab_UI` row can show both hand-placed units
-(`Army.groups`, this spec) and the procedural `UnitRule`s that spawn more units for the same army
+`Params::Army`/`UnitGroup`/`UnitTransform`/`MapArea`/`MarkerInstanceGroup`/`PropInstanceGroup`/
+`DecalInstanceGroup`/`MarkerChain` (this spec) are the opposite kind of data: **manually-placed,
+human-authored entities** a designer positions directly (mouse clicks on the canvas, or values
+imported unchanged from an existing `.sanmap`). No PROC stage computes or reinterprets them —
+round-trip fidelity is their entire purpose (ARCH §1.8, "pass-through" bucket). The two mechanisms
+coexist per domain: an `ArmiesTab_UI` row can show both hand-placed units (`Army.groups`, this
+spec) and the procedural `UnitRule`s that spawn more units for the same army
 (`ScatterRule_PARAMS.h`) — two independent producers of the same `armies[]` roster, exactly as v1
-had.
-
-This closes the confirmed gap flagged in `work_orders/RECIPE_PARITY_BACKLOG.md` Tier 1 ("Areas" —
-"no `Params::MapArea` type; the area rectangles don't round-trip") and in the standing scope notes
-of `ArmiesTab_UI.h` ("AN ARMY HAS NO `_PARAMS` HOME... A durable `Army_PARAMS` is its own
-work-order") and `AreasTab_UI.h` ("AN AREA HAS NO `_PARAMS` HOME... a durable `MapArea_PARAMS`...
-is its own work-order") — both written under ARCH §8.4 ("a coder never invents a missing type").
-This ratification is that missing ARCH ruling; the follow-on coder work-order wires
-`MapRecipe_PARAMS.h` to hold these types and retires those two UI scope notes.
+had. The same pattern repeats for markers: `MarkersTab_UI` shows both hand-placed marker instances
+(`MarkerInstanceGroup`, this spec) and the procedural `MarkerRule`s that generate more
+(`MarkerRule_PARAMS.h`) — two independent producers of the same `markers[]` collection. The manual
+prop/decal *layer* concept this third session adds (`PropInstanceLayer`/`DecalInstanceLayer`) is
+the same kind of authoring-convenience metadata as `ManualPropGroup`
+(`PropsTab_Manual_UI.h`) — organizational grouping for hand-placed instances, not a procedural rule.
 
 ## Structural ruling — recursive tree preserved, dictionaries become vectors + `name`
 The format's `Army → UnitGroup → UnitGroup*/UnitTransform*` shape is a genuinely recursive tree (a
@@ -41,9 +50,56 @@ decoration: `MakeAreaNamesUnique` (`AreasTab_List_UI.h`) is the existing precede
 unique on edit, and the live engine's `GameUtils.GetArea(name)` (`UNIT_PROP_MARKER_DATA_SPEC`)
 confirms `MapArea.name` specifically is a load-bearing gameplay identifier, not cosmetic.
 
+**`markers` applies the identical rule one level deeper still — the same recursive-tree posture as
+`Army`, not a new mechanism.** `markers: Dictionary<string, MarkerType{ resource, transforms:
+Dictionary<string, MarkerTransform> }>` is a *two-level* dictionary, confirmed field-for-field
+against `SanMap.Types.cs` (`SanMap.cs:151`, `MarkerType`/`MarkerTransform` at
+`SanMap.Types.cs:161-176`). Both levels fold in exactly as `Army`/`UnitGroup` already do: the outer
+key (the marker *type* name, e.g. `Spawn`/`Alloys`) becomes `MarkerInstanceGroup::name`, the inner
+key (the *instance* name, e.g. `Mex 0`) becomes `MarkerTransform::name`.
+
+**`props`/`decals` need no dict→vector conversion at all.** `PropType[]`/`DecalType[]` are already
+bare C# arrays at the top level (`SanMap.cs:153,157`), and each entry's own `transforms` is a
+`List<PropTransform>`/`List<DecalTransform>` (`SanMap.Types.cs:112,130`) — an *ordered array*, not
+a dictionary, with no per-instance key to fold in. `std::vector` is the direct, verbatim
+translation; no `name` field is invented for something the format never keyed.
+
+**`chains` folds in exactly like `markers`' outer level, but its value is a bare array, not another
+dictionary.** `chains: Dictionary<string, MarkerChain.Marker[]>` (`SanMap.cs:150`) — the outer key
+(the chain name, e.g. `FirstChain`) folds in as `MarkerChain::name`; the value is directly an
+ordered `Marker[]`, which becomes `MarkerChain::markers` (a `std::vector`, verbatim field name from
+the format's own `MarkerChain.markers` C# field at `SanMap.Types.cs:147` — see "`Marker` →
+`ChainMarker`" below for why the *element* type is renamed while the *field* name is not).
+
+## `InstancedTransform` promoted to a real shared PARAMS type — `UnitTransform` is NOT retrofitted
+The format's `InstancedTransform` (`SanMap.Types.cs:179`, `{ position, rotation, scale }`) is the
+base every entity transform type inherits (`UnitTransform`, `PropTransform`, `DecalTransform`,
+`MarkerTransform` all `: InstancedTransform` — confirmed by reading each constructor). The first
+ratification session already spelled `UnitTransform`'s ten scalar fields out flat
+(`positionX/Y/Z`, `rotationX/Y/Z/W`, `scaleX/Y/Z`) rather than composing a shared base, because no
+such base existed yet in `Params::`. This session promotes those same ten fields into a real,
+reusable `Params::InstancedTransform` (matching the composition precedent already live in
+`PropRule`/`DecalRule`/`UnitRule`/`MarkerRule`, which all hold a `ScatterTransform transform`
+member rather than duplicating its fields) — `PropTransform`/`DecalTransform` compose it as their
+one geometric member (see the third-session revision below), and `MarkerTransform` adds
+`name`/`alias` alongside it.
+
+`UnitTransform` itself is **deliberately not retrofitted** to compose `InstancedTransform` in this
+ratification. It is an already-shipped, already-spec'd type (previous session); rewriting its ten
+inline scalar fields into `InstancedTransform transform;` is pure churn against working law for no
+functional gain — nothing reads `UnitTransform` differently either way, and doing it now would edit
+a type this same spec already finalized without new evidence driving the change (mirrors the ARCH
+§1.8 "never retype without a fresh ruling backed by newly confirmed evidence" posture applied to
+shape, not naming). **Noted as an optional future consistency pass — not part of this
+ratification, not to be inferred as "already decided" by a coder.**
+
 ## The naming derivation (ARCH §1.8 applied)
-All four types sit in the "pass-through" bucket: format spelling by default, case-converted, with
-named exceptions. See ARCH §1.8 for the general rule; this table is its application here.
+All types across the three sessions sit in the same "pass-through" bucket: format spelling by
+default, case-converted, with named exceptions. See ARCH §1.8 for the general rule; this table is
+its application here. Rows above the first divider are the first session (`Army`/`UnitGroup`/
+`UnitTransform`/`MapArea`); rows between the dividers are the second session (`markers`/`props`/
+`decals`/`chains`); the final rows are the third session (`layerIndex`, ARCH §12 — see the dedicated
+section below for the full reasoning, not re-derived in the table alone).
 
 | Format field | PARAMS field | Rule applied |
 | --- | --- | --- |
@@ -62,13 +118,21 @@ named exceptions. See ARCH §1.8 for the general rule; this table is its applica
 | `InstancedTransform.position` | `positionX/Y/Z` | matches the established SanGen world convention (`PlacementInstance_DATA.h`) rather than introducing a `Vector3` PARAMS type |
 | `InstancedTransform.rotation` | `rotationX/Y/Z/W` | quaternion, same convention |
 | `InstancedTransform.scale` | `scaleX/Y/Z` | same convention |
-
-No `Vector3`/`Quaternion` math type exists in `src/math/` today (confirmed by grep), and none of
-the flat-scalar PARAMS/DATA types built so far (`Data::PlacementInstance`,
-`Erosion_Droplet_PROC.h`'s droplet state) use one; introducing one now is out of scope for a types
-ratification and would itself be a §8.4 violation in reverse (inventing a type nobody asked for).
-`UnitTransform` therefore follows the same flat-scalar convention its DATA-layer sibling
-`Data::PlacementInstance` already uses.
+| `markers` outer dict key (marker TYPE name) | `MarkerInstanceGroup::name` | dict→vector+name, one level of the two-level fold-in |
+| `MarkerType.resource` | `MarkerInstanceGroup::bResource` | verbatim word, §1.1 `b`-boolean prefix |
+| `MarkerType.transforms` (dict) | `MarkerInstanceGroup::transforms` (vector) | verbatim name; dict→vector, other level of the fold-in |
+| `markers[type].transforms` inner dict key (instance name) | `MarkerTransform::name` | dict→vector+name, deepest level |
+| `markers[type][name].alias` | `MarkerTransform::alias` | already-ratified SanGen-added sibling field (`SANMAP_FORMAT_SPEC` Correction 11) — same pattern as `Army`'s `armyColor`/`alias` |
+| `PropType.blueprintPath` | `PropInstanceGroup::blueprintPath` | verbatim |
+| `PropType.transforms` (`List`) | `PropInstanceGroup::transforms` (vector) | verbatim name; ordered array, not a dict — no `name` fold-in (nothing to fold) |
+| `DecalType.blueprintPath` | `DecalInstanceGroup::blueprintPath` | verbatim |
+| `DecalType.transforms` (`List`) | `DecalInstanceGroup::transforms` (vector) | same as `PropType` |
+| `chains` dict key (chain name) | `MarkerChain::name` | dict→vector+name |
+| `MarkerChain.markers` (`Marker[]`) | `MarkerChain::markers` | verbatim field name, borrowed directly from the format's own C# field |
+| `MarkerChain.Marker` (nested struct) | `ChainMarker` (top-level struct) | renamed — see "`Marker` → `ChainMarker`" below |
+| `Marker.type` | `ChainMarker::type` | verbatim |
+| `Marker.name` | `ChainMarker::name` | verbatim |
+| *(no format field — SanGen-added)* | `PropTransform::layerIndex` / `DecalTransform::layerIndex` | ARCH §12, direct field injection — see below |
 
 ## `armyColor` / `alias` — the two already-ratified `armies[key]` additions
 `SANMAP_FORMAT_SPEC` Correction 11 already ratified `armyColor` and `alias` as SanGen-added,
@@ -79,25 +143,96 @@ it does not invent them. `Params::Army` therefore carries the format-native fiel
 (`armyColor`, `alias`) together in one flat type — there is no reason to split "format-native" and
 "SanGen-added" fields across two types when both round-trip into the same JSON object.
 
-## `UnitTransform.type` → `legacyTypeTag` — non-canonical passthrough (ruled, not re-derived)
-`type`'s real-world meaning is unresolved, and the evidence that previously existed for it came
-from an unconfirmed third-party map-editor tool — now ruled untrustworthy. It is kept as a
-**non-canonical passthrough string**:
-- Round-tripped faithfully on import — never discarded, in case a real file populates it.
-- **Never computed, interpreted, or branched on by any SanGen stage.** `templateIdentifier`
-  (`tpId`) remains the sole field SanGen uses to identify a unit.
-- Named `legacyTypeTag`, not `type`, specifically so it does **not** read as a normal, meaningful
-  field — a future reader who sees `legacyTypeTag` should ask before relying on it, which is the
-  point of the name. **Do not "fix" or start deriving behavior from this field without a fresh
-  ARCH ruling backed by newly confirmed evidence** — the prior evidence was already retracted
-  once.
+The same Correction 11 also ratifies `markers[key]` gaining **`alias`** (see
+`SANMAP_FORMAT_SPEC`'s "Merges into existing format-native collections" note) — this session's
+`MarkerTransform::alias` field gives *that* addition its home, exactly the same move one level
+deeper in the marker tree.
 
-## Live-engine scope note (out of scope here — apply, don't re-derive)
-Whether the live game engine's unit-spawn path actually reads `armies[x].groups`, or instead uses
-a separate `_data.lua`-based `groups` registry, is **explicitly out of scope** for this
-ratification. This spec's job is that PARAMS/IO round-trip the `.sanmap` format's own
-`armies[x].groups` shape exactly as the official format and editor already do, independent of what
-the live engine currently consumes.
+## `layerIndex` / `PropGroups` / `DecalGroups` — the manual-layer authoring addition (ARCH §12)
+Third session. Adds manual-layer membership for hand-placed props/decals — the `PropsTab_Manual_UI`/
+future `DecalsTab_Manual_UI` grouping concept, which previously had no serialized `Params::` home
+(`PropsTab_Manual_UI.h`'s SCOPE NOTE 1: "v1's manual prop GROUPS ... have no `_PARAMS` home in the
+tree"). Full reasoning and the format-native-injection-vs-separate-array general principle: ARCH
+§12. Summary:
+
+- **`PropTransform`/`DecalTransform::layerIndex`** (`int`, default `0`) is a **direct field
+  injection** into the per-instance transform, not a contiguous index-range in a side table. A
+  range-based alternative was considered and rejected: it has a real silent-corruption failure
+  mode — if any external tool (hand-editing, or the real Unity map editor, both supported workflows
+  for this format) reorders an entry in `transforms[]` without changing the count, the ranges stay
+  internally self-consistent while silently misattributing instances to the wrong layer,
+  undetectable by any validation. `layerIndex` travels with the instance, so external reordering
+  cannot desync it. Cost is trivial (~1 MB even at Forge's 63.5k prop instances,
+  `SANMAP_FORMAT_SPEC`'s 23-map survey) against the file's actual bulk, which is textures, not JSON.
+- **Not on shared `InstancedTransform`.** `layerIndex` is Prop/Decal-specific authoring metadata; if
+  it lived on the shared base it would leak onto `MarkerTransform`'s composed member and every
+  future consumer of the base that has no concept of a manual layer.
+- **JSON key `layerIndex`, lowerCamelCase**, merged directly into the existing transform object —
+  the same rule already governing `armyColor`/`alias` (ARCH §1.6 Correction 0), applied one level
+  deeper: to an *array-element* object (`props[].transforms[]`) rather than a *dictionary-value*
+  object, because `props`/`decals` are arrays, not dictionaries (see the structural ruling above).
+- **Separate layer-metadata arrays**, one per domain, top-level PascalCase schema-v3 keys
+  `PropGroups`/`DecalGroups` (`SANMAP_FORMAT_SPEC` Correction 14) — not `PropLayers`/`DecalLayers`:
+  `PropsStack`/`DecalsStack`'s Group→Layer(rule) procedural hierarchy (`SANMAP_FORMAT_SPEC`
+  Correction 7) already uses "Layer" for something unrelated (a rule inside a Stack), and reusing it
+  here would collide two different concepts under the same word. `ManualPropGroup` is also the
+  already-live identifier in `src/ui/PropsTab_Manual_UI.h`, so `PropGroups`/`DecalGroups` picks up
+  an existing name rather than inventing a new one.
+- **Import validation:** `layerIndex` out of range against the corresponding `PropGroups`/
+  `DecalGroups` array size is a loud logged clamp to `0` (Constitution §6) — never a hard refusal,
+  because this is authoring-convenience metadata, not gameplay-authoritative data. A missing
+  `layerIndex` key on an older/foreign file degrades for free to `0` (the field's own default).
+
+## Why props/decals now need a wrapper transform type — SUPERSEDES the second session's ruling
+The second session ruled `PropTransform`/`DecalTransform` need no wrapper type at all, because
+`PropTransform`/`DecalTransform` in the C# format add **zero fields** beyond `InstancedTransform`
+(confirmed — their only C# content is a constructor that assigns `position`/`rotation`/`scale`,
+nothing else), so `PropInstanceGroup`/`DecalInstanceGroup` held `std::vector<InstancedTransform>`
+directly. **That premise no longer holds.** `layerIndex` (above) is a genuinely new per-instance
+field that is not part of `InstancedTransform` and must not leak onto it, so `PropTransform`/
+`DecalTransform` are now real, named `Params::` wrapper types — thin, but no longer empty:
+
+```cpp
+struct PropTransform  { InstancedTransform transform; int layerIndex = 0; };
+struct DecalTransform { InstancedTransform transform; int layerIndex = 0; };
+```
+
+`MarkerTransform` was always the odd one out for exactly this reason (it already carried `name`/
+`alias` alongside its `InstancedTransform`) — `PropTransform`/`DecalTransform` now follow the same
+shape, composing an `InstancedTransform transform;` member rather than inheriting or flattening it,
+matching the composition precedent `MarkerRule`/`PropRule`/`DecalRule`/`UnitRule` already use for
+`ScatterTransform`.
+
+## Cardinality ruling — the marker-type key stays `std::string`, NOT retyped to `MarkerCategory`
+`MarkerInstanceGroup::name` (the folded-in outer `markers` dict key — the marker *type* name, e.g.
+`Spawn`/`Alloys`) is ruled a free-form `std::string`, **not** retyped to the existing
+`enum class MarkerCategory { Generic, Spawn, Alloys, Expansion }` (`MarkerRule_PARAMS.h`).
+
+This is confirmed correct, and on stronger grounds than a closed-set-vs-open-set intuition alone:
+
+1. **The format itself is structurally open.** `markers: Dictionary<string, MarkerType>`
+   (`SanMap.cs:151`) — a C# string-keyed dictionary, not an enum-keyed one. There is no format-side
+   constraint of any kind on what a key may be; retyping to a closed C++ enum would silently
+   drop or corrupt any marker type outside the known set on import. This is exactly the failure
+   mode ARCH §1.8's pass-through-verbatim-by-default rule exists to prevent (compare `Army.faction`,
+   which *is* retyped — but only because the format itself types that field as a closed 0/1/2 int,
+   not a string).
+2. **`MarkerCategory` is demonstrably not the same set, in either direction.** It is a SanGen-owned
+   procedural-*rule* categorization (`MarkerRule_PARAMS.h`, used by `Placement_PROC` to decide what
+   the AI-analysis pass should expect at a generated marker) — not a wire-format enum at all. It
+   already contains `Generic` and `Expansion`, neither of which has ever been observed in any real
+   `.sanmap` (`SANMAP_FORMAT_SPEC`'s 23-map survey found only `Spawn`/`Alloys` in the wild), and it
+   omits whatever a human/tool might legally type in as a hand-authored marker-type key. Equating
+   "the pass-through wire-level type-name string" with "SanGen's own placement-intent enum" would
+   be a category error even setting the closed/open question aside — they classify different
+   things (one is an identity the format assigns, the other is a purpose SanGen infers for its own
+   procedural rules).
+3. The 23-map survey's "only `Spawn`/`Alloys` observed" is corroborating, not load-bearing — a
+   small, non-exhaustive sample cannot license retyping a structurally open format field to a
+   closed set; that would need an explicit, engine-confirmed enumeration of every legal marker type
+   name, which does not exist.
+
+**Ruling confirmed as proposed:** `MarkerInstanceGroup::name` is `std::string`.
 
 ## The types
 
@@ -124,6 +259,8 @@ struct UnitTransform {
     std::string legacyTypeTag;                                       // `type` — passthrough only, see above
 };
 ```
+*(Kept as its already-ratified flat-scalar shape — NOT retrofitted onto `InstancedTransform` below;
+see "`InstancedTransform` promoted... `UnitTransform` is NOT retrofitted" above.)*
 
 ```
 struct UnitGroup {
@@ -157,17 +294,120 @@ struct MapArea {
 };
 ```
 
-All four types live in `Params::` (new files under `src/params/`, e.g. `Army_PARAMS.h`,
-`MapArea_PARAMS.h`) — PARAMS holds no logic beyond what's shown (Constitution §1); no member
-function belongs on any of these except perhaps trivial validity checks matching existing
+The shared base promoted in the second session, and the resolved/baked-instance types built on it:
+
+```
+struct InstancedTransform {
+    float positionX = 0.0f; float positionY = 0.0f; float positionZ = 0.0f;
+    float rotationX = 0.0f; float rotationY = 0.0f; float rotationZ = 0.0f; float rotationW = 1.0f;
+    float scaleX = 1.0f; float scaleY = 1.0f; float scaleZ = 1.0f;
+};
+```
+
+```
+// Third session (ARCH §12): PropTransform/DecalTransform are now thin named wrapper types, not a
+// bare InstancedTransform — see "Why props/decals now need a wrapper transform type" above.
+struct PropTransform  { InstancedTransform transform; int layerIndex = 0; };
+struct DecalTransform { InstancedTransform transform; int layerIndex = 0; };
+
+struct PropInstanceGroup  { std::string blueprintPath; std::vector<PropTransform>  transforms; };
+struct DecalInstanceGroup { std::string blueprintPath; std::vector<DecalTransform> transforms; };
+```
+
+```
+// Third session (ARCH §12): the separate manual-layer metadata array, one entry per authored
+// layer, indexed by PropTransform/DecalTransform::layerIndex. Same shape for both domains.
+struct PropInstanceLayer  { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; };
+struct DecalInstanceLayer { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; };
+```
+
+```
+struct MarkerTransform {
+    std::string name;             // folded-in inner dict key — instance name (e.g. "Mex 0")
+    InstancedTransform transform;
+    std::string alias;            // SanGen-added, already-ratified SANMAP_FORMAT_SPEC Correction 11
+};
+
+struct MarkerInstanceGroup {
+    std::string name;                        // folded-in outer dict key — marker TYPE name
+                                              // (e.g. "Spawn"/"Alloys") — free-form std::string,
+                                              // NOT MarkerCategory; see cardinality ruling above
+    bool bResource = false;                  // format's `resource`, b-prefixed per §1.1
+    std::vector<MarkerTransform> transforms;
+};
+```
+
+```
+struct ChainMarker { std::string type; std::string name; };  // deliberately renamed from format's
+                                                                // bare "Marker" — see naming
+                                                                // exception above
+
+struct MarkerChain {
+    std::string name;                   // folded-in outer dict key — chain name
+    std::vector<ChainMarker> markers;   // ORDERED — semantically meaningful sequence, never
+                                         // resorted. Field name borrowed directly from the
+                                         // format's own MarkerChain.markers C# field.
+};
+```
+
+All types live in `Params::` — PARAMS holds no logic beyond what's shown (Constitution §1); no
+member function belongs on any of these except perhaps trivial validity checks matching existing
 precedent (`MapRecipe::IsValid()`).
 
+## `UnitTransform.type` → `legacyTypeTag` — non-canonical passthrough (ruled, not re-derived)
+`type`'s real-world meaning is unresolved, and the evidence that previously existed for it came
+from an unconfirmed third-party map-editor tool — now ruled untrustworthy. It is kept as a
+**non-canonical passthrough string**:
+- Round-tripped faithfully on import — never discarded, in case a real file populates it.
+- **Never computed, interpreted, or branched on by any SanGen stage.** `templateIdentifier`
+  (`tpId`) remains the sole field SanGen uses to identify a unit.
+- Named `legacyTypeTag`, not `type`, specifically so it does **not** read as a normal, meaningful
+  field — a future reader who sees `legacyTypeTag` should ask before relying on it, which is the
+  point of the name. **Do not "fix" or start deriving behavior from this field without a fresh
+  ARCH ruling backed by newly confirmed evidence** — the prior evidence was already retracted
+  once.
+
+## `Marker` → `ChainMarker` — a naming exception of the same class as `Area.height` → `length`
+The format's C# nested type is literally named `Marker` (`MarkerChain.Marker`, `SanMap.Types.cs:
+150`). Verbatim would collide inside a codebase that already has `MarkerTransform`,
+`MarkerInstanceGroup`, `MarkerRule`, and `MarkerCategory` all live in the same `Params::` namespace
+— a bare `Marker` sitting next to those is genuinely ambiguous about which "marker" concept it
+names (a placement-rule marker? a resolved instance? a chain reference?). This is the same
+"verbatim would collide with an established SanGen quantity" exception class ARCH §1.8 already
+carves out for `Area.height` → `length`, applied to a type name instead of a field name. The
+`markers`/`name` field *names* on `ChainMarker` stay verbatim — only the *type* name changes.
+
+## File organization
+- `Army_PARAMS.h`, `MapArea_PARAMS.h` — first session, `Army`/`UnitGroup`/`UnitTransform`/`Faction`
+  and `MapArea` respectively (unchanged since).
+- `InstancedTransform_PARAMS.h` — the shared base, added in the second session. Depended on by
+  `MarkerInstance_PARAMS.h` and `PropInstance_PARAMS.h` below.
+- `MarkerInstance_PARAMS.h` — `MarkerTransform`, `MarkerInstanceGroup`.
+- `PropInstance_PARAMS.h` — `PropTransform`, `DecalTransform`, `PropInstanceGroup`,
+  `DecalInstanceGroup`, `PropInstanceLayer`, `DecalInstanceLayer` together, mirroring the existing
+  `ScatterRule_PARAMS.h` multi-type-per-file precedent (`PropRule`/`DecalRule`/`UnitRule` already
+  share one file for the same reason: near-identical shapes, always touched together). The third
+  session's four new types join this file rather than starting a new one — same reasoning.
+- `MarkerChain_PARAMS.h` — `ChainMarker`, `MarkerChain`.
+
 ## Where these land (for the coder work-order — not built here)
-`MapRecipe_PARAMS.h` gains `std::vector<Army> armies;` and `std::vector<MapArea> areas;` alongside
-its existing `markerRules`/`propRules`/`decalRules`/`unitRules`. That edit, the matching IO
-round-trip (`MapImporter`/`MapExporter`, mirroring the existing `*_Rules_IO` pair), and retiring
-the two UI scope notes above are a separate coder work-order — this ratification fixes only the
-shape.
+`MapRecipe_PARAMS.h` gains, alongside its existing `markerRules`/`propRules`/`decalRules`/
+`unitRules` (procedural) and `armies`/`areas` (first-session pass-through):
+
+```cpp
+std::vector<Army>                armies;
+std::vector<MapArea>             areas;
+std::vector<MarkerInstanceGroup> markers;
+std::vector<PropInstanceGroup>   props;
+std::vector<DecalInstanceGroup>  decals;
+std::vector<MarkerChain>         chains;
+std::vector<PropInstanceLayer>   propLayers;    // ARCH §12 — metadata for schema v3 `PropGroups`
+std::vector<DecalInstanceLayer>  decalLayers;   // ARCH §12 — metadata for schema v3 `DecalGroups`
+```
+
+That edit, the matching IO round-trip (`MapImporter`/`MapExporter`, mirroring the existing
+`*_Rules_IO` pair), and retiring the corresponding UI scope notes are a separate coder
+work-order — this ratification fixes only the shape.
 
 One integration question is deliberately left for that work-order, not decided here:
 `Params::UnitRule::armyIndex` (the procedural scatter rule's "which army") currently has no
@@ -175,3 +415,37 @@ One integration question is deliberately left for that work-order, not decided h
 into the new `recipe.armies`, and how `ArmiesTab_UI`'s presentation-only `ArmyPresentation` folds
 into or is replaced by `Params::Army`, is UI/PIPELINE wiring, not a PARAMS-shape question, and is
 not decided by this spec.
+
+**Second integration question, added by the third session, also left open:** how `Ui::ManualPropGroup`
+(`PropsTab_Manual_UI.h`) folds into or is replaced by `Params::PropInstanceLayer` is UI wiring, not
+decided here. This ratification only gives the concept a durable, serializable `Params::` home
+(`PropInstanceLayer`/`PropGroups`) where none existed before — closing the "no `_PARAMS` home"
+half of that file's SCOPE NOTE 1. The UI presentation type, its `previewColorToggle`/
+`iconScaleToggle` realtime-preview machinery, and its dirty-flag notification are unaffected and
+remain a separate UI work-order.
+
+## Flagged for the future entity-export IO coder work-order — NOT resolved by this ratification
+This ratification fixes shape only. Four items are explicitly flagged, not resolved, for whichever
+work-order wires `PropInstanceGroup`/`DecalInstanceGroup`/`MarkerInstanceGroup`/`MarkerChain` into
+IO:
+1. **`blueprintPath` validation is mandatory before any export of `PropInstanceGroup`/
+   `DecalInstanceGroup`.** A single unresolvable path aborts the rest of map load in-game
+   (already-known finding, `SANMAP_FORMAT_SPEC`'s "props export is disabled" note). Never
+   synthesize a fallback path (e.g. `<code>/<code>.santp`) — resolve literally against the real
+   pack or fail loudly (Constitution §6). The validation mechanism itself is IO/BRIDGE's call, not
+   ratified here.
+2. **Rotation is currently unimplemented in the existing exporter, and props export is currently
+   disabled entirely** (`SANMAP_FORMAT_SPEC`'s "Known gaps in the current exporter" note — identity
+   quaternions written for every entity type, props commented out). These are pre-existing
+   fix-targets this PARAMS ratification does not itself resolve; the entity-export work-order that
+   wires these new types into IO must close both.
+3. **The confirmed coordinate flip (`world.z = length - z - 1`, `SANMAP_FORMAT_SPEC`) applies to
+   every `InstancedTransform.positionZ` on `PropInstanceGroup`/`DecalInstanceGroup`/
+   `MarkerTransform` on both import and export** — the same flip that will apply to
+   `UnitTransform.positionZ`, extended to the three new position-carrying types this session adds.
+4. **`layerIndex` range validation (ARCH §12) is an import-time concern, not an export-time one.**
+   On export, `layerIndex` is written as-is (it is always in range by construction, since only the
+   UI can produce it and only against the live `propLayers`/`decalLayers` array). On import, a
+   `layerIndex` at or beyond `propLayers.size()`/`decalLayers.size()` is a loud, logged clamp to
+   `0` (Constitution §6) — the work-order implementing the importer must apply this per-instance,
+   not just once at file scope, since different instances can carry different out-of-range values.

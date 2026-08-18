@@ -13,9 +13,12 @@
 //     own fields: every DATA field has exactly one writing stage (ARCH §3.4), and IO is not a
 //     stage. Binding an imported heightfield into generation (as v1's "imported RAW layer" did)
 //     needs its own work-order.
-//  2. ENTITIES (the format's markers/armies/props/decals) are not read: the v2 recipe holds
-//     placement RULES, not instances, and there is no PARAMS home for a manually placed entity.
-//     Reading them is the same work-order that writes them.
+//  2. ENTITIES (the format's markers/armies/props/decals) are not read, WITH TWO EXCEPTIONS:
+//     `areas`/`armies` now round-trip into `recipe.areas`/`recipe.armies` (STEP2_ArmiesAreas_IO —
+//     `Params::MapArea`/`Params::Army` give those two domains a real PARAMS home). `markers`/
+//     `props`/`decals` are still unread: the v2 recipe holds placement RULES for those, not
+//     instances, and there is still no PARAMS home for a manually placed one. Reading them is a
+//     separate work-order.
 #pragma once
 #include <cstdint>
 #include <string>

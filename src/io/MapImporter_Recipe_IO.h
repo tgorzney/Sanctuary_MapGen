@@ -74,5 +74,13 @@ void ReadLayerStackJson(const nlohmann::json& generatorData, Params::LayerStack&
 void ReadStrataSettingsJson(const nlohmann::json& generatorData, Params::MapRecipe& outRecipe);
 void ReadPlacementRulesJson(const nlohmann::json& generatorData, Params::MapRecipe& outRecipe);
 
+// MapImporter_Areas_IO.cpp / MapImporter_Armies_IO.cpp — `areas`/`armies` are top-level `.sanmap`
+// keys, SIBLINGS of `mapGeneratorData`, not nested inside it. Both take the top-level `document`
+// (never `generatorData`) and must be called unconditionally, BEFORE the `mapGeneratorData`
+// presence gate in MapImporter_IO.cpp — see that file's "Critical wiring correction" note. Total
+// per Constitution §6: a missing/non-object key leaves outRecipe.areas/armies untouched (empty).
+void ReadAreasJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadArmiesJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+
 } // namespace Io
 } // namespace SanmapGen

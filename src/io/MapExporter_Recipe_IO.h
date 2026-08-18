@@ -29,5 +29,13 @@ nlohmann::ordered_json BuildStrataSettingsJson(const Params::MapRecipe& recipe);
 // MapExporter_Rules_IO.cpp — the four placement rule vectors, as one object.
 nlohmann::ordered_json BuildPlacementRulesJson(const Params::MapRecipe& recipe);
 
+// MapExporter_Areas_IO.cpp — `recipe.areas` -> the top-level `areas` dictionary (JSON object keyed
+// by MapArea::name). No coordinate flip (ENTITY_AUTHORING_PARAMS_SPEC finding 3).
+nlohmann::ordered_json BuildAreasJson(const Params::MapRecipe& recipe);
+
+// MapExporter_Armies_IO.cpp — `recipe.armies` -> the top-level `armies` dictionary (JSON object
+// keyed by Army::name, recursing through UnitGroup.groups/units).
+nlohmann::ordered_json BuildArmiesJson(const Params::MapRecipe& recipe);
+
 } // namespace Io
 } // namespace SanmapGen

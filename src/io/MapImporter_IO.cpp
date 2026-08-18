@@ -81,6 +81,14 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
         && mapWidth <= options.safetyLimits.maximumMapSize)
         outRecipe.geometry.mapSize = mapWidth;
 
+    // `areas`/`armies` are top-level `.sanmap` keys, SIBLINGS of `mapGeneratorData`, not nested
+    // inside it — read unconditionally and BEFORE the mapGeneratorData-presence gate below, so a
+    // hand-authored file with real armies/areas but no mapGeneratorData block still keeps them
+    // (Critical wiring correction, STEP2_ArmiesAreas_IO). outRecipe.geometry.mapSize is already
+    // populated from the top-level `width` key above, so the positionZ flip-inverse is correct here.
+    ReadAreasJson(document, outRecipe);
+    ReadArmiesJson(document, outRecipe);
+
     if (!document.contains("mapGeneratorData") || !document["mapGeneratorData"].is_object()) {
         result.Warn("No mapGeneratorData block: only the map's own dimensions were recovered.");
         return true;
