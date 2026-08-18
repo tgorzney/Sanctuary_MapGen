@@ -28,8 +28,10 @@ void MutateSimulationInputsWithoutRebaking(Ui::PreviewTestScene& scene) {
     scene.strata[0].slopeGateStrength = 0.25f;
     scene.strata[0].bInvertSlopeGate = true;
     scene.strata[0].importedMaskMode = Params::ImportedMaskMode::StaticOverride;
-    scene.strata[0].maskRemapMinimum = 0.3f;               // the ONE remap lives in Mask (§7.2.5)
-    scene.strata[0].maskRemapMaximum = 0.6f;
+    for (int channel = 0; channel < Params::kStratumColorChannelCount; ++channel) {
+        scene.strata[0].maskRemapMinimum[channel] = 0.3f;  // the ONE remap lives in Mask (§7.2.5)
+        scene.strata[0].maskRemapMaximum[channel] = 0.6f;
+    }
     scene.fields.materialProportions[0].Fill(0.0f);        // physical, sim-owned: not a preview input
 }
 
