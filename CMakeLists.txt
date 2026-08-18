@@ -279,7 +279,8 @@ add_sangen_test(AssetPipeline_IO_Test
     src/io/SanpackReader_IO_Test.cpp
     src/io/AssetAtlasCache_IO_Test.cpp
     src/io/AssetPipeline_TestSupport_IO_Test.cpp
-    src/io/AssetPipeline_TestDamage_IO_Test.cpp)
+    src/io/AssetPipeline_TestDamage_IO_Test.cpp
+    src/io/MapExporter_BlueprintValidation_IO_Test.cpp)
 target_include_directories(AssetPipeline_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
@@ -471,6 +472,19 @@ add_sangen_test(MapImporter_IO_Test
     src/io/MapImporter_IO_Test.cpp
     src/io/MapImporter_Validation_IO_Test.cpp
     src/io/MapImporter_Fields_IO_Test.cpp)
+# STEP4_PropsDecals_IO: the pure (disk-free) props/decals JSON round trip, deliberately kept OUT of
+# MapImporter_IO_Test.exe — it calls BuildPropsJson/BuildDecalsJson/BuildPropGroupsJson/
+# BuildDecalGroupsJson and their reader inverses directly, bypassing BuildSanmapJsonText/
+# ParseSanmapJsonText entirely, since those are not wired to call these functions yet.
+add_sangen_test(PropsDecals_IO_Test       src/io/MapImporter_PropsDecals_IO_Test.cpp)
+target_link_libraries(PropsDecals_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+# STEP6_MigrationSubsystem_IO: the shared JSON transform-primitive toolkit and the version-
+# resolution/refusal-law runner. Both construct nlohmann::json fixtures directly, so both link the
+# library the same way MapExporter_IO_Test/PropsDecals_IO_Test already do.
+add_sangen_test(JsonPrimitives_IO_Test    src/io/JsonPrimitives_IO_Test.cpp)
+target_link_libraries(JsonPrimitives_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+add_sangen_test(Sanmap_MigrationRunner_IO_Test src/io/Sanmap_MigrationRunner_IO_Test.cpp)
+target_link_libraries(Sanmap_MigrationRunner_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 add_sangen_test(FilesTab_UI_Test
     src/ui/FilesTab_UI_Test.cpp
     src/ui/FilesTab_Roundtrip_UI_Test.cpp)

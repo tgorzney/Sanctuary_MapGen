@@ -57,9 +57,13 @@ bool RunImportSupComLua(FilesTabState& state, Params::MapRecipe& recipe) {
 
 bool RunRecipeExport(FilesTabAction action, FilesTabState& state, const Params::MapRecipe& recipe,
                      const Data::MapFields* fields) {
+    // `state.assetPack` — the internal warn-not-block safety net (MapExporter_IO.cpp); the UI's own
+    // pre-check/confirm-dialog gate already ran, in FilesTab_Draw_UI.cpp, before this was called.
     const Io::MapExportResult result = (action == FilesTabAction::ExportAll && fields != nullptr)
-        ? Io::MapExporter::ExportAll(state.exportFolderPath, recipe, *fields, state.exportOptions)
-        : Io::MapExporter::ExportSanmapOnly(state.exportFolderPath, recipe, state.exportOptions);
+        ? Io::MapExporter::ExportAll(state.exportFolderPath, recipe, *fields, state.exportOptions,
+                                     state.assetPack)
+        : Io::MapExporter::ExportSanmapOnly(state.exportFolderPath, recipe, state.exportOptions,
+                                            state.assetPack);
     AppendFilesTabLog(state, result.debugLog);
     return result.bSucceeded;
 }

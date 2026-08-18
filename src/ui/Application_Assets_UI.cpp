@@ -80,12 +80,22 @@ std::string Application::TemplateIdentifierOfIcon(int iconId) const {
 // The cache directory is the SystemTab's caller-owned buffer (its SCOPE NOTE 1: no PARAMS home
 // exists for it, and inventing one needs its own work-order). The shell reads it at load time
 // rather than mirroring it, so there is exactly one copy of that string in the process.
+//
+// STEP5_PropsDecalsValidation_UI, LOAD-BEARING: `tabState.files.assetPack` is fed the long-lived
+// `assetPackReader` ONLY when its OWN Open()+ReadCentralDirectoryOnce() both succeed for the
+// CURRENT sanpackPath — every other path through this function (no path set, a failed open, a
+// failed directory parse) leaves it nullptr, never a pointer into an empty/unopened reader.
 bool Application::LoadAssetAtlas() {
     iconManifest.entries.clear();
     iconManifest.pageTextureIdentifiers.clear();
     iconTemplateIdentifiers.clear();
     atlasResidency.Clear();
+    assetPackReader.Close();
+    tabState.files.assetPack = nullptr;
     if (sanpackPath[0] == '\0') { assetStatusMessage = "No sanpack selected."; return false; }
+
+    if (assetPackReader.Open(sanpackPath) && assetPackReader.ReadCentralDirectoryOnce())
+        tabState.files.assetPack = &assetPackReader;
 
     Io::AtlasBuildReport buildReport;
     const std::string cacheDirectory(tabState.system.assetCacheDirectory);

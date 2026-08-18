@@ -33,6 +33,7 @@
 #include "Application_TabState_UI.h"
 #include "MapCanvas_UI.h"
 #include "PreviewComposite_UI.h"
+#include "../io/SanpackReader_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/GenerationAssembler_PIPELINE.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
@@ -129,6 +130,10 @@ private:
     std::unique_ptr<Sys::GpuResourceManager> gpuResourceManager;   // created with the context
     Sys::AtlasResidency           atlasResidency;
     Io::AssetAtlasCache           assetAtlasCache;
+    // Long-lived blueprintPath reader, SEPARATE from AssetAtlasCache's own transient one. Fed down
+    // into `tabState.files.assetPack` ONLY on a successful Open()+ReadCentralDirectoryOnce() for
+    // the current sanpackPath (Application_Assets_UI.cpp LoadAssetAtlas() — the load-bearing rule).
+    Io::SanpackReader              assetPackReader;
     IconAtlasManifest             iconManifest;
     std::vector<std::string>      iconTemplateIdentifiers;   // iconId -> `tpId` side table
     std::string                   assetStatusMessage = "No sanpack loaded.";

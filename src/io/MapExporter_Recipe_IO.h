@@ -37,5 +37,27 @@ nlohmann::ordered_json BuildAreasJson(const Params::MapRecipe& recipe);
 // keyed by Army::name, recursing through UnitGroup.groups/units).
 nlohmann::ordered_json BuildArmiesJson(const Params::MapRecipe& recipe);
 
+// MapExporter_Markers_IO.cpp — `recipe.markers` -> the top-level `markers` dictionary (two-level
+// JSON object keyed by MarkerInstanceGroup::name / MarkerTransform::name). Applies the coordinate
+// flip to MarkerTransform.transform.positionZ (STEP3_MarkersChains_IO).
+nlohmann::ordered_json BuildMarkersJson(const Params::MapRecipe& recipe);
+
+// MapExporter_Chains_IO.cpp — `recipe.chains` -> the top-level `chains` dictionary (JSON object
+// keyed by MarkerChain::name, each value a bare array of {type,name} objects, not a wrapping
+// object — STEP3_MarkersChains_IO finding 3). No coordinate flip.
+nlohmann::ordered_json BuildChainsJson(const Params::MapRecipe& recipe);
+
+// MapExporter_Props_IO.cpp / MapExporter_Decals_IO.cpp — `recipe.props`/`recipe.decals` -> the
+// top-level `props`/`decals` plain JSON ARRAYS (not dictionaries — STEP4_PropsDecals_IO finding 1),
+// and `recipe.propLayers`/`recipe.decalLayers` -> the top-level `PropGroups`/`DecalGroups` PascalCase
+// arrays (SANMAP_FORMAT_SPEC Correction 14). Applies the coordinate flip to
+// PropTransform/DecalTransform.transform.positionZ. Called from BuildSanmapJsonText
+// (STEP5_PropsDecalsValidation_UI live-wired these); `blueprintPath` resolution against a sanpack
+// is a separate, sibling pre-flight step (`Io::ValidatePropAndDecalBlueprintPaths`), not this pass.
+nlohmann::ordered_json BuildPropsJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildPropGroupsJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildDecalsJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildDecalGroupsJson(const Params::MapRecipe& recipe);
+
 } // namespace Io
 } // namespace SanmapGen

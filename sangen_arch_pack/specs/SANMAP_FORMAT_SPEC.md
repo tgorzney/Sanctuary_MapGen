@@ -120,12 +120,46 @@ Vector4 maskRemapMax;            // default (1,1,1,1) — {x,y,z,w}
   empty `groups`; spawns→`Spawn`, mexes→`Alloys` (with duplicate-id guard).
 - **Known gaps in the current exporter (fix targets):** (1) rotations are NOT
   converted — spawns/mexes/decals/props all write an identity quaternion (TODO);
-  (2) **props export is disabled** — commented out because "many prop formats
-  are outdated, causing maps to fail loading."
+  (2) **props export is disabled** — commented out because "many prop formats are
+  outdated, causing maps to fail loading." **Root cause identified (in-game, 2026-08):
+  a single unresolvable `blueprintPath` aborts the remainder of map load.** Props
+  parsed before the bad entry still render; everything parsed *after* props — the
+  `markers` block above all — silently never spawns. The observable symptom is
+  "my alloy points disappeared", not "a prop is missing", which is why this was
+  mis-attributed to prop formats being outdated.
+
+  **Therefore (Constitution §6): the exporter MUST verify every `blueprintPath`
+  resolves to a real file before writing a `.sanmap`.** An unverified path is a
+  map-breaking defect, not a cosmetic one. This is the single highest-value
+  validation in the IO layer.
 - **Faction / army colors (Colors.cs):** EDA = dark green (0.078,0.329,0.196),
   Chosen = dark red (0.412,0.008,0.008), Guard = golden amber
   (0.690,0.549,0.188); plus a 32-entry `ArmyColors[]` palette + named
   `ColorLookup`. Used for army/marker coloring in the UI.
+
+### Sampling terrain height for entity placement (empirically confirmed)
+`Textures/heightmap.raw` is headerless little-endian `uint16`, `N×N` where
+`N = heightmapResolution`. World-space Y for an entity at world `(x, z)`:
+
+```
+row = z
+col = (N - 1) - x            // the documented flip, applied to the index
+y   = bilinear(heightmap[row][col]) * height / 65536.0
+```
+
+`height` is the map's terrain vertical extent (`128` on Pandemonium, `410` on
+Two_Step_Shuffle, `1600` on The_Forge) — **read it from the map, never hardcode.**
+
+Validation: **median absolute error 0.0105** world units over 63,538 prop instances
+in `The_Forge.sanmap`; mean 0.311. Alternatives ruled out decisively — un-flipped
+`(z, x)` gives mean error 28.1, transposed `(x, z)` gives 22.8.
+
+**Open question, deliberately not resolved here:** which axis carries the flip cannot
+be determined from shipped maps. `(N-1-z, x)` and `(z, N-1-x)` disagree on only 28 of
+22,528 Two_Step_Shuffle instances, and on those the winner is a 53.6% coin flip,
+because every official map tested is symmetric. The documented convention
+(`world.z = length - z - 1`) stands; do not "fix" it on the strength of a
+better-looking residual. A decisive test needs an asymmetric map.
 
 ## Validated against an official map (~TEAM-1v1_Tropical_256)
 - Confirms: fileVersion 3, mapVersion 1; width=length=256, height=128;
@@ -148,7 +182,10 @@ Vector4 maskRemapMax;            // default (1,1,1,1) — {x,y,z,w}
   in the map structure — read one per family, not all six.
 - **Props** appear heavily in real maps (Forge 63.5k instances / 39 blueprints;
   White_Desert 29k; Two_Step 22.5k; There_Is_Time 4.9k). Blueprints are
-  `.santp` paths; each transform is position/rotation/scale.
+  `.santp` paths — **but `.sanprop` is also a live extension**: the entire
+  Pandemonium prop set ships as `.sanprop` containing dialect-A Lua. An
+  extension allow-list of `.santp` only will reject valid blueprints; each
+  transform is position/rotation/scale.
 - **Decals** in There_Is_Time (4 types, 76) and Two_Step (1). Blueprints are
   `.sandecal`; DecalType = { blueprintPath, transforms }.
 - **Chains** only in Two_Step (`FirstChain`, 3 elems, `{type:'Alloys',

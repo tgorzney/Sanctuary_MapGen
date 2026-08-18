@@ -4,6 +4,7 @@
 // format dictates ... verbatim so import/export round-trips").
 #include "MapExporter_Recipe_IO.h"
 #include "MapExporter_IO.h"
+#include "Sanmap_MigrationManifest_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cmath>
 
@@ -37,7 +38,6 @@ nlohmann::ordered_json BuildStratumLayersJson(const Params::MapRecipe& recipe) {
 
 nlohmann::ordered_json BuildMapGeneratorDataJson(const Params::MapRecipe& recipe) {
     nlohmann::ordered_json generatorData;
-    generatorData["MapGeneratorDataVersion"] = mapGeneratorDataVersion;
     generatorData["MapSize"]                = recipe.geometry.mapSize;
     generatorData["Seed"]                   = recipe.geometry.seed;
     generatorData["TerrainMinHeight"]       = recipe.geometry.terrainMinHeight;
@@ -62,8 +62,12 @@ std::string MapExporter::BuildSanmapJsonText(const Params::MapRecipe& recipe,
                                              const MapExportOptions& options) {
     const Params::Geometry& geometry = recipe.geometry;
     nlohmann::ordered_json document;
-    document["fileVersion"] = sanmapFileVersion;
-    document["mapVersion"]  = sanmapMapVersion;
+    document["fileVersion"]   = sanmapFileVersion;
+    document["mapVersion"]    = sanmapMapVersion;
+    // Top-level, sibling of fileVersion/mapVersion/name — REPLACES the old nested
+    // mapGeneratorData.MapGeneratorDataVersion write (SANMAP_FORMAT_SPEC Correction 1). Read back by
+    // Sanmap_MigrationRunner_IO on import, from the same kCurrentSanGenVersion constant.
+    document["SanGenVersion"] = kCurrentSanGenVersion;
     document["name"]        = options.mapName;
     document["credits"]     = options.mapCredits;
     document["width"]       = geometry.mapSize;
@@ -83,15 +87,17 @@ std::string MapExporter::BuildSanmapJsonText(const Params::MapRecipe& recipe,
     document["fadeStartDistance"] = 1.0f;
     document["stratumLayers"]     = BuildStratumLayersJson(recipe);
 
-    // SCOPE NOTE 1 (MapExporter_IO.h): `areas`/`armies` now round-trip real content; the remaining
-    // entity domains are still written empty and VALID rather than omitted, so an importer that
-    // expects them never sees a missing key.
-    document["areas"]   = BuildAreasJson(recipe);
-    document["armies"]  = BuildArmiesJson(recipe);
-    document["markers"] = nlohmann::ordered_json::object();
-    document["chains"]  = nlohmann::ordered_json::object();
-    document["decals"]  = nlohmann::ordered_json::array();
-    document["props"]   = nlohmann::ordered_json::array();
+    // SCOPE NOTE 1 (MapExporter_IO.h): every entity domain now round-trips real content.
+    // `PropGroups`/`DecalGroups` are SanGen-owned manual-layer metadata (SANMAP_FORMAT_SPEC
+    // Correction 14), siblings of `props`/`decals`, not nested inside them.
+    document["areas"]       = BuildAreasJson(recipe);
+    document["armies"]      = BuildArmiesJson(recipe);
+    document["markers"]     = BuildMarkersJson(recipe);
+    document["chains"]      = BuildChainsJson(recipe);
+    document["decals"]      = BuildDecalsJson(recipe);
+    document["props"]       = BuildPropsJson(recipe);
+    document["PropGroups"]  = BuildPropGroupsJson(recipe);
+    document["DecalGroups"] = BuildDecalGroupsJson(recipe);
 
     document["mapGeneratorData"] = BuildMapGeneratorDataJson(recipe);
     const int indent = options.jsonIndentSpaceCount > 0 ? options.jsonIndentSpaceCount : -1;

@@ -54,6 +54,12 @@ the platform seam (ARCH §3.3 / §5).
 - Fix-targets: identity-quaternion export (rotation unimplemented); props export
   disabled; single-pass memory-mapped sanpack ingestion (never 2 GB in RAM); validate
   every external file (Constitution §6). IO loads/saves only — it never simulates.
+- Props export is blocked by one specific defect: **an unresolvable `blueprintPath`
+  aborts the rest of map load and silently kills the `markers` block.** Every exported
+  blueprintPath must be resolved against the real pack before write. Resolve paths
+  **literally** — prop folder naming is inconsistent across biome sets, so never
+  synthesize `<tpId>/<tpId>.santp`. Two prop-template dialects ship simultaneously
+  (`propTemplate` vs `PropTemplate`); a reader must branch on the root table name.
 
 ## When dispatched
 Translate the human's intent into IO-layer work-orders grounded in the specs and real

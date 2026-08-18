@@ -23,7 +23,12 @@ void CheckAPartialDocumentRecoversWhatItHas() {
     const Io::MapImportOptions options;
     Params::MapRecipe recipe;
     Io::MapImportResult result;
-    Check(Io::MapImporter::ParseSanmapJsonText("{\"width\": 128}", recipe, options, result),
+    // "SanGenVersion":2 satisfies the migration runner's version gate (STEP6_MigrationSubsystem_IO
+    // — the runner is now the literal first thing ParseSanmapJsonText does, and a document with no
+    // version marker at all is refused, never guessed). This fixture is deliberately partial BELOW
+    // that gate: it still has no `mapGeneratorData` block, which is what this check actually tests.
+    Check(Io::MapImporter::ParseSanmapJsonText("{\"SanGenVersion\": 2, \"width\": 128}", recipe,
+                                               options, result),
           "a document with no generator block still loads what it has");
     Check(recipe.geometry.mapSize == 128, "recovering the map's own dimensions");
     Check(result.warningCount == 1, "and warning that the generator settings were not there");
@@ -34,7 +39,9 @@ void CheckHostileValuesFallBackToDefaults() {
     const Io::MapImportOptions options;
     Params::MapRecipe recipe;
     Io::MapImportResult result;
-    const char* hostileText = "{\"mapGeneratorData\":{\"MapSize\":99999,\"Seed\":\"nope\","
+    // "SanGenVersion":2 — see CheckAPartialDocumentRecoversWhatItHas's note above; the hostility
+    // under test here is entirely inside mapGeneratorData, below the migration runner's gate.
+    const char* hostileText = "{\"SanGenVersion\":2,\"mapGeneratorData\":{\"MapSize\":99999,\"Seed\":\"nope\","
                               "\"TerrainMaxHeight\":-4.0,\"WorldUnitsPerCell\":0.0,"
                               "\"GeoLayers\":[{\"Mode\":77}]}}";
     Check(Io::MapImporter::ParseSanmapJsonText(hostileText, recipe, options, result),

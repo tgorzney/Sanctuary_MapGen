@@ -2,8 +2,12 @@
 
 Source of truth: lua at `engine/LJ/lua/common/{units,props,markers}`,
 `resourceSpot.lua`, `area.lua`, and `AI/UnitBlueprintValidator.lua`
-(authoritative tpId decoder). **The `.sanpack` files are assets only** (dds
-icons, editor brushes, models/textures) — NOT the definitions.
+(authoritative tpId decoder). Units, markers and areas are defined in lua
+under `engine/LJ/lua/common/`. **Props are not** — `Environment.sanpack`
+holds 98 prop *definitions* (`.santp`/`.sanprop` Lua templates).
+`props/propsTemplates/` in lua holds only 4 (`exe0000`–`exe0002` test props +
+`defaultWreckage`). For props the pack is the primary definition source; the
+lua folder is not.
 
 ## Factions
 Three factions: **Chosen, Guard, EDA**. Army indices in map scripts:
@@ -40,6 +44,41 @@ A template id is 7 chars: `<object><faction><type><tech><role><id2>`.
 - `props/propsTemplates/` holds `.santp` templates. Most environment props live
   in `Environment.sanpack` (2.3 GB), referenced by maps via `blueprintPath` like
   `Environment/01_Highlands/Props/edbm0149/edbm0149.santp` (codes edbm*, edmm*).
+
+### Two incompatible prop-template dialects ship together
+A parser must handle both. Detect on the root table name.
+
+**A — Environment pack** (`Environment/*/Props/**/*.santp`, and Pandemonium's
+`.sanprop`). Root table `propTemplate` (lowercase p). 98/98 audited files.
+- `collider{center,size}`, `footprint{x,y}`, `defence.health{max,value}`
+- `economy{harvestTime, harvest{alloys, plasma}}`
+- `visuals{isWreckage, skeleton, lods[]{distance,shadowCastingMode,model,material},
+  impostor{...}}`
+- `snapping{snapToGrid,snapToGround,snapToWaterLevel,positonOffset,orientation,
+  rotationSnap,randomScaleRange}` — present in 98/98
+- optional `effects[]{type,tag,effect,…}` — `FireEffect` / `SimpleEffect` /
+  `KnockdownEffect`
+- `general{class[],name,tpId}`, `tags[]`
+
+**B — engine lua** (`engine/LJ/lua/common/props/propsTemplates/*/*.santp`).
+Root table `PropTemplate` (capital P).
+- `collisionInfo{centerOffset,collisionSize}` — *not* `collider{center,size}`
+- `harvest{alloys, energy}` — *not* `plasma`
+- `visuals.mesh{isWreckage, lod0distance, lod1distance, lod2distance}` — no `lods[]`,
+  no model/material paths, no impostor, no snapping
+
+**Load-bearing misspellings in shipped files — do NOT "correct" them:**
+`maxVerrtices` (double r), `positonOffset` (missing i).
+
+**Data-quality defects found (report upstream, do not replicate):** 9 of 98 files
+have `general.tpId` != filename — all in Pandemonium. The 8 `CrystCluster_*` files
+declare `CrystalCluster_*` ("Crystal" vs "Cryst"), and `Cliff_03.sanprop` declares
+`tpId = "Cliff_02"`, making `Cliff_02` a **duplicate tpId**. A tpId-keyed index must
+therefore detect and report collisions rather than silently overwrite.
+
+**Not a defect:** props sharing another prop's `.sanmaterial` is normal and
+intentional — 36 instances (e.g. `edbm0142`–`edbm0150` all use
+`edbm0141_lod0.sanmaterial`). A validator must not flag it.
 
 ## Markers
 - `markers/markerTemplates/`: `alloyMarker` (mex), construction/formation/

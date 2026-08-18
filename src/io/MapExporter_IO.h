@@ -11,14 +11,13 @@
 // (TAB_REBUILD_PLAN "Files / Save · Removed").
 //
 // SCOPE NOTES (ARCH §8.4 — reported, not invented):
-//  1. RESOLVED ENTITIES (`Data::PlacementResults` markers/props/units) are not written: this
-//     module's inputs are the recipe and the fields, and the entity blocks of the format need
-//     the coordinate flip plus the rotation conversion SANMAP_FORMAT_SPEC lists as a known gap.
-//     `areas`/`armies` now round-trip real, hand-authored content from `recipe.areas`/
-//     `recipe.armies` (STEP2_ArmiesAreas_IO). `markers`/`chains`/`decals`/`props` are still
-//     written EMPTY and valid — those four remain their own work-order.
+//  1. RESOLVED ENTITIES (`Data::PlacementResults` markers/props/units) are not written: inputs are
+//     the recipe and the fields. `areas`/`armies`/`markers`/`chains`/`props`/`decals` all round-trip
+//     real `recipe.*` content (STEP2/STEP3/STEP4; blueprintPath validation added by STEP5). An
+//     unresolved `props`/`decals` blueprintPath is reported, never dropped, never used to block the
+//     export (`ValidatePropAndDecalBlueprintPaths` below) — this builder stays disk-free.
 //  2. ATMOSPHERE has no `_PARAMS` home in the v2 tree, so the lighting/fog block is written from
-//     the format's own defaults rather than from settings that do not exist.
+//     the format's own defaults, not settings that do not exist.
 #pragma once
 #include <cstddef>
 #include <string>
@@ -28,6 +27,8 @@ namespace SanmapGen {
 namespace Data { class MapFields; }
 namespace Params { struct MapRecipe; }
 namespace Io {
+
+class SanpackReader;
 
 // Every output file name is a setting, never a literal at a write site (Constitution §8).
 struct MapExportFileNames {
@@ -71,9 +72,10 @@ struct MapExportResult {
 inline constexpr int sanmapFileVersion   = 3;
 inline constexpr int sanmapMapVersion    = 1;
 inline constexpr int sanmapStratumCount  = 9;
-// Bumped whenever the shape of the `mapGeneratorData` block changes, so an importer can tell a
-// v1-written block from a v2-written one instead of guessing.
-inline constexpr int mapGeneratorDataVersion = 2;
+// `SanGenVersion` (SANMAP_FORMAT_SPEC Correction 1) REPLACES the old write-only
+// `mapGeneratorDataVersion` literal — it is written top-level from `Io::kCurrentSanGenVersion`
+// (Sanmap_MigrationManifest_IO.h), the single source of truth `Sanmap_MigrationRunner_IO` reads
+// back on import (IO_MIGRATION_SPEC.md §3/§4).
 
 // 0..1 -> the format's 16-bit heightmap sample. Out-of-range input is clamped, never wrapped.
 inline unsigned short QuantizeNormalizedHeightSample(float normalizedHeight) {
@@ -89,6 +91,19 @@ inline unsigned char QuantizeNormalizedWeightSample(float normalizedWeight) {
     return static_cast<unsigned char>(normalizedWeight * 255.0f + 0.5f);
 }
 
+// One `props`/`decals` blueprintPath validation pass (MapExporter_BlueprintValidation_IO.cpp).
+// Warn-not-block: AllResolved() gates nothing here — the caller decides what to do with a finding.
+struct BlueprintValidationReport {
+    std::vector<std::string> unresolvedBlueprintPaths;   // literal strings, props then decals
+    bool AllResolved() const { return unresolvedBlueprintPaths.empty(); }
+    std::string SummaryText() const;   // ONE wording — shared by the UI dialog body and debugLog
+};
+
+// `assetPack` MUST already be `Open()`+`ReadCentralDirectoryOnce()`'d by the caller. Pure/read-only,
+// touches no disk, never called from inside BuildSanmapJsonText (same tier as `recipe.IsValid()`).
+BlueprintValidationReport ValidatePropAndDecalBlueprintPaths(const Params::MapRecipe& recipe,
+                                                              const SanpackReader& assetPack);
+
 // Joins one path segment onto a folder with a single forward slash, whatever the folder ended in.
 std::string JoinExportPath(const std::string& folderPath, const std::string& segmentName);
 
@@ -103,15 +118,18 @@ bool WriteBinaryFileBytes(const std::string& filePath, const void* bytes, std::s
 
 class MapExporter {
 public:
-    // The recipe only: `<folder>/<mapName>.sanmap`, no textures. "Export Sanmap Only".
+    // `<folder>/<mapName>.sanmap`, no textures. `assetPack` non-null LOGS a blueprintPath finding
+    // (never gates bSucceeded — warn-not-block).
     static MapExportResult ExportSanmapOnly(const std::string& folderPath,
                                             const Params::MapRecipe& recipe,
-                                            const MapExportOptions& options = MapExportOptions());
+                                            const MapExportOptions& options = MapExportOptions(),
+                                            const SanpackReader* assetPack = nullptr);
 
-    // The recipe plus every enabled texture. "Export All (Project+Textures)".
+    // The recipe plus every enabled texture. `assetPack` — see ExportSanmapOnly above.
     static MapExportResult ExportAll(const std::string& folderPath, const Params::MapRecipe& recipe,
                                      const Data::MapFields& fields,
-                                     const MapExportOptions& options = MapExportOptions());
+                                     const MapExportOptions& options = MapExportOptions(),
+                                     const SanpackReader* assetPack = nullptr);
 
     // The individual export actions the Files tab offers, each usable on its own.
     static bool WriteHeightmapRaw(const std::string& filePath, const Data::MapFields& fields,

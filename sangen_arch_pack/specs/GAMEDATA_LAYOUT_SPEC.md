@@ -39,9 +39,25 @@ unit's UI thumbnail is NOT here — it is the stored
 ## Environment — `Environment/Environment/<Biome>/`
 Biomes: `01_Highlands, 02_Evergreen, 03_Desert, 04_Baikal, 09_Industrial,
 10_WhiteDesert, Winter, Common, Dev, DysonParts, Pandemonium, Skybox, Water`.
-Each biome → `Decals/`, `Props/`, `Stratum/`.
-- `Props/<code>/` — prop mesh folders (`edbm*/edbs*/edml*/edmm*/edms*` = bush/
-  small/large/medium props); heavy 3D assets, **no stored thumbnails**.
+Each biome → `Decals/`, `Props/`, `Stratum/` — **except `Winter`, which has no
+`Props/` directory; only biomes with a `Props/` folder can contribute to a
+prop index.**
+- `Props/` — prop folders. Heavy 3D assets, **no stored thumbnails**.
+  **Folder names are NOT derivable from the tpId.** Three distinct conventions ship:
+
+  | Set | Convention | Example |
+  |---|---|---|
+  | 01_Highlands, 02_Evergreen, 04_Baikal | `<tpId>/<tpId>.santp` | `edbm0149/edbm0149.santp` |
+  | 10_WhiteDesert | `<tpId>_<description>/<tpId>.santp` | `edmm0301_chalkrock_01/edmm0301.santp` |
+  | 03_Desert | Quixel asset IDs, no tpId code at all | `Nature_Rock_vd5rfiq_4K_3d_ms/` |
+  | Pandemonium | flat `<Name>.sanprop`, shared `Models/` + `Materials/` siblings | `CrystCluster_B1.sanprop` |
+
+  **Rule: always use the literal `blueprintPath` from the `.sanmap`. Never synthesize
+  `<code>/<code>.santp`** — it breaks on 9 WhiteDesert props, all 15 03_Desert props,
+  and all 17 Pandemonium props.
+
+  Prop-code prefixes (`edbm/edbs/edml/edmm/edms`) remain a useful *size/class* hint
+  where present, but are absent in 03_Desert and Pandemonium.
 - `Stratum/` — the terrain textures (albedo/normal/mask) the `.sanmap` stratum
   layers reference.
 - `Decals/` — `.sandecal` decal images.

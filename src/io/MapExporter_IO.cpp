@@ -23,6 +23,17 @@ bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe&
     return true;
 }
 
+// The blueprintPath safety net (finalized IO plumbing item 4): warn-not-block, for a caller that
+// passes a non-null assetPack without going through the Files-tab dialog at all — the SAME
+// validation the UI pre-check runs, just logged instead of gating the button. `result.bSucceeded`
+// is NEVER touched here.
+void LogBlueprintValidationFindings(const Params::MapRecipe& recipe, const SanpackReader* assetPack,
+                                    MapExportResult& result) {
+    if (assetPack == nullptr) return;
+    const BlueprintValidationReport report = ValidatePropAndDecalBlueprintPaths(recipe, *assetPack);
+    if (!report.AllResolved()) result.Log(report.SummaryText());
+}
+
 } // namespace
 
 bool EnsureExportFolderExists(const std::string& folderPath, MapExportResult& result) {
@@ -39,18 +50,22 @@ bool EnsureExportFolderExists(const std::string& folderPath, MapExportResult& re
 
 MapExportResult MapExporter::ExportSanmapOnly(const std::string& folderPath,
                                               const Params::MapRecipe& recipe,
-                                              const MapExportOptions& options) {
+                                              const MapExportOptions& options,
+                                              const SanpackReader* assetPack) {
     MapExportResult result;
     if (!recipe.IsValid()) { result.Log("Export refused: the recipe's geometry is not valid."); return result; }
+    LogBlueprintValidationFindings(recipe, assetPack, result);
     if (!EnsureExportFolderExists(folderPath, result)) return result;
     result.bSucceeded = WriteSanmapDocument(folderPath, recipe, options, result);
     return result;
 }
 
 MapExportResult MapExporter::ExportAll(const std::string& folderPath, const Params::MapRecipe& recipe,
-                                       const Data::MapFields& fields, const MapExportOptions& options) {
+                                       const Data::MapFields& fields, const MapExportOptions& options,
+                                       const SanpackReader* assetPack) {
     MapExportResult result;
     if (!recipe.IsValid()) { result.Log("Export refused: the recipe's geometry is not valid."); return result; }
+    LogBlueprintValidationFindings(recipe, assetPack, result);
     if (!EnsureExportFolderExists(folderPath, result)) return result;
     if (!WriteSanmapDocument(folderPath, recipe, options, result)) return result;
 

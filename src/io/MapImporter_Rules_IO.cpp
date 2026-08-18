@@ -1,6 +1,6 @@
 // MapImporter_Rules_IO.cpp — `mapGeneratorData.PlacementRules` -> the recipe's four rule vectors.
 // Layer: IO. The exact inverse of MapExporter_Rules_IO.cpp.
-#include "MapImporter_Recipe_IO.h"
+#include "JsonPrimitives_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {

@@ -69,9 +69,11 @@ static void TestDocumentCarriesTheFormatsOwnFields() {
     Check(documentText.find("\"stratumLayers\"") != std::string::npos,
           "the format's fixed texture layer array is present");
     Check(documentText.find("\"props\"") != std::string::npos,
-          "and the still-unwired entity domains (markers/chains/decals/props) are written empty "
-          "and valid, never omitted (SCOPE NOTE 1) — areas/armies now round-trip real content and "
-          "are covered by MapImporter_IO_Test's CheckArmiesAndAreas instead");
+          "and props/decals are written valid and empty when the recipe has none, never omitted — "
+          "STEP4_PropsDecals_IO gave them real Params:: types and pure builders, and "
+          "STEP5_PropsDecalsValidation_UI live-wired those builders into BuildSanmapJsonText "
+          "(SCOPE NOTE 1); areas/armies/markers/chains/props/decals are all covered end to end by "
+          "MapImporter_IO_Test's CheckArmiesAndAreas/CheckMarkersAndChains/CheckPropsAndDecals");
 }
 
 // STEP1_ShippingBugFixes: `maskRemapMin`/`maskRemapMax` are real Vector4 objects (ARCH §7.2

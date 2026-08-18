@@ -58,5 +58,9 @@ bool PatchFileByte(const std::string& filePath, const char* marker, unsigned cha
 void RunSanpackReaderChecks(const SyntheticSanpack& layout);              // SanpackReader_IO_Test.cpp
 void RunAtlasCacheChecks(const SyntheticSanpack& layout,
                          const std::string& scratchDirectory);            // AssetAtlasCache_IO_Test.cpp
+// STEP5_PropsDecalsValidation_UI: SanpackReader::HasEntry / ValidatePropAndDecalBlueprintPaths /
+// the warn-not-block export safety net, all against this SAME synthetic sanpack.
+void RunBlueprintValidationChecks(const SyntheticSanpack& layout,
+                                  const std::string& scratchDirectory);   // MapExporter_BlueprintValidation_IO_Test.cpp
 
 } // namespace AssetPipelineTest

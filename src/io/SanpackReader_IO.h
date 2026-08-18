@@ -83,6 +83,13 @@ public:
     const std::vector<SanpackEntry>& DirectoryEntries() const { return directoryEntries; }
     const SanpackIngestStatistics& Statistics() const { return statistics; }
 
+    // ONE exact, case-sensitive lookup against the ALREADY-PARSED central directory (same
+    // "ReadCentralDirectoryOnce() is the caller's job" contract DirectoryEntries() already has —
+    // does NOT parse on demand). An unopened/unparsed reader answers false, never asserts
+    // (Constitution §6). blueprintPath strings are literal archive paths (SPEC-1) — never
+    // normalized, never fuzzy-matched.
+    bool HasEntry(const std::string& entryName) const;
+
 private:
     bool MapFile(const std::string& sanpackPath);
     void UnmapFile();

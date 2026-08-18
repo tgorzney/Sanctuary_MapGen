@@ -20,6 +20,7 @@
 //     fields — every DATA field has exactly one writing stage (ARCH §3.4) and IO is not a stage.
 //     With no destination bound the recipe still loads; the textures are simply skipped.
 #pragma once
+#include "ConfirmDialog_UI.h"
 #include "Section_UI.h"
 #include "../io/MapExporter_IO.h"
 #include "../io/MapImporter_IO.h"
@@ -29,6 +30,7 @@ namespace SanmapGen {
 namespace Data { class MapFields; }
 namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
+namespace Io { class SanpackReader; }
 namespace Ui {
 
 // See SCOPE NOTE 1. Returns true when the recipe was populated; `outLog` is appended to the panel.
@@ -73,6 +75,22 @@ struct FilesTabState {
     std::string debugLog;
     int         maximumDebugLogCharacterCount = 65536;   // the panel is bounded, not unbounded
     bool        bLoadBakedFieldsOnImport = true;
+
+    // STEP5_PropsDecalsValidation_UI — the long-lived reader Application owns, fed down here.
+    // LOAD-BEARING: non-null ONLY when Application's own Open()+ReadCentralDirectoryOnce() both
+    // succeeded for the CURRENT sanpack path; nullptr on first launch, after a failed load, or once
+    // the path is cleared. A dangling-into-empty reader would report every blueprintPath as
+    // unresolved (SanpackReader::HasEntry's "unopened answers false" contract) and pop the confirm
+    // dialog on every export for a designer who never loaded a pack at all.
+    const Io::SanpackReader* assetPack = nullptr;
+
+    // The blueprintPath confirm-dialog's pending state (Files-tab flow, FilesTab_Draw_UI.cpp only):
+    // set on a dirty ExportSanmapOnly/ExportAll click, cleared on OK or Cancel. RunFilesTabAction
+    // itself never sees any of this — it stays the same headless, unconditional "just do it" call.
+    ConfirmDialogState confirmDialogState;
+    FilesTabAction      pendingConfirmAction  = FilesTabAction::ExportSanmapOnly;
+    bool                bConfirmActionPending = false;
+    std::string         confirmDialogBodyText;
 };
 
 // Appends one block to the log and holds it inside its budget by dropping WHOLE lines off the

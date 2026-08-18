@@ -1,11 +1,17 @@
 // FilesTab_Draw_UI.cpp — the imgui composition of the Files / Save tab. Layer: UI.
 // Three sections: Open (sanmap + SupCom lua), Export (the six actions), and the debug log.
-// Every button is one call into RunFilesTabAction — the draw path decides nothing.
+// Every button is one call into RunFilesTabAction — the draw path decides nothing, WITH ONE
+// EXCEPTION: ExportSanmapOnly/ExportAll gain a blueprintPath pre-check -> confirm-dialog ->
+// deferred-commit flow (STEP5_PropsDecalsValidation_UI). This is the ONE non-headless layer in the
+// tab, which is why all of that new logic lives here and nowhere else — RunFilesTabAction itself
+// never changes.
 #include "FilesTab_UI.h"
 #include "FilesTab_Browse_UI.h"
 #include "Checkbox_UI.h"
+#include "ConfirmDialog_UI.h"
 #include "TextInput_UI.h"
 #include "../data/MapFields_DATA.h"
+#include "../io/SanpackReader_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
 #include "imgui.h"
@@ -23,6 +29,50 @@ void DrawActionButton(FilesTabAction action, FilesTabState& state, Params::MapRe
     const bool bImported = action == FilesTabAction::OpenSanmap
                         || action == FilesTabAction::ImportSupComLua;
     if (bSucceeded && bImported && previewDriver != nullptr) previewDriver->RequestMapUpdate();
+}
+
+// The STEP5 pre-check: clean (or no pack loaded) -> true, the caller runs the action exactly as
+// today, zero added cost. Dirty -> stashes the pending action + report.SummaryText() into the
+// state's confirm-state, requests the dialog open, and returns false — the caller must NOT export
+// this frame. `state.assetPack == nullptr` skips validation entirely (Files-tab flow item 1).
+bool PreCheckGatedExport(FilesTabAction action, FilesTabState& state, const Params::MapRecipe& recipe) {
+    if (state.assetPack == nullptr) return true;
+    const Io::BlueprintValidationReport report =
+        Io::ValidatePropAndDecalBlueprintPaths(recipe, *state.assetPack);
+    if (report.AllResolved()) return true;
+    state.pendingConfirmAction              = action;
+    state.bConfirmActionPending             = true;
+    state.confirmDialogBodyText             = report.SummaryText();
+    state.confirmDialogState.bOpenRequested = true;
+    return false;
+}
+
+// ExportSanmapOnly/ExportAll ONLY — never the four texture-only exports, which carry no
+// blueprintPath data at all (Files-tab flow, final line).
+void DrawGatedExportButton(FilesTabAction action, FilesTabState& state, Params::MapRecipe& recipe,
+                           Data::MapFields* fields) {
+    if (!ImGui::Button(FilesTabActionLabel(action))) return;
+    if (PreCheckGatedExport(action, state, recipe)) RunFilesTabAction(action, state, recipe, fields);
+}
+
+// Drawn every frame, unconditionally, regardless of whether a warning is currently pending — an
+// imgui modal popup must be given the chance to run its own frame every frame it might be open.
+// OK exports the stashed action anyway (the designer's call); Cancel aborts with nothing written.
+void DrawPendingBlueprintWarningDialog(FilesTabState& state, Params::MapRecipe& recipe,
+                                       Data::MapFields* fields) {
+    ConfirmDialogOptions options;
+    options.title               = "Unresolved blueprintPath";
+    options.bodyText            = state.confirmDialogBodyText;
+    options.primaryButtonLabel  = "Export Anyway";
+    options.secondaryButtonLabel = "Cancel";
+    const ConfirmDialogChange change =
+        DrawConfirmDialog("filesTabBlueprintWarning", state.confirmDialogState, options);
+    if (change.bPrimaryClicked) {
+        RunFilesTabAction(state.pendingConfirmAction, state, recipe, fields);
+        state.bConfirmActionPending = false;
+    } else if (change.bSecondaryClicked) {
+        state.bConfirmActionPending = false;
+    }
 }
 
 void DrawOpenSection(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFields* fields,
@@ -54,9 +104,9 @@ void DrawExportSection(FilesTabState& state, Params::MapRecipe& recipe, Data::Ma
     DrawTextInput("Map Name", state.exportOptions.mapName, nameRules);
     DrawTextInput("Credits", state.exportOptions.mapCredits);
 
-    DrawActionButton(FilesTabAction::ExportSanmapOnly, state, recipe, fields, previewDriver);
+    DrawGatedExportButton(FilesTabAction::ExportSanmapOnly, state, recipe, fields);
     ImGui::SameLine();
-    DrawActionButton(FilesTabAction::ExportAll, state, recipe, fields, previewDriver);
+    DrawGatedExportButton(FilesTabAction::ExportAll, state, recipe, fields);
     ImGui::Separator();
     DrawActionButton(FilesTabAction::ExportHeightmapRaw, state, recipe, fields, previewDriver);
     ImGui::SameLine();
@@ -89,6 +139,9 @@ void DrawFilesTab(Params::MapRecipe& recipe, FilesTabState& state, Data::MapFiel
     DrawOpenSection(state, recipe, fields, previewDriver);
     DrawExportSection(state, recipe, fields, previewDriver);
     DrawLogSection(state);
+    // Unconditional (Files-tab flow item 4): a warning triggered from inside the (possibly now
+    // collapsed) Export section must still get its popup frame every frame it might be open.
+    DrawPendingBlueprintWarningDialog(state, recipe, fields);
     ImGui::PopID();
 }
 

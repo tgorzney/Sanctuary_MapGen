@@ -107,6 +107,7 @@ int main(int argc, char** argv) {
     if (FailureCount() == 0) {
         RunSanpackReaderChecks(layout);
         RunAtlasCacheChecks(layout, scratchDirectory.string());
+        RunBlueprintValidationChecks(layout, scratchDirectory.string());
     }
     if (FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", FailureCount());

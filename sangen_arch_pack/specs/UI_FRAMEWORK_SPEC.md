@@ -52,9 +52,21 @@ entities responsively; imgui is used, but bypassed on the hot paths.
 The bypass toolkit above is not per-tab copy-paste — it is **one shared widget
 library** every tab draws from: RangeSlider, VirtualList<T>, DraggableList<T>,
 gradient editor, icon-grid / atlas-thumbnail button, labelled dial, RT-toggle
-wrapper, etc. One optimized implementation, consistent look, DRY. New tabs compose
-these; they do not hand-roll imgui. Widgets that show icons/thumbnails read from
-the resident atlas (ASSET_LOADING_SPEC), never from files.
+wrapper, **`ConfirmDialog_UI`**, etc. One optimized implementation, consistent
+look, DRY. New tabs compose these; they do not hand-roll imgui. Widgets that show
+icons/thumbnails read from the resident atlas (ASSET_LOADING_SPEC), never from
+files.
+
+- **`ConfirmDialog_UI`** — generic, reusable OK/Cancel confirm-modal (title +
+  pre-formatted body text + two labelled buttons; caller owns a one-per-site
+  `ConfirmDialogState`, no ESC/backdrop dismissal by default —
+  `bClosableWithoutChoice` opts in). Added to the library the same session that
+  ratified `ENTITY_AUTHORING_PARAMS_SPEC.md`'s blueprintPath "warn, never block"
+  export ruling — its first consumer is the Files-tab export-warning flow
+  (`work_orders/STEP5_PropsDecalsValidation_UI.md`), but the widget itself is a
+  general primitive, not bespoke to that flow: no confirm-dialog widget existed in
+  the toolkit before this addition. Follows the existing `ColorSwatch_UI.cpp`
+  draw/state split (`WidgetHelpers_UI.h` "THE SPLIT").
 
 ## v2 guidance
 - Keep the bypass toolkit (1–7); make it the standard, not ad-hoc per tab.

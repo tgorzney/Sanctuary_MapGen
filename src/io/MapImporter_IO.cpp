@@ -4,6 +4,7 @@
 // let the block readers move the recipe off its defaults.
 #include "MapImporter_IO.h"
 #include "MapImporter_Recipe_IO.h"
+#include "Sanmap_MigrationRunner_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <filesystem>
 #include <fstream>
@@ -72,6 +73,12 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     }
     if (!document.is_object()) { result.Log("The document is not a JSON object."); return false; }
 
+    // The migration runner is the LITERAL FIRST thing that touches the document — before even the
+    // `height`/`width` reads below — so a refused document (newer than this build, or carrying no
+    // version marker at all) can never leave outRecipe partially mutated (Constitution §6 atomicity;
+    // IO_MIGRATION_SPEC.md §4.4: runs before any domain block reader).
+    if (!RunSanmapMigrations(document, result)) return false;
+
     // The format's own `height` is the terrain's vertical extent (SANMAP_FORMAT_SPEC): it is the
     // authority when there is no generator block, and mapGeneratorData overrides it below.
     ReadJsonFloat(document, "height", outRecipe.geometry.terrainMaxHeight);
@@ -81,13 +88,23 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
         && mapWidth <= options.safetyLimits.maximumMapSize)
         outRecipe.geometry.mapSize = mapWidth;
 
-    // `areas`/`armies` are top-level `.sanmap` keys, SIBLINGS of `mapGeneratorData`, not nested
-    // inside it — read unconditionally and BEFORE the mapGeneratorData-presence gate below, so a
-    // hand-authored file with real armies/areas but no mapGeneratorData block still keeps them
-    // (Critical wiring correction, STEP2_ArmiesAreas_IO). outRecipe.geometry.mapSize is already
+    // `areas`/`armies`/`markers`/`chains`/`props`/`decals`/`PropGroups`/`DecalGroups` are top-level
+    // `.sanmap` keys, SIBLINGS of `mapGeneratorData`, not nested inside it — read unconditionally
+    // and BEFORE the mapGeneratorData-presence gate below, so a hand-authored file with real entity
+    // content but no mapGeneratorData block still keeps it (Critical wiring correction,
+    // STEP2_ArmiesAreas_IO, applied directly to markers/chains per STEP3_MarkersChains_IO and to
+    // props/decals per STEP5_PropsDecalsValidation_UI). outRecipe.geometry.mapSize is already
     // populated from the top-level `width` key above, so the positionZ flip-inverse is correct here.
+    // *Groups readers run BEFORE the instance readers: the layerIndex clamp (ARCH §12) validates
+    // against propLayers/decalLayers, which only the *Groups readers populate.
     ReadAreasJson(document, outRecipe);
     ReadArmiesJson(document, outRecipe);
+    ReadMarkersJson(document, outRecipe);
+    ReadChainsJson(document, outRecipe);
+    ReadPropGroupsJson(document, outRecipe);
+    ReadPropsJson(document, outRecipe, result);
+    ReadDecalGroupsJson(document, outRecipe);
+    ReadDecalsJson(document, outRecipe, result);
 
     if (!document.contains("mapGeneratorData") || !document["mapGeneratorData"].is_object()) {
         result.Warn("No mapGeneratorData block: only the map's own dimensions were recovered.");

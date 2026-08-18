@@ -9,7 +9,10 @@
 #include "Geometry_PARAMS.h"
 #include "LayerStack_PARAMS.h"
 #include "MapArea_PARAMS.h"
+#include "MarkerChain_PARAMS.h"
+#include "MarkerInstance_PARAMS.h"
 #include "MarkerRule_PARAMS.h"
+#include "PropInstance_PARAMS.h"
 #include "ScatterRule_PARAMS.h"
 #include "Stratum_PARAMS.h"
 #include "Symmetry_PARAMS.h"
@@ -32,10 +35,18 @@ struct MapRecipe {
     Water                   water;
     int                     globalSymmetryMask = SymmetryAxis::None;
     // Hand-placed, pass-through entity data (ENTITY_AUTHORING_PARAMS_SPEC) — round-trip fidelity
-    // through the `.sanmap` `armies`/`areas` dictionaries is their entire purpose; no PROC stage
-    // computes or reinterprets them.
-    std::vector<Army>       armies;
-    std::vector<MapArea>    areas;
+    // through the `.sanmap` `armies`/`areas`/`markers`/`chains` dictionaries is their entire
+    // purpose; no PROC stage computes or reinterprets them.
+    std::vector<Army>                armies;
+    std::vector<MapArea>             areas;
+    std::vector<MarkerInstanceGroup> markers;
+    std::vector<MarkerChain>         chains;
+    // PARAMS types + pure JSON round-trip only (STEP4_PropsDecals_IO) — NOT yet live-wired into
+    // BuildSanmapJsonText/ParseSanmapJsonText. See MapExporter_IO.h/MapImporter_IO.h SCOPE NOTES.
+    std::vector<PropInstanceGroup>   props;
+    std::vector<DecalInstanceGroup>  decals;
+    std::vector<PropInstanceLayer>   propLayers;
+    std::vector<DecalInstanceLayer>  decalLayers;
 
     bool IsValid() const { return geometry.IsValid(); }
 };

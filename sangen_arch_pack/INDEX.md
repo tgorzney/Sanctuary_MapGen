@@ -21,7 +21,7 @@ spec(s) a question needs — never the whole pack.
 | noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
 | the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights` | `specs/MASKING_SPEC.md` |
 | marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
-| pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
+| pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
 | preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix | `specs/PREVIEW_COMPOSITING_SPEC.md` |
@@ -54,6 +54,19 @@ corrected that correction's prior claim that `DecalRule` already carries the
 `bSymmetryUseGlobal`/`symmetryMask` override pair (it does not — recorded as a defect,
 `PLACEMENT_SCATTER_SPEC`'s "Known issues" addendum, alongside a second recorded defect: the
 16-slot symmetry-orbit buffer can now silently overflow under a large radial count).
+
+`ENTITY_AUTHORING_PARAMS_SPEC` was extended a fifth time to close its own flagged item 1
+(export-time `blueprintPath` validation) with a human ruling: an unresolvable `blueprintPath`
+is reported — via the new IO-layer `ValidatePropAndDecalBlueprintPaths` check
+(`MapExporter_IO.h`) and a `ConfirmDialog_UI` warning dialog naming the runtime risk — never
+silently dropped and never silently used to hard-refuse the export; the designer sees the
+warning and can choose to proceed anyway. This resolves the item's original "resolve
+literally against the real pack or fail loudly (Constitution §6)" ambiguity in favor of
+fail-loudly meaning "surfaced loudly to the human," not "hard-refused by the tool." Items 2-4
+of that same flagged list remain open. Implemented by `work_orders/STEP4_PropsDecals_IO.md`
+and `work_orders/STEP5_PropsDecalsValidation_UI.md`. The same ruling adds `ConfirmDialog_UI` —
+a new generic, reusable OK/Cancel confirm-modal widget with no prior equivalent — to
+`UI_FRAMEWORK_SPEC.md`'s "Universal widget library".
 
 **Standing deferred ruling:** persistent ordered thickness columns + true surface-exposure
 derivation (ARCH §7.5, `LAYER_SYSTEM_SPEC` "Known gap") — an M6 DATA-shape work order.

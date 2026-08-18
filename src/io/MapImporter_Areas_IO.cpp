@@ -3,7 +3,7 @@
 // MapArea::name (a dictionary, not an array — ENTITY_AUTHORING_PARAMS_SPEC finding 1), unlike the
 // MapExporter_Rules_IO.cpp/MapImporter_Rules_IO.cpp array pattern this deliberately does not copy.
 // Flat; no recursion needed. No coordinate flip (finding 3).
-#include "MapImporter_Recipe_IO.h"
+#include "JsonPrimitives_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {

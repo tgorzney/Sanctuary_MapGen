@@ -118,6 +118,105 @@ void CheckArmiesAndAreas(const Params::MapRecipe& original, const Params::MapRec
     Check(loadedUnit.legacyTypeTag == originalUnit.legacyTypeTag, "legacyTypeTag survives verbatim");
 }
 
+// Since `mapSize` never leaves the fixture, this asserts flip-then-unflip is the identity without
+// the test needing to know the map-size constant, mirroring CheckArmiesAndAreas's exact style.
+void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(loaded.markers.size() == 1, "one marker group survives");
+    if (!loaded.markers.empty()) {
+        const Params::MarkerInstanceGroup& originalGroup = original.markers[0];
+        const Params::MarkerInstanceGroup& loadedGroup = loaded.markers[0];
+        Check(loadedGroup.name == originalGroup.name, "the marker group's name (JSON key) survives");
+        Check(loadedGroup.bResource == originalGroup.bResource, "bResource survives, non-default");
+
+        Check(loadedGroup.transforms.size() == 1, "one marker transform survives");
+        if (!loadedGroup.transforms.empty()) {
+            const Params::MarkerTransform& originalMarker = originalGroup.transforms[0];
+            const Params::MarkerTransform& loadedMarker = loadedGroup.transforms[0];
+            Check(loadedMarker.name == originalMarker.name, "the marker's name survives");
+            Check(loadedMarker.alias == originalMarker.alias, "the marker's alias survives");
+            Check(NearlyEqual(loadedMarker.transform.positionX, originalMarker.transform.positionX)
+                  && NearlyEqual(loadedMarker.transform.positionY, originalMarker.transform.positionY),
+                  "positionX/Y survive untouched by the flip");
+            // The flip (export) and its inverse (import) compose to the identity — this is what
+            // actually exercises the coordinate flip, without the test needing to know mapSize.
+            Check(NearlyEqual(loadedMarker.transform.positionZ, originalMarker.transform.positionZ),
+                  "positionZ round-trips through the flip back to its original value");
+            Check(NearlyEqual(loadedMarker.transform.rotationX, originalMarker.transform.rotationX)
+                  && NearlyEqual(loadedMarker.transform.rotationY, originalMarker.transform.rotationY)
+                  && NearlyEqual(loadedMarker.transform.rotationZ, originalMarker.transform.rotationZ)
+                  && NearlyEqual(loadedMarker.transform.rotationW, originalMarker.transform.rotationW),
+                  "the non-identity rotation survives verbatim, with no flip applied");
+            Check(NearlyEqual(loadedMarker.transform.scaleX, originalMarker.transform.scaleX)
+                  && NearlyEqual(loadedMarker.transform.scaleY, originalMarker.transform.scaleY)
+                  && NearlyEqual(loadedMarker.transform.scaleZ, originalMarker.transform.scaleZ),
+                  "scale survives");
+        }
+    }
+
+    Check(loaded.chains.size() == 1, "one marker chain survives");
+    if (loaded.chains.empty()) return;
+    const Params::MarkerChain& originalChain = original.chains[0];
+    const Params::MarkerChain& loadedChain = loaded.chains[0];
+    Check(loadedChain.name == originalChain.name, "the chain's name (JSON key) survives");
+    Check(loadedChain.markers.size() == 2, "both chain markers survive");
+    if (loadedChain.markers.size() != 2) return;
+    Check(loadedChain.markers[0].type == originalChain.markers[0].type
+          && loadedChain.markers[0].name == originalChain.markers[0].name,
+          "the first chain marker's type/name survive");
+    Check(loadedChain.markers[1].type == originalChain.markers[1].type
+          && loadedChain.markers[1].name == originalChain.markers[1].name,
+          "the second chain marker's type/name survive, and order is preserved");
+}
+
+// Since `mapSize` never leaves the fixture, this asserts flip-then-unflip is the identity without
+// the test needing to know the map-size constant, mirroring CheckArmiesAndAreas/
+// CheckMarkersAndChains's exact style. Both layerIndex values are IN RANGE (0) — this fixture feeds
+// RunRoundTripTests's "no warning" assertion, so it must not itself trip the layerIndex clamp; the
+// clamp path is PropsDecals_IO_Test's job (MapImporter_PropsDecals_IO_Test.cpp).
+void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(loaded.propLayers.size() == 1, "one prop layer survives");
+    Check(loaded.props.size() == 1, "one prop group survives");
+    if (!loaded.propLayers.empty() && !loaded.props.empty()) {
+        const Params::PropInstanceGroup& originalGroup = original.props[0];
+        const Params::PropInstanceGroup& loadedGroup = loaded.props[0];
+        Check(loadedGroup.blueprintPath == originalGroup.blueprintPath,
+              "PropInstanceGroup::blueprintPath survives");
+        Check(loadedGroup.transforms.size() == 1, "one prop transform survives");
+        if (!loadedGroup.transforms.empty()) {
+            const Params::PropTransform& originalTransform = originalGroup.transforms[0];
+            const Params::PropTransform& loadedTransform = loadedGroup.transforms[0];
+            Check(NearlyEqual(loadedTransform.transform.positionX, originalTransform.transform.positionX)
+                  && NearlyEqual(loadedTransform.transform.positionY, originalTransform.transform.positionY),
+                  "prop positionX/Y survive untouched by the flip");
+            Check(NearlyEqual(loadedTransform.transform.positionZ, originalTransform.transform.positionZ),
+                  "prop positionZ round-trips through the flip back to its original value");
+            Check(loadedTransform.layerIndex == originalTransform.layerIndex,
+                  "the in-range prop layerIndex survives exactly");
+        }
+    }
+
+    Check(loaded.decalLayers.size() == 1, "one decal layer survives");
+    Check(loaded.decals.size() == 1, "one decal group survives");
+    if (!loaded.decalLayers.empty() && !loaded.decals.empty()) {
+        const Params::DecalInstanceGroup& originalGroup = original.decals[0];
+        const Params::DecalInstanceGroup& loadedGroup = loaded.decals[0];
+        Check(loadedGroup.blueprintPath == originalGroup.blueprintPath,
+              "DecalInstanceGroup::blueprintPath survives");
+        Check(loadedGroup.transforms.size() == 1, "one decal transform survives");
+        if (!loadedGroup.transforms.empty()) {
+            const Params::DecalTransform& originalTransform = originalGroup.transforms[0];
+            const Params::DecalTransform& loadedTransform = loadedGroup.transforms[0];
+            Check(NearlyEqual(loadedTransform.transform.positionX, originalTransform.transform.positionX)
+                  && NearlyEqual(loadedTransform.transform.positionY, originalTransform.transform.positionY),
+                  "decal positionX/Y survive untouched by the flip");
+            Check(NearlyEqual(loadedTransform.transform.positionZ, originalTransform.transform.positionZ),
+                  "decal positionZ round-trips through the flip back to its original value");
+            Check(loadedTransform.layerIndex == originalTransform.layerIndex,
+                  "the in-range decal layerIndex survives exactly");
+        }
+    }
+}
+
 void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     Params::GeoLayer geoLayer;
     geoLayer.name = "Ridges";
@@ -197,6 +296,81 @@ void FillFixtureArmiesAndAreas(Params::MapRecipe& recipe) {
     recipe.armies.push_back(army);
 }
 
+void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
+    Params::MarkerTransform markerTransform;
+    markerTransform.name = "Mex 0";
+    markerTransform.transform.positionX = 8.0f;
+    markerTransform.transform.positionY = 2.0f;
+    markerTransform.transform.positionZ = 23.0f;                     // non-zero: exercises the flip
+    markerTransform.transform.rotationX = 0.05f; markerTransform.transform.rotationY = 0.15f;
+    markerTransform.transform.rotationZ = 0.25f; markerTransform.transform.rotationW = 0.95f;  // non-identity
+    markerTransform.transform.scaleX = 1.5f; markerTransform.transform.scaleY = 1.25f;
+    markerTransform.transform.scaleZ = 1.75f;                        // non-unit
+    markerTransform.alias = "North Mex";
+
+    Params::MarkerInstanceGroup group;
+    group.name = "Alloys";
+    group.bResource = true;                                          // non-default
+    group.transforms.push_back(markerTransform);
+    recipe.markers.push_back(group);
+
+    Params::MarkerChain chain;
+    chain.name = "FirstChain";
+    chain.markers.push_back({ "Alloys", "Mex 0" });
+    chain.markers.push_back({ "Spawn", "Spawn 0" });
+    recipe.chains.push_back(chain);
+}
+
+// One prop group and one decal group, each with a single, IN-RANGE-layerIndex transform — mirrors
+// FillFixtureArmiesAndAreas/FillFixtureMarkersAndChains's style. This is what makes CheckPropsAndDecals
+// exercise the LIVE BuildSanmapJsonText/ParseSanmapJsonText path for props/decals for the first
+// time (STEP4_PropsDecals_IO's own test only drove the pure builders/readers directly).
+void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
+    Params::PropInstanceLayer propLayer;
+    propLayer.name = "Foreground Props";
+    propLayer.color[0] = 0.1f; propLayer.color[1] = 0.2f;
+    propLayer.color[2] = 0.3f; propLayer.color[3] = 0.4f;
+    propLayer.iconScale = 1.5f;
+    recipe.propLayers.push_back(propLayer);
+
+    Params::PropTransform propTransform;
+    propTransform.transform.positionX = 5.0f;
+    propTransform.transform.positionY = 1.0f;
+    propTransform.transform.positionZ = 17.0f;                    // non-zero: exercises the flip
+    propTransform.transform.rotationX = 0.1f; propTransform.transform.rotationY = 0.2f;
+    propTransform.transform.rotationZ = 0.3f; propTransform.transform.rotationW = 0.9f;  // non-identity
+    propTransform.transform.scaleX = 2.0f; propTransform.transform.scaleY = 3.0f;
+    propTransform.transform.scaleZ = 4.0f;                        // non-unit
+    propTransform.layerIndex = 0;                                 // in range: no clamp warning
+
+    Params::PropInstanceGroup propGroup;
+    propGroup.blueprintPath = "Props/Rock/Rock01.santp";
+    propGroup.transforms.push_back(propTransform);
+    recipe.props.push_back(propGroup);
+
+    Params::DecalInstanceLayer decalLayer;
+    decalLayer.name = "Ground Decals";
+    decalLayer.color[0] = 0.5f; decalLayer.color[1] = 0.6f;
+    decalLayer.color[2] = 0.7f; decalLayer.color[3] = 0.8f;
+    decalLayer.iconScale = 0.75f;
+    recipe.decalLayers.push_back(decalLayer);
+
+    Params::DecalTransform decalTransform;
+    decalTransform.transform.positionX = 8.0f;
+    decalTransform.transform.positionY = 2.0f;
+    decalTransform.transform.positionZ = 23.0f;                   // non-zero: exercises the flip
+    decalTransform.transform.rotationX = 0.05f; decalTransform.transform.rotationY = 0.15f;
+    decalTransform.transform.rotationZ = 0.25f; decalTransform.transform.rotationW = 0.95f;  // non-identity
+    decalTransform.transform.scaleX = 1.5f; decalTransform.transform.scaleY = 1.25f;
+    decalTransform.transform.scaleZ = 1.75f;                      // non-unit
+    decalTransform.layerIndex = 0;                                // in range: no clamp warning
+
+    Params::DecalInstanceGroup decalGroup;
+    decalGroup.blueprintPath = "Decals/Blood/Blood01.santp";
+    decalGroup.transforms.push_back(decalTransform);
+    recipe.decals.push_back(decalGroup);
+}
+
 } // namespace
 
 Params::MapRecipe BuildPopulatedRecipe() {
@@ -215,6 +389,8 @@ Params::MapRecipe BuildPopulatedRecipe() {
     FillFixtureLayerStackAndStrata(recipe);
     FillFixturePlacementRules(recipe);
     FillFixtureArmiesAndAreas(recipe);
+    FillFixtureMarkersAndChains(recipe);
+    FillFixturePropsAndDecals(recipe);
     return recipe;
 }
 
@@ -229,6 +405,8 @@ void RunRoundTripTests() {
     CheckGeometryAndWater(original, loaded);
     CheckLayerStackAndRules(original, loaded);
     CheckArmiesAndAreas(original, loaded);
+    CheckMarkersAndChains(original, loaded);
+    CheckPropsAndDecals(original, loaded);
 }
 
 } // namespace MapFormatTest

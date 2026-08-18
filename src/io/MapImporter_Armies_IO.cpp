@@ -4,7 +4,7 @@
 // PARAMS_SPEC finding 1) — the local `ReadNameKeyedObject` template below mirrors
 // MapImporter_Rules_IO.cpp's file-local `ReadRuleArray`, kept file-local per the IO Architecture
 // Expert ruling (promote only if a THIRD domain later needs the identical shape).
-#include "MapImporter_Recipe_IO.h"
+#include "JsonPrimitives_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {

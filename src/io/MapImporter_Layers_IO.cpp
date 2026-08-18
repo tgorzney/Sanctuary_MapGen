@@ -2,7 +2,7 @@
 // Layer: IO. The exact inverse of MapExporter_Layers_IO.cpp, key for key. Enum values are fenced
 // to their declared range (GenerationEnums_PARAMS.h), so a document from a newer build degrades to
 // the default member rather than casting a wild integer into an enum (Constitution §6).
-#include "MapImporter_Recipe_IO.h"
+#include "JsonPrimitives_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {

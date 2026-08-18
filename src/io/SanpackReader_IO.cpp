@@ -66,5 +66,13 @@ void SanpackReader::Close() {
     bDirectoryParsed = false;
 }
 
+// Plain linear scan (SanpackReader_IO.h): tens of lookups against thousands of entries on a
+// human-triggered export click, not a hot path — no index needed.
+bool SanpackReader::HasEntry(const std::string& entryName) const {
+    for (const SanpackEntry& entry : directoryEntries)
+        if (entry.name == entryName) return true;
+    return false;
+}
+
 } // namespace Io
 } // namespace SanmapGen

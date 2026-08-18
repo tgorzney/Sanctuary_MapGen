@@ -424,16 +424,32 @@ half of that file's SCOPE NOTE 1. The UI presentation type, its `previewColorTog
 `iconScaleToggle` realtime-preview machinery, and its dirty-flag notification are unaffected and
 remain a separate UI work-order.
 
-## Flagged for the future entity-export IO coder work-order — NOT resolved by this ratification
-This ratification fixes shape only. Four items are explicitly flagged, not resolved, for whichever
-work-order wires `PropInstanceGroup`/`DecalInstanceGroup`/`MarkerInstanceGroup`/`MarkerChain` into
-IO:
-1. **`blueprintPath` validation is mandatory before any export of `PropInstanceGroup`/
-   `DecalInstanceGroup`.** A single unresolvable path aborts the rest of map load in-game
-   (already-known finding, `SANMAP_FORMAT_SPEC`'s "props export is disabled" note). Never
-   synthesize a fallback path (e.g. `<code>/<code>.santp`) — resolve literally against the real
-   pack or fail loudly (Constitution §6). The validation mechanism itself is IO/BRIDGE's call, not
-   ratified here.
+## Flagged for the future entity-export IO coder work-order — items 2–4 NOT resolved by this
+## ratification; item 1 RATIFIED in a later session (see below)
+This ratification fixes shape only. Four items were originally flagged, not resolved, for
+whichever work-order wired `PropInstanceGroup`/`DecalInstanceGroup`/`MarkerInstanceGroup`/
+`MarkerChain` into IO. Item 1 has since been closed by an explicit human ruling, recorded in full
+below; items 2–4 remain open exactly as originally flagged:
+1. **RATIFIED — warn, never block.** `blueprintPath` validation is mandatory before any export of
+   `PropInstanceGroup`/`DecalInstanceGroup`: a single unresolvable path aborts the rest of the live
+   game's map load (`SPEC-1_PropFormatCorrections_DOCS.md` Correction 3, already applied to
+   `SANMAP_FORMAT_SPEC`). Never synthesize a fallback path (e.g. `<code>/<code>.santp`) — resolve
+   literally against the real pack. **This closes the item's original "...resolve literally against
+   the real pack or fail loudly (Constitution §6)" ambiguity in favor of fail-loudly meaning
+   surfaced loudly to the human, not hard-refused by the tool:** an unresolvable path is *reported*
+   — via the IO-layer `ValidatePropAndDecalBlueprintPaths` check (a pure, read-only function against
+   an already-opened `SanpackReader`, declared in the public `MapExporter_IO.h`, returning a
+   `BlueprintValidationReport`) and a `ConfirmDialog_UI` warning that names the runtime risk
+   (`UI_FRAMEWORK_SPEC.md`'s "Universal widget library") — never silently dropped, and never
+   silently used to refuse the export outright. The designer sees the warning and chooses: OK
+   exports anyway, Cancel aborts with nothing written. Any non-UI caller that supplies a
+   `SanpackReader` (tests, a future non-UI entry point) gets the identical check run as a **logged,
+   non-gating** safety net — `result.bSucceeded` is never gated by an unresolved-path finding. A
+   caller with no `SanpackReader` (`assetPack == nullptr` — every call site that predates this
+   ruling) skips validation entirely: zero behavior change. Human-ratified this session; implemented
+   by `work_orders/STEP4_PropsDecals_IO.md` (PARAMS/pure-builder groundwork, unwired) and
+   `work_orders/STEP5_PropsDecalsValidation_UI.md` (the validation function, the live wiring, and
+   `ConfirmDialog_UI`).
 2. **Rotation is currently unimplemented in the existing exporter, and props export is currently
    disabled entirely** (`SANMAP_FORMAT_SPEC`'s "Known gaps in the current exporter" note — identity
    quaternions written for every entity type, props commented out). These are pre-existing

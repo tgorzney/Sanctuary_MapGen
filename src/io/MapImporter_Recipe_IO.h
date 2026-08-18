@@ -4,7 +4,13 @@
 // EVERY reader here is total: it takes the parent object and a key, and it writes the destination
 // ONLY when the key exists with the right JSON type. That is Constitution §6 in one pattern — a
 // corrupt or partial document leaves the recipe on its own defaults instead of on garbage.
+//
+// The generic typed accessors (`ReadJsonFloat`/`ReadJsonInteger`/`ReadJsonBoolean`/
+// `ReadJsonEnumeration`/`ReadJsonText`) live in `JsonPrimitives_IO.h` now (IO_MIGRATION_SPEC.md §5
+// — they were mis-homed here, cross-included by domains that have nothing to do with Recipe).
+// `ReadJsonFloatVector4` stays: it is Stratum/Recipe-domain-specific shape, not a generic primitive.
 #pragma once
+#include "JsonPrimitives_IO.h"
 #include <nlohmann/json.hpp>
 #include <string>
 
@@ -14,42 +20,6 @@ namespace Io {
 
 struct MapImportOptions;
 struct MapImportResult;
-
-// --- The typed accessors every reader is built from. -------------------------------------------
-inline bool ReadJsonFloat(const nlohmann::json& parent, const char* key, float& destination) {
-    if (!parent.contains(key) || !parent[key].is_number()) return false;
-    destination = parent[key].get<float>();
-    return true;
-}
-
-inline bool ReadJsonInteger(const nlohmann::json& parent, const char* key, int& destination) {
-    if (!parent.contains(key) || !parent[key].is_number()) return false;
-    destination = parent[key].get<int>();
-    return true;
-}
-
-inline bool ReadJsonBoolean(const nlohmann::json& parent, const char* key, bool& destination) {
-    if (!parent.contains(key) || !parent[key].is_boolean()) return false;
-    destination = parent[key].get<bool>();
-    return true;
-}
-
-inline bool ReadJsonText(const nlohmann::json& parent, const char* key, std::string& destination) {
-    if (!parent.contains(key) || !parent[key].is_string()) return false;
-    destination = parent[key].get<std::string>();
-    return true;
-}
-
-// An enum stored as its integer value. The value is FENCED to [0, valueCount) so a document
-// written by a newer build can never index an enum out of range.
-inline bool ReadJsonEnumeration(const nlohmann::json& parent, const char* key, int valueCount,
-                                int& destination) {
-    int value = destination;
-    if (!ReadJsonInteger(parent, key, value)) return false;
-    if (value < 0 || value >= valueCount) return false;
-    destination = value;
-    return true;
-}
 
 // A 4-component field stored as `{"x":.., "y":.., "z":.., "w":..}` (ARCH §7.2 item 10's Vector4
 // shape). Each component is read independently, same as the scalar readers above, so a partial
@@ -81,6 +51,25 @@ void ReadPlacementRulesJson(const nlohmann::json& generatorData, Params::MapReci
 // per Constitution §6: a missing/non-object key leaves outRecipe.areas/armies untouched (empty).
 void ReadAreasJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadArmiesJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+
+// MapImporter_Markers_IO.cpp / MapImporter_Chains_IO.cpp — `markers`/`chains` are top-level
+// `.sanmap` keys, SIBLINGS of `mapGeneratorData`, same posture and calling contract as
+// `areas`/`armies` above (STEP3_MarkersChains_IO, following Step 2's wiring-order correction
+// directly).
+void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadChainsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+
+// MapImporter_Props_IO.cpp / MapImporter_Decals_IO.cpp — `props`/`decals` and `PropGroups`/
+// `DecalGroups` are top-level `.sanmap` keys (STEP4_PropsDecals_IO). `ReadPropGroupsJson`/
+// `ReadDecalGroupsJson` MUST be called before `ReadPropsJson`/`ReadDecalsJson`: the `layerIndex`
+// range-clamp (ARCH §12) validates against `outRecipe.propLayers.size()`/`outRecipe.decalLayers.
+// size()`, which the *Groups readers populate. Called from ParseSanmapJsonText, Groups before
+// instances, in that order (STEP5_PropsDecalsValidation_UI live-wired these — see
+// MapImporter_IO.h SCOPE NOTE 2).
+void ReadPropGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadPropsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
+void ReadDecalGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadDecalsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
 
 } // namespace Io
 } // namespace SanmapGen
