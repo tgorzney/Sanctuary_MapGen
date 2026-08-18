@@ -34,24 +34,52 @@ void ConfigureSharedFields(MaskStratumConfiguration& configuration, const MaskCo
     configuration.maskMaximum        = constants.maskMaximum;
 }
 
+// The 7 raw gate values, read from whichever record `stratum.bSlopeUseGlobal` selects
+// (MASKING_SPEC §1.7 — a config SOURCE decision at flattening time, never a kernel change).
+// `Params::Stratum` and `Params::SlopeDefaults` share the same 7 field names by construction, so
+// this is the only place that source selection happens.
+struct SlopeGateSourceValues {
+    bool  bSlopeGateEnabled;
+    float minimumSlopeDegrees;
+    float maximumSlopeDegrees;
+    float slopeFeatherDegreesLow;
+    float slopeFeatherDegreesHigh;
+    bool  bUseSmoothstep;
+    bool  bInvertSlopeGate;
+    float slopeGateStrength;
+};
+
+SlopeGateSourceValues ResolveSlopeGateSource(const Params::Stratum& stratum,
+                                             const Params::SlopeDefaults& slopeDefaults) {
+    if (stratum.bSlopeUseGlobal)
+        return { slopeDefaults.bSlopeGateEnabled, slopeDefaults.minimumSlopeDegrees,
+                 slopeDefaults.maximumSlopeDegrees, slopeDefaults.slopeFeatherDegreesLow,
+                 slopeDefaults.slopeFeatherDegreesHigh, slopeDefaults.bUseSmoothstep,
+                 slopeDefaults.bInvertSlopeGate, slopeDefaults.slopeGateStrength };
+    return { stratum.bSlopeGateEnabled, stratum.minimumSlopeDegrees, stratum.maximumSlopeDegrees,
+             stratum.slopeFeatherDegreesLow, stratum.slopeFeatherDegreesHigh, stratum.bUseSmoothstep,
+             stratum.bInvertSlopeGate, stratum.slopeGateStrength };
+}
+
 void ConfigureSlopeGate(MaskStratumConfiguration& configuration, const Params::Stratum& stratum,
-                        const MaskConstants& constants) {
-    float lowDegrees  = stratum.minimumSlopeDegrees;
-    float highDegrees = stratum.maximumSlopeDegrees;
+                        const Params::SlopeDefaults& slopeDefaults, const MaskConstants& constants) {
+    const SlopeGateSourceValues source = ResolveSlopeGateSource(stratum, slopeDefaults);
+    float lowDegrees  = source.minimumSlopeDegrees;
+    float highDegrees = source.maximumSlopeDegrees;
     if (highDegrees < lowDegrees) { const float swap = lowDegrees; lowDegrees = highDegrees; highDegrees = swap; }
     configuration.slopeGradientLow  = SlopeDegreesToGradient(lowDegrees, constants);
     configuration.slopeGradientHigh = SlopeDegreesToGradient(highDegrees, constants);
 
     const float featherLowGradient = configuration.slopeGradientLow
-                                   - SlopeDegreesToGradient(lowDegrees - stratum.slopeFeatherDegreesLow, constants);
-    const float featherHighGradient = SlopeDegreesToGradient(highDegrees + stratum.slopeFeatherDegreesHigh, constants)
+                                   - SlopeDegreesToGradient(lowDegrees - source.slopeFeatherDegreesLow, constants);
+    const float featherHighGradient = SlopeDegreesToGradient(highDegrees + source.slopeFeatherDegreesHigh, constants)
                                     - configuration.slopeGradientHigh;
     configuration.inverseFeatherLow  = featherLowGradient  > 0.0f ? 1.0f / featherLowGradient  : 0.0f;
     configuration.inverseFeatherHigh = featherHighGradient > 0.0f ? 1.0f / featherHighGradient : 0.0f;
 
-    configuration.bSmoothstepEnabled = stratum.bUseSmoothstep ? 1 : 0;
-    configuration.bInvertEnabled     = stratum.bInvertSlopeGate ? 1 : 0;
-    float strength = stratum.bSlopeGateEnabled ? stratum.slopeGateStrength : 0.0f;
+    configuration.bSmoothstepEnabled = source.bUseSmoothstep ? 1 : 0;
+    configuration.bInvertEnabled     = source.bInvertSlopeGate ? 1 : 0;
+    float strength = source.bSlopeGateEnabled ? source.slopeGateStrength : 0.0f;
     if (strength < 0.0f) strength = 0.0f;
     if (strength > 1.0f) strength = 1.0f;
     configuration.gateStrength = strength;
@@ -90,7 +118,7 @@ void MaskStage::PrepareRun() {
         if (static_cast<std::size_t>(index) >= strata.size()) continue;   // unconfigured: stays defaulted
         const Data::StratumArt* art = static_cast<std::size_t>(index) < stratumArt.size()
                                     ? &stratumArt[index] : nullptr;
-        ConfigureSlopeGate(configuration, strata[index], constants);
+        ConfigureSlopeGate(configuration, strata[index], slopeDefaults, constants);
         ConfigureStoredArt(configuration, strata[index], art, packedStoredMaskValues, vertexSize);
     }
     if (packedStoredMaskValues.empty()) packedStoredMaskValues.push_back(0.0f);   // never a null binding

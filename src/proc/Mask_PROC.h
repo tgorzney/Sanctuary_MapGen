@@ -30,6 +30,7 @@
 #include "../data/MapFields_DATA.h"
 #include "../data/StratumArt_DATA.h"
 #include "../params/Geometry_PARAMS.h"
+#include "../params/SlopeDefaults_PARAMS.h"
 #include "../params/Stratum_PARAMS.h"
 #include "../sys/Dispatch_SYS.h"
 
@@ -43,7 +44,8 @@ public:
     MaskStage(const Params::Geometry& geometrySettings,
               const std::vector<Params::Stratum>& stratumSettings,
               const std::vector<Data::StratumArt>& stratumArtInput,
-              Data::MapFields& outputFields);
+              Data::MapFields& outputFields,
+              const Params::SlopeDefaults& slopeDefaultSettings);
 
     // Configuration (all optional; ARCH §4.2 Mask defaults = Gpu/Visual preview, Cpu/Accurate
     // output — and Mask sits in the Output Exact chain because Placement consumes it, §4.6).
@@ -57,10 +59,12 @@ public:
     void SetThreadPool(Sys::ThreadPool* pool) { threadPool = pool; }
 
     // Hash of everything this stage consumes that is its OWN: geometry scale, the stage
-    // constants, every per-stratum mask setting, and the stored art's content. The heightfield
-    // and the proportions this stage reads belong to UPSTREAM stages, so they are deliberately
-    // not hashed here — Generation_PIPELINE mixes the upstream hash forward, which is what makes
-    // "upstream changed => mask re-runs" work without this stage knowing the pipeline shape.
+    // constants, the shared `slopeDefaults` record, every per-stratum mask setting (including
+    // which SOURCE record — its own fields or `slopeDefaults` — `bSlopeUseGlobal` selects), and
+    // the stored art's content. The heightfield and the proportions this stage reads belong to
+    // UPSTREAM stages, so they are deliberately not hashed here — Generation_PIPELINE mixes the
+    // upstream hash forward, which is what makes "upstream changed => mask re-runs" work without
+    // this stage knowing the pipeline shape.
     std::size_t ComputeParameterHash() const;
 
     // Resolves the backend through Sys::Dispatch and runs there. Returns the backend used.
@@ -85,6 +89,7 @@ private:
     const std::vector<Params::Stratum>&   strata;
     const std::vector<Data::StratumArt>&  stratumArt;
     Data::MapFields&                      mapFields;
+    const Params::SlopeDefaults&          slopeDefaults;
     MaskConstants                         constants;
 
     Sys::DispatchPolicy      dispatchPolicy;                                   // ARCH §4.2 defaults

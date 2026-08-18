@@ -66,5 +66,10 @@ nlohmann::ordered_json BuildDecalGroupsJson(const Params::MapRecipe& recipe);
 // header comment for the full field-name-mismatch table).
 void BuildAtmosphereJson(const Params::MapRecipe& recipe, nlohmann::ordered_json& document);
 
+// MapExporter_SlopeDefaults_IO.cpp — `recipe.slopeDefaults` -> the top-level `SlopeDefaults`
+// object (STEP10_SlopeDefaults_Mechanism, MASKING_SPEC.md §1.7's shared-default layer). One flat
+// object, sibling of `armies`/`atmosphere`/etc., NOT nested in `mapGeneratorData`.
+nlohmann::ordered_json BuildSlopeDefaultsJson(const Params::MapRecipe& recipe);
+
 } // namespace Io
 } // namespace SanmapGen

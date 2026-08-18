@@ -333,6 +333,22 @@ void CheckAtmosphere(const Params::MapRecipe& original, const Params::MapRecipe&
           "globalWind* fields survive through their mismatched wind* JSON keys");
 }
 
+// STEP10_SlopeDefaults_Mechanism: the top-level `SlopeDefaults` object, sibling of `armies`/
+// `atmosphere`, not nested in `mapGeneratorData`.
+void CheckSlopeDefaults(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    const Params::SlopeDefaults& originalSlopeDefaults = original.slopeDefaults;
+    const Params::SlopeDefaults& loadedSlopeDefaults = loaded.slopeDefaults;
+    Check(loadedSlopeDefaults.bSlopeGateEnabled == originalSlopeDefaults.bSlopeGateEnabled
+          && NearlyEqual(loadedSlopeDefaults.minimumSlopeDegrees, originalSlopeDefaults.minimumSlopeDegrees)
+          && NearlyEqual(loadedSlopeDefaults.maximumSlopeDegrees, originalSlopeDefaults.maximumSlopeDegrees)
+          && NearlyEqual(loadedSlopeDefaults.slopeFeatherDegreesLow, originalSlopeDefaults.slopeFeatherDegreesLow)
+          && NearlyEqual(loadedSlopeDefaults.slopeFeatherDegreesHigh, originalSlopeDefaults.slopeFeatherDegreesHigh)
+          && loadedSlopeDefaults.bUseSmoothstep == originalSlopeDefaults.bUseSmoothstep
+          && loadedSlopeDefaults.bInvertSlopeGate == originalSlopeDefaults.bInvertSlopeGate
+          && NearlyEqual(loadedSlopeDefaults.slopeGateStrength, originalSlopeDefaults.slopeGateStrength),
+          "the whole SlopeDefaults block survives, top-level and outside mapGeneratorData");
+}
+
 void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     Params::GeoLayer geoLayer;
     geoLayer.name = "Ridges";
@@ -564,6 +580,21 @@ void FillFixtureAtmosphere(Params::MapRecipe& recipe) {
     globalWind.globalWindDirection = 220.0f;
 }
 
+// STEP10_SlopeDefaults_Mechanism: non-default values in every one of the 7 fields, so a
+// round-trip bug in any single one is caught (not just the ones that happen to equal
+// Stratum's own hardcoded defaults already).
+void FillFixtureSlopeDefaults(Params::MapRecipe& recipe) {
+    Params::SlopeDefaults& slopeDefaults = recipe.slopeDefaults;
+    slopeDefaults.bSlopeGateEnabled       = true;
+    slopeDefaults.minimumSlopeDegrees     = 8.0f;
+    slopeDefaults.maximumSlopeDegrees     = 62.0f;
+    slopeDefaults.slopeFeatherDegreesLow  = 2.5f;
+    slopeDefaults.slopeFeatherDegreesHigh = 4.5f;
+    slopeDefaults.bUseSmoothstep          = true;
+    slopeDefaults.bInvertSlopeGate        = true;
+    slopeDefaults.slopeGateStrength       = 0.72f;
+}
+
 } // namespace
 
 Params::MapRecipe BuildPopulatedRecipe() {
@@ -585,6 +616,7 @@ Params::MapRecipe BuildPopulatedRecipe() {
     FillFixtureMarkersAndChains(recipe);
     FillFixturePropsAndDecals(recipe);
     FillFixtureAtmosphere(recipe);
+    FillFixtureSlopeDefaults(recipe);
     return recipe;
 }
 
@@ -602,6 +634,7 @@ void RunRoundTripTests() {
     CheckMarkersAndChains(original, loaded);
     CheckPropsAndDecals(original, loaded);
     CheckAtmosphere(original, loaded);
+    CheckSlopeDefaults(original, loaded);
 }
 
 // A pure-reader check, deliberately NOT routed through ParseSanmapJsonText/RunRoundTripTests

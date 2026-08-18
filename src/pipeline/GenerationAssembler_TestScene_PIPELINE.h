@@ -50,6 +50,7 @@ inline void AddLayerStack(Params::MapRecipe& recipe) {
 inline void AddStrata(Params::MapRecipe& recipe) {
     recipe.strata.assign(static_cast<std::size_t>(Data::MapFields::stratumCount), Params::Stratum());
     Params::Stratum& detailStratum = recipe.strata[detailStratumIndex];
+    detailStratum.bSlopeUseGlobal         = false;   // exercise its OWN window, not slopeDefaults
     detailStratum.bSlopeGateEnabled       = true;
     detailStratum.maximumSlopeDegrees     = 25.0f;
     detailStratum.bUseSmoothstep          = true;

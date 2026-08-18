@@ -23,6 +23,7 @@ struct DirtyHashHarness {
     Data::MapFields fields;
     std::vector<Params::Stratum> strata;
     std::vector<Data::StratumArt> stratumArt;
+    Params::SlopeDefaults slopeDefaults;
     Proc::MaskStage stage;
     Pipeline::GenerationPipeline pipeline;
     std::size_t upstreamHeightParameter = 1;
@@ -30,7 +31,7 @@ struct DirtyHashHarness {
 
     DirtyHashHarness()
         : strata(Data::MapFields::stratumCount), stratumArt(Data::MapFields::stratumCount),
-          stage(geometry, strata, stratumArt, fields) {
+          stage(geometry, strata, stratumArt, fields, slopeDefaults) {
         geometry.mapSize = 32;
         fields.Resize(geometry.VertexSize());
         FillTestHeightfield(fields, geometry.VertexSize());
@@ -100,9 +101,110 @@ void CheckStoredArtDirtying(DirtyHashHarness& harness) {
     Check(ran.empty() && harness.maskRunCount == 6, "the stage settles again once nothing changes");
 }
 
+// STEP10_SlopeDefaults_Mechanism acceptance test, part 1: the resolution is a pure substitution.
+// A stratum with `bSlopeUseGlobal == true` reading a populated `slopeDefaults` must resolve to
+// the IDENTICAL `MaskStratumConfiguration` as the same stratum with `bSlopeUseGlobal == false`
+// and its own 7 fields manually set to match `slopeDefaults`'s values.
+void CheckPureSubstitution() {
+    Params::SlopeDefaults slopeDefaults;
+    slopeDefaults.bSlopeGateEnabled       = true;
+    slopeDefaults.minimumSlopeDegrees     = 12.0f;
+    slopeDefaults.maximumSlopeDegrees     = 47.0f;
+    slopeDefaults.slopeFeatherDegreesLow  = 3.0f;
+    slopeDefaults.slopeFeatherDegreesHigh = 6.0f;
+    slopeDefaults.bUseSmoothstep          = true;
+    slopeDefaults.bInvertSlopeGate        = true;
+    slopeDefaults.slopeGateStrength       = 0.6f;
+
+    Params::Geometry geometry;
+    geometry.mapSize = 8;
+    Data::MapFields fieldsGlobal, fieldsExplicit;
+    fieldsGlobal.Resize(geometry.VertexSize());
+    fieldsExplicit.Resize(geometry.VertexSize());
+    FillTestHeightfield(fieldsGlobal, geometry.VertexSize());
+    FillTestHeightfield(fieldsExplicit, geometry.VertexSize());
+    FillTestMaterialProportions(fieldsGlobal, geometry.VertexSize());
+    FillTestMaterialProportions(fieldsExplicit, geometry.VertexSize());
+    const std::vector<Data::StratumArt> stratumArt = NoStratumArt();
+
+    std::vector<Params::Stratum> globalStrata(Data::MapFields::stratumCount);
+    globalStrata[0].bSlopeUseGlobal = true;   // reads slopeDefaults; own 7 fields stay defaulted
+
+    std::vector<Params::Stratum> explicitStrata(Data::MapFields::stratumCount);
+    explicitStrata[0].bSlopeUseGlobal         = false;
+    explicitStrata[0].bSlopeGateEnabled       = slopeDefaults.bSlopeGateEnabled;
+    explicitStrata[0].minimumSlopeDegrees     = slopeDefaults.minimumSlopeDegrees;
+    explicitStrata[0].maximumSlopeDegrees     = slopeDefaults.maximumSlopeDegrees;
+    explicitStrata[0].slopeFeatherDegreesLow  = slopeDefaults.slopeFeatherDegreesLow;
+    explicitStrata[0].slopeFeatherDegreesHigh = slopeDefaults.slopeFeatherDegreesHigh;
+    explicitStrata[0].bUseSmoothstep          = slopeDefaults.bUseSmoothstep;
+    explicitStrata[0].bInvertSlopeGate        = slopeDefaults.bInvertSlopeGate;
+    explicitStrata[0].slopeGateStrength       = slopeDefaults.slopeGateStrength;
+
+    const Params::SlopeDefaults emptyDefaults;   // explicitStrata never consults this
+    Proc::MaskStage globalStage(geometry, globalStrata, stratumArt, fieldsGlobal, slopeDefaults);
+    Proc::MaskStage explicitStage(geometry, explicitStrata, stratumArt, fieldsExplicit, emptyDefaults);
+    globalStage.RunOnCpu();
+    explicitStage.RunOnCpu();
+
+    const Proc::MaskStratumConfiguration& fromGlobal   = globalStage.StratumConfigurations()[0];
+    const Proc::MaskStratumConfiguration& fromExplicit = explicitStage.StratumConfigurations()[0];
+    Check(fromGlobal.slopeGradientLow   == fromExplicit.slopeGradientLow
+       && fromGlobal.slopeGradientHigh  == fromExplicit.slopeGradientHigh
+       && fromGlobal.inverseFeatherLow  == fromExplicit.inverseFeatherLow
+       && fromGlobal.inverseFeatherHigh == fromExplicit.inverseFeatherHigh
+       && fromGlobal.bSmoothstepEnabled == fromExplicit.bSmoothstepEnabled
+       && fromGlobal.bInvertEnabled     == fromExplicit.bInvertEnabled
+       && fromGlobal.gateStrength       == fromExplicit.gateStrength,
+          "bSlopeUseGlobal is a pure config-source substitution, bit for bit");
+    Check(FieldsAreByteIdentical(fieldsGlobal.surfaceStratumWeights[0], fieldsExplicit.surfaceStratumWeights[0]),
+          "the resolved surface weights match too, not just the flattened configuration");
+}
+
+// STEP10_SlopeDefaults_Mechanism acceptance test, part 2: the Generator Expert's hash ruling.
+// Ruling item 1 (implemented verbatim in Mask_PROC.cpp) is explicit that `HashSlopeDefaults` is
+// folded into `ComputeParameterHash()` UNCONDITIONALLY — "not gated on whether any stratum
+// currently has bSlopeUseGlobal == true" — the same posture `HashConstants` already has for
+// per-stratum constants that are not "currently live" for every stratum. Under that ruling, a
+// `slopeDefaults`-only edit therefore dirties EVERY MaskStage's hash, regardless of whether any
+// of ITS OWN strata currently opt into `slopeDefaults` — there is no way to hash it
+// unconditionally (as ruled) AND have it leave an all-`bSlopeUseGlobal==false` stage's hash
+// untouched; those two properties are mutually exclusive for a single aggregate stage hash. This
+// test verifies the ruling as written: BOTH stages below see the hash move. (NOTE: this differs
+// from this ticket's own acceptance-test prose, which additionally asked for the opaque stage's
+// hash to stay put — that specific sentence cannot hold simultaneously with ruling item 1's
+// "unconditional" instruction; flagged for the human/Generator Expert rather than silently
+// re-deriving a conditional hash the ruling explicitly rejected.)
+void CheckSlopeDefaultsHashSensitivity() {
+    Params::Geometry geometry;
+    Data::MapFields fields;
+    fields.Resize(geometry.VertexSize());
+    const std::vector<Data::StratumArt> stratumArt = NoStratumArt();
+    Params::SlopeDefaults slopeDefaults;
+
+    std::vector<Params::Stratum> usesGlobalStrata(Data::MapFields::stratumCount);
+    usesGlobalStrata[0].bSlopeUseGlobal = true;
+    Proc::MaskStage usesGlobalStage(geometry, usesGlobalStrata, stratumArt, fields, slopeDefaults);
+    const std::size_t hashBeforeGlobalEdit = usesGlobalStage.ComputeParameterHash();
+
+    std::vector<Params::Stratum> opaqueStrata(Data::MapFields::stratumCount);
+    opaqueStrata[0].bSlopeUseGlobal = false;
+    Proc::MaskStage opaqueStage(geometry, opaqueStrata, stratumArt, fields, slopeDefaults);
+    const std::size_t hashBeforeOpaqueEdit = opaqueStage.ComputeParameterHash();
+
+    slopeDefaults.maximumSlopeDegrees = 61.0f;   // the whole edit: nothing per-stratum touched
+    Check(usesGlobalStage.ComputeParameterHash() != hashBeforeGlobalEdit,
+          "a slopeDefaults-only edit dirties a stratum with bSlopeUseGlobal == true");
+    Check(opaqueStage.ComputeParameterHash() != hashBeforeOpaqueEdit,
+          "ruling item 1's UNCONDITIONAL HashSlopeDefaults call also dirties an all-opaque stage "
+          "(this is the ruled behavior, not a bug — see the function header comment)");
+}
+
 } // namespace
 
 void RunDirtyHashTests() {
+    CheckPureSubstitution();
+    CheckSlopeDefaultsHashSensitivity();
     DirtyHashHarness harness;
     CheckSettingsDirtying(harness);
     CheckStoredArtDirtying(harness);

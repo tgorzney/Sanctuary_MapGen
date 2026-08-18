@@ -21,6 +21,7 @@ std::vector<Params::Stratum> MakePurityStrata() {
     std::vector<Params::Stratum> strata(Data::MapFields::stratumCount);
     for (int index = 0; index < Data::MapFields::stratumCount; ++index) {
         Params::Stratum& stratum = strata[index];
+        stratum.bSlopeUseGlobal     = false;   // exercise every stratum's OWN window, not slopeDefaults
         stratum.bSlopeGateEnabled   = true;
         stratum.minimumSlopeDegrees = 4.0f * static_cast<float>(index);
         stratum.maximumSlopeDegrees = 25.0f + 4.0f * static_cast<float>(index);
@@ -69,7 +70,8 @@ void CheckSlopeFieldMatchesAnalyticGradient() {
 
     const std::vector<Params::Stratum> strata(Data::MapFields::stratumCount);
     const std::vector<Data::StratumArt> stratumArt = NoStratumArt();
-    Proc::MaskStage stage(geometry, strata, stratumArt, fields);
+    const Params::SlopeDefaults slopeDefaults;
+    Proc::MaskStage stage(geometry, strata, stratumArt, fields, slopeDefaults);
     stage.RunOnCpu();
 
     const float expectedSlope = geometry.terrainMaxHeight * risePerCell * std::sqrt(5.0f);
@@ -86,12 +88,13 @@ void RunPurityTests() {
     const int vertexSize = geometry.VertexSize();
     const std::vector<Params::Stratum> strata = MakePurityStrata();
     const std::vector<Data::StratumArt> stratumArt = MakePurityArt();
+    const Params::SlopeDefaults slopeDefaults;
 
     Data::MapFields fields;
     BuildInputs(fields, vertexSize);
     const Data::MapFields inputSnapshot = fields;   // proportions + heightfield before the run
 
-    Proc::MaskStage stage(geometry, strata, stratumArt, fields);
+    Proc::MaskStage stage(geometry, strata, stratumArt, fields, slopeDefaults);
     stage.RunOnCpu();
 
     // 1. Single writer: only surfaceStratumWeights moved.
@@ -120,7 +123,7 @@ void RunPurityTests() {
     // state that would make a re-run from a clean conductor differ.
     Data::MapFields replayFields;
     BuildInputs(replayFields, vertexSize);
-    Proc::MaskStage replayStage(geometry, strata, stratumArt, replayFields);
+    Proc::MaskStage replayStage(geometry, strata, stratumArt, replayFields, slopeDefaults);
     replayStage.RunOnCpu();
     bool bReplayMatches = true;
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)

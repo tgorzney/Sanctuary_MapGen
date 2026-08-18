@@ -41,6 +41,7 @@ std::vector<Params::Stratum> MakeParitySettings() {
     std::vector<Params::Stratum> strata(Data::MapFields::stratumCount);
     for (int index = 0; index < Data::MapFields::stratumCount; ++index) {
         Params::Stratum& stratum = strata[index];
+        stratum.bSlopeUseGlobal = false;   // exercise every stratum's OWN window, not slopeDefaults
         stratum.bSlopeGateEnabled = index != 0;
         stratum.minimumSlopeDegrees = 5.0f * static_cast<float>(index);
         stratum.maximumSlopeDegrees = 20.0f + 6.0f * static_cast<float>(index);
@@ -96,13 +97,14 @@ void RunParityTests(const char* shaderDirectory) {
     geometry.mapSize = kMapSize;
     const std::vector<Params::Stratum> strata = MakeParitySettings();
     const std::vector<Data::StratumArt> stratumArt = MakeParityArt();
+    const Params::SlopeDefaults slopeDefaults;
 
     Data::MapFields cpuFields, gpuFields, untouchedFields;
     BuildInputs(geometry, cpuFields);
     BuildInputs(geometry, gpuFields);
     BuildInputs(geometry, untouchedFields);
 
-    Proc::MaskStage cpuStage(geometry, strata, stratumArt, cpuFields);
+    Proc::MaskStage cpuStage(geometry, strata, stratumArt, cpuFields, slopeDefaults);
     cpuStage.RunOnCpu();
     CheckWeightsAreResolved(cpuFields, geometry.VertexSize());
     CheckProportionsUntouched(cpuFields, untouchedFields,
@@ -116,7 +118,7 @@ void RunParityTests(const char* shaderDirectory) {
     Sys::GpuResourceManager manager(shaderDirectory);
     Check(manager.Initialize(), "GPU resource manager initializes");
 
-    Proc::MaskStage gpuStage(geometry, strata, stratumArt, gpuFields);
+    Proc::MaskStage gpuStage(geometry, strata, stratumArt, gpuFields, slopeDefaults);
     gpuStage.SetGpuResourceManager(&manager);
     gpuStage.RunOnGpu();
     Check(gpuStage.IsGpuAvailable(), "mask compute program compiled from its three GLSL units");

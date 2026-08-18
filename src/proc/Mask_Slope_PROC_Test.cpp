@@ -22,6 +22,7 @@ void FillRampHeightfield(Data::MapFields& fields, int vertexSize, float risePerC
 std::vector<Params::Stratum> MakeGateSettings(float minimumDegrees, float maximumDegrees,
                                               bool bSmoothstep, float featherDegrees) {
     Params::Stratum stratum;
+    stratum.bSlopeUseGlobal = false;   // exercise this stratum's own window, not slopeDefaults
     stratum.bSlopeGateEnabled = true;
     stratum.minimumSlopeDegrees = minimumDegrees;
     stratum.maximumSlopeDegrees = maximumDegrees;
@@ -45,7 +46,8 @@ std::vector<float> RunGate(const std::vector<Params::Stratum>& strata, int mapSi
     else       FillTestHeightfield(fields, vertexSize);
     FillTestMaterialProportions(fields, vertexSize);
     const std::vector<Data::StratumArt> stratumArt = NoStratumArt();
-    Proc::MaskStage stage(geometry, strata, stratumArt, fields);
+    const Params::SlopeDefaults slopeDefaults;
+    Proc::MaskStage stage(geometry, strata, stratumArt, fields, slopeDefaults);
     stage.RunOnCpu();
     std::vector<float> gateWeights;
     gateWeights.reserve(static_cast<std::size_t>(vertexSize) * vertexSize);

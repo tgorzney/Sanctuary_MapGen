@@ -32,7 +32,8 @@ Data::FloatField BakeRampSlope(float worldUnitsPerCell) {
     FillTestMaterialProportions(fields, vertexSize);
     const std::vector<Params::Stratum> strata(Data::MapFields::stratumCount);
     const std::vector<Data::StratumArt> stratumArt = NoStratumArt();
-    Proc::MaskStage stage(geometry, strata, stratumArt, fields);
+    const Params::SlopeDefaults slopeDefaults;
+    Proc::MaskStage stage(geometry, strata, stratumArt, fields, slopeDefaults);
     stage.RunOnCpu();
     return fields.slope;
 }
@@ -65,7 +66,8 @@ void CheckWorldUnitsPerCellDirtiesTheStage() {
     fields.Resize(geometry.VertexSize());
     const std::vector<Params::Stratum> strata(Data::MapFields::stratumCount);
     const std::vector<Data::StratumArt> stratumArt = NoStratumArt();
-    Proc::MaskStage stage(geometry, strata, stratumArt, fields);
+    const Params::SlopeDefaults slopeDefaults;
+    Proc::MaskStage stage(geometry, strata, stratumArt, fields, slopeDefaults);
     const std::size_t hashBeforeChange = stage.ComputeParameterHash();
     geometry.worldUnitsPerCell = 2.0f;
     Check(stage.ComputeParameterHash() != hashBeforeChange,

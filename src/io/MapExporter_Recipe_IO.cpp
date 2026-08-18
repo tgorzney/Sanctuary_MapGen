@@ -103,6 +103,9 @@ std::string MapExporter::BuildSanmapJsonText(const Params::MapRecipe& recipe,
     // ...), same tier as the entity domains above — writes directly into `document`, see
     // MapExporter_Atmosphere_IO.cpp's own header comment for the shape difference.
     BuildAtmosphereJson(recipe, document);
+    // STEP10_SlopeDefaults_Mechanism: one flat top-level object, same tier as the entity domains
+    // above — sibling of `armies`/`atmosphere`, NOT nested in `mapGeneratorData`.
+    document["SlopeDefaults"] = BuildSlopeDefaultsJson(recipe);
 
     document["mapGeneratorData"] = BuildMapGeneratorDataJson(recipe);
     const int indent = options.jsonIndentSpaceCount > 0 ? options.jsonIndentSpaceCount : -1;

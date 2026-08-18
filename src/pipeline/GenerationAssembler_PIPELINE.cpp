@@ -15,7 +15,8 @@ GenerationAssembler::GenerationAssembler(const Params::MapRecipe& recipeSettings
       erosionStage(recipeSettings.geometry, mapFields),
       thermalStage(recipeSettings.geometry, mapFields),
       flowAccumulationStage(recipeSettings.geometry, mapFields),
-      maskStage(recipeSettings.geometry, recipeSettings.strata, stratumArt, mapFields),
+      maskStage(recipeSettings.geometry, recipeSettings.strata, stratumArt, mapFields,
+                recipeSettings.slopeDefaults),
       placementStage(recipeSettings, mapFields, placementResults),
       bakeStage(recipeSettings.geometry, recipeSettings.strata, stratumArt, mapFields, bakedTextures) {
     RegisterStages();

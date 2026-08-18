@@ -80,5 +80,11 @@ void ReadDecalsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe
 void ReadAtmosphereJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
                        MapImportResult& result);
 
+// MapImporter_SlopeDefaults_IO.cpp — the top-level `SlopeDefaults` object -> `recipe.slopeDefaults`
+// (STEP10_SlopeDefaults_Mechanism). Same tier and calling contract as `areas`/`armies`/`atmosphere`
+// above: takes the top-level `document` directly, called unconditionally BEFORE the
+// `mapGeneratorData` presence gate.
+void ReadSlopeDefaultsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+
 } // namespace Io
 } // namespace SanmapGen

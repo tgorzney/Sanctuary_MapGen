@@ -108,6 +108,9 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     // ATMOSPHERE_PARAMS_SPEC: ~49 flat top-level keys, same tier/ordering rule as the entity
     // domains above — unconditional, before the mapGeneratorData gate below.
     ReadAtmosphereJson(document, outRecipe, result);
+    // STEP10_SlopeDefaults_Mechanism: one flat top-level object, same tier/ordering rule as the
+    // entity domains above — unconditional, before the mapGeneratorData gate below.
+    ReadSlopeDefaultsJson(document, outRecipe);
 
     if (!document.contains("mapGeneratorData") || !document["mapGeneratorData"].is_object()) {
         result.Warn("No mapGeneratorData block: only the map's own dimensions were recovered.");

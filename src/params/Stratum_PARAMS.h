@@ -23,6 +23,12 @@ namespace Params {
 
 struct Stratum {
     // --- Slope gate: the stratum shows only where the terrain slope is inside this window.
+    // `bSlopeUseGlobal` (default true, MASKING_SPEC §1.7): when true, the Mask stage's
+    // config-flattening step reads the 7 fields below from the recipe's shared `SlopeDefaults`
+    // instead of this stratum's own; when false, it reads exactly these fields, as always. The
+    // per-stratum fields stay the ground truth either way — this is a config SOURCE choice made
+    // once at flattening time, never a change to the kernel itself.
+    bool  bSlopeUseGlobal         = true;
     bool  bSlopeGateEnabled       = false;
     float minimumSlopeDegrees     = 0.0f;    // window low edge, degrees
     float maximumSlopeDegrees     = 90.0f;   // window high edge, degrees

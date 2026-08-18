@@ -15,6 +15,7 @@
 #include "MarkerRule_PARAMS.h"
 #include "PropInstance_PARAMS.h"
 #include "ScatterRule_PARAMS.h"
+#include "SlopeDefaults_PARAMS.h"
 #include "Stratum_PARAMS.h"
 #include "Symmetry_PARAMS.h"
 #include "Water_PARAMS.h"
@@ -29,6 +30,10 @@ struct MapRecipe {
     // keeps a private per-stratum array. Shorter than MapFields::stratumCount is legal —
     // strata past the end run on their defaults.
     std::vector<Stratum>    strata;
+    // The shared-default layer any stratum with `bSlopeUseGlobal == true` resolves its slope
+    // gate against (MASKING_SPEC §1.7) — a single global record, not a per-stratum type
+    // (ARCH §7.1).
+    SlopeDefaults           slopeDefaults;
     std::vector<MarkerRule> markerRules;
     std::vector<PropRule>   propRules;
     std::vector<DecalRule>  decalRules;

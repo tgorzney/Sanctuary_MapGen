@@ -39,7 +39,8 @@ std::vector<float> RunMerge(const std::vector<Params::Stratum>& strata) {
     for (int stratum = 0; stratum < Data::MapFields::stratumCount; ++stratum)
         fields.materialProportions[stratum].Fill(kProportionValue);
     const std::vector<Data::StratumArt> stratumArt = MakeCheckerArt();
-    Proc::MaskStage stage(geometry, strata, stratumArt, fields);
+    const Params::SlopeDefaults slopeDefaults;
+    Proc::MaskStage stage(geometry, strata, stratumArt, fields, slopeDefaults);
     stage.RunOnCpu();
     std::vector<float> result;
     for (int y = 0; y < geometry.VertexSize(); ++y)
@@ -76,6 +77,7 @@ void CheckMergeModes() {
 void CheckGateInteraction() {
     std::vector<Params::Stratum> settings = MakeMergeSettings(Params::ImportedMaskMode::StaticOverride);
     for (Params::Stratum& stratum : settings) {
+        stratum.bSlopeUseGlobal = false;   // exercise THIS stratum's own window, not slopeDefaults
         stratum.bSlopeGateEnabled = true;
         stratum.minimumSlopeDegrees = 80.0f;
         stratum.maximumSlopeDegrees = 89.0f;
@@ -86,6 +88,7 @@ void CheckGateInteraction() {
 
     settings = MakeMergeSettings(Params::ImportedMaskMode::ProceduralStart);
     for (Params::Stratum& stratum : settings) {
+        stratum.bSlopeUseGlobal = false;   // exercise THIS stratum's own window, not slopeDefaults
         stratum.bSlopeGateEnabled = true;
         stratum.minimumSlopeDegrees = 80.0f;
         stratum.maximumSlopeDegrees = 89.0f;
@@ -124,7 +127,8 @@ void CheckMissingArtDegradesSafely() {
         fields.materialProportions[stratum].Fill(kProportionValue);
     const std::vector<Params::Stratum> settings = MakeMergeSettings(Params::ImportedMaskMode::StaticOverride);
     const std::vector<Data::StratumArt> emptyArt = NoStratumArt();
-    Proc::MaskStage stage(geometry, settings, emptyArt, fields);
+    const Params::SlopeDefaults slopeDefaults;
+    Proc::MaskStage stage(geometry, settings, emptyArt, fields, slopeDefaults);
     stage.RunOnCpu();
     CheckNear(fields.surfaceStratumWeights[0].Get(1, 1), kProportionValue, 1e-6f,
               "StaticOverride with no loaded art falls back to the procedural weight");

@@ -44,10 +44,31 @@ std::size_t HashStratumSettings(std::size_t seed, const Params::Stratum& stratum
     seed = HashFloat(seed, stratum.slopeFeatherDegreesHigh);
     seed = HashFloat(seed, stratum.slopeGateStrength);
     seed = HashInteger(seed, static_cast<int>(stratum.importedMaskMode));
+    // Which SOURCE record (this stratum's own fields, or the recipe's shared `SlopeDefaults`)
+    // `ConfigureSlopeGate` reads from is itself part of this stage's input (Generator Expert
+    // ruling, STEP10_SlopeDefaults_Mechanism) — omitting it would let flipping this flag alone
+    // silently reuse a stale cached result.
+    seed = HashInteger(seed, stratum.bSlopeUseGlobal ? 1 : 0);
     // `maskRemapMinimum`/`maskRemapMaximum` are per-stratum material/appearance pass-through
     // data, NOT a Mask-stage input (Generator Expert ruling) — hashing an unconsumed input
     // would itself be an ARCH §3.4 purity violation the other direction, so they stay out.
     return seed;
+}
+
+// `recipe.slopeDefaults` is a Mask-stage input the instant ANY stratum has `bSlopeUseGlobal ==
+// true` — and since the flattening step (PrepareRun) re-resolves every stratum slot
+// unconditionally whenever the stage runs at all, there is no partial per-stratum re-run this
+// would need to protect by hashing it conditionally (Generator Expert ruling, ticket STEP10):
+// hashed here UNCONDITIONALLY, same posture as HashConstants below.
+std::size_t HashSlopeDefaults(std::size_t seed, const Params::SlopeDefaults& slopeDefaults) {
+    seed = HashInteger(seed, slopeDefaults.bSlopeGateEnabled ? 1 : 0);
+    seed = HashInteger(seed, slopeDefaults.bUseSmoothstep ? 1 : 0);
+    seed = HashInteger(seed, slopeDefaults.bInvertSlopeGate ? 1 : 0);
+    seed = HashFloat(seed, slopeDefaults.minimumSlopeDegrees);
+    seed = HashFloat(seed, slopeDefaults.maximumSlopeDegrees);
+    seed = HashFloat(seed, slopeDefaults.slopeFeatherDegreesLow);
+    seed = HashFloat(seed, slopeDefaults.slopeFeatherDegreesHigh);
+    return HashFloat(seed, slopeDefaults.slopeGateStrength);
 }
 
 // The stored art is a loaded input (Data::StratumArt), so its CONTENT is hashed — otherwise
@@ -67,15 +88,17 @@ std::size_t HashStoredArt(std::size_t seed, const Data::StratumArt& art) {
 MaskStage::MaskStage(const Params::Geometry& geometrySettings,
                      const std::vector<Params::Stratum>& stratumSettings,
                      const std::vector<Data::StratumArt>& stratumArtInput,
-                     Data::MapFields& outputFields)
+                     Data::MapFields& outputFields,
+                     const Params::SlopeDefaults& slopeDefaultSettings)
     : geometry(geometrySettings), strata(stratumSettings), stratumArt(stratumArtInput),
-      mapFields(outputFields) {}
+      mapFields(outputFields), slopeDefaults(slopeDefaultSettings) {}
 
 std::size_t MaskStage::ComputeParameterHash() const {
     std::size_t hash = HashInteger(hashBasis, geometry.mapSize);
     hash = HashFloat(hash, geometry.terrainMaxHeight);
     hash = HashFloat(hash, geometry.worldUnitsPerCell);   // the gradient's run (M5-0d)
     hash = HashConstants(hash, constants);
+    hash = HashSlopeDefaults(hash, slopeDefaults);
     hash = HashInteger(hash, static_cast<int>(strata.size()));
     for (const Params::Stratum& stratum : strata) hash = HashStratumSettings(hash, stratum);
     hash = HashInteger(hash, static_cast<int>(stratumArt.size()));
