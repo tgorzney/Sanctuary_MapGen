@@ -19,17 +19,20 @@ void ReadGeometryJson(const nlohmann::json& generatorData, const MapImportOption
             result.Warn("MapSize " + std::to_string(mapSize) + " is outside the safety limits; kept "
                         + std::to_string(geometry.mapSize) + ".");
     }
-    int seed = static_cast<int>(geometry.seed);
-    if (ReadJsonInteger(generatorData, "Seed", seed))
-        geometry.seed = seed > 0 ? static_cast<unsigned int>(seed) : 0u;
-    ReadJsonFloat(generatorData, "TerrainMinHeight", geometry.terrainMinHeight);
+    // Seed/ScaleFeaturesToMapSize/TerrainMinHeight/WorldUnitsPerCell RELOCATED to the top-level
+    // `GeneralMapSettings` object, read by `ReadGeneralMapSettingsJson` UNCONDITIONALLY and BEFORE
+    // this function (SANMAP_FORMAT_SPEC Correction 2; MapImporter_IO.cpp wiring order) — no longer
+    // read here.
     ReadJsonFloat(generatorData, "TerrainMaxHeight", geometry.terrainMaxHeight);
-    ReadJsonBoolean(generatorData, "ScaleFeaturesToMapSize", geometry.bScaleFeaturesToMapSize);
-    ReadJsonFloat(generatorData, "WorldUnitsPerCell", geometry.worldUnitsPerCell);
-    ReadJsonInteger(generatorData, "GlobalSymmetryMask", outRecipe.globalSymmetryMask);
+    // GlobalSymmetryMask RELOCATED to the top-level `Symmetry` object, read by `ReadSymmetryJson`
+    // UNCONDITIONALLY and BEFORE this function (SANMAP_FORMAT_SPEC Correction 4, STEP16;
+    // MapImporter_IO.cpp wiring order) — no longer read here.
 
     // The band invariant Geometry::IsValid() depends on, enforced on the way IN so a hand-edited
-    // document can never produce a recipe the pipeline refuses (Constitution §6).
+    // document can never produce a recipe the pipeline refuses (Constitution §6). Correct
+    // post-relocation ONLY because `ReadGeneralMapSettingsJson` already ran (see that reader's own
+    // header comment) — `geometry.terrainMinHeight`/`geometry.worldUnitsPerCell` are already set by
+    // the time this block runs, and `geometry.terrainMaxHeight` was just set above.
     if (geometry.terrainMaxHeight < 1.0f) {
         result.Warn("TerrainMaxHeight was not positive; raised to 1.");
         geometry.terrainMaxHeight = 1.0f;

@@ -15,6 +15,12 @@ namespace SymmetryAxis {
     constexpr int MirrorAcrossZ  = 1 << 1;   // z -> (extent - z)
     constexpr int RotateHalfTurn = 1 << 2;   // 180 degrees about the map center (point symmetry)
     constexpr int QuarterTurns   = 1 << 3;   // 90/180/270 degrees about the map center
+    // Reserved bit (ARCH.md §13, STEP16 ruling #1/#3): N-way rotation, count set by the sibling
+    // `radialSymmetryRepeatCount` field. `BuildSymmetryOrbit` (Placement_Symmetry_PROC.h) has no
+    // branch for this bit yet, so a mask with it set produces no clones — dormant, not dangerous
+    // (confirmed by direct read: the orbit builder is 4 explicit branches, not a generic bit walk).
+    // The actual N-way rotation generator (`AppendRadialTurns`) is separate, future PROC work.
+    constexpr int Radial         = 1 << 4;
 }
 
 // Highest clone count any single mask can produce (mirror X * mirror Z * quarter turns).
@@ -34,6 +40,23 @@ struct SymmetryDetection {
     // Rewrite a nearly-symmetric field into an exactly symmetric one rather than only reporting
     // it. Off by default: it is a destructive correction.
     bool bSnapImperfectSymmetry = false;
+};
+
+// The six exotic-blend scalars SANMAP_FORMAT_SPEC Correction 4's `Symmetry` section carries
+// (`SymSuperpositionBlend`/`SymmetryBlurRadius`/`CrossFadeWidth`/`CylinderZScale`/
+// `TorusMajorRadius`/`TorusMinorRadius`). Zero PROC consumer today — reserved from the moment
+// they are settable (Constitution §8), same posture as `SymmetryDetection`/`StratumAppearance`.
+// `Params::SymAlgorithm`, the enum choosing WHICH of these blends is active, is explicitly OUT OF
+// SCOPE for this ticket (STEP16 ruling #1) — defining a brand-new enum type is a bigger design
+// act than these plain scalars; that field/JSON key is deferred to a future work-order, not
+// omitted by oversight.
+struct SymmetryBlend {
+    float superpositionBlend = 0.5f;   // Superposition mix, 0 = source only, 1 = fully blended
+    float blurRadius         = 4.0f;   // Blur-mode symmetry, in cells
+    float crossFadeWidth     = 8.0f;   // CrossFade-mode seam width, in cells
+    float cylinderZScale     = 1.0f;   // Cylinder3D wrap scale along Z
+    float torusMajorRadius   = 64.0f;  // Torus3D major radius, in cells
+    float torusMinorRadius   = 16.0f;  // Torus3D minor radius, in cells
 };
 
 } // namespace Params

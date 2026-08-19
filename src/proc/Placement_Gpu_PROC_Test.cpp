@@ -51,6 +51,13 @@ static Params::MapRecipe MakeParityRecipe() {
     recipe.geometry.terrainMaxHeight = 128.0f;
     recipe.water.bEnabled = true;
     recipe.water.waterLevelMaximum = 32.0f;          // exercises the water gate on both backends
+    // STEP16_SymmetryGlobalSettings_IO audit: the default `globalSymmetryMask` changed from None
+    // to RotateHalfTurn (ARCH-ratified). A whole symmetry orbit is accepted or rejected together
+    // (Placement_Accept_PROC.cpp), and this scene's cone/water layout is not point-symmetric, so a
+    // non-None mask collapses `cpuResults.props.Count()` to 0 (verified directly, not assumed) and
+    // fails this test's "the Cpu run placed instances" check. This test validates Cpu/Gpu parity,
+    // not symmetry; pinned explicitly.
+    recipe.globalSymmetryMask = Params::SymmetryAxis::None;
 
     Params::MarkerRule markerRule;
     markerRule.category = Params::MarkerCategory::Alloys;

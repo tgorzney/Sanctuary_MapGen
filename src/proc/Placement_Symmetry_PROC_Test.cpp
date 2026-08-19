@@ -144,6 +144,18 @@ int main() {
     Check(bClosedUnderRotation, "half-turn clones are exact point reflections");
     Check(AllSpawnsReachable(pointResults.markers, fields, 20.0f), "half-turn spawns reachable");
 
+    // --- STEP16_SymmetryGlobalSettings_IO ruling #3: `SymmetryAxis::Radial` is a reserved bit
+    // with no orbit-generation branch yet. `BuildSymmetryOrbit` must not produce any clone for it
+    // — a mask with only that bit set returns just the source point, exactly like `None` would.
+    // This documents the dormancy so a future reviewer re-checks the `symmetryOrbitMaximum`
+    // buffer-overflow risk when the real `AppendRadialTurns` PROC ticket adds a branch for it.
+    Proc::SymmetryOrbitPoint radialOrbit[Params::symmetryOrbitMaximum];
+    const int radialOrbitCount = Proc::BuildSymmetryOrbit(Params::SymmetryAxis::Radial, extent,
+                                                           10.0f, 10.0f, 0.01f, radialOrbit,
+                                                           Params::symmetryOrbitMaximum);
+    Check(radialOrbitCount == 1,
+          "the Radial bit alone produces no clones yet: BuildSymmetryOrbit has no branch for it");
+
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

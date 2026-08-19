@@ -18,9 +18,13 @@
 //     Bake; `Placement_Symmetry_PROC` mirrors placed ENTITIES, not the field). The plan's "all
 //     exist in params, expose all" is true of v1, not of this tree. A symmetry stage plus its
 //     settings type is a work-order, not a side effect of a tab.
-//  2. `Params::SymmetryDetection` has no aggregate home yet: `Params::MapRecipe` carries the mask
-//     but no detection record, so the caller owns the instance and passes it in. Adding one line
-//     to `MapRecipe_PARAMS.h` is not C1's to make (one owner per PARAMS file).
+//  2. STALE, retired by STEP16_SymmetryGlobalSettings_IO: `Params::SymmetryDetection` now has its
+//     aggregate home, `Params::MapRecipe::symmetryDetection` (MapRecipe_PARAMS.h). This note used
+//     to read "no aggregate home yet ... the caller owns the instance and passes it in" — that
+//     framing is what STEP16 retired. `DrawSymmetryTab`'s signature below still takes
+//     `symmetryDetection` BY REFERENCE from the caller rather than reading `recipe.
+//     symmetryDetection` directly: STEP16 was PARAMS/IO scope only and explicitly did not rewire
+//     this draw call (a separate, already-tracked UI-wiring follow-up).
 #pragma once
 #include "Checkbox_UI.h"
 #include "Section_UI.h"

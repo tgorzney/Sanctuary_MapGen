@@ -21,6 +21,12 @@ static Params::MapRecipe MakeRecipe(unsigned int seed) {
     recipe.geometry.mapSize = PlacementTest::mapSize;
     recipe.geometry.seed = seed;
     recipe.geometry.terrainMaxHeight = 128.0f;
+    // STEP16_SymmetryGlobalSettings_IO: the default `globalSymmetryMask` changed from None to
+    // RotateHalfTurn (ARCH-ratified). This fixture's spawn rule has `bSymmetryUseGlobal == true`
+    // (its default), so a non-None global mask would multiply markers.Count() past this test's
+    // hardcoded expectations below. Pinned explicitly: this test validates Poisson spacing/gates,
+    // not symmetry.
+    recipe.globalSymmetryMask = Params::SymmetryAxis::None;
 
     Params::MarkerRule spawnRule;
     spawnRule.category = Params::MarkerCategory::Spawn;

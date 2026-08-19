@@ -51,9 +51,13 @@ earlier "props/decals need no wrapper transform type" ruling now that `layerInde
 per-instance data. The same session (ARCH §13) added Radial N-fold heightmap/entity symmetry
 (`SymmetryAxis::Radial`, `radialSymmetryRepeatCount`) to `SANMAP_FORMAT_SPEC` Correction 4 and
 corrected that correction's prior claim that `DecalRule` already carries the
-`bSymmetryUseGlobal`/`symmetryMask` override pair (it does not — recorded as a defect,
-`PLACEMENT_SCATTER_SPEC`'s "Known issues" addendum, alongside a second recorded defect: the
-16-slot symmetry-orbit buffer can now silently overflow under a large radial count).
+`bSymmetryUseGlobal`/`symmetryMask` override pair (at that time it did not — recorded as
+Defect 1 in `PLACEMENT_SCATTER_SPEC`'s "Known issues" addendum, alongside a second recorded
+defect: the 16-slot symmetry-orbit buffer can now silently overflow under a large radial
+count). **Defect 1 has since shipped**, fixed by a later coder work-order — `DecalRule` now
+carries the pair and `AppendDecalRules` resolves a symmetry mask for decals, confirmed by
+reading `src/params/ScatterRule_PARAMS.h` and `src/proc/Placement_Rules_PROC.cpp` (see the
+"Standing recorded defects" note below); the 16-slot orbit-overflow defect remains open.
 
 `ENTITY_AUTHORING_PARAMS_SPEC` was extended a fifth time to close its own flagged item 1
 (export-time `blueprintPath` validation) with a human ruling: an unresolvable `blueprintPath`
@@ -72,10 +76,12 @@ a new generic, reusable OK/Cancel confirm-modal widget with no prior equivalent 
 derivation (ARCH §7.5, `LAYER_SYSTEM_SPEC` "Known gap") — an M6 DATA-shape work order.
 Do not patch it inside a mask or sim work-order.
 
+**Fixed since ARCH §13:** `DecalRule` (`src/params/ScatterRule_PARAMS.h`) now carries the
+`bSymmetryUseGlobal`/`symmetryMask` pair, and `AppendDecalRules` resolves a symmetry mask for
+decals via `ResolveSymmetryMask` — see `SANMAP_FORMAT_SPEC` Correction 4 and
+`PLACEMENT_SCATTER_SPEC` (Defect 1, now closed).
+
 **Standing recorded defects awaiting a coder work-order (not yet fixed):**
-- `DecalRule` (`src/params/ScatterRule_PARAMS.h`) has no `bSymmetryUseGlobal`/`symmetryMask`
-  pair, and `AppendDecalRules` never resolves a symmetry mask for decals at all — see
-  `SANMAP_FORMAT_SPEC` Correction 4 and `PLACEMENT_SCATTER_SPEC`.
 - `Params::symmetryOrbitMaximum = 16` (`src/params/Symmetry_PARAMS.h`) can silently overflow
-  once a designer-chosen `radialSymmetryRepeatCount` combines with mirror axes — see the same
-  two specs.
+  once a designer-chosen `radialSymmetryRepeatCount` combines with mirror axes — see
+  `SANMAP_FORMAT_SPEC` Correction 4 and `PLACEMENT_SCATTER_SPEC` (Defect 2).

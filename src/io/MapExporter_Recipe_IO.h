@@ -22,9 +22,16 @@ nlohmann::ordered_json BuildMapGeneratorDataJson(const Params::MapRecipe& recipe
 // strata past the end are written on their defaults).
 nlohmann::ordered_json BuildStratumLayersJson(const Params::MapRecipe& recipe);
 
-// MapExporter_Layers_IO.cpp
-nlohmann::ordered_json BuildLayerStackJson(const Params::LayerStack& layerStack);
+// MapExporter_Layers_IO.cpp — the unrelated per-stratum settings (the layer-stack half of this
+// file's old name relocated out, see MapExporter_HeightmapStack_IO.cpp below).
 nlohmann::ordered_json BuildStrataSettingsJson(const Params::MapRecipe& recipe);
+
+// MapExporter_HeightmapStack_IO.cpp — `recipe.layerStack` -> the top-level `HeightmapStack` object
+// (SANMAP_FORMAT_SPEC Correction 3): `{ SimulationGrouping, GeoLayers }`, REPLACING the legacy
+// `mapGeneratorData.SimulationGrouping`/`GeoLayers` stray keys (relocated, not duplicated). Each
+// `GeoLayer`/`Layer` also gains a local `SymmetryUseGlobal`/`SymmetryMask` override, same pattern as
+// `MarkerRule`/`PropRule`/`UnitRule` — settings-only, no PROC consumer yet.
+nlohmann::ordered_json BuildHeightmapStackJson(const Params::LayerStack& layerStack);
 
 // MapExporter_MarkersStack_IO.cpp / MapExporter_PropsStack_IO.cpp / MapExporter_DecalsStack_IO.cpp /
 // MapExporter_UnitsStack_IO.cpp — `recipe.markerRules`/`propRules`/`decalRules`/`unitRules` -> the
@@ -81,6 +88,33 @@ void BuildAtmosphereJson(const Params::MapRecipe& recipe, nlohmann::ordered_json
 // object (STEP10_SlopeDefaults_Mechanism, MASKING_SPEC.md §1.7's shared-default layer). One flat
 // object, sibling of `armies`/`atmosphere`/etc., NOT nested in `mapGeneratorData`.
 nlohmann::ordered_json BuildSlopeDefaultsJson(const Params::MapRecipe& recipe);
+
+// MapExporter_GeneralMapSettings_IO.cpp — `recipe.geometry`/`recipe.generalMapSettings` -> the
+// top-level `GeneralMapSettings` object (SANMAP_FORMAT_SPEC Correction 2): `Seed`/
+// `ScaleFeaturesToMapSize`/`TerrainMinHeight`/`WorldUnitsPerCell`, RELOCATED out of the legacy
+// `mapGeneratorData` blob, plus the one genuinely new field, `GlobalGravity`. One flat object,
+// sibling of `armies`/`atmosphere`/`SlopeDefaults`, NOT nested in `mapGeneratorData`.
+nlohmann::ordered_json BuildGeneralMapSettingsJson(const Params::MapRecipe& recipe);
+
+// MapExporter_Symmetry_IO.cpp — `recipe.globalSymmetryMask`/`radialSymmetryRepeatCount`/
+// `symmetryDetection`/`symmetryBlend` -> the top-level `Symmetry` object (SANMAP_FORMAT_SPEC
+// Correction 4, STEP16). One flat object, sibling of `armies`/`atmosphere`/`SlopeDefaults`/etc.,
+// NOT nested in `mapGeneratorData`. `GlobalSymmetryMask` is RELOCATED here, not duplicated (see
+// MapExporter_Recipe_IO.cpp). `Params::SymAlgorithm` is explicitly out of scope (ruling #1).
+nlohmann::ordered_json BuildSymmetryJson(const Params::MapRecipe& recipe);
+
+// MapExporter_FlowAccumulation_IO.cpp — `recipe.flow`/`recipe.accumulation` -> the top-level
+// `Flow`/`Accumulation` objects (SANMAP_FORMAT_SPEC Correction 6, STEP17). Two flat objects, siblings
+// of `armies`/`atmosphere`/`SlopeDefaults`/etc., NOT nested in `mapGeneratorData`. No PROC consumer
+// for either — pure reservation.
+nlohmann::ordered_json BuildFlowJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildAccumulationJson(const Params::MapRecipe& recipe);
+
+// MapExporter_DetailNormal_IO.cpp — `recipe.detailNormal` -> the top-level `DetailNormal` object
+// (SANMAP_FORMAT_SPEC Correction 8, STEP18). One flat object, sibling of `armies`/`atmosphere`/
+// `SlopeDefaults`/`Flow`/etc., NOT nested in `mapGeneratorData`. No PROC consumer — pure
+// reservation of `DetailNormalMapSize`.
+nlohmann::ordered_json BuildDetailNormalJson(const Params::MapRecipe& recipe);
 
 // MapExporter_StratumGeneration_IO.cpp — `recipe.strata` -> the top-level `StratumGenerationSettings`
 // array (SANMAP_FORMAT_SPEC Correction 12): per-stratum soil physics (6 fields, new writes) plus the

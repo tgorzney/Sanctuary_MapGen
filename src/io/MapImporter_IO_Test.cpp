@@ -31,19 +31,103 @@ void CheckGeometryAndWater(const Params::MapRecipe& original, const Params::MapR
           "the whole water block survives");
 }
 
+// SANMAP_FORMAT_SPEC Correction 2: `GlobalGravity`, the one genuinely new field
+// (`Params::GeneralMapSettings`, not a rival store for per-stratum gravity — see that header's own
+// comment). The other 4 `GeneralMapSettings` fields (Seed/ScaleFeaturesToMapSize/TerrainMinHeight/
+// WorldUnitsPerCell) are already covered by CheckGeometryAndWater above — they still land on
+// `recipe.geometry`, only their WIRE location moved.
+void CheckGeneralMapSettings(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(NearlyEqual(loaded.generalMapSettings.globalGravity, original.generalMapSettings.globalGravity),
+          "globalGravity survives through the new top-level GeneralMapSettings object");
+}
+
+// SANMAP_FORMAT_SPEC Correction 2: `Seed`/`ScaleFeaturesToMapSize`/`TerrainMinHeight`/
+// `WorldUnitsPerCell` are RELOCATED, not dual-written — checked against the raw exported JSON TEXT
+// of `mapGeneratorData` itself, mirroring CheckRelocatedSlopeGateKeysNotInLegacyBlob's own style.
+// Also confirms `GeneralMapSettings` lands as a top-level SIBLING of `mapGeneratorData`, and that
+// the 2 untouched legacy keys (MapSize/TerrainMaxHeight) still live in the legacy blob exactly as
+// before (regression guard). `GlobalSymmetryMask` is no longer one of those untouched keys —
+// STEP16_SymmetryGlobalSettings_IO relocated it out to the new `Symmetry` section
+// (CheckSymmetryTopLevelNotNested below).
+void CheckGeneralMapSettingsTopLevelNotNested(const std::string& documentText) {
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+    Check(document.contains("mapGeneratorData"), "mapGeneratorData still exists");
+    const std::string generatorDataText = document["mapGeneratorData"].dump();
+    Check(generatorDataText.find("\"Seed\"") == std::string::npos
+          && generatorDataText.find("ScaleFeaturesToMapSize") == std::string::npos
+          && generatorDataText.find("TerrainMinHeight") == std::string::npos
+          && generatorDataText.find("WorldUnitsPerCell") == std::string::npos,
+          "none of the 4 relocated keys appear anywhere under document[\"mapGeneratorData\"] "
+          "(relocated, not duplicated)");
+    Check(document.contains("GeneralMapSettings") && document["GeneralMapSettings"].is_object(),
+          "GeneralMapSettings appears as a top-level sibling of mapGeneratorData, not nested inside it");
+    Check(document["mapGeneratorData"].contains("MapSize")
+          && document["mapGeneratorData"].contains("TerrainMaxHeight"),
+          "MapSize/TerrainMaxHeight still round-trip through the legacy blob, untouched by this "
+          "correction");
+}
+
+// SANMAP_FORMAT_SPEC Correction 3: `HeightmapStack` — `simulationGrouping`, and every existing
+// `GeoLayer`/`Layer` field (the bulk of the content, a pure relocation that must not silently drop
+// or corrupt any of it), plus the two genuinely new symmetry-override fields on both levels,
+// non-default AND distinct between the two levels (catches a field mix-up between them).
 void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(loaded.layerStack.simulationGrouping == original.layerStack.simulationGrouping
+          && original.layerStack.simulationGrouping == Params::SimulationGrouping::Separate,
+          "simulationGrouping survives through HeightmapStack, exercising the non-default value");
     Check(loaded.layerStack.geoLayers.size() == original.layerStack.geoLayers.size(),
           "the geo-layer count survives");
     if (!loaded.layerStack.geoLayers.empty()) {
+        const Params::GeoLayer& originalGeoLayer = original.layerStack.geoLayers[0];
         const Params::GeoLayer& geoLayer = loaded.layerStack.geoLayers[0];
-        Check(geoLayer.name == "Ridges" && geoLayer.bErodeBelow && geoLayer.stratumIndex == 2,
-              "the geo-layer's own settings survive");
+        Check(geoLayer.name == "Ridges" && geoLayer.bEnabled == originalGeoLayer.bEnabled
+              && geoLayer.mode == originalGeoLayer.mode && geoLayer.bErodeBelow
+              && geoLayer.blendMode == originalGeoLayer.blendMode && geoLayer.stratumIndex == 2,
+              "the geo-layer's own settings survive, all fields");
+        Check(originalGeoLayer.bSymmetryUseGlobal == false
+              && geoLayer.bSymmetryUseGlobal == originalGeoLayer.bSymmetryUseGlobal
+              && geoLayer.symmetryMask == originalGeoLayer.symmetryMask && geoLayer.symmetryMask == 5,
+              "the geo-layer's own local symmetry override survives (new field, Correction 3)");
         Check(geoLayer.layers.size() == 1, "and it kept its noise layer");
         if (!geoLayer.layers.empty()) {
+            const Params::Layer& originalLayer = originalGeoLayer.layers[0];
             const Params::Layer& layer = geoLayer.layers[0];
-            Check(layer.name == "Base Noise" && layer.octaves == 6, "with its name and octaves");
-            Check(NearlyEqual(layer.frequency, 0.031f) && NearlyEqual(layer.opacity, 0.75f)
-                  && NearlyEqual(layer.levelsMidtones, 1.4f), "and its noise/blend/levels scalars");
+            Check(layer.name == "Base Noise" && layer.bEnabled == originalLayer.bEnabled
+                  && layer.bLocked == originalLayer.bLocked
+                  && layer.stratumIndex == originalLayer.stratumIndex,
+                  "the layer's identity/stack-control fields survive");
+            Check(layer.noiseType == originalLayer.noiseType
+                  && layer.fractalType == originalLayer.fractalType
+                  && NearlyEqual(layer.frequency, originalLayer.frequency)
+                  && layer.octaves == originalLayer.octaves
+                  && NearlyEqual(layer.gain, originalLayer.gain)
+                  && NearlyEqual(layer.lacunarity, originalLayer.lacunarity)
+                  && NearlyEqual(layer.weightedStrength, originalLayer.weightedStrength)
+                  && NearlyEqual(layer.pingPongStrength, originalLayer.pingPongStrength)
+                  && NearlyEqual(layer.cellularJitter, originalLayer.cellularJitter),
+                  "the layer's noise-source fields survive");
+            Check(NearlyEqual(layer.landDensity, originalLayer.landDensity)
+                  && NearlyEqual(layer.mountainDensity, originalLayer.mountainDensity)
+                  && NearlyEqual(layer.plateauDensity, originalLayer.plateauDensity)
+                  && NearlyEqual(layer.rampDensity, originalLayer.rampDensity),
+                  "the layer's density-shaping fields survive");
+            Check(NearlyEqual(layer.levelsShadows, originalLayer.levelsShadows)
+                  && NearlyEqual(layer.levelsMidtones, originalLayer.levelsMidtones)
+                  && NearlyEqual(layer.levelsHighlights, originalLayer.levelsHighlights)
+                  && NearlyEqual(layer.levelsOutputBlack, originalLayer.levelsOutputBlack)
+                  && NearlyEqual(layer.levelsOutputWhite, originalLayer.levelsOutputWhite),
+                  "the layer's Levels fields survive");
+            Check(layer.blendMode == originalLayer.blendMode
+                  && NearlyEqual(layer.opacity, originalLayer.opacity)
+                  && NearlyEqual(layer.heightBlendContrast, originalLayer.heightBlendContrast)
+                  && NearlyEqual(layer.heightBlendMinimum, originalLayer.heightBlendMinimum)
+                  && NearlyEqual(layer.heightBlendMaximum, originalLayer.heightBlendMaximum),
+                  "the layer's stack-combine fields survive");
+            Check(originalLayer.bSymmetryUseGlobal == false
+                  && layer.bSymmetryUseGlobal == originalLayer.bSymmetryUseGlobal
+                  && layer.symmetryMask == originalLayer.symmetryMask && layer.symmetryMask == 9,
+                  "the layer's own local symmetry override survives, independent of the geo-layer's "
+                  "(new field, Correction 3)");
         }
     }
     // Size is no longer 1 here: `ReadStratumLayersJson` (SANMAP_FORMAT_SPEC Correction 13) grows
@@ -67,6 +151,115 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
           && loaded.unitRules[0].count == 5 && loaded.unitRules[0].bSymmetryUseGlobal == false
           && loaded.unitRules[0].symmetryMask == 4,
           "the unit rules survive, including the per-rule symmetry override");
+}
+
+// SANMAP_FORMAT_SPEC Correction 3: `mapGeneratorData.SimulationGrouping`/`GeoLayers` are RELOCATED,
+// not dual-written — checked against the raw exported JSON TEXT of `mapGeneratorData` itself,
+// mirroring CheckGeneralMapSettingsTopLevelNotNested's own style. Also confirms `HeightmapStack`
+// lands as a top-level SIBLING of `mapGeneratorData`, shaped `{ SimulationGrouping, GeoLayers }`,
+// and that the 2 untouched legacy keys (MapSize/TerrainMaxHeight) still live in the legacy blob
+// exactly as before (regression guard). `GlobalSymmetryMask` is no longer one of those untouched
+// keys — STEP16_SymmetryGlobalSettings_IO relocated it out to the new `Symmetry` section
+// (CheckSymmetryTopLevelNotNested below).
+void CheckHeightmapStackTopLevelNotNested(const std::string& documentText) {
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+    Check(document.contains("mapGeneratorData"), "mapGeneratorData still exists");
+    const std::string generatorDataText = document["mapGeneratorData"].dump();
+    Check(generatorDataText.find("\"GeoLayers\"") == std::string::npos
+          && generatorDataText.find("\"SimulationGrouping\"") == std::string::npos,
+          "neither GeoLayers nor SimulationGrouping appear anywhere under "
+          "document[\"mapGeneratorData\"] (relocated, not duplicated)");
+    Check(document.contains("HeightmapStack") && document["HeightmapStack"].is_object(),
+          "HeightmapStack appears as a top-level sibling of mapGeneratorData, not nested inside it");
+    Check(document["HeightmapStack"].contains("SimulationGrouping")
+          && document["HeightmapStack"].contains("GeoLayers")
+          && document["HeightmapStack"]["GeoLayers"].is_array(),
+          "HeightmapStack carries both SimulationGrouping and the GeoLayers array");
+    Check(document["mapGeneratorData"].contains("MapSize")
+          && document["mapGeneratorData"].contains("TerrainMaxHeight"),
+          "MapSize/TerrainMaxHeight still round-trip through the legacy blob, untouched by this "
+          "correction");
+}
+
+// SANMAP_FORMAT_SPEC Correction 4 (STEP16): `mapGeneratorData.GlobalSymmetryMask` is RELOCATED,
+// not dual-written — checked against the raw exported JSON TEXT of `mapGeneratorData` itself,
+// mirroring CheckGeneralMapSettingsTopLevelNotNested's own style. Also confirms the new top-level
+// `Symmetry` object lands as a sibling of `mapGeneratorData`, carrying all 10 Correction-4 fields
+// this ticket writes (`SymAlgorithm` is explicitly out of scope — ruling #1 — and is not checked
+// here).
+void CheckSymmetryTopLevelNotNested(const std::string& documentText) {
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+    Check(document.contains("mapGeneratorData"), "mapGeneratorData still exists");
+    const std::string generatorDataText = document["mapGeneratorData"].dump();
+    Check(generatorDataText.find("GlobalSymmetryMask") == std::string::npos,
+          "GlobalSymmetryMask no longer appears anywhere under document[\"mapGeneratorData\"] "
+          "(relocated, not duplicated)");
+    Check(document.contains("Symmetry") && document["Symmetry"].is_object(),
+          "Symmetry appears as a top-level sibling of mapGeneratorData, not nested inside it");
+    const nlohmann::json& symmetry = document["Symmetry"];
+    Check(symmetry.contains("GlobalSymmetryMask") && symmetry.contains("RadialSymmetryRepeatCount")
+          && symmetry.contains("SnapImperfectSymmetry") && symmetry.contains("SymmetryDetectionTolerance")
+          && symmetry.contains("SymSuperpositionBlend") && symmetry.contains("SymmetryBlurRadius")
+          && symmetry.contains("CrossFadeWidth") && symmetry.contains("CylinderZScale")
+          && symmetry.contains("TorusMajorRadius") && symmetry.contains("TorusMinorRadius"),
+          "Symmetry carries all 10 Correction-4 fields this ticket writes");
+}
+
+// STEP16_SymmetryGlobalSettings_IO: `recipe.radialSymmetryRepeatCount`/`symmetryDetection`/
+// `symmetryBlend`, plus the per-rule/per-layer `radialSymmetryRepeatCount` sibling of
+// `SymmetryMask` on each of MarkerRule/PropRule/DecalRule/UnitRule/GeoLayer/Layer — every value
+// non-default, so a round-trip bug in any single one is caught.
+void CheckSymmetryFields(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(loaded.radialSymmetryRepeatCount == original.radialSymmetryRepeatCount
+          && original.radialSymmetryRepeatCount == 5,
+          "recipe.radialSymmetryRepeatCount survives through the new top-level Symmetry section");
+    Check(loaded.symmetryDetection.bSnapImperfectSymmetry == original.symmetryDetection.bSnapImperfectSymmetry
+          && original.symmetryDetection.bSnapImperfectSymmetry == true
+          && NearlyEqual(loaded.symmetryDetection.detectionTolerance,
+                        original.symmetryDetection.detectionTolerance),
+          "recipe.symmetryDetection survives, exercising the non-default snap path");
+    const Params::SymmetryBlend& originalBlend = original.symmetryBlend;
+    const Params::SymmetryBlend& loadedBlend = loaded.symmetryBlend;
+    Check(NearlyEqual(loadedBlend.superpositionBlend, originalBlend.superpositionBlend)
+          && NearlyEqual(loadedBlend.blurRadius, originalBlend.blurRadius)
+          && NearlyEqual(loadedBlend.crossFadeWidth, originalBlend.crossFadeWidth)
+          && NearlyEqual(loadedBlend.cylinderZScale, originalBlend.cylinderZScale)
+          && NearlyEqual(loadedBlend.torusMajorRadius, originalBlend.torusMajorRadius)
+          && NearlyEqual(loadedBlend.torusMinorRadius, originalBlend.torusMinorRadius),
+          "recipe.symmetryBlend survives, all six exotic-blend scalars");
+
+    Check(!loaded.markerRules.empty()
+          && loaded.markerRules[0].radialSymmetryRepeatCount == original.markerRules[0].radialSymmetryRepeatCount
+          && original.markerRules[0].radialSymmetryRepeatCount == 6,
+          "MarkerRule::radialSymmetryRepeatCount survives, sibling of SymmetryMask");
+    Check(!loaded.propRules.empty()
+          && loaded.propRules[0].radialSymmetryRepeatCount == original.propRules[0].radialSymmetryRepeatCount
+          && original.propRules[0].radialSymmetryRepeatCount == 7,
+          "PropRule::radialSymmetryRepeatCount survives, sibling of SymmetryMask");
+    Check(!loaded.decalRules.empty()
+          && loaded.decalRules[0].radialSymmetryRepeatCount == original.decalRules[0].radialSymmetryRepeatCount
+          && original.decalRules[0].radialSymmetryRepeatCount == 8,
+          "DecalRule::radialSymmetryRepeatCount survives, sibling of SymmetryMask");
+    Check(!loaded.unitRules.empty()
+          && loaded.unitRules[0].radialSymmetryRepeatCount == original.unitRules[0].radialSymmetryRepeatCount
+          && original.unitRules[0].radialSymmetryRepeatCount == 9,
+          "UnitRule::radialSymmetryRepeatCount survives, sibling of SymmetryMask");
+
+    if (!loaded.layerStack.geoLayers.empty()) {
+        const Params::GeoLayer& originalGeoLayer = original.layerStack.geoLayers[0];
+        const Params::GeoLayer& geoLayer = loaded.layerStack.geoLayers[0];
+        Check(geoLayer.radialSymmetryRepeatCount == originalGeoLayer.radialSymmetryRepeatCount
+              && originalGeoLayer.radialSymmetryRepeatCount == 10,
+              "GeoLayer::radialSymmetryRepeatCount survives, sibling of SymmetryMask");
+        if (!geoLayer.layers.empty()) {
+            const Params::Layer& originalLayer = originalGeoLayer.layers[0];
+            const Params::Layer& layer = geoLayer.layers[0];
+            Check(layer.radialSymmetryRepeatCount == originalLayer.radialSymmetryRepeatCount
+                  && originalLayer.radialSymmetryRepeatCount == 11,
+                  "Layer::radialSymmetryRepeatCount survives, sibling of SymmetryMask, independent "
+                  "of the geo-layer's own value");
+        }
+    }
 }
 
 // STEP13_PlacementStacks_IO: the 4 new `MarkerRule` fields (SANMAP_FORMAT_SPEC Correction 7's
@@ -536,17 +729,90 @@ void CheckSlopeDefaults(const Params::MapRecipe& original, const Params::MapReci
           "the whole SlopeDefaults block survives, top-level and outside mapGeneratorData");
 }
 
+// STEP17_FlowAccumulation_Reserved_IO: the top-level `Flow` object, sibling of `armies`/
+// `atmosphere`/`SlopeDefaults`, not nested in `mapGeneratorData`.
+void CheckFlow(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(NearlyEqual(loaded.flow.flowMapColor[0], original.flow.flowMapColor[0])
+          && NearlyEqual(loaded.flow.flowMapColor[1], original.flow.flowMapColor[1])
+          && NearlyEqual(loaded.flow.flowMapColor[2], original.flow.flowMapColor[2])
+          && NearlyEqual(loaded.flow.flowMapColor[3], original.flow.flowMapColor[3]),
+          "recipe.flow.flowMapColor survives all four components, top-level and outside "
+          "mapGeneratorData");
+}
+
+// STEP18_DetailNormal_IO: the top-level `DetailNormal` object, sibling of `armies`/`atmosphere`/
+// `SlopeDefaults`/`Flow`, not nested in `mapGeneratorData`.
+void CheckDetailNormal(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(loaded.detailNormal.mapSize == original.detailNormal.mapSize,
+          "recipe.detailNormal.mapSize survives, top-level and outside mapGeneratorData");
+}
+
+// STEP17_FlowAccumulation_Reserved_IO's acceptance test: `Accumulation` writes as a genuinely
+// empty JSON object (no invented fields), as a top-level sibling of `mapGeneratorData`.
+void CheckAccumulationWritesEmptyObject(const std::string& documentText) {
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+    Check(document.contains("Accumulation") && document["Accumulation"].is_object(),
+          "Accumulation appears as a top-level sibling of mapGeneratorData, not nested inside it");
+    Check(document["Accumulation"].empty(),
+          "Accumulation writes as a genuinely empty object — no fields are invented");
+}
+
 void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
+    // SANMAP_FORMAT_SPEC Correction 3: non-default (the LayerStack_PARAMS.h default is Unified), so
+    // the round trip exercises HeightmapStack's SimulationGrouping key for real
+    // (CheckLayerStackAndRules).
+    recipe.layerStack.simulationGrouping = Params::SimulationGrouping::Separate;
+
     Params::GeoLayer geoLayer;
     geoLayer.name = "Ridges";
+    geoLayer.bEnabled = false;
+    geoLayer.mode = Params::GeoLayerMode::Shaper;
     geoLayer.bErodeBelow = true;
+    geoLayer.blendMode = Params::HeightBlendMode::Multiply;
     geoLayer.stratumIndex = 2;
+    // Correction 3's genuinely new field pair, non-default (the override path, not the
+    // shared-default path).
+    geoLayer.bSymmetryUseGlobal = false;
+    geoLayer.symmetryMask = 5;
+    // STEP16_SymmetryGlobalSettings_IO: the new sibling field, non-default (CheckSymmetryFields).
+    geoLayer.radialSymmetryRepeatCount = 10;
+
     Params::Layer layer;
     layer.name = "Base Noise";
+    layer.bEnabled = false;
+    layer.bLocked = true;
+    layer.stratumIndex = 4;
+    layer.noiseType = Params::NoiseType::Cellular;
+    layer.fractalType = Params::FractalType::Ridged;
     layer.frequency = 0.031f;
     layer.octaves = 6;
-    layer.opacity = 0.75f;
+    layer.gain = 0.65f;
+    layer.lacunarity = 2.4f;
+    layer.weightedStrength = 0.2f;
+    layer.pingPongStrength = 1.5f;
+    layer.cellularJitter = 0.6f;
+    layer.landDensity = 0.7f;
+    layer.mountainDensity = 0.3f;
+    layer.plateauDensity = 0.15f;
+    layer.rampDensity = 0.1f;
+    layer.levelsShadows = 0.05f;
     layer.levelsMidtones = 1.4f;
+    layer.levelsHighlights = 0.9f;
+    layer.levelsOutputBlack = 0.02f;
+    layer.levelsOutputWhite = 0.95f;
+    layer.blendMode = Params::HeightBlendMode::Overlay;
+    layer.opacity = 0.75f;
+    layer.heightBlendContrast = 1.6f;
+    layer.heightBlendMinimum = 0.1f;
+    layer.heightBlendMaximum = 0.9f;
+    // Correction 3's genuinely new field pair, non-default AND distinct from the GeoLayer's own
+    // override above (catches a field mix-up between the two levels).
+    layer.bSymmetryUseGlobal = false;
+    layer.symmetryMask = 9;
+    // STEP16_SymmetryGlobalSettings_IO: the new sibling field, non-default AND distinct from the
+    // geo-layer's own value above (CheckSymmetryFields).
+    layer.radialSymmetryRepeatCount = 11;
+
     geoLayer.layers.push_back(layer);
     recipe.layerStack.geoLayers.push_back(geoLayer);
 
@@ -617,6 +883,8 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     markerRule.count = 8;
     markerRule.clearanceSpacing = 14.0f;
     markerRule.symmetryMask = 1;
+    // STEP16_SymmetryGlobalSettings_IO: the new sibling field, non-default (CheckSymmetryFields).
+    markerRule.radialSymmetryRepeatCount = 6;
     // STEP13_PlacementStacks_IO: the 4 new per-layer fields, non-default
     // (CheckMarkerRuleNewFieldsAndGlobalMarkerSettings).
     markerRule.hydroMultiplier = 1.8f;
@@ -629,17 +897,21 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     propRule.bAvoidWater = true;
     propRule.bSymmetryUseGlobal = false;
     propRule.symmetryMask = 2;
+    // STEP16_SymmetryGlobalSettings_IO: the new sibling field, non-default (CheckSymmetryFields).
+    propRule.radialSymmetryRepeatCount = 7;
     recipe.propRules.push_back(propRule);
     Params::DecalRule decalRule;
     decalRule.spacingMinimum = 6.0f;
     decalRule.bSymmetryUseGlobal = false;
     decalRule.symmetryMask = 8;
+    decalRule.radialSymmetryRepeatCount = 8;
     recipe.decalRules.push_back(decalRule);
     Params::UnitRule unitRule;
     unitRule.armyIndex = 2;
     unitRule.count = 5;
     unitRule.bSymmetryUseGlobal = false;
     unitRule.symmetryMask = 4;
+    unitRule.radialSymmetryRepeatCount = 9;
     recipe.unitRules.push_back(unitRule);
 
     // STEP13_PlacementStacks_IO: every GlobalMarkerSettings field, non-default (ARCH §11).
@@ -842,6 +1114,22 @@ void FillFixtureAtmosphere(Params::MapRecipe& recipe) {
     globalWind.globalWindDirection = 220.0f;
 }
 
+// STEP16_SymmetryGlobalSettings_IO: `recipe.radialSymmetryRepeatCount`/`symmetryDetection`/
+// `symmetryBlend`, non-default (CheckSymmetryFields). `globalSymmetryMask` itself is already set,
+// non-default, in BuildPopulatedRecipe.
+void FillFixtureSymmetry(Params::MapRecipe& recipe) {
+    recipe.radialSymmetryRepeatCount = 5;
+    recipe.symmetryDetection.bSnapImperfectSymmetry = true;
+    recipe.symmetryDetection.detectionTolerance = 0.08f;
+    Params::SymmetryBlend& blend = recipe.symmetryBlend;
+    blend.superpositionBlend = 0.65f;
+    blend.blurRadius         = 6.5f;
+    blend.crossFadeWidth     = 12.0f;
+    blend.cylinderZScale     = 1.4f;
+    blend.torusMajorRadius   = 80.0f;
+    blend.torusMinorRadius   = 22.0f;
+}
+
 // STEP10_SlopeDefaults_Mechanism: non-default values in every one of the 7 fields, so a
 // round-trip bug in any single one is caught (not just the ones that happen to equal
 // Stratum's own hardcoded defaults already).
@@ -857,6 +1145,21 @@ void FillFixtureSlopeDefaults(Params::MapRecipe& recipe) {
     slopeDefaults.slopeGateStrength       = 0.72f;
 }
 
+// STEP17_FlowAccumulation_Reserved_IO: `recipe.flow.flowMapColor`, non-default in every component
+// (CheckFlow). `recipe.accumulation` stays on its (empty) defaults — Accumulation has no fields yet.
+void FillFixtureFlow(Params::MapRecipe& recipe) {
+    Params::Flow& flow = recipe.flow;
+    flow.flowMapColor[0] = 0.9f;
+    flow.flowMapColor[1] = 0.1f;
+    flow.flowMapColor[2] = 0.5f;
+    flow.flowMapColor[3] = 0.75f;
+}
+
+// STEP18_DetailNormal_IO: `recipe.detailNormal.mapSize`, non-default (CheckDetailNormal).
+void FillFixtureDetailNormal(Params::MapRecipe& recipe) {
+    recipe.detailNormal.mapSize = 2048;
+}
+
 } // namespace
 
 Params::MapRecipe BuildPopulatedRecipe() {
@@ -867,6 +1170,8 @@ Params::MapRecipe BuildPopulatedRecipe() {
     recipe.geometry.terrainMaxHeight = 300.0f;
     recipe.geometry.bScaleFeaturesToMapSize = false;
     recipe.geometry.worldUnitsPerCell = 2.5f;
+    // SANMAP_FORMAT_SPEC Correction 2: the one genuinely new field, non-default (CheckGeneralMapSettings).
+    recipe.generalMapSettings.globalGravity = 6.5f;
     recipe.globalSymmetryMask = 3;
     recipe.water.bEnabled = true;
     recipe.water.waterLevelMaximum = 40.0f;
@@ -879,6 +1184,9 @@ Params::MapRecipe BuildPopulatedRecipe() {
     FillFixturePropsAndDecals(recipe);
     FillFixtureAtmosphere(recipe);
     FillFixtureSlopeDefaults(recipe);
+    FillFixtureSymmetry(recipe);
+    FillFixtureFlow(recipe);
+    FillFixtureDetailNormal(recipe);
     return recipe;
 }
 
@@ -891,7 +1199,10 @@ void RunRoundTripTests() {
           "the exporter's own document parses");
     Check(result.warningCount == 0, "with no warning: the two halves agree key for key");
     CheckGeometryAndWater(original, loaded);
+    CheckGeneralMapSettings(original, loaded);
+    CheckGeneralMapSettingsTopLevelNotNested(documentText);
     CheckLayerStackAndRules(original, loaded);
+    CheckHeightmapStackTopLevelNotNested(documentText);
     CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(original, loaded);
     CheckPlacementStacksTopLevelNotNested(documentText);
     CheckStratumAppearance(original, loaded);
@@ -903,6 +1214,11 @@ void RunRoundTripTests() {
     CheckPropsAndDecals(original, loaded);
     CheckAtmosphere(original, loaded);
     CheckSlopeDefaults(original, loaded);
+    CheckSymmetryTopLevelNotNested(documentText);
+    CheckSymmetryFields(original, loaded);
+    CheckFlow(original, loaded);
+    CheckAccumulationWritesEmptyObject(documentText);
+    CheckDetailNormal(original, loaded);
 }
 
 // A pure-reader check, deliberately NOT routed through ParseSanmapJsonText/RunRoundTripTests
@@ -972,6 +1288,23 @@ void CheckStratumGenerationSettingsCardinalityMismatchWarns() {
           "and the fields those entries carry still land");
 }
 
+// STEP17_FlowAccumulation_Reserved_IO's forward-compatibility requirement: a document whose
+// `Accumulation` object carries keys no current field list recognizes (because none exists yet)
+// reads without error — a future ticket that adds real Accumulation fields must not need this
+// reader rewritten just to tolerate unknown keys. A pure-reader check, deliberately NOT routed
+// through ParseSanmapJsonText/RunRoundTripTests's own fixture (which has no such keys to begin
+// with), mirroring CheckUnrecognizedSkyboxIntensityModeFallsBackSafely's own style above.
+void CheckAccumulationReaderToleratesUnrecognizedKeys() {
+    nlohmann::json document;
+    document["Accumulation"]["SomeFutureField"] = 1.5f;
+    document["Accumulation"]["AnotherFutureField"] = "future value";
+    Params::MapRecipe loaded;
+    Io::ReadAccumulationJson(document, loaded);
+    // Reaching here without throwing/crashing IS the assertion; ReadAccumulationJson has no
+    // MapImportResult parameter to check a warning count against — it degrades silently by design.
+    Check(true, "an Accumulation object carrying unrecognized future keys reads without error");
+}
+
 } // namespace MapFormatTest
 } // namespace SanmapGen
 
@@ -980,6 +1313,7 @@ int main() {
     SanmapGen::MapFormatTest::CheckUnrecognizedSkyboxIntensityModeFallsBackSafely();
     SanmapGen::MapFormatTest::CheckStratumLayersCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::CheckStratumGenerationSettingsCardinalityMismatchWarns();
+    SanmapGen::MapFormatTest::CheckAccumulationReaderToleratesUnrecognizedKeys();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

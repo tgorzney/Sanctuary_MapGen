@@ -111,6 +111,15 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     // STEP10_SlopeDefaults_Mechanism: one flat top-level object, same tier/ordering rule as the
     // entity domains above — unconditional, before the mapGeneratorData gate below.
     ReadSlopeDefaultsJson(document, outRecipe);
+    // SANMAP_FORMAT_SPEC Correction 6 (STEP17): `Flow`/`Accumulation`, same tier/ordering rule as
+    // the entity domains above — unconditional, before the mapGeneratorData gate below. Pure
+    // reservation: no PROC consumer for either.
+    ReadFlowJson(document, outRecipe);
+    ReadAccumulationJson(document, outRecipe);
+    // SANMAP_FORMAT_SPEC Correction 8 (STEP18): the top-level `DetailNormal` object, same tier/
+    // ordering rule as `Flow`/`Accumulation` immediately above — unconditional, before the
+    // mapGeneratorData gate below. Pure reservation: no PROC consumer yet.
+    ReadDetailNormalJson(document, outRecipe);
     // SANMAP_FORMAT_SPEC Correction 13: `stratumLayers[9]`, same tier/ordering rule as the entity
     // domains above — unconditional, before the mapGeneratorData gate below. NOT alongside
     // `ReadStrataSettingsJson` below, which stays gated: that one reads the separate, legacy
@@ -135,6 +144,22 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     ReadPropsStackJson(document, outRecipe);
     ReadDecalsStackJson(document, outRecipe);
     ReadUnitsStackJson(document, outRecipe);
+    // SANMAP_FORMAT_SPEC Correction 2: the top-level `GeneralMapSettings` object, same tier/ordering
+    // rule as every top-level-key reader above — unconditional, before the mapGeneratorData gate
+    // below. LOAD-BEARING: this must also run BEFORE `ReadGeometryJson` inside that gate — its
+    // clamp/Warn block depends on `geometry.terrainMinHeight`/`geometry.worldUnitsPerCell` already
+    // being set here (see MapImporter_GeneralMapSettings_IO.cpp's own header comment).
+    ReadGeneralMapSettingsJson(document, outRecipe);
+    // SANMAP_FORMAT_SPEC Correction 3: the top-level `HeightmapStack` object, same tier/ordering
+    // rule as every top-level-key reader above — unconditional, before the mapGeneratorData gate
+    // below. REPLACES the deleted `ReadLayerStackJson(generatorData, ...)` call that used to run
+    // inside that gate (relocated, not dual-written).
+    ReadHeightmapStackJson(document, outRecipe.layerStack);
+    // SANMAP_FORMAT_SPEC Correction 4 (STEP16): the top-level `Symmetry` object, same tier/ordering
+    // rule as every top-level-key reader above — unconditional, before the mapGeneratorData gate
+    // below. REPLACES the deleted `ReadJsonInteger(generatorData, "GlobalSymmetryMask", ...)` read
+    // that used to run inside that gate (relocated, not dual-read).
+    ReadSymmetryJson(document, outRecipe);
 
     if (!document.contains("mapGeneratorData") || !document["mapGeneratorData"].is_object()) {
         result.Warn("No mapGeneratorData block: only the map's own dimensions were recovered.");
@@ -143,7 +168,6 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     const nlohmann::json& generatorData = document["mapGeneratorData"];
     ReadGeometryJson(generatorData, options, outRecipe, result);
     ReadWaterJson(generatorData, outRecipe);
-    ReadLayerStackJson(generatorData, outRecipe.layerStack);
     ReadStrataSettingsJson(generatorData, outRecipe);
     return true;
 }

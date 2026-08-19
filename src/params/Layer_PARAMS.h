@@ -50,6 +50,23 @@ struct Layer {
     float           heightBlendContrast = 1.0f;
     float           heightBlendMinimum  = 0.0f;
     float           heightBlendMaximum  = 1.0f;
+
+    // Local symmetry override (SANMAP_FORMAT_SPEC Correction 3), same field names/defaults/position
+    // convention as MarkerRule/PropRule/UnitRule's existing override. SETTINGS ONLY — zero PROC
+    // consumer: no heightfield-symmetry stage exists in this codebase yet (Correction 4/ARCH
+    // territory, explicitly deferred). Reserved from the moment it is settable (Constitution §8),
+    // same posture as StratumAppearance_PARAMS.h.
+    //
+    // NAMED GAP, explicitly deferred (not this ticket's to fix): the real map format's per-layer
+    // MinHeight/MaxHeight/MinSlope/MaxSlope height-and-slope gates have no equivalent field here at
+    // all — silently dropped in the v1->v2 port, not merely carried over. Logged for a future
+    // LAYER_SYSTEM_SPEC conversation.
+    bool bSymmetryUseGlobal = true;
+    int  symmetryMask       = 0;
+    // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
+    // `symmetryMask`. Zero PROC consumer yet (STEP16 ruling #1/#2/#3 — this override IS one of
+    // the homes ARCH §13 names, retrofit in scope for this ticket).
+    int  radialSymmetryRepeatCount = 3;
 };
 
 } // namespace Params

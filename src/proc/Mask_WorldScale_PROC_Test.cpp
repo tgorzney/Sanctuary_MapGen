@@ -88,6 +88,13 @@ Params::MapRecipe MakeConeFlankRecipe(float worldUnitsPerCell) {
     recipe.geometry.seed              = 4242u;
     recipe.geometry.terrainMaxHeight  = PlacementTest::terrainMaxHeight;
     recipe.geometry.worldUnitsPerCell = worldUnitsPerCell;
+    // STEP16_SymmetryGlobalSettings_IO audit: the default `globalSymmetryMask` changed from None
+    // to RotateHalfTurn (ARCH-ratified). A whole symmetry orbit is accepted or rejected together
+    // (Placement_Accept_PROC.cpp), and the cone flank here sits off-center, so its point-reflected
+    // mirror mostly falls outside the gated flank annulus — a non-None mask would collapse
+    // `coarseResults.props.Count()` well under this test's `> 20` bound instead of merely doubling
+    // it. This test validates the world-scale gate agreement, not symmetry; pinned explicitly.
+    recipe.globalSymmetryMask = Params::SymmetryAxis::None;
     Params::PropRule rule;
     rule.density         = 0.9f;
     rule.spacingMinimum  = 2.0f;

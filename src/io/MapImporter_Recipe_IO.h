@@ -36,11 +36,10 @@ inline bool ReadJsonFloatVector4(const nlohmann::json& parent, const char* key,
     return bAnyComponentRead;
 }
 
-// --- The block readers (MapImporter_Recipe_IO.cpp / MapImporter_Layers_IO.cpp). -----------------
+// --- The block readers (MapImporter_Recipe_IO.cpp). -----------------------------------------
 void ReadGeometryJson(const nlohmann::json& generatorData, const MapImportOptions& options,
                       Params::MapRecipe& outRecipe, MapImportResult& result);
 void ReadWaterJson(const nlohmann::json& generatorData, Params::MapRecipe& outRecipe);
-void ReadLayerStackJson(const nlohmann::json& generatorData, Params::LayerStack& outLayerStack);
 void ReadStrataSettingsJson(const nlohmann::json& generatorData, Params::MapRecipe& outRecipe);
 
 // MapImporter_Areas_IO.cpp / MapImporter_Armies_IO.cpp — `areas`/`armies` are top-level `.sanmap`
@@ -85,6 +84,14 @@ void ReadAtmosphereJson(const nlohmann::json& document, Params::MapRecipe& outRe
 // `mapGeneratorData` presence gate.
 void ReadSlopeDefaultsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 
+// MapImporter_GeneralMapSettings_IO.cpp — the top-level `GeneralMapSettings` object ->
+// `recipe.geometry`/`recipe.generalMapSettings` (SANMAP_FORMAT_SPEC Correction 2). Same tier and
+// calling contract as `SlopeDefaults`/`areas`/`armies` above: takes the top-level `document`
+// directly and MUST be called unconditionally, BEFORE the `mapGeneratorData` presence gate, AND
+// before `ReadGeometryJson` — see the .cpp's own header comment for why that ordering is
+// load-bearing.
+void ReadGeneralMapSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+
 // MapImporter_StratumLayers_IO.cpp — the top-level `stratumLayers[9]` array -> `Params::Stratum::
 // appearance` (+ tileCount/tint*/maskRemap*, SANMAP_FORMAT_SPEC Correction 13), the mirror of
 // `BuildStratumLayersJson`. Same tier and calling contract as `areas`/`armies`/`atmosphere`/
@@ -122,6 +129,35 @@ void ReadGlobalMarkerSettingsJson(const nlohmann::json& document, Params::MapRec
 void ReadPropsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadDecalsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadUnitsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+
+// MapImporter_Symmetry_IO.cpp — the top-level `Symmetry` object -> `recipe.globalSymmetryMask`/
+// `radialSymmetryRepeatCount`/`symmetryDetection`/`symmetryBlend` (SANMAP_FORMAT_SPEC Correction
+// 4, STEP16), REPLACING the legacy `mapGeneratorData.GlobalSymmetryMask` read removed from
+// `ReadGeometryJson` (relocated, not dual-read). Same tier and calling contract as
+// `PropsStack`/`SlopeDefaults`/etc. above: takes the top-level `document` directly and must be
+// called unconditionally, BEFORE the `mapGeneratorData` presence gate.
+void ReadSymmetryJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+
+// MapImporter_FlowAccumulation_IO.cpp — the top-level `Flow`/`Accumulation` objects ->
+// `recipe.flow`/`recipe.accumulation` (SANMAP_FORMAT_SPEC Correction 6, STEP17). Same tier and
+// calling contract as `PropsStack`/`SlopeDefaults`/etc. above: each takes the top-level `document`
+// directly and must be called unconditionally, BEFORE the `mapGeneratorData` presence gate.
+// `ReadAccumulationJson` reads no fields (none exist yet) but tolerates any/unknown content.
+void ReadFlowJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadAccumulationJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+
+// MapImporter_DetailNormal_IO.cpp — the top-level `DetailNormal` object -> `recipe.detailNormal`
+// (SANMAP_FORMAT_SPEC Correction 8, STEP18). Same tier and calling contract as `Flow`/
+// `SlopeDefaults`/etc. above: takes the top-level `document` directly and must be called
+// unconditionally, BEFORE the `mapGeneratorData` presence gate.
+void ReadDetailNormalJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+
+// MapImporter_HeightmapStack_IO.cpp — the top-level `HeightmapStack` object -> `recipe.layerStack`
+// (SANMAP_FORMAT_SPEC Correction 3), REPLACING the legacy `ReadLayerStackJson`/
+// `mapGeneratorData.SimulationGrouping`/`GeoLayers` (relocated, not duplicated). Same tier and
+// calling contract as `PropsStack`/`SlopeDefaults`/etc. above: takes the top-level `document`
+// directly and must be called unconditionally, BEFORE the `mapGeneratorData` presence gate.
+void ReadHeightmapStackJson(const nlohmann::json& document, Params::LayerStack& outLayerStack);
 
 } // namespace Io
 } // namespace SanmapGen

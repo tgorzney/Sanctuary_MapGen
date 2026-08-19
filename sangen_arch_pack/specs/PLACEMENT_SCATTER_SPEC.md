@@ -171,21 +171,26 @@ result, not re-filter (see the shadow-sim issue in `PREVIEW_COMPOSITING_SPEC`).
   absolute world/game units, and a Y above this floats above all terrain; see
   `SANMAP_FORMAT_SPEC` entity-position encoding), stratum loop bound 9.
 
-**Two current-tree defects (ARCH §13, recorded not fixed — see the addendum at the
-end of this file for full detail):**
-- **Defect 1 — `DecalRule` has no `bSymmetryUseGlobal`/`symmetryMask` pair**
-  (`src/params/ScatterRule_PARAMS.h`), and `AppendDecalRules`
-  (`src/proc/Placement_Rules_PROC.cpp`) never calls `ResolveSymmetryMask` for
-  decals — decals currently generate with **no symmetry at all**, not even the
-  global default. A future coder work-order must add the missing PARAMS pair and
-  wire it into `AppendDecalRules`, mirroring `AppendPropRules`.
-- **Defect 2 — `Params::symmetryOrbitMaximum = 16`** backs a fixed-size stack array
-  (`SymmetryOrbitPoint orbit[16]`, `src/proc/Placement_Accept_PROC.cpp:33`) that a
-  designer-chosen `radialSymmetryRepeatCount` (ARCH §13) combined with mirrors can
-  now exceed (e.g. 8-fold × MirrorX × MirrorZ → up to 32) — the buffer silently
-  drops excess clones rather than erroring. A future Compute Optimization Expert or
-  Generator Expert work-order must raise the cap and/or add a loud validated clamp
-  on the designer-facing count (Constitution §6).
+**Two current-tree defects recorded at ARCH §13 ratification (see the addendum at
+the end of this file for full detail) — Defect 1 is now FIXED, Defect 2 remains
+open:**
+- **Defect 1 — FIXED.** `DecalRule` originally had no `bSymmetryUseGlobal`/
+  `symmetryMask` pair (`src/params/ScatterRule_PARAMS.h`), and `AppendDecalRules`
+  (`src/proc/Placement_Rules_PROC.cpp`) never called `ResolveSymmetryMask` for
+  decals — decals generated with **no symmetry at all**, not even the global
+  default. A coder work-order has since closed this: `DecalRule` now carries the
+  `bSymmetryUseGlobal`/`symmetryMask` pair alongside `MarkerRule`/`PropRule`/
+  `UnitRule` (confirmed by code read), and `AppendDecalRules` now calls
+  `ResolveSymmetryMask` for decals, mirroring `AppendPropRules`; the `.sanmap` IO
+  round-trip for the pair exists too.
+- **Defect 2 — still open.** `Params::symmetryOrbitMaximum = 16` backs a
+  fixed-size stack array (`SymmetryOrbitPoint orbit[16]`,
+  `src/proc/Placement_Accept_PROC.cpp:33`) that a designer-chosen
+  `radialSymmetryRepeatCount` (ARCH §13) combined with mirrors can now exceed
+  (e.g. 8-fold × MirrorX × MirrorZ → up to 32) — the buffer silently drops excess
+  clones rather than erroring. A future Compute Optimization Expert or Generator
+  Expert work-order must raise the cap and/or add a loud validated clamp on the
+  designer-facing count (Constitution §6).
 
 ## v2 guidance
 One scatter module: a seeded, position-hashed density/spacing sampler (Poisson-disk)
@@ -225,7 +230,10 @@ to a designer-chosen `radialSymmetryRepeatCount`) is new PROC work for a future
 work-order, not built by this ratification. Full field/JSON-key detail:
 `SANMAP_FORMAT_SPEC` Correction 4.
 
-Defects 1 and 2 above are the two items this session records for follow-up; both
-are real, current-tree, `src/` findings (not dead-code findings), confirmed by
-direct code read (`ScatterRule_PARAMS.h`, `Placement_Rules_PROC.cpp`,
-`Placement_Accept_PROC.cpp`).
+Defects 1 and 2 above are the two items this session recorded for follow-up, both
+real, current-tree, `src/` findings (not dead-code findings) confirmed by direct
+code read (`ScatterRule_PARAMS.h`, `Placement_Rules_PROC.cpp`,
+`Placement_Accept_PROC.cpp`). **Defect 1 has since been fixed** by a later coder
+work-order — `DecalRule`'s `bSymmetryUseGlobal`/`symmetryMask` pair and its
+`AppendDecalRules` wiring, re-confirmed live by code read. **Defect 2 remains
+open.**

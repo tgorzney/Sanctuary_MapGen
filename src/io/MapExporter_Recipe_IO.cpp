@@ -53,15 +53,14 @@ nlohmann::ordered_json BuildStratumLayersJson(const Params::MapRecipe& recipe) {
 
 nlohmann::ordered_json BuildMapGeneratorDataJson(const Params::MapRecipe& recipe) {
     nlohmann::ordered_json generatorData;
+    // Seed/ScaleFeaturesToMapSize/TerrainMinHeight/WorldUnitsPerCell RELOCATED to the top-level
+    // `GeneralMapSettings` object (SANMAP_FORMAT_SPEC Correction 2) — no longer written here.
     generatorData["MapSize"]                = recipe.geometry.mapSize;
-    generatorData["Seed"]                   = recipe.geometry.seed;
-    generatorData["TerrainMinHeight"]       = recipe.geometry.terrainMinHeight;
     generatorData["TerrainMaxHeight"]       = recipe.geometry.terrainMaxHeight;
-    generatorData["ScaleFeaturesToMapSize"] = recipe.geometry.bScaleFeaturesToMapSize;
-    generatorData["WorldUnitsPerCell"]      = recipe.geometry.worldUnitsPerCell;
-    generatorData["GlobalSymmetryMask"]     = recipe.globalSymmetryMask;
-    generatorData["SimulationGrouping"]     = static_cast<int>(recipe.layerStack.simulationGrouping);
-    generatorData["GeoLayers"]              = BuildLayerStackJson(recipe.layerStack);
+    // GlobalSymmetryMask RELOCATED to the top-level `Symmetry` object (SANMAP_FORMAT_SPEC
+    // Correction 4, STEP16, BuildSymmetryJson below) — no longer written here.
+    // SimulationGrouping/GeoLayers RELOCATED to the top-level `HeightmapStack` object
+    // (SANMAP_FORMAT_SPEC Correction 3, BuildHeightmapStackJson below) — no longer written here.
     generatorData["Stratums"]               = BuildStrataSettingsJson(recipe);
     nlohmann::ordered_json water;
     water["Enabled"]           = recipe.water.bEnabled;
@@ -137,6 +136,31 @@ std::string MapExporter::BuildSanmapJsonText(const Params::MapRecipe& recipe,
     // STEP10_SlopeDefaults_Mechanism: one flat top-level object, same tier as the entity domains
     // above — sibling of `armies`/`atmosphere`, NOT nested in `mapGeneratorData`.
     document["SlopeDefaults"] = BuildSlopeDefaultsJson(recipe);
+    // SANMAP_FORMAT_SPEC Correction 2: one flat top-level object, same tier as `SlopeDefaults`
+    // above — sibling of `armies`/`atmosphere`/`SlopeDefaults`, NOT nested in `mapGeneratorData`.
+    // REPLACES the legacy `mapGeneratorData.Seed`/`ScaleFeaturesToMapSize`/`TerrainMinHeight`/
+    // `WorldUnitsPerCell` writes removed from BuildMapGeneratorDataJson above (relocated, not
+    // duplicated), plus the one genuinely new field, `GlobalGravity`.
+    document["GeneralMapSettings"] = BuildGeneralMapSettingsJson(recipe);
+    // SANMAP_FORMAT_SPEC Correction 3: one flat top-level object, same tier as `SlopeDefaults`/
+    // `GeneralMapSettings` above — sibling of `mapGeneratorData`, NOT nested in it. REPLACES the
+    // legacy `mapGeneratorData.SimulationGrouping`/`GeoLayers` writes removed from
+    // BuildMapGeneratorDataJson above (relocated, not duplicated).
+    document["HeightmapStack"] = BuildHeightmapStackJson(recipe.layerStack);
+    // SANMAP_FORMAT_SPEC Correction 4 (STEP16): one flat top-level object, same tier as
+    // `SlopeDefaults`/`GeneralMapSettings`/`HeightmapStack` above — sibling of `mapGeneratorData`,
+    // NOT nested in it. REPLACES the legacy `mapGeneratorData.GlobalSymmetryMask` write removed
+    // from BuildMapGeneratorDataJson above (relocated, not duplicated).
+    document["Symmetry"] = BuildSymmetryJson(recipe);
+    // SANMAP_FORMAT_SPEC Correction 6 (STEP17): two flat top-level objects, same tier as
+    // `SlopeDefaults`/`GeneralMapSettings`/`HeightmapStack`/`Symmetry` above — siblings of
+    // `mapGeneratorData`, NOT nested in it. Pure reservation: no PROC consumer for either.
+    document["Flow"] = BuildFlowJson(recipe);
+    document["Accumulation"] = BuildAccumulationJson(recipe);
+    // SANMAP_FORMAT_SPEC Correction 8 (STEP18): one flat top-level object, same tier as `Flow`/
+    // `Accumulation` above — sibling of `mapGeneratorData`, NOT nested in it. Pure reservation:
+    // no PROC consumer for the layered-heightmap-delta system this settles a home for.
+    document["DetailNormal"] = BuildDetailNormalJson(recipe);
 
     document["mapGeneratorData"] = BuildMapGeneratorDataJson(recipe);
     const int indent = options.jsonIndentSpaceCount > 0 ? options.jsonIndentSpaceCount : -1;

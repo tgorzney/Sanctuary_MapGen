@@ -67,6 +67,11 @@ inline Params::MapRecipe MakeRecipe(unsigned int seed) {
     recipe.geometry.mapSize          = mapSize;
     recipe.geometry.seed             = seed;
     recipe.geometry.terrainMaxHeight = 128.0f;
+    // STEP16_SymmetryGlobalSettings_IO: the default `globalSymmetryMask` changed from None to
+    // RotateHalfTurn (ARCH-ratified). The spawn rule below has `bSymmetryUseGlobal == true` (its
+    // default), so a non-None global mask would multiply markers.Count() past
+    // GenerationAssembler_Outputs_PIPELINE_Test.cpp's exact-count assertion. Pinned explicitly.
+    recipe.globalSymmetryMask        = Params::SymmetryAxis::None;
     AddLayerStack(recipe);
     AddStrata(recipe);
 

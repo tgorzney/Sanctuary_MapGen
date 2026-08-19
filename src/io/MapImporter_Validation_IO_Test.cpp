@@ -40,10 +40,12 @@ void CheckHostileValuesFallBackToDefaults() {
     Params::MapRecipe recipe;
     Io::MapImportResult result;
     // "SanGenVersion":2 — see CheckAPartialDocumentRecoversWhatItHas's note above; the hostility
-    // under test here is entirely inside mapGeneratorData, below the migration runner's gate.
+    // under test here is split across `mapGeneratorData` and the top-level `HeightmapStack` object
+    // (SANMAP_FORMAT_SPEC Correction 3 relocated `GeoLayers` out of the legacy blob — the enum-fence
+    // check below now exercises `ReadHeightmapStackJson`, not the deleted `ReadLayerStackJson`).
     const char* hostileText = "{\"SanGenVersion\":2,\"mapGeneratorData\":{\"MapSize\":99999,\"Seed\":\"nope\","
-                              "\"TerrainMaxHeight\":-4.0,\"WorldUnitsPerCell\":0.0,"
-                              "\"GeoLayers\":[{\"Mode\":77}]}}";
+                              "\"TerrainMaxHeight\":-4.0,\"WorldUnitsPerCell\":0.0},"
+                              "\"HeightmapStack\":{\"GeoLayers\":[{\"Mode\":77}]}}";
     Check(Io::MapImporter::ParseSanmapJsonText(hostileText, recipe, options, result),
           "a hostile document parses rather than throwing");
     Check(recipe.geometry.mapSize == Params::Geometry().mapSize,
@@ -57,6 +59,39 @@ void CheckHostileValuesFallBackToDefaults() {
           && recipe.layerStack.geoLayers[0].mode == Params::GeoLayer().mode,
           "an out-of-range enum is fenced to its default rather than cast wild");
     Check(result.warningCount > 0, "with every fallback warned about");
+}
+
+// SANMAP_FORMAT_SPEC Correction 2, ARCH Expert finding 2: Seed's negative-value guard, exercised
+// through the new top-level `GeneralMapSettings` object — a negative signed value clamps to 0
+// rather than wrapping around to ~4 billion when cast to unsigned.
+void CheckNegativeSeedClampsToZero() {
+    const Io::MapImportOptions options;
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    const char* documentText = "{\"SanGenVersion\":2,\"GeneralMapSettings\":{\"Seed\":-77}}";
+    Check(Io::MapImporter::ParseSanmapJsonText(documentText, recipe, options, result),
+          "a document with a negative Seed still parses");
+    Check(recipe.geometry.seed == 0u,
+          "a negative Seed clamps to 0, not a raw negative-to-unsigned wraparound");
+}
+
+// SANMAP_FORMAT_SPEC Correction 2, ARCH Expert finding 1: the TerrainMinHeight/TerrainMaxHeight
+// band invariant at the end of ReadGeometryJson is still enforced correctly post-relocation — it
+// stays correct ONLY because ReadGeneralMapSettingsJson (which now owns TerrainMinHeight) runs
+// BEFORE ReadGeometryJson (which owns TerrainMaxHeight, from the legacy mapGeneratorData blob).
+void CheckTerrainMinHeightBandClampPostRelocation() {
+    const Io::MapImportOptions options;
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    const char* documentText =
+        "{\"SanGenVersion\":2,\"GeneralMapSettings\":{\"TerrainMinHeight\":500.0},"
+        "\"mapGeneratorData\":{\"TerrainMaxHeight\":100.0}}";
+    Check(Io::MapImporter::ParseSanmapJsonText(documentText, recipe, options, result),
+          "a document with TerrainMinHeight above TerrainMaxHeight still parses");
+    Check(NearlyEqual(recipe.geometry.terrainMaxHeight, 100.0f), "TerrainMaxHeight lands as written");
+    Check(NearlyEqual(recipe.geometry.terrainMinHeight, 99.0f),
+          "a floor above the ceiling is clamped one unit below it, exactly as before the relocation");
+    Check(result.warningCount > 0, "with the clamp logged as a warning");
 }
 
 void CheckAnUnresolvablePathIsRefused() {
@@ -78,6 +113,8 @@ void RunValidationTests() {
     CheckUnusableDocumentsAreRefused();
     CheckAPartialDocumentRecoversWhatItHas();
     CheckHostileValuesFallBackToDefaults();
+    CheckNegativeSeedClampsToZero();
+    CheckTerrainMinHeightBandClampPostRelocation();
     CheckAnUnresolvablePathIsRefused();
 }
 

@@ -24,6 +24,7 @@ nlohmann::ordered_json BuildPropRuleJson(const Params::PropRule& rule) {
     json["NearCliffDistanceMaximum"] = rule.nearCliffDistanceMaximum;
     json["SymmetryUseGlobal"] = rule.bSymmetryUseGlobal;
     json["SymmetryMask"] = rule.symmetryMask;
+    json["RadialSymmetryRepeatCount"] = rule.radialSymmetryRepeatCount;
     json["Transform"] = BuildScatterTransformJson(rule.transform);
     return json;
 }

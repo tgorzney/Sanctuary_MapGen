@@ -45,6 +45,7 @@ nlohmann::ordered_json BuildMarkerRuleJson(const Params::MarkerRule& rule) {
     json["SpawnPointCount"] = rule.spawnPointCount;
     json["SymmetryUseGlobal"] = rule.bSymmetryUseGlobal;
     json["SymmetryMask"] = rule.symmetryMask;
+    json["RadialSymmetryRepeatCount"] = rule.radialSymmetryRepeatCount;
     json["Transform"] = BuildScatterTransformJson(rule.transform);
     return json;
 }

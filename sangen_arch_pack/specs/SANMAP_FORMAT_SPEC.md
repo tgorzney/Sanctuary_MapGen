@@ -290,15 +290,20 @@ existing fields under this section's umbrella, not new work. **New** for
 **Correction, superseding this section's earlier claim (ARCH §13):** the
 original text of this correction additionally claimed the `bSymmetryUseGlobal`/
 `symmetryMask` pair is "already live and tested" on `DecalRule` as well. **That
-claim is factually wrong and is withdrawn.** `src/params/ScatterRule_PARAMS.h`'s
-`DecalRule` carries no `bSymmetryUseGlobal`/`symmetryMask` pair at all, and
-`AppendDecalRules` (`src/proc/Placement_Rules_PROC.cpp`) never calls
-`ResolveSymmetryMask` for decals — decals currently receive **no** symmetry at
-all on generation, not even the global default. This is a real implementation
-gap, flagged as Defect 1 in `PLACEMENT_SCATTER_SPEC`'s "Known issues" section
-for a future coder work-order (adding the missing pair and wiring it into
-`AppendDecalRules`, mirroring `AppendPropRules`) — not fixed by this
-ratification.
+claim was factually wrong at ARCH §13 ratification time and was withdrawn.** At
+that time `src/params/ScatterRule_PARAMS.h`'s `DecalRule` carried no
+`bSymmetryUseGlobal`/`symmetryMask` pair at all, and `AppendDecalRules`
+(`src/proc/Placement_Rules_PROC.cpp`) never called `ResolveSymmetryMask` for
+decals — decals generated with **no** symmetry at all, not even the global
+default. This was flagged as Defect 1 in `PLACEMENT_SCATTER_SPEC`'s "Known
+issues" section for a future coder work-order.
+
+**Defect 1 is now FIXED (later session).** `DecalRule` now carries the
+`bSymmetryUseGlobal`/`symmetryMask` pair alongside `MarkerRule`/`PropRule`/
+`UnitRule`, and `AppendDecalRules` now calls `ResolveSymmetryMask` for decals,
+mirroring `AppendPropRules` — confirmed by code read; the `.sanmap` IO
+round-trip for the pair exists too. `PLACEMENT_SCATTER_SPEC` records this
+closure in full.
 
 **Radial N-fold symmetry (ARCH §13, ratified this session):**
 - **New bit:** `SymmetryAxis::Radial = 1 << 4` (`Symmetry_PARAMS.h`). Confirmed
@@ -317,7 +322,7 @@ ratification.
   ```
   Each independently-overridable mask (`MapRecipe::globalSymmetryMask`,
   `MarkerRule::symmetryMask`, `PropRule::symmetryMask`, `UnitRule::symmetryMask`,
-  and — once Defect 1 above is fixed — `DecalRule::symmetryMask`, plus the
+  and, now that Defect 1 above is fixed, `DecalRule::symmetryMask`, plus the
   future `HeightmapStack` `GeoLayer`/`Layer` override, Correction 3) needs its
   own `N`: a local override with `bSymmetryUseGlobal = false` but no local count
   would otherwise silently inherit the global `N`, defeating the point of a

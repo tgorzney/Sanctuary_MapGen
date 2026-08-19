@@ -28,6 +28,9 @@ struct PropRule {
 
     bool  bSymmetryUseGlobal = true;
     int   symmetryMask       = 0;
+    // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
+    // `symmetryMask`. Zero PROC consumer yet (STEP16 ruling #1/#3).
+    int   radialSymmetryRepeatCount = 3;
 
     ScatterTransform transform;
 };
@@ -47,6 +50,9 @@ struct DecalRule {
 
     bool  bSymmetryUseGlobal = true;
     int   symmetryMask       = 0;
+    // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
+    // `symmetryMask`. Zero PROC consumer yet (STEP16 ruling #1/#3).
+    int   radialSymmetryRepeatCount = 3;
 
     ScatterTransform transform;
 };
@@ -69,6 +75,9 @@ struct UnitRule {
 
     bool  bSymmetryUseGlobal = true;
     int   symmetryMask       = 0;
+    // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
+    // `symmetryMask`. Zero PROC consumer yet (STEP16 ruling #1/#3).
+    int   radialSymmetryRepeatCount = 3;
 
     ScatterTransform transform;
 };

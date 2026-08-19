@@ -22,6 +22,7 @@ nlohmann::ordered_json BuildUnitRuleJson(const Params::UnitRule& rule) {
     json["MaskWeightMinimum"] = rule.maskWeightMinimum;
     json["SymmetryUseGlobal"] = rule.bSymmetryUseGlobal;
     json["SymmetryMask"] = rule.symmetryMask;
+    json["RadialSymmetryRepeatCount"] = rule.radialSymmetryRepeatCount;
     json["Transform"] = BuildScatterTransformJson(rule.transform);
     return json;
 }

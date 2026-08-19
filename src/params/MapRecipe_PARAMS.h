@@ -5,8 +5,12 @@
 // concerns (dispatch/backend) — those are not reproducible-recipe content.
 #pragma once
 #include <vector>
+#include "Accumulation_PARAMS.h"
 #include "Army_PARAMS.h"
 #include "Atmosphere_PARAMS.h"
+#include "DetailNormal_PARAMS.h"
+#include "Flow_PARAMS.h"
+#include "GeneralMapSettings_PARAMS.h"
 #include "Geometry_PARAMS.h"
 #include "GlobalMarkerSettings_PARAMS.h"
 #include "LayerStack_PARAMS.h"
@@ -26,6 +30,11 @@ namespace Params {
 
 struct MapRecipe {
     Geometry               geometry;
+    // The top-level `GeneralMapSettings` section (SANMAP_FORMAT_SPEC Correction 2): Seed/
+    // ScaleFeaturesToMapSize/TerrainMinHeight/WorldUnitsPerCell live ON `geometry` above (relocated
+    // OUT of the legacy `mapGeneratorData` blob on the wire, not out of Geometry in memory) —
+    // `generalMapSettings` itself holds only the one genuinely new field, `globalGravity`.
+    GeneralMapSettings     generalMapSettings;
     LayerStack             layerStack;
     // The ONE per-stratum settings array (ARCH §7.1). A stage reads a span of it; no stage
     // keeps a private per-stratum array. Shorter than MapFields::stratumCount is legal —
@@ -47,7 +56,32 @@ struct MapRecipe {
     // Sun/sky/fog/wind rendering-presentation recipe (ATMOSPHERE_PARAMS_SPEC) — a flat sibling of
     // `water`, no PROC/PIPELINE stage reads it yet (see the spec's own "Where these land").
     Atmosphere              atmosphere;
-    int                     globalSymmetryMask = SymmetryAxis::None;
+    // Reserved homes for the future two-simulation velocity->accumulation model
+    // (SANMAP_FORMAT_SPEC Correction 6) — flat siblings of `water`/`atmosphere`. `flow` carries the
+    // one real field the spec names (`flowMapColor`, a preview tint); `accumulation` is genuinely
+    // empty. No PROC consumer for either yet.
+    Flow                    flow;
+    Accumulation            accumulation;
+    // Reserved home for the future layered-heightmap-delta system (SANMAP_FORMAT_SPEC Correction
+    // 8) — a flat sibling of `flow`/`accumulation`. Carries the one live field the spec names
+    // (`mapSize`); the layered-heightmap-delta system itself has no PROC consumer yet. NOT wired
+    // to `DetailNormalTab_UI.h`'s `detailNormalSizeIndex`, which stays caller-owned tab state.
+    DetailNormal            detailNormal;
+    int                     globalSymmetryMask = SymmetryAxis::RotateHalfTurn;
+    // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
+    // `globalSymmetryMask`, NOT nested in a new sub-struct, so every existing
+    // `recipe.globalSymmetryMask` call site (Placement_Rules_PROC.cpp/Placement_Hash_PROC.cpp/
+    // IO/UI) stays untouched. Zero PROC consumer yet (STEP16 ruling #1/#3): `Radial` is a
+    // reserved bit with no orbit-generation branch in `BuildSymmetryOrbit`.
+    int                     radialSymmetryRepeatCount = 3;
+    // The aggregate home `Params::SymmetryDetection` was missing (retires SymmetryTab_UI.h SCOPE
+    // NOTE 2's "caller-owned" framing — STEP16). `globalSymmetryMask` above stays the ONE home of
+    // the mask (ARCH §7.1); this is a separate concept (what counts as symmetric vs. what
+    // symmetry to produce), not a rival store for it.
+    SymmetryDetection       symmetryDetection;
+    // The six exotic-blend scalars (Symmetry_PARAMS.h) — zero PROC consumer yet, same posture as
+    // `symmetryDetection` above.
+    SymmetryBlend           symmetryBlend;
     // Hand-placed, pass-through entity data (ENTITY_AUTHORING_PARAMS_SPEC) — round-trip fidelity
     // through the `.sanmap` `armies`/`areas`/`markers`/`chains` dictionaries is their entire
     // purpose; no PROC stage computes or reinterprets them.

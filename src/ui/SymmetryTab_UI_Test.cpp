@@ -69,7 +69,10 @@ void RunAxisOptionChecks() {
 // The tab edits `recipe.globalSymmetryMask` directly - no mirror word, no separate load/store step.
 void RunMirrorChecks() {
     Params::MapRecipe recipe;
-    Check(recipe.globalSymmetryMask == Params::SymmetryAxis::None, "a new recipe carries no symmetry");
+    // STEP16_SymmetryGlobalSettings_IO (ARCH-ratified): the default changed from None to
+    // RotateHalfTurn.
+    Check(recipe.globalSymmetryMask == Params::SymmetryAxis::RotateHalfTurn,
+          "a new recipe carries the RotateHalfTurn default");
 
     recipe.globalSymmetryMask = Params::SymmetryAxis::MirrorAcrossZ;
     Check(IsPlacementSymmetryAxisSet(recipe.globalSymmetryMask, 1), "the recipe's mask is read directly");
