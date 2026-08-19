@@ -446,9 +446,16 @@ move from **global scalars (v1)** to **per-layer fields on `Params::MarkerRule`*
 — a genuine addition to that type, not a relocation, needed for the coder
 work-order.
 
-**`GlobalMarkerSettings`** sub-key inside `MarkersStack`: `GlobalIconAlloy`,
-`GlobalIconPlasma`, `GlobalIconSpawn`, `MarkerColorAlloy`/`MarkerColorPlasma`/
-`MarkerColorSpawn`, `MarkerScaleAlloy`/`MarkerScalePlasma`/`MarkerScaleSpawn`.
+**`GlobalMarkerSettings`** is its own top-level PascalCase key, a sibling of
+`MarkersStack` — **not** nested inside it. (This correction's original text
+called it a "sub-key inside `MarkersStack`"; that phrasing is superseded by
+ARCH §11's ruling and STEP13's implementation, both of which ship it as a flat
+top-level sibling. `MarkersStack` is itself a bare array — Correction 7's own
+"flat array … wrapped under the new top-level key" wording above — so it could
+never structurally host a nested key regardless.) Fields:
+`GlobalIconAlloy`, `GlobalIconPlasma`, `GlobalIconSpawn`, `MarkerColorAlloy`/
+`MarkerColorPlasma`/`MarkerColorSpawn`, `MarkerScaleAlloy`/`MarkerScalePlasma`/
+`MarkerScaleSpawn`.
 **Ruled: `Plasma` = Energy, a real planned resource type, not the v1 invention
 flagged in `IO_PARITY_REPORT.md` Decision #5** — keep all three Plasma-named
 fields.
