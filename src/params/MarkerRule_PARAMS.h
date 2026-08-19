@@ -58,6 +58,14 @@ struct MarkerRule {
     bool bSymmetryUseGlobal = true;
     int  symmetryMask       = 0;
 
+    // Per-layer resource/spawn tuning (SANMAP_FORMAT_SPEC Correction 7): moved from v1's global
+    // scalars to per-`MarkerRule` fields, so different marker layers (e.g. an "outer expansions"
+    // layer vs. a "start Alloys" layer) can tune these independently (Constitution §8).
+    float hydroMultiplier = 1.0f;   // hydro-adjacent resource density multiplier
+    float reclaimDensity  = 0.0f;   // wreckage/reclaim density this layer seeds
+    float mexDensity      = 0.0f;   // Alloy (mex) spot density this layer seeds
+    int   spawnPointCount = 0;      // spawn positions this layer places, when category == Spawn
+
     // Instance transform (scale/rotation/align ranges + tpId).
     ScatterTransform transform;
 };

@@ -69,6 +69,59 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
           "the unit rules survive, including the per-rule symmetry override");
 }
 
+// STEP13_PlacementStacks_IO: the 4 new `MarkerRule` fields (SANMAP_FORMAT_SPEC Correction 7's
+// confirmed cardinality change: v1 global scalars, now per-layer fields) and the whole
+// `GlobalMarkerSettings` block (ARCH §11), all through the new top-level `MarkersStack`/
+// `GlobalMarkerSettings` keys — REPLACING the deleted `mapGeneratorData.PlacementRules` object.
+void CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(const Params::MapRecipe& original,
+                                                     const Params::MapRecipe& loaded) {
+    Check(!loaded.markerRules.empty()
+          && NearlyEqual(loaded.markerRules[0].hydroMultiplier, original.markerRules[0].hydroMultiplier)
+          && NearlyEqual(loaded.markerRules[0].reclaimDensity, original.markerRules[0].reclaimDensity)
+          && NearlyEqual(loaded.markerRules[0].mexDensity, original.markerRules[0].mexDensity)
+          && loaded.markerRules[0].spawnPointCount == original.markerRules[0].spawnPointCount,
+          "hydroMultiplier/reclaimDensity/mexDensity/spawnPointCount survive on MarkerRule "
+          "(previously write-only-to-nothing)");
+
+    const Params::GlobalMarkerSettings& originalSettings = original.globalMarkerSettings;
+    const Params::GlobalMarkerSettings& loadedSettings = loaded.globalMarkerSettings;
+    Check(loadedSettings.iconNameAlloy == originalSettings.iconNameAlloy
+          && loadedSettings.iconNamePlasma == originalSettings.iconNamePlasma
+          && loadedSettings.iconNameSpawn == originalSettings.iconNameSpawn,
+          "GlobalMarkerSettings's three icon names survive");
+    Check(NearlyEqual(loadedSettings.colorAlloy[0], originalSettings.colorAlloy[0])
+          && NearlyEqual(loadedSettings.colorAlloy[1], originalSettings.colorAlloy[1])
+          && NearlyEqual(loadedSettings.colorAlloy[2], originalSettings.colorAlloy[2])
+          && NearlyEqual(loadedSettings.colorAlloy[3], originalSettings.colorAlloy[3])
+          && NearlyEqual(loadedSettings.colorPlasma[0], originalSettings.colorPlasma[0])
+          && NearlyEqual(loadedSettings.colorSpawn[0], originalSettings.colorSpawn[0]),
+          "GlobalMarkerSettings's three colors survive, all four components each");
+    Check(NearlyEqual(loadedSettings.scaleAlloy, originalSettings.scaleAlloy)
+          && NearlyEqual(loadedSettings.scalePlasma, originalSettings.scalePlasma)
+          && NearlyEqual(loadedSettings.scaleSpawn, originalSettings.scaleSpawn),
+          "GlobalMarkerSettings's three scales survive");
+}
+
+// SANMAP_FORMAT_SPEC Correction 7, ruling #3: `mapGeneratorData.PlacementRules` is RELOCATED, not
+// dual-written — checked against the raw exported JSON TEXT of `mapGeneratorData` itself (not just
+// the C++ call sites), mirroring CheckRelocatedSlopeGateKeysNotInLegacyBlob's own style. Also
+// confirms the 5 new keys land as top-level SIBLINGS of `mapGeneratorData`, not nested inside it
+// (ruling #1/#2).
+void CheckPlacementStacksTopLevelNotNested(const std::string& documentText) {
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+    Check(document.contains("mapGeneratorData"), "mapGeneratorData still exists");
+    const std::string generatorDataText = document["mapGeneratorData"].dump();
+    Check(generatorDataText.find("PlacementRules") == std::string::npos,
+          "\"PlacementRules\" no longer appears anywhere under document[\"mapGeneratorData\"]");
+    Check(document.contains("MarkersStack") && document["MarkersStack"].is_array()
+          && document.contains("PropsStack") && document["PropsStack"].is_array()
+          && document.contains("DecalsStack") && document["DecalsStack"].is_array()
+          && document.contains("UnitsStack") && document["UnitsStack"].is_array()
+          && document.contains("GlobalMarkerSettings") && document["GlobalMarkerSettings"].is_object(),
+          "MarkersStack/PropsStack/DecalsStack/UnitsStack/GlobalMarkerSettings all appear as "
+          "top-level siblings of mapGeneratorData, not nested inside it");
+}
+
 // SANMAP_FORMAT_SPEC Correction 13: `BuildStratumLayersJson`'s real writes (albedo/normal/mask
 // paths, tileSizeFar no longer aliasing the near tileCount, the six fields that were never
 // written at all, farColorRemap) and `ReadStratumLayersJson`, the wholly new importer, both
@@ -564,6 +617,12 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     markerRule.count = 8;
     markerRule.clearanceSpacing = 14.0f;
     markerRule.symmetryMask = 1;
+    // STEP13_PlacementStacks_IO: the 4 new per-layer fields, non-default
+    // (CheckMarkerRuleNewFieldsAndGlobalMarkerSettings).
+    markerRule.hydroMultiplier = 1.8f;
+    markerRule.reclaimDensity  = 0.35f;
+    markerRule.mexDensity      = 0.6f;
+    markerRule.spawnPointCount = 6;
     recipe.markerRules.push_back(markerRule);
     Params::PropRule propRule;
     propRule.density = 0.4f;
@@ -582,6 +641,21 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     unitRule.bSymmetryUseGlobal = false;
     unitRule.symmetryMask = 4;
     recipe.unitRules.push_back(unitRule);
+
+    // STEP13_PlacementStacks_IO: every GlobalMarkerSettings field, non-default (ARCH §11).
+    Params::GlobalMarkerSettings& globalMarkerSettings = recipe.globalMarkerSettings;
+    globalMarkerSettings.iconNameAlloy  = "AlloyIconAlt";
+    globalMarkerSettings.iconNamePlasma = "PlasmaIconAlt";
+    globalMarkerSettings.iconNameSpawn  = "SpawnIconAlt";
+    globalMarkerSettings.colorAlloy[0] = 0.11f; globalMarkerSettings.colorAlloy[1] = 0.22f;
+    globalMarkerSettings.colorAlloy[2] = 0.33f; globalMarkerSettings.colorAlloy[3] = 0.44f;
+    globalMarkerSettings.colorPlasma[0] = 0.55f; globalMarkerSettings.colorPlasma[1] = 0.66f;
+    globalMarkerSettings.colorPlasma[2] = 0.77f; globalMarkerSettings.colorPlasma[3] = 0.88f;
+    globalMarkerSettings.colorSpawn[0] = 0.12f; globalMarkerSettings.colorSpawn[1] = 0.34f;
+    globalMarkerSettings.colorSpawn[2] = 0.56f; globalMarkerSettings.colorSpawn[3] = 0.78f;
+    globalMarkerSettings.scaleAlloy  = 0.25f;
+    globalMarkerSettings.scalePlasma = 0.3f;
+    globalMarkerSettings.scaleSpawn  = 0.2f;
 }
 
 void FillFixtureArmiesAndAreas(Params::MapRecipe& recipe) {
@@ -818,6 +892,8 @@ void RunRoundTripTests() {
     Check(result.warningCount == 0, "with no warning: the two halves agree key for key");
     CheckGeometryAndWater(original, loaded);
     CheckLayerStackAndRules(original, loaded);
+    CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(original, loaded);
+    CheckPlacementStacksTopLevelNotNested(documentText);
     CheckStratumAppearance(original, loaded);
     CheckStratumGenerationSettings(original, loaded);
     CheckLegacyStratumBlobFieldsStillSurvive(original, loaded);

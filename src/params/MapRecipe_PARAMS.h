@@ -8,6 +8,7 @@
 #include "Army_PARAMS.h"
 #include "Atmosphere_PARAMS.h"
 #include "Geometry_PARAMS.h"
+#include "GlobalMarkerSettings_PARAMS.h"
 #include "LayerStack_PARAMS.h"
 #include "MapArea_PARAMS.h"
 #include "MarkerChain_PARAMS.h"
@@ -38,6 +39,10 @@ struct MapRecipe {
     std::vector<PropRule>   propRules;
     std::vector<DecalRule>  decalRules;
     std::vector<UnitRule>   unitRules;
+    // Map-wide default icon/color/scale for the three resource marker kinds (ARCH §11, completes
+    // SANMAP_FORMAT_SPEC Correction 7) — a flat sibling of `markerRules`, for now (a future
+    // MarkersStack Group/Layer wrapper may fold this inside it later; not designed here).
+    GlobalMarkerSettings    globalMarkerSettings;
     Water                   water;
     // Sun/sky/fog/wind rendering-presentation recipe (ATMOSPHERE_PARAMS_SPEC) — a flat sibling of
     // `water`, no PROC/PIPELINE stage reads it yet (see the spec's own "Where these land").

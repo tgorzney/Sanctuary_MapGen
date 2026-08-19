@@ -69,7 +69,9 @@ nlohmann::ordered_json BuildMapGeneratorDataJson(const Params::MapRecipe& recipe
     water["DeepWaterDepthMin"] = recipe.water.deepWaterDepthMinimum;
     water["DeepWaterDepthMax"] = recipe.water.deepWaterDepthMaximum;
     generatorData["Water"] = water;
-    generatorData["PlacementRules"] = BuildPlacementRulesJson(recipe);
+    // The four placement-rule vectors RELOCATED to the top-level `MarkersStack`/`PropsStack`/
+    // `DecalsStack`/`UnitsStack` keys (SANMAP_FORMAT_SPEC Correction 7, ruling #3) — no longer
+    // written here.
     return generatorData;
 }
 
@@ -116,6 +118,17 @@ std::string MapExporter::BuildSanmapJsonText(const Params::MapRecipe& recipe,
     document["props"]       = BuildPropsJson(recipe);
     document["PropGroups"]  = BuildPropGroupsJson(recipe);
     document["DecalGroups"] = BuildDecalGroupsJson(recipe);
+
+    // SANMAP_FORMAT_SPEC Correction 7: the four placement-rule vectors as bare top-level arrays,
+    // siblings of `mapGeneratorData` (ruling #1), REPLACING the legacy nested
+    // `mapGeneratorData.PlacementRules` object written above by `BuildMapGeneratorDataJson`.
+    // `GlobalMarkerSettings` is its own top-level key, a sibling of `MarkersStack` (ARCH §11,
+    // ruling #2), not nested inside it.
+    document["MarkersStack"] = BuildMarkersStackJson(recipe);
+    document["PropsStack"]   = BuildPropsStackJson(recipe);
+    document["DecalsStack"]  = BuildDecalsStackJson(recipe);
+    document["UnitsStack"]   = BuildUnitsStackJson(recipe);
+    document["GlobalMarkerSettings"] = BuildGlobalMarkerSettingsJson(recipe);
 
     // ATMOSPHERE_PARAMS_SPEC: ~49 flat top-level keys (`sunRA`, `skylightIntensity`, `windSpeed`,
     // ...), same tier as the entity domains above — writes directly into `document`, see

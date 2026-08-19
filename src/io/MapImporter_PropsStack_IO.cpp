@@ -1,0 +1,33 @@
+// MapImporter_PropsStack_IO.cpp — the top-level `PropsStack` array -> `recipe.propRules`.
+// Layer: IO. The exact inverse of MapExporter_PropsStack_IO.cpp. `ReadPropRuleJson`'s body is
+// relocated verbatim from the deleted MapImporter_Rules_IO.cpp; only its container changed. Same
+// tier/calling contract as `areas`/`armies`/`PropGroups`/etc.: takes the top-level `document`
+// directly and is called unconditionally, BEFORE the `mapGeneratorData` presence gate.
+#include "MapImporter_Recipe_IO.h"
+#include "MapImporter_ScatterTransform_IO.h"
+#include "../params/MapRecipe_PARAMS.h"
+
+namespace SanmapGen {
+namespace Io {
+namespace {
+
+void ReadPropRuleJson(const nlohmann::json& json, Params::PropRule& rule) {
+    ReadSharedRuleGates(json, rule);
+    ReadJsonFloat(json, "Density", rule.density);
+    ReadJsonBoolean(json, "AvoidWater", rule.bAvoidWater);
+    ReadJsonBoolean(json, "NearCliffs", rule.bNearCliffs);
+    ReadJsonFloat(json, "SpacingMinimum", rule.spacingMinimum);
+    ReadJsonFloat(json, "ObstacleDistanceMinimum", rule.obstacleDistanceMinimum);
+    ReadJsonFloat(json, "NearCliffDistanceMaximum", rule.nearCliffDistanceMaximum);
+    ReadJsonBoolean(json, "SymmetryUseGlobal", rule.bSymmetryUseGlobal);
+    ReadJsonInteger(json, "SymmetryMask", rule.symmetryMask);
+}
+
+} // namespace
+
+void ReadPropsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
+    ReadRuleArray(document, "PropsStack", outRecipe.propRules, ReadPropRuleJson);
+}
+
+} // namespace Io
+} // namespace SanmapGen

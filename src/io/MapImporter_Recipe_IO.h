@@ -42,7 +42,6 @@ void ReadGeometryJson(const nlohmann::json& generatorData, const MapImportOption
 void ReadWaterJson(const nlohmann::json& generatorData, Params::MapRecipe& outRecipe);
 void ReadLayerStackJson(const nlohmann::json& generatorData, Params::LayerStack& outLayerStack);
 void ReadStrataSettingsJson(const nlohmann::json& generatorData, Params::MapRecipe& outRecipe);
-void ReadPlacementRulesJson(const nlohmann::json& generatorData, Params::MapRecipe& outRecipe);
 
 // MapImporter_Areas_IO.cpp / MapImporter_Armies_IO.cpp — `areas`/`armies` are top-level `.sanmap`
 // keys, SIBLINGS of `mapGeneratorData`, not nested inside it. Both take the top-level `document`
@@ -108,6 +107,21 @@ void ReadStratumLayersJson(const nlohmann::json& document, Params::MapRecipe& ou
 // logged warning via `result` — never a silent truncation, never a hard refusal.
 void ReadStratumGenerationSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
                                       MapImportResult& result);
+
+// MapImporter_MarkersStack_IO.cpp / MapImporter_PropsStack_IO.cpp / MapImporter_DecalsStack_IO.cpp /
+// MapImporter_UnitsStack_IO.cpp — the top-level `MarkersStack`/`PropsStack`/`DecalsStack`/
+// `UnitsStack` arrays -> `recipe.markerRules`/`propRules`/`decalRules`/`unitRules`
+// (SANMAP_FORMAT_SPEC Correction 7, ruling #1), REPLACING the legacy, now-deleted
+// `ReadPlacementRulesJson`/`mapGeneratorData.PlacementRules` (ruling #3). `ReadGlobalMarkerSettingsJson`
+// — the top-level `GlobalMarkerSettings` object -> `recipe.globalMarkerSettings` (ARCH §11, ruling
+// #2), a SIBLING read of `MarkersStack`, not nested inside it. Same tier and calling contract as
+// `areas`/`armies`/`PropGroups`/etc. above: each takes the top-level `document` directly and must
+// be called unconditionally, BEFORE the `mapGeneratorData` presence gate.
+void ReadMarkersStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadGlobalMarkerSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadPropsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadDecalsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadUnitsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 
 } // namespace Io
 } // namespace SanmapGen

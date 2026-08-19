@@ -14,7 +14,7 @@ namespace {
 constexpr int factionCount = 3;   // Chosen, Guard, EDA
 
 // The buffer is fixed width and must stay NUL-terminated whatever the document claimed — the same
-// bounded copy ReadScatterTransformJson (MapImporter_Rules_IO.cpp) uses for `tpid`.
+// bounded copy ReadScatterTransformJson (MapImporter_ScatterTransform_IO.cpp) uses for `tpid`.
 void CopyBoundedTemplateIdentifier(const std::string& text, char (&templateIdentifier)[8]) {
     const std::size_t capacity = sizeof(templateIdentifier) - 1u;
     const std::size_t copyLength = text.size() < capacity ? text.size() : capacity;

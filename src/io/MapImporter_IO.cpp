@@ -125,6 +125,16 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     // separate, legacy `mapGeneratorData.Stratums` blob's remaining 5 fields and MERGES onto
     // whatever this call already wrote.
     ReadStratumGenerationSettingsJson(document, outRecipe, result);
+    // SANMAP_FORMAT_SPEC Correction 7: `MarkersStack`/`PropsStack`/`DecalsStack`/`UnitsStack`/
+    // `GlobalMarkerSettings`, same tier/ordering rule as every top-level-key reader above —
+    // unconditional, before the mapGeneratorData gate below. REPLACES the deleted
+    // `ReadPlacementRulesJson(generatorData, outRecipe)` call that used to run inside that gate
+    // (ruling #3: relocated, not dual-written).
+    ReadMarkersStackJson(document, outRecipe);
+    ReadGlobalMarkerSettingsJson(document, outRecipe);
+    ReadPropsStackJson(document, outRecipe);
+    ReadDecalsStackJson(document, outRecipe);
+    ReadUnitsStackJson(document, outRecipe);
 
     if (!document.contains("mapGeneratorData") || !document["mapGeneratorData"].is_object()) {
         result.Warn("No mapGeneratorData block: only the map's own dimensions were recovered.");
@@ -135,7 +145,6 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     ReadWaterJson(generatorData, outRecipe);
     ReadLayerStackJson(generatorData, outRecipe.layerStack);
     ReadStrataSettingsJson(generatorData, outRecipe);
-    ReadPlacementRulesJson(generatorData, outRecipe);
     return true;
 }
 

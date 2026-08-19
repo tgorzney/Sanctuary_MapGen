@@ -26,8 +26,19 @@ nlohmann::ordered_json BuildStratumLayersJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildLayerStackJson(const Params::LayerStack& layerStack);
 nlohmann::ordered_json BuildStrataSettingsJson(const Params::MapRecipe& recipe);
 
-// MapExporter_Rules_IO.cpp — the four placement rule vectors, as one object.
-nlohmann::ordered_json BuildPlacementRulesJson(const Params::MapRecipe& recipe);
+// MapExporter_MarkersStack_IO.cpp / MapExporter_PropsStack_IO.cpp / MapExporter_DecalsStack_IO.cpp /
+// MapExporter_UnitsStack_IO.cpp — `recipe.markerRules`/`propRules`/`decalRules`/`unitRules` -> the
+// top-level `MarkersStack`/`PropsStack`/`DecalsStack`/`UnitsStack` bare JSON ARRAYS
+// (SANMAP_FORMAT_SPEC Correction 7, ruling #1), siblings of `mapGeneratorData`, REPLACING the old
+// nested `mapGeneratorData.PlacementRules` object (relocated, not duplicated — ruling #3).
+// `BuildGlobalMarkerSettingsJson` — `recipe.globalMarkerSettings` -> the top-level
+// `GlobalMarkerSettings` object (ARCH §11), a SIBLING of `MarkersStack`, not nested inside it
+// (ruling #2).
+nlohmann::ordered_json BuildMarkersStackJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildGlobalMarkerSettingsJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildPropsStackJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildDecalsStackJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildUnitsStackJson(const Params::MapRecipe& recipe);
 
 // MapExporter_Areas_IO.cpp — `recipe.areas` -> the top-level `areas` dictionary (JSON object keyed
 // by MapArea::name). No coordinate flip (ENTITY_AUTHORING_PARAMS_SPEC finding 3).
