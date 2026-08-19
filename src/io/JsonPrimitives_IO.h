@@ -56,6 +56,22 @@ inline bool ReadJsonEnumeration(const nlohmann::json& parent, const char* key, i
     return true;
 }
 
+// Reads an integer and CLAMPS it into [minimum, maximum], OVERWRITING `destination` with the
+// clamped result — unlike `ReadJsonEnumeration`, which REJECTS an out-of-range value and leaves
+// `destination` at its prior/default. A saved 500 imports as `maximum`, not as whatever the
+// struct's own default happened to be (STEP23 ruling #6, e.g. `radialSymmetryRepeatCount`). Silent,
+// no logging — same posture as `ReadJsonEnumeration`'s idiom (no logging subsystem exists in
+// src/sys, Constitution §6); human-facing surfacing belongs on a future UI widget ticket.
+inline bool ReadJsonIntegerClamped(const nlohmann::json& parent, const char* key, int minimum,
+                                   int maximum, int& destination) {
+    int value = destination;
+    if (!ReadJsonInteger(parent, key, value)) return false;
+    if (value < minimum) value = minimum;
+    if (value > maximum) value = maximum;
+    destination = value;
+    return true;
+}
+
 // --- The transform primitives every migration composes from (IO_MIGRATION_SPEC.md §5). ---------
 
 // Moves a value to a new key in the SAME object. No-op — total and idempotent — if `oldKey` is

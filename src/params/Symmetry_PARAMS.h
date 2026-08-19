@@ -15,16 +15,26 @@ namespace SymmetryAxis {
     constexpr int MirrorAcrossZ  = 1 << 1;   // z -> (extent - z)
     constexpr int RotateHalfTurn = 1 << 2;   // 180 degrees about the map center (point symmetry)
     constexpr int QuarterTurns   = 1 << 3;   // 90/180/270 degrees about the map center
-    // Reserved bit (ARCH.md §13, STEP16 ruling #1/#3): N-way rotation, count set by the sibling
-    // `radialSymmetryRepeatCount` field. `BuildSymmetryOrbit` (Placement_Symmetry_PROC.h) has no
-    // branch for this bit yet, so a mask with it set produces no clones — dormant, not dangerous
-    // (confirmed by direct read: the orbit builder is 4 explicit branches, not a generic bit walk).
-    // The actual N-way rotation generator (`AppendRadialTurns`) is separate, future PROC work.
+    // N-way rotation (ARCH.md §13, STEP16 ruling #1/#3, STEP23): count set by the sibling
+    // `radialSymmetryRepeatCount` field. `BuildSymmetryOrbit`/`AppendRadialTurns`
+    // (Placement_Symmetry_PROC.h) generate the orbit directly from each turn's angle (STEP23
+    // ruling #1) — bit-check order tracks ascending bit value, so `Radial` runs last, after
+    // `QuarterTurns`.
     constexpr int Radial         = 1 << 4;
 }
 
-// Highest clone count any single mask can produce (mirror X * mirror Z * quarter turns).
-constexpr int symmetryOrbitMaximum = 16;
+// The `[minimum, maximum]` range `radialSymmetryRepeatCount` is clamped to at every IO read site
+// (STEP23 ruling #2/#6) — single source of truth for IO, the PROC-level defensive clamp, and the
+// future UI slider. `N < 2` is not a rotation (identity only); `12` is a policy ceiling, generous
+// for RTS-scale radial team symmetry (no existing player/army-count constant to derive it from).
+constexpr int radialSymmetryRepeatCountMinimum = 2;
+constexpr int radialSymmetryRepeatCountMaximum = 12;
+
+// Highest clone count any single mask can produce: mirror X * mirror Z * quarter turns * Radial's
+// N (STEP23 ruling #6). Must stay >= 16 * radialSymmetryRepeatCountMaximum so a future ceiling
+// change doesn't silently reopen the buffer-overflow risk ARCH §13 Defect 2 flagged (at N_max=12:
+// 16 * 12 = 192; 256 leaves one page / power-of-two headroom against future symmetry families).
+constexpr int symmetryOrbitMaximum = 256;
 
 // The two settings the Symmetry tab promotes out of v1 (WO C1). They are about RECOGNISING
 // symmetry in a heightfield that already exists — an imported map, or an authored stack that is

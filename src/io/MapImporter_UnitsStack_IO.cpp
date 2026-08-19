@@ -18,7 +18,8 @@ void ReadUnitRuleJson(const nlohmann::json& json, Params::UnitRule& rule) {
     ReadJsonFloat(json, "SpacingMinimum", rule.spacingMinimum);
     ReadJsonBoolean(json, "SymmetryUseGlobal", rule.bSymmetryUseGlobal);
     ReadJsonInteger(json, "SymmetryMask", rule.symmetryMask);
-    ReadJsonInteger(json, "RadialSymmetryRepeatCount", rule.radialSymmetryRepeatCount);
+    ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,
+                          Params::radialSymmetryRepeatCountMaximum, rule.radialSymmetryRepeatCount);
 }
 
 } // namespace

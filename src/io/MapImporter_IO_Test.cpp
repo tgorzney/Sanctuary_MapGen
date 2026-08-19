@@ -1305,6 +1305,70 @@ void CheckAccumulationReaderToleratesUnrecognizedKeys() {
     Check(true, "an Accumulation object carrying unrecognized future keys reads without error");
 }
 
+// STEP23_RadialSymmetryOrbit_PROC acceptance test 6: `ReadJsonIntegerClamped` round-trips an
+// in-range value exactly and CLAMPS an out-of-range `RadialSymmetryRepeatCount` into [2, 12],
+// OVERWRITING `destination` with the clamped result rather than leaving it at its prior/default —
+// verified via raw-JSON-text fixtures (not just call-site inspection), at the `Symmetry` global
+// section and one per-rule stack (`MarkersStack`), mirroring
+// CheckUnrecognizedSkyboxIntensityModeFallsBackSafely's own pure-reader style above.
+void CheckRadialSymmetryRepeatCountClampsOnImport() {
+    // --- the Symmetry global section: in-range round-trips exactly, out-of-range clamps.
+    {
+        nlohmann::json document;
+        document["Symmetry"]["RadialSymmetryRepeatCount"] = 7;
+        Params::MapRecipe loaded;
+        Io::ReadSymmetryJson(document, loaded);
+        Check(loaded.radialSymmetryRepeatCount == 7,
+              "Symmetry.RadialSymmetryRepeatCount round-trips an in-range value exactly");
+    }
+    {
+        nlohmann::json document;
+        document["Symmetry"]["RadialSymmetryRepeatCount"] = 500;
+        Params::MapRecipe loaded;
+        Io::ReadSymmetryJson(document, loaded);
+        Check(loaded.radialSymmetryRepeatCount == Params::radialSymmetryRepeatCountMaximum,
+              "Symmetry.RadialSymmetryRepeatCount clamps 500 down to the [2, 12] maximum, "
+              "overwriting destination rather than leaving it at its prior/default");
+    }
+    for (int outOfRangeValue : { 0, 1, -5 }) {
+        nlohmann::json document;
+        document["Symmetry"]["RadialSymmetryRepeatCount"] = outOfRangeValue;
+        Params::MapRecipe loaded;
+        loaded.radialSymmetryRepeatCount = 9999;   // a value the clamp must overwrite, not preserve
+        Io::ReadSymmetryJson(document, loaded);
+        Check(loaded.radialSymmetryRepeatCount == Params::radialSymmetryRepeatCountMinimum,
+              "Symmetry.RadialSymmetryRepeatCount clamps an out-of-range low value up to the "
+              "[2, 12] minimum, overwriting destination");
+    }
+
+    // --- one per-rule stack (MarkersStack): the same clamp behavior on MarkerRule::
+    // radialSymmetryRepeatCount, confirming the wiring is not Symmetry-section-specific.
+    {
+        nlohmann::json document;
+        document["MarkersStack"] = nlohmann::json::array();
+        nlohmann::json markerJson;
+        markerJson["RadialSymmetryRepeatCount"] = 0;
+        document["MarkersStack"].push_back(markerJson);
+        Params::MapRecipe loaded;
+        Io::ReadMarkersStackJson(document, loaded);
+        Check(!loaded.markerRules.empty()
+              && loaded.markerRules[0].radialSymmetryRepeatCount == Params::radialSymmetryRepeatCountMinimum,
+              "MarkersStack[0].RadialSymmetryRepeatCount clamps 0 up to the [2, 12] minimum on import");
+    }
+    {
+        nlohmann::json document;
+        document["MarkersStack"] = nlohmann::json::array();
+        nlohmann::json markerJson;
+        markerJson["RadialSymmetryRepeatCount"] = 500;
+        document["MarkersStack"].push_back(markerJson);
+        Params::MapRecipe loaded;
+        Io::ReadMarkersStackJson(document, loaded);
+        Check(!loaded.markerRules.empty()
+              && loaded.markerRules[0].radialSymmetryRepeatCount == Params::radialSymmetryRepeatCountMaximum,
+              "MarkersStack[0].RadialSymmetryRepeatCount clamps 500 down to the [2, 12] maximum on import");
+    }
+}
+
 } // namespace MapFormatTest
 } // namespace SanmapGen
 
@@ -1314,6 +1378,7 @@ int main() {
     SanmapGen::MapFormatTest::CheckStratumLayersCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::CheckStratumGenerationSettingsCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::CheckAccumulationReaderToleratesUnrecognizedKeys();
+    SanmapGen::MapFormatTest::CheckRadialSymmetryRepeatCountClampsOnImport();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

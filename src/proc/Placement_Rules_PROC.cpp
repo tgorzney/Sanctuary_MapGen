@@ -15,7 +15,8 @@ inline float ReciprocalOrZero(float value, float epsilon) {
 
 void AppendMarkerRules(const PlacementConstants& constants, const Params::MapRecipe& recipe,
                        std::vector<ScatterRuleConfiguration>& configurations,
-                       std::vector<Data::TemplateIdentifier>& identifiers) {
+                       std::vector<Data::TemplateIdentifier>& identifiers,
+                       std::vector<int>& radialSymmetryRepeatCounts) {
     for (std::size_t index = 0; index < recipe.markerRules.size(); ++index) {
         const Params::MarkerRule& rule = recipe.markerRules[index];
         // A hidden rule still generates: its markers hold clearance/fairness even when the
@@ -28,6 +29,8 @@ void AppendMarkerRules(const PlacementConstants& constants, const Params::MapRec
         configuration.focusGradientMode = static_cast<int>(rule.focusGradient);
         configuration.symmetryMask      = ResolveSymmetryMask(rule.bSymmetryUseGlobal, rule.symmetryMask,
                                                               recipe.globalSymmetryMask);
+        const int radialSymmetryRepeatCount = ResolveRadialSymmetryRepeatCount(
+            rule.bSymmetryUseGlobal, rule.radialSymmetryRepeatCount, recipe.radialSymmetryRepeatCount);
         configuration.targetCount             = rule.count;
         configuration.density                 = rule.density;
         configuration.spacingMinimum          = rule.clearanceSpacing;
@@ -46,12 +49,14 @@ void AppendMarkerRules(const PlacementConstants& constants, const Params::MapRec
         if (rule.bHidden)             configuration.selectionFlags |= ScatterSelectionFlag::Hidden;
         configurations.push_back(configuration);
         identifiers.push_back(Data::MakeTemplateIdentifier(rule.transform.templateIdentifier));
+        radialSymmetryRepeatCounts.push_back(radialSymmetryRepeatCount);
     }
 }
 
 void AppendPropRules(const PlacementConstants& constants, const Params::MapRecipe& recipe,
                      std::vector<ScatterRuleConfiguration>& configurations,
-                     std::vector<Data::TemplateIdentifier>& identifiers) {
+                     std::vector<Data::TemplateIdentifier>& identifiers,
+                     std::vector<int>& radialSymmetryRepeatCounts) {
     for (std::size_t index = 0; index < recipe.propRules.size(); ++index) {
         const Params::PropRule& rule = recipe.propRules[index];
         if (!rule.bEnabled) continue;
@@ -59,6 +64,8 @@ void AppendPropRules(const PlacementConstants& constants, const Params::MapRecip
             constants, recipe.geometry, recipe.water, rule, static_cast<int>(index), 1);
         configuration.symmetryMask = ResolveSymmetryMask(rule.bSymmetryUseGlobal, rule.symmetryMask,
                                                          recipe.globalSymmetryMask);
+        const int radialSymmetryRepeatCount = ResolveRadialSymmetryRepeatCount(
+            rule.bSymmetryUseGlobal, rule.radialSymmetryRepeatCount, recipe.radialSymmetryRepeatCount);
         configuration.density                  = rule.density;
         configuration.spacingMinimum           = rule.spacingMinimum;
         configuration.obstacleDistanceMinimum  = rule.obstacleDistanceMinimum;
@@ -68,12 +75,14 @@ void AppendPropRules(const PlacementConstants& constants, const Params::MapRecip
         if (rule.bNearCliffs) configuration.selectionFlags |= ScatterSelectionFlag::NearCliffs;
         configurations.push_back(configuration);
         identifiers.push_back(Data::MakeTemplateIdentifier(rule.transform.templateIdentifier));
+        radialSymmetryRepeatCounts.push_back(radialSymmetryRepeatCount);
     }
 }
 
 void AppendUnitRules(const PlacementConstants& constants, const Params::MapRecipe& recipe,
                      std::vector<ScatterRuleConfiguration>& configurations,
-                     std::vector<Data::TemplateIdentifier>& identifiers) {
+                     std::vector<Data::TemplateIdentifier>& identifiers,
+                     std::vector<int>& radialSymmetryRepeatCounts) {
     for (std::size_t index = 0; index < recipe.unitRules.size(); ++index) {
         const Params::UnitRule& rule = recipe.unitRules[index];
         if (!rule.bEnabled) continue;
@@ -81,17 +90,21 @@ void AppendUnitRules(const PlacementConstants& constants, const Params::MapRecip
             constants, recipe.geometry, recipe.water, rule, static_cast<int>(index), 2);
         configuration.symmetryMask = ResolveSymmetryMask(rule.bSymmetryUseGlobal, rule.symmetryMask,
                                                          recipe.globalSymmetryMask);
+        const int radialSymmetryRepeatCount = ResolveRadialSymmetryRepeatCount(
+            rule.bSymmetryUseGlobal, rule.radialSymmetryRepeatCount, recipe.radialSymmetryRepeatCount);
         configuration.armyIndex      = rule.armyIndex;
         configuration.targetCount    = rule.count;
         configuration.spacingMinimum = rule.spacingMinimum;
         configurations.push_back(configuration);
         identifiers.push_back(Data::MakeTemplateIdentifier(rule.transform.templateIdentifier));
+        radialSymmetryRepeatCounts.push_back(radialSymmetryRepeatCount);
     }
 }
 
 void AppendDecalRules(const PlacementConstants& constants, const Params::MapRecipe& recipe,
                       std::vector<ScatterRuleConfiguration>& configurations,
-                      std::vector<Data::TemplateIdentifier>& identifiers) {
+                      std::vector<Data::TemplateIdentifier>& identifiers,
+                      std::vector<int>& radialSymmetryRepeatCounts) {
     for (std::size_t index = 0; index < recipe.decalRules.size(); ++index) {
         const Params::DecalRule& rule = recipe.decalRules[index];
         if (!rule.bEnabled) continue;
@@ -99,11 +112,14 @@ void AppendDecalRules(const PlacementConstants& constants, const Params::MapReci
             constants, recipe.geometry, recipe.water, rule, static_cast<int>(index), 3);
         configuration.symmetryMask = ResolveSymmetryMask(rule.bSymmetryUseGlobal, rule.symmetryMask,
                                                          recipe.globalSymmetryMask);
+        const int radialSymmetryRepeatCount = ResolveRadialSymmetryRepeatCount(
+            rule.bSymmetryUseGlobal, rule.radialSymmetryRepeatCount, recipe.radialSymmetryRepeatCount);
         configuration.density        = rule.density;
         configuration.spacingMinimum = rule.spacingMinimum;
         configuration.selectionFlags |= ScatterSelectionFlag::UseDensity;
         configurations.push_back(configuration);
         identifiers.push_back(Data::MakeTemplateIdentifier(rule.transform.templateIdentifier));
+        radialSymmetryRepeatCounts.push_back(radialSymmetryRepeatCount);
     }
 }
 
@@ -112,10 +128,15 @@ void AppendDecalRules(const PlacementConstants& constants, const Params::MapReci
 void PlacementStage::BuildRuleConfigurations() {
     ruleConfigurations.clear();
     ruleTemplateIdentifiers.clear();
-    AppendMarkerRules(constants, recipe, ruleConfigurations, ruleTemplateIdentifiers);
-    AppendPropRules(constants, recipe, ruleConfigurations, ruleTemplateIdentifiers);
-    AppendUnitRules(constants, recipe, ruleConfigurations, ruleTemplateIdentifiers);
-    AppendDecalRules(constants, recipe, ruleConfigurations, ruleTemplateIdentifiers);
+    ruleRadialSymmetryRepeatCounts.clear();
+    AppendMarkerRules(constants, recipe, ruleConfigurations, ruleTemplateIdentifiers,
+                      ruleRadialSymmetryRepeatCounts);
+    AppendPropRules(constants, recipe, ruleConfigurations, ruleTemplateIdentifiers,
+                    ruleRadialSymmetryRepeatCounts);
+    AppendUnitRules(constants, recipe, ruleConfigurations, ruleTemplateIdentifiers,
+                    ruleRadialSymmetryRepeatCounts);
+    AppendDecalRules(constants, recipe, ruleConfigurations, ruleTemplateIdentifiers,
+                     ruleRadialSymmetryRepeatCounts);
 }
 
 } // namespace Proc

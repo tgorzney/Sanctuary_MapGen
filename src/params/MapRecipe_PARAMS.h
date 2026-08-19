@@ -71,8 +71,10 @@ struct MapRecipe {
     // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
     // `globalSymmetryMask`, NOT nested in a new sub-struct, so every existing
     // `recipe.globalSymmetryMask` call site (Placement_Rules_PROC.cpp/Placement_Hash_PROC.cpp/
-    // IO/UI) stays untouched. Zero PROC consumer yet (STEP16 ruling #1/#3): `Radial` is a
-    // reserved bit with no orbit-generation branch in `BuildSymmetryOrbit`.
+    // IO/UI) stays untouched. Consumed by `AppendRadialTurns`/`BuildSymmetryOrbit`
+    // (Placement_Symmetry_PROC.h, STEP23) via `ResolveRadialSymmetryRepeatCount`, the same
+    // `bSymmetryUseGlobal` switch `ResolveSymmetryMask` already uses for `globalSymmetryMask`.
+    // Clamped to `[Params::radialSymmetryRepeatCountMinimum, ...Maximum]` at every IO read site.
     int                     radialSymmetryRepeatCount = 3;
     // The aggregate home `Params::SymmetryDetection` was missing (retires SymmetryTab_UI.h SCOPE
     // NOTE 2's "caller-owned" framing — STEP16). `globalSymmetryMask` above stays the ONE home of

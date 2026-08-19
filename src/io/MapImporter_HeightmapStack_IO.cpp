@@ -71,7 +71,8 @@ void ReadLayerJson(const nlohmann::json& json, Params::Layer& layer) {
     // heightfield-symmetry stage exists yet; Correction 4/ARCH territory, explicitly deferred).
     ReadJsonBoolean(json, "SymmetryUseGlobal", layer.bSymmetryUseGlobal);
     ReadJsonInteger(json, "SymmetryMask", layer.symmetryMask);
-    ReadJsonInteger(json, "RadialSymmetryRepeatCount", layer.radialSymmetryRepeatCount);
+    ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,
+                          Params::radialSymmetryRepeatCountMaximum, layer.radialSymmetryRepeatCount);
 }
 
 void ReadGeoLayerJson(const nlohmann::json& json, Params::GeoLayer& geoLayer) {
@@ -88,7 +89,8 @@ void ReadGeoLayerJson(const nlohmann::json& json, Params::GeoLayer& geoLayer) {
     // Correction 3's genuinely new fields — same posture as Layer's own pair above.
     ReadJsonBoolean(json, "SymmetryUseGlobal", geoLayer.bSymmetryUseGlobal);
     ReadJsonInteger(json, "SymmetryMask", geoLayer.symmetryMask);
-    ReadJsonInteger(json, "RadialSymmetryRepeatCount", geoLayer.radialSymmetryRepeatCount);
+    ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,
+                          Params::radialSymmetryRepeatCountMaximum, geoLayer.radialSymmetryRepeatCount);
     if (!json.contains("Layers") || !json["Layers"].is_array()) return;
     for (const nlohmann::json& layerJson : json["Layers"]) {
         Params::Layer layer;

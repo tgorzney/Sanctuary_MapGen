@@ -29,7 +29,9 @@ struct PropRule {
     bool  bSymmetryUseGlobal = true;
     int   symmetryMask       = 0;
     // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
-    // `symmetryMask`. Zero PROC consumer yet (STEP16 ruling #1/#3).
+    // `symmetryMask`. Consumed by `AppendRadialTurns`/`BuildSymmetryOrbit` via
+    // `ResolveRadialSymmetryRepeatCount` (STEP23), the same `bSymmetryUseGlobal` switch
+    // `ResolveSymmetryMask` already uses for `symmetryMask`.
     int   radialSymmetryRepeatCount = 3;
 
     ScatterTransform transform;
@@ -51,7 +53,9 @@ struct DecalRule {
     bool  bSymmetryUseGlobal = true;
     int   symmetryMask       = 0;
     // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
-    // `symmetryMask`. Zero PROC consumer yet (STEP16 ruling #1/#3).
+    // `symmetryMask`. Consumed by `AppendRadialTurns`/`BuildSymmetryOrbit` via
+    // `ResolveRadialSymmetryRepeatCount` (STEP23), the same `bSymmetryUseGlobal` switch
+    // `ResolveSymmetryMask` already uses for `symmetryMask`.
     int   radialSymmetryRepeatCount = 3;
 
     ScatterTransform transform;
@@ -76,7 +80,9 @@ struct UnitRule {
     bool  bSymmetryUseGlobal = true;
     int   symmetryMask       = 0;
     // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
-    // `symmetryMask`. Zero PROC consumer yet (STEP16 ruling #1/#3).
+    // `symmetryMask`. Consumed by `AppendRadialTurns`/`BuildSymmetryOrbit` via
+    // `ResolveRadialSymmetryRepeatCount` (STEP23), the same `bSymmetryUseGlobal` switch
+    // `ResolveSymmetryMask` already uses for `symmetryMask`.
     int   radialSymmetryRepeatCount = 3;
 
     ScatterTransform transform;

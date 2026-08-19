@@ -21,7 +21,8 @@ void ReadPropRuleJson(const nlohmann::json& json, Params::PropRule& rule) {
     ReadJsonFloat(json, "NearCliffDistanceMaximum", rule.nearCliffDistanceMaximum);
     ReadJsonBoolean(json, "SymmetryUseGlobal", rule.bSymmetryUseGlobal);
     ReadJsonInteger(json, "SymmetryMask", rule.symmetryMask);
-    ReadJsonInteger(json, "RadialSymmetryRepeatCount", rule.radialSymmetryRepeatCount);
+    ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,
+                          Params::radialSymmetryRepeatCountMaximum, rule.radialSymmetryRepeatCount);
 }
 
 } // namespace

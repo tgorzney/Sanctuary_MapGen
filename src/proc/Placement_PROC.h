@@ -102,6 +102,12 @@ private:
 
     std::vector<ScatterRuleConfiguration>    ruleConfigurations;
     std::vector<Data::TemplateIdentifier>    ruleTemplateIdentifiers;
+    // The resolved `SymmetryAxis::Radial` repeat count per rule, in lockstep with
+    // `ruleConfigurations`/`ruleTemplateIdentifiers` (STEP23 ruling #4). CPU-only, never mirrored
+    // into `ScatterRuleConfiguration`'s GLSL twin: the gate kernel deliberately does not scatter,
+    // so orbit generation is CPU-only forever by design (PLACEMENT_SCATTER_SPEC "CPU vs GPU"), not
+    // by omission — same precedent as `ruleTemplateIdentifiers` itself.
+    std::vector<int>                         ruleRadialSymmetryRepeatCounts;
     Data::FloatField                         obstacleDistanceField;   // Jump-Flood distance
     Data::FloatField                         gateWeightField;         // per-rule, reused
     std::vector<float>                       gpuGateTransferBuffer;

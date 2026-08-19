@@ -48,7 +48,8 @@ void ReadMarkerRuleJson(const nlohmann::json& json, Params::MarkerRule& rule) {
     ReadJsonInteger(json, "SpawnPointCount", rule.spawnPointCount);
     ReadJsonBoolean(json, "SymmetryUseGlobal", rule.bSymmetryUseGlobal);
     ReadJsonInteger(json, "SymmetryMask", rule.symmetryMask);
-    ReadJsonInteger(json, "RadialSymmetryRepeatCount", rule.radialSymmetryRepeatCount);
+    ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,
+                          Params::radialSymmetryRepeatCountMaximum, rule.radialSymmetryRepeatCount);
 }
 
 // The inverse of `BuildGlobalMarkerSettingsJson`'s `{r,g,b,a}` shape.

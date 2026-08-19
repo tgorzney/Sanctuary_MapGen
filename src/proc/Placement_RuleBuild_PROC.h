@@ -55,6 +55,14 @@ inline int ResolveSymmetryMask(bool bUseGlobal, int ruleMask, int globalMask) {
     return bUseGlobal ? globalMask : ruleMask;
 }
 
+// The SAME bUseGlobal switch that resolves symmetryMask must equivalently resolve the `Radial`
+// bit's companion count (STEP23 ruling #5): a local override with bSymmetryUseGlobal == false but
+// no local count would otherwise silently inherit the global N, defeating the point of the
+// override (STEP16 ruling #2).
+inline int ResolveRadialSymmetryRepeatCount(bool bUseGlobal, int ruleCount, int globalCount) {
+    return bUseGlobal ? globalCount : ruleCount;
+}
+
 // Everything the four rule families share: the gates, the edge padding, the mask gate, the
 // water surface and the instance transform.
 template <typename RuleType>

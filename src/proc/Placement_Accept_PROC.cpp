@@ -34,8 +34,9 @@ void PlacementStage::AcceptCandidates(std::size_t configurationIndex,
     int placedCount = 0;
     for (const ScatterCandidate& candidate : candidates) {
         if (bLimitCount && placedCount >= configuration.targetCount) break;
-        const int orbitCount = BuildSymmetryOrbit(configuration.symmetryMask, extent,
-                                                  candidate.positionX, candidate.positionY,
+        const int orbitCount = BuildSymmetryOrbit(configuration.symmetryMask,
+                                                  ruleRadialSymmetryRepeatCounts[configurationIndex],
+                                                  extent, candidate.positionX, candidate.positionY,
                                                   constants.symmetryDuplicateEpsilon,
                                                   orbit, Params::symmetryOrbitMaximum);
         if (!IsOrbitPlaceable(configuration, orbit, orbitCount, spacingGrid)) continue;
