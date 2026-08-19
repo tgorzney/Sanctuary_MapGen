@@ -117,6 +117,14 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     // `mapGeneratorData.Stratums` blob and MERGES onto whatever this call already wrote (see
     // MapImporter_Recipe_IO.cpp's own header comment on that reader).
     ReadStratumLayersJson(document, outRecipe, result);
+    // SANMAP_FORMAT_SPEC Correction 12: `StratumGenerationSettings[9]`, same tier/ordering rule as
+    // `stratumLayers` immediately above — unconditional, before the mapGeneratorData gate below, and
+    // AFTER `ReadStratumLayersJson` so its own cardinality check reads `stratumLayers`'s length off
+    // the document with that sibling call already having had first crack at growing `outRecipe.
+    // strata`. NOT alongside `ReadStrataSettingsJson` below, which stays gated: that one reads the
+    // separate, legacy `mapGeneratorData.Stratums` blob's remaining 5 fields and MERGES onto
+    // whatever this call already wrote.
+    ReadStratumGenerationSettingsJson(document, outRecipe, result);
 
     if (!document.contains("mapGeneratorData") || !document["mapGeneratorData"].is_object()) {
         result.Warn("No mapGeneratorData block: only the map's own dimensions were recovered.");

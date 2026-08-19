@@ -101,6 +101,9 @@ std::string MapExporter::BuildSanmapJsonText(const Params::MapRecipe& recipe,
     document["fadeDistance"]      = 128.0f;
     document["fadeStartDistance"] = 1.0f;
     document["stratumLayers"]     = BuildStratumLayersJson(recipe);
+    // SANMAP_FORMAT_SPEC Correction 12: soil physics + slope-gate overrides, index-aligned with
+    // `stratumLayers`, same tier, sibling of it (not nested in `mapGeneratorData`).
+    document["StratumGenerationSettings"] = BuildStratumGenerationSettingsJson(recipe);
 
     // SCOPE NOTE 1 (MapExporter_IO.h): every entity domain now round-trips real content.
     // `PropGroups`/`DecalGroups` are SanGen-owned manual-layer metadata (SANMAP_FORMAT_SPEC

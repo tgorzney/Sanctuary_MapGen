@@ -48,7 +48,10 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
     }
     // Size is no longer 1 here: `ReadStratumLayersJson` (SANMAP_FORMAT_SPEC Correction 13) grows
     // `strata` to the format's fixed 9 layers regardless of how many the fixture populated — see
-    // CheckStratumAppearance below, which asserts that cardinality directly.
+    // CheckStratumAppearance below, which asserts that cardinality directly. bSlopeGateEnabled/
+    // maximumSlopeDegrees now round-trip through the new top-level `StratumGenerationSettings`
+    // array (Correction 12, CheckStratumGenerationSettings below) rather than the legacy
+    // `mapGeneratorData.Stratums` blob; tileCount still comes through the untouched legacy blob.
     Check(!loaded.strata.empty() && loaded.strata[0].bSlopeGateEnabled
           && NearlyEqual(loaded.strata[0].maximumSlopeDegrees, 55.0f)
           && NearlyEqual(loaded.strata[0].tileCount, 24.0f), "the stratum settings survive");
@@ -106,6 +109,92 @@ void CheckStratumAppearance(const Params::MapRecipe& original, const Params::Map
           && NearlyEqual(loadedAppearance.farColorRemapColor[2], originalAppearance.farColorRemapColor[2])
           && NearlyEqual(loadedAppearance.farColorRemapColor[3], originalAppearance.farColorRemapColor[3]),
           "farColorRemapColor survives, all four components (previously never written)");
+}
+
+// SANMAP_FORMAT_SPEC Correction 12: the new top-level `StratumGenerationSettings` array — per-
+// stratum soil physics (6 fields, genuinely new writes: nothing serialized `soilPhysics` at all
+// before this ticket) plus the 9 slope-gate fields (`SlopeUseGlobal` + the 8 relocated verbatim
+// from the legacy `mapGeneratorData.Stratums` blob), including the override path
+// (`bSlopeUseGlobal = false`) round-tripping correctly, not just the shared-default path.
+void CheckStratumGenerationSettings(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    const Params::Stratum& originalStratum = original.strata[0];
+    const Params::Stratum& loadedStratum = loaded.strata[0];
+    const Params::StratumSoilPhysics& originalSoilPhysics = originalStratum.soilPhysics;
+    const Params::StratumSoilPhysics& loadedSoilPhysics = loadedStratum.soilPhysics;
+    Check(NearlyEqual(loadedSoilPhysics.hardness, originalSoilPhysics.hardness)
+          && NearlyEqual(loadedSoilPhysics.friction, originalSoilPhysics.friction)
+          && NearlyEqual(loadedSoilPhysics.cohesion, originalSoilPhysics.cohesion)
+          && NearlyEqual(loadedSoilPhysics.capacityMultiplier, originalSoilPhysics.capacityMultiplier)
+          && NearlyEqual(loadedSoilPhysics.absorptionRate, originalSoilPhysics.absorptionRate)
+          && loadedSoilPhysics.bErodable == originalSoilPhysics.bErodable,
+          "all 6 soilPhysics fields survive through StratumGenerationSettings "
+          "(previously write-only-to-nothing)");
+    Check(originalStratum.bSlopeUseGlobal == false
+          && loadedStratum.bSlopeUseGlobal == originalStratum.bSlopeUseGlobal,
+          "SlopeUseGlobal survives through StratumGenerationSettings, exercising the override path "
+          "(bSlopeUseGlobal = false), not just the shared-default path");
+    Check(loadedStratum.bSlopeGateEnabled == originalStratum.bSlopeGateEnabled
+          && NearlyEqual(loadedStratum.minimumSlopeDegrees, originalStratum.minimumSlopeDegrees)
+          && NearlyEqual(loadedStratum.maximumSlopeDegrees, originalStratum.maximumSlopeDegrees)
+          && NearlyEqual(loadedStratum.slopeFeatherDegreesLow, originalStratum.slopeFeatherDegreesLow)
+          && NearlyEqual(loadedStratum.slopeFeatherDegreesHigh, originalStratum.slopeFeatherDegreesHigh)
+          && loadedStratum.bUseSmoothstep == originalStratum.bUseSmoothstep
+          && loadedStratum.bInvertSlopeGate == originalStratum.bInvertSlopeGate
+          && NearlyEqual(loadedStratum.slopeGateStrength, originalStratum.slopeGateStrength),
+          "the 8 relocated slope-gate fields survive through StratumGenerationSettings");
+}
+
+// Regression guard (Correction 12): the 5 fields the correction leaves untouched
+// (`ImportedMaskMode`/`MaskRemapMinimum`/`Maximum`/`Enabled`/`TintRed`/`Green`/`Blue`/`TileCount`)
+// still round-trip correctly through the legacy `mapGeneratorData.Stratums` blob now that 8 fewer
+// keys flow through `ReadStrataSettingsJson`'s grow-and-merge loop (Step 11's fix must still work
+// once this ticket shrinks the blob).
+void CheckLegacyStratumBlobFieldsStillSurvive(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    const Params::Stratum& originalStratum = original.strata[0];
+    const Params::Stratum& loadedStratum = loaded.strata[0];
+    Check(loadedStratum.importedMaskMode == originalStratum.importedMaskMode
+          && originalStratum.importedMaskMode == Params::ImportedMaskMode::StaticOverride,
+          "ImportedMaskMode still survives through the legacy blob");
+    Check(loadedStratum.bEnabled == originalStratum.bEnabled && originalStratum.bEnabled == false,
+          "Enabled still survives through the legacy blob");
+    Check(NearlyEqual(loadedStratum.maskRemapMinimum[0], originalStratum.maskRemapMinimum[0])
+          && NearlyEqual(loadedStratum.maskRemapMinimum[1], originalStratum.maskRemapMinimum[1])
+          && NearlyEqual(loadedStratum.maskRemapMinimum[2], originalStratum.maskRemapMinimum[2])
+          && NearlyEqual(loadedStratum.maskRemapMinimum[3], originalStratum.maskRemapMinimum[3])
+          && NearlyEqual(loadedStratum.maskRemapMaximum[0], originalStratum.maskRemapMaximum[0])
+          && NearlyEqual(loadedStratum.maskRemapMaximum[1], originalStratum.maskRemapMaximum[1])
+          && NearlyEqual(loadedStratum.maskRemapMaximum[2], originalStratum.maskRemapMaximum[2])
+          && NearlyEqual(loadedStratum.maskRemapMaximum[3], originalStratum.maskRemapMaximum[3]),
+          "MaskRemapMinimum/Maximum still survive through the legacy blob, all four components each");
+    Check(NearlyEqual(loadedStratum.tintRed, originalStratum.tintRed)
+          && NearlyEqual(loadedStratum.tintGreen, originalStratum.tintGreen)
+          && NearlyEqual(loadedStratum.tintBlue, originalStratum.tintBlue),
+          "TintRed/Green/Blue still survive through the legacy blob");
+    Check(NearlyEqual(loadedStratum.tileCount, originalStratum.tileCount),
+          "TileCount still survives through the legacy blob");
+}
+
+// Correction 12 is a RELOCATION, not a duplication: the 8 slope-gate keys must no longer appear
+// anywhere under `document["mapGeneratorData"]["Stratums"]` in the exported document. Checked
+// against the raw exported JSON TEXT of that specific sub-object (not just the C++ call sites) —
+// scoped to the legacy blob's own serialized text, since the same 8 key spellings legitimately
+// still appear elsewhere in the document, under the new `StratumGenerationSettings` array.
+void CheckRelocatedSlopeGateKeysNotInLegacyBlob(const std::string& documentText) {
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+    Check(document.contains("mapGeneratorData") && document["mapGeneratorData"].contains("Stratums"),
+          "the legacy mapGeneratorData.Stratums blob still exists (not deleted this ticket)");
+    const std::string legacyStratumsText = document["mapGeneratorData"]["Stratums"].dump();
+    static const char* const relocatedKeys[] = {
+        "SlopeGateEnabled", "MinimumSlopeDegrees", "MaximumSlopeDegrees", "SlopeFeatherDegreesLow",
+        "SlopeFeatherDegreesHigh", "UseSmoothstep", "InvertSlopeGate", "SlopeGateStrength"
+    };
+    bool bAnyRelocatedKeyFound = false;
+    for (const char* key : relocatedKeys) {
+        if (legacyStratumsText.find(key) != std::string::npos) bAnyRelocatedKeyFound = true;
+    }
+    Check(!bAnyRelocatedKeyFound,
+          "none of the 8 relocated slope-gate keys appear anywhere under mapGeneratorData.Stratums "
+          "in the exported document text (relocated, not duplicated)");
 }
 
 // Since `mapSize` never leaves the fixture, this asserts flip-then-unflip is the identity without
@@ -409,12 +498,44 @@ void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     recipe.layerStack.geoLayers.push_back(geoLayer);
 
     Params::Stratum stratum;
-    stratum.bSlopeGateEnabled = true;
-    stratum.maximumSlopeDegrees = 55.0f;
+    // SANMAP_FORMAT_SPEC Correction 12: the whole slope-gate block, non-default, including
+    // `bSlopeUseGlobal = false` — the override path, not just the shared-default path
+    // (CheckStratumGenerationSettings). All 8 round-trip through the new top-level
+    // `StratumGenerationSettings` array now, not the legacy `mapGeneratorData.Stratums` blob.
+    stratum.bSlopeUseGlobal         = false;
+    stratum.bSlopeGateEnabled       = true;
+    stratum.minimumSlopeDegrees     = 12.0f;
+    stratum.maximumSlopeDegrees     = 55.0f;
+    stratum.slopeFeatherDegreesLow  = 3.0f;
+    stratum.slopeFeatherDegreesHigh = 6.0f;
+    stratum.bUseSmoothstep          = true;
+    stratum.bInvertSlopeGate        = true;
+    stratum.slopeGateStrength       = 0.6f;
+
+    // The 5 keys Correction 12 leaves untouched in the legacy `mapGeneratorData.Stratums` blob
+    // (CheckLegacyStratumBlobFieldsStillSurvive) — non-default, so a regression in the
+    // grow-and-merge loop losing one of them after 8 fewer keys flow through it would be caught.
+    stratum.importedMaskMode   = Params::ImportedMaskMode::StaticOverride;
+    stratum.bEnabled           = false;
+    stratum.maskRemapMinimum[0] = 0.05f; stratum.maskRemapMinimum[1] = 0.15f;
+    stratum.maskRemapMinimum[2] = 0.25f; stratum.maskRemapMinimum[3] = 0.35f;
+    stratum.maskRemapMaximum[0] = 0.65f; stratum.maskRemapMaximum[1] = 0.75f;
+    stratum.maskRemapMaximum[2] = 0.85f; stratum.maskRemapMaximum[3] = 0.95f;
     stratum.tileCount = 24.0f;
     stratum.tintRed   = 0.4f;
     stratum.tintGreen = 0.5f;
     stratum.tintBlue  = 0.6f;
+
+    // SANMAP_FORMAT_SPEC Correction 12: all 6 `soilPhysics` fields, non-default — genuinely new
+    // writes; nothing serialized this sub-struct at all before this ticket
+    // (CheckStratumGenerationSettings).
+    Params::StratumSoilPhysics& soilPhysics = stratum.soilPhysics;
+    soilPhysics.hardness           = 0.65f;
+    soilPhysics.friction           = 0.35f;
+    soilPhysics.cohesion           = 0.9f;
+    soilPhysics.capacityMultiplier = 3.5f;
+    soilPhysics.absorptionRate     = 0.08f;
+    soilPhysics.bErodable          = false;
 
     // SANMAP_FORMAT_SPEC Correction 13: every real `StratumAppearance` field, non-default, so a
     // round-trip bug in any single one is caught (CheckStratumAppearance).
@@ -698,6 +819,9 @@ void RunRoundTripTests() {
     CheckGeometryAndWater(original, loaded);
     CheckLayerStackAndRules(original, loaded);
     CheckStratumAppearance(original, loaded);
+    CheckStratumGenerationSettings(original, loaded);
+    CheckLegacyStratumBlobFieldsStillSurvive(original, loaded);
+    CheckRelocatedSlopeGateKeysNotInLegacyBlob(documentText);
     CheckArmiesAndAreas(original, loaded);
     CheckMarkersAndChains(original, loaded);
     CheckPropsAndDecals(original, loaded);
@@ -745,6 +869,33 @@ void CheckStratumLayersCardinalityMismatchWarns() {
           "and the fields those entries carry still land");
 }
 
+// SANMAP_FORMAT_SPEC Correction 12's cardinality invariant: `StratumGenerationSettings`'s actual
+// array length is compared against `stratumLayers`'s actual array length (the two SanGen-owned
+// arrays, to EACH OTHER, not each independently against `sanmapStratumCount`) — a mismatch is a
+// LOGGED WARNING, never a crash and never a silent truncation, mirroring
+// CheckStratumLayersCardinalityMismatchWarns's own style above.
+void CheckStratumGenerationSettingsCardinalityMismatchWarns() {
+    nlohmann::json document;
+    document["stratumLayers"] = nlohmann::json::array();
+    for (int index = 0; index < 9; ++index) document["stratumLayers"].push_back(nlohmann::json::object());
+    document["StratumGenerationSettings"] = nlohmann::json::array();
+    for (int index = 0; index < 5; ++index) {                  // wrong length: 5, not 9
+        nlohmann::json entry;
+        entry["Hardness"] = 0.77f;
+        document["StratumGenerationSettings"].push_back(entry);
+    }
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Io::ReadStratumGenerationSettingsJson(document, loaded, result);
+    Check(result.warningCount > 0,
+          "a StratumGenerationSettings length that disagrees with stratumLayers's length logs a "
+          "warning, not a crash");
+    Check(loaded.strata.size() == 5,
+          "the entries actually present are still read in full, never silently truncated");
+    Check(NearlyEqual(loaded.strata[0].soilPhysics.hardness, 0.77f),
+          "and the fields those entries carry still land");
+}
+
 } // namespace MapFormatTest
 } // namespace SanmapGen
 
@@ -752,6 +903,7 @@ int main() {
     SanmapGen::MapFormatTest::RunRoundTripTests();
     SanmapGen::MapFormatTest::CheckUnrecognizedSkyboxIntensityModeFallsBackSafely();
     SanmapGen::MapFormatTest::CheckStratumLayersCardinalityMismatchWarns();
+    SanmapGen::MapFormatTest::CheckStratumGenerationSettingsCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

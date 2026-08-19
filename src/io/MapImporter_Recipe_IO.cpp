@@ -69,14 +69,9 @@ void ReadStrataSettingsJson(const nlohmann::json& generatorData, Params::MapReci
         const nlohmann::json& stratumJson = strataJson[index];
         if (!stratumJson.is_object()) continue;
         Params::Stratum& stratum = outRecipe.strata[index];
-        ReadJsonBoolean(stratumJson, "SlopeGateEnabled", stratum.bSlopeGateEnabled);
-        ReadJsonFloat(stratumJson, "MinimumSlopeDegrees", stratum.minimumSlopeDegrees);
-        ReadJsonFloat(stratumJson, "MaximumSlopeDegrees", stratum.maximumSlopeDegrees);
-        ReadJsonFloat(stratumJson, "SlopeFeatherDegreesLow", stratum.slopeFeatherDegreesLow);
-        ReadJsonFloat(stratumJson, "SlopeFeatherDegreesHigh", stratum.slopeFeatherDegreesHigh);
-        ReadJsonBoolean(stratumJson, "UseSmoothstep", stratum.bUseSmoothstep);
-        ReadJsonBoolean(stratumJson, "InvertSlopeGate", stratum.bInvertSlopeGate);
-        ReadJsonFloat(stratumJson, "SlopeGateStrength", stratum.slopeGateStrength);
+        // The 8 slope-gate reads RELOCATED to `ReadStratumGenerationSettingsJson`
+        // (SANMAP_FORMAT_SPEC Correction 12, MapImporter_StratumGeneration_IO.cpp) — no longer read
+        // from this legacy blob.
         int maskMode = static_cast<int>(stratum.importedMaskMode);
         if (ReadJsonEnumeration(stratumJson, "ImportedMaskMode", 3, maskMode))
             stratum.importedMaskMode = static_cast<Params::ImportedMaskMode>(maskMode);

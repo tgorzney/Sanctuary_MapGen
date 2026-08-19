@@ -60,15 +60,10 @@ nlohmann::ordered_json BuildGeoLayerJson(const Params::GeoLayer& geoLayer) {
 }
 
 nlohmann::ordered_json BuildStratumJson(const Params::Stratum& stratum) {
+    // The 8 slope-gate keys (`SlopeGateEnabled` ... `SlopeGateStrength`) RELOCATED to the top-level
+    // `StratumGenerationSettings` array (SANMAP_FORMAT_SPEC Correction 12,
+    // MapExporter_StratumGeneration_IO.cpp) — not duplicated here anymore.
     nlohmann::ordered_json json;
-    json["SlopeGateEnabled"]       = stratum.bSlopeGateEnabled;
-    json["MinimumSlopeDegrees"]    = stratum.minimumSlopeDegrees;
-    json["MaximumSlopeDegrees"]    = stratum.maximumSlopeDegrees;
-    json["SlopeFeatherDegreesLow"] = stratum.slopeFeatherDegreesLow;
-    json["SlopeFeatherDegreesHigh"] = stratum.slopeFeatherDegreesHigh;
-    json["UseSmoothstep"]          = stratum.bUseSmoothstep;
-    json["InvertSlopeGate"]        = stratum.bInvertSlopeGate;
-    json["SlopeGateStrength"]      = stratum.slopeGateStrength;
     json["ImportedMaskMode"]       = static_cast<int>(stratum.importedMaskMode);
     // Genuine Vector4 (ARCH §7.2 item 10) — mirrors the format-native `stratumLayers[].maskRemapMin/
     // Max` shape so the two on-disk representations of the same setting never disagree.

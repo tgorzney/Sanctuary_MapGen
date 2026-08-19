@@ -97,5 +97,17 @@ void ReadSlopeDefaultsJson(const nlohmann::json& document, Params::MapRecipe& ou
 void ReadStratumLayersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
                            MapImportResult& result);
 
+// MapImporter_StratumGeneration_IO.cpp — the top-level `StratumGenerationSettings[9]` array ->
+// `Params::Stratum::soilPhysics` + the 9 slope-gate fields (SANMAP_FORMAT_SPEC Correction 12), the
+// mirror of `BuildStratumGenerationSettingsJson`. Same tier and calling contract as `stratumLayers`
+// above: takes the top-level `document` directly, called unconditionally BEFORE the
+// `mapGeneratorData` presence gate — NOT alongside `ReadStrataSettingsJson`, which stays gated (it
+// reads the separate, legacy `mapGeneratorData.Stratums` blob for its own remaining 5 fields).
+// Grow-only, merge-in-place, same as `ReadStratumLayersJson` — never clears `outRecipe.strata`. A
+// `StratumGenerationSettings` length that disagrees with `stratumLayers`'s own length is a loud,
+// logged warning via `result` — never a silent truncation, never a hard refusal.
+void ReadStratumGenerationSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
+                                      MapImportResult& result);
+
 } // namespace Io
 } // namespace SanmapGen

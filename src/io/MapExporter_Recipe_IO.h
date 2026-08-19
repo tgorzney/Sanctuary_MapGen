@@ -71,5 +71,12 @@ void BuildAtmosphereJson(const Params::MapRecipe& recipe, nlohmann::ordered_json
 // object, sibling of `armies`/`atmosphere`/etc., NOT nested in `mapGeneratorData`.
 nlohmann::ordered_json BuildSlopeDefaultsJson(const Params::MapRecipe& recipe);
 
+// MapExporter_StratumGeneration_IO.cpp — `recipe.strata` -> the top-level `StratumGenerationSettings`
+// array (SANMAP_FORMAT_SPEC Correction 12): per-stratum soil physics (6 fields, new writes) plus the
+// 9 slope-gate fields (`SlopeUseGlobal` + the 8 relocated from the legacy `mapGeneratorData.Stratums`
+// blob). Sibling of `stratumLayers`, index-aligned with it, same fixed-`sanmapStratumCount`
+// cardinality pattern as `BuildStratumLayersJson`.
+nlohmann::ordered_json BuildStratumGenerationSettingsJson(const Params::MapRecipe& recipe);
+
 } // namespace Io
 } // namespace SanmapGen
