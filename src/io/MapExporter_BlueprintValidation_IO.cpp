@@ -1,14 +1,15 @@
 // MapExporter_BlueprintValidation_IO.cpp — `ValidatePropAndDecalBlueprintPaths` and
-// `BlueprintValidationReport::SummaryText`. Layer: IO. Declared in the PUBLIC MapExporter_IO.h
-// (not MapExporter_Recipe_IO.h) — the UI layer calls this directly, a deliberate exception to the
-// "one domain, one file pair" convention: it is cross-domain validation over BOTH `props` and
-// `decals` together, not a JSON builder/reader for either (STEP5_PropsDecalsValidation_UI).
+// `BlueprintValidationReport::SummaryText`. Layer: IO. Declared in its own PUBLIC
+// MapExporter_BlueprintValidation_IO.h (STEP32; not MapExporter_Recipe_IO.h) — the UI layer calls
+// this directly, a deliberate exception to the "one domain, one file pair" convention: it is
+// cross-domain validation over BOTH `props` and `decals` together, not a JSON builder/reader for
+// either (STEP5_PropsDecalsValidation_UI).
 //
 // Design ruling (work-order "warn, never block, for EVERY caller"): this function only REPORTS —
 // it never refuses an export and it touches no disk itself. `assetPack` MUST already be
 // `Open()`+`ReadCentralDirectoryOnce()`'d by the caller; this stays a sibling pre-flight step, the
 // same tier as `recipe.IsValid()`, never called from inside `BuildSanmapJsonText`.
-#include "MapExporter_IO.h"
+#include "MapExporter_BlueprintValidation_IO.h"
 #include "SanpackReader_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 

@@ -3,6 +3,7 @@
 // assembly of the parts is separable from the toolkit that draws them, so the acceptance test can
 // drive exactly this wiring with no window and no GL context.
 #include "Application_UI.h"
+#include "../io/UnknownImportBag_IO.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -30,6 +31,11 @@ Application::Application(ApplicationSettings applicationSettings)
                 assembler.Placements().markers, entityIdentifiers),
       previewDriver(AssemblerWithDefaultStages(assembler)),
       threadPool(settings.workerThreadCount) {
+    // STEP24_ImportNeverRefuses_IO ruling 4/6: one-time wiring — `tabState.files` (FilesTabState)
+    // only ever holds a nullable, caller-owned pointer (see that header's own comment), never the
+    // JSON-bearing value itself.
+    assetBridge.unknownImportData = std::make_unique<Io::UnknownImportBag>();
+    tabState.files.unknownImportData = assetBridge.unknownImportData.get();
     ConfigureDefaultPreview(composite.Settings(), settings.previewResolution,
                             assembler.WorldUnitsPerCell());
     // The left column's `[O]`/`[ ]` rows are the composite's layer flags from the first frame on,
@@ -102,7 +108,7 @@ bool Application::ApplyExecutionPolicy() {
 }
 
 const IconAtlasManifest* Application::ActiveIconManifest() const {
-    return iconManifest.EntryCount() > 0 ? &iconManifest : nullptr;
+    return assetBridge.iconManifest.EntryCount() > 0 ? &assetBridge.iconManifest : nullptr;
 }
 
 } // namespace Ui

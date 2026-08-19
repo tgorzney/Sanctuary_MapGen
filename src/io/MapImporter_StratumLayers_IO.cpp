@@ -4,6 +4,10 @@
 // Correction 13. Split out of MapImporter_Recipe_IO.cpp under the ARCH §1.5 size ceiling; its
 // declaration stays in that file's header (MapImporter_Recipe_IO.h), matching the precedent of
 // MapImporter_Layers_IO.cpp / MapImporter_SlopeDefaults_IO.cpp.
+// STEP30_LegacyBlobFieldHoming_IO: also reads `ImportedMaskMode`/`Enabled`. This function runs
+// unconditionally (MapImporter_IO.cpp, before the mapGeneratorData gate); the gated legacy
+// `ReadStrataSettingsJson` (MapImporter_Recipe_IO.cpp) runs AFTER and still wins on overlap when
+// `mapGeneratorData.Stratums` is present, matching the STEP27 water precedent exactly.
 #include "MapImporter_Recipe_IO.h"
 #include "MapImporter_IO.h"
 #include "MapExporter_IO.h"   // sanmapStratumCount — the shared format-invariant cardinality
@@ -37,6 +41,10 @@ void ReadJsonColorRgba(const nlohmann::json& parent, const char* key, float dest
 // one field on whatever it already held.
 void ReadStratumLayerJson(const nlohmann::json& layerJson, Params::Stratum& stratum) {
     Params::StratumAppearance& appearance = stratum.appearance;
+    int maskMode = static_cast<int>(stratum.importedMaskMode);
+    if (ReadJsonEnumeration(layerJson, "ImportedMaskMode", 3, maskMode))
+        stratum.importedMaskMode = static_cast<Params::ImportedMaskMode>(maskMode);
+    ReadJsonBoolean(layerJson, "Enabled", stratum.bEnabled);
     ReadJsonPathWrapper(layerJson, "albedo", appearance.albedoTexturePath);
     ReadJsonPathWrapper(layerJson, "normal", appearance.normalTexturePath);
     ReadJsonPathWrapper(layerJson, "mask", appearance.compositeTexturePath);

@@ -1,11 +1,11 @@
 // AppSettings_IO.cpp — the round trip: nlohmann::json, flat, direct 1:1 with the member names
 // (AppSettings_IO.h Design item 3). Layer: IO. Folder creation and the raw byte write are BORROWED
-// from MapExporter_IO.h (EnsureFolderExists / JoinExportPath / WriteBinaryFileBytes) rather than
-// re-implemented, the same file-write precedent the `.sanmap` writer already sets: a direct
+// from FilesystemPrimitives_IO.h (EnsureFolderExists / JoinExportPath / WriteBinaryFileBytes) rather
+// than re-implemented, the same file-write precedent the `.sanmap` writer already sets: a direct
 // `ofstream` trunc-write, not atomic (Constitution §6 — this is convenience state, not map data).
 #include "AppSettings_IO.h"
 #include "JsonPrimitives_IO.h"
-#include "MapExporter_IO.h"
+#include "FilesystemPrimitives_IO.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>

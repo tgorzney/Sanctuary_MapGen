@@ -4,6 +4,7 @@
 // Aggregates the geometry, layer stack, strata, placement rules, and water. Excludes execution
 // concerns (dispatch/backend) — those are not reproducible-recipe content.
 #pragma once
+#include <string>
 #include <vector>
 #include "Accumulation_PARAMS.h"
 #include "Army_PARAMS.h"
@@ -30,6 +31,14 @@ namespace Params {
 
 struct MapRecipe {
     Geometry               geometry;
+    // The document's own free-text identity (SANMAP_FORMAT_SPEC "Base" groups `name`/`credits`
+    // alongside `width`/`length`/`height` — plain flat document-root fields, not a nested block).
+    // Previously UI-session-only state on `MapExportOptions` with no import path (real data loss:
+    // opening a `.sanmap` and re-exporting it silently reset both to these defaults);
+    // STEP25_MapNameCredits_IO gives them a real PARAMS home so they round-trip. Same default
+    // values `MapExportOptions` used to carry, so a brand-new recipe's export behavior is unchanged.
+    std::string             mapName    = "mapdef";
+    std::string             mapCredits = "Sanctuary Map Generator";
     // The top-level `GeneralMapSettings` section (SANMAP_FORMAT_SPEC Correction 2): Seed/
     // ScaleFeaturesToMapSize/TerrainMinHeight/WorldUnitsPerCell live ON `geometry` above (relocated
     // OUT of the legacy `mapGeneratorData` blob on the wire, not out of Geometry in memory) —

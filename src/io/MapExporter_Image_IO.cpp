@@ -7,6 +7,8 @@
 // PNG encoding uses miniz's own writer — the same vendored library `SanpackReader_Inflate_IO.cpp`
 // already compiles into this library, so the image path adds no dependency and no build edit.
 #include "MapExporter_IO.h"
+#include "FilesystemPrimitives_IO.h"
+#include "MapExporter_SampleQuantize_IO.h"
 #include "../data/MapFields_DATA.h"
 #include <miniz.h>
 #include <cmath>

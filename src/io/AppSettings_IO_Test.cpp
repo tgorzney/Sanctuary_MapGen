@@ -4,7 +4,7 @@
 // Constitution §6 degrade-gracefully paths: a missing directory, a missing file, and corrupt JSON.
 #include "AppSettings_IO.h"
 #include "AppSettingsLocation_IO.h"
-#include "MapExporter_IO.h"
+#include "FilesystemPrimitives_IO.h"
 #include <cstdio>
 #include <filesystem>
 #include <fstream>

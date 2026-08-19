@@ -21,7 +21,6 @@ Params::MapRecipe WriteFixtureMap(const std::string& folderPath) {
     fields.surfaceStratumWeights[0].Set(1, 1, 1.0f);
     fields.surfaceStratumWeights[5].Set(2, 3, 1.0f);
     Io::MapExportOptions exportOptions;
-    exportOptions.mapName = "mapdef";
     Check(Io::MapExporter::ExportAll(folderPath, recipe, fields, exportOptions).bSucceeded,
           "the fixture map exports");
     return recipe;

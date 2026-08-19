@@ -67,14 +67,15 @@ void BuildIconAtlasManifest(const Io::AssetAtlas& atlas, const Sys::AtlasResiden
 
 void Application::SetSanpackPath(const std::string& path) {
     const std::size_t copyCount =
-        path.size() < sizeof(sanpackPath) - 1 ? path.size() : sizeof(sanpackPath) - 1;
-    std::memcpy(sanpackPath, path.c_str(), copyCount);
-    sanpackPath[copyCount] = '\0';
+        path.size() < sizeof(assetBridge.sanpackPath) - 1 ? path.size() : sizeof(assetBridge.sanpackPath) - 1;
+    std::memcpy(assetBridge.sanpackPath, path.c_str(), copyCount);
+    assetBridge.sanpackPath[copyCount] = '\0';
 }
 
 std::string Application::TemplateIdentifierOfIcon(int iconId) const {
-    if (iconId < 0 || iconId >= static_cast<int>(iconTemplateIdentifiers.size())) return std::string();
-    return iconTemplateIdentifiers[static_cast<std::size_t>(iconId)];
+    if (iconId < 0 || iconId >= static_cast<int>(assetBridge.iconTemplateIdentifiers.size()))
+        return std::string();
+    return assetBridge.iconTemplateIdentifiers[static_cast<std::size_t>(iconId)];
 }
 
 // The cache directory is the SystemTab's caller-owned buffer (its SCOPE NOTE 1: no PARAMS home
@@ -86,30 +87,38 @@ std::string Application::TemplateIdentifierOfIcon(int iconId) const {
 // CURRENT sanpackPath — every other path through this function (no path set, a failed open, a
 // failed directory parse) leaves it nullptr, never a pointer into an empty/unopened reader.
 bool Application::LoadAssetAtlas() {
-    iconManifest.entries.clear();
-    iconManifest.pageTextureIdentifiers.clear();
-    iconTemplateIdentifiers.clear();
-    atlasResidency.Clear();
-    assetPackReader.Close();
+    assetBridge.iconManifest.entries.clear();
+    assetBridge.iconManifest.pageTextureIdentifiers.clear();
+    assetBridge.iconTemplateIdentifiers.clear();
+    assetBridge.atlasResidency.Clear();
+    assetBridge.assetPackReader.Close();
     tabState.files.assetPack = nullptr;
-    if (sanpackPath[0] == '\0') { assetStatusMessage = "No sanpack selected."; return false; }
+    if (assetBridge.sanpackPath[0] == '\0') {
+        assetBridge.assetStatusMessage = "No sanpack selected.";
+        return false;
+    }
 
-    if (assetPackReader.Open(sanpackPath) && assetPackReader.ReadCentralDirectoryOnce())
-        tabState.files.assetPack = &assetPackReader;
+    if (assetBridge.assetPackReader.Open(assetBridge.sanpackPath) &&
+        assetBridge.assetPackReader.ReadCentralDirectoryOnce())
+        tabState.files.assetPack = &assetBridge.assetPackReader;
 
     Io::AtlasBuildReport buildReport;
     const std::string cacheDirectory(tabState.system.assetCacheDirectory);
-    if (!assetAtlasCache.BuildOrLoad(sanpackPath, cacheDirectory, settings.assetEntryFilter,
-                                     settings.atlasBuildSettings, buildReport, &threadPool)) {
-        assetStatusMessage = "Atlas build failed; the icon pickers stay on typed template ids.";
+    if (!assetBridge.assetAtlasCache.BuildOrLoad(assetBridge.sanpackPath, cacheDirectory,
+                                                 settings.assetEntryFilter,
+                                                 settings.atlasBuildSettings, buildReport,
+                                                 &threadPool)) {
+        assetBridge.assetStatusMessage = "Atlas build failed; the icon pickers stay on typed template ids.";
         return false;
     }
     UploadAtlasPages();
-    BuildIconAtlasManifest(assetAtlasCache.Atlas(), atlasResidency, gpuResourceManager.get(),
-                           iconManifest, iconTemplateIdentifiers);
-    assetStatusMessage = "Atlas: " + std::to_string(assetAtlasCache.Atlas().EntryCount()) +
-                         " icons on " + std::to_string(assetAtlasCache.Atlas().PageCount()) +
-                         (buildReport.bLoadedFromDiskCache ? " page(s), from cache." : " page(s), built.");
+    BuildIconAtlasManifest(assetBridge.assetAtlasCache.Atlas(), assetBridge.atlasResidency,
+                           gpuResourceManager.get(), assetBridge.iconManifest,
+                           assetBridge.iconTemplateIdentifiers);
+    assetBridge.assetStatusMessage =
+        "Atlas: " + std::to_string(assetBridge.assetAtlasCache.Atlas().EntryCount()) +
+        " icons on " + std::to_string(assetBridge.assetAtlasCache.Atlas().PageCount()) +
+        (buildReport.bLoadedFromDiskCache ? " page(s), from cache." : " page(s), built.");
     return true;
 }
 
@@ -118,11 +127,11 @@ bool Application::LoadAssetAtlas() {
 // the grid degrades to zero page identifiers rather than failing the load.
 bool Application::UploadAtlasPages() {
     if (gpuResourceManager == nullptr) return false;
-    const std::vector<Io::AtlasImage>& pages = assetAtlasCache.Atlas().Pages();
+    const std::vector<Io::AtlasImage>& pages = assetBridge.assetAtlasCache.Atlas().Pages();
     bool bEveryPageResident = true;
     for (std::size_t pageIndex = 0; pageIndex < pages.size(); ++pageIndex) {
         const Io::AtlasImage& page = pages[pageIndex];
-        bEveryPageResident = atlasResidency.UploadPage(*gpuResourceManager,
+        bEveryPageResident = assetBridge.atlasResidency.UploadPage(*gpuResourceManager,
                                                        static_cast<int>(pageIndex), page.width,
                                                        page.height, page.rgbaPixels.data(),
                                                        page.rgbaPixels.size())

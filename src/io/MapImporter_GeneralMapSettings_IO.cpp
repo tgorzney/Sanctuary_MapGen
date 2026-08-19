@@ -9,6 +9,12 @@
 // block at its end enforces the TerrainMinHeight/TerrainMaxHeight band and the WorldUnitsPerCell
 // positivity floor; it stays correct post-relocation only because `geometry.terrainMinHeight`/
 // `geometry.worldUnitsPerCell` are already set from THIS reader by the time that block runs.
+//
+// STEP30_LegacyBlobFieldHoming_IO: also reads `TerrainMaxHeight`, sibling of `TerrainMinHeight`.
+// This runs AFTER the top-level `height` read (MapImporter_IO.cpp, lossy int) and BEFORE the
+// gated legacy `mapGeneratorData.TerrainMaxHeight` read (`ReadGeometryJson`), so precedence is:
+// `height` < this reader's full-precision `TerrainMaxHeight` < the legacy blob, which still wins
+// when present (matching STEP27's precedent).
 #include "JsonPrimitives_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
@@ -30,6 +36,7 @@ void ReadGeneralMapSettingsJson(const nlohmann::json& document, Params::MapRecip
     ReadJsonBoolean(json, "ScaleFeaturesToMapSize", geometry.bScaleFeaturesToMapSize);
     ReadJsonFloat(json, "GlobalGravity", outRecipe.generalMapSettings.globalGravity);
     ReadJsonFloat(json, "TerrainMinHeight", geometry.terrainMinHeight);
+    ReadJsonFloat(json, "TerrainMaxHeight", geometry.terrainMaxHeight);
     ReadJsonFloat(json, "WorldUnitsPerCell", geometry.worldUnitsPerCell);
 }
 

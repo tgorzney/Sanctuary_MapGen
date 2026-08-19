@@ -6,9 +6,10 @@
 // and each TGA is an uncompressed 32-bit BGRA image written bottom-row-first with no RLE (RLE is
 // deliberately off — the editor rejects it).
 #include "MapExporter_IO.h"
+#include "FilesystemPrimitives_IO.h"
+#include "MapExporter_SampleQuantize_IO.h"
 #include "../data/MapFields_DATA.h"
 #include <cstdint>
-#include <fstream>
 
 namespace SanmapGen {
 namespace Io {
@@ -58,23 +59,6 @@ bool WriteStratumMaskTga(const std::string& filePath, const Data::MapFields& fie
 }
 
 } // namespace
-
-std::string JoinExportPath(const std::string& folderPath, const std::string& segmentName) {
-    if (folderPath.empty()) return segmentName;
-    const char lastCharacter = folderPath[folderPath.size() - 1];
-    if (lastCharacter == '/' || lastCharacter == '\\') return folderPath + segmentName;
-    return folderPath + "/" + segmentName;
-}
-
-bool WriteBinaryFileBytes(const std::string& filePath, const void* bytes, std::size_t byteCount) {
-    if (bytes == nullptr && byteCount > 0) return false;
-    std::ofstream outputStream(filePath, std::ios::binary | std::ios::trunc);
-    if (!outputStream) return false;
-    if (byteCount > 0)
-        outputStream.write(static_cast<const char*>(bytes), static_cast<std::streamsize>(byteCount));
-    outputStream.flush();
-    return static_cast<bool>(outputStream);
-}
 
 bool MapExporter::WriteHeightmapRaw(const std::string& filePath, const Data::MapFields& fields,
                                     MapExportResult& result) {

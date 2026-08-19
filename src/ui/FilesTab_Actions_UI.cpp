@@ -7,6 +7,8 @@
 // tab writes no byte and creates no folder itself — `Io::EnsureExportFolderExists` is the door.
 #include "FilesTab_UI.h"
 #include "../data/MapFields_DATA.h"
+#include "../io/FilesystemPrimitives_IO.h"
+#include "../io/UnknownImportBag_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {
@@ -32,8 +34,13 @@ bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFie
     }
     Io::MapImportOptions options = state.importOptions;
     options.bLoadBakedFields = state.bLoadBakedFieldsOnImport;
+    // STEP24_ImportNeverRefuses_IO ruling 4: a fresh open replaces whatever the prior session's bag
+    // held — it describes THIS document, not a merge of two unrelated documents' unknown data.
+    // `unknownImportData` is nullable (caller-owned, `FilesTab_UI.h`'s own comment) — nothing to
+    // reset/thread when no caller bound one.
+    if (state.unknownImportData != nullptr) *state.unknownImportData = Io::UnknownImportBag();
     const Io::MapImportResult result =
-        Io::MapImporter::LoadSanmap(state.sanmapPath, recipe, fields, options);
+        Io::MapImporter::LoadSanmap(state.sanmapPath, recipe, fields, options, state.unknownImportData);
     AppendFilesTabLog(state, result.debugLog);
     return result.bSucceeded;
 }
@@ -61,9 +68,9 @@ bool RunRecipeExport(FilesTabAction action, FilesTabState& state, const Params::
     // pre-check/confirm-dialog gate already ran, in FilesTab_Draw_UI.cpp, before this was called.
     const Io::MapExportResult result = (action == FilesTabAction::ExportAll && fields != nullptr)
         ? Io::MapExporter::ExportAll(state.exportFolderPath, recipe, *fields, state.exportOptions,
-                                     state.assetPack)
+                                     state.assetPack, state.unknownImportData)
         : Io::MapExporter::ExportSanmapOnly(state.exportFolderPath, recipe, state.exportOptions,
-                                            state.assetPack);
+                                            state.assetPack, state.unknownImportData);
     AppendFilesTabLog(state, result.debugLog);
     return result.bSucceeded;
 }

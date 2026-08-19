@@ -5,6 +5,7 @@
 // sanpack `SanpackReader_IO_Test.cpp` already built (reuses `AssetPipeline_TestSupport_IO.h`
 // rather than hand-rolling a second archive).
 #include "AssetPipeline_TestSupport_IO.h"
+#include "MapExporter_BlueprintValidation_IO.h"
 #include "MapExporter_IO.h"
 #include "SanpackReader_IO.h"
 #include "../params/MapRecipe_PARAMS.h"

@@ -57,11 +57,15 @@ void CheckEveryExportActionRuns(Ui::FilesTabState& state, Params::MapRecipe& rec
 void CheckTheExportThenOpenRoundTrip() {
     Ui::FilesTabState state;
     state.exportFolderPath = ScratchFolderPath("SanGenFilesTabTest");
-    state.exportOptions.mapName = "mapdef";
 
     Params::MapRecipe recipe;
     recipe.geometry.mapSize = 8;
     recipe.geometry.seed = 4242u;
+    // Non-default, so the round trip below also proves the Files tab's Name/Credits inputs are
+    // bound straight to the recipe (STEP25_MapNameCredits_IO) — not a stale MapExportOptions
+    // default, and not lost on Open.
+    recipe.mapName = "PlayableFixture";
+    recipe.mapCredits = "STEP25 Round-Trip Test";
     Data::MapFields fields;
     fields.Resize(recipe.geometry.VertexSize(), 0.0f);
     fields.heightfield.Set(2, 2, 1.0f);
@@ -76,6 +80,12 @@ void CheckTheExportThenOpenRoundTrip() {
           "recovering the recipe");
     Check(loadedFields.IsSized() && loadedFields.heightfield.Get(2, 2) > 0.99f,
           "and the baked heightfield with it");
+    // STEP25_MapNameCredits_IO acceptance test item 4: the Name/Credits text inputs are bound
+    // directly to `recipe.mapName`/`mapCredits`, so a real opened file's own values land here, not
+    // the old MapExportOptions defaults ("mapdef"/"Sanctuary Map Generator").
+    Check(loadedRecipe.mapName == "PlayableFixture" && loadedRecipe.mapCredits == "STEP25 Round-Trip Test",
+          "and the Files tab's Name/Credits fields (recipe.mapName/mapCredits) show the opened "
+          "file's actual content, not a stale export-time default");
 
     state.bLoadBakedFieldsOnImport = false;
     Data::MapFields skippedFields;

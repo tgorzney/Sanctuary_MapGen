@@ -2,18 +2,24 @@
 // Layer: IO. Both create the destination folder, write the document, and report every file they
 // produced so the tab's log panel can show the result rather than a silent success.
 #include "MapExporter_IO.h"
+#include "FilesystemPrimitives_IO.h"
+#include "MapExporter_BlueprintValidation_IO.h"
+#include "UnknownImportBag_IO.h"
 #include "../data/MapFields_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
-#include <filesystem>
 
 namespace SanmapGen {
 namespace Io {
 namespace {
 
 bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe& recipe,
-                         const MapExportOptions& options, MapExportResult& result) {
-    const std::string documentPath = JoinExportPath(folderPath, options.mapName + ".sanmap");
-    const std::string documentText = MapExporter::BuildSanmapJsonText(recipe, options);
+                         const MapExportOptions& options, MapExportResult& result,
+                         const UnknownImportBag* unknownData) {
+    // The output file name matches the document's own `mapName` (STEP25_MapNameCredits_IO moved
+    // this off `MapExportOptions` onto the recipe — it is real, importable document content, not an
+    // export-run-only option).
+    const std::string documentPath = JoinExportPath(folderPath, recipe.mapName + ".sanmap");
+    const std::string documentText = MapExporter::BuildSanmapJsonText(recipe, options, unknownData);
     if (!WriteBinaryFileBytes(documentPath, documentText.data(), documentText.size())) {
         result.Log("Failed to write " + documentPath);
         return false;
@@ -36,18 +42,6 @@ void LogBlueprintValidationFindings(const Params::MapRecipe& recipe, const Sanpa
 
 } // namespace
 
-bool EnsureFolderExists(const std::string& folderPath, std::string& outErrorMessage) {
-    if (folderPath.empty()) { outErrorMessage = "no destination folder was given."; return false; }
-    std::error_code folderError;
-    const std::filesystem::path folder(folderPath);
-    std::filesystem::create_directories(folder, folderError);
-    if (folderError && !std::filesystem::exists(folder)) {
-        outErrorMessage = "could not create " + folderPath;
-        return false;
-    }
-    return true;
-}
-
 bool EnsureExportFolderExists(const std::string& folderPath, MapExportResult& result) {
     std::string errorMessage;
     if (!EnsureFolderExists(folderPath, errorMessage)) { result.Log("Export failed: " + errorMessage); return false; }
@@ -57,23 +51,25 @@ bool EnsureExportFolderExists(const std::string& folderPath, MapExportResult& re
 MapExportResult MapExporter::ExportSanmapOnly(const std::string& folderPath,
                                               const Params::MapRecipe& recipe,
                                               const MapExportOptions& options,
-                                              const SanpackReader* assetPack) {
+                                              const SanpackReader* assetPack,
+                                              const UnknownImportBag* unknownData) {
     MapExportResult result;
     if (!recipe.IsValid()) { result.Log("Export refused: the recipe's geometry is not valid."); return result; }
     LogBlueprintValidationFindings(recipe, assetPack, result);
     if (!EnsureExportFolderExists(folderPath, result)) return result;
-    result.bSucceeded = WriteSanmapDocument(folderPath, recipe, options, result);
+    result.bSucceeded = WriteSanmapDocument(folderPath, recipe, options, result, unknownData);
     return result;
 }
 
 MapExportResult MapExporter::ExportAll(const std::string& folderPath, const Params::MapRecipe& recipe,
                                        const Data::MapFields& fields, const MapExportOptions& options,
-                                       const SanpackReader* assetPack) {
+                                       const SanpackReader* assetPack,
+                                       const UnknownImportBag* unknownData) {
     MapExportResult result;
     if (!recipe.IsValid()) { result.Log("Export refused: the recipe's geometry is not valid."); return result; }
     LogBlueprintValidationFindings(recipe, assetPack, result);
     if (!EnsureExportFolderExists(folderPath, result)) return result;
-    if (!WriteSanmapDocument(folderPath, recipe, options, result)) return result;
+    if (!WriteSanmapDocument(folderPath, recipe, options, result, unknownData)) return result;
 
     const std::string texturesFolder = JoinExportPath(folderPath, options.fileNames.texturesFolderName);
     if (!EnsureExportFolderExists(texturesFolder, result)) return result;

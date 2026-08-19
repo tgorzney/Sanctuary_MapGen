@@ -62,7 +62,7 @@ void Application::DrawPanelSwitcher() {
     ImGui::Text("Regenerations: %d", previewDriver.PipelineRunCount());
     ImGui::Text("Composites: %d", previewDriver.PreviewCompositeCount());
     ImGui::Text("Stages last run: %d", static_cast<int>(previewDriver.StagesThatRan().size()));
-    ImGui::TextWrapped("%s", assetStatusMessage.c_str());
+    ImGui::TextWrapped("%s", AssetStatusMessage().c_str());
 }
 
 } // namespace Ui

@@ -10,13 +10,15 @@
 // _Execution_UI / _Assets_UI / _AssetPanel_UI / _Recipe_UI / _Preview{Setup,Ramps}_UI /
 // _AppSettings_UI. Member headers (§7.1 composition, §1.5 split; none reached by any other unit):
 // _Settings_UI.h / _Panels_UI.h / _Visibility_UI.h / _Execution_UI.h / _HostedSettings_UI.h (no
-// `Params::MapRecipe` home yet) / _TabState_UI.h / _Defaults_UI.h (launch defaults, atlas bridge,
-// free functions). ApplicationMain_UI.cpp is the thin entry point, not part of the library.
+// `Params::MapRecipe` home yet) / _TabState_UI.h / _AssetBridge_UI.h (sanpack -> atlas ->
+// residency -> `Ui::IconAtlasManifest` bridge) / _Defaults_UI.h (launch defaults, free functions).
+// ApplicationMain_UI.cpp is the thin entry point, not part of the library.
 #pragma once
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
+#include "Application_AssetBridge_UI.h"
 #include "Application_Defaults_UI.h"
 #include "Application_Execution_UI.h"
 #include "Application_HostedSettings_UI.h"
@@ -24,11 +26,9 @@
 #include "Application_TabState_UI.h"
 #include "MapCanvas_UI.h"
 #include "PreviewComposite_UI.h"
-#include "../io/SanpackReader_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/GenerationAssembler_PIPELINE.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
-#include "../sys/AtlasResidency_SYS.h"
 #include "../sys/ThreadPool_SYS.h"
 
 namespace SanmapGen {
@@ -64,12 +64,12 @@ public:
 
     // --- assets (Application_Assets_UI.cpp) ---
     void SetSanpackPath(const std::string& path);
-    const char* SanpackPath() const { return sanpackPath; }
+    const char* SanpackPath() const { return assetBridge.sanpackPath; }
     bool LoadAssetAtlas();                             // sanpack -> atlas -> pages -> manifest
-    const IconAtlasManifest& IconManifest() const { return iconManifest; }
+    const IconAtlasManifest& IconManifest() const { return assetBridge.iconManifest; }
     // The template identifier an icon id names; empty when it names nothing.
     std::string TemplateIdentifierOfIcon(int iconId) const;
-    const std::string& AssetStatusMessage() const { return assetStatusMessage; }
+    const std::string& AssetStatusMessage() const { return assetBridge.assetStatusMessage; }
 
     // --- the assembled parts, exposed so the acceptance test drives the SHELL's own wiring ---
     ApplicationSettings&           Settings()  { return settings; }
@@ -126,21 +126,10 @@ private:
     Sys::DispatchPolicy           dispatchPolicy;   // the SystemTab's determinism/backend home
     Sys::ThreadPool               threadPool;
     std::unique_ptr<Sys::GpuResourceManager> gpuResourceManager;   // created with the context
-    Sys::AtlasResidency           atlasResidency;
-    Io::AssetAtlasCache           assetAtlasCache;
-    // Long-lived blueprintPath reader, SEPARATE from AssetAtlasCache's own transient one. Fed down
-    // into `tabState.files.assetPack` ONLY on a successful Open()+ReadCentralDirectoryOnce() for
-    // the current sanpackPath (Application_Assets_UI.cpp LoadAssetAtlas() — the load-bearing rule).
-    Io::SanpackReader              assetPackReader;
-    IconAtlasManifest             iconManifest;
-    std::vector<std::string>      iconTemplateIdentifiers;   // iconId -> `tpId` side table
-    std::string                   assetStatusMessage = "No sanpack loaded.";
-    char                          sanpackPath[260] = { 0 };
+    ApplicationAssetBridge        assetBridge;   // sanpack -> atlas -> residency -> manifest
     void*                         windowHandle = nullptr;   // GLFWwindow*, kept opaque here
     std::uint32_t lastSelectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;
     int  frameCount           = 0;
-    bool bAssetLoadRequested  = false;
-    bool bAssetLoadAnnounced  = false;
     bool bImguiReady          = false;
 };
 

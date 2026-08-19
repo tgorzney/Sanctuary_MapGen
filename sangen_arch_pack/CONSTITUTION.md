@@ -90,9 +90,14 @@ format headers, and fall back to a safe placeholder on any failure — never loa
 an unverified or corrupt file into RAM or the UI. Mirror the game's own
 validate-then-default-then-log pattern (see MODDING_SCRIPTING_SPEC). This is the
 concrete form of "validate all input to avoid crashes." A `.sanmap`'s declared
-schema version is external input too: an absent/old version is a loud, logged
-fallback and a version newer than this build understands is a flat refusal, never
-a silent best-effort (`IO_MIGRATION_SPEC`).
+schema version is external input too, but its value is never grounds to refuse the
+file: an absent, old, or newer-than-this-build version is always a loud, logged
+best-effort — the importer migrates what it recognizes and recovers what it does
+not into a preserved passthrough rather than dropping it, never a silent
+best-effort and never a flat refusal (`IO_MIGRATION_SPEC`). This does not relax
+the sentence above it: a file that fails to parse, is not a JSON object, or fails
+the size/header checks is still refused outright — only a version marker's value
+stops being refusal-worthy.
 
 ## 7. Work-order schema
 Coders execute schema-valid work-orders only. Required fields: title; root

@@ -30,7 +30,7 @@ namespace SanmapGen {
 namespace Data { class MapFields; }
 namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
-namespace Io { class SanpackReader; }
+namespace Io { class SanpackReader; struct UnknownImportBag; }
 namespace Ui {
 
 // See SCOPE NOTE 1. Returns true when the recipe was populated; `outLog` is appended to the panel.
@@ -68,6 +68,16 @@ struct FilesTabState {
 
     Io::MapImportOptions importOptions;
     Io::MapExportOptions exportOptions;
+
+    // STEP24_ImportNeverRefuses_IO ruling 4/6: the load-edit-save session's own Unknown-Import
+    // passthrough — populated by OpenSanmap, re-merged (gap-filling only) by ExportSanmapOnly/
+    // ExportAll so data this build does not recognize survives a load/save cycle. NULLABLE, CALLER-
+    // OWNED (the `Data::MapFields* fields` precedent, not the `Io::MapImportOptions` by-value
+    // precedent): `UnknownImportBag` embeds a real `nlohmann::json`, and this header must stay
+    // includable by every UI translation unit that touches the Files tab WITHOUT dragging nlohmann's
+    // headers along (several UI/App targets do not link `nlohmann_json` at all — Constitution §1's
+    // IO-only JSON homing). The tab never inspects its contents; it only forwards the pointer.
+    Io::UnknownImportBag* unknownImportData = nullptr;
 
     SupComLuaImportFunction ImportSupComLua = nullptr;   // SCOPE NOTE 1
     void*                   supComUserData  = nullptr;

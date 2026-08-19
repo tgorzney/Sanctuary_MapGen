@@ -71,7 +71,7 @@ void Application::Shutdown() {
     assembler.SetGpuResourceManager(nullptr);
     composite.SetGpuResourceManager(nullptr);
     canvas.SetPreviewTexture(nullptr, Sys::GpuTextureHandle(), composite.Resolution());
-    atlasResidency.Clear();
+    assetBridge.atlasResidency.Clear();
     gpuResourceManager.reset();
     if (bImguiReady) {
         ImGui_ImplOpenGL3_Shutdown();

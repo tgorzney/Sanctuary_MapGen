@@ -15,7 +15,8 @@
 //     the recipe and the fields. `areas`/`armies`/`markers`/`chains`/`props`/`decals` all round-trip
 //     real `recipe.*` content (STEP2/STEP3/STEP4; blueprintPath validation added by STEP5). An
 //     unresolved `props`/`decals` blueprintPath is reported, never dropped, never used to block the
-//     export (`ValidatePropAndDecalBlueprintPaths` below) — this builder stays disk-free.
+//     export (`ValidatePropAndDecalBlueprintPaths`, MapExporter_BlueprintValidation_IO.h) — this
+//     builder stays disk-free.
 //  2. RETIRED: ATMOSPHERE now has a `_PARAMS` home (`Params::Atmosphere`, ATMOSPHERE_PARAMS_SPEC)
 //     and round-trips real `recipe.atmosphere` content via `BuildAtmosphereJson`
 //     (MapExporter_Atmosphere_IO.cpp) — no longer written from the format's own defaults.
@@ -30,6 +31,7 @@ namespace Params { struct MapRecipe; }
 namespace Io {
 
 class SanpackReader;
+struct UnknownImportBag;
 
 // Every output file name is a setting, never a literal at a write site (Constitution §8).
 struct MapExportFileNames {
@@ -42,8 +44,9 @@ struct MapExportFileNames {
 };
 
 struct MapExportOptions {
-    std::string mapName    = "mapdef";
-    std::string mapCredits = "Sanctuary Map Generator";
+    // `mapName`/`mapCredits` MOVED to `Params::MapRecipe` (STEP25_MapNameCredits_IO) — they are
+    // real, importable document content, not export-run-only options; see MapExporter_Recipe_IO.cpp
+    // and MapImporter_IO.cpp's ParseSanmapJsonText.
     MapExportFileNames fileNames;
 
     int  jsonIndentSpaceCount = 4;
@@ -78,43 +81,11 @@ inline constexpr int sanmapStratumCount  = 9;
 // (Sanmap_MigrationManifest_IO.h), the single source of truth `Sanmap_MigrationRunner_IO` reads
 // back on import (IO_MIGRATION_SPEC.md §3/§4).
 
-// 0..1 -> the format's 16-bit heightmap sample. Out-of-range input is clamped, never wrapped.
-inline unsigned short QuantizeNormalizedHeightSample(float normalizedHeight) {
-    if (!(normalizedHeight > 0.0f)) return 0u;                       // also catches NaN
-    if (normalizedHeight >= 1.0f) return 65535u;
-    return static_cast<unsigned short>(normalizedHeight * 65535.0f + 0.5f);
-}
-
-// 0..1 -> one 8-bit mask/visualization channel. Same clamping contract.
-inline unsigned char QuantizeNormalizedWeightSample(float normalizedWeight) {
-    if (!(normalizedWeight > 0.0f)) return 0u;
-    if (normalizedWeight >= 1.0f) return 255u;
-    return static_cast<unsigned char>(normalizedWeight * 255.0f + 0.5f);
-}
-
-// One `props`/`decals` blueprintPath validation pass (MapExporter_BlueprintValidation_IO.cpp).
-// Warn-not-block: AllResolved() gates nothing here — the caller decides what to do with a finding.
-struct BlueprintValidationReport {
-    std::vector<std::string> unresolvedBlueprintPaths;   // literal strings, props then decals
-    bool AllResolved() const { return unresolvedBlueprintPaths.empty(); }
-    std::string SummaryText() const;   // ONE wording — shared by the UI dialog body and debugLog
-};
-
-// `assetPack` MUST already be `Open()`+`ReadCentralDirectoryOnce()`'d by the caller. Pure/read-only,
-// touches no disk, never called from inside BuildSanmapJsonText (same tier as `recipe.IsValid()`).
-BlueprintValidationReport ValidatePropAndDecalBlueprintPaths(const Params::MapRecipe& recipe,
-                                                              const SanpackReader& assetPack);
-
-// Joins one path segment onto a folder with a single forward slash, whatever the folder ended in.
-std::string JoinExportPath(const std::string& folderPath, const std::string& segmentName);
-
-// The result-agnostic core: creates `folderPath` (and its parents) if it is not already there.
-// False — with the reason in `outErrorMessage` — for an empty path or a folder the platform
-// refused to make. `EnsureExportFolderExists` below is the `MapExportResult`-shaped wrapper every
-// Write* action here uses; a caller with no `MapExportResult` of its own (AppSettings_IO's
-// clean-shutdown save, STEP19_AppSettings_IO) uses this one directly instead of inventing a
-// duplicate folder-creation path (Constitution §6).
-bool EnsureFolderExists(const std::string& folderPath, std::string& outErrorMessage);
+// STEP32 split, under this header's ARCH §1.5 ceiling: the quantizers moved to
+// MapExporter_SampleQuantize_IO.h, `BlueprintValidationReport`/`ValidatePropAndDecalBlueprintPaths`
+// moved to MapExporter_BlueprintValidation_IO.h, and the generic (never exporter-specific)
+// `JoinExportPath`/`EnsureFolderExists`/`WriteBinaryFileBytes` moved to FilesystemPrimitives_IO.h.
+// `EnsureExportFolderExists` below, the `MapExportResult`-shaped wrapper, stays here.
 
 // Creates a destination folder (and its parents) if it is not already there. False — with the
 // reason logged — for an empty path or a folder the platform refused to make. This is the ONE
@@ -122,23 +93,27 @@ bool EnsureFolderExists(const std::string& folderPath, std::string& outErrorMess
 // layer above IO ever touches the filesystem itself (ARCH §3.3 — IO owns the format seam).
 bool EnsureExportFolderExists(const std::string& folderPath, MapExportResult& result);
 
-// Writes a blob to disk in one call. False on any stream failure — never a partial success.
-bool WriteBinaryFileBytes(const std::string& filePath, const void* bytes, std::size_t byteCount);
-
 class MapExporter {
 public:
     // `<folder>/<mapName>.sanmap`, no textures. `assetPack` non-null LOGS a blueprintPath finding
-    // (never gates bSucceeded — warn-not-block).
+    // (never gates bSucceeded — warn-not-block). `unknownData` is nullable
+    // (STEP24_ImportNeverRefuses_IO ruling 6, `UnknownImportBag_IO.h`) — when given (the same bag
+    // the load-edit-save session's own `LoadSanmap`/`ParseSanmapJsonText` call populated), its
+    // captured keys re-merge as one nested `UnknownImport` object in the re-exported document
+    // (STEP28_UnknownImportNesting_IO) — never colliding with a known-domain field, since the bag's
+    // content never lands at the document's own top level.
     static MapExportResult ExportSanmapOnly(const std::string& folderPath,
                                             const Params::MapRecipe& recipe,
                                             const MapExportOptions& options = MapExportOptions(),
-                                            const SanpackReader* assetPack = nullptr);
+                                            const SanpackReader* assetPack = nullptr,
+                                            const UnknownImportBag* unknownData = nullptr);
 
-    // The recipe plus every enabled texture. `assetPack` — see ExportSanmapOnly above.
+    // The recipe plus every enabled texture. `assetPack`/`unknownData` — see ExportSanmapOnly above.
     static MapExportResult ExportAll(const std::string& folderPath, const Params::MapRecipe& recipe,
                                      const Data::MapFields& fields,
                                      const MapExportOptions& options = MapExportOptions(),
-                                     const SanpackReader* assetPack = nullptr);
+                                     const SanpackReader* assetPack = nullptr,
+                                     const UnknownImportBag* unknownData = nullptr);
 
     // The individual export actions the Files tab offers, each usable on its own.
     static bool WriteHeightmapRaw(const std::string& filePath, const Data::MapFields& fields,
@@ -151,9 +126,13 @@ public:
                                        const MapExportOptions& options, MapExportResult& result);
 
     // recipe -> the whole `.sanmap` document, as text. Pure and disk-free: this is the half the
-    // round-trip acceptance test drives against MapImporter.
+    // round-trip acceptance test drives against MapImporter. `unknownData` is nullable — see
+    // `ExportSanmapOnly` above; the re-merge is the LAST write, immediately before `document.dump()`
+    // (ruling 6), writing the whole bag under the single `UnknownImport` key — a no-op when the bag
+    // is empty (no key is written at all).
     static std::string BuildSanmapJsonText(const Params::MapRecipe& recipe,
-                                           const MapExportOptions& options = MapExportOptions());
+                                           const MapExportOptions& options = MapExportOptions(),
+                                           const UnknownImportBag* unknownData = nullptr);
 };
 
 } // namespace Io

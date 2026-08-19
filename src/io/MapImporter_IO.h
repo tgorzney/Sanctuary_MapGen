@@ -18,8 +18,8 @@
 //     (STEP4_PropsDecals_IO, live-wired by STEP5_PropsDecalsValidation_UI) all round-trip into
 //     their `recipe.*` PARAMS homes by `ParseSanmapJsonText` below. `props`/`decals`
 //     `blueprintPath` values are NOT resolved against any sanpack here — that is
-//     `Io::ValidatePropAndDecalBlueprintPaths` (MapExporter_IO.h), an export-side, warn-not-block
-//     check with no read-side counterpart.
+//     `Io::ValidatePropAndDecalBlueprintPaths` (MapExporter_BlueprintValidation_IO.h), an
+//     export-side, warn-not-block check with no read-side counterpart.
 #pragma once
 #include <cstdint>
 #include <string>
@@ -28,6 +28,8 @@ namespace SanmapGen {
 namespace Data { class MapFields; }
 namespace Params { struct MapRecipe; }
 namespace Io {
+
+struct UnknownImportBag;
 
 // Validation caps (Constitution §6) — settings with sane defaults, never literals at a use site.
 struct MapImportSafetyLimits {
@@ -69,15 +71,20 @@ bool ResolveSanmapDocumentPath(const std::string& pathOrFolder, std::string& out
 class MapImporter {
 public:
     // The whole action: resolve, read, parse, and (when asked and given a destination) load the
-    // baked fields. `outFields` is nullable — see SCOPE NOTE 1.
+    // baked fields. `outFields` is nullable — see SCOPE NOTE 1. `outUnknownData` is nullable too
+    // (STEP24_ImportNeverRefuses_IO ruling 4, `UnknownImportBag_IO.h`) — when given, every
+    // genuinely-unrecognized top-level `.sanmap` key lands there instead of being silently dropped.
     static MapImportResult LoadSanmap(const std::string& pathOrFolder, Params::MapRecipe& outRecipe,
                                       Data::MapFields* outFields,
-                                      const MapImportOptions& options = MapImportOptions());
+                                      const MapImportOptions& options = MapImportOptions(),
+                                      UnknownImportBag* outUnknownData = nullptr);
 
     // Document text -> recipe, with no disk access at all. This is the half the round-trip
-    // acceptance test drives against MapExporter::BuildSanmapJsonText.
+    // acceptance test drives against MapExporter::BuildSanmapJsonText. `outUnknownData` — see
+    // `LoadSanmap` above.
     static bool ParseSanmapJsonText(const std::string& documentText, Params::MapRecipe& outRecipe,
-                                    const MapImportOptions& options, MapImportResult& result);
+                                    const MapImportOptions& options, MapImportResult& result,
+                                    UnknownImportBag* outUnknownData = nullptr);
 
     // `<folder>/Textures/*` -> the caller's fields. The fields are RESIZED to the recipe's
     // geometry first, so a payload that disagrees with the document is clipped, never trusted.

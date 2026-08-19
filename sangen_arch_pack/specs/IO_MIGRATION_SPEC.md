@@ -79,10 +79,11 @@ capability disciplined:
 ## 3. The manifest — the one file touched on every version bump
 
 **`Sanmap_MigrationManifest_IO.h/.cpp`.** One ordered table: for each source version `N`
-present, an **ordered list** of the migration functions that fire carrying a document
-from `N` to `N+1`, plus (optionally) the legacy top-level keys to delete once every
-migration in that step has run — deletion uses `DeleteKeyIfPresent` (§5), and it happens
-**after** every migration that still needs to read the old location has executed.
+present, an **ordered list of `MigrationEntry` values** (below) that fire carrying a
+document from `N` to `N+1`, plus (optionally) the legacy top-level keys to delete once
+every migration in that step has run — deletion uses `DeleteKeyIfPresent` (§5), and it
+happens **after** every migration that still needs to read the old location has executed,
+**and only when the whole step runs** (`legacyKeysToDelete`, below).
 
 - **Sparse by construction.** Most version steps touch a handful of domains, not all of
   them. The table has exactly as many entries per step as that step needs — never a fixed
@@ -105,6 +106,42 @@ migration in that step has run — deletion uses `DeleteKeyIfPresent` (§5), and
   `MapExporter_IO.h:75` with no reader anywhere. One source of truth for "what version
   does this build produce" removes the class of bug where the writer and the (future)
   reader silently drift apart.
+- **`MigrationEntry` — the manifest's element type.** Each entry in a step's migration
+  list is `MigrationEntry { MigrationFunction function; const char* name; const char*
+  description; bool bIndependentlySelectable = false; }`, not a bare function pointer.
+  - `name` is the migration's own identifier (e.g. `"GeneralMapSettings_Migrate_V2"`) —
+    what the UI-layer selective-apply feature (§6) shows a human, and what any log line
+    naming "which migration did this" refers to.
+  - `description` is a human-readable one-line summary of what the migration does —
+    promoted out of what §7's worked example currently shows as a bare `//` comment, into
+    data the manifest carries so a UI or log can surface it without parsing source.
+  - `bIndependentlySelectable` defaults to `false`: a step is, by default, an atomic
+    unit — selectable and appliable only as a whole.
+- **`bIndependentlySelectable` — an opt-in, author-declared, individually-justified
+  exception.** May only be set `true` by the migration's own author, with a one-line
+  justification comment at the declaration site, and only once they have verified no
+  sibling migration in the same step depends on this one running before, after, or at
+  all. Because steps are append-only and frozen once shipped (§1), this claim is checked
+  once, against the sibling set that exists when the step ships, and never needs
+  re-verification afterward.
+  - **A required paired test, not declaration-plus-review alone.** A migration declared
+    `bIndependentlySelectable = true` must add an assertion to its existing
+    `<Domain>_Migrate_V<N>_IO_Test.cpp` (§1): given the step's original OLD-shape fixture,
+    running *only* this migration — no sibling migrations, no step-level
+    `legacyKeysToDelete` — produces the same valid NEW-shape output, for the keys it owns,
+    as running it inside the full step does. Order-independence is an empirical claim a
+    human reviewer can get wrong (a sibling read that only happens to work because of
+    execution order is exactly the class of defect this subsystem exists to catch), and
+    §1 already establishes that every migration's behavior is asserted by a fixture test,
+    not trusted by inspection — this is that same law applied to the narrower claim
+    `bIndependentlySelectable` makes. `bIndependentlySelectable = true` without this test
+    is a spec violation, not an accepted lesser practice.
+- **`legacyKeysToDelete` fires only on whole-step application.** A selective/partial
+  application (§6) — one or more `bIndependentlySelectable` entries applied without the
+  rest of their step — never runs the step's `legacyKeysToDelete`, even if every
+  `bIndependentlySelectable` entry in the step happened to be selected. Only a run where
+  every entry in the step's migration list fires triggers the legacy-key cleanup. This
+  keeps old-location data intact for any sibling the human has not yet chosen to apply.
 
 ## 4. The runner
 
@@ -114,7 +151,9 @@ migration in that step has run — deletion uses `DeleteKeyIfPresent` (§5), and
    historical predecessor field `MapGeneratorDataVersion`/`mapGeneratorDataVersion`
    (`SanGenVersion` "replaces" it, `SANMAP_FORMAT_SPEC` Correction 1) and **logs that it
    did so** — a fallback is never silent (Constitution §6). If **neither** field is
-   present, the runner refuses outright (§6) rather than guessing version 1.
+   present, no version is resolved and the runner performs no migration walk for this
+   import — see §6's no-version-marker rule for the committed direct-read behavior and
+   the separate UI-layer preview/apply path.
 2. **Walking forward.** From the resolved version to `kCurrentSanGenVersion`, for each
    step: run that step's migration list in the manifest's declared order, delete that
    step's declared legacy keys, then set `document["SanGenVersion"] = N + 1` before
@@ -122,7 +161,7 @@ migration in that step has run — deletion uses `DeleteKeyIfPresent` (§5), and
    individual migration's — every step leaves the document honestly stamped, whether or
    not further steps follow.
 3. **Current-version passthrough.** A document already at `kCurrentSanGenVersion` is a
-   no-op: the runner still performs version resolution and the refusal check (§6), but
+   no-op: the runner still performs version resolution and the recovery check (§6), but
    calls no migration.
 4. **Runs before any domain block reader.** `MapImporter` invokes the runner on the freshly
    parsed JSON **before** any `Read<Domain>Json` block reader executes. Consequence: block
@@ -193,20 +232,44 @@ correct in the proposal and is unchanged.
   the same no-crash, no-surprise contract the existing `ReadJson*` accessors already keep
   (Constitution §6), extended from "read" to "transform."
 
-## 6. Refusal law (Constitution §6, made concrete for this subsystem)
+## 6. Recovery law (Constitution §6, made concrete for this subsystem)
 
-- `SanGenVersion` (or its resolved legacy predecessor, §4.1) **newer** than
-  `kCurrentSanGenVersion` → the runner refuses the import outright, with a clear logged
-  reason ("this map was saved by a newer SanGen and cannot be opened"). Never a
-  best-effort partial parse, never silently dropping fields it does not recognize.
+- **Newer than `kCurrentSanGenVersion`.** `SanGenVersion` (or its resolved legacy
+  predecessor, §4.1) newer than this build's `kCurrentSanGenVersion` → never refused. The
+  runner logs a loud warning ("this map was saved by a newer SanGen than this build
+  understands — recovering what it can") and runs no migration steps, since there is
+  nothing forward to migrate to. Block readers then read whatever current-shape keys are
+  present; anything they don't recognize falls to the Unknown Import passthrough below.
 - **No version marker of any kind** (neither `SanGenVersion` nor its legacy predecessor
-  field present) → refuse; do not guess a starting version. A genuinely un-versioned
-  true-v1-dialect document, if one is ever found in the wild and needs support, gets its
-  own explicitly-named legacy-detection step added to the runner's version-resolution
-  logic (sniffing a v1-only fingerprint field, e.g. `Fractal`/`UseImage`) — a deliberate,
-  visible addition, never a silent default-to-1.
-- These two rules are this subsystem's entire discharge of Constitution §6 ("a version
-  mismatch must not silently degrade") for the `.sanmap` importer.
+  field present) → never refused. The runner logs a loud warning and does **not** resolve
+  a starting version or walk any migration — the document is handed to the readers
+  exactly as found, current-shape keys only. This direct read (plus the existing
+  legacy `mapGeneratorData`-gated readers, plus Unknown Import passthrough below) is the
+  **sole committed result of an ordinary import call for this case: no guessing, ever.**
+  A separate, **UI-layer-only** feature may *preview* what treating this document as an
+  assumed version `1` and walking the full migration chain would find, without mutating
+  anything, and let a human selectively apply some or all of it (down to individual
+  `bIndependentlySelectable` migrations, §3) — if they do, that second pass's result,
+  Unknown Import bag included, **replaces** the direct-read result entirely; the two are
+  never merged. This preview/apply feature is scoped only to this no-version-marker case
+  — the "newer than `kCurrentSanGenVersion`" clause above and the "old, in-range version"
+  clause below are unchanged and remain fully automatic.
+- **Old, in-range version** (present, less than `kCurrentSanGenVersion`) → unchanged from
+  before: walk forward per §4, loud-logged. This was never a refusal case.
+- **Unknown Import passthrough.** Any top-level key the manifest's migration steps do not
+  consume and that is not one of `SANMAP_FORMAT_SPEC`'s current sections is preserved
+  verbatim under one reserved top-level key, `UnknownImport`, instead of being silently
+  dropped. `UnknownImport` round-trips: `MapExporter_IO` writes it back out unchanged on
+  re-export, so data this build does not understand survives a load/save cycle intact. A
+  key already consumed by a recognized migration or matching a current-schema section is
+  never duplicated into `UnknownImport`.
+- **Layer ruling.** None of the above relaxes any *other* validation this build performs —
+  a file that fails to parse, is not a JSON object, or fails the size/header checks
+  (Constitution §6, first paragraph) is still refused outright. Only a version marker's
+  value — absent, old, or newer than this build — has stopped being refusal-worthy.
+- These rules are this subsystem's entire discharge of Constitution §6 ("a version
+  mismatch must not silently degrade, and is never grounds to refuse the file") for the
+  `.sanmap` importer.
 
 ## 7. Worked example (V2 → V3, illustrative — NOT a coder-tier prescription)
 

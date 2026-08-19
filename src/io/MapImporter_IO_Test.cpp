@@ -6,10 +6,22 @@
 #include "MapImporter_IO.h"
 #include "MapImporter_Recipe_IO.h"
 #include "MapExporter_IO.h"
+#include "Sanmap_MigrationManifest_IO.h"
+#include "Sanmap_KnownTopLevelKeys_IO.h"
 
 namespace SanmapGen {
 namespace MapFormatTest {
 namespace {
+
+// STEP25_MapNameCredits_IO acceptance test item 1: `mapName`/`mapCredits` are flat document-root
+// fields (SANMAP_FORMAT_SPEC "Base") that now live on the recipe itself, not on the export-only
+// `MapExportOptions` — a non-default mapName and a genuinely EMPTY mapCredits both survive exactly.
+void CheckMapNameAndCredits(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(loaded.mapName == original.mapName && original.mapName == "Nomad's Crossing",
+          "mapName survives the round trip, exercising a non-default value");
+    Check(loaded.mapCredits == original.mapCredits && original.mapCredits.empty(),
+          "an empty mapCredits survives verbatim — legitimate real content, not a gap");
+}
 
 void CheckGeometryAndWater(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
     Check(loaded.geometry.mapSize == original.geometry.mapSize, "mapSize survives");
@@ -1164,6 +1176,11 @@ void FillFixtureDetailNormal(Params::MapRecipe& recipe) {
 
 Params::MapRecipe BuildPopulatedRecipe() {
     Params::MapRecipe recipe;
+    // STEP25_MapNameCredits_IO acceptance test item 1: a non-default mapName, and a genuinely
+    // EMPTY mapCredits — real official-map content (every official Supreme Commander demo map's
+    // credits field is empty), not a gap. CheckMapNameAndCredits below asserts both survive.
+    recipe.mapName = "Nomad's Crossing";
+    recipe.mapCredits = "";
     recipe.geometry.mapSize = 512;
     recipe.geometry.seed = 1337u;
     recipe.geometry.terrainMinHeight = 12.0f;
@@ -1198,6 +1215,7 @@ void RunRoundTripTests() {
     Check(Io::MapImporter::ParseSanmapJsonText(documentText, loaded, Io::MapImportOptions(), result),
           "the exporter's own document parses");
     Check(result.warningCount == 0, "with no warning: the two halves agree key for key");
+    CheckMapNameAndCredits(original, loaded);
     CheckGeometryAndWater(original, loaded);
     CheckGeneralMapSettings(original, loaded);
     CheckGeneralMapSettingsTopLevelNotNested(documentText);
@@ -1369,16 +1387,249 @@ void CheckRadialSymmetryRepeatCountClampsOnImport() {
     }
 }
 
+// STEP25_MapNameCredits_IO acceptance test item 2: a document with a missing or empty top-level
+// `name` key imports with recipe.mapName == "mapdef" (the fallback), matching the Files tab's own
+// enforced invariant (TextInputRules{bAllowEmpty=false, fallbackText="mapdef"}). A pure
+// ParseSanmapJsonText check, deliberately NOT routed through RunRoundTripTests's own fixture (which
+// has no such keys to begin with), mirroring CheckUnrecognizedSkyboxIntensityModeFallsBackSafely's
+// own style above. `SanGenVersion` is set on each hand-built document purely to clear the migration
+// gate (RunSanmapMigrations) that runs before any domain reader — unrelated to this ticket.
+void CheckMapNameFallsBackWhenMissingOrEmpty() {
+    {
+        nlohmann::json document;
+        document["SanGenVersion"] = Io::kCurrentSanGenVersion;   // no "name" key at all
+        Params::MapRecipe loaded;
+        Io::MapImportResult result;
+        Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+              "a document with no name key at all still parses");
+        Check(loaded.mapName == "mapdef",
+              "and mapName falls back to \"mapdef\" when the key is missing entirely");
+    }
+    {
+        nlohmann::json document;
+        document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+        document["name"] = "";
+        Params::MapRecipe loaded;
+        Io::MapImportResult result;
+        Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+              "a document with an empty name key still parses");
+        Check(loaded.mapName == "mapdef",
+              "and mapName falls back to \"mapdef\" when the key is present but empty");
+    }
+}
+
+// STEP25_MapNameCredits_IO acceptance test item 3: a document with an empty top-level `credits`
+// key imports with recipe.mapCredits == "" — confirming NO fallback is applied here, unlike
+// mapName (an empty credits string is legitimate real content: every official Supreme Commander
+// demo map's credits field is genuinely empty).
+void CheckMapCreditsHasNoFallbackWhenEmpty() {
+    nlohmann::json document;
+    document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+    document["credits"] = "";
+    Params::MapRecipe loaded;
+    loaded.mapCredits = "a prior value the reader must overwrite";
+    Io::MapImportResult result;
+    Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+          "a document with an empty credits key still parses");
+    Check(loaded.mapCredits.empty(),
+          "and mapCredits stays empty — no fallback is applied, unlike mapName");
+}
+
+// STEP27_WaterTopLevelImport_IO acceptance test item 1: a document with the top-level `hasWater`/
+// `waterLevel`/`waterDepth` mirrors and NO `mapGeneratorData` block at all (simulating a real
+// official/SupCom map, which never carries that block) imports with recipe.water populated from
+// those top-level keys instead of silently staying at the Params::Water struct defaults. A pure
+// ParseSanmapJsonText check, mirroring CheckMapNameFallsBackWhenMissingOrEmpty's own style.
+void CheckWaterImportsFromTopLevelWhenNoGeneratorData() {
+    nlohmann::json document;
+    document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+    document["hasWater"]   = true;
+    document["waterLevel"] = 25.0f;
+    document["waterDepth"] = 12.0f;
+    // No "mapGeneratorData" key at all.
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+          "a document with top-level water keys and no mapGeneratorData block still parses");
+    Check(loaded.water.bEnabled == true
+          && NearlyEqual(loaded.water.waterLevelMaximum, 25.0f)
+          && NearlyEqual(loaded.water.deepWaterDepthMaximum, 12.0f),
+          "water.bEnabled/waterLevelMaximum/deepWaterDepthMaximum populate from the top-level "
+          "hasWater/waterLevel/waterDepth mirrors when mapGeneratorData is absent");
+}
+
+// STEP27_WaterTopLevelImport_IO acceptance test item 2: a document with BOTH the top-level water
+// mirrors AND a mapGeneratorData.Water block present, where the two genuinely disagree, imports
+// with the legacy blob's values winning — confirms call-order precedence (the gated ReadWaterJson
+// call runs AFTER the unconditional top-level reads), matching the existing terrainMaxHeight
+// precedent at MapImporter_IO.cpp's mapGeneratorData gate.
+void CheckWaterLegacyBlobWinsOverTopLevelMirrorsOnDisagreement() {
+    nlohmann::json document;
+    document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+    document["hasWater"]   = false;
+    document["waterLevel"] = 10.0f;
+    document["waterDepth"] = 5.0f;
+    nlohmann::json water;
+    water["Enabled"]           = true;
+    water["WaterLevelMax"]     = 99.0f;
+    water["DeepWaterDepthMin"] = 1.0f;
+    water["DeepWaterDepthMax"] = 88.0f;
+    nlohmann::json generatorData;
+    generatorData["Water"] = water;
+    document["mapGeneratorData"] = generatorData;
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+          "a document with both water locations, disagreeing, still parses");
+    Check(loaded.water.bEnabled == true
+          && NearlyEqual(loaded.water.waterLevelMaximum, 99.0f)
+          && NearlyEqual(loaded.water.deepWaterDepthMinimum, 1.0f)
+          && NearlyEqual(loaded.water.deepWaterDepthMaximum, 88.0f),
+          "the legacy mapGeneratorData.Water block's values win over the disagreeing top-level "
+          "mirrors, confirming call-order precedence");
+}
+
+// STEP30_LegacyBlobFieldHoming_IO acceptance test item 1: a document with ONLY
+// `GeneralMapSettings.TerrainMaxHeight` set (no top-level `height`, no `mapGeneratorData` block at
+// all) imports at full float precision — proving the new reader, not the pre-existing lossy
+// top-level `height` int mirror, is what lands the value. Mirrors
+// CheckWaterImportsFromTopLevelWhenNoGeneratorData's own style.
+void CheckTerrainMaxHeightImportsFromGeneralMapSettingsAtFullPrecision() {
+    nlohmann::json document;
+    document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+    document["GeneralMapSettings"]["TerrainMaxHeight"] = 142.375f;
+    // No "height" key, no "mapGeneratorData" block at all.
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+          "a document with only GeneralMapSettings.TerrainMaxHeight still parses");
+    Check(NearlyEqual(loaded.geometry.terrainMaxHeight, 142.375f),
+          "terrainMaxHeight round-trips at full float precision through GeneralMapSettings, not "
+          "the lossy top-level height int mirror");
+}
+
+// STEP30_LegacyBlobFieldHoming_IO acceptance test item 2: a document with ONLY
+// `stratumLayers[0].ImportedMaskMode`/`Enabled` set (no `mapGeneratorData` block at all) imports
+// both fields from that entry. Mirrors CheckWaterImportsFromTopLevelWhenNoGeneratorData's own style.
+void CheckStratumImportedMaskModeAndEnabledImportFromStratumLayers() {
+    nlohmann::json document;
+    document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+    nlohmann::json layer;
+    layer["ImportedMaskMode"] = static_cast<int>(Params::ImportedMaskMode::StaticOverride);
+    layer["Enabled"] = false;
+    document["stratumLayers"] = nlohmann::json::array();
+    document["stratumLayers"].push_back(layer);
+    // No "mapGeneratorData" block at all.
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+          "a document with only stratumLayers[0].ImportedMaskMode/Enabled still parses");
+    Check(!loaded.strata.empty()
+          && loaded.strata[0].importedMaskMode == Params::ImportedMaskMode::StaticOverride
+          && loaded.strata[0].bEnabled == false,
+          "ImportedMaskMode/Enabled import from stratumLayers[0], both non-default values, when "
+          "mapGeneratorData is absent");
+}
+
+// STEP30_LegacyBlobFieldHoming_IO acceptance test item 3: a document with ONLY the top-level
+// `deepWaterDepthMin` key set (no `mapGeneratorData` block at all) imports it. Mirrors
+// CheckWaterImportsFromTopLevelWhenNoGeneratorData's own style.
+void CheckDeepWaterDepthMinImportsFromTopLevelWhenNoGeneratorData() {
+    nlohmann::json document;
+    document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+    document["deepWaterDepthMin"] = 7.5f;
+    // No "mapGeneratorData" block at all.
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+          "a document with only the top-level deepWaterDepthMin key still parses");
+    Check(NearlyEqual(loaded.water.deepWaterDepthMinimum, 7.5f),
+          "deepWaterDepthMinimum populates from the top-level deepWaterDepthMin mirror when "
+          "mapGeneratorData is absent");
+}
+
+// STEP30_LegacyBlobFieldHoming_IO acceptance test item 4: a document carrying BOTH the new
+// top-level/array homes for all 4 fields AND the legacy mapGeneratorData blob, disagreeing on all
+// 4, imports with the legacy blob's values winning for every single one — not just the water field
+// STEP27 already proved. Mirrors CheckWaterLegacyBlobWinsOverTopLevelMirrorsOnDisagreement's own
+// style, extended to the other 3 fields this ticket adds.
+void CheckLegacyBlobWinsOverAllFourNewFieldHomesOnDisagreement() {
+    nlohmann::json document;
+    document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+
+    // The 4 new homes: one set of values.
+    document["GeneralMapSettings"]["TerrainMaxHeight"] = 100.0f;
+    document["deepWaterDepthMin"] = 1.0f;
+    nlohmann::json layer;
+    layer["ImportedMaskMode"] = static_cast<int>(Params::ImportedMaskMode::ProceduralStart);
+    layer["Enabled"] = true;
+    document["stratumLayers"] = nlohmann::json::array();
+    document["stratumLayers"].push_back(layer);
+
+    // The legacy mapGeneratorData blob: disagreeing values on all 4, which must win.
+    nlohmann::json generatorData;
+    generatorData["TerrainMaxHeight"] = 500.0f;
+    nlohmann::json water;
+    water["DeepWaterDepthMin"] = 9.0f;
+    generatorData["Water"] = water;
+    nlohmann::json legacyStratum;
+    legacyStratum["ImportedMaskMode"] = static_cast<int>(Params::ImportedMaskMode::StaticOverride);
+    legacyStratum["Enabled"] = false;
+    generatorData["Stratums"] = nlohmann::json::array();
+    generatorData["Stratums"].push_back(legacyStratum);
+    document["mapGeneratorData"] = generatorData;
+
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+          "a document with all 4 new homes and a disagreeing legacy blob still parses");
+    Check(NearlyEqual(loaded.geometry.terrainMaxHeight, 500.0f),
+          "the legacy blob's TerrainMaxHeight wins over GeneralMapSettings' disagreeing value");
+    Check(NearlyEqual(loaded.water.deepWaterDepthMinimum, 9.0f),
+          "the legacy blob's Water.DeepWaterDepthMin wins over the disagreeing top-level mirror");
+    Check(!loaded.strata.empty()
+          && loaded.strata[0].importedMaskMode == Params::ImportedMaskMode::StaticOverride
+          && loaded.strata[0].bEnabled == false,
+          "the legacy blob's Stratums[0] ImportedMaskMode/Enabled win over the disagreeing "
+          "stratumLayers[0] entry, for both fields");
+}
+
+// KnownTopLevelSanmapKeys_IO_Test (STEP24_ImportNeverRefuses_IO ruling 4's paired coverage test):
+// every key `BuildSanmapJsonText` writes is present in `IsKnownTopLevelSanmapKey`'s maintained
+// allowlist (`Sanmap_KnownTopLevelKeys_IO.cpp`) — a future coder adding a new top-level export key
+// without updating that allowlist fails loud here in CI, rather than that key silently mis-bagging
+// into a future import's Unknown-Import passthrough.
+void CheckKnownTopLevelSanmapKeysCoverage() {
+    const Params::MapRecipe recipe = BuildPopulatedRecipe();
+    const std::string documentText = Io::MapExporter::BuildSanmapJsonText(recipe);
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+    for (const auto& [key, value] : document.items()) {
+        (void)value;
+        Check(Io::IsKnownTopLevelSanmapKey(key),
+              ("BuildSanmapJsonText's top-level key \"" + key
+               + "\" is present in the KnownTopLevelSanmapKeys allowlist").c_str());
+    }
+}
+
 } // namespace MapFormatTest
 } // namespace SanmapGen
 
 int main() {
     SanmapGen::MapFormatTest::RunRoundTripTests();
+    SanmapGen::MapFormatTest::CheckKnownTopLevelSanmapKeysCoverage();
     SanmapGen::MapFormatTest::CheckUnrecognizedSkyboxIntensityModeFallsBackSafely();
     SanmapGen::MapFormatTest::CheckStratumLayersCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::CheckStratumGenerationSettingsCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::CheckAccumulationReaderToleratesUnrecognizedKeys();
     SanmapGen::MapFormatTest::CheckRadialSymmetryRepeatCountClampsOnImport();
+    SanmapGen::MapFormatTest::CheckMapNameFallsBackWhenMissingOrEmpty();
+    SanmapGen::MapFormatTest::CheckMapCreditsHasNoFallbackWhenEmpty();
+    SanmapGen::MapFormatTest::CheckWaterImportsFromTopLevelWhenNoGeneratorData();
+    SanmapGen::MapFormatTest::CheckWaterLegacyBlobWinsOverTopLevelMirrorsOnDisagreement();
+    SanmapGen::MapFormatTest::CheckTerrainMaxHeightImportsFromGeneralMapSettingsAtFullPrecision();
+    SanmapGen::MapFormatTest::CheckStratumImportedMaskModeAndEnabledImportFromStratumLayers();
+    SanmapGen::MapFormatTest::CheckDeepWaterDepthMinImportsFromTopLevelWhenNoGeneratorData();
+    SanmapGen::MapFormatTest::CheckLegacyBlobWinsOverAllFourNewFieldHomesOnDisagreement();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

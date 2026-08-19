@@ -11,6 +11,7 @@
 #include "ConfirmDialog_UI.h"
 #include "TextInput_UI.h"
 #include "../data/MapFields_DATA.h"
+#include "../io/MapExporter_BlueprintValidation_IO.h"
 #include "../io/SanpackReader_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
@@ -101,8 +102,8 @@ void DrawExportSection(FilesTabState& state, Params::MapRecipe& recipe, Data::Ma
     TextInputRules nameRules;
     nameRules.bAllowEmpty  = false;
     nameRules.fallbackText = "mapdef";
-    DrawTextInput("Map Name", state.exportOptions.mapName, nameRules);
-    DrawTextInput("Credits", state.exportOptions.mapCredits);
+    DrawTextInput("Map Name", recipe.mapName, nameRules);
+    DrawTextInput("Credits", recipe.mapCredits);
 
     DrawGatedExportButton(FilesTabAction::ExportSanmapOnly, state, recipe, fields);
     ImGui::SameLine();

@@ -54,7 +54,8 @@ bool Application::RunOneFrame() {
 // Poll while work is pending; block on events (with a timeout, so a hidden shell can never hang)
 // once nothing is dirty — a settled app costs no CPU.
 void Application::PumpWindowEvents() {
-    if (previewDriver.NeedsMapUpdate() || previewDriver.NeedsPreviewRender() || bAssetLoadRequested)
+    if (previewDriver.NeedsMapUpdate() || previewDriver.NeedsPreviewRender() ||
+        assetBridge.bAssetLoadRequested)
         glfwPollEvents();
     else
         glfwWaitEventsTimeout(static_cast<double>(settings.idleWaitSeconds));

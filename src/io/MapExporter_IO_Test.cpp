@@ -3,6 +3,8 @@
 // quantizers, the path join, the document's own top-level fields, and the exact byte layout of
 // the heightmap RAW and the stratum TGAs (which is what the Sanctuary editor reads).
 #include "MapExporter_IO.h"
+#include "FilesystemPrimitives_IO.h"
+#include "MapExporter_SampleQuantize_IO.h"
 #include "../data/MapFields_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cmath>
@@ -57,11 +59,16 @@ static void TestDocumentCarriesTheFormatsOwnFields() {
     recipe.geometry.terrainMaxHeight = 200.0f;
     recipe.water.bEnabled = true;
     recipe.water.waterLevelMaximum = 42.5f;
-    Io::MapExportOptions options;
-    options.mapName = "scratch";
-    const std::string documentText = Io::MapExporter::BuildSanmapJsonText(recipe, options);
+    recipe.mapName = "scratch";
+    recipe.mapCredits = "A Test Cartographer";
+    const std::string documentText = Io::MapExporter::BuildSanmapJsonText(recipe);
 
     Check(documentText.find("\"fileVersion\"") != std::string::npos, "the document names its version");
+    Check(documentText.find("\"name\": \"scratch\"") != std::string::npos,
+          "the document's own name comes from the recipe, not a write-only export option "
+          "(STEP25_MapNameCredits_IO)");
+    Check(documentText.find("\"credits\": \"A Test Cartographer\"") != std::string::npos,
+          "and so does credits");
     Check(documentText.find("\"mapGeneratorData\"") != std::string::npos,
           "and carries the generator-state block that makes the sanmap the source of truth");
     Check(documentText.find("\"heightmapResolution\": 513") != std::string::npos,
@@ -94,7 +101,6 @@ static void TestStratumLayersWriteVector4RemapAndIntegerHeight() {
     recipe.geometry.terrainMaxHeight = 127.6f;   // a legal fractional Params::Geometry value
 
     Io::MapExportOptions options;
-    options.mapName = "scratch";
     const std::string documentText = Io::MapExporter::BuildSanmapJsonText(recipe, options);
     const nlohmann::json document = nlohmann::json::parse(documentText);
     const nlohmann::json& stratumLayer = document.at("stratumLayers").at(0);
@@ -131,6 +137,39 @@ static void TestStratumLayersWriteVector4RemapAndIntegerHeight() {
           "and its value round-trips exactly");
 }
 
+// STEP30_LegacyBlobFieldHoming_IO: the exporter's own half of the 4 new field homes — each key
+// present, at the right JSON location, carrying the recipe's value at full precision (not just the
+// legacy `mapGeneratorData` blob's copy, which already covered these values before this ticket).
+static void TestNewFieldHomesAreWritten() {
+    Params::MapRecipe recipe;
+    recipe.geometry.mapSize = 4;
+    recipe.geometry.terrainMaxHeight = 142.375f;   // a non-round float, full precision matters
+    recipe.strata.resize(1);
+    recipe.strata[0].importedMaskMode = Params::ImportedMaskMode::StaticOverride;
+    recipe.strata[0].bEnabled = false;
+    recipe.water.deepWaterDepthMinimum = 7.5f;
+
+    const std::string documentText = Io::MapExporter::BuildSanmapJsonText(recipe);
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+
+    Check(document.contains("GeneralMapSettings") && document["GeneralMapSettings"].contains("TerrainMaxHeight")
+          && std::abs(document["GeneralMapSettings"]["TerrainMaxHeight"].get<float>() - 142.375f) < 1e-4f,
+          "GeneralMapSettings.TerrainMaxHeight is written at full float precision, sibling of "
+          "TerrainMinHeight");
+
+    const nlohmann::json& stratumLayer = document.at("stratumLayers").at(0);
+    Check(stratumLayer.contains("ImportedMaskMode")
+          && stratumLayer.at("ImportedMaskMode").get<int>()
+             == static_cast<int>(Params::ImportedMaskMode::StaticOverride),
+          "stratumLayers[0].ImportedMaskMode is written as the enum ordinal");
+    Check(stratumLayer.contains("Enabled") && stratumLayer.at("Enabled").get<bool>() == false,
+          "stratumLayers[0].Enabled is written");
+
+    Check(document.contains("deepWaterDepthMin")
+          && std::abs(document["deepWaterDepthMin"].get<float>() - 7.5f) < 1e-4f,
+          "the top-level deepWaterDepthMin key is written, sibling of hasWater/waterLevel/waterDepth");
+}
+
 static void TestAnInvalidRecipeIsRefusedBeforeAnythingIsWritten() {
     const std::string scratchFolder = ScratchFolderPath();
     Params::MapRecipe recipe;
@@ -148,6 +187,7 @@ static void TestExportAllWritesEveryPayload() {
     const std::string scratchFolder = ScratchFolderPath();
     Params::MapRecipe recipe;
     recipe.geometry.mapSize = 8;
+    recipe.mapName = "scratch";
     Data::MapFields fields;
     fields.Resize(recipe.geometry.VertexSize(), 0.0f);
     fields.heightfield.Set(0, 0, 1.0f);
@@ -156,11 +196,15 @@ static void TestExportAllWritesEveryPayload() {
     fields.flow.Set(1, 1, 0.25f);
 
     Io::MapExportOptions options;
-    options.mapName = "scratch";
     const Io::MapExportResult result = Io::MapExporter::ExportAll(scratchFolder, recipe, fields, options);
     Check(result.bSucceeded, "Export All succeeds against a sized field set");
     Check(result.WrittenFileCount() == 6,
           "and writes the document plus heightmap, two masks, slope and flow");
+    std::error_code pathError;
+    Check(std::filesystem::exists(std::filesystem::path(Io::JoinExportPath(scratchFolder, "scratch.sanmap")),
+                                  pathError),
+          "the document's file name comes from recipe.mapName, not a write-only export option "
+          "(STEP25_MapNameCredits_IO)");
 
     const std::string texturesFolder = Io::JoinExportPath(scratchFolder, "Textures");
     const std::vector<unsigned char> heightBytes =
@@ -196,6 +240,7 @@ int main() {
     TestPathJoinNeverDoublesASeparator();
     TestDocumentCarriesTheFormatsOwnFields();
     TestStratumLayersWriteVector4RemapAndIntegerHeight();
+    TestNewFieldHomesAreWritten();
     TestAnInvalidRecipeIsRefusedBeforeAnythingIsWritten();
     TestExportAllWritesEveryPayload();
     TestFolderPreparationIsTheOneDoorAboveIo();

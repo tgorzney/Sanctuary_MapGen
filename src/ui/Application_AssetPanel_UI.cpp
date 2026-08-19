@@ -58,8 +58,8 @@ void Application::ResolveIconSelections() {
 }
 
 bool Application::ServiceAssetLoadRequest() {
-    if (!bAssetLoadRequested) return false;
-    if (!bAssetLoadAnnounced) {
+    if (!assetBridge.bAssetLoadRequested) return false;
+    if (!assetBridge.bAssetLoadAnnounced) {
         const ImGuiIO& io = ImGui::GetIO();
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                                 ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -68,11 +68,11 @@ bool Application::ServiceAssetLoadRequest() {
                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav))
             ImGui::TextUnformatted("Loading assets... this may take a few seconds.");
         ImGui::End();
-        bAssetLoadAnnounced = true;
+        assetBridge.bAssetLoadAnnounced = true;
         return true;                 // present this frame, then load on the next
     }
-    bAssetLoadRequested = false;
-    bAssetLoadAnnounced = false;
+    assetBridge.bAssetLoadRequested = false;
+    assetBridge.bAssetLoadAnnounced = false;
     LoadAssetAtlas();
     return false;
 }
@@ -82,11 +82,11 @@ bool Application::ServiceAssetLoadRequest() {
 // shell holds them and passes them to IO at call time rather than inventing a settings type.
 void Application::DrawAssetPanel() {
     ImGui::TextUnformatted("ASSET ATLAS");
-    ImGui::InputText("Sanpack", sanpackPath, IM_ARRAYSIZE(sanpackPath));
-    if (ImGui::Button("Load Sanpack")) bAssetLoadRequested = true;
+    ImGui::InputText("Sanpack", assetBridge.sanpackPath, IM_ARRAYSIZE(assetBridge.sanpackPath));
+    if (ImGui::Button("Load Sanpack")) assetBridge.bAssetLoadRequested = true;
     ImGui::SameLine();
-    ImGui::Text("Icons resident: %d", iconManifest.EntryCount());
-    ImGui::TextWrapped("%s", assetStatusMessage.c_str());
+    ImGui::Text("Icons resident: %d", assetBridge.iconManifest.EntryCount());
+    ImGui::TextWrapped("%s", assetBridge.assetStatusMessage.c_str());
 }
 
 } // namespace Ui

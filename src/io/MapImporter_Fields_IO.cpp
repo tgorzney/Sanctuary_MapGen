@@ -6,7 +6,7 @@
 // document is clipped to the recipe's grid and the mismatch is logged (Constitution §6). A missing
 // texture is not an error — a .sanmap exported "sanmap only" simply has none.
 #include "MapImporter_IO.h"
-#include "MapExporter_IO.h"
+#include "FilesystemPrimitives_IO.h"
 #include "../data/MapFields_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cstdint>

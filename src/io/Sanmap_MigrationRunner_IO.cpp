@@ -3,15 +3,16 @@
 #include "Sanmap_MigrationManifest_IO.h"
 #include "JsonPrimitives_IO.h"
 #include "MapImporter_IO.h"
+#include "UnknownImportBag_IO.h"
 #include <string>
 
 namespace SanmapGen {
 namespace Io {
 namespace {
 
-constexpr const char* kSanGenVersionKey        = "SanGenVersion";
-constexpr const char* kMapGeneratorDataKey      = "mapGeneratorData";
-constexpr const char* kLegacyVersionKey         = "MapGeneratorDataVersion";
+constexpr const char* kSanGenVersionKey   = "SanGenVersion";
+constexpr const char* kMapGeneratorDataKey = "mapGeneratorData";
+constexpr const char* kLegacyVersionKey    = "MapGeneratorDataVersion";
 
 // §4.1: `SanGenVersion` is read FIRST; the legacy nested field is only consulted when that key is
 // absent. Returns false — outResolvedVersion untouched — when NEITHER marker is present.
@@ -30,25 +31,48 @@ bool ResolveSanGenVersion(const nlohmann::json& document, int& outResolvedVersio
     return false;
 }
 
+// Ruling 4's population step. Called strictly AFTER the forward-walk below, so any legacy key a
+// migration step deliberately deleted via `DeleteKeyIfPresent` (§3's `legacyKeysToDelete`) is
+// already physically gone from `document` — ordering alone provides the "deliberately deleted" vs.
+// "genuinely unknown" distinction, no extra bookkeeping needed.
+//
+// STEP28_UnknownImportNesting_IO: seed the bag FIRST from any incoming `UnknownImport` object's own
+// children, flattened one level (NOT re-wrapped under a nested `UnknownImport` key) — a document
+// that was itself exported with a nested `UnknownImport` bag must round-trip without accumulating
+// nesting on every load/save cycle. The per-key loop below then continues to capture any OTHER
+// genuinely-unrecognized top-level keys into the same bag, unaffected.
+void CaptureUnknownTopLevelKeys(const nlohmann::json& document, UnknownImportBag& outUnknownData) {
+    if (document.contains("UnknownImport") && document["UnknownImport"].is_object())
+        for (const auto& [key, value] : document["UnknownImport"].items())
+            outUnknownData.unknownTopLevelKeys[key] = value;
+
+    for (const auto& [key, value] : document.items()) {
+        if (IsKnownTopLevelSanmapKey(key)) continue;
+        outUnknownData.unknownTopLevelKeys[key] = value;
+    }
+}
+
 } // namespace
 
-bool RunSanmapMigrations(nlohmann::json& document, MapImportResult& result) {
-    int resolvedVersion = 0;
+void RunSanmapMigrations(nlohmann::json& document, MapImportResult& result,
+                         UnknownImportBag* outUnknownData) {
+    int resolvedVersion = kCurrentSanGenVersion;
     if (!ResolveSanGenVersion(document, resolvedVersion, result)) {
-        result.Log("Refused: the document has no version marker at all (neither a top-level "
-                   "SanGenVersion field nor the legacy mapGeneratorData.MapGeneratorDataVersion "
-                   "field) — this build never guesses a starting version.");
-        return false;
-    }
-    if (resolvedVersion > kCurrentSanGenVersion) {
-        result.Log("Refused: this map was saved by a newer SanGen (SanGenVersion "
-                   + std::to_string(resolvedVersion) + ") than this build supports (current "
-                   + std::to_string(kCurrentSanGenVersion) + ") and cannot be opened.");
-        return false;
+        // No version marker of any kind (§6): never a blind version-1 walk — resolve to a
+        // zero-iteration state so the loop below naturally does nothing and control falls straight
+        // through to the readers, current-shape keys only (plus the existing legacy
+        // mapGeneratorData-gated readers, plus this function's own Unknown-Import capture below).
+        result.Warn("No SanGenVersion or legacy version field found; skipping migration, "
+                    "recovering via direct field match only.");
+        resolvedVersion = kCurrentSanGenVersion;
+    } else if (resolvedVersion > kCurrentSanGenVersion) {
+        result.Warn("This map was saved by a newer SanGen (SanGenVersion "
+                   + std::to_string(resolvedVersion) + "); recovering best-effort — fields this "
+                   "build does not recognize are preserved, not applied.");
     }
 
-    // §4.2: walk forward generically. Zero-iterates whenever resolvedVersion == kCurrentSanGenVersion
-    // (the ONLY case this ticket's empty manifest can ever legally reach) — §4.3's pass-through.
+    // §4.2: walk forward generically. Zero-iterates for both cases above (resolvedVersion ==
+    // kCurrentSanGenVersion, or resolvedVersion > kCurrentSanGenVersion) with no extra branch.
     const std::vector<MigrationStep>& manifest = SanmapMigrationManifest();
     for (int sourceVersion = resolvedVersion; sourceVersion < kCurrentSanGenVersion; ++sourceVersion) {
         const MigrationStep* step = nullptr;
@@ -64,7 +88,9 @@ bool RunSanmapMigrations(nlohmann::json& document, MapImportResult& result) {
         // every step leaves the document honestly stamped, whether or not further steps follow.
         document[kSanGenVersionKey] = sourceVersion + 1;
     }
-    return true;
+
+    // Ruling 4: Unknown-Import capture, strictly after the walk (and any deletions it ran) above.
+    if (outUnknownData != nullptr) CaptureUnknownTopLevelKeys(document, *outUnknownData);
 }
 
 } // namespace Io
