@@ -70,7 +70,7 @@ void RunCanvasBindingChecks(Application& application) {
 } // namespace
 
 int main() {
-    Application application;
+    Application application(TestApplicationSettings());
     PrepareShellForTest(application);
 
     RunFirstGenerationChecks(application);

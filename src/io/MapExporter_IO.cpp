@@ -36,15 +36,21 @@ void LogBlueprintValidationFindings(const Params::MapRecipe& recipe, const Sanpa
 
 } // namespace
 
-bool EnsureExportFolderExists(const std::string& folderPath, MapExportResult& result) {
-    if (folderPath.empty()) { result.Log("Export failed: no destination folder was given."); return false; }
+bool EnsureFolderExists(const std::string& folderPath, std::string& outErrorMessage) {
+    if (folderPath.empty()) { outErrorMessage = "no destination folder was given."; return false; }
     std::error_code folderError;
     const std::filesystem::path folder(folderPath);
     std::filesystem::create_directories(folder, folderError);
     if (folderError && !std::filesystem::exists(folder)) {
-        result.Log("Export failed: could not create " + folderPath);
+        outErrorMessage = "could not create " + folderPath;
         return false;
     }
+    return true;
+}
+
+bool EnsureExportFolderExists(const std::string& folderPath, MapExportResult& result) {
+    std::string errorMessage;
+    if (!EnsureFolderExists(folderPath, errorMessage)) { result.Log("Export failed: " + errorMessage); return false; }
     return true;
 }
 

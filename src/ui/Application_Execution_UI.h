@@ -99,11 +99,15 @@ inline bool StoreDeterministic(bool bDeterministic, Sys::DispatchPolicy& dispatc
 void LoadExecutionSettings(Pipeline::GenerationAssembler& generationAssembler,
                            ApplicationExecutionSettings& executionSettings);
 
-// the toggles -> every stage's policy, plus the shell's own determinism flag. Reports whether any
-// stage's policy moved, which is exactly when the caller owes a regeneration.
+// the toggles -> every stage's policy, plus the shell's own determinism flag and `bUseGpuMarkers`
+// (STEP19_AppSettings_IO "Flagged, not blocking": placementStage's own preview backend, seeded from
+// AppSettings at startup — it has a real live target but no Performance-panel checkbox yet, so it
+// travels as a parameter here rather than a fourth ApplicationExecutionSettings field). Reports
+// whether any stage's policy moved, which is exactly when the caller owes a regeneration.
 // (Application_Execution_UI.cpp)
 bool ApplyExecutionSettings(ApplicationExecutionSettings& executionSettings,
                             bool bDeterministic,
+                            bool bUseGpuMarkers,
                             Pipeline::GenerationAssembler& generationAssembler);
 
 } // namespace Ui

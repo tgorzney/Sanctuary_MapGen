@@ -108,6 +108,14 @@ BlueprintValidationReport ValidatePropAndDecalBlueprintPaths(const Params::MapRe
 // Joins one path segment onto a folder with a single forward slash, whatever the folder ended in.
 std::string JoinExportPath(const std::string& folderPath, const std::string& segmentName);
 
+// The result-agnostic core: creates `folderPath` (and its parents) if it is not already there.
+// False — with the reason in `outErrorMessage` — for an empty path or a folder the platform
+// refused to make. `EnsureExportFolderExists` below is the `MapExportResult`-shaped wrapper every
+// Write* action here uses; a caller with no `MapExportResult` of its own (AppSettings_IO's
+// clean-shutdown save, STEP19_AppSettings_IO) uses this one directly instead of inventing a
+// duplicate folder-creation path (Constitution §6).
+bool EnsureFolderExists(const std::string& folderPath, std::string& outErrorMessage);
+
 // Creates a destination folder (and its parents) if it is not already there. False — with the
 // reason logged — for an empty path or a folder the platform refused to make. This is the ONE
 // door a caller of the individual Write* actions below uses to prepare their destination, so no

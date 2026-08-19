@@ -38,6 +38,11 @@ Application::Application(ApplicationSettings applicationSettings)
     LoadExecutionSettings(assembler, executionSettings);
     assembler.SetThreadPool(&threadPool);
     WireCallbacks();
+    // Runs LAST: it may overwrite the mirrors LoadExecutionSettings just read off the stages'
+    // ARCH §4.2 defaults, and ApplyExecutionSettings (which it calls) only WRITES DispatchPolicy —
+    // never a parameter hash — so it cannot disagree with the hashes PreviewDriver already cached
+    // above (Application_AppSettings_UI.cpp).
+    LoadAppSettingsAtStartup();
 }
 
 Application::~Application() { Shutdown(); }
@@ -89,7 +94,8 @@ Sys::GpuTextureHandle Application::UploadCompositeTexels() {
 // execution change is invisible to every stage's parameter hash — the recipe did not move — so the
 // driver's door for it is RequestMapUpdate (SystemTab_UI.cpp states the same reasoning).
 bool Application::ApplyExecutionPolicy() {
-    if (!ApplyExecutionSettings(executionSettings, tabState.system.bDeterministic, assembler))
+    if (!ApplyExecutionSettings(executionSettings, tabState.system.bDeterministic, bUseGpuMarkers,
+                                assembler))
         return false;
     previewDriver.RequestMapUpdate();
     return true;

@@ -36,6 +36,12 @@ struct ApplicationSettings {
     unsigned workerThreadCount       = 0;       // 0 = hardware concurrency
     Io::AtlasBuildSettings atlasBuildSettings;  // page size / validation caps / thumbnail size
     Io::SanpackEntryFilter assetEntryFilter;    // which archive entries the atlas ingests
+
+    // Empty = resolve the real platform default (Io::DefaultAppSettingsDirectory(),
+    // `%APPDATA%\SanGen\` on Windows) at construction. A test points this at a scratch folder
+    // instead, so no automated run ever touches the real user's roaming profile
+    // (STEP19_AppSettings_IO).
+    std::string appSettingsDirectoryOverride;
 };
 
 } // namespace Ui

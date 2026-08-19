@@ -1,26 +1,17 @@
-// Application_UI.h — the SanGen v2 application shell: the window, the GL context, the imgui
-// runtime and the frame loop that mount the M5-6 tabs and the M5-5 canvas over the M4-5 pipeline.
-// Layer: UI. Accuracy class: Visual. It OWNS NO SIM LOGIC (ARCH §3.2): each frame it only sets
-// params, lets `Pipeline::PreviewDriver` DERIVE and service the two-tier dirty flags, and draws
-// what the composite baked. It knows no stage order and holds no rival backend toggle.
-//
-// It is the one unit that legally sees IO and UI at once, which is why the sanpack -> atlas ->
-// residency -> `Ui::IconAtlasManifest` bridge lives here and in no tab. GL objects reach it only
-// through `Sys::GpuResourceManager` (ARCH §3.2).
-//
-// Aspect translation units behind this one header, each tagged at its own top (ARCH §1.5):
-// _UI / _Window_UI / _Frame_UI (assembly, bring-up, the frame loop) · _Draw_UI / _LeftColumn_UI
-// (the two panes; the v1 column and its `[O]`/`[ ]`) · _Panel{Terrain,Environment,System}_UI (the
-// three groups' bodies) · _Execution_UI (the Performance toggles -> per-stage DispatchPolicy) ·
-// _Assets_UI / _AssetPanel_UI (the sanpack -> atlas -> `tpId` bridge) · _Recipe_UI /
-// _PreviewSetup_UI / _PreviewRamps_UI (the launch defaults).
-// Member headers (the ARCH §7.1 composition rule, split for the §1.5 ceiling — none is a type any
-// other unit reaches): _Settings_UI.h (every value the shell runs on, Constitution §8) ·
-// _Panels_UI.h (the panel catalogue: groups, order, which rows toggle) · _Visibility_UI.h (the
-// `[O]`/`[ ]` state and its mapping onto the composite) · _Execution_UI.h · _HostedSettings_UI.h
-// (the tab settings with no `Params::MapRecipe` home yet) · _TabState_UI.h · _Defaults_UI.h (the
-// launch defaults and the atlas bridge, as free functions).
-// ApplicationMain_UI.cpp is the thin entry point, and is NOT part of the library.
+// Application_UI.h — SanGen v2's application shell: window, GL context, imgui runtime, and the
+// frame loop mounting the tabs/canvas over the pipeline. Layer: UI. Accuracy class: Visual. Owns
+// NO SIM LOGIC (ARCH §3.2): each frame it only sets params, lets `Pipeline::PreviewDriver` derive
+// and service the dirty flags, draws what the composite baked — no stage order, no rival backend
+// toggle. The one unit that legally sees IO and UI at once (sanpack -> atlas -> residency ->
+// `Ui::IconAtlasManifest` bridge lives here, in no tab); GL reaches it only through
+// `Sys::GpuResourceManager` (ARCH §3.2).
+// Aspect .cpp units behind this header are each self-documented at their own top (ARCH §1.5): _UI
+// / _Window_UI / _Frame_UI / _Draw_UI / _LeftColumn_UI / _Panel{Terrain,Environment,System}_UI /
+// _Execution_UI / _Assets_UI / _AssetPanel_UI / _Recipe_UI / _Preview{Setup,Ramps}_UI /
+// _AppSettings_UI. Member headers (§7.1 composition, §1.5 split; none reached by any other unit):
+// _Settings_UI.h / _Panels_UI.h / _Visibility_UI.h / _Execution_UI.h / _HostedSettings_UI.h (no
+// `Params::MapRecipe` home yet) / _TabState_UI.h / _Defaults_UI.h (launch defaults, atlas bridge,
+// free functions). ApplicationMain_UI.cpp is the thin entry point, not part of the library.
 #pragma once
 #include <cstdint>
 #include <memory>
@@ -66,6 +57,10 @@ public:
     // Pushes the Performance toggles onto every stage's policy; true = one moved and a regeneration
     // was requested. Runs every frame, not only while that panel is on screen.
     bool ApplyExecutionPolicy();                       // Application_UI.cpp
+
+    // The ONE step Run()'s clean-exit path performs after the frame loop ends (STEP19_AppSettings_IO)
+    // — never folded into Shutdown(), which also runs from the destructor and must not autosave.
+    void SaveAppSettingsAtShutdown();          // Application_AppSettings_UI.cpp
 
     // --- assets (Application_Assets_UI.cpp) ---
     void SetSanpackPath(const std::string& path);
@@ -114,6 +109,7 @@ private:
     bool ApplyIconSelection(int selectedIconId, int& lastIconId,
                             char (&templateIdentifier)[8]);   // Application_AssetPanel_UI.cpp
     const IconAtlasManifest* ActiveIconManifest() const;   // null until an atlas is resident
+    void LoadAppSettingsAtStartup();         // Application_AppSettings_UI.cpp
 
     ApplicationSettings           settings;
     Params::MapRecipe             recipe;
@@ -125,6 +121,8 @@ private:
     ApplicationTabState           tabState;
     ApplicationHostedSettings     hostedSettings;   // the tab settings with no recipe home yet
     ApplicationExecutionSettings  executionSettings;
+    bool bUseGpuMarkers = false;   // placementStage's preview backend; no checkbox yet (STEP19)
+    std::string appSettingsDirectory;   // resolved once at construction (STEP19_AppSettings_IO)
     Sys::DispatchPolicy           dispatchPolicy;   // the SystemTab's determinism/backend home
     Sys::ThreadPool               threadPool;
     std::unique_ptr<Sys::GpuResourceManager> gpuResourceManager;   // created with the context

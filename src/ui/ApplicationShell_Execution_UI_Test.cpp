@@ -71,7 +71,7 @@ void CheckWysiwygBaking(Application& application) {
 } // namespace
 
 void RunShellExecutionChecks() {
-    Application application;
+    Application application(TestApplicationSettings());
     PrepareShellForTest(application);
     Check(!application.ApplyExecutionPolicy(),
           "a fresh shell's panel already agrees with every stage");

@@ -12,6 +12,7 @@
 // Initialize() reports that honestly and the test SKIPS, exactly as the GPU parity tests do.
 #include "Application_UI.h"
 #include <cstdio>
+#include <filesystem>
 
 using namespace SanmapGen;
 using namespace SanmapGen::Ui;
@@ -19,6 +20,15 @@ using namespace SanmapGen::Ui;
 namespace {
 
 int failureCount = 0;
+
+// A directory that never exists on disk (STEP19_AppSettings_IO). Deliberately local rather than
+// ApplicationShell_TestSupport_UI.h's shared NullAppSettingsDirectoryForTests(): that header also
+// pulls in ParameterTabs_TestSupport_UI.h's own Check(), which this file already declares its own
+// (identically named and signed) local twin of.
+std::string NullAppSettingsDirectory() {
+    std::error_code pathError;
+    return (std::filesystem::temp_directory_path(pathError) / "SanGenWindowTestNeverWritesHere").string();
+}
 
 void Check(bool bCondition, const char* label) {
     if (bCondition) return;
@@ -39,6 +49,10 @@ ApplicationSettings MakeHiddenShellSettings(const char* shaderDirectory) {
     settings.previewResolution    = smokePreviewResolution;
     settings.windowWidth          = 640;
     settings.windowHeight         = 480;
+    // Never the real `%APPDATA%\SanGen\` — this binary calls RequestClose()+RunOneFrame()+
+    // Shutdown() directly rather than Run(), so it never flushes, but LoadAppSettingsAtStartup()
+    // still runs at construction and must not read a stranger's real saved preferences.
+    settings.appSettingsDirectoryOverride = NullAppSettingsDirectory();
     if (shaderDirectory != nullptr && shaderDirectory[0] != '\0')
         settings.shaderSearchDirectories.push_back(shaderDirectory);
     return settings;

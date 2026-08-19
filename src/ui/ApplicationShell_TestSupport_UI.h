@@ -9,6 +9,7 @@
 #pragma once
 #include "Application_UI.h"
 #include "ParameterTabs_TestSupport_UI.h"   // Check(), the synthetic pointer sequences
+#include <filesystem>
 
 namespace SanmapGen {
 namespace Ui {
@@ -17,6 +18,24 @@ constexpr int shellTestMapSize          = 64;
 constexpr int shellTestPreviewResolution = 64;
 constexpr int shellTestErosionDropletCount = 2000;
 constexpr float shellTestCanvasSidePixels  = 256.0f;
+
+// A directory that never exists on disk. EVERY shell test's Application must be constructed with
+// this override (ApplicationSettings::appSettingsDirectoryOverride) rather than the bare default,
+// so an automated run never reads — and, since none of these binaries calls Run() or
+// SaveAppSettingsAtShutdown(), never could write — the real `%APPDATA%\SanGen\AppSettings.json` a
+// developer's real, previously-run app may have created (STEP19_AppSettings_IO). Without this, a
+// machine that HAS such a file would seed these shells from a stranger's saved preferences instead
+// of the compiled defaults every other assertion here assumes.
+inline std::string NullAppSettingsDirectoryForTests() {
+    std::error_code pathError;
+    return (std::filesystem::temp_directory_path(pathError) / "SanGenShellTestsNeverWriteHere").string();
+}
+
+inline ApplicationSettings TestApplicationSettings() {
+    ApplicationSettings settings;
+    settings.appSettingsDirectoryOverride = NullAppSettingsDirectoryForTests();
+    return settings;
+}
 
 // A shell shrunk to test size, generated once. Nothing here replaces a shell member: every value
 // below is set through the same public surface a user's edit would move.
@@ -62,6 +81,7 @@ void RunShellDirtyTierChecks(Application& application);   // ApplicationShell_Di
 void RunShellIconBridgeChecks();                          // ApplicationShell_IconBridge_UI_Test.cpp
 void RunShellVisibilityChecks();                          // ApplicationShell_Visibility_UI_Test.cpp
 void RunShellExecutionChecks();                           // ApplicationShell_Execution_UI_Test.cpp
+void RunShellAppSettingsChecks();                          // ApplicationShell_AppSettings_UI_Test.cpp
 
 } // namespace Ui
 } // namespace SanmapGen

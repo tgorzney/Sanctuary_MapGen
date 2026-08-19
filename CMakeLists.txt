@@ -493,12 +493,19 @@ add_sangen_test(FilesTab_UI_Test
     src/ui/FilesTab_UI_Test.cpp
     src/ui/FilesTab_Roundtrip_UI_Test.cpp)
 
-# Tab-rebuild batch E — the host shell. One binary over three translation units (main() lives in
+# STEP19_AppSettings_IO: the app's first persistent file outside `.sanmap` and the asset atlas
+# cache — a scratch-folder Save/Load round trip plus the missing-directory/missing-file/corrupt-JSON
+# degrade-gracefully paths and the platform seam's own plausibility check.
+add_sangen_test(AppSettings_IO_Test src/io/AppSettings_IO_Test.cpp)
+
+# Tab-rebuild batch E — the host shell. One binary over four translation units (main() lives in
 # ApplicationShell_Layout_UI_Test.cpp): the left column's catalogue is pure data, so the v1 layout is
-# asserted rather than eyeballed; the other two drive a REAL Ui::Application on the Cpu twin, so the
-# `[O]`/`[ ]` -> composite mapping and the Performance -> per-stage DispatchPolicy fan-out are the
-# SHELL's own wiring, not a replica of it. Headless — no imgui frame, no window, no GL.
+# asserted rather than eyeballed; the other three drive a REAL Ui::Application on the Cpu twin, so the
+# `[O]`/`[ ]` -> composite mapping, the Performance -> per-stage DispatchPolicy fan-out, and the
+# STEP19_AppSettings_IO startup-seed/clean-shutdown-flush wiring are the SHELL's own wiring, not a
+# replica of it. Headless — no imgui frame, no window, no GL.
 add_sangen_test(ApplicationShell_Layout_UI_Test
     src/ui/ApplicationShell_Layout_UI_Test.cpp
     src/ui/ApplicationShell_Visibility_UI_Test.cpp
-    src/ui/ApplicationShell_Execution_UI_Test.cpp)
+    src/ui/ApplicationShell_Execution_UI_Test.cpp
+    src/ui/ApplicationShell_AppSettings_UI_Test.cpp)

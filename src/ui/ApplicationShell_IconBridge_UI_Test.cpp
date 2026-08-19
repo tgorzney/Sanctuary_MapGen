@@ -88,7 +88,7 @@ void RunShellIconBridgeChecks() {
     std::filesystem::remove_all(shellTestCacheDirectory, errorCode);
     Check(AssetPipelineTest::WriteSyntheticSanpack(layout), "the synthetic sanpack was written");
 
-    Application application;
+    Application application(TestApplicationSettings());
     ConfigureShellForAtlas(application);
     Check(application.LoadAssetAtlas(), "the shell loaded the sanpack through the M5-4 pipeline");
     RunManifestShapeChecks(application);

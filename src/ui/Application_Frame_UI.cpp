@@ -27,6 +27,7 @@ GLFWwindow* AsGlfwWindow(void* windowHandle) { return static_cast<GLFWwindow*>(w
 int Application::Run() {
     if (!Initialize()) return 1;
     while (RunOneFrame()) {}
+    SaveAppSettingsAtShutdown();   // the clean-exit flush (STEP19_AppSettings_IO) — Run() only
     Shutdown();
     return 0;
 }

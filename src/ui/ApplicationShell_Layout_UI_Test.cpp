@@ -67,6 +67,7 @@ int main() {
     RunCatalogueChecks();
     RunShellVisibilityChecks();
     RunShellExecutionChecks();
+    RunShellAppSettingsChecks();
 
     if (previewTestFailureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", previewTestFailureCount);

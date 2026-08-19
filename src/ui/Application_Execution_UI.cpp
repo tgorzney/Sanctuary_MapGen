@@ -56,6 +56,16 @@ bool ApplyGpuToggles(const ApplicationExecutionSettings& executionSettings,
     return bPolicyMoved;
 }
 
+// STEP19_AppSettings_IO "Flagged, not blocking": the same one-line pattern the terrain/flow
+// toggles use, aimed at Placement instead — its Cpu path stays authoritative (ARCH §4.2, Exact
+// class), the Gpu path only ever speeds up the preview density gate.
+bool ApplyMarkersGpuToggle(bool bUseGpuMarkers, Pipeline::GenerationAssembler& generationAssembler) {
+    return EditStagePolicy(generationAssembler.Placement(),
+                           [bUseGpuMarkers](Sys::DispatchPolicy& policy) {
+                               return StorePreviewBackend(bUseGpuMarkers, policy);
+                           });
+}
+
 bool ApplyWysiwygBaking(ApplicationExecutionSettings& executionSettings,
                         Pipeline::GenerationAssembler& generationAssembler) {
     bool bPolicyMoved = false;
@@ -83,11 +93,12 @@ void LoadExecutionSettings(Pipeline::GenerationAssembler& generationAssembler,
 }
 
 bool ApplyExecutionSettings(ApplicationExecutionSettings& executionSettings, bool bDeterministic,
-                            Pipeline::GenerationAssembler& generationAssembler) {
+                            bool bUseGpuMarkers, Pipeline::GenerationAssembler& generationAssembler) {
     bool bPolicyMoved = ApplyGpuToggles(executionSettings, generationAssembler);
     // WYSIWYG runs AFTER the backend toggles: it copies the preview pass, so it has to see the
     // backend the user just chose rather than the one the previous frame carried.
     bPolicyMoved = ApplyWysiwygBaking(executionSettings, generationAssembler) || bPolicyMoved;
+    bPolicyMoved = ApplyMarkersGpuToggle(bUseGpuMarkers, generationAssembler) || bPolicyMoved;
     VisitAllStages(generationAssembler, [&](auto& stage) {
         bPolicyMoved = EditStagePolicy(stage, [bDeterministic](Sys::DispatchPolicy& policy) {
             return StoreDeterministic(bDeterministic, policy);

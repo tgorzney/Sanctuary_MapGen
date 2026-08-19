@@ -34,7 +34,7 @@ void SetPanelVisible(Application& application, ApplicationPanel panel, bool bVis
 } // namespace
 
 void RunShellVisibilityChecks() {
-    Application application;
+    Application application(TestApplicationSettings());
     PrepareShellForTest(application);
     CheckEveryToggledFieldHasALayer(application);
 
