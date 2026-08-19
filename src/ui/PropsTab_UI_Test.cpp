@@ -1,8 +1,12 @@
 // PropsTab_UI_Test.cpp — tab-rebuild WO C4 acceptance, part 4: the Props tab and the two other
-// stacks it hosts (the manual prop groups and the decal rules). Pure logic only — the rule<->widget
-// mirrors, the group-color override, the label fallbacks and the tpId probe — so the binary needs
+// stacks it hosts (the manual prop layers and the decal rules). Pure logic only — the rule<->widget
+// mirrors, the layer-color override, the label fallbacks and the tpId probe — so the binary needs
 // no imgui frame, no window and no GL context.
-// NOT YET REGISTERED IN CMake — WO C4 does not own CMakeLists.txt (gate CD-int registers it).
+// STEP22: the manual prop layers retype onto the real `Params::PropInstanceLayer`, and this file
+// gains the clamp/renumber repair checks for `recipe.props[].transforms[].layerIndex` — the checks
+// that matter: deleting a layer must never drop a prop instance (CLAMPS to layer 0, the DELIBERATE
+// divergence from Step 20's army-removal DROP behavior), and reordering a layer must renumber every
+// referencing `layerIndex` exactly the way Step 20 fixed for `armyIndex`.
 #include "PropsTab_UI.h"
 #include <cstdio>
 #include <cstring>
@@ -63,30 +67,130 @@ void RunTemplateIdentifierChecks() {
           "the eighth byte stays clear, so the %.7s row label cannot run off the field");
 }
 
-// The manual groups are presentation state (SCOPE NOTE 1), so the invariants are the override and
-// the fences around them.
-void RunManualPropGroupChecks() {
+// STEP22: manual prop layers are real recipe content now (`Params::PropInstanceLayer`), so the
+// invariants are the same selection/override/label fences the retired `ManualPropGroup` checks
+// exercised, retargeted onto the retyped vector `DrawManualPropLayers` is handed directly (it is no
+// longer state-owned).
+void RunManualPropLayerChecks() {
     ManualPropLayersState state;
-    Check(SelectedManualPropGroup(state) == nullptr, "an empty block selects no group");
-    state.groups.push_back(ManualPropGroup());
-    state.selectedGroupIndex = 0;
-    Check(SelectedManualPropGroup(state) == &state.groups[0], "the selected group is reachable");
-    state.selectedGroupIndex = 2;
-    Check(SelectedManualPropGroup(state) == nullptr, "an index past the last group selects nothing");
+    std::vector<Params::PropInstanceLayer> propLayers;
+    Check(SelectedManualPropLayer(propLayers, state.selectedLayerIndex) == nullptr,
+          "an empty block selects no layer");
+    propLayers.push_back(Params::PropInstanceLayer());
+    state.selectedLayerIndex = 0;
+    Check(SelectedManualPropLayer(propLayers, state.selectedLayerIndex) == &propLayers[0],
+          "the selected layer is reachable");
+    state.selectedLayerIndex = 2;
+    Check(SelectedManualPropLayer(propLayers, state.selectedLayerIndex) == nullptr,
+          "an index past the last layer selects nothing");
 
-    ManualPropGroup& group = state.groups[0];
-    group.previewColor[0] = 0.25f;
-    state.groupColor[0]   = 0.75f;
-    Check(EffectiveManualPropGroupColor(state, group) == group.previewColor,
-          "with the shared tint off a group draws its OWN color");
+    Params::PropInstanceLayer& layer = propLayers[0];
+    layer.color[0]       = 0.25f;
+    state.groupColor[0]  = 0.75f;
+    Check(EffectiveManualPropLayerColor(state, layer) == layer.color,
+          "with the shared tint off a layer draws its OWN color");
     state.bUseGroupColor = true;
-    Check(EffectiveManualPropGroupColor(state, group) == state.groupColor,
-          "and with it on every group draws the one shared color");
+    Check(EffectiveManualPropLayerColor(state, layer) == state.groupColor,
+          "and with it on every layer draws the one shared color");
 
-    Check(ManualPropGroupRowLabel(group) != nullptr && ManualPropGroupRowLabel(group)[0] != '\0',
-          "an unnamed group still draws a label");
+    Check(ManualPropLayerRowLabel(layer) != nullptr && ManualPropLayerRowLabel(layer)[0] != '\0',
+          "an unnamed layer still draws a label");
     Check(state.iconScaleRange.minimumValue == 0.1f && state.iconScaleRange.maximumValue == 10.0f,
           "the icon scale sliders carry the plan's 0.1-10");
+}
+
+// Two prop groups, four transforms across three layers, in recipe order: 0, 1, 0, 2.
+std::vector<Params::PropInstanceGroup> MakePropsWithLayers() {
+    std::vector<Params::PropInstanceGroup> props(2);
+    props[0].transforms.resize(3);
+    props[0].transforms[0].layerIndex = 0;
+    props[0].transforms[1].layerIndex = 1;
+    props[0].transforms[2].layerIndex = 0;
+    props[1].transforms.resize(1);
+    props[1].transforms[0].layerIndex = 2;
+    return props;
+}
+
+int PropCountAcrossGroups(const std::vector<Params::PropInstanceGroup>& props) {
+    int count = 0;
+    for (const auto& group : props) count += static_cast<int>(group.transforms.size());
+    return count;
+}
+
+// STEP22 ruling #5 — the DELIBERATE divergence from Step 20's `DropUnitRulesForRemovedArmy`: an
+// orphaned prop transform CLAMPS to layer 0, it is never dropped.
+void RunPropLayerRemovalChecks() {
+    std::vector<Params::PropInstanceGroup> props = MakePropsWithLayers();
+    const int countBeforeRemoval = PropCountAcrossGroups(props);
+    Check(ClampPropLayerIndicesForRemovedLayer(props, 1), "removing a layer with transforms reports the move");
+    Check(PropCountAcrossGroups(props) == countBeforeRemoval,
+          "not one prop transform is dropped - a prop losing its layer tag is still a real prop");
+    Check(props[0].transforms[0].layerIndex == 0 && props[0].transforms[2].layerIndex == 0,
+          "layers BELOW the removed one keep their index");
+    Check(props[1].transforms[0].layerIndex == 1,
+          "and every layer above it shifts down one");
+
+    props = MakePropsWithLayers();
+    Check(ClampPropLayerIndicesForRemovedLayer(props, 0),
+          "removing layer 0 clamps every transform that named it");
+    Check(props[0].transforms[0].layerIndex == 0 && props[0].transforms[2].layerIndex == 0,
+          "the orphaned transforms clamp to layer 0, not -1 or any sentinel");
+    Check(props[0].transforms[1].layerIndex == 0 && props[1].transforms[0].layerIndex == 1,
+          "every surviving layer above the removed one shifts down one");
+
+    props = MakePropsWithLayers();
+    Check(!ClampPropLayerIndicesForRemovedLayer(props, -1), "a signal about no layer at all changes nothing");
+    std::vector<Params::PropInstanceGroup> emptyProps;
+    Check(!ClampPropLayerIndicesForRemovedLayer(emptyProps, 0), "and an empty recipe reports no move");
+}
+
+// STEP20 ruling #4's fix, applied to `layerIndex`: dragging a layer row must renumber it.
+void RunPropLayerReorderRenumberChecks() {
+    // Downward (below-target): layer 0 dragged onto layer 2 (of 3 total).
+    std::vector<Params::PropInstanceGroup> props = MakePropsWithLayers();
+    Check(RenumberPropLayerIndicesForReorder(props, 0, 2, 3),
+          "a downward reorder (source below target) reports the move");
+    Check(props[0].transforms[0].layerIndex == 2 && props[0].transforms[2].layerIndex == 2,
+          "both transforms that named the dragged layer now name its new (target) slot");
+    Check(props[0].transforms[1].layerIndex == 0, "layer 1's transform shifts down into layer 0's old slot");
+    Check(props[1].transforms[0].layerIndex == 1, "layer 2's transform shifts down into layer 1's old slot");
+
+    // Upward (above-target): layer 2 dragged onto layer 0.
+    props = MakePropsWithLayers();
+    Check(RenumberPropLayerIndicesForReorder(props, 2, 0, 3),
+          "an upward reorder (source above target) reports the move");
+    Check(props[1].transforms[0].layerIndex == 0, "the dragged layer's transform now names its new (target) slot");
+    Check(props[0].transforms[0].layerIndex == 1 && props[0].transforms[2].layerIndex == 1,
+          "layer 0's transforms shift up into layer 1's old slot");
+    Check(props[0].transforms[1].layerIndex == 2, "layer 1's transform shifts up into layer 2's old slot");
+
+    // No-op: source == target, and an out-of-range source.
+    props = MakePropsWithLayers();
+    Check(!RenumberPropLayerIndicesForReorder(props, 1, 1, 3), "dropping a row back on itself reports no move");
+    Check(props[0].transforms[1].layerIndex == 1, "and changes nothing");
+    Check(!RenumberPropLayerIndicesForReorder(props, -1, 1, 3), "a signal about no layer at all changes nothing");
+    Check(!RenumberPropLayerIndicesForReorder(props, 5, 1, 3),
+          "an out-of-range source is rejected rather than trusted");
+}
+
+// `PropGroups` exports as a plain array (STEP22 ruling #6), so this is cosmetic UX parity with
+// Armies/Areas, not a data-loss fix — but two "Add Prop Layer" clicks must still produce distinct
+// names per the acceptance test.
+void RunPropLayerNameUniquenessChecks() {
+    std::vector<Params::PropInstanceLayer> propLayers;
+    Params::PropInstanceLayer firstLayer;
+    firstLayer.name = NextPropLayerName(static_cast<int>(propLayers.size()));
+    propLayers.push_back(firstLayer);
+    Params::PropInstanceLayer secondLayer;
+    secondLayer.name = NextPropLayerName(static_cast<int>(propLayers.size()));
+    propLayers.push_back(secondLayer);
+    Check(propLayers[0].name != propLayers[1].name,
+          "two 'Add Prop Layer' clicks in a row already produce distinct names");
+    Check(!MakeNamesUnique(propLayers), "and the shared repair confirms nothing needed fixing");
+
+    propLayers[1].name = propLayers[0].name;
+    Check(MakeNamesUnique(propLayers), "a genuine collision reports the repair");
+    Check(propLayers[0].name != propLayers[1].name, "and the later row is the one that gets suffixed");
 }
 
 } // namespace
@@ -95,7 +199,10 @@ int main() {
     RunPropRuleMirrorChecks();
     RunDecalRuleMirrorChecks();
     RunTemplateIdentifierChecks();
-    RunManualPropGroupChecks();
+    RunManualPropLayerChecks();
+    RunPropLayerRemovalChecks();
+    RunPropLayerReorderRenumberChecks();
+    RunPropLayerNameUniquenessChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

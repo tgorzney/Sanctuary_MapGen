@@ -102,10 +102,12 @@ Params::PropRule* SelectedPropRule(std::vector<Params::PropRule>& propRules,
 
 void DrawPropsTab(Params::MapRecipe& recipe, PropsTabState& state,
                   Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
-                  const Data::PlacementInstances* placedProps) {
+                  const Data::PlacementInstances* placedProps,
+                  const Data::PlacementInstances* placedDecals) {
     ImGui::PushID("propsTab");
-    DrawManualPropLayers(state.manualLayers, placedProps);
+    DrawManualPropLayers(state.manualLayers, recipe.propLayers, recipe.props, placedProps);
     DrawRuleStack(recipe, state, previewDriver, iconManifest);
+    DrawManualDecalLayers(state.manualDecalLayers, recipe.decalLayers, recipe.decals, placedDecals);
     DrawDecalRuleStack(recipe.decalRules, state.decalStack, previewDriver, iconManifest);
     ImGui::PopID();
 }

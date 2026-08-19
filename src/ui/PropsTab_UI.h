@@ -18,12 +18,15 @@
 //  1. `Params::PropRule` has NO separate "physics simulate" flag and NO collision TAG: the one
 //     gameplay flag the tree models is `ScatterTransform::bCollidable`, drawn once in the shared
 //     Instance Transform block. A second control over it would be a rival toggle (ARCH §4).
-//  2. Manual prop GROUPS have no PARAMS home — see PropsTab_Manual_UI.h.
+//  2. Manual prop/decal layers have a real PARAMS home now — see PropsTab_Manual_UI.h /
+//     PropsTab_ManualDecals_UI.h (STEP22). The manual decal layers block is a SIBLING FILE joining
+//     this tab, not a new "Decals tab" — there isn't one (ARCH §8.4, STEP22 ruling #7).
 #pragma once
 #include "IconGridWidget_UI.h"
 #include "LabelledDialWidget_UI.h"
 #include "PropsTab_Decals_UI.h"
 #include "PropsTab_Manual_UI.h"
+#include "PropsTab_ManualDecals_UI.h"
 #include "PropsTab_Rules_UI.h"
 #include "RangeSliderWidget_UI.h"
 #include "../params/ScatterRule_PARAMS.h"
@@ -65,6 +68,7 @@ struct PropsTabState {
     PlacementGateState      gate;
     PlacementTransformState transform;
     ManualPropLayersState   manualLayers;
+    ManualDecalLayersState  manualDecalLayers;
     DecalRuleStackState     decalStack;
 };
 
@@ -93,12 +97,14 @@ inline bool StorePropRuleValues(const PropsTabState& state, Params::PropRule& ru
 Params::PropRule* SelectedPropRule(std::vector<Params::PropRule>& propRules,
                                    const PropsTabState& state);
 
-// `iconManifest` and `placedProps` are both nullable: with no resident atlas the picker degrades
-// to the typed tpId, and before the first generation the transform list simply says so.
+// `iconManifest`, `placedProps` and `placedDecals` are all nullable: with no resident atlas the
+// picker degrades to the typed tpId, and before the first generation the transform lists simply
+// say so. `placedDecals` is STEP22-new, mirroring the existing `placedProps`.
 void DrawPropsTab(Params::MapRecipe& recipe, PropsTabState& state,
                   Pipeline::PreviewDriver* previewDriver,
                   const IconAtlasManifest* iconManifest = nullptr,
-                  const Data::PlacementInstances* placedProps = nullptr);
+                  const Data::PlacementInstances* placedProps = nullptr,
+                  const Data::PlacementInstances* placedDecals = nullptr);
 
 } // namespace Ui
 } // namespace SanmapGen

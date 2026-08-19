@@ -40,7 +40,7 @@ void Application::DrawEnvironmentGroupPanel() {
             break;
         case ApplicationPanel::Props:
             DrawPropsTab(recipe, tabState.props, &previewDriver, ActiveIconManifest(),
-                         &assembler.Placements().props);
+                         &assembler.Placements().props, &assembler.Placements().decals);
             break;
         case ApplicationPanel::Areas:
             DrawAreasTab(recipe, tabState.areas, &previewDriver);

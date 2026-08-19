@@ -1,5 +1,5 @@
 // PropsTab_Manual_UI.cpp — the imgui composition of the manual prop layers block. Layer: UI.
-// Shared widgets only: DraggableList for the group stack, VirtualList for the read-only transform
+// Shared widgets only: DraggableList for the layer stack, VirtualList for the read-only transform
 // list, Checkbox / ColorSwatch / SliderScalar / TextInput / Section for the rest.
 // Nothing here notifies Pipeline::PreviewDriver (PropsTab_Manual_UI.h SCOPE NOTE 1).
 #include "PropsTab_Manual_UI.h"
@@ -15,8 +15,8 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-// The block-wide settings: one shared tint for every group, and the icon scale the whole layer
-// draws at.
+// The block-wide settings: one shared tint for every layer, and the icon scale the whole layer
+// stack draws at.
 void DrawLayerSettings(ManualPropLayersState& state) {
     DrawCheckbox("Use Group Color", state.bUseGroupColor);
     if (state.bUseGroupColor)
@@ -26,50 +26,81 @@ void DrawLayerSettings(ManualPropLayersState& state) {
                      state.layerIconScaleToggle, WidgetStyle(), "%.2f");
 }
 
-// The group stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.
-DraggableListSignal DrawGroupList(const ManualPropLayersState& state) {
-    return DraggableList<ManualPropGroup>::Render(
-        "manualPropGroups", state.groups,
+// The layer stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.
+DraggableListSignal DrawLayerList(const std::vector<Params::PropInstanceLayer>& propLayers,
+                                  int selectedLayerIndex) {
+    return DraggableList<Params::PropInstanceLayer>::Render(
+        "manualPropLayers", propLayers,
         [&](int rowIndex) {
             DraggableListRow row;
-            row.label = ManualPropGroupRowLabel(state.groups[static_cast<std::size_t>(rowIndex)]);
+            row.label = ManualPropLayerRowLabel(propLayers[static_cast<std::size_t>(rowIndex)]);
             return row;
         },
         [](int) {},
-        state.selectedGroupIndex);
+        selectedLayerIndex);
 }
 
-void ApplyGroupListSignal(ManualPropLayersState& state, const DraggableListSignal& signal) {
+// A removed layer clamps every referencing `layerIndex` to 0 rather than dropping the prop instance
+// (ClampPropLayerIndicesForRemovedLayer, STEP22 ruling #5); a reordered layer renumbers them
+// (RenumberPropLayerIndicesForReorder, called BEFORE the layers vector itself moves — the renumber
+// needs the pre-move layer count), mirroring ArmiesTab_UI.cpp's ApplyArmyListSignal. Reports whether
+// `props` moved, which — unlike `recipe.unitRules`/`armyIndex` — feeds no pipeline stage either
+// (PropsTab_Manual_UI.h SCOPE NOTE 1), so the caller never notifies the preview driver with it.
+bool ApplyLayerListSignal(std::vector<Params::PropInstanceLayer>& propLayers,
+                         std::vector<Params::PropInstanceGroup>& props, ManualPropLayersState& state,
+                         const DraggableListSignal& signal) {
     if (signal.kind == DraggableListSignalKind::Select) {
-        state.selectedGroupIndex = signal.sourceRowIndex;
-        return;
+        state.selectedLayerIndex = signal.sourceRowIndex;
+        return false;
     }
-    if (!ApplyDraggableListSignal(state.groups, signal)) return;
-    if (state.selectedGroupIndex >= static_cast<int>(state.groups.size()))
-        state.selectedGroupIndex = static_cast<int>(state.groups.size()) - 1;
+    const bool bDeleting            = signal.kind == DraggableListSignalKind::Delete;
+    const bool bReordering          = signal.kind == DraggableListSignalKind::Reorder;
+    const int  sourceLayerIndex     = signal.sourceRowIndex;
+    const int  layerCountBeforeMove = static_cast<int>(propLayers.size());
+    bool bPropsMoved = bReordering && RenumberPropLayerIndicesForReorder(
+        props, sourceLayerIndex, signal.targetRowIndex, layerCountBeforeMove);
+    if (!ApplyDraggableListSignal(propLayers, signal)) return bPropsMoved;
+    if (bDeleting)
+        bPropsMoved = ClampPropLayerIndicesForRemovedLayer(props, sourceLayerIndex) || bPropsMoved;
+    if (state.selectedLayerIndex >= static_cast<int>(propLayers.size()))
+        state.selectedLayerIndex = static_cast<int>(propLayers.size()) - 1;
+    return bPropsMoved;
 }
 
-// The selected group's own name, tint and icon scale. The tint is hidden while the block is set
-// to one shared color: two live controls over one drawn color would be a rival control (ARCH §4).
-void DrawSelectedGroup(ManualPropLayersState& state) {
-    ManualPropGroup* const group = SelectedManualPropGroup(state);
-    if (group == nullptr) {
-        ImGui::TextUnformatted("Select a prop group to edit it.");
-        return;
+// The Add Prop Layer button. Reports whether a layer was added, so the caller knows to run the
+// name-uniqueness repair (cosmetic here, STEP22 ruling #6 — see UniqueNameList_UI.h).
+bool DrawLayerListButtons(std::vector<Params::PropInstanceLayer>& propLayers, ManualPropLayersState& state) {
+    if (!ImGui::Button("Add Prop Layer")) return false;
+    Params::PropInstanceLayer layer;
+    layer.name = NextPropLayerName(static_cast<int>(propLayers.size()));
+    propLayers.push_back(layer);
+    state.selectedLayerIndex = static_cast<int>(propLayers.size()) - 1;
+    return true;
+}
+
+// The selected layer's own name, tint and icon scale. The tint is hidden while the block is set to
+// one shared color: two live controls over one drawn color would be a rival control (ARCH §4).
+// Reports whether the name committed, the only field the uniqueness repair cares about.
+bool DrawSelectedLayer(std::vector<Params::PropInstanceLayer>& propLayers, ManualPropLayersState& state) {
+    Params::PropInstanceLayer* const layer = SelectedManualPropLayer(propLayers, state.selectedLayerIndex);
+    if (layer == nullptr) {
+        ImGui::TextUnformatted("Select a prop layer to edit it.");
+        return false;
     }
     TextInputRules nameRules;
     nameRules.maximumLength = 48;
     nameRules.bAllowEmpty   = false;
-    nameRules.fallbackText  = "Prop Group";
-    DrawTextInput("Name", group->name, nameRules);
+    nameRules.fallbackText  = "Prop Layer";
+    const bool bNameCommitted = DrawTextInput("Name", layer->name, nameRules).bCommitted;
     if (!state.bUseGroupColor)
-        DrawColorSwatch("Color", group->previewColor, state.previewColorOptions,
-                        group->previewColorToggle);
-    DrawSliderScalar("Icon Scale", group->iconScale, state.iconScaleRange, group->iconScaleToggle,
-                     WidgetStyle(), "%.2f");
+        DrawColorSwatch("Color", layer->color, state.previewColorOptions, state.selectedLayerColorToggle);
+    DrawSliderScalar("Icon Scale", layer->iconScale, state.iconScaleRange,
+                     state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
+    return bNameCommitted;
 }
 
-// The resolved transforms, read-only and virtualized (SCOPE NOTE 2).
+// The resolved transforms, read-only and virtualized (SCOPE NOTE 2). Unfiltered, unrelated to
+// manual-layer membership: `Data::PlacementInstances` has no `layerIndex`-equivalent field.
 void DrawTransformList(ManualPropLayersState& state, const Data::PlacementInstances* placedProps) {
     if (!DrawSectionBegin("Transforms (read-only)", state.transformListSection)) return;
     if (placedProps == nullptr || placedProps->IsEmpty()) {
@@ -93,14 +124,19 @@ void DrawTransformList(ManualPropLayersState& state, const Data::PlacementInstan
 
 } // namespace
 
-void DrawManualPropLayers(ManualPropLayersState& state, const Data::PlacementInstances* placedProps) {
+void DrawManualPropLayers(ManualPropLayersState& state, std::vector<Params::PropInstanceLayer>& propLayers,
+                          std::vector<Params::PropInstanceGroup>& props,
+                          const Data::PlacementInstances* placedProps) {
     if (!DrawSectionBegin("Manual Prop Layers", state.section)) return;
     DrawLayerSettings(state);
-    if (ImGui::Button("Add Prop Group")) state.groups.push_back(ManualPropGroup());
-    const DraggableListSignal signal = DrawGroupList(state);
-    if (signal.bHasSignal()) ApplyGroupListSignal(state, signal);
-    DrawSelectedGroup(state);
+    bool bLayersMoved = DrawLayerListButtons(propLayers, state);
+    const DraggableListSignal signal = DrawLayerList(propLayers, state.selectedLayerIndex);
+    if (signal.bHasSignal()) ApplyLayerListSignal(propLayers, props, state, signal);
+    bLayersMoved = DrawSelectedLayer(propLayers, state) || bLayersMoved;
     DrawTransformList(state, placedProps);
+    // The export keys layers by NAME parity with Armies/Areas (cosmetic here, STEP22 ruling #6) —
+    // the repair runs on the frames a name settled, not every frame.
+    if (bLayersMoved) MakeNamesUnique(propLayers);
     DrawSectionEnd();
 }
 
