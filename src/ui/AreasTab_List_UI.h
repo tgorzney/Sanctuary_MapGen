@@ -1,5 +1,8 @@
-// AreasTab_List_UI.h — one map area rectangle, and the pure lifecycle rules of the list of them.
-// Layer: UI. Accuracy class: Visual. TAB_REBUILD_PLAN "§ Areas"; tab-rebuild WO C4.
+// AreasTab_List_UI.h — the pure lifecycle rules for the list of map areas, plus the UI-only color
+// side table an area's rectangle is drawn with. Layer: UI. Accuracy class: Visual (color) /
+// Visual-Exact (the rectangle fields, real `Params::MapArea` content). TAB_REBUILD_PLAN "§ Areas";
+// tab-rebuild WO C4; retyped onto the real `Params::MapArea` by STEP21
+// (`ENTITY_AUTHORING_PARAMS_SPEC.md`).
 //
 // Split out of AreasTab_UI.h so the tab header stays small (ARCH §1.5) and so the three rules that
 // actually have teeth — the engine-required PlayableArea, the unique-name repair the export
@@ -9,11 +12,19 @@
 // v1 ran the unique-name repair as a loop tacked onto the end of the tab draw
 // (gui/tabs/Tab_Areas.cpp), so it only ever ran while the tab was open. Here it is a function the
 // tab calls and a test can call too.
+//
+// COLOR HAS NO `_PARAMS` HOME (STEP21 ruling #4 — the ratified `Params::MapArea` shape never gave
+// an area a color field, unlike `Params::Army::armyColor`) — it stays UI-only, but its VALUE must
+// survive a selection change or a Reorder, so it lives in a small side table keyed by
+// `MapArea::name`, NOT vector position (position drifts under Reorder for no reason color needs to
+// care about — Constitution §6).
 #pragma once
 #include <string>
 #include <vector>
 #include "ColorSwatch_UI.h"
 #include "RtToggleWidget_UI.h"
+#include "UniqueNameList_UI.h"
+#include "../params/MapArea_PARAMS.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -22,28 +33,11 @@ namespace Ui {
 // the name is what the exported map file carries, so the name is the identity.
 inline constexpr const char* kPlayableAreaName = "PlayableArea";
 
-// One named rectangle in map-cell space. Alpha is a real channel here — an area draws as a
-// translucent overlay — which is the one place the library's alpha bar is asked for.
-struct MapAreaRectangle {
-    std::string name;
-    float originX = 0.0f;
-    float originZ = 0.0f;
-    float width   = 100.0f;
-    float length  = 100.0f;
-    float color[kColorSwatchChannelCount] = { 1.0f, 1.0f, 1.0f, 0.35f };
-
-    RealtimeToggle originXToggle;
-    RealtimeToggle originZToggle;
-    RealtimeToggle widthToggle;
-    RealtimeToggle lengthToggle;
-    RealtimeToggle colorToggle;
-};
-
-inline bool IsPlayableArea(const MapAreaRectangle& area) { return area.name == kPlayableAreaName; }
-inline bool IsAreaRemovable(const MapAreaRectangle& area) { return !IsPlayableArea(area); }
+inline bool IsPlayableArea(const Params::MapArea& area) { return area.name == kPlayableAreaName; }
+inline bool IsAreaRemovable(const Params::MapArea& area) { return !IsPlayableArea(area); }
 
 // The label a row shows — never empty (Constitution §6).
-inline const char* AreaRowLabel(const MapAreaRectangle& area) {
+inline const char* AreaRowLabel(const Params::MapArea& area) {
     return area.name.empty() ? "Area" : area.name.c_str();
 }
 
@@ -52,7 +46,7 @@ inline int ResolvedAreaMapSize(int mapSize) { return mapSize > 1 ? mapSize : 1; 
 
 // "Set to Map Size": the whole map, origin at the corner. Reports whether the rectangle moved, so
 // a button press that changes nothing costs no recomposite.
-inline bool SetAreaToMapSize(MapAreaRectangle& area, int mapSize) {
+inline bool SetAreaToMapSize(Params::MapArea& area, int mapSize) {
     const float extent = static_cast<float>(ResolvedAreaMapSize(mapSize));
     const bool bMoved = area.originX != 0.0f || area.originZ != 0.0f
                      || area.width != extent || area.length != extent;
@@ -63,48 +57,39 @@ inline bool SetAreaToMapSize(MapAreaRectangle& area, int mapSize) {
     return bMoved;
 }
 
-// The name v1's Add New Area button coined, kept so an imported v1 project reads the same.
-inline std::string NextAreaName(int areaCount) {
-    return std::string("NewArea_") + std::to_string(areaCount < 0 ? 0 : areaCount);
-}
-
-// True when some EARLIER row already answers to `name` — the half of the uniqueness rule that
-// decides which of two clashing rows is the one that gets renamed (the later one).
-inline bool AreaNameIsTakenBefore(const std::vector<MapAreaRectangle>& areas, std::size_t areaIndex,
-                                  const std::string& name) {
-    const std::size_t rowCount = areaIndex < areas.size() ? areaIndex : areas.size();
-    for (std::size_t rowIndex = 0u; rowIndex < rowCount; ++rowIndex)
-        if (areas[rowIndex].name == name) return true;
-    return false;
-}
-
-// Repairs duplicate names by suffixing the later row (`Base`, `Base_1`, `Base_2` ...). The export
-// keys areas by name, so two rows sharing one would silently drop an area — this is Constitution
-// §6 applied to a name the designer typed. Reports whether any name moved.
-inline bool MakeAreaNamesUnique(std::vector<MapAreaRectangle>& areas) {
-    bool bNamesMoved = false;
-    for (std::size_t areaIndex = 0u; areaIndex < areas.size(); ++areaIndex) {
-        if (!AreaNameIsTakenBefore(areas, areaIndex, areas[areaIndex].name)) continue;
-        const std::string baseName = areas[areaIndex].name;
-        int suffix = 1;
-        do {
-            areas[areaIndex].name = baseName + "_" + std::to_string(suffix++);
-        } while (AreaNameIsTakenBefore(areas, areaIndex, areas[areaIndex].name));
-        bNamesMoved = true;
-    }
-    return bNamesMoved;
-}
+// The name v1's Add New Area button coined, kept so an imported v1 project reads the same. Thin
+// domain wrapper over the shared cross-entity template (UniqueNameList_UI.h, STEP20 ARCH ruling).
+inline std::string NextAreaName(int areaCount) { return NextUniqueLabel("NewArea", areaCount); }
 
 // The engine-required area is present or it is created, at the FRONT and sized to the map. Reports
 // whether the list moved.
-inline bool EnsurePlayableArea(std::vector<MapAreaRectangle>& areas, int mapSize) {
-    for (const MapAreaRectangle& area : areas)
+inline bool EnsurePlayableArea(std::vector<Params::MapArea>& areas, int mapSize) {
+    for (const Params::MapArea& area : areas)
         if (IsPlayableArea(area)) return false;
-    MapAreaRectangle playableArea;
+    Params::MapArea playableArea;
     playableArea.name = kPlayableAreaName;
     SetAreaToMapSize(playableArea, mapSize);
     areas.insert(areas.begin(), playableArea);
     return true;
+}
+
+// A UI-only color, keyed by area NAME (STEP21 ruling #4) — the default matches what
+// `MapAreaRectangle::color` used to default to, and what `EnsurePlayableArea` used to set.
+struct AreaColorEntry {
+    std::string name;
+    float color[kColorSwatchChannelCount] = { 1.0f, 1.0f, 1.0f, 0.35f };
+};
+
+// Finds the color entry for `areaName`, or appends a fresh default-colored one on first touch —
+// the same linear-scan idiom `NameIsTakenBefore` already uses. Returns the channel array directly
+// so a caller can hand it straight to `DrawColorSwatch`.
+inline float* ResolveAreaColor(std::vector<AreaColorEntry>& areaColors, const std::string& areaName) {
+    for (AreaColorEntry& entry : areaColors)
+        if (entry.name == areaName) return entry.color;
+    AreaColorEntry entry;
+    entry.name = areaName;
+    areaColors.push_back(entry);
+    return areaColors.back().color;
 }
 
 } // namespace Ui
