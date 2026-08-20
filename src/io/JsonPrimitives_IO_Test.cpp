@@ -1,9 +1,10 @@
-// JsonPrimitives_IO_Test.cpp — acceptance test for the five transform primitives
-// (`RenameKey`/`MoveKey`/`WrapScalarAsVector`/`DefaultIfMissing`/`DeleteKeyIfPresent`), including
-// the idempotency check IO_MIGRATION_SPEC.md §5 requires (a second call is always safe) for at
-// least `DeleteKeyIfPresent`/`RenameKey`. Does not re-test the relocated `ReadJson*` typed
-// accessors — those already have live coverage through every existing `MapImporter_*_IO.cpp`
-// round-trip test; this file's job is the NEW transform primitives.
+// JsonPrimitives_IO_Test.cpp — acceptance test for the six transform primitives
+// (`RenameKey`/`MoveKey`/`WrapScalarAsVector`/`DefaultIfMissing`/`DeleteKeyIfPresent`/
+// `ConvertColorArrayToRgbaObject`), including the idempotency check IO_MIGRATION_SPEC.md §5
+// requires (a second call is always safe) for at least `DeleteKeyIfPresent`/`RenameKey`/
+// `ConvertColorArrayToRgbaObject`. Does not re-test the relocated `ReadJson*` typed accessors —
+// those already have live coverage through every existing `MapImporter_*_IO.cpp` round-trip test;
+// this file's job is the NEW transform primitives.
 #include "JsonPrimitives_IO.h"
 #include <cstdio>
 
@@ -87,6 +88,34 @@ void CheckDeleteKeyIfPresent() {
     Check(object == before, "DeleteKeyIfPresent is idempotent: a second call changes nothing");
 }
 
+void CheckConvertColorArrayToRgbaObject() {
+    // Converts a real 4-element array correctly.
+    nlohmann::json object = { {"color", {0.25f, 0.5f, 0.75f, 1.0f}} };
+    Io::ConvertColorArrayToRgbaObject(object, "color");
+    Check(object["color"].is_object(), "ConvertColorArrayToRgbaObject replaces the array with an object");
+    Check(object["color"]["r"] == 0.25f && object["color"]["g"] == 0.5f &&
+          object["color"]["b"] == 0.75f && object["color"]["a"] == 1.0f,
+          "ConvertColorArrayToRgbaObject maps array elements to r/g/b/a in order");
+
+    // Pads a short array correctly: missing r/g/b default to 0, missing a defaults to 1.
+    nlohmann::json shortArray = { {"color", {0.1f, 0.2f}} };
+    Io::ConvertColorArrayToRgbaObject(shortArray, "color");
+    Check(shortArray["color"]["r"] == 0.1f && shortArray["color"]["g"] == 0.2f &&
+          shortArray["color"]["b"] == 0.0f && shortArray["color"]["a"] == 1.0f,
+          "ConvertColorArrayToRgbaObject pads a short array with 0/0/0/1 defaults");
+
+    // No-op when the key is absent.
+    nlohmann::json missing = nlohmann::json::object();
+    Io::ConvertColorArrayToRgbaObject(missing, "absent");
+    Check(!missing.contains("absent"), "ConvertColorArrayToRgbaObject is a no-op when the key is absent");
+
+    // No-op (and idempotent) when called twice on an already-converted object.
+    nlohmann::json converted = object;
+    Io::ConvertColorArrayToRgbaObject(converted, "color");
+    Check(converted == object,
+          "ConvertColorArrayToRgbaObject is idempotent: a second call on an already-converted object changes nothing");
+}
+
 } // namespace
 
 int main() {
@@ -95,6 +124,7 @@ int main() {
     CheckWrapScalarAsVector();
     CheckDefaultIfMissing();
     CheckDeleteKeyIfPresent();
+    CheckConvertColorArrayToRgbaObject();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

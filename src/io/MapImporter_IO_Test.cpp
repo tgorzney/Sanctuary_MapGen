@@ -54,29 +54,17 @@ void CheckGeneralMapSettings(const Params::MapRecipe& original, const Params::Ma
 }
 
 // SANMAP_FORMAT_SPEC Correction 2: `Seed`/`ScaleFeaturesToMapSize`/`TerrainMinHeight`/
-// `WorldUnitsPerCell` are RELOCATED, not dual-written — checked against the raw exported JSON TEXT
-// of `mapGeneratorData` itself, mirroring CheckRelocatedSlopeGateKeysNotInLegacyBlob's own style.
-// Also confirms `GeneralMapSettings` lands as a top-level SIBLING of `mapGeneratorData`, and that
-// the 2 untouched legacy keys (MapSize/TerrainMaxHeight) still live in the legacy blob exactly as
-// before (regression guard). `GlobalSymmetryMask` is no longer one of those untouched keys —
-// STEP16_SymmetryGlobalSettings_IO relocated it out to the new `Symmetry` section
-// (CheckSymmetryTopLevelNotNested below).
+// `WorldUnitsPerCell` are RELOCATED, not dual-written, into the top-level `GeneralMapSettings`
+// object. STEP36_LegacyBlobDeletion_IO: a fresh export no longer writes `mapGeneratorData` at ALL
+// (TestDocumentCarriesTheFormatsOwnFields, MapExporter_IO_Test.cpp, covers that globally), so the
+// narrower "not nested inside mapGeneratorData" check this used to make is now moot — confirmed
+// trivially by the blob's total absence — and the MapSize/TerrainMaxHeight legacy-blob regression
+// guard this used to run is gone with it (both values still round-trip via their own top-level
+// homes — CheckGeometryAndWater/CheckGeneralMapSettings — untouched by this ticket).
 void CheckGeneralMapSettingsTopLevelNotNested(const std::string& documentText) {
     const nlohmann::json document = nlohmann::json::parse(documentText);
-    Check(document.contains("mapGeneratorData"), "mapGeneratorData still exists");
-    const std::string generatorDataText = document["mapGeneratorData"].dump();
-    Check(generatorDataText.find("\"Seed\"") == std::string::npos
-          && generatorDataText.find("ScaleFeaturesToMapSize") == std::string::npos
-          && generatorDataText.find("TerrainMinHeight") == std::string::npos
-          && generatorDataText.find("WorldUnitsPerCell") == std::string::npos,
-          "none of the 4 relocated keys appear anywhere under document[\"mapGeneratorData\"] "
-          "(relocated, not duplicated)");
     Check(document.contains("GeneralMapSettings") && document["GeneralMapSettings"].is_object(),
-          "GeneralMapSettings appears as a top-level sibling of mapGeneratorData, not nested inside it");
-    Check(document["mapGeneratorData"].contains("MapSize")
-          && document["mapGeneratorData"].contains("TerrainMaxHeight"),
-          "MapSize/TerrainMaxHeight still round-trip through the legacy blob, untouched by this "
-          "correction");
+          "GeneralMapSettings appears as its own top-level object");
 }
 
 // SANMAP_FORMAT_SPEC Correction 3: `HeightmapStack` — `simulationGrouping`, and every existing
@@ -165,49 +153,32 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
           "the unit rules survive, including the per-rule symmetry override");
 }
 
-// SANMAP_FORMAT_SPEC Correction 3: `mapGeneratorData.SimulationGrouping`/`GeoLayers` are RELOCATED,
-// not dual-written — checked against the raw exported JSON TEXT of `mapGeneratorData` itself,
-// mirroring CheckGeneralMapSettingsTopLevelNotNested's own style. Also confirms `HeightmapStack`
-// lands as a top-level SIBLING of `mapGeneratorData`, shaped `{ SimulationGrouping, GeoLayers }`,
-// and that the 2 untouched legacy keys (MapSize/TerrainMaxHeight) still live in the legacy blob
-// exactly as before (regression guard). `GlobalSymmetryMask` is no longer one of those untouched
-// keys — STEP16_SymmetryGlobalSettings_IO relocated it out to the new `Symmetry` section
-// (CheckSymmetryTopLevelNotNested below).
+// SANMAP_FORMAT_SPEC Correction 3: `SimulationGrouping`/`GeoLayers` are RELOCATED, not dual-written,
+// into the top-level `HeightmapStack` object. STEP36_LegacyBlobDeletion_IO: a fresh export no longer
+// writes `mapGeneratorData` at ALL (TestDocumentCarriesTheFormatsOwnFields, MapExporter_IO_Test.cpp,
+// covers that globally), so the narrower "not nested inside mapGeneratorData" check this used to
+// make is now moot, and the MapSize/TerrainMaxHeight legacy-blob regression guard this used to run
+// is gone with it (both values still round-trip via their own top-level homes, untouched).
 void CheckHeightmapStackTopLevelNotNested(const std::string& documentText) {
     const nlohmann::json document = nlohmann::json::parse(documentText);
-    Check(document.contains("mapGeneratorData"), "mapGeneratorData still exists");
-    const std::string generatorDataText = document["mapGeneratorData"].dump();
-    Check(generatorDataText.find("\"GeoLayers\"") == std::string::npos
-          && generatorDataText.find("\"SimulationGrouping\"") == std::string::npos,
-          "neither GeoLayers nor SimulationGrouping appear anywhere under "
-          "document[\"mapGeneratorData\"] (relocated, not duplicated)");
     Check(document.contains("HeightmapStack") && document["HeightmapStack"].is_object(),
-          "HeightmapStack appears as a top-level sibling of mapGeneratorData, not nested inside it");
+          "HeightmapStack appears as its own top-level object");
     Check(document["HeightmapStack"].contains("SimulationGrouping")
           && document["HeightmapStack"].contains("GeoLayers")
           && document["HeightmapStack"]["GeoLayers"].is_array(),
           "HeightmapStack carries both SimulationGrouping and the GeoLayers array");
-    Check(document["mapGeneratorData"].contains("MapSize")
-          && document["mapGeneratorData"].contains("TerrainMaxHeight"),
-          "MapSize/TerrainMaxHeight still round-trip through the legacy blob, untouched by this "
-          "correction");
 }
 
-// SANMAP_FORMAT_SPEC Correction 4 (STEP16): `mapGeneratorData.GlobalSymmetryMask` is RELOCATED,
-// not dual-written — checked against the raw exported JSON TEXT of `mapGeneratorData` itself,
-// mirroring CheckGeneralMapSettingsTopLevelNotNested's own style. Also confirms the new top-level
-// `Symmetry` object lands as a sibling of `mapGeneratorData`, carrying all 10 Correction-4 fields
-// this ticket writes (`SymAlgorithm` is explicitly out of scope — ruling #1 — and is not checked
-// here).
+// SANMAP_FORMAT_SPEC Correction 4 (STEP16): `GlobalSymmetryMask` is RELOCATED, not dual-written,
+// into the new top-level `Symmetry` object, carrying all 10 Correction-4 fields this ticket writes
+// (`SymAlgorithm` is explicitly out of scope — ruling #1 — and is not checked here).
+// STEP36_LegacyBlobDeletion_IO: a fresh export no longer writes `mapGeneratorData` at ALL
+// (TestDocumentCarriesTheFormatsOwnFields, MapExporter_IO_Test.cpp, covers that globally), so the
+// narrower "not nested inside mapGeneratorData" check this used to make is now moot.
 void CheckSymmetryTopLevelNotNested(const std::string& documentText) {
     const nlohmann::json document = nlohmann::json::parse(documentText);
-    Check(document.contains("mapGeneratorData"), "mapGeneratorData still exists");
-    const std::string generatorDataText = document["mapGeneratorData"].dump();
-    Check(generatorDataText.find("GlobalSymmetryMask") == std::string::npos,
-          "GlobalSymmetryMask no longer appears anywhere under document[\"mapGeneratorData\"] "
-          "(relocated, not duplicated)");
     Check(document.contains("Symmetry") && document["Symmetry"].is_object(),
-          "Symmetry appears as a top-level sibling of mapGeneratorData, not nested inside it");
+          "Symmetry appears as its own top-level object");
     const nlohmann::json& symmetry = document["Symmetry"];
     Check(symmetry.contains("GlobalSymmetryMask") && symmetry.contains("RadialSymmetryRepeatCount")
           && symmetry.contains("SnapImperfectSymmetry") && symmetry.contains("SymmetryDetectionTolerance")
@@ -307,24 +278,21 @@ void CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(const Params::MapRecipe& or
           "GlobalMarkerSettings's three scales survive");
 }
 
-// SANMAP_FORMAT_SPEC Correction 7, ruling #3: `mapGeneratorData.PlacementRules` is RELOCATED, not
-// dual-written — checked against the raw exported JSON TEXT of `mapGeneratorData` itself (not just
-// the C++ call sites), mirroring CheckRelocatedSlopeGateKeysNotInLegacyBlob's own style. Also
-// confirms the 5 new keys land as top-level SIBLINGS of `mapGeneratorData`, not nested inside it
-// (ruling #1/#2).
+// SANMAP_FORMAT_SPEC Correction 7, ruling #3: `PlacementRules` is RELOCATED, not dual-written, into
+// the 5 new top-level keys checked below (ruling #1/#2). STEP36_LegacyBlobDeletion_IO: a fresh
+// export no longer writes `mapGeneratorData` at ALL — the old home `PlacementRules` used to be
+// relocated OUT of — (TestDocumentCarriesTheFormatsOwnFields, MapExporter_IO_Test.cpp, covers that
+// globally), so the narrower "not nested inside mapGeneratorData" check this used to make is now
+// moot.
 void CheckPlacementStacksTopLevelNotNested(const std::string& documentText) {
     const nlohmann::json document = nlohmann::json::parse(documentText);
-    Check(document.contains("mapGeneratorData"), "mapGeneratorData still exists");
-    const std::string generatorDataText = document["mapGeneratorData"].dump();
-    Check(generatorDataText.find("PlacementRules") == std::string::npos,
-          "\"PlacementRules\" no longer appears anywhere under document[\"mapGeneratorData\"]");
     Check(document.contains("MarkersStack") && document["MarkersStack"].is_array()
           && document.contains("PropsStack") && document["PropsStack"].is_array()
           && document.contains("DecalsStack") && document["DecalsStack"].is_array()
           && document.contains("UnitsStack") && document["UnitsStack"].is_array()
           && document.contains("GlobalMarkerSettings") && document["GlobalMarkerSettings"].is_object(),
-          "MarkersStack/PropsStack/DecalsStack/UnitsStack/GlobalMarkerSettings all appear as "
-          "top-level siblings of mapGeneratorData, not nested inside it");
+          "MarkersStack/PropsStack/DecalsStack/UnitsStack/GlobalMarkerSettings all appear as their "
+          "own top-level objects/arrays");
 }
 
 // SANMAP_FORMAT_SPEC Correction 13: `BuildStratumLayersJson`'s real writes (albedo/normal/mask
@@ -340,6 +308,14 @@ void CheckStratumAppearance(const Params::MapRecipe& original, const Params::Map
     const Params::Stratum& loadedStratum = loaded.strata[0];
     const Params::StratumAppearance& originalAppearance = originalStratum.appearance;
     const Params::StratumAppearance& loadedAppearance = loadedStratum.appearance;
+    // STEP37_StratumAppearanceRoundtrip_IO: name/environmentName/materialName — name previously
+    // wrote a generated placeholder instead of the real value; the other two were never written or
+    // read anywhere in src/io/ at all.
+    Check(loadedAppearance.name == originalAppearance.name
+          && loadedAppearance.environmentName == originalAppearance.environmentName
+          && loadedAppearance.materialName == originalAppearance.materialName,
+          "name/environmentName/materialName round-trip the real designer-set values (name no "
+          "longer writes the generated \"Stratum <index>\" placeholder)");
     Check(NearlyEqual(loadedStratum.tintRed, originalStratum.tintRed)
           && NearlyEqual(loadedStratum.tintGreen, originalStratum.tintGreen)
           && NearlyEqual(loadedStratum.tintBlue, originalStratum.tintBlue),
@@ -402,19 +378,21 @@ void CheckStratumGenerationSettings(const Params::MapRecipe& original, const Par
           "the 8 relocated slope-gate fields survive through StratumGenerationSettings");
 }
 
-// Regression guard (Correction 12): the 5 fields the correction leaves untouched
-// (`ImportedMaskMode`/`MaskRemapMinimum`/`Maximum`/`Enabled`/`TintRed`/`Green`/`Blue`/`TileCount`)
-// still round-trip correctly through the legacy `mapGeneratorData.Stratums` blob now that 8 fewer
-// keys flow through `ReadStrataSettingsJson`'s grow-and-merge loop (Step 11's fix must still work
-// once this ticket shrinks the blob).
+// Regression guard (Correction 12, STEP11): the 5 fields those tickets duplicated onto the
+// top-level `stratumLayers[]` entries (`ImportedMaskMode`/`MaskRemapMinimum`/`Maximum`/`Enabled`/
+// `TintRed`/`Green`/`Blue`/`TileCount`) still round-trip correctly. STEP36_LegacyBlobDeletion_IO:
+// a fresh export no longer writes the legacy `mapGeneratorData.Stratums` blob at all, so on THIS
+// path (the real exporter) these values necessarily flow through their top-level `stratumLayers[]`
+// duplicate now — the gated legacy-blob reader itself is untouched and still covered separately by
+// MapImporter_IO_Test.cpp's own synthetic-old-shaped-document coverage (import side only).
 void CheckLegacyStratumBlobFieldsStillSurvive(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
     const Params::Stratum& originalStratum = original.strata[0];
     const Params::Stratum& loadedStratum = loaded.strata[0];
     Check(loadedStratum.importedMaskMode == originalStratum.importedMaskMode
           && originalStratum.importedMaskMode == Params::ImportedMaskMode::StaticOverride,
-          "ImportedMaskMode still survives through the legacy blob");
+          "ImportedMaskMode still survives, via the top-level stratumLayers[] duplicate");
     Check(loadedStratum.bEnabled == originalStratum.bEnabled && originalStratum.bEnabled == false,
-          "Enabled still survives through the legacy blob");
+          "Enabled still survives, via the top-level stratumLayers[] duplicate");
     Check(NearlyEqual(loadedStratum.maskRemapMinimum[0], originalStratum.maskRemapMinimum[0])
           && NearlyEqual(loadedStratum.maskRemapMinimum[1], originalStratum.maskRemapMinimum[1])
           && NearlyEqual(loadedStratum.maskRemapMinimum[2], originalStratum.maskRemapMinimum[2])
@@ -423,37 +401,22 @@ void CheckLegacyStratumBlobFieldsStillSurvive(const Params::MapRecipe& original,
           && NearlyEqual(loadedStratum.maskRemapMaximum[1], originalStratum.maskRemapMaximum[1])
           && NearlyEqual(loadedStratum.maskRemapMaximum[2], originalStratum.maskRemapMaximum[2])
           && NearlyEqual(loadedStratum.maskRemapMaximum[3], originalStratum.maskRemapMaximum[3]),
-          "MaskRemapMinimum/Maximum still survive through the legacy blob, all four components each");
+          "MaskRemapMinimum/Maximum still survive, via the top-level stratumLayers[] duplicate, all "
+          "four components each");
     Check(NearlyEqual(loadedStratum.tintRed, originalStratum.tintRed)
           && NearlyEqual(loadedStratum.tintGreen, originalStratum.tintGreen)
           && NearlyEqual(loadedStratum.tintBlue, originalStratum.tintBlue),
-          "TintRed/Green/Blue still survive through the legacy blob");
+          "TintRed/Green/Blue still survive, via the top-level stratumLayers[] duplicate");
     Check(NearlyEqual(loadedStratum.tileCount, originalStratum.tileCount),
-          "TileCount still survives through the legacy blob");
+          "TileCount still survives, via the top-level stratumLayers[] duplicate");
 }
 
 // Correction 12 is a RELOCATION, not a duplication: the 8 slope-gate keys must no longer appear
-// anywhere under `document["mapGeneratorData"]["Stratums"]` in the exported document. Checked
-// against the raw exported JSON TEXT of that specific sub-object (not just the C++ call sites) —
-// scoped to the legacy blob's own serialized text, since the same 8 key spellings legitimately
-// still appear elsewhere in the document, under the new `StratumGenerationSettings` array.
-void CheckRelocatedSlopeGateKeysNotInLegacyBlob(const std::string& documentText) {
-    const nlohmann::json document = nlohmann::json::parse(documentText);
-    Check(document.contains("mapGeneratorData") && document["mapGeneratorData"].contains("Stratums"),
-          "the legacy mapGeneratorData.Stratums blob still exists (not deleted this ticket)");
-    const std::string legacyStratumsText = document["mapGeneratorData"]["Stratums"].dump();
-    static const char* const relocatedKeys[] = {
-        "SlopeGateEnabled", "MinimumSlopeDegrees", "MaximumSlopeDegrees", "SlopeFeatherDegreesLow",
-        "SlopeFeatherDegreesHigh", "UseSmoothstep", "InvertSlopeGate", "SlopeGateStrength"
-    };
-    bool bAnyRelocatedKeyFound = false;
-    for (const char* key : relocatedKeys) {
-        if (legacyStratumsText.find(key) != std::string::npos) bAnyRelocatedKeyFound = true;
-    }
-    Check(!bAnyRelocatedKeyFound,
-          "none of the 8 relocated slope-gate keys appear anywhere under mapGeneratorData.Stratums "
-          "in the exported document text (relocated, not duplicated)");
-}
+// under any legacy `mapGeneratorData.Stratums` blob. STEP36_LegacyBlobDeletion_IO: a fresh export
+// no longer writes `mapGeneratorData` at ALL, so this dedicated per-key scoped check is now fully
+// subsumed by the blanket "no mapGeneratorData key anywhere in the document" assertion
+// (TestDocumentCarriesTheFormatsOwnFields, MapExporter_IO_Test.cpp) — removed rather than kept as
+// a vacuously-true duplicate.
 
 // Since `mapSize` never leaves the fixture, this asserts flip-then-unflip is the identity without
 // the test needing to know the map-size constant, per the work-order's acceptance test wording.
@@ -871,6 +834,11 @@ void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     // SANMAP_FORMAT_SPEC Correction 13: every real `StratumAppearance` field, non-default, so a
     // round-trip bug in any single one is caught (CheckStratumAppearance).
     Params::StratumAppearance& appearance = stratum.appearance;
+    // STEP37_StratumAppearanceRoundtrip_IO: the designer-editable identity fields — a hardcoded
+    // placeholder for `name` and total non-existence for the other two, before this ticket.
+    appearance.name            = "Lush Grass";
+    appearance.environmentName = "Temperate Forest";
+    appearance.materialName    = "Grass_01";
     appearance.albedoTexturePath    = "Textures/Grass_Albedo.dds";
     appearance.normalTexturePath    = "Textures/Grass_Normal.dds";
     appearance.compositeTexturePath = "Textures/Grass_Mask.dds";
@@ -1214,7 +1182,18 @@ void RunRoundTripTests() {
     Io::MapImportResult result;
     Check(Io::MapImporter::ParseSanmapJsonText(documentText, loaded, Io::MapImportOptions(), result),
           "the exporter's own document parses");
-    Check(result.warningCount == 0, "with no warning: the two halves agree key for key");
+    // STEP36_LegacyBlobDeletion_IO: a fresh export no longer writes `mapGeneratorData` at all, so
+    // the importer's own gated "no legacy mapGeneratorData block" notice (MapImporter_ParseDocument_IO.cpp)
+    // now fires on every normal export from this build onward. STEP38_MapGeneratorDataWarningWording_IO
+    // reworded that notice AND demoted it from Warn() to Log(): absence is the EXPECTED, NORMAL state
+    // for a current-format export, not a degraded-recovery signal — every field it used to guard has
+    // its own top-level home, as every Check* call below (and the exact round-trip text-equality
+    // check at the end of this function) still proves field for field. Any warning still fails this
+    // test — this notice is informational only.
+    Check(result.warningCount == 0
+          && result.debugLog.find("No legacy mapGeneratorData block present") != std::string::npos,
+          "with exactly the one expected informational mapGeneratorData-absence notice, and no "
+          "warning at all: the two halves still agree key for key");
     CheckMapNameAndCredits(original, loaded);
     CheckGeometryAndWater(original, loaded);
     CheckGeneralMapSettings(original, loaded);
@@ -1226,7 +1205,6 @@ void RunRoundTripTests() {
     CheckStratumAppearance(original, loaded);
     CheckStratumGenerationSettings(original, loaded);
     CheckLegacyStratumBlobFieldsStillSurvive(original, loaded);
-    CheckRelocatedSlopeGateKeysNotInLegacyBlob(documentText);
     CheckArmiesAndAreas(original, loaded);
     CheckMarkersAndChains(original, loaded);
     CheckPropsAndDecals(original, loaded);
@@ -1237,12 +1215,23 @@ void RunRoundTripTests() {
     CheckFlow(original, loaded);
     CheckAccumulationWritesEmptyObject(documentText);
     CheckDetailNormal(original, loaded);
+
+    // STEP36_LegacyBlobDeletion_IO acceptance test item 3: a full export -> import -> export round
+    // trip on a fresh (never-legacy) recipe stays stable — the second export also carries no
+    // mapGeneratorData key, and every other field matches the first export exactly.
+    const std::string reExportedDocumentText = Io::MapExporter::BuildSanmapJsonText(loaded);
+    Check(reExportedDocumentText.find("\"mapGeneratorData\"") == std::string::npos,
+          "the second export also carries no mapGeneratorData key");
+    Check(reExportedDocumentText == documentText,
+          "and the second export matches the first export exactly, field for field");
 }
 
 // A pure-reader check, deliberately NOT routed through ParseSanmapJsonText/RunRoundTripTests
-// (which asserts warningCount == 0 on a clean document) — an unrecognized skyboxIntensityMode
-// string must fall back to Exposure with a LOGGED warning, never a crash (STEP9_
-// Atmosphere_PARAMS_IO's acceptance test).
+// (which asserts warningCount == 0, since STEP38_MapGeneratorDataWarningWording_IO demoted the
+// expected mapGeneratorData-absence notice from Warn() to Log(), and no other warning, on an
+// otherwise-clean document) — an unrecognized
+// skyboxIntensityMode string must fall back to Exposure with a LOGGED warning, never a crash
+// (STEP9_Atmosphere_PARAMS_IO's acceptance test).
 void CheckUnrecognizedSkyboxIntensityModeFallsBackSafely() {
     nlohmann::json document;
     document["skyboxIntensityMode"] = "NotARealMode";
@@ -1258,8 +1247,10 @@ void CheckUnrecognizedSkyboxIntensityModeFallsBackSafely() {
 // SANMAP_FORMAT_SPEC Correction 13's cardinality invariant: `stratumLayers[9]` is fixed by the
 // format. A document with the wrong array length is a LOGGED WARNING, never a crash and never a
 // silent truncation (Constitution §6) — a pure-reader check, deliberately NOT routed through
-// ParseSanmapJsonText/RunRoundTripTests (which asserts warningCount == 0 on a clean document),
-// mirroring CheckUnrecognizedSkyboxIntensityModeFallsBackSafely's own style above.
+// ParseSanmapJsonText/RunRoundTripTests (which asserts warningCount == 0, since
+// STEP38_MapGeneratorDataWarningWording_IO demoted the expected mapGeneratorData-absence notice
+// from Warn() to Log(), on an otherwise-clean document), mirroring
+// CheckUnrecognizedSkyboxIntensityModeFallsBackSafely's own style above.
 void CheckStratumLayersCardinalityMismatchWarns() {
     nlohmann::json document;
     document["stratumLayers"] = nlohmann::json::array();
@@ -1531,6 +1522,35 @@ void CheckStratumImportedMaskModeAndEnabledImportFromStratumLayers() {
           "mapGeneratorData is absent");
 }
 
+// STEP37_StratumAppearanceRoundtrip_IO acceptance test item 2: an old-shaped `stratumLayers[0]`
+// entry missing `name`/`environmentName`/`materialName` entirely must import without crashing and
+// leave the fields on their sane default (empty string) — matching `StratumNameRules()`
+// (StratumsTab_UI.h)'s own `bAllowEmpty = true` invariant, the SAME rule the live Stratums tab
+// already enforces for a brand-new, never-named stratum. No "mapdef"-style fallback text applies
+// here (unlike STEP25's `mapName`): an empty stratum name is legitimate, UI-legal content, not a
+// gap needing a placeholder.
+void CheckStratumAppearanceIdentityFieldsMissingKeysImportWithSaneFallback() {
+    nlohmann::json document;
+    document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+    nlohmann::json layer;
+    layer["albedo"] = { { "path", "Textures/Old.dds" } };   // an old-shaped entry with some content,
+                                                             // but no name/environmentName/materialName
+    document["stratumLayers"] = nlohmann::json::array();
+    document["stratumLayers"].push_back(layer);
+    // No "mapGeneratorData" block at all.
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+          "an old-shaped stratumLayers[0] entry missing name/environmentName/materialName still "
+          "parses, no crash");
+    Check(!loaded.strata.empty()
+          && loaded.strata[0].appearance.name.empty()
+          && loaded.strata[0].appearance.environmentName.empty()
+          && loaded.strata[0].appearance.materialName.empty(),
+          "all three fields land on their sane empty default, matching StratumNameRules()'s own "
+          "bAllowEmpty invariant rather than a crash or an invented non-empty placeholder");
+}
+
 // STEP30_LegacyBlobFieldHoming_IO acceptance test item 3: a document with ONLY the top-level
 // `deepWaterDepthMin` key set (no `mapGeneratorData` block at all) imports it. Mirrors
 // CheckWaterImportsFromTopLevelWhenNoGeneratorData's own style.
@@ -1594,6 +1614,55 @@ void CheckLegacyBlobWinsOverAllFourNewFieldHomesOnDisagreement() {
           "stratumLayers[0] entry, for both fields");
 }
 
+// STEP36_LegacyBlobDeletion_IO acceptance test item 2: a SYNTHETIC old-shaped document — a real
+// `mapGeneratorData` block and NOTHING else (no top-level `GeneralMapSettings`, no
+// `stratumLayers[].ImportedMaskMode`/`Enabled`, no top-level `hasWater`/`waterLevel`/
+// `deepWaterDepthMin` mirrors at all) — still imports its terrainMaxHeight/water/stratum settings
+// correctly from the legacy blob alone. This is the never-refuse law (STEP24) and the gated legacy
+// readers (`ReadGeometryJson`/`ReadWaterJson`/`ReadStrataSettingsJson`) proven completely unaffected
+// by this ticket's export-side-only deletion — real old files like `World_Domination.sanmap`/
+// `Pandemonium Isthmus.sanmap` still carry exactly this shape.
+void CheckPureOldShapedDocumentStillImportsFromLegacyBlobAlone() {
+    nlohmann::json document;
+    document["SanGenVersion"] = Io::kCurrentSanGenVersion;
+
+    nlohmann::json generatorData;
+    generatorData["TerrainMaxHeight"] = 175.5f;
+    nlohmann::json water;
+    water["Enabled"]           = true;
+    water["WaterLevelMax"]     = 33.0f;
+    water["DeepWaterDepthMin"] = 4.0f;
+    water["DeepWaterDepthMax"] = 21.0f;
+    generatorData["Water"] = water;
+    nlohmann::json legacyStratum;
+    legacyStratum["ImportedMaskMode"] = static_cast<int>(Params::ImportedMaskMode::StaticOverride);
+    legacyStratum["Enabled"]          = false;
+    legacyStratum["TileCount"]        = 12.0f;
+    generatorData["Stratums"] = nlohmann::json::array();
+    generatorData["Stratums"].push_back(legacyStratum);
+    document["mapGeneratorData"] = generatorData;
+    // No GeneralMapSettings, no stratumLayers, no top-level water mirrors at all — a pure old-shaped
+    // document, exactly like a real pre-STEP30 export.
+
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Check(Io::MapImporter::ParseSanmapJsonText(document.dump(), loaded, Io::MapImportOptions(), result),
+          "a purely old-shaped document (legacy blob only, nothing top-level) still parses "
+          "(never-refuse, STEP24)");
+    Check(NearlyEqual(loaded.geometry.terrainMaxHeight, 175.5f),
+          "terrainMaxHeight imports from the legacy mapGeneratorData.TerrainMaxHeight alone");
+    Check(loaded.water.bEnabled == true
+          && NearlyEqual(loaded.water.waterLevelMaximum, 33.0f)
+          && NearlyEqual(loaded.water.deepWaterDepthMinimum, 4.0f)
+          && NearlyEqual(loaded.water.deepWaterDepthMaximum, 21.0f),
+          "the whole water block imports from the legacy mapGeneratorData.Water alone");
+    Check(!loaded.strata.empty()
+          && loaded.strata[0].importedMaskMode == Params::ImportedMaskMode::StaticOverride
+          && loaded.strata[0].bEnabled == false
+          && NearlyEqual(loaded.strata[0].tileCount, 12.0f),
+          "stratum settings import from the legacy mapGeneratorData.Stratums alone");
+}
+
 // KnownTopLevelSanmapKeys_IO_Test (STEP24_ImportNeverRefuses_IO ruling 4's paired coverage test):
 // every key `BuildSanmapJsonText` writes is present in `IsKnownTopLevelSanmapKey`'s maintained
 // allowlist (`Sanmap_KnownTopLevelKeys_IO.cpp`) — a future coder adding a new top-level export key
@@ -1628,8 +1697,10 @@ int main() {
     SanmapGen::MapFormatTest::CheckWaterLegacyBlobWinsOverTopLevelMirrorsOnDisagreement();
     SanmapGen::MapFormatTest::CheckTerrainMaxHeightImportsFromGeneralMapSettingsAtFullPrecision();
     SanmapGen::MapFormatTest::CheckStratumImportedMaskModeAndEnabledImportFromStratumLayers();
+    SanmapGen::MapFormatTest::CheckStratumAppearanceIdentityFieldsMissingKeysImportWithSaneFallback();
     SanmapGen::MapFormatTest::CheckDeepWaterDepthMinImportsFromTopLevelWhenNoGeneratorData();
     SanmapGen::MapFormatTest::CheckLegacyBlobWinsOverAllFourNewFieldHomesOnDisagreement();
+    SanmapGen::MapFormatTest::CheckPureOldShapedDocumentStillImportsFromLegacyBlobAlone();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

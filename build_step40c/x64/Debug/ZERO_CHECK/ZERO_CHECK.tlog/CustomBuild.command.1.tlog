@@ -1,0 +1,10 @@
+^D:\PROJECTS\SANCTUARY\MAP GENERATOR\BUILD_STEP40C\CMAKEFILES\FFF72EB0A5C5C1210D4713E372380C24\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SD:/Projects/Sanctuary/Map Generator" "-BD:/Projects/Sanctuary/Map Generator/build_step40c" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "D:/Projects/Sanctuary/Map Generator/build_step40c/SanmapGenerator.sln"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

@@ -63,14 +63,18 @@ bool RunImportSupComLua(FilesTabState& state, Params::MapRecipe& recipe) {
 }
 
 bool RunRecipeExport(FilesTabAction action, FilesTabState& state, const Params::MapRecipe& recipe,
-                     const Data::MapFields* fields) {
-    // `state.assetPack` — the internal warn-not-block safety net (MapExporter_IO.cpp); the UI's own
-    // pre-check/confirm-dialog gate already ran, in FilesTab_Draw_UI.cpp, before this was called.
+                     const Data::MapFields* fields, bool bBlueprintValidationAcknowledged) {
+    // `state.assetPack` feeds the IO layer's own refuse-by-default blueprintPath gate
+    // (STEP39_BlueprintValidationGate_IO, MapExporter_IO.cpp) — the UI's pre-check/confirm-dialog
+    // (FilesTab_Draw_UI.cpp) already ran before this was called; `bBlueprintValidationAcknowledged`
+    // is that dialog's own "Export Anyway" choice, threaded straight through.
     const Io::MapExportResult result = (action == FilesTabAction::ExportAll && fields != nullptr)
         ? Io::MapExporter::ExportAll(state.exportFolderPath, recipe, *fields, state.exportOptions,
-                                     state.assetPack, state.unknownImportData)
+                                     state.assetPack, state.unknownImportData,
+                                     bBlueprintValidationAcknowledged)
         : Io::MapExporter::ExportSanmapOnly(state.exportFolderPath, recipe, state.exportOptions,
-                                            state.assetPack, state.unknownImportData);
+                                            state.assetPack, state.unknownImportData,
+                                            bBlueprintValidationAcknowledged);
     AppendFilesTabLog(state, result.debugLog);
     return result.bSucceeded;
 }
@@ -117,7 +121,7 @@ const char* FilesTabActionLabel(FilesTabAction action) {
 }
 
 bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapRecipe& recipe,
-                       Data::MapFields* fields) {
+                       Data::MapFields* fields, bool bBlueprintValidationAcknowledged) {
     if (FilesTabActionNeedsBakedFields(action) && (fields == nullptr || !fields->IsSized())) {
         AppendFilesTabLog(state, std::string(FilesTabActionLabel(action))
                           + " refused: nothing is generated yet, so there is no baked field to write.");
@@ -126,7 +130,7 @@ bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapR
     if (action == FilesTabAction::OpenSanmap)      return RunOpenSanmap(state, recipe, fields);
     if (action == FilesTabAction::ImportSupComLua) return RunImportSupComLua(state, recipe);
     if (action == FilesTabAction::ExportSanmapOnly || action == FilesTabAction::ExportAll)
-        return RunRecipeExport(action, state, recipe, fields);
+        return RunRecipeExport(action, state, recipe, fields, bBlueprintValidationAcknowledged);
     return RunTextureExport(action, state, *fields);
 }
 

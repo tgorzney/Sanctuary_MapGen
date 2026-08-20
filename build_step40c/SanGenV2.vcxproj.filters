@@ -1,0 +1,1411 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\Accumulation_Migrate_V2_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AppSettingsLocation_Shell_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AppSettings_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_BlockCodec_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_Decode_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_DiskLoad_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_DiskSave_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_Fingerprint_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_Pack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_PropThumbnail_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\DetailNormal_Migrate_V2_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\EntityCollections_Migrate_V2_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\FileDialog_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\FileDialog_Shell_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\FilesystemPrimitives_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\Flow_Migrate_V2_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\GeneralMapSettings_Migrate_V2_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\GlobalMarkerSettings_Migrate_V2_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Areas_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Armies_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Atmosphere_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_BlueprintValidation_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Chains_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_DecalsStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Decals_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_DetailNormal_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_DocumentAssembly_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_FlowAccumulation_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_GeneralMapSettings_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_HeightmapStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Image_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_MarkersStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Markers_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_PropsStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Props_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Recipe_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_ScatterTransform_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_SlopeDefaults_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_StratumGeneration_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_StratumLayers_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Symmetry_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Textures_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_UnitsStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Areas_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Armies_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Atmosphere_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Chains_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_DecalsStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Decals_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_DetailNormal_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Fields_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_FlowAccumulation_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_GeneralMapSettings_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_HeightmapStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_MarkersStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Markers_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_ParseDocument_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_PropsStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Props_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Recipe_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_ScatterTransform_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_SlopeDefaults_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_StratumGeneration_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_StratumLayers_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Symmetry_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_UnitsStack_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\Sanmap_KnownTopLevelKeys_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\Sanmap_MigrationManifest_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\Sanmap_MigrationRunner_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\SanpackReader_CentralDirectory_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\SanpackReader_Extract_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\SanpackReader_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\SanpackReader_Inflate_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\SanpackReader_MemoryMap_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\SlopeDefaults_Migrate_V2_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\StratumGenerationSettings_Migrate_V2_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\io\Symmetry_Migrate_V2_IO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\pipeline\GenerationAssembler_PIPELINE.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\pipeline\GenerationAssembler_Stages_PIPELINE.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\pipeline\PreviewDriver_PIPELINE.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Bake_Composite_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Bake_Gpu_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Bake_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Accumulation_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_DropletTransfer_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Droplet_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Field_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Gpu_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Rain_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Spawn_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_Accumulate_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_Direction_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_Fill_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_GpuRelax_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_Gpu_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_Apply_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_Gpu_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_Prepare_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Blend_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_GpuBuffers_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_GpuProgram_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Gpu_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Noise_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Prepare_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Accept_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Emit_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Fields_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Gpu_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Hash_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Metrics_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Rules_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Scatter_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Thermal_Gpu_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Thermal_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Thermal_Relax_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\proc\Thermal_Transport_PROC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\sys\AtlasResidency_SYS.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\sys\GpuGlFunctions_SYS.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\sys\GpuResource_Buffer_SYS.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\sys\GpuResource_ProgramParts_SYS.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\sys\GpuResource_Program_SYS.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\sys\GpuResource_ShaderPath_SYS.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\sys\GpuResource_Texture_SYS.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\AccumulationTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_AppSettings_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_AssetPanel_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Assets_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Draw_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Execution_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Frame_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_LeftColumn_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_PanelEnvironment_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_PanelSystem_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_PanelTerrain_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_PreviewRamps_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_PreviewSetup_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Recipe_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Window_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\AreasTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\ArmiesTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\ArmiesTab_Units_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\AtmosphereControls_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\AtmosphereTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Checkbox_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\ColorSwatch_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Combo_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\ConfirmDialog_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\DetailNormalTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\FilePathPicker_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\FilesTab_Actions_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\FilesTab_Browse_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\FilesTab_Draw_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\FlowTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\GradientEditorWidget_Draw_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\GradientEditorWidget_Paint_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\GradientEditorWidget_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\GradientLut_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\HeightmapTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\HolesTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\IconGridWidget_Draw_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\IconGridWidget_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LabelledDialWidget_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Advanced_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Draw_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Erosion_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Group_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Layer_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Scalars_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Soil_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayersTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Levels_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\MapCanvas_Draw_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\MapCanvas_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\MarkersTab_Area_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\MarkersTab_Globals_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\MarkersTab_Placed_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\MarkersTab_Rules_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\MarkersTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\MaskLayerTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Picking_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PlacementRuleSections_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_Cpu_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_GpuBuffers_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_GpuProgram_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_Gpu_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_Prepare_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_Decals_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_ManualDecals_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_Manual_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_Rules_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\RangeSliderWidget_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\RtToggleWidget_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\Section_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\SliderScalar_Integer_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\SliderScalar_Track_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\SliderScalar_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\SlopeTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\SmoothnessTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_Appearance_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_Draw_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_Material_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_Scalars_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_Soil_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\SymmetryTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\SystemTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\TerrainTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\TextInput_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\TintTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\src\ui\WaterTab_UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Projects\Sanctuary\Map Generator\core\miniz.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\data\EntityIdBuffer_DATA.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\data\FloatField_DATA.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\data\MapFields_DATA.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\data\PlacementInstance_DATA.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\data\PlacementInstances_DATA.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\data\PlacementResults_DATA.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\data\SpatialGrid_DATA.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\data\StratumArt_DATA.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\Accumulation_Migrate_V2_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\AppSettingsLocation_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\AppSettings_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_Atlas_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_Decode_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_DiskFormat_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetAtlasCache_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\AssetPipeline_TestSupport_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\DetailNormal_Migrate_V2_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\EntityCollections_Migrate_V2_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\FileDialog_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\FileDialog_Shell_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\FilesystemPrimitives_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\Flow_Migrate_V2_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\GeneralMapSettings_Migrate_V2_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\GlobalMarkerSettings_Migrate_V2_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\JsonPrimitives_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_BlueprintValidation_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_DocumentAssembly_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_Recipe_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_SampleQuantize_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_ScatterTransform_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapExporter_UnknownImportMerge_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapFormat_TestSupport_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_Recipe_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\MapImporter_ScatterTransform_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\Sanmap_KnownTopLevelKeys_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\Sanmap_MigrationManifest_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\Sanmap_MigrationRunner_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\SanpackReader_Format_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\SanpackReader_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\SlopeDefaults_Migrate_V2_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\StratumGenerationSettings_Migrate_V2_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\Symmetry_Migrate_V2_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\io\UnknownImportBag_IO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\math\FloatVector_MATH.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\math\FloatVector_Scalar_MATH.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\math\HeightOcclusion_MATH.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\math\JumpFloodDistanceField_MATH.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\math\Morton_MATH.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\math\RadialClearance_MATH.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\math\Reciprocal_MATH.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\math\Trigonometry_MATH.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\Accumulation_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\Army_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\AtmosphereBackgroundFog_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\AtmosphereExposureSkybox_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\AtmosphereGlobalWind_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\AtmosphereHeightFog_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\AtmosphereLegacyFog_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\AtmosphereLinearFog_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\AtmosphereSkylight_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\AtmosphereSun_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\Atmosphere_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\DetailNormal_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\Flow_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\GeneralMapSettings_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\GenerationEnums_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\GeoLayer_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\Geometry_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\GlobalMarkerSettings_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\GradientRamp_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\InstancedTransform_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\LayerStack_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\Layer_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\MapArea_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\MapRecipe_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\MarkerChain_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\MarkerInstance_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\MarkerRule_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\PropInstance_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\ScatterRule_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\ScatterTransform_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\SlopeDefaults_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\StratumAppearance_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\StratumSoilPhysics_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\Stratum_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\Symmetry_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\params\Water_PARAMS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\pipeline\GenerationAssembler_PIPELINE.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\pipeline\GenerationAssembler_TestScene_PIPELINE.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\pipeline\Generation_PIPELINE.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\pipeline\PreviewDriver_PIPELINE.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Bake_Kernel_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Bake_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Bake_Sampling_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Bake_TestScene_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Column_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Droplet_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Kernel_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Physics_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Settings_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_TestFixture_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_Kernel_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_TestSupport_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_Kernel_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_Merge_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_Slope_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_TestSupport_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Kernel_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Shape_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_TestStacks_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_TestSupport_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Candidate_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Gate_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Kernel_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_RuleBuild_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_SpacingGrid_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_SymmetryOrbit_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Symmetry_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Test_Terrain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_Transform_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Thermal_Kernel_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Thermal_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Thermal_Test_PROC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\sys\ArenaAllocator_SYS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\sys\AtlasResidency_SYS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\sys\Dispatch_SYS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\sys\GpuGlFunctions_SYS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\sys\GpuResource_SYS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\sys\GpuResource_TestSupport_SYS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\sys\ThreadPool_SYS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\AccumulationTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\ApplicationShell_TestSupport_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_AssetBridge_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Defaults_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Execution_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_HostedSettings_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Panels_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_PreviewRamps_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Settings_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_TabState_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Application_Visibility_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\AreasTab_List_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\AreasTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\ArmiesTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\ArmiesTab_Units_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\AtmosphereControls_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\AtmosphereSettings_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\AtmosphereTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Checkbox_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\ColorSwatch_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Combo_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\ConfirmDialog_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\DetailNormalTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\DraggableListWidget_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\DraggableList_TestScene_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\FilePathLabel_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\FilePathPicker_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\FilesTab_Browse_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\FilesTab_TestSupport_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\FilesTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\FlowTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\GradientEditorWidget_Paint_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\GradientEditorWidget_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\GradientLut_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\HeightmapTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\HolesTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\IconGridWidget_TestSupport_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\IconGridWidget_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LabelledDialWidget_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Action_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Draw_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Erosion_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Scalars_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_Signals_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_SoilPreset_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_TestSupport_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayerEditor_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LayersTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\LevelsHistogram_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Levels_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\ListWidget_TestFrame_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\MapCanvasView_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\MapCanvas_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\MarkersTab_Globals_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\MarkersTab_Placed_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\MarkersTab_Rules_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\MarkersTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\MaskLayerTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\ParameterTabs_TestSupport_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Picking_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PlacementRuleSections_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_Color_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_Kernel_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_Settings_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_TestScene_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewIntegration_TestScene_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_Decals_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_ManualDecals_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_Manual_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_Rules_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PropsTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\RangeSliderWidget_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\RtToggleWidget_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\Section_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\SliderScalar_Track_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\SliderScalar_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\SlopeTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\SmoothnessTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_Draw_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_Options_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_Scalars_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_SoilPhysics_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_TestSupport_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\StratumsTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\SymmetryTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\SystemTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\TerrainOverlayTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\TerrainTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\TextInput_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\TintTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\UniqueNameList_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\VirtualListWidget_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\WaterTab_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\WidgetHelpers_UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Bake_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\DoubleBuffer_Test.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Column_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Erosion_Splat_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\FlowAccumulation_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_Merge_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Mask_Slope_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Cellular_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Fractal_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Hash_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Lattice_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Shape_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_SimplexSmooth_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\NoiseBlend_Simplex_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Placement_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\proc\Thermal_PROC.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_Color_UI.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_Sampling_UI.glsl" />
+    <ClInclude Include="D:\Projects\Sanctuary\Map Generator\src\ui\PreviewComposite_UI.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\Projects\Sanctuary\Map Generator\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="D:\Projects\Sanctuary\Map Generator\build_step40c\_deps\json-src\nlohmann_json.natvis" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{6DE21731-E907-32B2-A978-51A1028A762D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{3E6288DA-3653-3FA8-BFE5-097529559BD1}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

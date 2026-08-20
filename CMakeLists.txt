@@ -182,8 +182,10 @@ target_sources(SanGenV2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core/miniz.c)
 target_include_directories(SanGenV2 PRIVATE ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 target_compile_features(SanGenV2 PUBLIC cxx_std_17)
 if(MSVC)
-    # /permissive- for conforming lookup; the GPU seam resolves GL entry points itself.
-    target_compile_options(SanGenV2 PRIVATE /permissive- /W3)
+    # /permissive- for conforming lookup; the GPU seam resolves GL entry points itself. /FS lets
+    # concurrent CL.EXE invocations (MultiProcessorCompilation) share one .pdb safely — without it
+    # a from-scratch parallel build of this many translation units hits C1041.
+    target_compile_options(SanGenV2 PRIVATE /permissive- /W3 /FS)
 endif()
 if(WIN32)
     target_link_libraries(SanGenV2 PUBLIC opengl32)
@@ -490,6 +492,47 @@ add_sangen_test(JsonPrimitives_IO_Test    src/io/JsonPrimitives_IO_Test.cpp)
 target_link_libraries(JsonPrimitives_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 add_sangen_test(Sanmap_MigrationRunner_IO_Test src/io/Sanmap_MigrationRunner_IO_Test.cpp)
 target_link_libraries(Sanmap_MigrationRunner_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+
+# STEP40B_TrivialRelocations_IO: the 4 trivial V2->V3 flat-key-relocation migrations. Each is a
+# standalone acceptance binary against its own hand-built OLD-shape fixture (IO_MIGRATION_SPEC.md
+# §1) — not wired into the manifest yet (STEP40F's job). The migration .cpp itself is already part
+# of SANGEN_V2_SOURCES (glob'd from src/io/*.cpp) and reaches the test through the SanGenV2 link,
+# same as Sanmap_MigrationRunner_IO_Test above — only the _Test.cpp is listed here.
+add_sangen_test(GeneralMapSettings_Migrate_V2_IO_Test src/io/GeneralMapSettings_Migrate_V2_IO_Test.cpp)
+target_link_libraries(GeneralMapSettings_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+add_sangen_test(Symmetry_Migrate_V2_IO_Test src/io/Symmetry_Migrate_V2_IO_Test.cpp)
+target_link_libraries(Symmetry_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+add_sangen_test(Accumulation_Migrate_V2_IO_Test src/io/Accumulation_Migrate_V2_IO_Test.cpp)
+target_link_libraries(Accumulation_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+add_sangen_test(DetailNormal_Migrate_V2_IO_Test src/io/DetailNormal_Migrate_V2_IO_Test.cpp)
+target_link_libraries(DetailNormal_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+
+# STEP40C_ColorConversionMigrations_IO: the two V2->V3 migrations that compose MoveKey with
+# ConvertColorArrayToRgbaObject (STEP40A) — not wired into the manifest yet (STEP40F's job). Same
+# glob'd-into-SANGEN_V2_SOURCES / direct-fixture-construction reasoning as STEP40B above.
+add_sangen_test(Flow_Migrate_V2_IO_Test src/io/Flow_Migrate_V2_IO_Test.cpp)
+target_link_libraries(Flow_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+add_sangen_test(GlobalMarkerSettings_Migrate_V2_IO_Test src/io/GlobalMarkerSettings_Migrate_V2_IO_Test.cpp)
+target_link_libraries(GlobalMarkerSettings_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+
+# STEP40D_StratumCrossDomainMigrations_IO: SlopeDefaults_Migrate_V2 (synthesizes ONE global
+# SlopeDefaults from every Stratums[i]'s legacy slope-gate fields, mode/mean per the ticket's exact
+# synthesis rule) and StratumGenerationSettings_Migrate_V2 (relocates those same 8 fields verbatim,
+# index-aligned, padded to 9) — not wired into the manifest yet (STEP40F's job). These two share a
+# read source AND write into overlapping StratumGenerationSettings[i] destinations (the
+# additive-write discipline both files' own comments describe), so StratumGenerationSettings_
+# Migrate_V2_IO_Test.cpp links both headers for the mandatory joint test. Same
+# glob'd-into-SANGEN_V2_SOURCES / direct-fixture-construction reasoning as STEP40B/C above.
+add_sangen_test(SlopeDefaults_Migrate_V2_IO_Test src/io/SlopeDefaults_Migrate_V2_IO_Test.cpp)
+target_link_libraries(SlopeDefaults_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+add_sangen_test(StratumGenerationSettings_Migrate_V2_IO_Test src/io/StratumGenerationSettings_Migrate_V2_IO_Test.cpp)
+target_link_libraries(StratumGenerationSettings_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+
+# STEP40E_EntityCollectionsMigration_IO: the bespoke army-color + alias-fold-in V2->V3 migration —
+# not wired into the manifest yet (STEP40F's job). Same glob'd-into-SANGEN_V2_SOURCES /
+# direct-fixture-construction reasoning as STEP40B/C above.
+add_sangen_test(EntityCollections_Migrate_V2_IO_Test src/io/EntityCollections_Migrate_V2_IO_Test.cpp)
+target_link_libraries(EntityCollections_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 add_sangen_test(FilesTab_UI_Test
     src/ui/FilesTab_UI_Test.cpp
     src/ui/FilesTab_Roundtrip_UI_Test.cpp)

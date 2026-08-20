@@ -1,9 +1,10 @@
 // MapExporter_BlueprintValidation_IO_Test.cpp — M5-4 harness acceptance, part 5:
 // STEP5_PropsDecalsValidation_UI's `SanpackReader::HasEntry` and
-// `Io::ValidatePropAndDecalBlueprintPaths`, plus the warn-not-block export safety net
-// (`MapExporter::ExportSanmapOnly`'s `assetPack` parameter), all against the SAME synthetic
-// sanpack `SanpackReader_IO_Test.cpp` already built (reuses `AssetPipeline_TestSupport_IO.h`
-// rather than hand-rolling a second archive).
+// `Io::ValidatePropAndDecalBlueprintPaths`, plus the export-side refuse-by-default gate
+// (`MapExporter::ExportSanmapOnly`'s `assetPack`/`bBlueprintValidationAcknowledged` parameters,
+// STEP39_BlueprintValidationGate_IO), all against the SAME synthetic sanpack
+// `SanpackReader_IO_Test.cpp` already built (reuses `AssetPipeline_TestSupport_IO.h` rather than
+// hand-rolling a second archive).
 #include "AssetPipeline_TestSupport_IO.h"
 #include "MapExporter_BlueprintValidation_IO.h"
 #include "MapExporter_IO.h"
@@ -72,24 +73,51 @@ void RunBlueprintValidationChecks(const SyntheticSanpack& layout, const std::str
     Check(dirtyReport.SummaryText().find(unresolvedPath) != std::string::npos,
           "the summary names the offending path");
 
-    // 4. The export-side safety net: assetPack non-null LOGS the finding but NEVER gates
-    // bSucceeded — warn, never block, even for a caller that never goes through the UI dialog.
+    // 4. The export-side safety net (STEP39_BlueprintValidationGate_IO): assetPack non-null and an
+    // unresolved path REFUSES the write by default — a structural gate now, not just one button's
+    // discipline — unless the caller explicitly acknowledges it.
     std::error_code pathError;
     const std::filesystem::path exportFolder =
         std::filesystem::path(scratchDirectory) / "blueprintValidationExport";
     std::filesystem::remove_all(exportFolder, pathError);
-    const MapExportResult dirtyResult =
-        MapExporter::ExportSanmapOnly(exportFolder.string(), dirtyRecipe, MapExportOptions(), &reader);
-    Check(dirtyResult.bSucceeded, "an unresolved blueprintPath is logged, not blocked — export still succeeds");
-    Check(dirtyResult.debugLog.find(unresolvedPath) != std::string::npos,
-          "and the SAME finding text reaches the export's own debugLog");
+    const std::string documentPath = (exportFolder / (dirtyRecipe.mapName + ".sanmap")).string();
 
-    // 5. assetPack == nullptr — the pre-ticket contract: no validation attempted, nothing logged.
+    // 4a. Acceptance item 1: no acknowledgment -> refused, nothing written, as a headless/batch
+    // caller that bypasses the UI dialog entirely would hit.
+    const MapExportResult unacknowledgedResult =
+        MapExporter::ExportSanmapOnly(exportFolder.string(), dirtyRecipe, MapExportOptions(), &reader);
+    Check(!unacknowledgedResult.bSucceeded,
+          "an unresolved blueprintPath with no acknowledgment refuses the write");
+    Check(unacknowledgedResult.WrittenFileCount() == 0, "and records nothing written");
+    Check(!std::filesystem::exists(documentPath, pathError), "no .sanmap file is produced");
+    Check(unacknowledgedResult.debugLog.find(unresolvedPath) != std::string::npos,
+          "the finding still reaches the export's own debugLog");
+    Check(unacknowledgedResult.debugLog.find("refused") != std::string::npos,
+          "and the refusal itself is logged");
+
+    // 4b. Acceptance item 2: the SAME call WITH acknowledgment succeeds and writes exactly as
+    // before this ticket.
+    const MapExportResult acknowledgedResult =
+        MapExporter::ExportSanmapOnly(exportFolder.string(), dirtyRecipe, MapExportOptions(), &reader,
+                                      /*unknownData=*/nullptr,
+                                      /*bBlueprintValidationAcknowledged=*/true);
+    Check(acknowledgedResult.bSucceeded, "an acknowledged unresolved blueprintPath still exports");
+    Check(std::filesystem::exists(documentPath, pathError), "and this time the .sanmap IS produced");
+    Check(acknowledgedResult.debugLog.find(unresolvedPath) != std::string::npos,
+          "the finding is still logged even when acknowledged");
+
+    // 5. assetPack == nullptr — the pre-ticket contract: no validation attempted, nothing logged,
+    // no acknowledgment required.
     const MapExportResult skippedResult =
         MapExporter::ExportSanmapOnly(exportFolder.string(), dirtyRecipe, MapExportOptions(), nullptr);
     Check(skippedResult.bSucceeded, "with no assetPack the same dirty recipe still exports cleanly");
     Check(skippedResult.debugLog.find(unresolvedPath) == std::string::npos,
           "and nothing about blueprintPaths is logged: validation was skipped entirely");
+
+    // 6. Acceptance item 4: zero unresolved paths succeeds without requiring any acknowledgment.
+    const MapExportResult cleanResult =
+        MapExporter::ExportSanmapOnly(exportFolder.string(), resolvedRecipe, MapExportOptions(), &reader);
+    Check(cleanResult.bSucceeded, "an all-resolved recipe exports with no acknowledgment at all");
 
     reader.Close();
 }

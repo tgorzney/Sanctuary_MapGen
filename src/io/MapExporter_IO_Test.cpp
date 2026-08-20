@@ -69,8 +69,13 @@ static void TestDocumentCarriesTheFormatsOwnFields() {
           "(STEP25_MapNameCredits_IO)");
     Check(documentText.find("\"credits\": \"A Test Cartographer\"") != std::string::npos,
           "and so does credits");
-    Check(documentText.find("\"mapGeneratorData\"") != std::string::npos,
-          "and carries the generator-state block that makes the sanmap the source of truth");
+    // STEP36_LegacyBlobDeletion_IO: a fresh export no longer writes the legacy `mapGeneratorData`
+    // blob at all — every field it used to carry now has a confirmed top-level duplicate
+    // (STEP11/STEP27/STEP30). The IMPORT side's gated legacy readers stay unaffected (see
+    // MapImporter_IO_Test.cpp's CheckWaterLegacyBlobWinsOverTopLevelMirrorsOnDisagreement and
+    // CheckLegacyBlobWinsOverAllFourNewFieldHomesOnDisagreement, both untouched by this ticket).
+    Check(documentText.find("\"mapGeneratorData\"") == std::string::npos,
+          "a fresh export writes no mapGeneratorData key at all (STEP36)");
     Check(documentText.find("\"heightmapResolution\": 513") != std::string::npos,
           "heightmapResolution is the VERTEX count, not the cell count");
     Check(documentText.find("\"stratumLayers\"") != std::string::npos,
@@ -170,6 +175,30 @@ static void TestNewFieldHomesAreWritten() {
           "the top-level deepWaterDepthMin key is written, sibling of hasWater/waterLevel/waterDepth");
 }
 
+// STEP37_StratumAppearanceRoundtrip_IO: `name`/`environmentName`/`materialName` write the real,
+// designer-editable `appearance.*` values — `name` no longer writes the generated
+// "Stratum <index>" placeholder (StratumsTab_Material_UI.cpp's live text input/combos), and
+// `environmentName`/`materialName` are written at all for the first time.
+static void TestStratumAppearanceIdentityFieldsAreWritten() {
+    Params::MapRecipe recipe;
+    recipe.geometry.mapSize = 4;
+    recipe.strata.resize(1);
+    recipe.strata[0].appearance.name            = "Lush Grass";
+    recipe.strata[0].appearance.environmentName = "Temperate Forest";
+    recipe.strata[0].appearance.materialName    = "Grass_01";
+
+    const std::string documentText = Io::MapExporter::BuildSanmapJsonText(recipe);
+    const nlohmann::json document = nlohmann::json::parse(documentText);
+    const nlohmann::json& stratumLayer = document.at("stratumLayers").at(0);
+
+    Check(stratumLayer.at("name").get<std::string>() == "Lush Grass",
+          "stratumLayers[0].name writes the real appearance.name, not the generated placeholder");
+    Check(stratumLayer.at("environmentName").get<std::string>() == "Temperate Forest",
+          "stratumLayers[0].environmentName is written (previously never written at all)");
+    Check(stratumLayer.at("materialName").get<std::string>() == "Grass_01",
+          "stratumLayers[0].materialName is written (previously never written at all)");
+}
+
 static void TestAnInvalidRecipeIsRefusedBeforeAnythingIsWritten() {
     const std::string scratchFolder = ScratchFolderPath();
     Params::MapRecipe recipe;
@@ -241,6 +270,7 @@ int main() {
     TestDocumentCarriesTheFormatsOwnFields();
     TestStratumLayersWriteVector4RemapAndIntegerHeight();
     TestNewFieldHomesAreWritten();
+    TestStratumAppearanceIdentityFieldsAreWritten();
     TestAnInvalidRecipeIsRefusedBeforeAnythingIsWritten();
     TestExportAllWritesEveryPayload();
     TestFolderPreparationIsTheOneDoorAboveIo();

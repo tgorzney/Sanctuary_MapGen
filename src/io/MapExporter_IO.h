@@ -14,9 +14,11 @@
 //  1. RESOLVED ENTITIES (`Data::PlacementResults` markers/props/units) are not written: inputs are
 //     the recipe and the fields. `areas`/`armies`/`markers`/`chains`/`props`/`decals` all round-trip
 //     real `recipe.*` content (STEP2/STEP3/STEP4; blueprintPath validation added by STEP5). An
-//     unresolved `props`/`decals` blueprintPath is reported, never dropped, never used to block the
-//     export (`ValidatePropAndDecalBlueprintPaths`, MapExporter_BlueprintValidation_IO.h) — this
-//     builder stays disk-free.
+//     unresolved `props`/`decals` blueprintPath is never dropped from the written recipe content —
+//     this builder itself stays disk-free and never refuses. Whether the WRITE that follows is
+//     allowed to proceed on an unresolved path is `MapExporter::ExportSanmapOnly`/`ExportAll`'s own
+//     call (`bBlueprintValidationAcknowledged`, STEP39_BlueprintValidationGate_IO), enforced above
+//     this builder, not inside it.
 //  2. RETIRED: ATMOSPHERE now has a `_PARAMS` home (`Params::Atmosphere`, ATMOSPHERE_PARAMS_SPEC)
 //     and round-trips real `recipe.atmosphere` content via `BuildAtmosphereJson`
 //     (MapExporter_Atmosphere_IO.cpp) — no longer written from the format's own defaults.
@@ -95,8 +97,15 @@ bool EnsureExportFolderExists(const std::string& folderPath, MapExportResult& re
 
 class MapExporter {
 public:
-    // `<folder>/<mapName>.sanmap`, no textures. `assetPack` non-null LOGS a blueprintPath finding
-    // (never gates bSucceeded — warn-not-block). `unknownData` is nullable
+    // `<folder>/<mapName>.sanmap`, no textures. `assetPack` non-null runs the blueprintPath safety
+    // net (STEP39_BlueprintValidationGate_IO): if any prop/decal blueprintPath fails to resolve
+    // against it, the export REFUSES (bSucceeded stays false, nothing is written) UNLESS the caller
+    // already passed `bBlueprintValidationAcknowledged = true` — the same choice the Files tab's own
+    // confirm dialog's "Export Anyway" button represents (FilesTab_Draw_UI.cpp). This is a
+    // refuse-by-default gate, not a silent skip: a future caller that never thought about
+    // blueprintPaths at all gets refused rather than shipping a `.sanmap` the game aborts loading
+    // partway through (SANMAP_FORMAT_SPEC). `assetPack == nullptr` skips validation entirely — the
+    // pre-STEP39 contract for a caller with no asset pack loaded. `unknownData` is nullable
     // (STEP24_ImportNeverRefuses_IO ruling 6, `UnknownImportBag_IO.h`) — when given (the same bag
     // the load-edit-save session's own `LoadSanmap`/`ParseSanmapJsonText` call populated), its
     // captured keys re-merge as one nested `UnknownImport` object in the re-exported document
@@ -106,14 +115,17 @@ public:
                                             const Params::MapRecipe& recipe,
                                             const MapExportOptions& options = MapExportOptions(),
                                             const SanpackReader* assetPack = nullptr,
-                                            const UnknownImportBag* unknownData = nullptr);
+                                            const UnknownImportBag* unknownData = nullptr,
+                                            bool bBlueprintValidationAcknowledged = false);
 
-    // The recipe plus every enabled texture. `assetPack`/`unknownData` — see ExportSanmapOnly above.
+    // The recipe plus every enabled texture. `assetPack`/`unknownData`/
+    // `bBlueprintValidationAcknowledged` — see ExportSanmapOnly above.
     static MapExportResult ExportAll(const std::string& folderPath, const Params::MapRecipe& recipe,
                                      const Data::MapFields& fields,
                                      const MapExportOptions& options = MapExportOptions(),
                                      const SanpackReader* assetPack = nullptr,
-                                     const UnknownImportBag* unknownData = nullptr);
+                                     const UnknownImportBag* unknownData = nullptr,
+                                     bool bBlueprintValidationAcknowledged = false);
 
     // The individual export actions the Files tab offers, each usable on its own.
     static bool WriteHeightmapRaw(const std::string& filePath, const Data::MapFields& fields,

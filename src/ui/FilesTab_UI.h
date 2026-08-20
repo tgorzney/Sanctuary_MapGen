@@ -120,10 +120,15 @@ inline void AppendFilesTabLog(FilesTabState& state, const std::string& text) {
 }
 
 // Runs one action end to end and logs the outcome. `recipe` is written by the two import actions;
-// `fields` is nullable (SCOPE NOTE 2). Returns whether the action reported success.
+// `fields` is nullable (SCOPE NOTE 2). `bBlueprintValidationAcknowledged` reaches
+// `MapExporter::ExportSanmapOnly`/`ExportAll` unchanged (STEP39_BlueprintValidationGate_IO) — every
+// action but the two recipe exports ignores it. Default false is exactly right for
+// `DrawGatedExportButton`'s normal click (`FilesTab_Draw_UI.cpp`'s own pre-check already guarantees
+// every path resolves before this runs); `DrawPendingBlueprintWarningDialog`'s "Export Anyway" click
+// is the one call site that passes true. Returns whether the action reported success.
 // FilesTab_Actions_UI.cpp — headless: no imgui frame, no window, no GL context.
 bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapRecipe& recipe,
-                       Data::MapFields* fields);
+                       Data::MapFields* fields, bool bBlueprintValidationAcknowledged = false);
 
 // Draws the tab. Every pointer is nullable; the tab still edits its own state with nothing bound.
 void DrawFilesTab(Params::MapRecipe& recipe, FilesTabState& state, Data::MapFields* fields,

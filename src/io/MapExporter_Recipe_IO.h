@@ -14,17 +14,15 @@ namespace Io {
 
 struct MapExportOptions;
 
-// The generator-state block: the on-disk form of `Params::MapRecipe` (SANMAP_FORMAT_SPEC
-// "mapGeneratorData — SanGen's generator-state round-trip").
-nlohmann::ordered_json BuildMapGeneratorDataJson(const Params::MapRecipe& recipe);
-
 // The format's fixed 9 texture layers, filled from the recipe's `strata` (shorter is legal —
 // strata past the end are written on their defaults).
 nlohmann::ordered_json BuildStratumLayersJson(const Params::MapRecipe& recipe);
 
-// MapExporter_Layers_IO.cpp — the unrelated per-stratum settings (the layer-stack half of this
-// file's old name relocated out, see MapExporter_HeightmapStack_IO.cpp below).
-nlohmann::ordered_json BuildStrataSettingsJson(const Params::MapRecipe& recipe);
+// STEP36_LegacyBlobDeletion_IO: the legacy `mapGeneratorData` blob's own builders
+// (`BuildMapGeneratorDataJson`, MapExporter_MapGeneratorData_IO.cpp; `BuildStrataSettingsJson`/
+// `BuildStratumJson`, MapExporter_Layers_IO.cpp) are DELETED, not just relocated — every field they
+// wrote now has a confirmed top-level duplicate (STEP11/STEP27/STEP30). The import side's gated
+// legacy readers stay unchanged; see MapImporter_Recipe_IO.cpp.
 
 // MapExporter_HeightmapStack_IO.cpp — `recipe.layerStack` -> the top-level `HeightmapStack` object
 // (SANMAP_FORMAT_SPEC Correction 3): `{ SimulationGrouping, GeoLayers }`, REPLACING the legacy

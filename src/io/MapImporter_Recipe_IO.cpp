@@ -28,11 +28,18 @@ void ReadGeometryJson(const nlohmann::json& generatorData, const MapImportOption
     // UNCONDITIONALLY and BEFORE this function (SANMAP_FORMAT_SPEC Correction 4, STEP16;
     // MapImporter_IO.cpp wiring order) — no longer read here.
 
-    // The band invariant Geometry::IsValid() depends on, enforced on the way IN so a hand-edited
-    // document can never produce a recipe the pipeline refuses (Constitution §6). Correct
-    // post-relocation ONLY because `ReadGeneralMapSettingsJson` already ran (see that reader's own
-    // header comment) — `geometry.terrainMinHeight`/`geometry.worldUnitsPerCell` are already set by
-    // the time this block runs, and `geometry.terrainMaxHeight` was just set above.
+    // The band invariant Geometry::IsValid() depends on is now ALSO enforced unconditionally, from
+    // `ParseSimulationDomainsJson` right after `GeneralMapSettings` is read — that's the fix for
+    // current-format files, which since `STEP36` never reach this gated block at all
+    // (STEP41_PostMigrationImportGaps_IO). It stays called here too, one more time, because THIS
+    // block's own `TerrainMaxHeight` re-read above can still introduce a fresh out-of-band value
+    // from a genuinely old file's legacy blob, independent of whatever `GeneralMapSettings` already
+    // held and already got clamped once — dropping this second call would silently un-clamp a
+    // legacy blob's own hostile `TerrainMaxHeight`/`TerrainMinHeight`/`WorldUnitsPerCell`.
+    ClampGeometryBand(geometry, result);
+}
+
+void ClampGeometryBand(Params::Geometry& geometry, MapImportResult& result) {
     if (geometry.terrainMaxHeight < 1.0f) {
         result.Warn("TerrainMaxHeight was not positive; raised to 1.");
         geometry.terrainMaxHeight = 1.0f;

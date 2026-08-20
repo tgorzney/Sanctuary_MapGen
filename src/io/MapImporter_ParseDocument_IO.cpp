@@ -87,14 +87,18 @@ void ParseStackDomainsJson(const nlohmann::json& document, Params::MapRecipe& ou
 // `Accumulation`/`DetailNormal` — flat top-level objects, siblings of `mapGeneratorData`, each
 // REPLACING a legacy `mapGeneratorData.*` field its own reader's header comment documents in full
 // (Correction numbers kept per call for traceability). `GeneralMapSettings` is LOAD-BEARING: it
-// must run before the gated `ReadGeometryJson` below — that reader's clamp/Warn block depends on
+// must run before `ClampGeometryBand` right below it — that guard's clamp/Warn block depends on
 // `geometry.terrainMinHeight`/`worldUnitsPerCell` already being set (see
-// MapImporter_GeneralMapSettings_IO.cpp's own header comment).
+// MapImporter_GeneralMapSettings_IO.cpp's own header comment). `ClampGeometryBand` runs
+// unconditionally HERE, not inside the gated legacy `ReadGeometryJson` tail, so it still catches a
+// hand-edited/corrupted value on a current-format document with no `mapGeneratorData` block at all
+// (STEP41_PostMigrationImportGaps_IO).
 void ParseSimulationDomainsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
                                 MapImportResult& result) {
     ReadAtmosphereJson(document, outRecipe, result);          // ATMOSPHERE_PARAMS_SPEC
     ReadSlopeDefaultsJson(document, outRecipe);                // STEP10_SlopeDefaults_Mechanism
     ReadGeneralMapSettingsJson(document, outRecipe);           // Correction 2
+    ClampGeometryBand(outRecipe.geometry, result);              // STEP41_PostMigrationImportGaps_IO
     ReadHeightmapStackJson(document, outRecipe.layerStack);    // Correction 3
     ReadSymmetryJson(document, outRecipe);                     // Correction 4 (STEP16)
     ReadFlowJson(document, outRecipe);                         // Correction 6 (STEP17)
@@ -127,8 +131,12 @@ bool MapImporter::ParseSanmapJsonText(const std::string& documentText, Params::M
     ParseStackDomainsJson(document, outRecipe);
     ParseSimulationDomainsJson(document, outRecipe, result);
 
+    // Absence here is the EXPECTED, NORMAL state for any current-format export (STEP36 stopped the
+    // exporter from ever writing this legacy block) — every top-level domain reader above has
+    // already recovered everything there is to recover. Informational, not a warning: Log(), not
+    // Warn() (STEP38).
     if (!document.contains("mapGeneratorData") || !document["mapGeneratorData"].is_object()) {
-        result.Warn("No mapGeneratorData block: only the map's own dimensions were recovered.");
+        result.Log("No legacy mapGeneratorData block present: nothing needed it (current-format export).");
         return true;
     }
     const nlohmann::json& generatorData = document["mapGeneratorData"];

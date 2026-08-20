@@ -29,15 +29,22 @@ bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe&
     return true;
 }
 
-// The blueprintPath safety net (finalized IO plumbing item 4): warn-not-block, for a caller that
-// passes a non-null assetPack without going through the Files-tab dialog at all — the SAME
-// validation the UI pre-check runs, just logged instead of gating the button. `result.bSucceeded`
-// is NEVER touched here.
-void LogBlueprintValidationFindings(const Params::MapRecipe& recipe, const SanpackReader* assetPack,
-                                    MapExportResult& result) {
-    if (assetPack == nullptr) return;
+// The blueprintPath safety net (STEP39_BlueprintValidationGate_IO): structural now, not just one
+// button's discipline — the SAME validation the UI pre-check runs, enforced here so every present
+// and future caller of ExportSanmapOnly/ExportAll gets it for free. `assetPack == nullptr` skips
+// validation entirely (pre-STEP39 contract). All-resolved -> proceed silently. Unresolved -> the
+// finding is always logged, and the write is refused (false, nothing created) UNLESS the caller
+// already passed `bBlueprintValidationAcknowledged = true` — the same choice the Files tab's
+// confirm-dialog "Export Anyway" click represents (FilesTab_Draw_UI.cpp).
+bool CheckBlueprintValidationGate(const Params::MapRecipe& recipe, const SanpackReader* assetPack,
+                                  bool bBlueprintValidationAcknowledged, MapExportResult& result) {
+    if (assetPack == nullptr) return true;
     const BlueprintValidationReport report = ValidatePropAndDecalBlueprintPaths(recipe, *assetPack);
-    if (!report.AllResolved()) result.Log(report.SummaryText());
+    if (report.AllResolved()) return true;
+    result.Log(report.SummaryText());
+    if (bBlueprintValidationAcknowledged) return true;
+    result.Log("Export refused: unresolved blueprintPath(s) were not acknowledged.");
+    return false;
 }
 
 } // namespace
@@ -52,10 +59,12 @@ MapExportResult MapExporter::ExportSanmapOnly(const std::string& folderPath,
                                               const Params::MapRecipe& recipe,
                                               const MapExportOptions& options,
                                               const SanpackReader* assetPack,
-                                              const UnknownImportBag* unknownData) {
+                                              const UnknownImportBag* unknownData,
+                                              bool bBlueprintValidationAcknowledged) {
     MapExportResult result;
     if (!recipe.IsValid()) { result.Log("Export refused: the recipe's geometry is not valid."); return result; }
-    LogBlueprintValidationFindings(recipe, assetPack, result);
+    if (!CheckBlueprintValidationGate(recipe, assetPack, bBlueprintValidationAcknowledged, result))
+        return result;
     if (!EnsureExportFolderExists(folderPath, result)) return result;
     result.bSucceeded = WriteSanmapDocument(folderPath, recipe, options, result, unknownData);
     return result;
@@ -64,10 +73,12 @@ MapExportResult MapExporter::ExportSanmapOnly(const std::string& folderPath,
 MapExportResult MapExporter::ExportAll(const std::string& folderPath, const Params::MapRecipe& recipe,
                                        const Data::MapFields& fields, const MapExportOptions& options,
                                        const SanpackReader* assetPack,
-                                       const UnknownImportBag* unknownData) {
+                                       const UnknownImportBag* unknownData,
+                                       bool bBlueprintValidationAcknowledged) {
     MapExportResult result;
     if (!recipe.IsValid()) { result.Log("Export refused: the recipe's geometry is not valid."); return result; }
-    LogBlueprintValidationFindings(recipe, assetPack, result);
+    if (!CheckBlueprintValidationGate(recipe, assetPack, bBlueprintValidationAcknowledged, result))
+        return result;
     if (!EnsureExportFolderExists(folderPath, result)) return result;
     if (!WriteSanmapDocument(folderPath, recipe, options, result, unknownData)) return result;
 

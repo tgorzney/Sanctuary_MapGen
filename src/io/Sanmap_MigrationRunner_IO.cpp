@@ -81,7 +81,7 @@ void RunSanmapMigrations(nlohmann::json& document, MapImportResult& result,
         }
         if (step != nullptr) {
             // Ordering is load-bearing law (§2 rule 2) — run exactly the manifest's declared order.
-            for (MigrationFunction migration : step->migrations) migration(document);
+            for (const MigrationEntry& entry : step->migrations) entry.function(document);
             for (const char* legacyKey : step->legacyKeysToDelete) DeleteKeyIfPresent(document, legacyKey);
         }
         // Writing the version field is the RUNNER's job, never an individual migration's (§4.2) —

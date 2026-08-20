@@ -115,5 +115,24 @@ inline void DeleteKeyIfPresent(nlohmann::json& parent, const char* key) {
     parent.erase(key);
 }
 
+// Converts a legacy 4-element [r,g,b,a] array at `key` into this format's current
+// {"r":,"g":,"b":,"a":} object shape — the color shape every V3 field already uses (armyColor,
+// FlowMapColor, MarkerColorAlloy/Plasma/Spawn). No-op — total and idempotent — if `key` is
+// absent, or if the value is not an array. Fewer than 4 elements pads missing trailing
+// components with 0 (r/g/b) or 1 (a) rather than throwing — never a partial-write.
+inline void ConvertColorArrayToRgbaObject(nlohmann::json& parent, const char* key) {
+    if (!parent.contains(key)) return;
+    if (!parent[key].is_array()) return;
+    const nlohmann::json array = parent[key];
+    static const char* const componentNames[4]    = { "r", "g", "b", "a" };
+    static const float       componentDefaults[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    nlohmann::json converted = nlohmann::json::object();
+    for (int i = 0; i < 4; ++i) {
+        if (i < static_cast<int>(array.size())) converted[componentNames[i]] = array[i];
+        else                                    converted[componentNames[i]] = componentDefaults[i];
+    }
+    parent[key] = std::move(converted);
+}
+
 } // namespace Io
 } // namespace SanmapGen

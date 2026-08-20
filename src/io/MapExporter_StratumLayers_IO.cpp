@@ -6,6 +6,11 @@
 // STEP30_LegacyBlobFieldHoming_IO: also writes `ImportedMaskMode`/`Enabled`, new sibling keys on
 // each entry — the legacy `mapGeneratorData.Stratums[].ImportedMaskMode`/`Enabled`
 // (MapExporter_Layers_IO.cpp) still writes too and stays authoritative on import when present.
+// STEP37_StratumAppearanceRoundtrip_IO: `name`/`environmentName`/`materialName` now write the real
+// `appearance.*` values (name no longer writes the generated "Stratum <index>" placeholder — that
+// text is purely the Stratums tab's display-time header fallback, `FormatStratumSectionLabel`
+// (StratumsTab_Options_UI.h), never written into the field itself; `StratumNameRules()`
+// (StratumsTab_UI.h) sets `bAllowEmpty = true`, so an empty name is a legal value here too).
 #include "MapExporter_Recipe_IO.h"
 #include "MapExporter_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -20,9 +25,9 @@ nlohmann::ordered_json BuildStratumLayersJson(const Params::MapRecipe& recipe) {
         const Params::Stratum stratum = bHasSettings ? recipe.strata[stratumIndex] : Params::Stratum();
         const Params::StratumAppearance& appearance = stratum.appearance;
         nlohmann::ordered_json layer;
-        layer["name"]        = "Stratum " + std::to_string(stratumIndex);
-        // `name` still writes the generated placeholder, not `appearance.name` — real gap, flagged
-        // for a future pass, not this correction (SANMAP_FORMAT_SPEC Correction 13).
+        layer["name"]            = appearance.name;
+        layer["environmentName"] = appearance.environmentName;
+        layer["materialName"]    = appearance.materialName;
         layer["ImportedMaskMode"] = static_cast<int>(stratum.importedMaskMode);
         layer["Enabled"]          = stratum.bEnabled;
         layer["albedo"]      = { { "path", appearance.albedoTexturePath } };

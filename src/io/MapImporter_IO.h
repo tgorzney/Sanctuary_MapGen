@@ -20,6 +20,18 @@
 //     `blueprintPath` values are NOT resolved against any sanpack here — that is
 //     `Io::ValidatePropAndDecalBlueprintPaths` (MapExporter_BlueprintValidation_IO.h), an
 //     export-side, warn-not-block check with no read-side counterpart.
+//  3. ORDERING LAW — TOP-LEVEL DOMAINS (stated once here; STEP42_ImporterRecipeHeaderTrim_IO):
+//     every top-level `.sanmap` domain key (`areas`/`armies`, `markers`/`chains`, `props`/`decals`/
+//     `PropGroups`/`DecalGroups`, `atmosphere`, `SlopeDefaults`, `GeneralMapSettings`,
+//     `stratumLayers`, `StratumGenerationSettings`, `MarkersStack`/`GlobalMarkerSettings`/
+//     `PropsStack`/`DecalsStack`/`UnitsStack`, `Symmetry`, `Flow`/`Accumulation`, `DetailNormal`) is
+//     a SIBLING of the legacy `mapGeneratorData` blob, not nested inside it. Every reader for one
+//     takes the top-level `document` directly and is called unconditionally, BEFORE the
+//     `mapGeneratorData` presence gate at the tail of `ParseSanmapJsonText`
+//     (MapImporter_ParseDocument_IO.cpp) — so hand-authored or current-format content survives even
+//     with no generator block at all. `MapImporter_Recipe_IO.h`'s per-declaration comments point
+//     back here instead of restating it; check each reader's own `.cpp` header comment for any
+//     additional, domain-specific ordering constraint beyond this shared one.
 #pragma once
 #include <cstdint>
 #include <string>

@@ -8,6 +8,8 @@
 // unconditionally (MapImporter_IO.cpp, before the mapGeneratorData gate); the gated legacy
 // `ReadStrataSettingsJson` (MapImporter_Recipe_IO.cpp) runs AFTER and still wins on overlap when
 // `mapGeneratorData.Stratums` is present, matching the STEP27 water precedent exactly.
+// STEP37_StratumAppearanceRoundtrip_IO: also reads `name`/`environmentName`/`materialName` into
+// `appearance.*` — no empty-value fallback needed, see the inline note at the read site.
 #include "MapImporter_Recipe_IO.h"
 #include "MapImporter_IO.h"
 #include "MapExporter_IO.h"   // sanmapStratumCount — the shared format-invariant cardinality
@@ -45,6 +47,13 @@ void ReadStratumLayerJson(const nlohmann::json& layerJson, Params::Stratum& stra
     if (ReadJsonEnumeration(layerJson, "ImportedMaskMode", 3, maskMode))
         stratum.importedMaskMode = static_cast<Params::ImportedMaskMode>(maskMode);
     ReadJsonBoolean(layerJson, "Enabled", stratum.bEnabled);
+    // `name`: no fallback text needed on a missing/old-shaped key — `StratumNameRules()`
+    // (StratumsTab_UI.h) sets `bAllowEmpty = true`, so the field's own empty default IS the UI's
+    // legal value, unlike STEP25's `mapName`. The header's "Stratum <index>" text is a display-time
+    // fallback (`FormatStratumSectionLabel`), never stored into this field.
+    ReadJsonText(layerJson, "name", appearance.name);
+    ReadJsonText(layerJson, "environmentName", appearance.environmentName);
+    ReadJsonText(layerJson, "materialName", appearance.materialName);
     ReadJsonPathWrapper(layerJson, "albedo", appearance.albedoTexturePath);
     ReadJsonPathWrapper(layerJson, "normal", appearance.normalTexturePath);
     ReadJsonPathWrapper(layerJson, "mask", appearance.compositeTexturePath);

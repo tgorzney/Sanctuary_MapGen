@@ -58,7 +58,10 @@ void DrawGatedExportButton(FilesTabAction action, FilesTabState& state, Params::
 
 // Drawn every frame, unconditionally, regardless of whether a warning is currently pending — an
 // imgui modal popup must be given the chance to run its own frame every frame it might be open.
-// OK exports the stashed action anyway (the designer's call); Cancel aborts with nothing written.
+// OK exports the stashed action anyway (the designer's call) — this IS the
+// `bBlueprintValidationAcknowledged = true` the IO layer now requires
+// (STEP39_BlueprintValidationGate_IO): without it, `MapExporter::ExportSanmapOnly`/`ExportAll` would
+// themselves refuse the very write this dialog exists to allow. Cancel aborts with nothing written.
 void DrawPendingBlueprintWarningDialog(FilesTabState& state, Params::MapRecipe& recipe,
                                        Data::MapFields* fields) {
     ConfirmDialogOptions options;
@@ -69,7 +72,8 @@ void DrawPendingBlueprintWarningDialog(FilesTabState& state, Params::MapRecipe& 
     const ConfirmDialogChange change =
         DrawConfirmDialog("filesTabBlueprintWarning", state.confirmDialogState, options);
     if (change.bPrimaryClicked) {
-        RunFilesTabAction(state.pendingConfirmAction, state, recipe, fields);
+        RunFilesTabAction(state.pendingConfirmAction, state, recipe, fields,
+                          /*bBlueprintValidationAcknowledged=*/true);
         state.bConfirmActionPending = false;
     } else if (change.bSecondaryClicked) {
         state.bConfirmActionPending = false;

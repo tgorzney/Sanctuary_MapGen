@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\Projects\Sanctuary\Map Generator\build_step40c\CMakeFiles\fff72eb0a5c5c1210d4713e372380c24\RUN_TESTS_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{78825176-FF60-322D-A3EF-2E1391792594}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

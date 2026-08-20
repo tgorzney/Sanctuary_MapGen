@@ -1,0 +1,302 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\x64\Debug\ZERO_CHECK</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\AccumulationTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Accumulation_Migrate_V2_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\AppSettings_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\ApplicationShell_Layout_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\ApplicationShell_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\ApplicationShell_Window_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\AreasTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\ArenaAllocator_SYS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\ArmiesTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\AssetPipeline_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\AtlasResidency_SYS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\AtmosphereTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Bake_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Checkbox_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\ColorSwatch_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Combo_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\CoreInputWidgets_LiveFrame_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\DetailNormal_Migrate_V2_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Dispatch_SYS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\EntityCollections_Migrate_V2_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\EntityIdBuffer_DATA_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Erosion_Gpu_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Erosion_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\FileDialog_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\FilePathPicker_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\FilesTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\FloatField_DATA_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\FloatVector_MATH_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\FlowAccumulation_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\FlowTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Flow_Migrate_V2_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\GeneralMapSettings_Migrate_V2_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\GenerationAssembler_PIPELINE_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Generation_PIPELINE_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Geometry_PARAMS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\GlobalMarkerSettings_Migrate_V2_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\GpuResource_SYS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\GradientEditorWidget_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\GradientLut_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\GradientRamp_PARAMS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\HeightmapTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\IconGridWidget_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\JsonPrimitives_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\JumpFloodDistanceField_MATH_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\LabelledDialWidget_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\LayerEditor_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\LayerStack_PARAMS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Levels_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\ListWidgets_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\MapCanvas_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\MapExporter_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\MapFields_DATA_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\MapImporter_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\MapRecipe_PARAMS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\MarkersTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\MaskLayerTabs_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Mask_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Morton_MATH_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\NoiseBlend_FeatureScale_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\NoiseBlend_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\ParameterTabs_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Picking_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\PlacementRuleSections_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\PlacementRules_PARAMS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Placement_Gpu_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Placement_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Placement_Symmetry_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\PreviewComposite_Gpu_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\PreviewComposite_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\PreviewComposite_Wysiwyg_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\PreviewIntegration_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\PropsDecals_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\PropsTab_ManualDecals_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\PropsTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\RadialClearance_MATH_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\RangeSliderWidget_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Reciprocal_MATH_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\RtToggleWidget_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\SanGenV2App.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\SanmapGenerator.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Sanmap_MigrationRunner_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Section_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\SliderScalar_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\SlopeDefaults_Migrate_V2_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\SlopeTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\SpatialGrid_DATA_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\StratumGenerationSettings_Migrate_V2_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Stratum_PARAMS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\StratumsTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\SymmetryTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Symmetry_Migrate_V2_IO_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\TextInput_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Thermal_PROC_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\ThreadPool_SYS_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\Trigonometry_MATH_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\Debug\WaterTab_UI_Test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>D:\Projects\Sanctuary\Map Generator\build_step40c\x64\Debug\ALL_BUILD</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles />
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>
