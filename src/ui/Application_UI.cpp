@@ -57,7 +57,7 @@ Application::~Application() { Shutdown(); }
 // know a composite exists, and the canvas may not know a pipeline exists, so the shell — which
 // legally sees both — hands each of them a closure over the other.
 void Application::WireCallbacks() {
-    previewDriver.SetPreviewCompositeCallback([this] { composite.Compose(); });
+    previewDriver.SetPreviewCompositeCallback([this] { composite.Compose(/*bNeedsTexelReadback=*/false); });
     canvas.SetRegenerationCallback([this] { previewDriver.RequestMapUpdate(); });
     canvas.SetSelectionChangedCallback([this](std::uint32_t entityIdentifier) {
         lastSelectedEntityIdentifier = entityIdentifier;

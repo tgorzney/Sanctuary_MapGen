@@ -47,9 +47,13 @@ public:
     // Runs the pass sequence on the Gpu when a resource manager with a live context is
     // available, else on the Cpu twin. Reports which one it used, rather than silently
     // producing nothing.
-    void Compose();
-    void ComposeOnCpu();   // PreviewComposite_Cpu_UI.cpp
-    void ComposeOnGpu();   // PreviewComposite_Gpu_UI.cpp
+    // `bNeedsTexelReadback`: when false, skips only the Gpu texture->CPU `CompositeTexels()`
+    // readback (the entity-id readback used for click-picking is unaffected either way).
+    // Production leaves it true unless it knows nothing reads `CompositeTexels()` this run,
+    // since the canvas draws `CompositeTexture()` (the GL handle) directly on the Gpu path.
+    void Compose(bool bNeedsTexelReadback = true);
+    void ComposeOnCpu();   // PreviewComposite_Cpu_UI.cpp -- texels ARE the primary output, always needed.
+    void ComposeOnGpu(bool bNeedsTexelReadback = true);   // PreviewComposite_Gpu_UI.cpp
 
     // The composited image: `Resolution()` squared packed RGBA8 texels, row-major.
     const std::vector<unsigned int>& CompositeTexels() const { return compositeTexels; }

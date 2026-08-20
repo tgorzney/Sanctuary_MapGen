@@ -45,7 +45,17 @@ making it fast.
   Mask to run after the sims, not between blend and erosion).
 - Each stage is ONE kernel with a CPU+GPU pair sharing one math source; you specify
   the algorithm and accuracy class, the Compute Optimization Expert realizes the
-  backends. Placement/markers must stay AI-analyzable (`AI_HOSTCLIENT_SPEC`).
+  backends. Placement/markers must stay AI-analyzable (`AI_HOSTCLIENT_SPEC`) — that
+  invariant now has a documented live consumer path through the Map Scenario system
+  (`MAP_SCENARIO_SPEC.md`).
+- **Spawn/Alloy markers you seed are subject to post-load mutation.** The game-side
+  Map Scenario system (`MAP_SCENARIO_SPEC.md`) rewrites
+  `GameInfo.MapData.markers.Spawn.transforms` and `.Alloys.transforms` in memory at
+  map-load time, per lobby composition — repositioning spawns and adding/deleting
+  alloy markers before the sim or the AI ever reads them. What you generate is the
+  authored baseline, not necessarily what a match plays on. Keep the generated set
+  valid and AI-analyzable on its own terms, and do not assume a 1:1 relationship
+  between generated markers and in-match markers.
 
 ## When dispatched
 Turn intent into PROC/PIPELINE work-orders grounded in the specs. Kill the shadow-sim

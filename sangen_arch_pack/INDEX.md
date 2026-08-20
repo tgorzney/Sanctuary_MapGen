@@ -9,6 +9,7 @@ spec(s) a question needs — never the whole pack.
 | .sanmap schema version migrations — SanGenVersion gating, the migration runner/manifest, JSON transform primitives | `specs/IO_MIGRATION_SPEC.md` |
 | units / props / markers, tpId scheme, factions, asset validation, .san* formats | `specs/UNIT_PROP_MARKER_DATA_SPEC.md` |
 | map scripting & events, lua sandbox, Tags, AI system, modding, validators | `specs/MODDING_SCRIPTING_SPEC.md` |
+| the Map Scenario system — `<MapName>_data.lua`/`<MapName>_Scenarios_Script.lua` file split, module API contract, three-tier scenario matching, `alloyMode` semantics, the mandatory-`spawns` hard requirement, execution/timing law, SanGen IO scope ruling | `specs/MAP_SCENARIO_SPEC.md` |
 | data model (GenerationParams), generation pipeline, GPU toggles, enums | `specs/PARAMS_PIPELINE_SPEC.md` |
 | height/material layers, GeoLayers, sim layers, thickness model, baking, stratum masks | `specs/LAYER_SYSTEM_SPEC.md` |
 | erosion (hydraulic droplet), thermal/talus, flow/accumulation, CPU-vs-GPU parity | `specs/SIM_ALGORITHMS_SPEC.md` |
@@ -24,7 +25,7 @@ spec(s) a question needs — never the whole pack.
 | pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
-| preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix | `specs/PREVIEW_COMPOSITING_SPEC.md` |
+| preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix; the ratified v2 screen-space overlay-layering design (six domains — Alloy/SpawnsArmies/Units/Props/Reclaim/Decals; LOD icon rendering; four dirty-flag tiers A/B/C/C2; the View toolbar's two-section popup; ARCH §14) | `specs/PREVIEW_COMPOSITING_SPEC.md` |
 | core math library — SIMD/fast-math/Morton/spatial internals (stub reality + v2 target) | `specs/MATH_SIMD_SPEC.md` |
 | future sim passes — fluvial/glacial/snow-melt design on the shared sim framework | `specs/FUTURE_SIM_TYPES_SPEC.md` |
 | map AI-analyzability invariants + host/client shared-generation protocol | `specs/AI_HOSTCLIENT_SPEC.md` |
@@ -72,6 +73,47 @@ and `work_orders/STEP5_PropsDecalsValidation_UI.md`. The same ruling adds `Confi
 a new generic, reusable OK/Cancel confirm-modal widget with no prior equivalent — to
 `UI_FRAMEWORK_SPEC.md`'s "Universal widget library".
 
+`MAP_SCENARIO_SPEC.md` was added later still, formalizing the now-deployed (confirmed live
+in-game 2026-08-20) SanGen Map Scenario system as first-class law: the `<MapName>_data.lua`/
+`<MapName>_Scenarios_Script.lua` file split, the `Scenario.ResolveAndApply`/
+`Scenario.SpawnNavalFleets` module contract, the three-tier (`PATTERN_SCENARIOS`/
+`COUNT_SCENARIOS`/`DEFAULT_SCENARIO`) matching system, the four `alloyMode` values, the
+hard requirement that every scenario needing deterministic spawns declares an explicit
+`spawns` table (the `.sanmap`'s one-spawn-transform-per-army shared-state failure mode
+discovered live the same day), the execution/timing law, and a ruling that SanGen
+Import/Export of the scenario file remains in scope but is reclassified as a distinct
+IO surface (a script-tree `.lua` companion file, not a `.sanmap`-package JSON section) —
+see ARCH §15. This consolidated and superseded the "what to build" content previously
+inline in `MODDING_SCRIPTING_SPEC.md`'s "Scenario-script file split" section, which now
+holds only that section's investigation trail (the disproven cross-tree-`Import()`
+hypothesis).
+
+⚠️ **Found during the ARCH §14 authoring pass, not fixed here:** this paragraph's own
+"see ARCH §15" is a forward reference that does not yet resolve — `ARCH.md` currently ends
+at §14 (the overlay-layering ruling below), with no §15 section present. The Map Scenario
+IO-surface ruling this paragraph describes appears never to have been written into `ARCH.md`
+itself, only recorded here in `INDEX.md`. This is a pre-existing gap, unrelated to the
+overlay-layering ratification, and is out of scope for this pass to close — flagged for
+whoever next touches the Map Scenario topic.
+
+`PREVIEW_COMPOSITING_SPEC.md` was extended with a new "Overlay layering (v2, ARCH §14)"
+section, ratifying `work_orders/DESIGN_MarkerPreviewLayering_R2.md` (which itself supersedes
+the earlier, narrower `DESIGN_MarkerPreviewLayering_R1.md` — historical only, not current):
+the six-domain (Alloy/SpawnsArmies/Units/Props/Reclaim/Decals) screen-space overlay-layer
+stack (`OverlayLayer_UI`/`OverlayDomainKind_UI`/`OverlaySubLayerRef_UI`), the two-mode
+(thumbnail/strategic-icon) LOD rendering rule, the four-tier dirty-flag model (adding C —
+screen-space redraw, and C2 — interaction-scoped redraw — on top of the existing two-tier A/B
+GPU-recomposite model), the mandatory first-work-order performance requirements (bulk vertex
+writes, cross-layer visible-vertex budget + decimation, atlas page bucketing), the View
+toolbar's two-section/no-crossing popup replacing "Regenerate," and a separately-recorded GPU
+color-texture readback defect. Full ruling text: `ARCH.md` §14. Several items are explicitly
+**left open** by this ratification, not resolved (`ARCH.md` §14.13,
+`PREVIEW_COMPOSITING_SPEC.md`'s matching list): real footprint-size data source; the
+cross-layer budget default and Tier B per-resolution costs (both pending a real benchmark);
+whether a stable id column exists for manual sub-layers; whether Decals actually route
+through `Data::PlacementInstances` today; and whether `OverlayLayer_UI::blendMode` reuses
+`Ui::PreviewBlendMode` or needs a new enum (UI Expert's call).
+
 **Standing deferred ruling:** persistent ordered thickness columns + true surface-exposure
 derivation (ARCH §7.5, `LAYER_SYSTEM_SPEC` "Known gap") — an M6 DATA-shape work order.
 Do not patch it inside a mask or sim work-order.
@@ -85,3 +127,8 @@ decals via `ResolveSymmetryMask` — see `SANMAP_FORMAT_SPEC` Correction 4 and
 - `Params::symmetryOrbitMaximum = 16` (`src/params/Symmetry_PARAMS.h`) can silently overflow
   once a designer-chosen `radialSymmetryRepeatCount` combines with mirror axes — see
   `SANMAP_FORMAT_SPEC` Correction 4 and `PLACEMENT_SCATTER_SPEC` (Defect 2).
+- `ComposeOnGpu()` (`PreviewComposite_Gpu_UI.cpp:78-81`) unconditionally reads back the full
+  color texture even when nothing downstream consumes it on the GPU-resident hot path — up to
+  256MB wasted PCIe transfer + blocking wait at the 8192² cap, every recompose. Narrow, already
+  diagnosed, independent of the ARCH §14 overlay redesign; should land before it. See
+  `PREVIEW_COMPOSITING_SPEC.md` / `ARCH.md` §14.10.

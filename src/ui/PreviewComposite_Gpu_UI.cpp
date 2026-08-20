@@ -31,7 +31,7 @@ void WaitForCompletion(Sys::GpuResourceManager& manager) {
 
 } // namespace
 
-void PreviewComposite::ComposeOnGpu() {
+void PreviewComposite::ComposeOnGpu(bool bNeedsTexelReadback) {
     PrepareRun();
     const int resolution = configuration.previewResolution;
     if (resolution <= 0) return;
@@ -74,9 +74,15 @@ void PreviewComposite::ComposeOnGpu() {
     WaitForCompletion(manager);
     // The canvas draws the texture itself; this readback exists so the Cpu twin stays the parity
     // reference and a headless caller still gets bytes. RGBA8 texels come back R,G,B,A per pixel,
-    // which is exactly the byte order `Ui::PackRgba8` packs into one unsigned int.
-    manager.ReadbackTexture(compositeTexture, compositeTexels.data(),
-                            compositeTexels.size() * sizeof(unsigned int));
+    // which is exactly the byte order `Ui::PackRgba8` packs into one unsigned int. Skipped when
+    // the caller knows nothing will read `CompositeTexels()` this run (e.g. the production
+    // hot path, where the canvas samples `CompositeTexture()` directly).
+    if (bNeedsTexelReadback) {
+        manager.ReadbackTexture(compositeTexture, compositeTexels.data(),
+                                compositeTexels.size() * sizeof(unsigned int));
+    }
+    // Unaffected by `bNeedsTexelReadback`: `MapCanvas::ApplyClick` reads this unconditionally on
+    // both backends for click-picking, on every recomposite.
     manager.ReadbackBuffer(CompositeBufferName::kEntityIdentifiers, entityIdentifierBuffer.Data(),
                            entityIdentifierBuffer.CellCount() * sizeof(unsigned int));
     bLastRunUsedGpu = true;

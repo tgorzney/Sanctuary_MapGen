@@ -121,10 +121,10 @@ Ratified alongside `ENTITY_AUTHORING_PARAMS_SPEC` (`Params::Army`/`UnitGroup`/`U
 `MapArea`). A PARAMS field's naming is governed by **what kind of data it is**, not by whether a
 `.sanmap` format key of a similar name happens to exist.
 
-- **Pass-through, human-authored, verbatim entity data.** No PROC stage computes or reinterprets
-  the value — round-trip fidelity is the field's entire purpose. Such a field uses **the format's
-  own spelling by default**, converted only for case (`camelCase`) and the §1.1 `b`-boolean
-  prefix. Governs `Army`, `UnitGroup`, `UnitTransform`, `MapArea`
+- **Pass-through, human-authored, verbatim entity data.** No PROC stage computes or
+  reinterprets the value — round-trip fidelity is the field's entire purpose. Such a field uses
+  **the format's own spelling by default**, converted only for case (`camelCase`) and the §1.1
+  `b`-boolean prefix. Governs `Army`, `UnitGroup`, `UnitTransform`, `MapArea`
   (`ENTITY_AUTHORING_PARAMS_SPEC`) and any future type in that same hand-authored-entity family.
 - **SanGen's own generative recipe/setting.** A PROC stage computes, derives, or reshapes the
   value, so the field keeps **SanGen's own descriptive name** even where a format key of similar
@@ -154,7 +154,7 @@ Ratified alongside `ENTITY_AUTHORING_PARAMS_SPEC` (`Params::Army`/`UnitGroup`/`U
   `PropTransform`/`DecalTransform::layerIndex`); **a separate SanGen-owned array is used only
   when the metadata is richer than a scalar AND no format-native group container already exists
   to hold it** (`PropInstanceLayer`/`DecalInstanceLayer`, ARCH §12). This is one consistent rule
-  applied per-case, not two competing philosophies — it does not reopen `armyColor`/`alias` or
+  applied per-case, not two competing philosophies — it does not reopen `armyColor`/`alias`/
   `MarkerTransform::alias`, all already-settled instances of the first branch.
 
 ---
@@ -1032,3 +1032,311 @@ producing 4-fold `QuarterTurns` instead of the designer's chosen N-fold repeat. 
 from, and additional to, the already-known finding that `SymmetryTab_UI.h`'s exclusive-checkbox
 row (unlike `PlacementRuleSections_UI.h`'s per-rule OR-able tick boxes) cannot express combined
 axes at all — both are UI-layer reconciliation work for the UI Expert, not decided here.
+
+## 14. Preview overlay layering — six-domain screen-space compositor (ARCH ruling, ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`)
+
+Closes and widens the hit-list #4 gap `PREVIEW_COMPOSITING_SPEC` already recorded ("Decals never
+composited"): today `Props`/`Units`/`Decals`, all resolved in `Data::PlacementResults`, **never
+reach the canvas at all** — a materially bigger gap than an earlier, superseded round
+(`work_orders/DESIGN_MarkerPreviewLayering_R1.md`, historical only, do not consult as current)
+assumed under a markers-only framing. This ruling covers **six** dynamic overlay domains — Alloy,
+Spawns/Armies, Units, Props, Reclaim (not in-game yet; slot reserved), Decals — kept open to
+adding more without a code-shape change.
+
+### 14.1 Module boundary and the DATA-vs-PARAMS split
+`OverlayLayer_UI`/`overlayLayers` is `UI`, the same precedent as `PreviewCompositeSettings::
+fieldLayers` (`PreviewComposite_Settings_UI.h`) — session-only presentation, not
+recipe-serialized (§14.5). Two kinds of sub-layer, never conflated:
+- **Procedural sub-layers** reuse the existing DATA columns (`PlacementInstance_DATA.h`'s
+  `ruleIndex`/`category`) — no new DATA field.
+- **Manual sub-layers** never touch DATA at all — they read `Params::MapRecipe` pass-through
+  arrays (`PropInstanceLayer`/`DecalInstanceLayer` §12, `Army.groups` §9,
+  `ENTITY_AUTHORING_PARAMS_SPEC`) directly, filtered by their own existing identity field.
+
+GPU-resident overlay draw state (vertex buffers, atlas bindings) routes through the existing
+`GpuResource_SYS` (`DISPATCH_INTERFACE_SPEC` §3) — a UI-owned GL pipeline is a named v1 defect
+class (§3.2, §5.4) and must not reappear here.
+
+### 14.2 Data model (binding shape)
+```cpp
+enum class OverlayDomainKind_UI   { Alloy, SpawnsArmies, Units, Props, Reclaim, Decals }; // open/additive
+enum class OverlaySubLayerKind_UI { Manual, ProceduralRule };
+
+struct OverlaySubLayerRef_UI { OverlaySubLayerKind_UI kind; int index; bool bEnabled = true; };
+
+struct OverlayLayer_UI {
+    std::string name;
+    OverlayDomainKind_UI domainKind;
+    bool bEnabled = true;
+    Ui::PreviewBlendMode blendMode;                  // reuse — leaning decision, §14.13 item 5 (open)
+    std::vector<OverlaySubLayerRef_UI> subLayers;     // any mix/count of Manual + ProceduralRule
+    float thumbnailLodThresholdPixels = 5.0f;         // §14.3
+    // color[4]/iconScale intentionally NOT always here — §14.5
+};
+std::vector<OverlayLayer_UI> overlayLayers;           // vector order = Z order, View-toolbar stack
+```
+A layer's drawn set is the union of every `bEnabled` sub-layer's resolved instances; one blend
+mode covers the whole layer. Reorder/add/remove never touches a fixed enum or switch statement —
+this indirection is the entire point of the sub-layer shape.
+
+Sub-layer → data mapping (binding; not to be re-derived per domain in a work-order):
+
+| Domain | Manual sub-layers | Procedural sub-layers |
+| --- | --- | --- |
+| Props | `recipe.propLayers[i]` (`PropInstanceLayer`) | `recipe.propRules[i]` |
+| Decals | `recipe.decalLayers[i]` (`DecalInstanceLayer`) | `recipe.decalRules[i]` |
+| Units | one sub-layer per top-level `Army.groups[name]` — **flat**, §14.4 | `recipe.unitRules[i]` |
+| Alloy / Spawns-Armies | ⚠️ blocked — no `MarkerInstanceLayer` PARAMS type exists yet (`work_orders/BRIEF_MarkersTabUI.md`); single undifferentiated Manual bucket until it lands. The struct shape above already splits to N once it does. | `recipe.markerRules[i]`, filtered by `category` (Spawn vs. rest), §14.6 |
+| Reclaim | n/a — no data yet | n/a — no rule type yet; slot reserved, zero cost until it ships |
+
+Sub-layer authoring (add/remove/toggle) lives in each domain's own tab (Props/Decals/Armies/
+Markers) — never the View toolbar, which only orders/blends/hides whole `OverlayLayer_UI`s.
+
+### 14.3 Icon rendering — two-mode LOD, not constant-screen-size-only
+R1's framing — markers are always constant-screen-size icons — is **wrong and is retired.** Each
+layer switches between two draw modes at its own `thumbnailLodThresholdPixels` (default 5px,
+tunable, Constitution §8):
+1. **Thumbnail mode** (zoomed in enough) — the entity's raster thumbnail at its true
+   world-footprint size: `screenSize = (baseFootprint * instance.scale) / worldUnitsPerCell *
+   pixelsPerCell * view.ZoomScale()`. Scales with zoom, by design.
+2. **Strategic icon mode** — when thumbnail mode would render below the threshold, switch to a
+   fixed-size symbolic icon. Constant screen pixels below threshold — this is the only mode R1's
+   retired assumption ever actually covered, now correctly scoped to this mode alone.
+
+Real, currently-unsolved gaps, recorded so no coder papers over them with an invented default:
+- **No world-footprint-size data exists anywhere in the codebase today** (`InstancedTransform`
+  carries a scale *multiplier*, not an absolute size) — needs a new `templateIdentifier ->
+  baseFootprintWidth/Depth` table, IO-layer, asset-derived not PARAMS-authored. Buildable now with
+  a placeholder default per domain; real mesh-derived bounds are separately-scoped later work
+  (§14.13 item 1).
+- Today's prop thumbnail (`AssetAtlasCache_PropThumbnail_IO.cpp`) is a placeholder flat-shaded
+  stand-in derived from a digest of the model bytes, not a real rendered view — its own header
+  already says so; unchanged and out of scope here.
+- A strategic icon per entity type is **new authored visual content**, not a second render of
+  existing data. **Decided: bespoke per blueprint** — every `templateIdentifier` gets its own
+  authored strategic icon, not a generic one-glyph-per-domain fallback. This is real
+  authoring/asset-pipeline work, out of this ruling's scope, not a rendering detail.
+- `IconAtlasEntry`/`IconAtlasManifest` (`IconGridWidget_UI.h`) stays one `iconId` -> one UV rect;
+  do not widen it — its only other consumer, the icon-picker grid, wants exactly one slot. Add a
+  **separate pairing lookup** the overlay renderer consumes: `templateIdentifier ->
+  {thumbnailIconId, strategicIconId}`, each id still resolving through the existing single-slot
+  manifest unchanged. The widget's own header already names this exact seam as anticipated.
+
+### 14.4 Nested `UnitGroup` addressing is flat
+Top-level `Army.groups[name]` is one sub-layer; nested `UnitGroup.groups` draw as part of their
+top-level parent, never separately addressable. This keeps `OverlaySubLayerRef_UI` uniform across
+every domain (no domain-specific recursive-index special case) and avoids the "flattened
+pre-order index into a mutable recursive tree" corruption class `ENTITY_AUTHORING_PARAMS_SPEC`
+already ruled against elsewhere. Confirmed (Format Expert) this mirrors the official `.sanmap`
+format's own `Army.groups`/`UnitGroup.units`/`.groups` tree 1:1 — not a SanGen invention.
+Recursive addressing is a legitimate future ask; it needs its own ratification if actually
+requested later.
+
+### 14.5 View-stack state — split by field, not one blanket policy
+- **Order / `bEnabled` / blend mode:** session-only UI presentation — same policy already
+  governing `PreviewCompositeSettings` (v1's serialized `PreviewLayers` was already a named
+  defect to replace, not evidence v2 must re-serialize).
+- **`color`/`iconScale`:** **not** a blanket UI-only field. Where a domain already owns a
+  recipe-serialized layer-metadata record — Props/Decals (`PropInstanceLayer`/
+  `DecalInstanceLayer`, §12) — `OverlayLayer_UI` reads/writes that record directly. No shadow
+  copy, no second source of truth. Where no such PARAMS record exists yet (Alloy/SpawnsArmies,
+  Units), these stay UI-session defaults until a future ratification gives them a real home —
+  mirror the shipped Props/Decals pattern, do not invent a new one now.
+
+### 14.6 `OverlayDomainKind_UI` vs `MarkerCategory`/`PlacementResults` — sits alongside, changes neither
+`Alloy`/`SpawnsArmies` re-slice the existing `markers` buffer by its existing `category` column.
+A UI enum may re-slice an existing DATA collection by its own field without the DATA shape
+changing — zero blast radius on `MarkersTab_Rules_UI.h` or marker import/export. ⚠️ Domain-kind
+is **asymmetric** versus DATA buckets — it splits markers 2 ways but maps Props/Units/Decals 1:1
+— a coder must not assume `domain == DATA-bucket identity`.
+
+### 14.7 View toolbar — replaces "Regenerate," one popup / two non-crossing sections
+"View" opens a click-to-open popup (not hover — hover-close would fight a drag-reorder gesture),
+`ImGui::BeginPopup("ViewLayersPopup")` rendering two independent `DraggableList` calls (the same
+widget `LayersTab` already uses for GeoLayers) separated by a static section label:
+- **"Terrain (composited)"** — `PreviewCompositeSettings::fieldLayers`.
+- **"Overlays (screen-space)"** — `overlayLayers`.
+
+Each row carries its own blend-mode `Combo_UI`. Reorder is real *within* each section; **a row
+cannot cross sections** — true interleaving (a marker rendering "under" a terrain layer) is
+rejected outright: it is not renderable without either re-baking markers into the texture (the
+exact bug this whole redesign kills) or rebuilding `PreviewComposite` into an interleaved
+multi-target compositor, and a control that *looks* interleaved but isn't would violate the
+WYSIWYG law by showing an order that is not the real render order. Mechanism: the two
+`DraggableList` renders use different drag-payload identifiers so cross-section drops
+structurally fail to match — no new validation code needed. No new widget; straight reuse.
+
+**"Regenerate" is retired from the primary toolbar.** `Pipeline::PreviewDriver` already
+auto-derives refresh tier from parameter hashes (`NotifyParametersChanged()`); a manual full-regen
+button is the exact anti-pattern that system exists to replace. `MapCanvas::
+RequestRegeneration()` and `PreviewDriver::RequestMapUpdate()` are currently **two rival trigger
+paths** — per hit-list #3's "retire rival toggles" (applied here to a UI-level trigger, not a
+compute backend), these **must collapse to one call path.** Keep exactly one debug/System-panel
+affordance calling `RequestMapUpdate()` directly, for the one legitimate manual case
+`PreviewDriver`'s own docstring already names ("a change no parameter hash can see: a resize, a
+recipe reload, new stratum art") — not on the View toolbar.
+
+⚠️ **R2 self-inconsistency found in the source document, flagged rather than silently resolved.**
+R2's own "ARCH rulings (this round)" item 4 reads the fieldLayers/overlayLayers unification
+question as still-open ("not ratifiable as scoped... route back to UI Expert"). A later section of
+the *same document* ("View toolbar") states the UI Expert's dedicated pass already ran and records
+the two-section/no-crossing design as "**Confirmed by human**." R2's own "Consolidated ❓ open
+items" list (item 1) was never updated to drop this after that later resolution — it still reads
+"sent back to UI Expert for a dedicated pass (in progress)." This ARCH ruling treats the later,
+explicitly human-confirmed text as authoritative (the strongest ratification signal anywhere in
+the document) and treats the two-section/no-crossing design above as **closed law**, not open —
+but the inconsistency itself is recorded here rather than quietly picked one way.
+
+### 14.8 Dirty-flag tiers — four, not two (extends `PREVIEW_COMPOSITING_SPEC`'s existing two-tier model)
+| Tier | Trigger | Cost |
+| --- | --- | --- |
+| A — Full regen | Sim/recipe param changed | Unchanged (PROC) |
+| B — Full recomposite | Terrain/water/stratum layer setting changed | Unchanged pass sequence. Cost is resolution-dependent, not one number — sub-ms-to-low-ms credible at the 512² default, plausibly several-to-10ms+ at the 8192² cap (256× the pixel work). **Rough-estimate; must be benchmarked at both, never shipped as one range** (Constitution §7 basis-tag law). |
+| C — Screen-space redraw | Every overlay layer, every frame: pan/zoom/hover/visibility/blend/reorder | Zero GPU recompute, per-layer culled, bounded by the §14.9 cross-layer budget |
+| C2 — Interaction-scoped redraw (new) | Active drag/edit on a marker or group | Cache non-selected instances' generated vertex+draw-command bytes once at gesture-start (CPU bytes, not a GPU texture/FBO), replay via memcpy each frame, regenerate live only the selection. Invalidates on pan/zoom/selection-change/layer-setting-change mid-gesture. |
+
+Reorder/blend-mode changes in the View stack are O(layerCount), never O(instances), for standard
+blend modes. ⚠️ Open: confirm the chosen blend modes do not need divergent per-vertex color
+encoding (premultiplied vs. straight alpha) — if one does, that layer's C2 cache must invalidate
+on mode change, and the thumbnail-vs-strategic swap needs the identical check. LOD threshold
+crossing during zoom needs no new invalidation rule of its own: zoom already invalidates C2's
+cache unconditionally.
+
+### 14.9 Rendering/performance — mandatory in the first work-order, not deferrable
+- **Bulk vertex writes only.** "Batched icon quads" means one bulk `ImDrawList::PrimReserve` +
+  raw vertex/index writes per layer, **not** N individual `ImDrawList::AddImage()` calls —
+  per-call overhead at 600k markers could plausibly cost 30–60ms, larger than the entire frame
+  budget, independent of the transform math. This is a stated work-order requirement, not left to
+  a coder's default imgui usage.
+- **Cross-layer visible-vertex budget with automatic decimation** (screen-cell clustering, then
+  priority-cap fallback) — mandatory in the first work-order, not deferrable. Rough-estimate
+  placeholder default ~400,000–500,000 instances before decimation kicks in (derived from a
+  3ms-of-16ms frame-budget target) — **explicitly a placeholder pending a real microbenchmark**
+  (SIMD-transform, bulk-write, and naive-`AddImage` timed separately at N ∈ {100k, 300k, 600k},
+  both 0%-culled and ~5%-visible, on real dev hardware, before this number becomes a ratified
+  constant per Constitution §7/§12 basis-tag law), must ship as a named tweakable setting
+  (Constitution §8), never a literal.
+- **Atlas page bucketing is required.** Thumbnails for many distinct prop templates can legally
+  scatter across many atlas pages (general bin-packed atlas, no same-page guarantee) — drawing in
+  raw visit order risks draw-call count regressing toward O(pages touched) instead of O(layers).
+  Fix: accumulate each visible instance's quad into a per-page bucket during vertex-gen, flush one
+  draw command per non-empty bucket — bounds draw calls to O(pages touched this frame) regardless
+  of visit order. Strategic-icon mode is naturally safe here (small fixed low-cardinality icon
+  set) — put it on one dedicated always-resident page.
+- Reuse the existing resident icon atlas (`Ui::IconAtlasManifest`) — already shared by
+  Markers/Armies/Props pickers, already proven at 10k+ scale via `ImGuiListClipper`-style
+  virtualization.
+- Per-layer AABB early-out + per-layer `Data::SpatialGrid` (§8.3) for view-window culling. ⚠️ The
+  grid gives **zero help** fully-zoomed-out (everything visible, every bucket queried) — that
+  case is genuinely O(N); the cross-layer budget above is what bounds it, not the grid.
+- **Layer-id column: do not physically resort `PlacementInstances` by layer.** Reuse the existing
+  `ruleIndex`/`category` columns (`PlacementInstance_DATA.h`) via a CSR bucket index built once
+  (same lifecycle point as `Data::SpatialGrid`'s build, right after Placement, §8.3) — per-layer
+  flat index arrays, cached, rebuilt only when that layer's own sub-layer membership changes, not
+  every frame. Two of R2's own open items bear directly on this scheme and are **not** resolved
+  here — §14.13 items 3 and 4.
+
+### 14.10 GPU color-texture readback bug (recorded, separate narrow fix, lands first)
+`ComposeOnGpu()` (`PreviewComposite_Gpu_UI.cpp:78-81`) unconditionally reads back the full color
+texture even on the GPU-resident hot path where nothing downstream consumes it (confirmed:
+`Application_UI.cpp` only consumes it `if (!composite.LastRunUsedGpu())`) — up to 256MB wasted
+PCIe transfer plus a blocking wait at the 8192² cap, every recompose. The entity-id buffer
+readback on the same lines is **not** dead — `MapCanvas_UI.cpp` click-picking reads it
+unconditionally on both backends. Fix scope: gate only the color-texture readback on
+`!bLastRunUsedGpu`; leave entity-id readback as-is. Independent of, and should land before, the
+overlay redesign — a narrow, already-diagnosed defect that compounds with every future Tier B
+trigger.
+
+### 14.11 Determinism
+Presentation-only — same Visual-class exemption `OPTIMIZATION_PILLARS.md` pillar 15 already
+grants GPU-resident preview compositing (Constitution §4, `DETERMINISM_SPEC`). **Binding
+guardrail:** any future screen-space decimation/clustering may only affect what is *drawn* — it
+must never mutate or discard `PlacementInstances`, and must never feed back into export/bake. A
+"helpful" LOD optimization silently becoming a second, non-deterministic placement decision is the
+exact failure mode this sentence forbids.
+
+### 14.12 Naming
+`OverlayLayer_UI` / `OverlayDomainKind_UI` / `OverlaySubLayerKind_UI` / `OverlaySubLayerRef_UI` —
+`_UI` suffix per §1.2, reflected throughout this section.
+
+### 14.13 Open items — left open, not resolved here
+R2's own "Consolidated ❓ open items" list, carried forward. A coder or future ARCH pass must not
+treat any of these as settled by this ruling:
+1. ⚠️ **Real footprint-size source:** placeholder-per-domain now (§14.3); who/when derives real
+   mesh bounds is unscheduled.
+2. ⚠️ **Cross-layer visible-vertex budget default and Tier B per-resolution costs** (§14.8-14.9):
+   need the real benchmark named in §14.9, not the reasoned placeholders in this ruling.
+3. ⚠️ **Manual sub-layer stable-id column:** not confirmed to exist for the CSR bucket scheme
+   (§14.9) — may be a small new-column ask.
+4. ⚠️ **Decals data source:** confirm whether Decals route through `PlacementInstances` at all
+   today before assuming one CSR scheme covers all six domains — `PREVIEW_COMPOSITING_SPEC`
+   already records "Decals never composited" as a standing gap and this has not been
+   independently re-verified in this ruling.
+5. ⚠️ **`OverlayLayer_UI::blendMode`:** reuse `Ui::PreviewBlendMode` verbatim, or a new enum? This
+   ruling leans reuse (reflected in §14.2's type) but the confirmation is the UI Expert's call, not
+   ARCH's, and is not made here.
+
+R2's own open item 1 (fieldLayers/overlayLayers unification) is **not** carried forward on this
+list — §14.7 above rules it closed, and records the R2 self-inconsistency that made this call
+non-trivial.
+
+## 15. The SanGen Map Scenario system — formalized as first-class law (ratifies `MAP_SCENARIO_SPEC.md`)
+
+The game's per-army spawn position, alloy/mex marker visibility, and playable-area resolution —
+for every player-count/composition a lobby can produce — is deterministically resolved once, at
+map load, by the SanGen Map Scenario system: an `<MapName>_data.lua` orchestrator paired with an
+`<MapName>_Scenarios_Script.lua` scenario module, both colocated in the engine's script tree
+(`LJ/lua/maps/<MapName>/`), linked at runtime via
+`Import("maps/<MapName>/<MapName>_Scenarios_Script.lua").Scenario`. **Status: DEPLOYED and
+confirmed working live in-game (2026-08-20).** This ruling promotes that deployment to binding
+ARCH law. Full contract — the two-file split, the module API (`ResolveAndApply`/
+`SpawnNavalFleets`), the three-tier `PATTERN_SCENARIOS`/`COUNT_SCENARIOS`/`DEFAULT_SCENARIO`
+matching system, the four `alloyMode` semantics (`explicit`/`occupancy`/`keepAll`/`delta`), the
+§6 hard requirement that a scenario needing deterministic spawns must declare an explicit
+`spawns` table, and the execution/timing law — lives entirely in `MAP_SCENARIO_SPEC.md`; it is
+not re-derived here.
+
+### 15.1 Layer classification
+This system is **game-side Lua, not SanGen C++** — it runs inside the engine's own script
+sandbox at map-load time, on the player's machine, not inside any SanGen process. It therefore
+does not occupy a slot in the Constitution §1 `MATH`/`DATA`/`PARAMS`/`PROC`/`PIPELINE`/`IO`/
+`UI`/`SYS` layer stack at all — those layers describe SanGen's own binary, and this is map
+content the binary produces (or, per §15.2, may in future consume), not code SanGen executes.
+Its prerequisite law (the `Import()` global-capture rule, the `LoadMapData()`/`CreateArmies()`/
+`RunMapSetup()`/`NewThread` lifecycle) is itself game-engine law, not SanGen architecture, and is
+recorded in `MODDING_SCRIPTING_SPEC.md` for that reason — a spec that documents the game's
+scripting contract SanGen must respect, distinct from a spec governing SanGen's own module shape.
+
+### 15.2 IO scope ruling — corrects an earlier assumption, does not reverse it
+An earlier ratification recorded SanGen Import/Export of the Scenarios file as in scope, under
+the assumption that the file would live in the map's **asset folder**
+(`Sanctuary_Data/Maps/<MapName>/`) — i.e. inside the shippable `.sanmap` package SanGen's
+`MapImporter_*`/`MapExporter_*` already read/write, an extension of the existing per-domain
+`.sanmap` JSON convention (§1.6-adjacent). That assumption is now known wrong: the file lives in
+the engine's **script tree** (`LJ/lua/maps/<MapName>/`, §15/§2 of `MAP_SCENARIO_SPEC.md`), a
+location SanGen's importer/exporter does not address today and which is not part of the `.sanmap`
+package at all.
+
+**Ruling: still in scope, reclassified — not a yes/no reversal.** The scope call stands; what
+changes is the *kind* of IO surface required. It is **not** an additional section inside the
+existing `.sanmap` JSON document (unlike `PropGroups`/`DecalGroups`, `HeightmapStack`, etc.) — it
+is a **separate companion artifact**, a `.lua` text file, at a **structurally distinct
+filesystem location** from the map asset export folder. It therefore does **not** extend the
+existing per-domain `MapImporter_<Domain>Stack_IO.cpp`/`MapExporter_*` convention
+(`IO_MIGRATION_SPEC.md` §1) — that convention is scoped to JSON fragments of the one `.sanmap`
+document — and needs its own convention, designed from scratch.
+
+**Ownership: the SanGen IO Architecture Expert's domain**, not this ARCH's — how to structure the
+new SanGen IO code, including any new file-type convention. Per the existing law already recorded
+in `MODDING_SCRIPTING_SPEC.md`: no code is written until a work-order exists and is ratified; the
+SanGen Coder writes zero code without one.
+
+**❓ Open design question, not resolved by this ratification** — flag to the IO Architecture
+Expert / human when this becomes live work: does SanGen literally round-trip the Lua text (parse
+and regenerate the tiered scenario tables verbatim, preserving hand-authored comments and the
+semantically-load-bearing `COUNT_SCENARIOS` ordering — hard, since Lua is not JSON), or does
+SanGen instead own only the *parameterized scenario data* (a PARAMS/JSON structure) and render
+that into `.lua` module text on export-only, never reading the `.lua` back in on import? The
+latter avoids a Lua parser entirely and fits SanGen's existing PARAMS→IO write direction better,
+but the choice is not decided here. Full detail and the "does SanGen know the game install's
+`LJ/lua` root at export time" sub-question: `MAP_SCENARIO_SPEC.md` §8.

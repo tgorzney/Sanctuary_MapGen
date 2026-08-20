@@ -16,7 +16,7 @@ struct ApplicationSettings {
     // (ApplicationMain_UI.cpp) and Sys::GpuResourceManager scans it, first match wins.
     std::vector<std::string> shaderSearchDirectories;
 
-    std::string windowTitle          = "Sanctuary Map Generator - SanGen v2";
+    std::string windowTitle          = "Sanctuary Map Generator - SanGen v3";
     std::string glslVersionDirective = "#version 430";
     int   windowWidth                = 1600;
     int   windowHeight               = 900;
@@ -29,7 +29,10 @@ struct ApplicationSettings {
     float leftPaneWidth              = 190.0f;
     float settingsWindowWidth        = 700.0f;
     float settingsWindowHeight       = 860.0f;
-    float canvasRegionSidePixels     = 760.0f;
+    float canvasRegionSidePixels     = 760.0f;  // Minimum-size floor for the preview canvas square,
+                                                 // not a fixed size: DrawCanvasWindow fits the real
+                                                 // window content region, falling back to this floor
+                                                 // for the first frame / a degenerate 0-sized region.
     float backgroundColor[4]         = { 0.10f, 0.10f, 0.12f, 1.0f };
     int   previewResolution          = 512;
 

@@ -5,6 +5,7 @@
 // (Application_PanelTerrain_UI.cpp / Application_PanelEnvironment_UI.cpp /
 // Application_PanelSystem_UI.cpp). It edits no rule, derives no tier and touches no DATA field.
 #include "Application_UI.h"
+#include <algorithm>
 #include <imgui.h>
 
 namespace SanmapGen {
@@ -47,7 +48,10 @@ void Application::DrawCanvasWindow() {
     ImGui::SameLine();
     if (canvas.HasSelection()) ImGui::Text("Selected entity: %u", canvas.SelectedEntityIdentifier());
     else                       ImGui::TextUnformatted("Selected entity: none");
-    canvas.Draw("mapCanvas", settings.canvasRegionSidePixels);
+    const ImVec2 available = ImGui::GetContentRegionAvail();
+    const float  fittedSide = std::min(available.x, available.y);
+    const float  regionSide = fittedSide > 0.0f ? fittedSide : settings.canvasRegionSidePixels;
+    canvas.Draw("mapCanvas", regionSide);
     ImGui::End();
 }
 

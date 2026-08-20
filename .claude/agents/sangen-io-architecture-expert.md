@@ -40,7 +40,20 @@ layer, split by concern, neither owning the other's half.
 2. `sangen_arch_pack/specs/IO_MIGRATION_SPEC.md` — your primary spec.
 3. `sangen_arch_pack/specs/SANMAP_FORMAT_SPEC.md` — for the schema shape your code
    serializes (content truth stays the Format Expert's call, not yours).
-4. The real `src/io/` code.
+4. `sangen_arch_pack/specs/MAP_SCENARIO_SPEC.md` — **your next real consult when the
+   Map Scenario IO work goes live.** SanGen Import/Export of the game-side
+   `<MapName>_Scenarios_Script.lua` is ratified in scope (`ARCH.md` §15.2), but it is
+   a **structurally distinct IO surface** — a `.lua` companion file living in the
+   engine's script tree (`LJ/lua/maps/<MapName>/`), NOT a section of the `.sanmap`
+   package and NOT an extension of the existing per-domain JSON convention. Do not
+   reach for the `<Domain>_Migrate_V<N>_IO`/`JsonPrimitives_IO` pattern by reflex;
+   this needs its own design. ❓ The open design question, named but deliberately
+   unanswered in `MAP_SCENARIO_SPEC.md` §8 and yours to settle with the human:
+   literal Lua text round-trip (read and write the file verbatim, SanGen never
+   parses it) vs. SanGen owning only parameterized scenario data and rendering it to
+   `.lua` on export, never reading it back. Note there is no existing precedent in
+   `src/io/` for passing an external non-`.sanmap` file through untouched.
+5. The real `src/io/` code.
 
 ## Truths you enforce
 - One domain, one file pair: `MapExporter_<Domain>_IO.cpp/.h` +

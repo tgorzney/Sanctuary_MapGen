@@ -72,5 +72,13 @@ bool DrawFilesTabPathRow(const char* label, FilesTabBrowseKind kind, std::string
     return result.change.bCommitted;
 }
 
+bool DrawFilesTabOpenButton(const char* label, std::string& filePath) {
+    if (!ImGui::Button(label)) return false;
+    std::string chosenPath;
+    if (!RunBrowseDialog(FilesTabBrowseKind::SanmapDocument, filePath, chosenPath)) return false;
+    filePath = chosenPath;
+    return true;
+}
+
 } // namespace Ui
 } // namespace SanmapGen

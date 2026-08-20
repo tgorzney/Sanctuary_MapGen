@@ -83,11 +83,13 @@ void DrawPendingBlueprintWarningDialog(FilesTabState& state, Params::MapRecipe& 
 void DrawOpenSection(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFields* fields,
                      Pipeline::PreviewDriver* previewDriver) {
     if (!DrawSectionBegin("Open", state.openSection)) return;
-    DrawFilesTabPathRow("Sanmap File Or Folder", FilesTabBrowseKind::SanmapDocument, state.sanmapPath);
     DrawCheckbox("Load Baked Textures On Import", state.bLoadBakedFieldsOnImport);
     if (fields == nullptr)
         ImGui::TextUnformatted("No field destination bound; the recipe loads, the textures are skipped.");
-    DrawActionButton(FilesTabAction::OpenSanmap, state, recipe, fields, previewDriver);
+    if (DrawFilesTabOpenButton(FilesTabActionLabel(FilesTabAction::OpenSanmap), state.sanmapPath)) {
+        const bool bSucceeded = RunFilesTabAction(FilesTabAction::OpenSanmap, state, recipe, fields);
+        if (bSucceeded && previewDriver != nullptr) previewDriver->RequestMapUpdate();
+    }
     ImGui::Separator();
     DrawFilesTabPathRow("SupCom Save Lua", FilesTabBrowseKind::SupComLuaDocument, state.supComLuaPath);
     DrawActionButton(FilesTabAction::ImportSupComLua, state, recipe, fields, previewDriver);

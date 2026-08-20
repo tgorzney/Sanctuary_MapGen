@@ -30,8 +30,8 @@ PreviewComposite::PreviewComposite(const Params::Geometry& geometrySettings,
 // Gpu is the composite's backend (ARCH §4.2 "preview color = Gpu / Visual"); the Cpu twin runs
 // when no resource manager was handed in, so a headless caller still gets a correct image
 // instead of nothing.
-void PreviewComposite::Compose() {
-    if (gpuResourceManager != nullptr) { ComposeOnGpu(); return; }
+void PreviewComposite::Compose(bool bNeedsTexelReadback) {
+    if (gpuResourceManager != nullptr) { ComposeOnGpu(bNeedsTexelReadback); return; }
     ComposeOnCpu();
 }
 

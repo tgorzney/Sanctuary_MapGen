@@ -11,6 +11,20 @@ validators are covered; `AI/` (huge), the rest of `host/`, `client/`,
 - **Sandboxed:** available functions are restricted through `.luarc.json`;
   `load`/`loadstring` are forced to text mode and **precompiled bytecode is
   rejected** (security). `builtInDocumentation.lua` documents the allowed stdlib.
+- **`Import()` return-value rule — load-bearing, applies to EVERY `Import()`
+  consumer, not just scenario scripts (confirmed live 2026-08-20).**
+  `Import()` does **not** use a module's `return` statement at all. Per its
+  own doc comment (`common/systems/import.lua` ~lines 20-26) it executes the
+  target file via `load(fileToImport, "@"..filePath, 'bt', envTable)` inside a
+  custom environment table, then returns that env table — capturing **only
+  the file's global variables**. A module written as
+  `local Scenario = {} ... return Scenario` yields a table with none of
+  `Scenario`'s fields — **silently, no error, no warning**. Rule for every
+  SanGen-authored (or human-authored) module meant to be consumed via
+  `Import()`: expose the module's API as a **global**
+  (`Scenario = {}`, not `local Scenario = {}`), and have the caller pull the
+  field off the returned env table (`Import(path).Scenario`), not treat the
+  `Import()` result itself as the module.
 
 ## Map scripting (events)
 - Each map folder under `lua/maps/<MapName>/` holds `<MapName>_data.lua` (and a
@@ -64,12 +78,159 @@ validators are covered; `AI/` (huge), the rest of `host/`, `client/`,
   scrolling console showing live `[Host]`/`[Client]` `[DEBUG]`/`[ERROR]`
   lines, every `Import:` file load, and the script's own `Log()`/`Warn()`
   output — point future debugging first here.
+  - **⚠️ F1 reliability now in question (2026-08-20, unresolved, flagged not
+    resolved here).** During an earlier iteration of the cross-tree-`Import()`
+    investigation (superseded finding, see "Scenario-script file split"
+    below), the human reported **nothing appeared in the F1 console** despite
+    units visibly spawning in-game. That earlier test is now known to have
+    been a false positive on an unrelated axis (the import itself never
+    succeeded — see below), so this F1 discrepancy's cause is unresolved on
+    its own terms too. Do not treat F1 as the sole diagnostic going
+    forward — visual/in-game confirmation and, better, an explicit
+    `Engine.FileExists()` check (as used in the disproof below) are more
+    reliable. Root cause (build/version difference, console state, timing)
+    not investigated; a separate, unscoped follow-up.
 - **Scripting API seen:** `NewThread(fn, ...)`, `WaitSeconds(n)`, `WaitTicks(n)`;
   `CreateUnit(armyId, tpId, position)`; `Orders.IssueOrder{ order="Move",
   units={u}, targetPosition=... }`; `Armies[armyId]:GetListOfUnits(tagExpr)`;
   `EngineClasses.float3(x,y,z)`; `MapUtils.GetMapName()`; `TestUtils.
   SpawnDebugUnitGroup(army, groupName)`; `table.random(list)`.
 - **Army indices:** Chosen=0, Guard=1, EDA=2 (see data spec).
+
+## Scenario-script file split (ratified 2026-08-20, amended 2026-08-20 x3, RETRACTION/correction 2026-08-20; consolidated into `MAP_SCENARIO_SPEC.md` 2026-08-20)
+
+**Current, binding law for this feature — file structure, module API contract,
+the three-tier scenario matching system, `alloyMode` semantics, the mandatory-
+`spawns` hard requirement, and the execution/timing rules — now lives in
+`sangen_arch_pack/specs/MAP_SCENARIO_SPEC.md`.** Read that spec for "what to
+build." This section is retained only as the **investigation trail** that
+produced that design — the disproven cross-tree-`Import()` hypothesis and the
+general `Import()`-mechanics lessons it surfaced (the global-capture rule is
+promoted to first-class law in "Lua runtime & sandbox" above) — real, hard-won
+evidence about `Import()` itself, useful for any future cross-file linking
+question, independent of scenarios specifically. Do not re-derive the scenario
+system's file-structure/module-contract law from this section; it has been
+removed here to avoid a second, driftable copy.
+
+**⚠️ Read this whole section before touching this feature.** An earlier
+amendment in this same file recorded cross-tree `Import()` (script tree →
+asset tree) as "✅ Confirmed live." **That confirmation was a false positive
+and is retracted below.** The correct, deployed answer is the opposite:
+cross-tree `Import()` does not work, and the two files are colocated in the
+script tree (`MAP_SCENARIO_SPEC.md` §2). Do not trust anything below this
+notice that predates the retraction; read the retraction first.
+
+**❌ RETRACTED — cross-tree `Import()` does not work (disproven live,
+2026-08-20). `Sanctuary_Map_System_Rework.md` §12 open question 6 is answered
+in the NEGATIVE: a script-tree file cannot `Import()` an asset-tree file.**
+
+Prior text in this section claimed the opposite ("✅ Confirmed live... `Import()`
+CAN cross from `LJ/lua` into `Sanctuary_Data/Maps/<MapName>/`"). That claim was
+wrong. Evidence chain, in order:
+
+1. **The original "2 BigBots spawned" test that produced the false ✅ was a
+   false positive.** It gated an import-path spawn behind
+   `pcall(Import, ...)` succeeding, alongside an unconditional direct spawn.
+   Both units actually observed spawning came from paths that did **not**
+   require a successful cross-tree import; the import-gated spawn never
+   actually ran, despite both units appearing (the direct/control spawn plus
+   something else — the import-path branch's own gate condition was never
+   satisfied). Additionally, the test module used
+   `local Scenario = {} ... return Scenario` — a pattern that is
+   fundamentally incompatible with `Import()` regardless of path resolution
+   (see the global-capture rule above): even if the cross-tree path had
+   resolved, `ScenarioTest.SpawnTestBigBot` would have been `nil` and the
+   `pcall` branch would never have fired. Two independent reasons the earlier
+   "confirmation" could never have been real; a future reader must not
+   re-trust that earlier entry.
+2. **Direct disproof, live in-game (the load-bearing evidence for this
+   retraction).** A diagnostic called `Engine.FileExists(libPath.."/"..path)`
+   — the EXACT string `common/systems/import.lua` builds internally at its
+   line ~137 (`local ModdedFilePath = libPath.."/"..filePath`) — with
+   `path = "../../Sanctuary_Data/Maps/Pandemonium Isthmus/Pandemonium
+   Isthmus_Scenarios_Script.lua"`. It returned **false**. Encoded as a
+   countable marker-row signal in-game (1 marker = true, 3 markers = false);
+   3 markers appeared. The `../../` traversal out of the `LJ/lua` root does
+   not resolve.
+3. **Consequence:** `Import()` reaches its own
+   `Error("Import: Error loading up module: '"..filePath.."'. File doesn't
+   exist.", 2)` (import.lua ~line 151) and **throws**, aborting the entire
+   enclosing chunk. This is why, across ~13 diagnostic iterations, every
+   checkpoint placed BEFORE the `Import` call fired and every checkpoint
+   AFTER it never did — regardless of content, position, or file size. (This
+   also retroactively explains item 1 above: the "successful" earlier test
+   never actually reached its import-gated branch under a working import —
+   it degenerated to the control spawn only, and the second unit's origin
+   was misattributed.)
+4. **Independent second finding, from reading `common/systems/import.lua`
+   directly (worth recording as its own rule — it cost hours; promoted to
+   first-class law in "Lua runtime & sandbox" above):** `Import()` does not
+   use a module's `return` statement at all; it captures only the executed
+   file's **global** variables via a custom env table. `local Scenario = {}
+   ... return Scenario` silently yields a table with none of `Scenario`'s
+   fields — no error. This is why the naive `Scenario.lua` module pattern is
+   wrong for anything meant to be `Import()`-consumed, independent of the
+   cross-tree question.
+
+**The now-correct, deployed arrangement** is the colocation rule ratified in
+`MAP_SCENARIO_SPEC.md` §2: both files live in `LJ/lua/maps/<MapName>/`, linked
+by `Import("maps/<MapName>/<MapName>_Scenarios_Script.lua").Scenario`. This is
+live and deployed now. The map's asset folder contains no `.lua` files. The
+human's original goal — scenario file in the map (asset) folder so only one
+file needs moving if `_data.lua` later relocates — is not achievable via
+`Import()` and has been abandoned. If `_data.lua` ever relocates, both files
+move together.
+
+⚠️ See the F1-reliability side-note under "Map scripting (events)" above —
+its cause remains unresolved and is now doubly uncertain given the false
+positive it was originally attached to; do not rely on F1 alone for future
+`Import()`/lifecycle diagnostics. Prefer explicit `Engine.FileExists()` /
+marker-signal-style checks as used in the disproof above.
+
+**⚠️ Unverified observation, NOT a confirmed cause — flag only, do not
+over-claim (2026-08-20).** While a 543-line scenario file sat at
+`Sanctuary_Data/Maps/<MapName>/<MapName>_Scenarios_Script.lua` (during the
+now-retracted cross-tree experiment), the game **hung on window close and
+required a force-quit**. Replacing it with a 9-line stub in the same asset-tree
+location stopped the hang. At the time, both the 543-line and 9-line files
+were failing to load via `Import()` regardless of size (per the disproof
+above), so file size/content cannot be the load-bearing variable through the
+`Import()` path — the mechanism is **unexplained**. Possible but unconfirmed
+candidate: some asset-folder scanner/watcher reacting to a large `.lua`
+sitting in the map asset tree, independent of whether anything ever
+`Import()`s it. Worth knowing before anyone puts a large `.lua` file in a map
+asset folder (`Sanctuary_Data/Maps/<MapName>/`) again, even now that the
+design no longer calls for it — a human map author could still do this by
+hand. Not investigated further; a separate, unscoped follow-up if it recurs.
+
+**Known tension — now moot, kept for audit trail.** An earlier amendment
+flagged tension between the human's stated expectation that `_data.lua` would
+eventually relocate to the asset folder, and `Sanctuary_Map_System_Rework.md`
+§6.3/§10.2 step 7, which keep `_data.lua` at `LJ/lua/maps/<N>/` unchanged with
+no relocation proposed. That tension is now **moot**: the colocation rule
+(`MAP_SCENARIO_SPEC.md` §2) ties both files together regardless of where
+`_data.lua` ends up, so no design decision hinges on resolving it. If
+`_data.lua` relocation ever becomes live work independent of this feature, the
+original ❓ (raised to the human/Format Expert) still applies: nothing in the
+source material besides the human's own expectation and a stray decoy copy in
+`Sanctuary_Data/Maps/Pandemonium Isthmus/` (which the engine does **not**
+load) supports `_data.lua` actually moving; `Sanctuary_Map_System_Rework.md`'s
+explicit design keeps it in `LJ/lua/maps/`.
+
+**Confirmed, not "not yet confirmed": sibling same-tree `Import()` is the
+standard, load-bearing mechanism here** — `<MapName>_data.lua` importing
+`<MapName>_Scenarios_Script.lua` from the *same* `LJ/lua/maps/<MapName>/`
+folder is exactly the ordinary, root-relative `Import()` pattern already used
+throughout the engine (`Import("common/gameUtils.lua")`,
+`Import("host/testUtils.lua")`, etc.) — nothing exotic, and no longer resting
+on the retracted cross-tree finding. Genuinely still open: whether
+`Import()`'s environment-capture (`__index = _G`, `import.lua:107-109`) or
+the `Mods_Active` reverse-scan (`replace/<path>` / `append/<path>`, §3.2 of
+the Rework doc) interacts with this same-tree sibling call in any way that
+matters (e.g. a mod replacing one file but not the other) — the source
+material describes both mechanisms but never traces this specific pairing
+end-to-end. Lower-risk than the retracted cross-tree question since it's the
+engine's own established pattern, but flagged, not verified.
 
 ## Tags system
 Units carry `tags`; queries use a `Tags` table with **multiplication as set

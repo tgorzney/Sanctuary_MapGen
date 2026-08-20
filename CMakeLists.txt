@@ -220,17 +220,17 @@ endforeach()
 # very same shell code the shipped binary runs. imgui + glfw + opengl32 arrive transitively:
 # SanGenV2 links imgui PUBLIC (M5-5) and imgui links glfw PUBLIC, so the app declares neither.
 # ---------------------------------------------------------------------------
-add_executable(SanGenV2App src/ui/ApplicationMain_UI.cpp)
-target_link_libraries(SanGenV2App PRIVATE SanGenV2)
-set_property(TARGET SanGenV2App PROPERTY FOLDER "SanGenV2")
+add_executable(SanGenV3App src/ui/ApplicationMain_UI.cpp)
+target_link_libraries(SanGenV3App PRIVATE SanGenV2)
+set_property(TARGET SanGenV3App PROPERTY FOLDER "SanGenV2")
 
 # The kernels ship BESIDE the executable: ApplicationMain_UI.cpp resolves `<exeDir>/sangen_shaders`
 # when no explicit directory is given, so a copied-out build finds its .glsl twins with no absolute
 # path anywhere (ARCH §4 / GpuResource_SYS.h "never a hardcoded absolute path"). The staged
 # directory above stays the single source: the tests are handed it directly, the app gets a copy.
-add_custom_command(TARGET SanGenV2App POST_BUILD
+add_custom_command(TARGET SanGenV3App POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SANGEN_V2_SHADER_DIRECTORY}" "$<TARGET_FILE_DIR:SanGenV2App>/sangen_shaders"
+            "${SANGEN_V2_SHADER_DIRECTORY}" "$<TARGET_FILE_DIR:SanGenV3App>/sangen_shaders"
     COMMENT "Staging SanGen v2 GPU kernels beside the application")
 
 # add_sangen_test(<name> <source>...) — one acceptance-test executable, registered

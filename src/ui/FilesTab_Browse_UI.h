@@ -25,5 +25,9 @@ enum class FilesTabBrowseKind {
 // True when `filePath` actually moved this frame.
 bool DrawFilesTabPathRow(const char* label, FilesTabBrowseKind kind, std::string& filePath);
 
+// Draws the button itself and, on click, runs the native Open dialog directly — no separate
+// Browse step, no picker row. True when the user picked a file (`filePath` was updated).
+bool DrawFilesTabOpenButton(const char* label, std::string& filePath);
+
 } // namespace Ui
 } // namespace SanmapGen

@@ -39,6 +39,17 @@ the platform seam (ARCH §3.3 / §5).
    and the ingestion half of `ASSET_LOADING_SPEC`. `IO_MIGRATION_SPEC` exists but is
    the IO Architecture Expert's primary spec, not yours — read it only to confirm
    what a document's `SanGenVersion` means, never to answer a code-shape question.
+   `MAP_SCENARIO_SPEC` is the law for the game-side Map Scenario system
+   (`<MapName>_data.lua` orchestrator + `<MapName>_Scenarios_Script.lua`, both in
+   `LJ/lua/maps/<MapName>/`). Read it whenever a question touches the `.sanmap`
+   marker tables it mutates at load time — `ApplyScenario` rewrites
+   `GameInfo.MapData.markers.Spawn.transforms` and `.Alloys.transforms` in memory
+   AFTER the `.sanmap` is parsed, so the shipped file is NOT what the sim sees.
+   Load-bearing consequence for format truth: the `.sanmap` stores exactly ONE
+   spawn transform per army, shared across every lobby composition, which is why
+   `MAP_SCENARIO_SPEC` makes an explicit per-scenario `spawns` table mandatory.
+   Design of SanGen's own Import/Export for the scenario `.lua` file is the IO
+   Architecture Expert's surface, not yours.
 3. The real code (v2 `io/`; today the zip-scan smeared across `MaterialTabs`/
    `main.cpp`), the actual `.sanmap` files, sanpacks, and lua unit/prop data.
 
