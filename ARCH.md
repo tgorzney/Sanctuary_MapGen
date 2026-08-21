@@ -1252,7 +1252,8 @@ unconditionally.
   (`Placement_PROC.cpp:64` `CollectionFor(3)`, `Placement_Rules_PROC.cpp:104-138`
   `AppendDecalRules`, `Placement_Kernel_PROC.h:52` collection index 3) — no special-case needed.
   One of R2's own open items still bears directly on this scheme and is **not** resolved here —
-  §14.13 item 3 (manual sub-layer stable-id; see its sharpened problem statement).
+  §14.13 item 3 (manual sub-layer stable-id; design closed, implementation still unscheduled —
+  see its updated status below).
 
 ### 14.10 GPU color-texture readback bug (recorded, separate narrow fix, lands first)
 `ComposeOnGpu()` (`PreviewComposite_Gpu_UI.cpp:78-81`) unconditionally reads back the full color
@@ -1278,35 +1279,107 @@ exact failure mode this sentence forbids.
 `_UI` suffix per §1.2, reflected throughout this section.
 
 ### 14.13 Open items — status as of this ratification (closed items marked)
-R2's own "Consolidated ❓ open items" list, carried forward. Items 4 and 5 were closed this
-session by direct expert consult; items 1-3 remain open. A coder or future ARCH pass must not
-treat items 1-3 as settled by this ruling:
+R2's own "Consolidated ❓ open items" list, carried forward. Items 4 and 5 were closed in the R2
+ratification session by direct expert consult; item 3 was closed on its *design* question in a
+later correction session (rulings below) — its two work-orders remain unscheduled implementation.
+Items 1-2 remain genuinely open. A coder or future ARCH pass must not treat items 1-2 as settled
+by this ruling:
 1. ⚠️ **Real footprint-size source:** placeholder-per-domain now (§14.3); who/when derives real
    mesh bounds is unscheduled.
 2. ⚠️ **Cross-layer visible-vertex budget default and Tier B per-resolution costs** (§14.8-14.9):
    need the real benchmark named in §14.9, not the reasoned placeholders in this ruling.
-3. ⚠️ **Manual sub-layer stable-id — a real DATA-shape work item, not a small column ask (open,
-   sharpened this session).** Generator Expert consult found a two-part gap, bigger than §14.9
-   originally assumed:
-   - (a) `PropInstanceLayer`/`DecalInstanceLayer` (`src/params/PropInstance_PARAMS.h:30-31`)
-     carry only `name`/`color[4]`/`iconScale` — no id field. The only backward reference,
-     `layerIndex` on `PropTransform`/`DecalTransform` (`PropInstance_PARAMS.h:19-20`), is a
-     **plain vector position, not a stable identity** — `RenumberPropLayerIndicesForReorder`
-     renumbers it on drag-reorder and `ClampPropLayerIndicesForRemovedLayer` clamps it on delete
-     (`src/ui/PropsTab_Manual_UI.cpp:43-67`, citing prior "STEP22 ruling #5").
-   - (b) `Data::PlacementInstances` — the resolved runtime SoA §14.9's CSR scheme buckets
-     against — **has no `layerIndex`-equivalent column at all** (confirmed,
-     `PropsTab_Manual_UI.cpp:103`): no way exists today to correlate a resolved instance back to
-     which manual layer authored it.
-   - Needs: (a) a stable id added to `PropInstanceLayer`/`DecalInstanceLayer` that survives
-     reorder/delete, distinct from the existing reorder-renumbered `layerIndex`; and (b) a new
-     correlation column on `Data::PlacementInstances` (or a side table) recording which manual
-     layer produced each resolved instance.
-   - Separately, related: manual/authored decals (`Params::DecalInstanceGroup`/`DecalTransform`,
-     `recipe.decals`) are pure round-trip-JSON PARAMS today, "NOT yet live-wired into
-     `BuildSanmapJsonText`/`ParseSanmapJsonText`" (`MapRecipe_PARAMS.h:103-104`) — they do not
-     resolve into `results.decals` at all, unlike the procedural path item 4 confirms.
-   - Stays open. This is a real DATA-shape work item for a future work-order; not resolved here.
+3. ✅ **DESIGN CLOSED — Manual sub-layer stable id + manual props/decals PROC resolution.**
+   Closed by three rulings below, in a correction session following the item's original "open,
+   sharpened" framing. Two work-orders are now fully specified; **implementation itself stays
+   unscheduled — this closes the design question, not the coding task.**
+   - **Correction to this item's own prior text.** It previously claimed manual props/decals were
+     "NOT yet live-wired into `BuildSanmapJsonText`/`ParseSanmapJsonText`," citing
+     `MapRecipe_PARAMS.h:103-104`. **That claim is false and is withdrawn** — confirmed live-wired
+     both directions: `MapExporter_DocumentAssembly_IO.cpp:63-64`
+     (`document["decals"] = BuildDecalsJson(recipe); document["props"] = BuildPropsJson(recipe);`),
+     `MapImporter_ParseDocument_IO.cpp:67-69` (`ReadPropGroupsJson`/`ReadDecalGroupsJson`),
+     round-trip-tested (`MapExporter_IO_Test.cpp:86`, `MapImporter_IO_Test.cpp:978,1180-1183`).
+     `MapRecipe_PARAMS.h:103-104`'s own comment is itself stale (code stays with the Coder to fix;
+     not this ARCH's file to edit). **What is actually still missing — confirmed identical for
+     Props and Decals, no asymmetry between the two domains, both unblock together with the same
+     work:** zero PROC-side resolution step exists for manual authoring at all. `src/proc/` has
+     zero references to `PropInstanceGroup`/`DecalInstanceGroup`/`recipe.props`/`recipe.decals`;
+     `Placement_PROC.cpp:62,64`'s `results.props`/`results.decals` are filled exclusively by the
+     procedural `ScatterRule` path.
+   - **(a) and (b) of the original problem statement still hold, unmodified by the correction
+     above:**
+     - (a) `PropInstanceLayer`/`DecalInstanceLayer` (`PropInstance_PARAMS.h:30-31`) carry only
+       `name`/`color[4]`/`iconScale` — no id. The only backward reference, `layerIndex` on
+       `PropTransform`/`DecalTransform` (`PropInstance_PARAMS.h:19-20`), is a plain vector
+       position — renumbered on reorder (`RenumberPropLayerIndicesForReorder`) and clamped on
+       delete (`ClampPropLayerIndicesForRemovedLayer`, `PropsTab_Manual_UI.cpp:43-67`) — not a
+       stable identity.
+     - (b) `Data::PlacementInstances` (`PlacementInstances_DATA.h`) has no correlation column back
+       to a manual layer at all.
+   - **WORK-ORDER A — Manual sub-layer stable id.** Add `int layerId = -1;` to
+     `PropInstanceLayer`/`DecalInstanceLayer`, assigned once at creation (Ruling 1 below), and
+     **never** touched by `RenumberPropLayerIndicesForReorder`/`ClampPropLayerIndicesForRemovedLayer`
+     — those keep renumbering the existing positional `layerIndex` exactly as today, unmodified;
+     the two fields coexist, serving different purposes (`layerIndex` = current authoring
+     position/JSON linkage from transforms, unchanged in shape and behavior; `layerId` = stable
+     identity for correlation). Confirmed genuinely new architecture for this codebase — zero
+     `layerId`/`stableId`/monotonic-counter precedent exists anywhere in `src/` prior to this
+     ruling. `Army_PARAMS.h`'s reorder logic (`ArmiesTab_UI.cpp`) uses the identical plain-position
+     scheme as Props/Decals with no stable id; `GeoLayer_PARAMS.h::stratumIndex` is an unrelated
+     fixed-slot reference, not list-position precedent. Neither is reusable prior art.
+   - **WORK-ORDER B — Manual props/decals PROC resolution + correlation column.** One work-order,
+     not split — part (b2) has nothing to populate without part (b1):
+     - (b1) wire `recipe.props`/`recipe.decals` into a real PROC resolution step, appending into
+       `results.props`/`results.decals` (the same `Data::PlacementInstances` SoA the procedural
+       scatter path already fills) — a straight 1:1 copy-through per Ruling 3 below, not a
+       symmetry-orbit expansion.
+     - (b2) add a `manualLayerId` column to `Data::PlacementInstances`, mirroring the existing
+       `armyIndex` column's shape (`PlacementInstances_DATA.h:27,38,49,69,86` —
+       sentinel-defaulted `std::vector<int>`, threaded through `Append`/`Get`/`Reserve`/`Clear`):
+       default `-1` for procedurally-scattered instances; populated with Work-Order A's `layerId`
+       (not the renumbered `layerIndex`) for manually-authored instances.
+   - **Ruling 1 — counter placement: NOT a persisted counter field on `MapRecipe`.**
+     `MapRecipe_PARAMS.h`'s own header states it "is exactly what `mapGeneratorData` serializes" —
+     every existing field is real recipe content; there is no session-only-scratch precedent to
+     extend, and a persisted counter is itself a second piece of state that can desync from the
+     ids it is supposed to stay ahead of (e.g. hand-edited JSON). Instead: **derive-on-create, no
+     stored counter.** A newly-created layer's `layerId` = `1 + max(layerId across the current
+     in-memory propLayers/decalLayers)`, or `0` if empty. This is self-healing across manual JSON
+     edits, satisfies "stable across save/load" for free — ids already present in a loaded file are
+     never renumbered, only `layerIndex` is — and an O(layer count) scan per creation is free at
+     this cardinality (tens of layers, not thousands). Reusing an id number after its owning layer
+     is deleted is not a hazard: `ClampPropLayerIndicesForRemovedLayer`'s existing delete path
+     leaves nothing referencing the old id, so nothing live can collide with it.
+   - **Ruling 2 — wire representation: new key `"Id"` in the `PropGroups`/`DecalGroups` wire
+     array.** Lands in `BuildPropGroupsJson`/`ReadPropGroupsJson` (`MapExporter_Props_IO.cpp` /
+     its `MapImporter_Props_IO.cpp` inverse) and the Decals siblings, PascalCase to match that
+     array's existing sibling keys (`"Name"`/`"Color"`/`"IconScale"`) — a distinct JSON context
+     from the transform-level array's camelCase `"layerIndex"`, which stays untouched.
+     **Legacy-file backfill:** a `PropGroups`/`DecalGroups` entry with no `"Id"` key on import gets
+     `layerId = <its index within that array>` — already unique (array positions are already
+     distinct) and safe going forward, since Ruling 1's derive-on-create rule scans whatever ids
+     exist post-backfill before minting the next one.
+   - **Ruling 3 — no symmetry participation for manual placements; straight copy-through.**
+     `PropTransform`/`DecalTransform` (`PropInstance_PARAMS.h:19-20`) carry only
+     `InstancedTransform transform; int layerIndex;` — no `bSymmetryUseGlobal`/`symmetryMask`,
+     unlike `PropRule`/`DecalRule`/`MarkerRule`/`ScatterRule`, which all carry that pair
+     (`ScatterRule_PARAMS.h:29-30,53-54,80-81`, `MarkerRule_PARAMS.h:58-59`). This is not an
+     oversight to fix — it follows directly from the already-ratified framing every hand-placed
+     type shares (`MapRecipe_PARAMS.h`'s own comment on `armies`/`areas`/`markers`/`chains`,
+     extended to props/decals by the §12 ruling): "round-trip fidelity... their entire purpose; no
+     PROC stage computes or reinterprets them." Reinforced by direct precedent: `recipe.armies` and
+     `recipe.markers` (the hand-placed `MarkerInstanceGroup` kind, distinct from `MarkerRule`)
+     never appear anywhere in `src/proc/` — the existing hand-placed-entity family already never
+     runs through `BuildSymmetryOrbit`/`ResolveSymmetryMask`. **Ruling: Work-Order B's (b1)
+     resolution step is a straight 1:1 copy-through, no symmetry-orbit expansion.** An author who
+     wants a mirrored prop places the mirrored copy manually, exactly as they already must for
+     armies and markers today. Props and Decals are therefore symmetric in every respect relevant
+     to this item — the "manual decals lag behind manual props" framing item 4 below implied no
+     longer applies; both domains have always had, and continue to have, an identical gap with an
+     identical fix.
+   - **Nothing left open on the design question.** Work-Orders A and B remain unscheduled
+     *implementation* — ordinary work-order scheduling, not a design gap, and not what this item's
+     ⚠️ previously flagged.
 4. ✅ **CLOSED — Decals data source.** Confirmed (Generator Expert): procedural Decals already
    resolve into `Data::PlacementResults::decals` (`PlacementResults_DATA.h:11-15`), the identical
    `Data::PlacementInstances` SoA type with identical `ruleIndex`/`category` columns
@@ -1317,8 +1390,9 @@ treat items 1-3 as settled by this ruling:
    consumer, not a DATA-shape mismatch. `PREVIEW_COMPOSITING_SPEC`'s prior "Decals never
    composited" framing is corrected accordingly. The §14.9 CSR-bucket/`SpatialGrid` scheme applies
    to procedural Decals exactly as written, no special-case needed. Applies **only** to procedural
-   decals (`recipe.decalRules`) — manual decals are the separate, still-open gap recorded in
-   item 3.
+   decals (`recipe.decalRules`) — manual decals are the separate gap recorded in item 3 (design
+   closed by three rulings in a later session; implementation unscheduled, and — per item 3's own
+   correction — no longer lagging behind manual props in any respect).
 5. ✅ **CLOSED — `OverlayLayer_UI::blendMode` retired; replaced by `opacity: float`.** UI Expert
    verdict: `Ui::PreviewBlendMode` (`src/ui/PreviewComposite_Settings_UI.h:26`) is a two-operand
    GPU raster-compositing enum (`Replace`/`AlphaBlend`/`Add`/`Multiply`/`Maximum`/`Minimum`) wired
