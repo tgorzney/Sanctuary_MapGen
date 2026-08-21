@@ -1068,16 +1068,22 @@ struct OverlayLayer_UI {
     std::string name;
     OverlayDomainKind_UI domainKind;
     bool bEnabled = true;
-    Ui::PreviewBlendMode blendMode;                  // reuse — leaning decision, §14.13 item 5 (open)
+    float opacity = 1.0f;                             // layer-wide alpha multiplier, folded into
+                                                        // each instance's tint alpha at draw time —
+                                                        // replaces blendMode, §14.13 item 5 (closed)
     std::vector<OverlaySubLayerRef_UI> subLayers;     // any mix/count of Manual + ProceduralRule
     float thumbnailLodThresholdPixels = 5.0f;         // §14.3
     // color[4]/iconScale intentionally NOT always here — §14.5
 };
 std::vector<OverlayLayer_UI> overlayLayers;           // vector order = Z order, View-toolbar stack
 ```
-A layer's drawn set is the union of every `bEnabled` sub-layer's resolved instances; one blend
-mode covers the whole layer. Reorder/add/remove never touches a fixed enum or switch statement —
-this indirection is the entire point of the sub-layer shape.
+A layer's drawn set is the union of every `bEnabled` sub-layer's resolved instances; one opacity
+multiplier applies to the whole layer — **not** `Ui::PreviewBlendMode` (UI Expert verdict,
+§14.13 item 5, closed: `Ui::PreviewBlendMode` is a two-operand GPU raster-compositing enum wired
+into the GPU composite shader as integer defines — meaningless for a textured-quad icon draw
+under ImGui's one global blend equation, and a per-layer blend-equation switch would break the
+bulk-batched-vertex-write model §14.9 mandates). Reorder/add/remove never touches a fixed enum or
+switch statement — this indirection is the entire point of the sub-layer shape.
 
 Sub-layer → data mapping (binding; not to be re-derived per domain in a work-order):
 
@@ -1133,7 +1139,7 @@ Recursive addressing is a legitimate future ask; it needs its own ratification i
 requested later.
 
 ### 14.5 View-stack state — split by field, not one blanket policy
-- **Order / `bEnabled` / blend mode:** session-only UI presentation — same policy already
+- **Order / `bEnabled` / opacity:** session-only UI presentation — same policy already
   governing `PreviewCompositeSettings` (v1's serialized `PreviewLayers` was already a named
   defect to replace, not evidence v2 must re-serialize).
 - **`color`/`iconScale`:** **not** a blanket UI-only field. Where a domain already owns a
@@ -1157,14 +1163,18 @@ widget `LayersTab` already uses for GeoLayers) separated by a static section lab
 - **"Terrain (composited)"** — `PreviewCompositeSettings::fieldLayers`.
 - **"Overlays (screen-space)"** — `overlayLayers`.
 
-Each row carries its own blend-mode `Combo_UI`. Reorder is real *within* each section; **a row
-cannot cross sections** — true interleaving (a marker rendering "under" a terrain layer) is
-rejected outright: it is not renderable without either re-baking markers into the texture (the
-exact bug this whole redesign kills) or rebuilding `PreviewComposite` into an interleaved
-multi-target compositor, and a control that *looks* interleaved but isn't would violate the
-WYSIWYG law by showing an order that is not the real render order. Mechanism: the two
-`DraggableList` renders use different drag-payload identifiers so cross-section drops
-structurally fail to match — no new validation code needed. No new widget; straight reuse.
+Terrain rows carry their own blend-mode `Combo_UI` (`PreviewCompositeSettings::fieldLayers`'s
+real GPU blend-equation switch into the composite shader — unchanged by this ruling). Overlay
+rows carry an **opacity slider** instead (§14.2, §14.13 item 5, closed) — there is no
+per-overlay-layer blend-equation switch; every overlay layer shares ImGui's one global blend
+equation. Reorder is real *within* each section; **a row cannot cross sections** — true
+interleaving (a marker rendering "under" a terrain layer) is rejected outright: it is not
+renderable without either re-baking markers into the texture (the exact bug this whole redesign
+kills) or rebuilding `PreviewComposite` into an interleaved multi-target compositor, and a control
+that *looks* interleaved but isn't would violate the WYSIWYG law by showing an order that is not
+the real render order. Mechanism: the two `DraggableList` renders use different drag-payload
+identifiers so cross-section drops structurally fail to match — no new validation code needed. No
+new widget; straight reuse.
 
 **"Regenerate" is retired from the primary toolbar.** `Pipeline::PreviewDriver` already
 auto-derives refresh tier from parameter hashes (`NotifyParametersChanged()`); a manual full-regen
@@ -1192,15 +1202,18 @@ but the inconsistency itself is recorded here rather than quietly picked one way
 | --- | --- | --- |
 | A — Full regen | Sim/recipe param changed | Unchanged (PROC) |
 | B — Full recomposite | Terrain/water/stratum layer setting changed | Unchanged pass sequence. Cost is resolution-dependent, not one number — sub-ms-to-low-ms credible at the 512² default, plausibly several-to-10ms+ at the 8192² cap (256× the pixel work). **Rough-estimate; must be benchmarked at both, never shipped as one range** (Constitution §7 basis-tag law). |
-| C — Screen-space redraw | Every overlay layer, every frame: pan/zoom/hover/visibility/blend/reorder | Zero GPU recompute, per-layer culled, bounded by the §14.9 cross-layer budget |
+| C — Screen-space redraw | Every overlay layer, every frame: pan/zoom/hover/visibility/opacity/reorder | Zero GPU recompute, per-layer culled, bounded by the §14.9 cross-layer budget |
 | C2 — Interaction-scoped redraw (new) | Active drag/edit on a marker or group | Cache non-selected instances' generated vertex+draw-command bytes once at gesture-start (CPU bytes, not a GPU texture/FBO), replay via memcpy each frame, regenerate live only the selection. Invalidates on pan/zoom/selection-change/layer-setting-change mid-gesture. |
 
-Reorder/blend-mode changes in the View stack are O(layerCount), never O(instances), for standard
-blend modes. ⚠️ Open: confirm the chosen blend modes do not need divergent per-vertex color
-encoding (premultiplied vs. straight alpha) — if one does, that layer's C2 cache must invalidate
-on mode change, and the thumbnail-vs-strategic swap needs the identical check. LOD threshold
-crossing during zoom needs no new invalidation rule of its own: zoom already invalidates C2's
-cache unconditionally.
+Reorder/opacity changes in the overlay View stack are O(layerCount), never O(instances) — opacity
+is a per-vertex tint-alpha multiply, already covered by the C2 table's "layer-setting-change"
+trigger above. **§14.13 item 5's resolution closes the open question this paragraph previously
+flagged:** overlay layers carry `opacity`, not a per-layer blend-mode enum (§14.2), so every
+overlay shares ImGui's one global blend equation and there is no divergent per-vertex
+color-encoding (premultiplied vs. straight alpha) risk to confirm. The thumbnail-vs-strategic swap
+still needs its own C2 invalidation check, independent of opacity. LOD threshold crossing during
+zoom needs no new invalidation rule of its own: zoom already invalidates C2's cache
+unconditionally.
 
 ### 14.9 Rendering/performance — mandatory in the first work-order, not deferrable
 - **Bulk vertex writes only.** "Batched icon quads" means one bulk `ImDrawList::PrimReserve` +
@@ -1230,11 +1243,16 @@ cache unconditionally.
   grid gives **zero help** fully-zoomed-out (everything visible, every bucket queried) — that
   case is genuinely O(N); the cross-layer budget above is what bounds it, not the grid.
 - **Layer-id column: do not physically resort `PlacementInstances` by layer.** Reuse the existing
-  `ruleIndex`/`category` columns (`PlacementInstance_DATA.h`) via a CSR bucket index built once
-  (same lifecycle point as `Data::SpatialGrid`'s build, right after Placement, §8.3) — per-layer
-  flat index arrays, cached, rebuilt only when that layer's own sub-layer membership changes, not
-  every frame. Two of R2's own open items bear directly on this scheme and are **not** resolved
-  here — §14.13 items 3 and 4.
+  `ruleIndex`/`category` columns (`Data::PlacementInstances`, `PlacementResults_DATA.h`) via a CSR
+  bucket index built once (same lifecycle point as `Data::SpatialGrid`'s build, right after
+  Placement, §8.3) — per-layer flat index arrays, cached, rebuilt only when that layer's own
+  sub-layer membership changes, not every frame. **Procedural Decals use this identical scheme,
+  confirmed** (§14.13 item 4, closed): `Data::PlacementResults::decals` is the same
+  `Data::PlacementInstances` SoA type with the same `ruleIndex`/`category` columns
+  (`Placement_PROC.cpp:64` `CollectionFor(3)`, `Placement_Rules_PROC.cpp:104-138`
+  `AppendDecalRules`, `Placement_Kernel_PROC.h:52` collection index 3) — no special-case needed.
+  One of R2's own open items still bears directly on this scheme and is **not** resolved here —
+  §14.13 item 3 (manual sub-layer stable-id; see its sharpened problem statement).
 
 ### 14.10 GPU color-texture readback bug (recorded, separate narrow fix, lands first)
 `ComposeOnGpu()` (`PreviewComposite_Gpu_UI.cpp:78-81`) unconditionally reads back the full color
@@ -1259,22 +1277,60 @@ exact failure mode this sentence forbids.
 `OverlayLayer_UI` / `OverlayDomainKind_UI` / `OverlaySubLayerKind_UI` / `OverlaySubLayerRef_UI` —
 `_UI` suffix per §1.2, reflected throughout this section.
 
-### 14.13 Open items — left open, not resolved here
-R2's own "Consolidated ❓ open items" list, carried forward. A coder or future ARCH pass must not
-treat any of these as settled by this ruling:
+### 14.13 Open items — status as of this ratification (closed items marked)
+R2's own "Consolidated ❓ open items" list, carried forward. Items 4 and 5 were closed this
+session by direct expert consult; items 1-3 remain open. A coder or future ARCH pass must not
+treat items 1-3 as settled by this ruling:
 1. ⚠️ **Real footprint-size source:** placeholder-per-domain now (§14.3); who/when derives real
    mesh bounds is unscheduled.
 2. ⚠️ **Cross-layer visible-vertex budget default and Tier B per-resolution costs** (§14.8-14.9):
    need the real benchmark named in §14.9, not the reasoned placeholders in this ruling.
-3. ⚠️ **Manual sub-layer stable-id column:** not confirmed to exist for the CSR bucket scheme
-   (§14.9) — may be a small new-column ask.
-4. ⚠️ **Decals data source:** confirm whether Decals route through `PlacementInstances` at all
-   today before assuming one CSR scheme covers all six domains — `PREVIEW_COMPOSITING_SPEC`
-   already records "Decals never composited" as a standing gap and this has not been
-   independently re-verified in this ruling.
-5. ⚠️ **`OverlayLayer_UI::blendMode`:** reuse `Ui::PreviewBlendMode` verbatim, or a new enum? This
-   ruling leans reuse (reflected in §14.2's type) but the confirmation is the UI Expert's call, not
-   ARCH's, and is not made here.
+3. ⚠️ **Manual sub-layer stable-id — a real DATA-shape work item, not a small column ask (open,
+   sharpened this session).** Generator Expert consult found a two-part gap, bigger than §14.9
+   originally assumed:
+   - (a) `PropInstanceLayer`/`DecalInstanceLayer` (`src/params/PropInstance_PARAMS.h:30-31`)
+     carry only `name`/`color[4]`/`iconScale` — no id field. The only backward reference,
+     `layerIndex` on `PropTransform`/`DecalTransform` (`PropInstance_PARAMS.h:19-20`), is a
+     **plain vector position, not a stable identity** — `RenumberPropLayerIndicesForReorder`
+     renumbers it on drag-reorder and `ClampPropLayerIndicesForRemovedLayer` clamps it on delete
+     (`src/ui/PropsTab_Manual_UI.cpp:43-67`, citing prior "STEP22 ruling #5").
+   - (b) `Data::PlacementInstances` — the resolved runtime SoA §14.9's CSR scheme buckets
+     against — **has no `layerIndex`-equivalent column at all** (confirmed,
+     `PropsTab_Manual_UI.cpp:103`): no way exists today to correlate a resolved instance back to
+     which manual layer authored it.
+   - Needs: (a) a stable id added to `PropInstanceLayer`/`DecalInstanceLayer` that survives
+     reorder/delete, distinct from the existing reorder-renumbered `layerIndex`; and (b) a new
+     correlation column on `Data::PlacementInstances` (or a side table) recording which manual
+     layer produced each resolved instance.
+   - Separately, related: manual/authored decals (`Params::DecalInstanceGroup`/`DecalTransform`,
+     `recipe.decals`) are pure round-trip-JSON PARAMS today, "NOT yet live-wired into
+     `BuildSanmapJsonText`/`ParseSanmapJsonText`" (`MapRecipe_PARAMS.h:103-104`) — they do not
+     resolve into `results.decals` at all, unlike the procedural path item 4 confirms.
+   - Stays open. This is a real DATA-shape work item for a future work-order; not resolved here.
+4. ✅ **CLOSED — Decals data source.** Confirmed (Generator Expert): procedural Decals already
+   resolve into `Data::PlacementResults::decals` (`PlacementResults_DATA.h:11-15`), the identical
+   `Data::PlacementInstances` SoA type with identical `ruleIndex`/`category` columns
+   markers/props/units use (`Placement_PROC.cpp:64` `CollectionFor(3)`,
+   `Placement_Rules_PROC.cpp:104-138` `AppendDecalRules`, `Placement_Kernel_PROC.h:52` collection
+   index 0=markers/1=props/2=units/3=decals). No compositor currently reads them (confirmed: no
+   `Decal` reference anywhere in `PreviewComposite_*`) — the gap is purely a missing draw-pass
+   consumer, not a DATA-shape mismatch. `PREVIEW_COMPOSITING_SPEC`'s prior "Decals never
+   composited" framing is corrected accordingly. The §14.9 CSR-bucket/`SpatialGrid` scheme applies
+   to procedural Decals exactly as written, no special-case needed. Applies **only** to procedural
+   decals (`recipe.decalRules`) — manual decals are the separate, still-open gap recorded in
+   item 3.
+5. ✅ **CLOSED — `OverlayLayer_UI::blendMode` retired; replaced by `opacity: float`.** UI Expert
+   verdict: `Ui::PreviewBlendMode` (`src/ui/PreviewComposite_Settings_UI.h:26`) is a two-operand
+   GPU raster-compositing enum (`Replace`/`AlphaBlend`/`Add`/`Multiply`/`Maximum`/`Minimum`) wired
+   into the GPU composite shader as integer defines (`PreviewComposite_GpuProgram_UI.cpp:43-48`)
+   — meaningless for an `ImDrawList::AddImage` icon draw (a textured quad with per-instance
+   vertex-color tint under ImGui's one global blend equation). Forcing a per-layer blend-equation
+   switch would require a custom render callback per overlay layer, breaking the bulk-batched-
+   vertex-write model §14.9 mandates and turning the "zero GPU recompute" screen-space tier into a
+   shader-state-change cost. §14.2's struct now carries `opacity: float` (0-1 layer-wide alpha
+   multiplier, folded into each instance's tint alpha at draw time) in place of `blendMode`. A
+   future additive-glow overlay kind is a narrow per-layer-kind flag, not a shared blend-mode
+   enum — not designed in now.
 
 R2's own open item 1 (fieldLayers/overlayLayers unification) is **not** carried forward on this
 list — §14.7 above rules it closed, and records the R2 self-inconsistency that made this call

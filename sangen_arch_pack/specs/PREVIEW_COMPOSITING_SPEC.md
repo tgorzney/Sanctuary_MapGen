@@ -62,11 +62,17 @@ computes with them (`MASKING_SPEC` §1.6). **Decals were never composited in v1*
 `DecalRule` exists and is imported (`ImportedDecalsJSON`) but the v1 preview has no
 decal SSBO or pass. As of this spec's last direct check, `src/ui`'s real v2 preview
 still has **no decal draw path either** — ARCH §14 ratifies the design that closes
-this (Decals is one of the six overlay domains, §14.2), but §14.13 item 4 records
-that whether Decals actually route through `Data::PlacementInstances` the way
-Props/Units do was **not** independently re-verified in that ratification pass.
-Treat "decals reach the canvas" as designed, not yet shipped, and the data-source
-question as still open.
+this (Decals is one of the six overlay domains, §14.2). **Update (§14.13 item 4,
+closed):** confirmed procedural Decals already resolve into
+`Data::PlacementResults::decals`, the identical `Data::PlacementInstances` SoA type
+with identical `ruleIndex`/`category` columns Props/Units use — the §14.9 CSR bucket
+scheme applies to procedural Decals unchanged, no special-case needed. The remaining
+gap is purely a **missing draw-pass consumer** (no compositor reads them yet), not a
+data-shape mismatch — "decals reach the canvas" is designed, not yet shipped, but the
+data-source question that was open is now closed. Separately, and unresolved
+(§14.13 item 3): manual/authored decals (`recipe.decals`) are not yet live-wired into
+`BuildSanmapJsonText`/`ParseSanmapJsonText` and do not resolve into `results.decals`
+at all today — a distinct gap from the procedural path above.
 
 ## The shadow-sim problem (the central hit-list item)
 The v1 preview **re-derives** results instead of sampling the bake:
@@ -127,7 +133,8 @@ Constitution §4 Visual class for scrubbing, escalate on idle per ARCH §4.4).
   sync with `LayerType` by hand.
 - **Duplicate/empty types**: two `StratumSettings`, empty `TerrainType_Decal.h`.
 - **Decals never previewed** — being closed by ARCH §14 (design ratified; data-source
-  question still open, §14.13 item 4); **accumulation has no own ramp** (v2's
+  confirmed and closed, §14.13 item 4 — see "Stratum & decals" above; draw-pass
+  consumer still unbuilt); **accumulation has no own ramp** (v2's
   `PreviewCompositeSettings::gradientRamps` is one-ramp-per-field, ARCH §8.2, so this
   is already fixed in the real v2 tree); **global mutable statics** (single-context,
   resize-keyed reallocation misses format changes) — v1 only.
@@ -180,7 +187,10 @@ struct OverlayLayer_UI {
     std::string name;
     OverlayDomainKind_UI domainKind;
     bool bEnabled = true;
-    Ui::PreviewBlendMode blendMode;                 // reuse leaning, ARCH §14.13 item 5 (open)
+    float opacity = 1.0f;                                // layer-wide alpha multiplier, folded
+                                                           // into each instance's tint alpha at
+                                                           // draw time — NOT Ui::PreviewBlendMode,
+                                                           // ARCH §14.13 item 5 (closed)
     std::vector<OverlaySubLayerRef_UI> subLayers;    // any mix/count of Manual + ProceduralRule
     float thumbnailLodThresholdPixels = 5.0f;
 };
@@ -198,12 +208,26 @@ of the overlay pipeline.
 1. Real world-footprint-size data source (placeholder-per-domain only, today).
 2. Cross-layer visible-vertex budget default and Tier B per-resolution costs — both
    are rough-estimate placeholders pending a real microbenchmark.
-3. Whether a stable id column exists yet for manual sub-layers (needed for the CSR
-   bucket scheme, ARCH §14.9).
-4. Whether Decals actually route through `Data::PlacementInstances` at all today —
-   confirm before assuming one CSR scheme covers all six domains.
-5. `OverlayLayer_UI::blendMode` — reuse `Ui::PreviewBlendMode` verbatim vs. a new
-   enum — UI Expert's call, not made here.
+3. **Manual sub-layer stable-id — a real DATA-shape work item (open, sharpened).**
+   Two-part gap: (a) `PropInstanceLayer`/`DecalInstanceLayer` carry no id field that
+   survives reorder/delete — the only backward reference, `layerIndex`, is a plain
+   vector position that gets renumbered on reorder and clamped on delete; (b)
+   `Data::PlacementInstances` has no `layerIndex`-equivalent column at all, so no
+   resolved instance can be correlated back to the manual layer that authored it.
+   Needs both a stable id on the layer-metadata types and a new correlation column
+   (or side table) on `Data::PlacementInstances`. Manual/authored decals additionally
+   don't resolve into `results.decals` at all yet (separate from procedural Decals,
+   item 4). Full statement: `ARCH.md` §14.13 item 3.
+4. ✅ **CLOSED.** Confirmed: procedural Decals route through `Data::PlacementInstances`
+   exactly like Props/Units/Markers (`Data::PlacementResults::decals`, same SoA type,
+   same `ruleIndex`/`category` columns) — the §14.9 CSR bucket scheme covers Decals
+   with no special-case. Only the draw-pass consumer is still unbuilt. Full statement:
+   `ARCH.md` §14.13 item 4.
+5. ✅ **CLOSED.** `OverlayLayer_UI::blendMode` is retired; `opacity: float` replaces it
+   (struct above). `Ui::PreviewBlendMode` is a GPU raster-compositing enum with no
+   meaning for an icon-quad draw under ImGui's single global blend equation. Full
+   statement: `ARCH.md` §14.13 item 5.
 
-A coder or future ARCH pass must treat all five as genuinely open, not resolved by
-this document's existence.
+Items 1 and 2 remain genuinely open, not resolved by this document's existence. Items
+3-5 above reflect their current (mixed open/closed) status; do not re-open 4 or 5
+without a new ratification.
