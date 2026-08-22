@@ -9,7 +9,7 @@ types as `int`.
 
 ## Root problem
 - `Params::Stratum::maskRemapMinimum`/`maskRemapMaximum` are `float` scalars.
-  `ARCH.md` §7.2 item 10 (ratified) widens these to `float[kStratumColorChannelCount]`
+  `ARCH_07_02_MaterialProportionVsSurfaceWeight.md` §7.2 item 10 (ratified) widens these to `float[kStratumColorChannelCount]`
   (4 components), matching the format's real `Vector4` shape confirmed in
   `SanMap.Types.cs`. `src/io/MapExporter_Recipe_IO.cpp::BuildStratumLayersJson`
   currently writes `layer["maskRemapMin"] = stratum.maskRemapMinimum;` — a bare
@@ -33,7 +33,7 @@ IO / BRIDGE. Accuracy class: Exact (format-shape correctness, not a numeric tole
 CPU only — JSON text I/O, not a dispatchable calculation.
 
 ## ARCH rules invoked
-- `ARCH.md` §7.2 item 10 (the ratified field-widening — implement exactly as specified:
+- `ARCH_07_02_MaterialProportionVsSurfaceWeight.md` §7.2 item 10 (the ratified field-widening — implement exactly as specified:
   `float maskRemapMinimum[kStratumColorChannelCount]` / `maskRemapMaximum[...]`,
   defaults `{0,0,0,0}` / `{1,1,1,1}`, reusing the constant already defined in
   `StratumAppearance_PARAMS.h`, which `Stratum_PARAMS.h` already includes).
@@ -67,7 +67,7 @@ CPU only — JSON text I/O, not a dispatchable calculation.
 - Any other `stratumLayers` field (albedo/normal/mask paths, tiling, etc.) — Correction 13.
 - `StratumGenerationSettings` (Correction 12) — separate step.
 - How the Mask stage's runtime kernel consumes the 4 remap channels — explicitly
-  deferred to a future ARCH ruling per `ARCH.md` §7.2 item 10's own text. Not this
+  deferred to a future ARCH ruling per `ARCH_07_02_MaterialProportionVsSurfaceWeight.md` §7.2 item 10's own text. Not this
   ticket's concern; this ticket only fixes the on-disk shape.
 
 ## Acceptance test

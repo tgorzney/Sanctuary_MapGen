@@ -2,7 +2,7 @@
 # rules out of the legacy `mapGeneratorData.PlacementRules` blob
 
 *Constitution §7. Executor: SanGen Coder. Implements `SANMAP_FORMAT_SPEC.md` Correction 7 +
-`ARCH.md` §11 (`Params::GlobalMarkerSettings`), per a Format Expert ruling obtained for this
+`ARCH_11_GlobalMarkerSettings.md` §11 (`Params::GlobalMarkerSettings`), per a Format Expert ruling obtained for this
 ticket resolving two ambiguities the specs left open (see "Ruled by this ticket" below).*
 
 ## Root problem
@@ -22,7 +22,7 @@ is built from)
    Correction 7's "flat array... wrapped under the new top-level key" wording governs.
 2. **`GlobalMarkerSettings` is its own top-level PascalCase key, a sibling of `MarkersStack`, NOT
    nested inside it.** Correction 7's "sub-key inside `MarkersStack`" phrasing is superseded by
-   `ARCH.md` §11, which is explicitly framed as completing Correction 7 and states `MapRecipe`
+   `ARCH_11_GlobalMarkerSettings.md` §11, which is explicitly framed as completing Correction 7 and states `MapRecipe`
    gains `globalMarkerSettings` as a "flat sibling of `markerRules`, for now." (A JSON array also
    cannot structurally host a nested key, which independently rules out reading Correction 7's
    wording literally.) **Flag to the ARCH Expert as a separate docs-only follow-up:** Correction
@@ -38,7 +38,7 @@ is built from)
 ## Target files
 **New PARAMS:**
 - `src/params/GlobalMarkerSettings_PARAMS.h` (new) — `Params::GlobalMarkerSettings`, exact shape
-  from `ARCH.md` §11 (verbatim, do not deviate):
+  from `ARCH_11_GlobalMarkerSettings.md` §11 (verbatim, do not deviate):
   ```cpp
   struct GlobalMarkerSettings {
       std::string iconNameAlloy  = "Alloy";
@@ -114,7 +114,7 @@ CPU only.
 
 ## ARCH rules invoked
 - `SANMAP_FORMAT_SPEC.md` Correction 7 — binding, as narrowed by "Ruled by this ticket" above.
-- `ARCH.md` §11 — binding, controls over Correction 7's "sub-key" wording (see ruling #2).
+- `ARCH_11_GlobalMarkerSettings.md` §11 — binding, controls over Correction 7's "sub-key" wording (see ruling #2).
 - Constitution §6 — asset/input validation posture (n/a to new fields directly, but governs the
   rule-array reads via the existing `ReadRuleArray` template's already-established
   default-on-non-object behavior — reuse it, do not reinvent).

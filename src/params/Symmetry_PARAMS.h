@@ -15,11 +15,11 @@ namespace SymmetryAxis {
     constexpr int MirrorAcrossZ  = 1 << 1;   // z -> (extent - z)
     constexpr int RotateHalfTurn = 1 << 2;   // 180 degrees about the map center (point symmetry)
     constexpr int QuarterTurns   = 1 << 3;   // 90/180/270 degrees about the map center
-    // N-way rotation (ARCH.md §13, STEP16 ruling #1/#3, STEP23): count set by the sibling
-    // `radialSymmetryRepeatCount` field. `BuildSymmetryOrbit`/`AppendRadialTurns`
-    // (Placement_Symmetry_PROC.h) generate the orbit directly from each turn's angle (STEP23
-    // ruling #1) — bit-check order tracks ascending bit value, so `Radial` runs last, after
-    // `QuarterTurns`.
+    // N-way rotation (ARCH_13_RadialSymmetry.md §13, STEP16 ruling #1/#3, STEP23): count
+    // set by the sibling `radialSymmetryRepeatCount` field.
+    // `BuildSymmetryOrbit`/`AppendRadialTurns` (Placement_Symmetry_PROC.h) generate the orbit
+    // directly from each turn's angle (STEP23 ruling #1) — bit-check order tracks ascending
+    // bit value, so `Radial` runs last, after `QuarterTurns`.
     constexpr int Radial         = 1 << 4;
 }
 

@@ -1,7 +1,7 @@
 # Work-Order — Step 16: `Symmetry` global section — schema-v3 Correction 4 (minus `SymAlgorithm`)
 
 *Constitution §7. Executor: SanGen Coder. Implements `SANMAP_FORMAT_SPEC.md` Correction 4 and
-`ARCH.md` §13 (Radial N-fold symmetry), narrowed by an explicit ARCH Expert scoping ruling
+`ARCH_13_RadialSymmetry.md` §13 (Radial N-fold symmetry), narrowed by an explicit ARCH Expert scoping ruling
 obtained for this ticket (see "Ruled by this ticket" below) — the spec text has real ambiguity
 about `SymAlgorithm` this ticket resolves by consult rather than guessing.*
 
@@ -120,7 +120,7 @@ CPU only. No PROC change — `SymmetryAxis::Radial` and every new field in this 
 consumers (ruling #1/#3).
 
 ## ARCH rules invoked
-- `SANMAP_FORMAT_SPEC.md` Correction 4, `ARCH.md` §13 — binding, as narrowed by "Ruled by this
+- `SANMAP_FORMAT_SPEC.md` Correction 4, `ARCH_13_RadialSymmetry.md` §13 — binding, as narrowed by "Ruled by this
   ticket" above.
 - Constitution §8 — settings exist in PARAMS from the moment they're settable, no consumer
   required first (same precedent already established this session).

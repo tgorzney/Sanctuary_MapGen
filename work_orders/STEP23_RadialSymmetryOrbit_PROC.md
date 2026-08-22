@@ -1,6 +1,6 @@
 # Work-Order — Step 23: `AppendRadialTurns` — the N-way rotation orbit generator for `SymmetryAxis::Radial`
 
-*Constitution §2/§3/§6. Executor: SanGen Coder. Implements the PROC half of ARCH.md §13
+*Constitution §2/§3/§6. Executor: SanGen Coder. Implements the PROC half of `ARCH_13_RadialSymmetry.md` §13
 (Radial N-fold symmetry) that §13 itself explicitly deferred: "`Radial`'s own orbit-generation
 function... is new PROC work for a future coder work-order — not designed here," plus both of
 §13's "Two defects recorded this session, not fixed here" (`DecalRule`'s gap is already closed,
@@ -255,7 +255,7 @@ CPU only — matches STEP16's existing ruling. `ScatterRuleConfiguration`/GPU ga
 unchanged (ruling 4).
 
 ## ARCH rules invoked
-- `ARCH.md` §13 — binding, as extended by this ticket's three expert consults (rotation math,
+- `ARCH_13_RadialSymmetry.md` §13 — binding, as extended by this ticket's three expert consults (rotation math,
   buffer sizing, GPU-struct module boundary).
 - `DISPATCH_INTERFACE_SPEC` §4 — the ARCH Expert's ruling on this ticket clarifies (does not
   amend) that its field-mirroring clause governs shared-buffer struct integrity, not blanket
