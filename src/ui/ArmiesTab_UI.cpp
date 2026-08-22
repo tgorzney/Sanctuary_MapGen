@@ -6,6 +6,7 @@
 #include "Combo_UI.h"
 #include "DraggableListWidget_UI.h"
 #include "TextInput_UI.h"
+#include "../io/Sanmap_ArmyIdentity_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
 #include "imgui.h"
@@ -63,7 +64,7 @@ bool DrawArmiesGlobals(std::vector<Params::Army>& armies, ArmiesTabState& state)
     bool bArmiesMoved = false;
     if (ImGui::Button("Add Army")) {
         Params::Army army;
-        army.name = NextArmyName(static_cast<int>(armies.size()));
+        army.displayName = NextArmyDisplayName(static_cast<int>(armies.size()));
         armies.push_back(army);
         state.selectedArmyIndex = static_cast<int>(armies.size()) - 1;
         bArmiesMoved = true;
@@ -72,15 +73,18 @@ bool DrawArmiesGlobals(std::vector<Params::Army>& armies, ArmiesTabState& state)
     return bArmiesMoved;
 }
 
-// The selected army's own fields: name, alias, team color, faction and starting resources. None
-// of it notifies the driver (SCOPE NOTE 1) — nothing hashes or previews an army's own fields yet.
-// Reports whether the NAME committed, the only field the uniqueness repair cares about.
-bool DrawArmySettings(Params::Army& army, ArmiesTabState& state) {
-    TextInputRules nameRules;
-    nameRules.maximumLength = 48;
-    nameRules.bAllowEmpty   = false;
-    nameRules.fallbackText  = "Army";
-    const bool bNameCommitted = DrawTextInput("Name", army.name, nameRules).bCommitted;
+// The selected army's own fields: the read-only engine identity, the human-authored display name,
+// alias, team color, faction and starting resources. None of it notifies the driver (SCOPE NOTE 1)
+// — nothing hashes or previews an army's own fields yet. STEP76: the "Name" text input now binds
+// `displayName`, never the machine-owned `name` (ruling 2) — nothing downstream repairs a display
+// name, so nothing is reported back.
+void DrawArmySettings(Params::Army& army, ArmiesTabState& state) {
+    ImGui::TextDisabled("Engine ID: %s", army.name.c_str());   // machine-owned, ruling 2 — no input
+
+    TextInputRules displayNameRules;
+    displayNameRules.maximumLength = 48;
+    displayNameRules.bAllowEmpty   = true;    // display-only; blank is legal, ArmyRowLabel falls back
+    DrawTextInput("Name", army.displayName, displayNameRules);
 
     TextInputRules aliasRules;
     aliasRules.maximumLength = 48;
@@ -101,7 +105,6 @@ bool DrawArmySettings(Params::Army& army, ArmiesTabState& state) {
                      WidgetStyle(), "%.0f");
     DrawSliderScalar("Starting Energy", army.energy, state.energyRange, state.energyToggle,
                      WidgetStyle(), "%.0f");
-    return bNameCommitted;
 }
 
 } // namespace
@@ -109,24 +112,30 @@ bool DrawArmySettings(Params::Army& army, ArmiesTabState& state) {
 void DrawArmiesTab(Params::MapRecipe& recipe, ArmiesTabState& state,
                    Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
     ImGui::PushID("armiesTab");
-    bool bArmiesMoved = DrawArmiesGlobals(recipe.armies, state);
+    bool bRosterMutated = DrawArmiesGlobals(recipe.armies, state);
     if (DrawSectionBegin("Armies", state.armySection)) {
         const DraggableListSignal signal = DrawArmyList(recipe.armies, state.selectedArmyIndex);
-        if (signal.bHasSignal())
+        if (signal.bHasSignal()) {
             NotifyPlacementChange(ApplyArmyListSignal(recipe, state, signal), previewDriver);
+            // STEP76: Reorder AND Delete both change at least one army's roster position (Select
+            // does not, but re-minting on a Select frame is a free no-op — AssignArmyIdentities is
+            // idempotent), so every signal, not just Add, must reach the re-mint below.
+            bRosterMutated = true;
+        }
         Params::Army* const army = SelectedArmy(recipe.armies, state.selectedArmyIndex);
         if (army == nullptr) {
             ImGui::TextUnformatted("Add or select an army to edit it.");
         } else {
-            bArmiesMoved = DrawArmySettings(*army, state) || bArmiesMoved;
+            DrawArmySettings(*army, state);
             DrawArmyUnitList(recipe.unitRules, state.selectedArmyIndex, state.units, previewDriver,
                              iconManifest);
         }
         DrawSectionEnd();
     }
-    // The export keys armies by NAME, so the duplicate repair runs on the frames a name settled —
-    // not every frame, which would rename a row mid-typing (STEP20 ruling #5).
-    if (bArmiesMoved) MakeNamesUnique(recipe.armies);
+    // STEP76: the export keys armies by an identity SanGen now owns outright (ARMY_XX), not a
+    // human-authored name, so this re-mints rather than de-duplicates — the identity must stay
+    // correct across Add/Reorder/Delete with no window where a stale ARMY_XX could reach export.
+    if (bRosterMutated) Io::AssignArmyIdentities(recipe.armies);
     ImGui::PopID();
 }
 

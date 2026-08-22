@@ -7,12 +7,14 @@
 // `ordered_json` keeps the written key order stable so two exports of the same recipe diff clean.
 #pragma once
 #include <nlohmann/json.hpp>
+#include <vector>
 
 namespace SanmapGen {
-namespace Params { struct MapRecipe; struct LayerStack; }
+namespace Params { struct MapRecipe; struct LayerStack; struct Army; }
 namespace Io {
 
 struct MapExportOptions;
+struct MapExportResult;
 
 // The format's fixed 9 texture layers, filled from the recipe's `strata` (shorter is legal —
 // strata past the end are written on their defaults).
@@ -52,6 +54,12 @@ nlohmann::ordered_json BuildAreasJson(const Params::MapRecipe& recipe);
 // MapExporter_Armies_IO.cpp — `recipe.armies` -> the top-level `armies` dictionary (JSON object
 // keyed by Army::name, recursing through UnitGroup.groups/units).
 nlohmann::ordered_json BuildArmiesJson(const Params::MapRecipe& recipe);
+
+// MapExporter_Armies_IO.cpp — STEP76_ArmyIdentityNaming_IO §3c defensive export-time guard: verifies
+// (never rewrites) that every army's `name` already matches its roster-position `ARMY_XX` identity,
+// warning once per mismatch via `result`. A backstop for a caller that mutates `recipe.armies`
+// without going through `ArmiesTab_UI`'s own re-mint — should fire zero times in a healthy build.
+void CheckArmyIdentitiesWellFormed(const std::vector<Params::Army>& armies, MapExportResult& result);
 
 // MapExporter_Markers_IO.cpp — `recipe.markers` -> the top-level `markers` dictionary (two-level
 // JSON object keyed by MarkerInstanceGroup::name / MarkerTransform::name). Applies the coordinate

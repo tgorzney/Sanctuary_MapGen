@@ -439,7 +439,8 @@ void CheckArmiesAndAreas(const Params::MapRecipe& original, const Params::MapRec
     if (loaded.armies.empty()) return;
     const Params::Army& originalArmy = original.armies[0];
     const Params::Army& loadedArmy = loaded.armies[0];
-    Check(loadedArmy.name == originalArmy.name && loadedArmy.faction == originalArmy.faction
+    Check(loadedArmy.name == originalArmy.name && loadedArmy.displayName == originalArmy.displayName
+          && loadedArmy.faction == originalArmy.faction
           && NearlyEqual(loadedArmy.alloys, originalArmy.alloys)
           && NearlyEqual(loadedArmy.energy, originalArmy.energy)
           && loadedArmy.alias == originalArmy.alias, "the army's own fields survive");
@@ -937,7 +938,13 @@ void FillFixtureArmiesAndAreas(Params::MapRecipe& recipe) {
     group.units.push_back(unit);
 
     Params::Army army;
-    army.name = "Army One";
+    // STEP76_ArmyIdentityNaming_IO: `name` is now the machine-owned engine identity (never a
+    // human-authored string) — a fixture value must already be ARMY_XX-shaped, or the unconditional
+    // import-side normalizer (MapImporter_ArmyIdentityNormalize_IO.cpp) rewrites it and logs a
+    // warning, breaking this test's own `warningCount == 0` round-trip assertion below. The
+    // human-authored label this position used to carry now lives on `displayName` instead.
+    army.name = "ARMY_01";
+    army.displayName = "Army One";
     army.faction = Params::Faction::Guard;
     army.alloys = 750.0f;
     army.energy = 600.0f;

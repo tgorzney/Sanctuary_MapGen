@@ -13,6 +13,7 @@
 // top-level key (Constitution §6) and reads no sibling domain's key; every pre-STEP35 ordering
 // comment said only "before the mapGeneratorData gate," never "before/after sibling domain X" —
 // confirmed by re-reading every reader's own file, and by the full round-trip suite staying green.
+#include "MapImporter_ArmyIdentityNormalize_IO.h"
 #include "MapImporter_IO.h"
 #include "MapImporter_Recipe_IO.h"
 #include "Sanmap_MigrationRunner_IO.h"
@@ -58,6 +59,12 @@ void ParseDocumentEnvelopeJson(const nlohmann::json& document, const MapImportOp
 // runs after `stratumLayers` so its cardinality check sees that array's already-grown length. NOT
 // alongside `ReadStrataSettingsJson` (ParseSanmapJsonText's gated tail): that one merges the
 // separate legacy `mapGeneratorData.Stratums` blob onto whatever this function already wrote.
+//
+// ⚠️ STEP76_ArmyIdentityNaming_IO §4b: `NormalizeArmyIdentities` runs LAST, at the END of this
+// function, not beside `ReadArmiesJson`. It rewrites BOTH `outRecipe.armies` AND
+// `outRecipe.markers` (the `"Spawn"` group's key references), and `ReadArmiesJson` runs before
+// `ReadMarkersJson` below — calling the normalizer any earlier would rewrite armies while
+// `outRecipe.markers` was still empty, silently orphaning every spawn marker.
 void ParseEntityDomainsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
                             MapImportResult& result) {
     ReadAreasJson(document, outRecipe);
@@ -70,6 +77,7 @@ void ParseEntityDomainsJson(const nlohmann::json& document, Params::MapRecipe& o
     ReadDecalsJson(document, outRecipe, result);
     ReadStratumLayersJson(document, outRecipe, result);
     ReadStratumGenerationSettingsJson(document, outRecipe, result);
+    NormalizeArmyIdentities(outRecipe, result);
 }
 
 // `MarkersStack`/`GlobalMarkerSettings`/`PropsStack`/`DecalsStack`/`UnitsStack` — the placement-rule

@@ -7,10 +7,12 @@
 // list walks, so the binary needs no imgui frame, no window and no GL context.
 #include "ArmiesTab_UI.h"
 #include "DraggableListWidget_UI.h"
+#include "../io/Sanmap_ArmyIdentity_IO.h"
 #include <cstdio>
 #include <string>
 
 using namespace SanmapGen;
+using namespace SanmapGen::Io;
 using namespace SanmapGen::Ui;
 
 namespace {
@@ -89,14 +91,18 @@ void RunArmyReorderRenumberChecks() {
 // A renamed AND reordered army's unit rules still resolve to the correct army afterward — the
 // combined case the acceptance test calls for. Mirrors ApplyArmyListSignal's own order: the
 // renumber runs BEFORE the armies vector itself moves (it needs the pre-move army count).
+// STEP76: `name` is machine-owned engine identity now, never a human-authored string — this test's
+// labels ("Alpha"/"Bravo"/"Charlie"/"Beta") are display labels, so they retarget to `displayName`.
+// `unitRules[*].armyIndex` stays untouched: it is positional and unaffected by the name/displayName
+// split.
 void RunCombinedRenameReorderChecks() {
     std::vector<Params::Army> armies(3);
-    armies[0].name = "Alpha";
-    armies[1].name = "Bravo";
-    armies[2].name = "Charlie";
+    armies[0].displayName = "Alpha";
+    armies[1].displayName = "Bravo";
+    armies[2].displayName = "Charlie";
     std::vector<Params::UnitRule> unitRules = MakeUnitRules();   // Alpha, Bravo, Alpha, Charlie
 
-    armies[1].name = "Beta";   // a plain rename: no index churn at all
+    armies[1].displayName = "Beta";   // a plain rename: no index churn at all
 
     const int armyCountBeforeMove = static_cast<int>(armies.size());
     Check(RenumberUnitRuleArmyIndicesForReorder(unitRules, 0, 2, armyCountBeforeMove),
@@ -106,17 +112,45 @@ void RunCombinedRenameReorderChecks() {
     signal.sourceRowIndex = 0;
     signal.targetRowIndex = 2;
     Check(ApplyDraggableListSignal(armies, signal), "the armies vector itself reorders");
-    Check(armies[0].name == "Beta" && armies[1].name == "Charlie" && armies[2].name == "Alpha",
+    Check(armies[0].displayName == "Beta" && armies[1].displayName == "Charlie"
+          && armies[2].displayName == "Alpha",
           "Alpha now sits at the end; Beta and Charlie shifted down to take its old slots");
 
-    Check(armies[static_cast<std::size_t>(unitRules[0].armyIndex)].name == "Alpha",
+    Check(armies[static_cast<std::size_t>(unitRules[0].armyIndex)].displayName == "Alpha",
           "rule 0 still resolves to Alpha");
-    Check(armies[static_cast<std::size_t>(unitRules[1].armyIndex)].name == "Beta",
+    Check(armies[static_cast<std::size_t>(unitRules[1].armyIndex)].displayName == "Beta",
           "rule 1 still resolves to the renamed Beta");
-    Check(armies[static_cast<std::size_t>(unitRules[2].armyIndex)].name == "Alpha",
+    Check(armies[static_cast<std::size_t>(unitRules[2].armyIndex)].displayName == "Alpha",
           "rule 2 still resolves to Alpha");
-    Check(armies[static_cast<std::size_t>(unitRules[3].armyIndex)].name == "Charlie",
+    Check(armies[static_cast<std::size_t>(unitRules[3].armyIndex)].displayName == "Charlie",
           "rule 3 still resolves to Charlie");
+}
+
+// STEP76 §7's required new case: after a Reorder signal moves the armies vector itself, re-minting
+// (as DrawArmiesTab does on every frame a DraggableListSignal fired) puts the engine identities back
+// in ARMY_01/ARMY_02/... roster order — while the display labels keep following their own row,
+// proving identity is positional and display is not (mirrors Sanmap_ArmyIdentity_IO_Test.cpp's own
+// reorder case, but through the tab's actual ApplyDraggableListSignal + AssignArmyIdentities
+// sequence, not the helper in isolation).
+void RunReorderPreservesArmyIdentityOrderChecks() {
+    std::vector<Params::Army> armies(3);
+    armies[0].displayName = "North";
+    armies[1].displayName = "Center";
+    armies[2].displayName = "South";
+    AssignArmyIdentities(armies);   // the tab's own initial re-mint: ARMY_01/ARMY_02/ARMY_03
+
+    DraggableListSignal signal;
+    signal.kind = DraggableListSignalKind::Reorder;
+    signal.sourceRowIndex = 0;
+    signal.targetRowIndex = 2;
+    Check(ApplyDraggableListSignal(armies, signal), "the reorder signal applies");
+    Check(AssignArmyIdentities(armies), "and the post-signal re-mint reports the move");
+
+    Check(armies[0].name == "ARMY_01" && armies[1].name == "ARMY_02" && armies[2].name == "ARMY_03",
+          "after a Reorder signal, re-minting puts identities back in ARMY_01/ARMY_02/... order");
+    Check(armies[0].displayName == "Center" && armies[1].displayName == "South"
+          && armies[2].displayName == "North",
+          "display labels followed their own row through the reorder, unlike the identity");
 }
 
 // The unit list is virtualized over an INDEX list rebuilt each frame, because one army's rules are
@@ -168,8 +202,9 @@ void RunArmySelectionChecks() {
 
     Check(ArmyRowLabel(armies[0]) != nullptr && ArmyRowLabel(armies[0])[0] != '\0',
           "an unnamed army still draws a label");
-    armies[0].name = "Left";
-    Check(std::string(ArmyRowLabel(armies[0])) == "Left", "a named one draws its name");
+    // STEP76: the row label draws `displayName`, never the machine-owned `name` (ruling 2).
+    armies[0].displayName = "Left";
+    Check(std::string(ArmyRowLabel(armies[0])) == "Left", "a named one draws its display name");
 
     const ArmiesTabState state;
     Check(state.alloysRange.maximumValue >= 100000.0f && state.energyRange.maximumValue >= 1000000.0f,
@@ -180,24 +215,29 @@ void RunArmySelectionChecks() {
           "the faction labels name Params::Faction, not the v1 Supreme Commander leftovers");
 }
 
-// The export keys armies by NAME, so two blank "Add Army" clicks must never collide.
-void RunArmyNameUniquenessChecks() {
+// STEP76: the export key is now the machine-minted `name` (ARMY_XX, never colliding by
+// construction — AssignArmyIdentities is exercised directly by Sanmap_ArmyIdentity_IO_Test.cpp), so
+// `MakeNamesUnique` no longer runs against armies at all (`displayName` duplicates are explicitly
+// legal — out of scope). What's left worth checking here: `NextArmyDisplayName` still seeds a
+// distinct DEFAULT label per "Add Army" click, and a colliding `displayName` is left exactly as
+// authored, with no repair — the opposite of the old behavior this test used to assert.
+void RunArmyDisplayNameDefaultsChecks() {
     std::vector<Params::Army> armies;
     Params::Army firstArmy;
-    firstArmy.name = NextArmyName(static_cast<int>(armies.size()));
+    firstArmy.displayName = NextArmyDisplayName(static_cast<int>(armies.size()));
     armies.push_back(firstArmy);
     Params::Army secondArmy;
-    secondArmy.name = NextArmyName(static_cast<int>(armies.size()));
+    secondArmy.displayName = NextArmyDisplayName(static_cast<int>(armies.size()));
     armies.push_back(secondArmy);
-    Check(armies[0].name != armies[1].name,
-          "two 'Add Army' clicks in a row already produce distinct names");
-    Check(!MakeNamesUnique(armies), "and the shared repair confirms nothing needed fixing");
+    Check(armies[0].displayName != armies[1].displayName,
+          "two 'Add Army' clicks in a row already seed distinct default display labels");
 
-    // The pathological case the repair exists for: two rows that DO collide (e.g. a designer typed
-    // over one name to match the other).
-    armies[1].name = armies[0].name;
-    Check(MakeNamesUnique(armies), "a genuine collision reports the repair");
-    Check(armies[0].name != armies[1].name, "and the later row is the one that gets suffixed");
+    // Unlike the retired name-uniqueness repair: two armies MAY share a displayName (STEP76 ruling
+    // 3) — they are still ARMY_01/ARMY_02 to the engine, which is what actually keeps them distinct
+    // on export. Nothing rewrites a colliding displayName.
+    armies[1].displayName = armies[0].displayName;
+    Check(armies[0].displayName == armies[1].displayName,
+          "a colliding displayName is legal and left exactly as authored — no repair runs");
 }
 
 } // namespace
@@ -206,10 +246,11 @@ int main() {
     RunArmyRemovalChecks();
     RunArmyReorderRenumberChecks();
     RunCombinedRenameReorderChecks();
+    RunReorderPreservesArmyIdentityOrderChecks();
     RunUnitRuleFilterChecks();
     RunUnitRuleMirrorChecks();
     RunArmySelectionChecks();
-    RunArmyNameUniquenessChecks();
+    RunArmyDisplayNameDefaultsChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

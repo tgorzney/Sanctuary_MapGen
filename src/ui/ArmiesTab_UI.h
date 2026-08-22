@@ -66,15 +66,18 @@ inline Params::Army* SelectedArmy(std::vector<Params::Army>& armies, int selecte
     return &armies[static_cast<std::size_t>(selectedArmyIndex)];
 }
 
-// The label an army row shows — never empty (Constitution §6).
+// The label an army row shows — the human-authored `displayName`, falling back to the machine-owned
+// engine identity (`name`) and then to a literal — never empty (Constitution §6, STEP76 §3b).
 inline const char* ArmyRowLabel(const Params::Army& army) {
+    if (!army.displayName.empty()) return army.displayName.c_str();
     return army.name.empty() ? "Army" : army.name.c_str();
 }
 
-// The name "Add Army" seeds a fresh row with, before the shared uniqueness repair runs — a thin
-// domain wrapper over the shared cross-entity template (UniqueNameList_UI.h, STEP20 ruling #5),
-// mirroring AreasTab_List_UI.h's `NextAreaName`.
-inline std::string NextArmyName(int armyCount) { return NextUniqueLabel("Army", armyCount); }
+// The display name "Add Army" seeds a fresh row with — a thin domain wrapper over the shared
+// cross-entity template (UniqueNameList_UI.h, STEP20 ruling #5), mirroring AreasTab_List_UI.h's
+// `NextAreaName`. STEP76: repointed onto `displayName` (never `name` — that field is machine-owned
+// and never fed through this or any other uniqueness repair).
+inline std::string NextArmyDisplayName(int armyCount) { return NextUniqueLabel("Army", armyCount); }
 
 // Repairs `recipe.unitRules` after an army row is removed: rules that spawned for the removed
 // army are DROPPED (they can no longer name an owner) and every rule above it shifts down one, so
