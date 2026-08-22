@@ -193,6 +193,22 @@ void RunPropLayerNameUniquenessChecks() {
     Check(propLayers[0].name != propLayers[1].name, "and the later row is the one that gets suffixed");
 }
 
+// STEP56 (`ARCH_14_13_OpenItems.md` §14.13 item 3, Work-Order A): a newly created layer's `layerId`
+// derives as max-plus-one across the current in-memory `propLayers`, never a stored counter.
+void RunNextPropLayerIdChecks() {
+    std::vector<Params::PropInstanceLayer> propLayers;
+    Check(NextPropLayerId(propLayers) == 0, "an empty propLayers vector mints id 0");
+
+    Params::PropInstanceLayer firstLayer;
+    firstLayer.layerId = 0;
+    propLayers.push_back(firstLayer);
+    Params::PropInstanceLayer secondLayer;
+    secondLayer.layerId = 2;
+    propLayers.push_back(secondLayer);
+    Check(NextPropLayerId(propLayers) == 3,
+          "ids {0, 2} mint 3 - max-plus-one, not count-based");
+}
+
 } // namespace
 
 int main() {
@@ -203,6 +219,7 @@ int main() {
     RunPropLayerRemovalChecks();
     RunPropLayerReorderRenumberChecks();
     RunPropLayerNameUniquenessChecks();
+    RunNextPropLayerIdChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

@@ -537,6 +537,9 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
 void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
     Check(loaded.propLayers.size() == 1, "one prop layer survives");
     Check(loaded.props.size() == 1, "one prop group survives");
+    if (!loaded.propLayers.empty())
+        Check(loaded.propLayers[0].layerId == original.propLayers[0].layerId,
+              "PropInstanceLayer::layerId survives the live BuildSanmapJsonText/ParseSanmapJsonText path");
     if (!loaded.propLayers.empty() && !loaded.props.empty()) {
         const Params::PropInstanceGroup& originalGroup = original.props[0];
         const Params::PropInstanceGroup& loadedGroup = loaded.props[0];
@@ -558,6 +561,9 @@ void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRec
 
     Check(loaded.decalLayers.size() == 1, "one decal layer survives");
     Check(loaded.decals.size() == 1, "one decal group survives");
+    if (!loaded.decalLayers.empty())
+        Check(loaded.decalLayers[0].layerId == original.decalLayers[0].layerId,
+              "DecalInstanceLayer::layerId survives the live BuildSanmapJsonText/ParseSanmapJsonText path");
     if (!loaded.decalLayers.empty() && !loaded.decals.empty()) {
         const Params::DecalInstanceGroup& originalGroup = original.decals[0];
         const Params::DecalInstanceGroup& loadedGroup = loaded.decals[0];
@@ -983,6 +989,7 @@ void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
     propLayer.color[0] = 0.1f; propLayer.color[1] = 0.2f;
     propLayer.color[2] = 0.3f; propLayer.color[3] = 0.4f;
     propLayer.iconScale = 1.5f;
+    propLayer.layerId = 7;                    // non-default: exercises the "Id" wire key round-trip
     recipe.propLayers.push_back(propLayer);
 
     Params::PropTransform propTransform;
@@ -1005,6 +1012,7 @@ void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
     decalLayer.color[0] = 0.5f; decalLayer.color[1] = 0.6f;
     decalLayer.color[2] = 0.7f; decalLayer.color[3] = 0.8f;
     decalLayer.iconScale = 0.75f;
+    decalLayer.layerId = 7;                     // non-default: exercises the "Id" wire key round-trip
     recipe.decalLayers.push_back(decalLayer);
 
     Params::DecalTransform decalTransform;

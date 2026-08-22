@@ -73,6 +73,7 @@ bool DrawLayerListButtons(std::vector<Params::PropInstanceLayer>& propLayers, Ma
     if (!ImGui::Button("Add Prop Layer")) return false;
     Params::PropInstanceLayer layer;
     layer.name = NextPropLayerName(static_cast<int>(propLayers.size()));
+    layer.layerId = NextPropLayerId(propLayers);
     propLayers.push_back(layer);
     state.selectedLayerIndex = static_cast<int>(propLayers.size()) - 1;
     return true;

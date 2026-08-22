@@ -93,6 +93,7 @@ void ReadDecalGroupsJson(const nlohmann::json& document, Params::MapRecipe& outR
     outRecipe.decalLayers.clear();
     for (const nlohmann::json& layerJson : document["DecalGroups"]) {
         Params::DecalInstanceLayer layer;
+        layer.layerId = static_cast<int>(outRecipe.decalLayers.size());   // legacy-backfill default
         if (layerJson.is_object()) {
             ReadJsonText(layerJson, "Name", layer.name);
             if (layerJson.contains("Color") && layerJson["Color"].is_object()) {
@@ -103,6 +104,7 @@ void ReadDecalGroupsJson(const nlohmann::json& document, Params::MapRecipe& outR
                 ReadJsonFloat(color, "a", layer.color[3]);
             }
             ReadJsonFloat(layerJson, "IconScale", layer.iconScale);
+            ReadJsonInteger(layerJson, "Id", layer.layerId);
         }
         outRecipe.decalLayers.push_back(layer);
     }

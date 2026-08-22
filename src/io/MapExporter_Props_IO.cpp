@@ -64,6 +64,7 @@ nlohmann::ordered_json BuildPropGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["Color"] = { { "r", layer.color[0] }, { "g", layer.color[1] },
                                { "b", layer.color[2] }, { "a", layer.color[3] } };
         layerJson["IconScale"] = layer.iconScale;
+        layerJson["Id"] = layer.layerId;
         propGroups.push_back(layerJson);
     }
     return propGroups;

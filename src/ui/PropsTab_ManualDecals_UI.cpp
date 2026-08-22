@@ -74,6 +74,7 @@ bool DrawLayerListButtons(std::vector<Params::DecalInstanceLayer>& decalLayers, 
     if (!ImGui::Button("Add Decal Layer")) return false;
     Params::DecalInstanceLayer layer;
     layer.name = NextDecalLayerName(static_cast<int>(decalLayers.size()));
+    layer.layerId = NextDecalLayerId(decalLayers);
     decalLayers.push_back(layer);
     state.selectedLayerIndex = static_cast<int>(decalLayers.size()) - 1;
     return true;

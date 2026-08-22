@@ -27,8 +27,8 @@ struct DecalInstanceGroup { std::string blueprintPath; std::vector<DecalTransfor
 // Third session (ARCH §12): the separate manual-layer metadata array, one entry per authored
 // layer, indexed by PropTransform/DecalTransform::layerIndex. Same shape for both domains. Wire
 // keys are `PropGroups`/`DecalGroups` (SANMAP_FORMAT_SPEC Correction 14), PascalCase.
-struct PropInstanceLayer  { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; };
-struct DecalInstanceLayer { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; };
+struct PropInstanceLayer  { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; int layerId = -1; };
+struct DecalInstanceLayer { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; int layerId = -1; };
 
 } // namespace Params
 } // namespace SanmapGen

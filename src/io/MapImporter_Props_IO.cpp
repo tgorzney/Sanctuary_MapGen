@@ -100,6 +100,7 @@ void ReadPropGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRe
     outRecipe.propLayers.clear();
     for (const nlohmann::json& layerJson : document["PropGroups"]) {
         Params::PropInstanceLayer layer;
+        layer.layerId = static_cast<int>(outRecipe.propLayers.size());   // legacy-backfill default
         if (layerJson.is_object()) {
             ReadJsonText(layerJson, "Name", layer.name);
             if (layerJson.contains("Color") && layerJson["Color"].is_object()) {
@@ -110,6 +111,7 @@ void ReadPropGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRe
                 ReadJsonFloat(color, "a", layer.color[3]);
             }
             ReadJsonFloat(layerJson, "IconScale", layer.iconScale);
+            ReadJsonInteger(layerJson, "Id", layer.layerId);
         }
         outRecipe.propLayers.push_back(layer);
     }

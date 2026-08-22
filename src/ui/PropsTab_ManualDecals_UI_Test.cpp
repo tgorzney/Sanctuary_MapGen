@@ -146,6 +146,22 @@ void RunDecalLayerNameUniquenessChecks() {
     Check(decalLayers[0].name != decalLayers[1].name, "and the later row is the one that gets suffixed");
 }
 
+// STEP56 (`ARCH_14_13_OpenItems.md` §14.13 item 3, Work-Order A): decal-typed mirror of
+// `RunNextPropLayerIdChecks`.
+void RunNextDecalLayerIdChecks() {
+    std::vector<Params::DecalInstanceLayer> decalLayers;
+    Check(NextDecalLayerId(decalLayers) == 0, "an empty decalLayers vector mints id 0");
+
+    Params::DecalInstanceLayer firstLayer;
+    firstLayer.layerId = 0;
+    decalLayers.push_back(firstLayer);
+    Params::DecalInstanceLayer secondLayer;
+    secondLayer.layerId = 2;
+    decalLayers.push_back(secondLayer);
+    Check(NextDecalLayerId(decalLayers) == 3,
+          "ids {0, 2} mint 3 - max-plus-one, not count-based");
+}
+
 } // namespace
 
 int main() {
@@ -153,6 +169,7 @@ int main() {
     RunDecalLayerRemovalChecks();
     RunDecalLayerReorderRenumberChecks();
     RunDecalLayerNameUniquenessChecks();
+    RunNextDecalLayerIdChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

@@ -41,6 +41,7 @@ Params::MapRecipe BuildFixtureRecipe() {
     propLayer.color[0] = 0.1f; propLayer.color[1] = 0.2f;
     propLayer.color[2] = 0.3f; propLayer.color[3] = 0.4f;
     propLayer.iconScale = 1.5f;
+    propLayer.layerId = 7;                    // non-default: exercises the "Id" wire key round-trip
     recipe.propLayers.push_back(propLayer);   // index 0 — the only valid propLayers index
 
     Params::PropTransform inRangeProp;
@@ -68,6 +69,7 @@ Params::MapRecipe BuildFixtureRecipe() {
     decalLayer.color[0] = 0.5f; decalLayer.color[1] = 0.6f;
     decalLayer.color[2] = 0.7f; decalLayer.color[3] = 0.8f;
     decalLayer.iconScale = 0.75f;
+    decalLayer.layerId = 7;                     // non-default: exercises the "Id" wire key round-trip
     recipe.decalLayers.push_back(decalLayer);   // index 0 — the only valid decalLayers index
 
     Params::DecalTransform inRangeDecal;
@@ -132,6 +134,8 @@ void RunPropsDecalsRoundTripTests() {
               "PropInstanceLayer::color survives all four components");
         Check(NearlyEqual(loadedLayer.iconScale, originalLayer.iconScale),
               "PropInstanceLayer::iconScale survives");
+        Check(loadedLayer.layerId == originalLayer.layerId,
+              "PropInstanceLayer::layerId survives through the 'Id' wire key");
     }
 
     // --- PropInstanceGroup / props -----------------------------------------------------------
@@ -183,6 +187,8 @@ void RunPropsDecalsRoundTripTests() {
               "DecalInstanceLayer::color survives all four components");
         Check(NearlyEqual(loadedLayer.iconScale, originalLayer.iconScale),
               "DecalInstanceLayer::iconScale survives");
+        Check(loadedLayer.layerId == originalLayer.layerId,
+              "DecalInstanceLayer::layerId survives through the 'Id' wire key");
     }
 
     // --- DecalInstanceGroup / decals ---------------------------------------------------------
@@ -219,10 +225,41 @@ void RunPropsDecalsRoundTripTests() {
     }
 }
 
+// STEP56 (`ARCH_14_13_OpenItems.md` §14.13 item 3, Work-Order A): an entry with no "Id" key
+// legacy-backfills `layerId` from its array position — already unique, safe going forward.
+void RunPropDecalGroupsLegacyBackfillTests() {
+    nlohmann::ordered_json document;
+    document["PropGroups"] = nlohmann::json::array({
+        nlohmann::json{ { "Name", "First" } },
+        nlohmann::json{ { "Name", "Second" } },
+    });
+    document["DecalGroups"] = nlohmann::json::array({
+        nlohmann::json{ { "Name", "First" } },
+        nlohmann::json{ { "Name", "Second" } },
+    });
+
+    Params::MapRecipe loaded;
+    Io::ReadPropGroupsJson(document, loaded);
+    Io::ReadDecalGroupsJson(document, loaded);
+
+    Check(loaded.propLayers.size() == 2, "both legacy PropGroups entries survive");
+    if (loaded.propLayers.size() == 2) {
+        Check(loaded.propLayers[0].layerId == 0, "the first legacy PropGroups entry backfills layerId 0");
+        Check(loaded.propLayers[1].layerId == 1, "the second legacy PropGroups entry backfills layerId 1");
+    }
+
+    Check(loaded.decalLayers.size() == 2, "both legacy DecalGroups entries survive");
+    if (loaded.decalLayers.size() == 2) {
+        Check(loaded.decalLayers[0].layerId == 0, "the first legacy DecalGroups entry backfills layerId 0");
+        Check(loaded.decalLayers[1].layerId == 1, "the second legacy DecalGroups entry backfills layerId 1");
+    }
+}
+
 } // namespace
 
 int main() {
     RunPropsDecalsRoundTripTests();
+    RunPropDecalGroupsLegacyBackfillTests();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;
