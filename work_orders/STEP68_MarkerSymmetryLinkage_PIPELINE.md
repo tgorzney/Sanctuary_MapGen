@@ -50,18 +50,28 @@ CPU-only by design).
 ## Solution — shape
 
 ### 1. New field
+
+**⚠️ Correction 2026-08-22:** the snippet below originally showed `layerIndex` as if already
+present, annotated "from STEP60." **STEP60 has not landed as of this ticket's dispatch** — the
+current shipped `MarkerTransform` (`src/params/MarkerInstance_PARAMS.h`) has only 3 fields
+(`name`, `transform`, `alias`). This ticket adds exactly ONE new field, as the 4th member, after
+`alias`. Do not add `layerIndex` here — that is STEP60's field, on its own independent schedule;
+if STEP60 has landed by the time this ticket is implemented, add `symmetryGroupIdentifier` after
+whatever fields already exist, in whatever order results — the field's own meaning doesn't depend
+on its position.
+
 ```cpp
-// MarkerInstance_PARAMS.h
+// MarkerInstance_PARAMS.h — current shipped shape, before this ticket:
+// struct MarkerTransform { std::string name; InstancedTransform transform; std::string alias; };
 struct MarkerTransform {
     std::string name;
     InstancedTransform transform;
     std::string alias;
-    int layerIndex = 0;                  // from STEP60, unchanged by this ticket
     int symmetryGroupIdentifier = 0;     // NEW — 0 = ungrouped, per Correction 16
 };
 ```
 Wire: direct field injection into `markers[type].transforms[name]`, lowerCamelCase, same merge
-rule as `alias`/`layerIndex` (Correction 16, already ratified — no new format ruling needed here).
+rule `alias` already uses (Correction 16, already ratified — no new format ruling needed here).
 No range to validate on import — `0` is always legal, any positive value accepted as-is.
 
 ### 2. The PIPELINE wrapper
@@ -143,7 +153,8 @@ PARAMS+IO+thin-wrapper additions this session.
 ## Acceptance test
 1. Wire round-trip: a `MarkerTransform` with non-zero `symmetryGroupIdentifier` survives export→
    import exactly, at the correct wire location (`markers[type].transforms[name]`, sibling of
-   `alias`/`layerIndex`).
+   `alias` — and of `layerIndex` too, if STEP60 has landed by the time this is implemented;
+   its presence or absence doesn't change this ticket's own field or its test).
 2. Wrapper unit test (pure, no imgui/GL, no marker types involved — proving the function is
    genuinely domain-agnostic): `Params::Geometry` with `mapSize = 256`, `worldUnitsPerCell = 2.0f`;
    `BuildWorldSymmetryOrbit(geometry, MirrorAcrossX, 0, 40.0f, 100.0f, points,

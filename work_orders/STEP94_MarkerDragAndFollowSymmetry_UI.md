@@ -327,7 +327,8 @@ type" rather than growing `MapCanvas` directly):
   (`SetManualMarkerDragSource(std::vector<Params::MarkerInstanceGroup>* markers, const
   std::vector<Params::MarkerInstanceLayer>* markerLayers, const Params::Geometry* geometry, const
   Params::MapRecipe* recipeForGlobalSymmetry)` — mutable `markers` pointer, everything else
-  read-only, injected the same way `SetPreviewComposite`/`SetMarkerPickingSource` already are
+  read-only, injected per STEP48's own specified setter shape for `SetPreviewComposite`/
+  `SetMarkerPickingSource` (neither landed yet as of this ticket's dispatch, same as this one)
   (STEP48's own ruling: an injected pointer beats a callback re-pushing derived state, "exactly the
   ...second copy... anti-pattern" — cited directly as precedent for this identical shape, not
   re-argued from scratch), a couple of forwarding method declarations.

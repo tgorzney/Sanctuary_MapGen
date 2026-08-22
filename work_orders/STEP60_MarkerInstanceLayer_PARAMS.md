@@ -47,6 +47,29 @@ Work-Order A for Props/Decals, is pure PARAMS+IO plumbing with **zero rendering/
 
 ## Fix
 
+### 0. ⚠️ Correction 2026-08-22 — missing prerequisite type, added here
+
+This ticket's §1 uses `Params::SymmetrySetting`, citing `ARCH_16_01_NewParamsShapes.md` §16.1 as
+if the struct already exists. **It does not — confirmed absent anywhere in `src/` (zero matches).**
+The ratifying ARCH section defines it as design law but no ticket had actually created the type
+until now. Add it first, in `src/params/Symmetry_PARAMS.h`, alongside the existing
+`SymmetryDetection`/`SymmetryBlend` types:
+
+```cpp
+// Symmetry_PARAMS.h — new
+struct SymmetrySetting {
+    bool bSymmetryUseGlobal = true;
+    int  symmetryMask       = 0;
+    int  radialSymmetryRepeatCount = 3;
+};
+```
+
+Then `#include "Symmetry_PARAMS.h"` in `MarkerInstance_PARAMS.h` before using it below. (This same
+struct is independently specified, verbatim identical, in `STEP66_MarkerRuleLayer_PARAMS.md` §Solution
+— whichever of STEP60/STEP66 lands first defines it; the other must check for its existence before
+re-adding it, exactly the same "first ticket to land wins" rule already used elsewhere in this
+backlog for shared primitives, e.g. `ReadTextFileBytes` between STEP71/STEP72.)
+
 ### 1. New type + new field — `MarkerInstance_PARAMS.h`
 ```cpp
 struct MarkerInstanceLayer {

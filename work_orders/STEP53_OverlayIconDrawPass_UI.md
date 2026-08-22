@@ -7,7 +7,7 @@ keep separate — coder's call"; 3.4's own note: "wired into 3.1's draw pass"). 
 deliverable of ARCH_14_PreviewOverlayLayering.md §14's redesign: the first code that actually draws Alloy/Spawns-Armies/Units/
 Props/Decals overlay icons on the canvas at all.
 
-**Depends on four prerequisites, none implemented yet — this ticket is not dispatchable until
+**Depends on five prerequisites, none implemented yet — this ticket is not dispatchable until
 they land, and only consumes their public surface, never invents a substitute for any of them:**
 - **STEP47** (Phase 1.1, **DRAFTED**, `STEP47_WorldScreenProjection_UI.md`) — world<->screen
   projection: `PreviewComposite::WorldToPreviewPixel()`/`PixelsPerPreviewCell()`,
@@ -18,10 +18,72 @@ they land, and only consumes their public surface, never invents a substitute fo
 - **STEP51** (Phase 2.1) — the `OverlayLayer_UI`/`OverlayDomainKind_UI`/`OverlaySubLayerRef_UI`
   data model and the `overlayLayers` stack itself (§14.2).
 - **STEP52** (Phase 2.2) — the `templateIdentifier -> {thumbnailIconId, strategicIconId}` atlas
-  pairing lookup (§14.3), plus (bundled under this same umbrella per this ticket's own brief) the
-  Phase 2.3 placeholder `templateIdentifier -> baseFootprintWidth/Depth` table §14.3's thumbnail
-  formula needs. Phase 2.3 is a distinct sequence item from 2.2; noted separately below wherever it
-  matters so the two are not conflated.
+  pairing lookup (§14.3).
+- **STEP58** (Phase 2.3) — the placeholder `templateIdentifier -> baseFootprintWidth/Depth` table
+  (`Io::WorldFootprintSizeTable`) §14.3's thumbnail formula needs.
+
+  **⚠️ Correction 2026-08-22 — the bundling this ticket originally assumed never happened.** This
+  ticket's text used to say STEP58's table wiring was "bundled under this same umbrella per this
+  ticket's own brief" as part of STEP52. It is not — verified directly: `STEP52_IconAtlasPairingLookup_UI.md`'s
+  own "Explicit out-of-scope" section names "the `baseFootprintWidth/Depth` table (Phase 2.3, a
+  separate READY sequence item)" as something it deliberately does NOT wire. `STEP58_WorldFootprintSizeTable_IO.md`
+  likewise explicitly declines to wire itself in, calling that "STEP51's or STEP52's job at their
+  own dispatch time." No ticket anywhere actually does it — **this ticket now does, in §0 below**,
+  since it is the one ticket that actually needs the wired accessor to exist.
+
+## 0. Wiring STEP58's footprint table — this ticket's own job (correction, see above)
+
+Mirrors STEP52's own `IconAtlasPairingLookup` wiring pattern exactly (`Application_AssetBridge_UI.h`
+field → populate in `LoadAssetAtlas()` → public accessor on `Application_UI.h`), for
+`Io::WorldFootprintSizeTable` instead:
+
+```cpp
+// Application_AssetBridge_UI.h — new include + field, next to iconPairingLookup
+#include "../io/WorldFootprintSizeTable_IO.h"
+...
+Io::WorldFootprintSizeTable   worldFootprintSizeTable;
+```
+
+```cpp
+// Application_Assets_UI.cpp, LoadAssetAtlas() — populate alongside iconPairingLookup.
+// Unlike iconPairingLookup, this table's content isn't derived from the loaded atlas at all
+// (it's STEP58's hand-seeded placeholder, Io::BuildPlaceholderWorldFootprintSizeTable()) — call
+// it once, unconditionally, not gated on atlas-load success:
+assetBridge.worldFootprintSizeTable = Io::BuildPlaceholderWorldFootprintSizeTable();
+```
+
+```cpp
+// Application_UI.h — new accessor, next to IconPairingLookup()
+const Io::WorldFootprintSizeTable& WorldFootprintSizeTable() const { return assetBridge.worldFootprintSizeTable; }
+```
+
+**⚠️ Correction 2026-08-22 (second pass) — the accessor above is NOT what the draw pass calls.**
+`MapCanvas` has no `Application` reference anywhere (confirmed: `src/ui/MapCanvas_UI.h` holds no
+such pointer/member) and the real call site, `Application_Draw_UI.cpp:54`'s bare
+`canvas.Draw("mapCanvas", regionSide);`, has no path back to `Application`. This codebase already
+ratified how `MapCanvas` receives exactly this kind of cross-cutting state — STEP48's own
+"RESOLVED — ARCH ruling" section: a push-in setter/pointer, the same mechanism
+`SetPreviewComposite`/`SetMarkerPickingSource`/`SetMarkerPickRadiusScreenPixels` already use, not
+a pull-based reach-back into `Application`. Follow that pattern instead:
+
+```cpp
+// MapCanvas_UI.h — new member + setter, alongside SetPreviewComposite/SetMarkerPickingSource
+const Io::WorldFootprintSizeTable* worldFootprintSizeTable = nullptr;
+void SetWorldFootprintSizeTable(const Io::WorldFootprintSizeTable* table) { worldFootprintSizeTable = table; }
+```
+
+```cpp
+// Application_UI.cpp, WireCallbacks() — wire it once, same place SetPreviewComposite is wired
+canvas.SetWorldFootprintSizeTable(&WorldFootprintSizeTable());
+```
+
+This ticket's own `baseFootprint` lookup (§1 item 8 below, the LOD formula) reads
+`worldFootprintSizeTable->Resolve(templateIdentifier)` off `MapCanvas`'s own injected pointer, not
+off `Application` directly. The `Application_UI.h` accessor above is still needed (it's what
+`WireCallbacks()` calls to get the pointer to inject) — just not called from inside the draw pass
+itself. Add `src/ui/Application_AssetBridge_UI.h`, `src/ui/Application_Assets_UI.cpp`,
+`src/ui/Application_UI.h`, and `src/ui/Application_UI.cpp` (the `WireCallbacks()` edit) to this
+ticket's own "Files touched" list (below) — they were missing from it.
 
 ## Problem
 Today, **nothing draws overlay icons on the canvas at all.** `Props`/`Units`/`Decals`, all
@@ -135,9 +197,11 @@ Then, for every `OverlayLayer_UI` in `overlayLayers`, **processed in vector orde
        screenSize = layer.strategicIconScreenSizePixels;   // NEW field, see below
    }
    ```
-   `baseFootprint` comes from the Phase 2.3 placeholder table — consumed via whatever accessor
-   STEP51/STEP52 land, **never a placeholder invented in this file** (§14.13 item 1 stays open;
-   this ticket must not paper over it with its own guess).
+   `baseFootprint` comes from `worldFootprintSizeTable->Resolve(templateIdentifier)` — the pointer
+   §0 above injects into `MapCanvas` via `SetWorldFootprintSizeTable()`, sourced from STEP58's
+   placeholder table — **never a placeholder invented in this draw-pass file itself** (§14.13
+   item 1, the real mesh-derived table, stays open; this ticket must not paper over that with its
+   own guess, only consume §0's plumbing).
    ⚠️ **New field needed on `OverlayLayer_UI`:** `float strategicIconScreenSizePixels` — the §14.2
    struct as ratified only carries `thumbnailLodThresholdPixels`, not a strategic-mode fixed size.
    Check whether STEP51 has already landed it by dispatch time; if not, add it there (same
@@ -294,6 +358,13 @@ onward uses `Data::SpatialGrid`/`PickMarker`, never reads what got drawn).
 - MODIFIED (possibly) `OverlayLayer_UI`'s home (STEP51's file) — the new
   `strategicIconScreenSizePixels` field and the layer-settings revision counter, **only if** they
   are not already there by dispatch time.
+- MODIFIED `src/ui/Application_AssetBridge_UI.h` — new include + `worldFootprintSizeTable` field (§0).
+- MODIFIED `src/ui/Application_Assets_UI.cpp` — `LoadAssetAtlas()` populate call (§0).
+- MODIFIED `src/ui/Application_UI.h` — new `WorldFootprintSizeTable()` accessor (§0). (The
+  `SetWorldFootprintSizeTable()` pointer setter itself lives on `MapCanvas_UI.h`, already covered
+  by this list's pre-existing `MapCanvas_UI.h` entry above — "the footprint table" in that entry
+  now means this setter specifically.)
+- MODIFIED `src/ui/Application_UI.cpp` — one new `WireCallbacks()` line injecting the pointer (§0).
 
 ## Layer & accuracy class
 UI. Accuracy class: Visual — screen-space presentation only, the same Visual-class exemption
@@ -328,7 +399,9 @@ backend; this ticket ships the scalar baseline that benchmark will compare again
 - Constitution §1.5 — size ceilings drive the multi-file split in §0.
 
 ## Explicit out-of-scope
-- Implementing STEP47/STEP50/STEP51/STEP52 themselves — this ticket only consumes their surface.
+- Implementing STEP47/STEP50/STEP51/STEP52/STEP58 themselves — this ticket only consumes their
+  surface (STEP58's placeholder table itself; §0 above is this ticket's own wiring of it, not a
+  reimplementation of STEP58's table).
 - The real, mesh-derived footprint-size table (§14.13 item 1) — placeholder only, consumed not
   invented.
 - The real, benchmarked cross-layer budget constant (§14.13 item 2) — Phase 3.3's job.

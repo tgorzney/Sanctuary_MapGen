@@ -10,8 +10,20 @@ dependency on STEP60 or any marker PARAMS work (verified below).
 
 ## Root problem
 `ARCH_15_05_ParamsScenariosType.md` §15.5 ratifies the `Params::Scenarios` C++ shape and §15.7 assigns its
-`.sanmap` JSON persistence to the Format Expert, who has delivered it as
-`SANMAP_FORMAT_SPEC.md` Correction 17 (`Scenarios`, ~line 883). Neither the type nor its
+`.sanmap` JSON persistence to the Format Expert. **⚠️ Correction 2026-08-22: this ticket originally
+cited that persistence as delivered — `SANMAP_FORMAT_SPEC.md` Correction 17 (`Scenarios`, ~line
+883) — but the live spec file has no Correction 17 (headings run 1–16, then jump to 18; zero
+occurrences of "Scenario" anywhere in the file), despite `INDEX.md`/`ARCH_15_10` both asserting it
+landed. Do not search the live spec for it — it isn't there.** This does not block the ticket: §1,
+§5, and §6 below already reproduce the full wire shape inline, verbatim, so nothing here actually
+depends on the missing spec section — treat those inline tables as the binding source of truth,
+and flag the Format Expert's missing Correction 17 as a separate documentation follow-up, not
+something this ticket's coder needs to chase down. **This correction covers every later mention
+of "Correction 17" in this document (§1, §3, §5, §6, §8, §9 all reference it) — every one of
+them, including the one phrased as a direct quotation in §8, is this ticket's own drafted
+specification, written in the voice of citing a ratified spec section that was expected to land
+alongside it but didn't. None of them are things to look up externally; implement what they say
+directly as this ticket's own content.** Neither the type nor its
 IO exists in the tree yet — confirmed: `src/params/` has no `Scenario*` file, no
 `MapExporter_Scenarios_IO`/`MapImporter_Scenarios_IO` exist, and `MapRecipe` has no
 `scenarios` member. `DESIGN_MapScenarioIO_R1.md` §0 identified this leg explicitly as
@@ -265,10 +277,12 @@ malformed-array case requires `result.Warn(...)`, matching `ReadPropsJson`/
 ## 8. `Sanmap_KnownTopLevelKeys_IO.cpp` (EDIT) — load-bearing, do not skip
 
 Add `"Scenarios"` to the `(a)` bucket (top-level keys read directly, unconditionally)
-in `KnownTopLevelSanmapKeys()`. Correction 17 is explicit: **"Once this Correction
-lands, `Scenarios` becomes one of `SANMAP_FORMAT_SPEC`'s current sections... and is
-therefore consumed by its own dedicated `MapImporter_Scenarios_IO` reader, not captured
-by the `UnknownImport` passthrough any longer."** Skipping this edit would double-bag
+in `KnownTopLevelSanmapKeys()`. **(This paragraph is this ticket's own instruction, not an
+external quotation — see the 2026-08-22 correction at the top of this file: no "Correction 17"
+exists in the live spec to quote from.)** Once `Scenarios` is added to that bucket, it becomes
+one of `.sanmap`'s recognized top-level sections and is consumed by its own dedicated
+`MapImporter_Scenarios_IO` reader, not captured by the `UnknownImport` passthrough any longer.
+Skipping this edit would double-bag
 `Scenarios` into `UnknownImport` on every import even after the real reader exists — a
 real, silent-looking bug this file's header comment exists specifically to prevent.
 

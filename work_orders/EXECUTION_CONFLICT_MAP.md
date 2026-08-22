@@ -1,139 +1,186 @@
-# Execution Conflict Map — parallel/sequential grouping for the unbuilt backlog
+# Execution Plan — parallel batch + sequential order for the unbuilt backlog
 
-*Companion to `IMPLEMENTATION_STATUS.md` (which confirms 91/93 M0-M5+STEP1-45 tickets are
-already shipped). This document scopes only the real remaining backlog — `STEP26A`, `STEP26B`,
-and `STEP46`–`STEP97` (41 tickets, `STEP95` excluded, it shipped this session) — 43 tickets total.
-`STEP96`/`STEP97` are excluded from the wave plan below; both are explicitly not-yet-dispatchable
-(STEP96 needs unwritten tickets 85–91; STEP97 needs STEP51+60+66 plus an open ARCH ruling).*
+*Checked and re-checked repeatedly on 2026-08-22 — see §0 for the full record (9 numbered
+findings across 2 rounds: an already-shipped ticket, a wave-placement error, 2 real compile
+blockers, 3 more compile/test gaps, a stale citation, 3 amendments that were themselves
+incomplete on first fix, and a 3-way dependency gap). Every round found something; treat this
+document as accurate as of its last edit, not as guaranteed final. Companion to
+`IMPLEMENTATION_STATUS.md`.*
 
-**Method:** every one of the 43 tickets was read in full by a dedicated agent, extracting its
-target-file list and every dependency/sequencing statement the ticket's own text makes. Every
-place where two tickets touched the same file **without cross-referencing each other** was then
-independently re-verified by a second agent reading both tickets' actual diffs to confirm whether
-the overlap is real, and if so, whether order matters. Findings below are tiered by how deep that
-verification went — do not treat a "flagged, not re-verified" item as cleared.
+**Scope: 42 real unbuilt tickets** — `STEP26A`, `STEP26B`, `STEP46`–`STEP97` minus `STEP95`
+(shipped this session) and minus `STEP46` (found already shipped during this pass — see §0).
+`STEP96`/`STEP97` are excluded from both the batch and the sequence below; neither is
+dispatchable yet (STEP96 needs unwritten tickets 85–91; STEP97 needs STEP51+60+66 landed *and*
+an open ARCH ruling).
 
-## Legend
-- **BLOCKING** — one ticket cannot compile/function without the other; hard order, no exceptions.
-- **REAL CONFLICT (verified)** — independently confirmed textual/logical overlap in the same
-  function or struct; needs serial landing. Order is stated where it matters.
-- **MECHANICAL (verified)** — same file, disjoint/adjacent edits; needs serial landing only to
-  avoid a literal patch-apply failure, order does not matter.
-- **FLAGGED (not independently re-verified)** — same file touched by 2+ tickets, found during
-  inventory but not run through the second verification pass. Treat as same-file-serialize by
-  default; confirm with a real diff before dispatching either ticket if both are ever scheduled
-  close together.
-- **CLEARED** — investigated and found safe to run in parallel.
+## 0. What the triple-check found and fixed
 
-## 1. The one real defect found (not just an ordering issue) — FIXED 2026-08-22
+The first pass of this document (same-day, earlier) grouped tickets into 6 loosely-sequenced
+"waves" based on spot-checking only the file-overlaps that looked suspicious. Re-verifying
+*every* ticket in the intended first parallel wave — both for self-sufficiency against the
+current shipped tree, and for real dependencies, not just claimed ones — found:
 
-**STEP75 vs STEP76 — REAL CONFLICT, and STEP75's own text instructed a bug. Amendment applied.**
-Both rewrite `DrawArmySettings` in `src/ui/ArmiesTab_UI.h`/`.cpp`. STEP76 makes `Army::name`
-machine-owned (never human/UI-settable — the `ARMY_XX` law ruled earlier this session) and adds
-`displayName` as the UI-editable field. STEP75's current text tells the coder to hand-set the
-mirrored army's `name` directly to a computed `ARMY_XX` string — a direct violation of STEP76's
-ruling once STEP76 lands. **Land STEP76 first.** STEP75 already depends on STEP68 anyway, so it
-cannot go first regardless — but its own drafted instructions should be corrected to write through
-whatever STEP76 ships (`AssignArmyIdentities`) rather than setting `army.name` by hand. Recommend
-a small amendment to `STEP75_ArmyMirrorSymmetry_UI.md` once STEP76 lands, same pattern already
-used for the STEP74/STEP76 amendment. **Done** — turned out simpler than "write through STEP76's
-mechanism": mirroring only touches an *existing* army row (never adds/deletes/reorders), so its
-`ARMY_XX` identity is already correct and untouched by the operation. The amendment strikes the
-old hand-set instruction entirely rather than redirecting it through `AssignArmyIdentities`.
+1. **STEP46 is already fully implemented.** The exact code it describes (`bNeedsTexelReadback`
+   gating) ships today, landed in commit `18c5154`, predating this whole consolidation effort.
+   Moved to `work_orders/shipped/`; it never belonged in the backlog count.
+2. **STEP54 was wrongly placed in the first parallel wave despite a hard dependency on STEP51**
+   ("cannot be dispatched until STEP51 lands `overlayLayers`") — an outright placement error in
+   the first pass, not a subtle judgment call. Fixed by excluding it from the parallel batch.
+3. **STEP50 and STEP51 will not compile against the current tree at all**, a hidden dependency
+   neither ticket's own dependency-claim caught. Both reference `Params::MarkerRuleLayer`/
+   `recipe.markerRuleLayers`, a type that doesn't exist until `STEP66` creates it. Both tickets
+   cite a "STEP79 confirmation" as if it resolves this — it only validates a *numbering
+   assumption* about that future type, not that the type exists yet. Excluded from the parallel
+   batch; both now sequenced right after STEP66.
+4. **STEP60 silently required `Params::SymmetrySetting`**, a struct that doesn't exist anywhere
+   in `src/` and that STEP60's own "Files touched" list never creates — a real compile blocker.
+   **Fixed**: amended `STEP60_MarkerInstanceLayer_PARAMS.md` §0 to add the struct definition
+   inline (it's also independently specified, byte-identical, in STEP66 — noted so whichever
+   lands first defines it once).
+5. **STEP68's own code snippet was misleading** — it showed a `layerIndex` field "from STEP60"
+   as if already present, but STEP60 hasn't landed. **Fixed**: amended to show the correct
+   3-field current struct and add only `symmetryGroupIdentifier`.
+6. **STEP72's own test suite will not compile in isolation** — it has a self-declared test-only
+   dependency on STEP65 and STEP70, but STEP70 is nowhere near ready (needs STEP63+STEP69 first)
+   and won't be reachable from STEP72's isolated worktree. **Fixed**: amended acceptance test
+   items 6(a)/6(d) to use a hardcoded literal + a deferred TODO instead of including headers that
+   don't exist yet.
+7. **STEP69 cited a `SANMAP_FORMAT_SPEC.md` Correction 17 that doesn't exist in the live spec
+   file** (despite other docs asserting it landed). Not a compile blocker — the ticket already
+   reproduces the full shape inline — but would send a coder on a dead-end search. **Fixed**:
+   amended to say so explicitly and point at the ticket's own inline tables instead.
 
-## 2. Other verified conflicts
+**Second pass (same day)** — re-ran the same rigorous check on the 22-ticket *sequential* list
+(which had only gotten the lighter original inventory treatment, not the full grep-against-`src/`
+audit), plus a fresh skeptical re-read of the 4 amendments above to confirm they didn't just
+relocate their own problem. Found:
 
-| Pair | Verdict | Resolution |
+8. **3 of the 4 amendments above were themselves incomplete** — each fixed the section it touched
+   but left stale, contradictory text elsewhere in the same file. STEP68's acceptance test still
+   asserted `layerIndex` as a guaranteed wire sibling; STEP69 still quoted "Correction 17" as a
+   real external document 15+ times including one fabricated-sounding verbatim quote; STEP72's
+   Backend Policy section still described a `Sys::CheckLuaSyntax` call the corrected test no
+   longer makes. **All three fixed properly this time**, swept for every stale reference, not
+   just the first one found.
+9. **STEP53 has a real 3-way gap**: it assumes STEP52 bundles in STEP58's footprint-table wiring
+   ("bundled under this same umbrella per this ticket's own brief"), but STEP52's own
+   out-of-scope section explicitly declines to do that, and STEP58's own out-of-scope section
+   also explicitly declines, calling it "STEP51's or STEP52's job." No ticket anywhere actually
+   wires `Io::WorldFootprintSizeTable` into `Application`. **Fixed**: added a new §0 to STEP53
+   itself (the actual consumer) with the missing wiring, mirroring STEP52's own
+   `IconAtlasPairingLookup` pattern; added STEP58 as a stated prerequisite.
+
+**Third pass (same day)** — checked the two edits above (§0.8's amendments, §0.9's STEP53 fix)
+independently, since fixing something is exactly where the prior round found gaps. Found:
+
+10. **STEP53's own §0 wiring was itself architecturally wrong** — it had the draw pass call
+    `Application::WorldFootprintSizeTable()` directly, but `MapCanvas` (where the draw pass
+    lives) has no `Application` reference anywhere, confirmed against real `src/`. This codebase
+    already ratified the correct pattern for exactly this case (STEP48's own "RESOLVED — ARCH
+    ruling": push-in setter/pointer, same mechanism as `SetPreviewComposite`). **Fixed**:
+    `MapCanvas` now gets a `SetWorldFootprintSizeTable()` pointer setter, wired once in
+    `WireCallbacks()`, matching the ticket's own pre-existing (and correct) "Files touched" line
+    for `MapCanvas_UI.h` that this newer text had briefly contradicted. Also swept and fixed 2
+    smaller leftovers in the same file: a "§8 below" reference to a section that doesn't exist
+    (it's item 8 inside §1), and a "four prerequisites" header left over from before STEP58 was
+    added as the 5th. STEP53's own "Files touched" list ends up with **4** newly-touched files
+    (`Application_AssetBridge_UI.h`, `Application_Assets_UI.cpp`, `Application_UI.h`,
+    `Application_UI.cpp`), not 3 as originally logged here.
+
+**Fourth pass (same day)** — re-verified STEP53's fix once more fresh (clean, all 5 checks
+passed), and specifically hunted the same bug *class* (code assuming a direct call/read path to
+another UI object that doesn't actually exist) across the 9 other UI-heavy tickets in both lists
+(STEP54, 55, 74, 77, 78, 80, 81, 83, 94). None found — every cross-object access in those 9
+resolves to a self-member, a function parameter, or a correctly-specified push-in setter. One
+trivial wording fix in STEP94 (cited an unlanded precedent as "already" existing rather than "per
+its specified shape"). This pass found no new compile blockers or dependency gaps — a first for
+this document, suggesting convergence.
+
+Everything below reflects the corrected picture, not the original claims.
+
+## 1. How "no conflicts" is being enforced
+
+Two different things can go wrong when tickets run at the same time, and they need different
+fixes:
+
+- **Blocking dependency** — ticket A needs a type/function/field only ticket B produces. This is
+  fatal if A and B run at the same time with no coordination: A's coder can't write correct code,
+  full stop. **This is the constraint enforced for the parallel batch below — zero tolerance,
+  verified per-ticket against the *current shipped tree*, not against each other's promises.**
+- **Same-file edit** — two tickets touch the same file (sometimes the same file *and* the same
+  function). This does not block either agent if each one works in its own isolated git worktree
+  starting from the same clean commit — it only becomes a problem when the two finished branches
+  get merged together afterward, and it's fixed by a normal rebase/merge step, not by blocking
+  dispatch. **Recommendation: dispatch every ticket in the parallel batch via `Agent` with
+  `isolation: "worktree"`.** All same-file touches found below are annotated with a recommended
+  merge order for the integration step after the batch finishes.
+
+## 2. THE PARALLEL BATCH — 18 tickets, dispatch simultaneously
+
+Every ticket below has **zero dependency on any other ticket in this backlog** (verified against
+current `src/`, not taken on the ticket's own word), and the 3 that had real compile blockers
+have been amended (§0). Hand these to 18 individual coder agents now, each in its own isolated
+worktree.
+
+`STEP26A · STEP47 · STEP49 · STEP52 · STEP55 · STEP56 · STEP58 · STEP60 (amended) · STEP62 ·
+STEP63 · STEP64 · STEP65 · STEP66 · STEP68 (amended) · STEP69 (amended) · STEP72 (amended) ·
+STEP76 · STEP84 (Scope A only — Scope B needs a `SANMAP_FORMAT_SPEC` Correction that is not yet
+ratified; the ticket already self-gates this, but tell the dispatched coder explicitly)`
+
+### Merge-order plan for the integration step after all 18 finish
+
+None of these are blocking — every group below is a same-file housekeeping merge, verified
+low-risk (disjoint or clearly-adjacent edits), not a redesign:
+
+| Files | Tickets | Merge order / note |
 |---|---|---|
-| STEP60 ↔ STEP68 | REAL CONFLICT | Both insert new `MarkerTransform` members at the same spot in `MarkerInstance_PARAMS.h` and both add sibling reads in `ReadMarkerTransformJson`. No logical dependency, but land STEP60 first — STEP68's own draft already assumes `layerIndex` exists ("from STEP60, unchanged"). |
-| STEP54 ↔ STEP55 | REAL CONFLICT (mechanical) | Both patches rewrite the identical `Regenerate` button line in `DrawCanvasWindow`. Order-free, but not simultaneous — second ticket's implementer works from the already-landed file. |
-| STEP26B ↔ STEP77 | MECHANICAL | Different enum/fields/branches in `FilesTab_UI.h`/`_Actions_UI.cpp`/`_Draw_UI.cpp`, no logical collision, but same file/struct — land STEP26B first (STEP77 lands much later anyway, gated on STEP64/65/71/72). |
-| STEP82 ↔ STEP84 | MECHANICAL | Disjoint line ranges in `MapExporter_IO.cpp`, no struct overlap. Land STEP84 first (zero dependencies, "safe to schedule at any point"), STEP82 rebases. |
-| STEP60 ↔ STEP69 ↔ STEP84 | REAL CONFLICT (hotspot) | STEP60 and STEP69 both edit the **same functions** `AppendEntityDomainsJson`/`ParseEntityDomainsJson`; STEP84 also touches both files. Genuine recurring collision point, not coincidence — serialize all three, any order, one at a time. |
-| STEP26A ↔ STEP84 | REAL CONFLICT (hotspot) | Both rewrite logic inside `Sanmap_MigrationRunner_IO.cpp`/`.h`. Serialize. |
-| STEP83 ↔ STEP97 | CLEARED (for now) | STEP83 only *relocates* `SeedMarkerDomains` into a new file, doesn't change its logic; STEP97 would edit its body later. No real overlap today, and STEP97 isn't dispatchable regardless (blocked on STEP51+60+66 + an open ARCH ruling). Flag for whoever eventually drafts STEP97's implementation: find `SeedMarkerDomains` in `Application_OverlaySetup_Seed_UI.cpp`, not STEP51's original file, if STEP83 has landed by then. |
-| STEP49 ↔ STEP80 | CLEARED | Confirmed disjoint — STEP80 never touches STEP49's files; within `MarkersTab_UI.h/.cpp` they edit different functions/state members entirely. Order-independent. |
-| STEP57 ↔ STEP50 (CSR bucket-0) | CLEARED | Real defect (manual instances defaulting `ruleIndex=0` would collide with procedural rule 0's bucket), but **already fixed in STEP57's current text** (`instance.ruleIndex = -1`, credited to STEP83 §7). STEP83's own narration is just stale — no action needed. |
+| `Application_UI.h` | STEP52 (@~L71), STEP64 (@~L124) | Either order — disjoint accessor/member insertions, 50+ lines apart. |
+| `PropInstance_PARAMS.h`, `MapExporter_Props_IO.cpp`, `MapImporter_Props_IO.cpp` | STEP56, STEP62 | STEP56 first (larger surface), then STEP62 — different structs/functions entirely, verified zero real overlap. |
+| `Symmetry_PARAMS.h` | STEP60, STEP66 | Both add the **identical** `SymmetrySetting` struct (verbatim, by design — see §0.4). Keep one copy, delete the duplicate definition; both tickets' consumers are unaffected either way. |
+| `MapRecipe_PARAMS.h` | STEP60 (`markerLayers` @~L107), STEP66 (renames `markerRules`→`markerRuleLayers` @~L56), STEP69 (`scenarios` @~L101) | Any order — three disjoint regions on one struct. |
+| `MapExporter_DocumentAssembly_IO.cpp` | STEP60 (@~L61), STEP69 (@~L66, same function `AppendEntityDomainsJson`, 5 lines apart), STEP84 (@~L34, different function) | STEP60 then STEP69 (adjacent, land together to resolve in one pass), STEP84 independent. |
+| `MapImporter_ParseDocument_IO.cpp` | STEP60 (@~L65), STEP69 (@~L72, end of `ParseEntityDomainsJson`), STEP76 (@~L72, **same anchor line as STEP69**) | STEP60 → STEP69 → STEP76 last, specifically to resolve the STEP69/STEP76 exact-line collision while it's fresh. |
+| `Sanmap_KnownTopLevelKeys_IO.cpp` | STEP60, STEP69 | Either order — two new list entries. |
+| `CMakeLists.txt` | STEP52, STEP58, STEP63, STEP64, STEP65, STEP69, STEP72, STEP76, STEP84 | All additive (new `add_sangen_test` lines / vendoring blocks in different spots). Merge in any stable order, run the full `ctest` suite once at the end. STEP65's LuaJIT vendoring block and STEP72's Lua-resource staging block are thematically adjacent (both Lua-related) — worth a manual glance even though both are pure additions. |
 
-## 3. Additional same-file touches — flagged from inventory, not independently re-verified
+## 3. THE SEQUENTIAL AGENT — 22 tickets, run one at a time in this order, after the batch merges
 
-Treat every row as "check before parallel dispatch," not as cleared:
+File conflicts don't matter here since it's one ticket at a time — only real dependencies do,
+all already satisfied by what precedes each entry:
 
-| File(s) | Tickets | Note |
-|---|---|---|
-| `PreviewComposite_UI.h` | STEP46, STEP47 | Different sections (signature default-param vs. new methods) — likely low risk, not deep-checked. |
-| `Application_UI.cpp` (`WireCallbacks()`) | STEP46, STEP48, STEP55 | Same function, three tickets. |
-| `MapCanvas_UI.h`/`.cpp` | STEP48, STEP53, STEP55, STEP78, STEP94 | Large recurring hotspot — every canvas-touching ticket lands here. |
-| `Application_UI.h` | STEP51, STEP52, STEP54, STEP64, STEP77 | Shared shell header. |
-| `Application_Settings_UI.h` / `ApplicationSettings` struct | STEP48, STEP77 | Different fields presumed, not confirmed. |
-| `OverlayLayer_Settings_UI.h` | STEP51, STEP53 (conditionally) | STEP53 only edits it "if STEP51 hasn't already" added the field. |
-| `MapRecipe_PARAMS.h` | STEP60, STEP66, STEP69 | Three different fields/renames on one struct file. |
-| `Sanmap_KnownTopLevelKeys_IO.cpp` | STEP60, STEP69 | Both add one key each. |
-| `Sanmap_MigrationManifest_IO.h`/`.cpp` | STEP26A, STEP67 | Both touch the migration manifest. |
-| `CMakeLists.txt` | Nearly every ticket | Universal — additive lines, always needs a final-merge pass; not treated as a real conflict per pair. |
+1. **STEP79** (← STEP66) — same dispatch unit as STEP66, land immediately after merge.
+2. **STEP80** (← STEP66+STEP79)
+3. **STEP50** (← STEP66 — the hidden dependency found in §0.3, now satisfiable)
+4. **STEP51** (← STEP66 — same)
+5. **STEP67** (← STEP66)
+6. **STEP26B** (← STEP26A)
+7. **STEP48** (← STEP47)
+8. **STEP81** (← STEP60, STEP49)
+9. **STEP53** (← STEP47, STEP50, STEP51, STEP52, STEP58 — STEP58 added 2026-08-22, §0.9)
+10. **STEP54** (← STEP51 — remember the amendment already applied to STEP75, not this one; STEP54 itself needed no content fix, only correct sequencing)
+11. **STEP57** (← STEP56)
+12. **STEP59** (← STEP53, must be *implemented*, not merely merged — verify its test suite is green before dispatching this one)
+13. **STEP70** (← STEP63, STEP69)
+14. **STEP71** (← STEP64, STEP70, STEP72)
+15. **STEP73** (← STEP69, STEP70, STEP63)
+16. **STEP74** (← STEP69)
+17. **STEP75** (← STEP68, STEP76 — amendment already applied earlier this session, ready as-is)
+18. **STEP77** (← STEP74, STEP64, STEP65, STEP71, STEP72)
+19. **STEP78** (← STEP47, STEP50, STEP51, STEP52, STEP53 — GATED, re-verify all five actually landed before dispatch, the ticket demands this itself)
+20. **STEP82** (← STEP76)
+21. **STEP83** (← STEP62 hard; STEP51, STEP53 soft/adaptive — both will already be landed by this point, so STEP83 takes its cleaner "already-landed" code path rather than the fold-in path)
+22. **STEP94** (← STEP47, STEP48, STEP68, STEP49, STEP81)
 
-## 4. Execution waves
+**Not yet schedulable, excluded from both lists above:**
+- `STEP96` — needs tickets 85–91 (unwritten) from `DESIGN_SantpFootprintIngestion_R1.md` §7.
+- `STEP97` — needs STEP51+STEP60+STEP66 landed (all three will be, by the end of step 5 above)
+  *and* a still-open ARCH routing-discriminator ruling. Re-check after step 5 whether that ruling
+  has landed; if so, STEP97 becomes real backlog, not a permanent block.
 
-Each wave's tickets are mutually parallel-safe (no shared file, or explicitly cleared above).
-A ticket only appears once its hard dependencies **and** its recommended conflict-resolution
-predecessors have landed. Where a same-wave ticket count is large, sub-teams can take one each.
+## 4. Verification method
 
-**Wave 1 — no dependencies, no unresolved collisions**
-STEP26A · STEP46 · STEP49 · STEP50 · STEP51 · STEP52 · STEP54 · STEP56 · STEP58 · STEP62 ·
-STEP63 · STEP64 · STEP65 · STEP69 · STEP76
-
-**Wave 2** — depends on Wave 1 landings
-STEP26B (← STEP26A) · STEP47 (after STEP46, file collision) · STEP55 (after STEP54) ·
-STEP57 (← STEP56) · STEP60 (after STEP69, hotspot) · STEP82 (← STEP76) ·
-STEP70 (← STEP63, STEP69) · STEP73 (← STEP69, STEP63 — also needs STEP70, see Wave 3) ·
-STEP74 (← STEP69)
-
-*(STEP73 actually also depends on STEP70, so it really lands in Wave 3 — listed here only to
-flag that its STEP69/STEP63 half is satisfied this wave.)*
-
-**Wave 3**
-STEP48 (← STEP47) · STEP66+STEP79 (single dispatch unit, land together, one branch — after
-STEP60, hotspot) · STEP68 (after STEP60, verified conflict) · STEP81 (← STEP60, STEP49) ·
-STEP73 (← STEP70) · STEP84 (after STEP60/STEP69/STEP26A hotspot cluster settles)
-
-**Wave 4**
-STEP53 (← STEP47, STEP50, STEP51, STEP52) · STEP67 (← STEP66) · STEP80 (← STEP66+STEP79) ·
-STEP75 (← STEP68, and REQUIRES STEP76 already landed — Wave 1 — real conflict fix) ·
-STEP71 (← STEP64, STEP70, STEP72 — **STEP72 has not appeared yet: it has no stated dependency
-and can run any wave ≥1; place it in Wave 1 alongside STEP64/65/63 for the scenario track to
-unblock STEP71/STEP73 on schedule**) · STEP83 (← STEP62 hard; STEP51/STEP53 soft, adaptive)
-
-**Wave 5**
-STEP59 (← STEP53, must be IMPLEMENTED not drafted) · STEP94 (← STEP47, STEP48, STEP68, STEP49,
-STEP81) · STEP77 (← STEP74, STEP64, STEP65, STEP71, STEP72; also after STEP26B, mechanical)
-
-**Wave 6**
-STEP78 (GATED — ← STEP47, STEP50, STEP51, STEP52, STEP53; re-check all five are actually landed
-before dispatch, per the ticket's own explicit re-verification instruction)
-
-**Not yet schedulable — blocked on work outside this 43-ticket set**
-- STEP96 — needs tickets 85–91 (unwritten) from `DESIGN_SantpFootprintIngestion_R1.md` §7.
-- STEP97 — needs STEP51+STEP60+STEP66 landed *and* an open ARCH routing-discriminator ruling.
-
-**Correction: STEP72 placement.** STEP72 has no stated dependency ("No dependency on STEP63")
-and only a test-only soft dependency on STEP65/STEP70 — it can and should run in **Wave 1**, not
-wait. This unblocks STEP71 one wave earlier than shown above; re-check STEP71's true earliest
-wave is `max(STEP64=W1, STEP70=W3, STEP72=W1) + 1 = W4`, not W5 as loosely implied — STEP71 has
-been moved to Wave 4's list above; STEP77 (which needs STEP71) becomes dispatchable in Wave 5 as
-already shown, one wave sooner than a naive reading would suggest.
-
-## 5. Notes for whoever dispatches these
-
-- The **STEP75/STEP76 fix** (§1) is the one item that should probably become a small ticket
-  amendment before dispatch, the same way STEP73/STEP74/STEP76 already amend each other in
-  place — otherwise a coder following STEP75's current literal text ships a naming-law violation.
-- The **hotspot clusters** (§2/§3) are a structural property of this codebase, not a planning
-  mistake: `MapRecipe_PARAMS.h`, `AppendEntityDomainsJson`/`ParseEntityDomainsJson`,
-  `Application_UI.cpp`/`.h`, and `MapCanvas_UI.h`/`.cpp` are central assembly points that almost
-  every domain ticket touches additively. No amount of re-ordering removes this — the practical
-  rule is: never dispatch two hotspot-touching tickets to two different coders in the same wave
-  without an explicit rebase step between them, even when this document lists them in the same
-  wave for logical-dependency purposes.
-- §3's "flagged, not re-verified" rows are the highest-value place to spend a future verification
-  pass if more confidence is wanted before actually executing — they were deprioritized here only
-  by depth of check, not because they're less likely to be real.
+Every ticket in §2 was re-read in full by an independent agent and checked against the *current*
+`src/` tree (not against another ticket's claims) for: (a) any code/type it silently needs that
+doesn't exist yet, (b) any "verify X before assuming Y" caveat, actually verified, (c) any open
+ARCH/Format Expert gap. Every same-file cluster in §2's merge table was independently re-verified
+by a second agent reading both tickets' actual insertion points, not just their file lists.
