@@ -91,6 +91,13 @@ public:
     std::uint32_t LastSelectedEntityIdentifier() const { return lastSelectedEntityIdentifier; }
     int FrameCount() const { return frameCount; }
 
+    // Map Scenario export target root / runtime-resource override (STEP64_GameInstallLocation_IO) —
+    // plain caller-owned members, same "no picker, no checkbox yet" posture bUseGpuMarkers shipped
+    // with (STEP19_AppSettings_IO); public (unlike bUseGpuMarkers) because nothing else on Application
+    // exposes an accessor for them yet, and the shell bridge / its own test read and write them directly.
+    std::string gameInstallRoot;
+    std::string scenarioRuntimeOverridePath;
+
 private:
     void WireCallbacks();                    // Application_UI.cpp
     void BindCompositeToCanvas();            // Application_UI.cpp

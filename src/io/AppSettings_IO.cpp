@@ -20,6 +20,8 @@ nlohmann::json ToJson(const AppSettings& settings) {
     document["sanpackPath"]          = settings.sanpackPath;
     document["assetCacheDirectory"]  = settings.assetCacheDirectory;
     document["environmentPackPath"]  = settings.environmentPackPath;
+    document["gameInstallRoot"]              = settings.gameInstallRoot;
+    document["scenarioRuntimeOverridePath"]  = settings.scenarioRuntimeOverridePath;
     document["bUseGpuTerrain"]       = settings.bUseGpuTerrain;
     document["bUseGpuFlow"]          = settings.bUseGpuFlow;
     document["bWysiwygBaking"]       = settings.bWysiwygBaking;
@@ -34,6 +36,8 @@ void FromJson(const nlohmann::json& document, AppSettings& outSettings) {
     ReadJsonText(document, "sanpackPath", outSettings.sanpackPath);
     ReadJsonText(document, "assetCacheDirectory", outSettings.assetCacheDirectory);
     ReadJsonText(document, "environmentPackPath", outSettings.environmentPackPath);
+    ReadJsonText(document, "gameInstallRoot", outSettings.gameInstallRoot);
+    ReadJsonText(document, "scenarioRuntimeOverridePath", outSettings.scenarioRuntimeOverridePath);
     ReadJsonBoolean(document, "bUseGpuTerrain", outSettings.bUseGpuTerrain);
     ReadJsonBoolean(document, "bUseGpuFlow", outSettings.bUseGpuFlow);
     ReadJsonBoolean(document, "bWysiwygBaking", outSettings.bWysiwygBaking);
