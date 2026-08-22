@@ -21,7 +21,7 @@ struct DecalTransform { InstancedTransform transform; int layerIndex = 0; };
 
 // `blueprintPath`/`transforms` are an ORDERED ARRAY, not a dictionary — the format's own
 // `PropType[]`/`DecalType[]` (`SanMap.cs:153,157`) have no per-instance key to fold in.
-struct PropInstanceGroup  { std::string blueprintPath; std::vector<PropTransform>  transforms; };
+struct PropInstanceGroup  { std::string blueprintPath; bool bReclaimable = false; std::vector<PropTransform>  transforms; };
 struct DecalInstanceGroup { std::string blueprintPath; std::vector<DecalTransform> transforms; };
 
 // Third session (ARCH §12): the separate manual-layer metadata array, one entry per authored

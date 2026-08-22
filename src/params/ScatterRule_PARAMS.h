@@ -18,6 +18,9 @@ struct PropRule {
     float maxHeight = 1.0f;
     bool  bAvoidWater = false;
     bool  bNearCliffs = false;
+    // template-level: does this rule's placed instances belong to the Reclaim overlay
+    // sub-layer partition, not the Props one (§14.2/§14.6)
+    bool  bReclaimable = false;
 
     float spacingMinimum          = 0.0f;   // Poisson-disk radius, in cells
     int   mapEdgePadding          = 0;

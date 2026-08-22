@@ -59,6 +59,7 @@ Params::MapRecipe BuildFixtureRecipe() {
 
     Params::PropInstanceGroup propGroup;
     propGroup.blueprintPath = "Props/Rock/Rock01.santp";
+    propGroup.bReclaimable = true;
     propGroup.transforms.push_back(inRangeProp);
     propGroup.transforms.push_back(outOfRangeProp);
     recipe.props.push_back(propGroup);
@@ -141,6 +142,8 @@ void RunPropsDecalsRoundTripTests() {
         const Params::PropInstanceGroup& loadedGroup = loaded.props[0];
         Check(loadedGroup.blueprintPath == originalGroup.blueprintPath,
               "PropInstanceGroup::blueprintPath survives");
+        Check(loadedGroup.bReclaimable == originalGroup.bReclaimable,
+              "PropInstanceGroup::bReclaimable survives");
         Check(loadedGroup.transforms.size() == 2, "both prop transforms survive");
         if (loadedGroup.transforms.size() == 2) {
             const Params::PropTransform& originalInRange = originalGroup.transforms[0];

@@ -17,7 +17,7 @@ int main() {
         { std::printf("FAIL marker focus/symmetry\n"); ++failures; }
 
     PropRule prop;
-    if (prop.density != 0.5f || prop.bAvoidWater || prop.bNearCliffs)
+    if (prop.density != 0.5f || prop.bAvoidWater || prop.bNearCliffs || prop.bReclaimable)
         { std::printf("FAIL prop defaults\n"); ++failures; }
 
     DecalRule decal;

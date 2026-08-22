@@ -16,6 +16,7 @@ nlohmann::ordered_json BuildPropRuleJson(const Params::PropRule& rule) {
     json["MinSlope"] = rule.minSlope;  json["MaxSlope"] = rule.maxSlope;
     json["MinHeight"] = rule.minHeight; json["MaxHeight"] = rule.maxHeight;
     json["AvoidWater"] = rule.bAvoidWater; json["NearCliffs"] = rule.bNearCliffs;
+    json["Reclaimable"] = rule.bReclaimable;
     json["SpacingMinimum"] = rule.spacingMinimum;
     json["MapEdgePadding"] = rule.mapEdgePadding;
     json["MaskStratumIndex"] = rule.maskStratumIndex;

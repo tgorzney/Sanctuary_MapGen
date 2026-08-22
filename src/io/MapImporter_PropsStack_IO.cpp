@@ -16,6 +16,7 @@ void ReadPropRuleJson(const nlohmann::json& json, Params::PropRule& rule) {
     ReadJsonFloat(json, "Density", rule.density);
     ReadJsonBoolean(json, "AvoidWater", rule.bAvoidWater);
     ReadJsonBoolean(json, "NearCliffs", rule.bNearCliffs);
+    ReadJsonBoolean(json, "Reclaimable", rule.bReclaimable);
     ReadJsonFloat(json, "SpacingMinimum", rule.spacingMinimum);
     ReadJsonFloat(json, "ObstacleDistanceMinimum", rule.obstacleDistanceMinimum);
     ReadJsonFloat(json, "NearCliffDistanceMaximum", rule.nearCliffDistanceMaximum);
