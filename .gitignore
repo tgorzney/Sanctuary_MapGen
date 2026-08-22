@@ -45,3 +45,7 @@ Thumbs.db
 
 # Claude Code agent worktrees (transient)
 .claude/worktrees/
+
+# Shipped work-order tickets — historical/local reference only, kept out of git
+# so completed-ticket churn never gets committed or pushed to remote.
+/work_orders/shipped/

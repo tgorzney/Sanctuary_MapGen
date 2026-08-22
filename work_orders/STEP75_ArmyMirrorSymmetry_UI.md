@@ -5,6 +5,13 @@
 `map-generator-13` (owns the related `STEP68` orbit-position wrapper — confirmed no conflict,
 this ticket does not modify their work).
 
+**⚠️ Amendment (STEP76, 2026-08-22):** `STEP76_ArmyIdentityNaming_IO.md` (drafted after this
+ticket) rules `Army::name` (the `ARMY_XX` engine identity) **machine-owned outright — minted only
+by `AssignArmyIdentities`, never hand-set by any other code path, UI or otherwise.** Ruling 4
+below, as originally drafted, told the Coder to compute and hand-set the mirrored army's `name` —
+that instruction is now superseded and **must not be implemented as written**. See the corrected
+text inline below. This ticket must land after STEP76.
+
 ## Problem
 Human's ask: Army1/3/5 (odd, by position in `recipe.armies`) get duplicated onto Army2/4/6
 (even), renamed, every duplicated unit rotated 180° about map center (position + orientation).
@@ -27,18 +34,23 @@ One-time duplicate action, not a persistent link.
    Recurses `UnitGroup.groups` and `UnitGroup.units` (both must be walked — a group can have
    nested child groups).
 
-   **⚠️ Naming law (confirmed by the human, recorded in the Format Expert's charter): army names
-   are load-bearing.** The engine assigns lobby slots by sorting army names ALPHABETICALLY
-   (`gameUtils.lua`'s `CreateArmies()`), so an unpadded name (`ARMY_1`/`ARMY_2`/`ARMY_10`) sorts
-   wrong from the 10th army onward — silently wrong slot assignment, no error. The required
-   format is `ARMY_XX`, zero-padded two digits. **Set the target army's name to the correctly
-   zero-padded form matching its own position in `recipe.armies`** (`ARMY_02`, `ARMY_04`, etc.) —
-   do NOT copy the source army's name verbatim (it names a different slot) and do NOT use
-   `NextArmyName`/`Params::Army armyCount)` (that seeds brand-new rows from a count string like
-   `"Army1"`, not the required `ARMY_XX` format — see the pre-existing gap noted below). Feed
-   `bArmiesMoved`-style true so any existing uniqueness repair still runs, but the padded format
-   is this ticket's own responsibility, not something to delegate to a helper that doesn't
-   currently produce it.
+   **⚠️ Naming law — CORRECTED per the STEP76 amendment above (was: hand-set the target's `name`;
+   now: do not touch `name` at all).** `Army::name` (`ARMY_XX`) is the machine-owned engine
+   identity (`STEP76_ArmyIdentityNaming_IO.md` ruling 2 — never human- or UI-code-settable, minted
+   only by `AssignArmyIdentities`). `MirrorArmyGroupsOntoNextArmy` mirrors an **existing** army
+   (`sourceIndex + 1` already has a roster row and therefore already has a correct `ARMY_XX`
+   identity, unchanged by this operation) — it does not add, delete, or reorder any army, so the
+   target's identity is already correct before the call and stays correct after it, with zero
+   action needed. **This function must touch only `groups`** (recursed via `UnitGroup.groups`/
+   `UnitGroup.units`, per point 4's structure below) **and must never read, compute, or write
+   `Params::Army::name` or `displayName` for either army.** Do not call `AssignArmyIdentities`
+   from here either — it is unnecessary (no roster mutation occurred) and calling it defensively
+   would just be dead code the Coder should not add. If the ticket text elsewhere still implies
+   setting a padded `ARMY_XX` string, that text is stale — this paragraph is authoritative.
+
+   *(Original, now-superseded text, kept for audit trail only — do NOT implement: "Set the
+   target army's name to the correctly zero-padded form matching its own position in
+   `recipe.armies`... do NOT copy the source army's name verbatim... do NOT use `NextArmyName`.")*
 
    **Pre-existing gap, OUT OF SCOPE for this ticket, flagged not fixed here:** `NextArmyName`
    (`ArmiesTab_UI.h:77`, `NextUniqueLabel("Army", armyCount)`) already produces `"Army1"`/`"Army2"`
