@@ -90,6 +90,7 @@ bool Application::LoadAssetAtlas() {
     assetBridge.iconManifest.entries.clear();
     assetBridge.iconManifest.pageTextureIdentifiers.clear();
     assetBridge.iconTemplateIdentifiers.clear();
+    assetBridge.iconPairingLookup.Clear();
     assetBridge.atlasResidency.Clear();
     assetBridge.assetPackReader.Close();
     tabState.files.assetPack = nullptr;
@@ -115,6 +116,7 @@ bool Application::LoadAssetAtlas() {
     BuildIconAtlasManifest(assetBridge.assetAtlasCache.Atlas(), assetBridge.atlasResidency,
                            gpuResourceManager.get(), assetBridge.iconManifest,
                            assetBridge.iconTemplateIdentifiers);
+    assetBridge.iconPairingLookup = BuildIconAtlasPairingLookup(assetBridge.iconTemplateIdentifiers);
     assetBridge.assetStatusMessage =
         "Atlas: " + std::to_string(assetBridge.assetAtlasCache.Atlas().EntryCount()) +
         " icons on " + std::to_string(assetBridge.assetAtlasCache.Atlas().PageCount()) +

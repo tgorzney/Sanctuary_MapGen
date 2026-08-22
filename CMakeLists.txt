@@ -335,6 +335,7 @@ add_sangen_test(GradientEditorWidget_UI_Test      src/ui/GradientEditorWidget_UI
 add_sangen_test(IconGridWidget_UI_Test
     src/ui/IconGridWidget_UI_Test.cpp
     src/ui/IconGridWidget_Virtualization_UI_Test.cpp)
+add_sangen_test(IconAtlasPairing_UI_Test          src/ui/IconAtlasPairing_UI_Test.cpp)
 add_sangen_test(Picking_UI_Test                   src/ui/Picking_UI_Test.cpp)
 add_sangen_test(PreviewComposite_UI_Test          src/ui/PreviewComposite_UI_Test.cpp)
 add_sangen_test(PreviewComposite_Wysiwyg_UI_Test  src/ui/PreviewComposite_Wysiwyg_UI_Test.cpp)

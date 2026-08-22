@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "IconAtlasPairing_UI.h"
 #include "IconGridWidget_UI.h"
 #include "../io/AssetAtlasCache_IO.h"
 #include "../io/SanpackReader_IO.h"
@@ -32,6 +33,7 @@ struct ApplicationAssetBridge {
     std::unique_ptr<Io::UnknownImportBag> unknownImportData;
     IconAtlasManifest             iconManifest;
     std::vector<std::string>      iconTemplateIdentifiers;   // iconId -> `tpId` side table
+    IconAtlasPairingLookup        iconPairingLookup;          // templateIdentifier -> {thumbnail, strategic}
     std::string                   assetStatusMessage = "No sanpack loaded.";
     char                          sanpackPath[260] = { 0 };
     bool bAssetLoadRequested  = false;
