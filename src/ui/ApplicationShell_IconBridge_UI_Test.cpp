@@ -55,6 +55,20 @@ void RunManifestShapeChecks(Application& application) {
           "an out-of-range icon id resolves to no template identifier");
 }
 
+// STEP52: prove IconPairingLookup() is actually populated by the real LoadAssetAtlas() path, not
+// only unit-testable against a hand-built vector in isolation (IconAtlasPairing_UI_Test.cpp).
+void RunIconPairingLookupWiringChecks(Application& application) {
+    const int expectedIconId = IconIdOfTemplate(application, "ucl3001");
+    Check(expectedIconId >= 0, "the known unit thumbnail resolved to a template identifier");
+    if (expectedIconId < 0) return;
+
+    const Ui::IconIdentifierPairing pairing = application.IconPairingLookup().Resolve("ucl3001");
+    Check(pairing.thumbnailIconId == expectedIconId,
+          "the pairing lookup's thumbnail id matches the manifest's own id for the same template");
+    Check(pairing.strategicIconId == Ui::kInvalidIconId,
+          "no authored strategic icon exists yet, so it resolves to the invalid sentinel");
+}
+
 // The pick, end to end: the grid reports an id, the shell resolves it to the template identifier
 // and stores it on the rule the Markers tab has selected — the tab never learns the atlas exists.
 void RunSelectionResolutionChecks(Application& application) {
@@ -93,6 +107,7 @@ void RunShellIconBridgeChecks() {
     Check(application.LoadAssetAtlas(), "the shell loaded the sanpack through the M5-4 pipeline");
     RunManifestShapeChecks(application);
     RunSelectionResolutionChecks(application);
+    RunIconPairingLookupWiringChecks(application);
 
     std::filesystem::remove(shellTestSanpackPath, errorCode);
     std::filesystem::remove_all(shellTestCacheDirectory, errorCode);

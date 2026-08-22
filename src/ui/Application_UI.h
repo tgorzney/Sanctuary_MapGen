@@ -69,6 +69,12 @@ public:
     const IconAtlasManifest& IconManifest() const { return assetBridge.iconManifest; }
     // The template identifier an icon id names; empty when it names nothing.
     std::string TemplateIdentifierOfIcon(int iconId) const;
+    // The atlas-pairing lookup STEP53's overlay renderer consumes: templateIdentifier ->
+    // {thumbnailIconId, strategicIconId}. strategicIconId presently always resolves to
+    // kInvalidIconId — no authored strategic-icon content exists yet (ARCH_14_03_IconRenderingLod.md §14.3, separate,
+    // unscheduled ticket); this accessor's contract does not change when that content lands, only
+    // the resolved value does.
+    const IconAtlasPairingLookup& IconPairingLookup() const { return assetBridge.iconPairingLookup; }
     const std::string& AssetStatusMessage() const { return assetBridge.assetStatusMessage; }
 
     // --- the assembled parts, exposed so the acceptance test drives the SHELL's own wiring ---
