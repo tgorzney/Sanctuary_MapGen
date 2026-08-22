@@ -120,6 +120,11 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
     ImGui::PushID("markersTab");
     DrawMarkersTabGlobals(state.globals, iconManifest);
     DrawRuleStack(recipe, state, previewDriver, iconManifest);
+    // STEP49: the hand-authored roster. `DrawManualMarkers` takes no map-size parameter, so the
+    // caller resolves the X/Z slider bounds from `recipe.geometry.mapSize` into the state each
+    // frame (MarkersTab_Manual_UI.h).
+    state.manual.positionHorizontalRange = MarkerPositionHorizontalSliderRange(recipe.geometry.mapSize);
+    DrawManualMarkers(recipe.markers, recipe.armies, state.manual);
     DrawPlacedMarkerList(placedMarkers, state.placedList);
     ImGui::PopID();
 }

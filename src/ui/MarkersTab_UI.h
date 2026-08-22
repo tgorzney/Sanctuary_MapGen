@@ -1,6 +1,8 @@
-// MarkersTab_UI.h — the marker tab: the global section, the procedural rule stack, and the
-// resolved placed-marker list. Layer: UI. Accuracy class: Visual. It edits exactly one recipe
-// slice — `recipe.markerRules`. TAB_REBUILD_PLAN "§ Markers"; extended by tab-rebuild WO C4.
+// MarkersTab_UI.h — the marker tab: the global section, the procedural rule stack, the
+// hand-authored manual roster, and the resolved placed-marker list. Layer: UI. Accuracy class:
+// Visual. Edits `recipe.markerRules` (the procedural rules) and `recipe.markers` (the manual
+// roster, STEP49, MarkersTab_Manual_UI.h); reads `recipe.armies` for the manual roster's Spawn
+// army picker. TAB_REBUILD_PLAN "§ Markers"; extended by tab-rebuild WO C4.
 //
 // The three shared list widgets each do the job they exist for: the procedural rules are a
 // DraggableList (an ORDERED stack of tens of rows, every row a drop target), the placed markers
@@ -19,12 +21,14 @@
 //  1. `Params::MarkerRule` has NO `name` and NO `baseColor`, so the plan's per-rule Name TextInput
 //     and Base Color ColorSwatch are not drawn; a rule row is labelled by its category and count.
 //     Both fields need a PARAMS work-order.
-//  2. Editable MANUAL markers have no PARAMS home at all — see MarkersTab_Placed_UI.h.
+//  2. Editable MANUAL markers are drawn by `MarkersTab_Manual_UI.h`'s `DrawManualMarkers` (STEP49)
+//     — see that header, not this one, for the hand-authored roster's shape.
 //  3. The global section holds NO recipe content — see MarkersTab_Globals_UI.h.
 #pragma once
 #include "IconGridWidget_UI.h"
 #include "LabelledDialWidget_UI.h"
 #include "MarkersTab_Globals_UI.h"
+#include "MarkersTab_Manual_UI.h"
 #include "MarkersTab_Placed_UI.h"
 #include "MarkersTab_Rules_UI.h"
 #include "RangeSliderWidget_UI.h"
@@ -72,6 +76,10 @@ struct MarkersTabState {
     PlacementTransformState transform;
     MarkersPlacedListState  placedList;
     SectionState            ruleStackSection;
+
+    // STEP49: the hand-authored roster editor, a sibling block to the procedural stack and the
+    // read-only placed list above (MarkersTab_Manual_UI.h).
+    ManualMarkersState      manual;
 };
 
 // rule -> widget mirrors (the paired min/max fields the range sliders edit, and the int count).

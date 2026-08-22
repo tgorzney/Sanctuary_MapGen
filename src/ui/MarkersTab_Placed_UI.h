@@ -8,11 +8,13 @@
 //
 // SCOPE NOTE (ARCH §8.4 — reported, not invented): the list is READ-ONLY. `Data::PlacementInstances`
 // is the Placement stage's COMPUTED OUTPUT, and every DATA field has exactly one writing stage
-// (Constitution §1) — a tab that edited it would be the UI simulating. v1's editable manual
-// markers (alias, position, per-marker symmetry, spawn->army assignment, delete) are RECIPE
-// content with no `_PARAMS` home in the tree: there is no `Params::ManualMarker` and no
-// `MapRecipe` slice to hold one. Adding that type is a PARAMS work-order this one does not own,
-// so those per-marker editors are NOT drawn; the resolved list below is what exists today.
+// (Constitution §1) — a tab that edited it would be the UI simulating. The hand-authored roster
+// (alias, position, spawn->army assignment, delete) is separate RECIPE content with a real PARAMS
+// home — `Params::MarkerInstanceGroup`/`MarkerTransform` (ENTITY_AUTHORING_PARAMS_SPEC) — edited
+// by `MarkersTab_Manual_UI.h`'s `DrawManualMarkers` (STEP49), a sibling block to this one. This
+// list stays exactly as it was: unfiltered, previewing every procedurally-resolved marker
+// regardless of manual-roster membership, same posture `PropsTab_Manual_UI.h` SCOPE NOTE 2 uses
+// for its own read-only transform preview.
 #pragma once
 #include "Section_UI.h"
 
