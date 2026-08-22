@@ -125,5 +125,14 @@ nlohmann::ordered_json BuildDetailNormalJson(const Params::MapRecipe& recipe);
 // cardinality pattern as `BuildStratumLayersJson`.
 nlohmann::ordered_json BuildStratumGenerationSettingsJson(const Params::MapRecipe& recipe);
 
+// MapExporter_Scenarios_IO.cpp — `recipe.scenarios` -> the top-level `Scenarios` object
+// (STEP69_ParamsScenariosRoundTrip_IO.md §1/§3/§5/§6 — this ticket's own inline tables are the
+// binding source of truth; no live SANMAP_FORMAT_SPEC "Correction 17" exists to cite instead, per
+// that ticket's 2026-08-22 correction, the way `BuildPropsJson` cites Correction 14). One flat
+// object, sibling of `armies`/`areas`/etc., NOT nested in `mapGeneratorData`. Applies the
+// coordinate flip to Spawns/Alloys/AlloysToAdd Position.z (unconfirmed, see the .cpp's own
+// ATTENTION comment).
+nlohmann::ordered_json BuildScenariosJson(const Params::MapRecipe& recipe);
+
 } // namespace Io
 } // namespace SanmapGen

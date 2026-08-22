@@ -51,7 +51,7 @@ void ParseDocumentEnvelopeJson(const nlohmann::json& document, const MapImportOp
 }
 
 // `areas`/`armies`/`markers`/`MarkerGroups`/`chains`/`PropGroups`/`props`/`DecalGroups`/`decals`/
-// `stratumLayers`/`StratumGenerationSettings` — top-level `.sanmap` keys, siblings of
+// `stratumLayers`/`StratumGenerationSettings`/`Scenarios` — top-level `.sanmap` keys, siblings of
 // `mapGeneratorData`, read unconditionally so hand-authored content survives even with no
 // generator block (STEP2/STEP3/STEP5). *Groups readers run before the instance readers (the
 // layerIndex clamp, ARCH §12, validates against the layer arrays *Groups populates) — new for
@@ -73,6 +73,9 @@ void ParseEntityDomainsJson(const nlohmann::json& document, Params::MapRecipe& o
     ReadDecalsJson(document, outRecipe, result);
     ReadStratumLayersJson(document, outRecipe, result);
     ReadStratumGenerationSettingsJson(document, outRecipe, result);
+    // STEP69_ParamsScenariosRoundTrip_IO: lobby-resolved spawn/alloy scenario data, same tier,
+    // sibling of the above (NOT nested in `mapGeneratorData`).
+    ReadScenariosJson(document, outRecipe, result);
 }
 
 // `MarkersStack`/`GlobalMarkerSettings`/`PropsStack`/`DecalsStack`/`UnitsStack` — the placement-rule

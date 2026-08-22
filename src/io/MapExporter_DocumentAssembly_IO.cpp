@@ -46,7 +46,7 @@ void BuildDocumentEnvelopeJson(const Params::MapRecipe& recipe, nlohmann::ordere
 }
 
 // `stratumLayers`, `StratumGenerationSettings`, `areas`, `armies`, `markers`, `chains`, `decals`,
-// `props`, `PropGroups`, `DecalGroups` — the recipe's own authored entities.
+// `props`, `PropGroups`, `DecalGroups`, `Scenarios` — the recipe's own authored entities.
 void AppendEntityDomainsJson(const Params::MapRecipe& recipe, nlohmann::ordered_json& document) {
     document["stratumLayers"] = BuildStratumLayersJson(recipe);
     // SANMAP_FORMAT_SPEC Correction 12: soil physics + slope-gate overrides, index-aligned with
@@ -65,6 +65,9 @@ void AppendEntityDomainsJson(const Params::MapRecipe& recipe, nlohmann::ordered_
     document["props"]       = BuildPropsJson(recipe);
     document["PropGroups"]  = BuildPropGroupsJson(recipe);
     document["DecalGroups"] = BuildDecalGroupsJson(recipe);
+    // STEP69_ParamsScenariosRoundTrip_IO: lobby-resolved spawn/alloy scenario data, same tier,
+    // sibling of the above (NOT nested in `mapGeneratorData`).
+    document["Scenarios"]   = BuildScenariosJson(recipe);
 }
 
 // `MarkersStack`, `PropsStack`, `DecalsStack`, `UnitsStack`, `GlobalMarkerSettings` — the

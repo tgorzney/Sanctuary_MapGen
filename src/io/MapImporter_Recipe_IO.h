@@ -136,5 +136,14 @@ void ReadDetailNormalJson(const nlohmann::json& document, Params::MapRecipe& out
 // `ReadLayerStackJson`/`mapGeneratorData.SimulationGrouping`/`GeoLayers` (relocated, not duplicated).
 void ReadHeightmapStackJson(const nlohmann::json& document, Params::LayerStack& outLayerStack);
 
+// MapImporter_Scenarios_IO.cpp — the top-level `Scenarios` object -> `recipe.scenarios`
+// (STEP69_ParamsScenariosRoundTrip_IO.md §1/§3/§5/§6/§7 — this ticket's own inline tables are the
+// binding source of truth). Needs `MapImportResult&` — unlike `ReadAreasJson`/`ReadArmiesJson` —
+// because the malformed-array case requires `result.Warn(...)`, matching `ReadPropsJson`/
+// `ReadStratumLayersJson`'s existing signature shape. Absent/non-object `Scenarios` leaves
+// `outRecipe.scenarios` at its default-constructed value (Constitution §6).
+void ReadScenariosJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
+                       MapImportResult& result);
+
 } // namespace Io
 } // namespace SanmapGen
