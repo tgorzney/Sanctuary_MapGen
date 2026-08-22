@@ -22,10 +22,10 @@ static Params::MapRecipe MakeRecipe(unsigned int seed) {
     recipe.geometry.seed = seed;
     recipe.geometry.terrainMaxHeight = 128.0f;
     // STEP16_SymmetryGlobalSettings_IO: the default `globalSymmetryMask` changed from None to
-    // RotateHalfTurn (ARCH-ratified). This fixture's spawn rule has `bSymmetryUseGlobal == true`
-    // (its default), so a non-None global mask would multiply markers.Count() past this test's
-    // hardcoded expectations below. Pinned explicitly: this test validates Poisson spacing/gates,
-    // not symmetry.
+    // RotateHalfTurn (ARCH-ratified). This fixture's spawn layer has `symmetry.bSymmetryUseGlobal
+    // == true` (its default, STEP66), so a non-None global mask would multiply markers.Count()
+    // past this test's hardcoded expectations below. Pinned explicitly: this test validates
+    // Poisson spacing/gates, not symmetry.
     recipe.globalSymmetryMask = Params::SymmetryAxis::None;
 
     Params::MarkerRule spawnRule;
@@ -37,7 +37,9 @@ static Params::MapRecipe MakeRecipe(unsigned int seed) {
     spawnRule.maxSlope = 10.0f;
     spawnRule.bRandomSelection = true;      // hashed order: no clearance scoring needed
     spawnRule.transform = PlacementTest::MakeTransform("m002", 1.0f, 1.0f);
-    recipe.markerRules.push_back(spawnRule);
+    Params::MarkerRuleLayer spawnLayer;
+    spawnLayer.rules.push_back(spawnRule);
+    recipe.markerRuleLayers.push_back(spawnLayer);
 
     Params::PropRule propRule;              // biome/mask gate: stratum 3 lives in the left half
     propRule.density = 0.35f;

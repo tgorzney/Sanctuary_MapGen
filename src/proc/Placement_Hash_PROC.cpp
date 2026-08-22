@@ -48,13 +48,11 @@ std::size_t HashMarkerRule(std::size_t seed, const Params::MarkerRule& rule) {
     seed = HashGateCore(seed, rule);
     seed = HashInteger(seed, (rule.bEnabled ? 1 : 0) | (rule.bHidden ? 2 : 0)
                            | (rule.bUseDensity ? 4 : 0) | (rule.bUseAllPositions ? 8 : 0)
-                           | (rule.bRandomSelection ? 16 : 0) | (rule.bCheckMaximumRadius ? 32 : 0)
-                           | (rule.bSymmetryUseGlobal ? 64 : 0));
+                           | (rule.bRandomSelection ? 16 : 0) | (rule.bCheckMaximumRadius ? 32 : 0));
     seed = HashInteger(seed, static_cast<int>(rule.category));
     seed = HashInteger(seed, static_cast<int>(rule.priority));
     seed = HashInteger(seed, static_cast<int>(rule.focusGradient));
     seed = HashInteger(seed, rule.count);
-    seed = HashInteger(seed, rule.symmetryMask);
     seed = HashFloat(seed, rule.density);
     seed = HashFloat(seed, rule.clearanceSpacing);
     seed = HashFloat(seed, rule.areaRadiusMinimum);
@@ -64,6 +62,19 @@ std::size_t HashMarkerRule(std::size_t seed, const Params::MarkerRule& rule) {
     seed = HashFloat(seed, rule.focusGradientRadius);
     seed = HashFloat(seed, rule.focusGradientStrength);
     return HashFloat(seed, rule.focusGradientContrast);
+}
+
+// The symmetry triplet lives on the LAYER now (ARCH_16_01_NewParamsShapes.md §16.1, STEP66/79):
+// bSymmetryUseGlobal/symmetryMask moved up a tier; radialSymmetryRepeatCount is newly hashed
+// here too — a pre-existing gap in the old per-rule hash (a deliberate, small fix, not smuggled
+// scope: the marker hash path is rewritten wholesale by this ticket regardless).
+std::size_t HashMarkerRuleLayer(std::size_t seed, const Params::MarkerRuleLayer& layer) {
+    seed = HashInteger(seed, (layer.bEnabled ? 1 : 0) | (layer.bHidden ? 2 : 0)
+                           | (layer.symmetry.bSymmetryUseGlobal ? 4 : 0));
+    seed = HashInteger(seed, layer.symmetry.symmetryMask);
+    seed = HashInteger(seed, layer.symmetry.radialSymmetryRepeatCount);
+    for (const Params::MarkerRule& rule : layer.rules) seed = HashMarkerRule(seed, rule);
+    return seed;
 }
 
 std::size_t HashPropRule(std::size_t seed, const Params::PropRule& rule) {
@@ -110,7 +121,7 @@ std::size_t PlacementStage::ComputeParameterHash() const {
     for (std::size_t word = 0; word < sizeof(PlacementConstants) / sizeof(unsigned int); ++word)
         hash = HashMix(hash, static_cast<std::size_t>(constantWords[word]));
 
-    for (const Params::MarkerRule& rule : recipe.markerRules) hash = HashMarkerRule(hash, rule);
+    for (const Params::MarkerRuleLayer& layer : recipe.markerRuleLayers) hash = HashMarkerRuleLayer(hash, layer);
     for (const Params::PropRule& rule : recipe.propRules)     hash = HashPropRule(hash, rule);
     for (const Params::UnitRule& rule : recipe.unitRules)     hash = HashUnitRule(hash, rule);
     for (const Params::DecalRule& rule : recipe.decalRules)   hash = HashDecalRule(hash, rule);

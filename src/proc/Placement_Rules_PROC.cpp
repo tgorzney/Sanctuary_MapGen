@@ -3,6 +3,7 @@
 // mechanisms" become one: markers, props, units and decals differ only in the selection
 // fields they fill in; from here on the scatter code knows nothing about rule families.
 #include "Placement_PROC.h"
+#include "Placement_RuleAppend_PROC.h"
 #include "Placement_RuleBuild_PROC.h"
 
 namespace SanmapGen {
@@ -11,46 +12,6 @@ namespace {
 
 inline float ReciprocalOrZero(float value, float epsilon) {
     return value > epsilon ? 1.0f / value : 1.0f / epsilon;
-}
-
-void AppendMarkerRules(const PlacementConstants& constants, const Params::MapRecipe& recipe,
-                       std::vector<ScatterRuleConfiguration>& configurations,
-                       std::vector<Data::TemplateIdentifier>& identifiers,
-                       std::vector<int>& radialSymmetryRepeatCounts) {
-    for (std::size_t index = 0; index < recipe.markerRules.size(); ++index) {
-        const Params::MarkerRule& rule = recipe.markerRules[index];
-        // A hidden rule still generates: its markers hold clearance/fairness even when the
-        // rule is switched off in the UI (PLACEMENT_SCATTER_SPEC "Transform & symmetry").
-        if (!rule.bEnabled && !rule.bHidden) continue;
-        ScatterRuleConfiguration configuration = MakeCommonConfiguration(
-            constants, recipe.geometry, recipe.water, rule, static_cast<int>(index), 0);
-        configuration.category          = static_cast<int>(rule.category);
-        configuration.priorityMode      = static_cast<int>(rule.priority);
-        configuration.focusGradientMode = static_cast<int>(rule.focusGradient);
-        configuration.symmetryMask      = ResolveSymmetryMask(rule.bSymmetryUseGlobal, rule.symmetryMask,
-                                                              recipe.globalSymmetryMask);
-        const int radialSymmetryRepeatCount = ResolveRadialSymmetryRepeatCount(
-            rule.bSymmetryUseGlobal, rule.radialSymmetryRepeatCount, recipe.radialSymmetryRepeatCount);
-        configuration.targetCount             = rule.count;
-        configuration.density                 = rule.density;
-        configuration.spacingMinimum          = rule.clearanceSpacing;
-        configuration.clearanceRadiusMinimum  = rule.areaRadiusMinimum;
-        configuration.clearanceRadiusMaximum  = rule.areaRadiusMaximum;
-        configuration.obstacleDistanceMinimum = rule.obstacleDistanceMinimum;
-        if (rule.areaHeightRange > 0.0f) configuration.clearanceHeightTolerance = rule.areaHeightRange;
-        configuration.focusGradientRadiusReciprocal =
-            ReciprocalOrZero(rule.focusGradientRadius, constants.focusGradientEpsilon);
-        configuration.focusGradientStrength = rule.focusGradientStrength;
-        configuration.focusGradientContrast = rule.focusGradientContrast;
-        if (rule.bUseDensity)         configuration.selectionFlags |= ScatterSelectionFlag::UseDensity;
-        if (rule.bUseAllPositions)    configuration.selectionFlags |= ScatterSelectionFlag::UseAllPositions;
-        if (rule.bRandomSelection)    configuration.selectionFlags |= ScatterSelectionFlag::RandomSelection;
-        if (rule.bCheckMaximumRadius) configuration.selectionFlags |= ScatterSelectionFlag::CheckMaximumRadius;
-        if (rule.bHidden)             configuration.selectionFlags |= ScatterSelectionFlag::Hidden;
-        configurations.push_back(configuration);
-        identifiers.push_back(Data::MakeTemplateIdentifier(rule.transform.templateIdentifier));
-        radialSymmetryRepeatCounts.push_back(radialSymmetryRepeatCount);
-    }
 }
 
 void AppendPropRules(const PlacementConstants& constants, const Params::MapRecipe& recipe,
