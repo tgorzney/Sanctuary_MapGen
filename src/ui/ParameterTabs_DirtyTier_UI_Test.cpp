@@ -87,7 +87,7 @@ void RunWaterLevelTierChecks(PreviewIntegrationScene& scene) {
 // same derivation, and the seed reaches all the way back to the first stage.
 void RunRuleAndSeedTierChecks(PreviewIntegrationScene& scene) {
     MarkersTabState markersState;
-    Params::MarkerRule* const rule = SelectedMarkerRule(scene.recipe.markerRules, markersState);
+    Params::MarkerRule* const rule = SelectedMarkerRule(scene.recipe.markerRuleLayers, markersState);
     Check(rule != nullptr, "the scene has a marker rule to edit");
     if (rule == nullptr) return;
     LoadMarkerRuleValues(*rule, markersState);

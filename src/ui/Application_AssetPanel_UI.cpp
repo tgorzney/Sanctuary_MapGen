@@ -44,7 +44,7 @@ bool Application::ApplyIconSelection(int selectedIconId, int& lastIconId,
 // beyond the read-only manifest they are handed.
 void Application::ResolveIconSelections() {
     bool bRecipeMoved = false;
-    Params::MarkerRule* const markerRule = SelectedMarkerRule(recipe.markerRules, tabState.markers);
+    Params::MarkerRule* const markerRule = SelectedMarkerRule(recipe.markerRuleLayers, tabState.markers);
     if (markerRule != nullptr)
         bRecipeMoved = ApplyIconSelection(tabState.markers.iconGridState.selectedIconId,
                                           tabState.lastMarkerIconId,

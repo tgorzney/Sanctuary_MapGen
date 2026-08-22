@@ -79,7 +79,7 @@ void RunSelectionResolutionChecks(Application& application) {
     application.TabState().markers.iconGridState.selectedIconId = iconId;
     application.ResolveIconSelections();
     Params::MarkerRule* const rule =
-        SelectedMarkerRule(application.Recipe().markerRules, application.TabState().markers);
+        SelectedMarkerRule(application.Recipe().markerRuleLayers, application.TabState().markers);
     Check(rule != nullptr, "the default recipe has a marker rule to write");
     if (rule == nullptr) return;
     Check(std::strcmp(rule->transform.templateIdentifier, "ucl3001") == 0,

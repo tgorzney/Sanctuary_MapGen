@@ -11,7 +11,7 @@ using namespace SanmapGen::Ui;
 
 void RunMarkersTabChecks(Params::MapRecipe& recipe) {
     MarkersTabState state;
-    Params::MarkerRule* const rule = SelectedMarkerRule(recipe.markerRules, state);
+    Params::MarkerRule* const rule = SelectedMarkerRule(recipe.markerRuleLayers, state);
     Check(rule != nullptr, "the marker selection resolves to a rule");
     if (rule == nullptr) return;
     LoadMarkerRuleValues(*rule, state);
@@ -45,7 +45,7 @@ void RunMarkersTabChecks(Params::MapRecipe& recipe) {
 
     // The tpId the IconGrid picker sits beside is a plain PARAMS field the tab writes directly.
     rule->transform.templateIdentifier[0] = 'z';
-    Check(recipe.markerRules[0].transform.templateIdentifier[0] == 'z',
+    Check(recipe.markerRuleLayers[0].rules[0].transform.templateIdentifier[0] == 'z',
           "the template id is edited in the recipe's own rule, not a copy");
 }
 
