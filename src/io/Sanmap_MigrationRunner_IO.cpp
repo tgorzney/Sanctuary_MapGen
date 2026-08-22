@@ -64,6 +64,7 @@ void RunSanmapMigrations(nlohmann::json& document, MapImportResult& result,
         // mapGeneratorData-gated readers, plus this function's own Unknown-Import capture below).
         result.Warn("No SanGenVersion or legacy version field found; skipping migration, "
                     "recovering via direct field match only.");
+        result.bNoVersionMarkerFound = true;
         resolvedVersion = kCurrentSanGenVersion;
     } else if (resolvedVersion > kCurrentSanGenVersion) {
         result.Warn("This map was saved by a newer SanGen (SanGenVersion "

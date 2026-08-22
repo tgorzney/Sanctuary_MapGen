@@ -492,6 +492,10 @@ add_sangen_test(JsonPrimitives_IO_Test    src/io/JsonPrimitives_IO_Test.cpp)
 target_link_libraries(JsonPrimitives_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 add_sangen_test(Sanmap_MigrationRunner_IO_Test src/io/Sanmap_MigrationRunner_IO_Test.cpp)
 target_link_libraries(Sanmap_MigrationRunner_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+# STEP26A_MigrationLosslessFlagAndPreview_IO: the preview/selective-apply surface (a NEW file pair,
+# not the runner) — same direct-fixture-construction reasoning as Sanmap_MigrationRunner_IO_Test above.
+add_sangen_test(Sanmap_MigrationPreview_IO_Test src/io/Sanmap_MigrationPreview_IO_Test.cpp)
+target_link_libraries(Sanmap_MigrationPreview_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 
 # STEP40B_TrivialRelocations_IO: the 4 trivial V2->V3 flat-key-relocation migrations. Each is a
 # standalone acceptance binary against its own hand-built OLD-shape fixture (IO_MIGRATION_SPEC.md

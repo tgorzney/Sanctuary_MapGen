@@ -65,6 +65,12 @@ struct MapImportResult {
     bool        bSucceeded        = false;
     bool        bRecipeLoaded     = false;
     bool        bBakedFieldsLoaded = false;
+    // STEP26A: set by Sanmap_MigrationRunner_IO's no-marker branch (IO_MIGRATION_SPEC.md §6) — never
+    // resolved to a starting version or walked a migration, since neither SanGenVersion nor its
+    // legacy predecessor field was present. This is what STEP26B's "Check for Migrations…" button
+    // gates on: only THEN may a human ask for the separate, UI-layer-only preview/selective-apply
+    // pass (`Sanmap_MigrationPreview_IO.h`).
+    bool        bNoVersionMarkerFound = false;
     int         warningCount      = 0;
     std::string resolvedDocumentPath;
     std::string resolvedFolderPath;

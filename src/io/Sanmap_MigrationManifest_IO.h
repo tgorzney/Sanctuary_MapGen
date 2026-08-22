@@ -40,11 +40,24 @@ using MigrationFunction = void (*)(nlohmann::json& document);
 // step is, by default, an atomic unit — selectable and appliable only as a whole; may only be set
 // true by the migration's own author, with a one-line justification comment at the declaration
 // site (§3).
+//
+// `bLosslessIfSkipped` (STEP26A, ratified ARCH ruling, §3) — a SECOND, ORTHOGONAL, author-declared
+// exception. `bIndependentlySelectable` answers an ORDERING question ("safe to run out of order").
+// `bLosslessIfSkipped` answers a DATA-SAFETY question ("safe to omit without losing data") — the two
+// can diverge in either direction and must never be conflated or "fixed" to match one another.
+// Defaults to false (the safe default). May only be set true by the migration's own author, with a
+// one-line justification comment at the declaration site, once verified against the READERS (not
+// just the migration's own transform) that every field it would have relocated is still recoverable
+// by some current-shape reader or existing legacy-mapGeneratorData-gated fallback reader when this
+// migration alone is skipped and every sibling in the step still runs. A dialog may only offer a
+// genuine "skip this" checkbox for an entry where bIndependentlySelectable == true AND
+// bLosslessIfSkipped == true (§3's dialog-gating law).
 struct MigrationEntry {
     MigrationFunction function;
     const char*       name;
     const char*       description;
     bool              bIndependentlySelectable = false;
+    bool              bLosslessIfSkipped       = false;
 };
 
 // One version step: `sourceVersion` -> `sourceVersion + 1`. Ordering inside `migrations` is load-
