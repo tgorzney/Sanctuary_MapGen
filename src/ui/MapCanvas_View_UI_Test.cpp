@@ -87,12 +87,55 @@ void CheckPanAndClamping() {
           "zooming in stops at the maximum zoom setting");
 }
 
+// STEP47: ProjectPreviewPixelToRegionLocal is the inverse of ResolvePreviewPixel. The round trip
+// is exact only up to ResolvePreviewPixel's own floor to an integer preview pixel, so the
+// tolerance is one preview pixel's worth of region-local span at the current zoom.
+void CheckRoundTripProjection() {
+    MapCanvasView view;
+    view.SetPreviewResolution(64);
+    view.SetRegionSide(256.0f);
+
+    auto checkRoundTrip = [](MapCanvasView& canvasView, float regionLocalX, float regionLocalY) {
+        const PreviewPixelCoordinate resolved = canvasView.ResolvePreviewPixel(regionLocalX, regionLocalY);
+        const RegionLocalPoint back = canvasView.ProjectPreviewPixelToRegionLocal(
+            static_cast<float>(resolved.pixelX), static_cast<float>(resolved.pixelY));
+        // The floor in ResolvePreviewPixel can lose up to one preview pixel, which is worth
+        // RegionSidePixels()/VisibleSpanPixels() screen pixels at the current zoom — the
+        // reciprocal of PreviewPixelsPerRegionPixel() (preview pixels PER screen pixel).
+        const float tolerance = canvasView.PreviewPixelsPerRegionPixel() > 0.0f
+            ? canvasView.RegionSidePixels() / canvasView.VisibleSpanPixels() + 0.01f
+            : 0.01f;
+        const float differenceX = back.regionLocalX - regionLocalX;
+        const float differenceY = back.regionLocalY - regionLocalY;
+        check((differenceX < tolerance && differenceX > -tolerance)
+           && (differenceY < tolerance && differenceY > -tolerance),
+              "the region-local point round-trips through the preview pixel within one preview pixel");
+    };
+
+    checkRoundTrip(view, 128.0f, 128.0f);
+    checkRoundTrip(view, 20.0f, 44.0f);
+    checkRoundTrip(view, 0.0f, 0.0f);
+    checkRoundTrip(view, 255.0f, 255.0f);
+
+    view.ZoomAtRegionPoint(64.0f, 64.0f, 2.0f);
+    checkRoundTrip(view, 64.0f, 64.0f);
+    checkRoundTrip(view, 100.0f, 150.0f);
+
+    // A degenerate view (never sized) answers (0,0), not a divide-by-zero, mirroring
+    // ResolvePreviewPixel's own early-return-zeroed contract.
+    MapCanvasView freshView;
+    const RegionLocalPoint degenerate = freshView.ProjectPreviewPixelToRegionLocal(10.0f, 10.0f);
+    check(degenerate.regionLocalX == 0.0f && degenerate.regionLocalY == 0.0f,
+          "an unsized view projects a preview pixel to (0,0) instead of dividing by zero");
+}
+
 } // namespace
 
 void RunMapCanvasViewChecks() {
     CheckUnzoomedMapping();
     CheckZoomAboutTheCursor();
     CheckPanAndClamping();
+    CheckRoundTripProjection();
 }
 
 } // namespace Ui

@@ -34,6 +34,12 @@ namespace Ui {
 
 class PreviewComposite {
 public:
+    // A world-space point on the horizontal plane (positionX/positionZ — positionY is height,
+    // PlacementInstance_DATA).
+    struct PreviewWorldPoint  { float worldX = 0.0f; float worldZ = 0.0f; };
+    // A point in preview-pixel space (the composited image's own pixel grid).
+    struct PreviewPixelPoint  { float pixelX = 0.0f; float pixelY = 0.0f; };
+
     PreviewComposite(const Params::Geometry& geometrySettings, const Params::Water& waterSettings,
                      const std::vector<Params::Stratum>& stratumSettings,
                      const Data::MapFields& inputFields,
@@ -43,6 +49,23 @@ public:
     PreviewCompositeSettings& Settings() { return settings; }
     const PreviewCompositeSettings& Settings() const { return settings; }
     void SetGpuResourceManager(Sys::GpuResourceManager* manager) { gpuResourceManager = manager; }
+
+    // Preview pixels per one world-space "cell" of the baked field grid — the scale factor world
+    // positions are mapped through. Zero if no field grid is baked yet (mirrors Resolution()'s own
+    // zero-when-unbaked contract).
+    float PixelsPerPreviewCell() const;   // PreviewComposite_Prepare_UI.cpp — mapFields.VertexSize()-derived
+
+    // World (positionX/positionZ — the horizontal plane; positionY is height,
+    // PlacementInstance_DATA) -> preview pixel. The exact mapping BuildEntityPoints already bakes
+    // marks through; extracted so there is exactly one copy (ARCH_08_03_SpatialGridVsSpacingGrid.md
+    // §8.3's "one copy" principle, same class of rule as Data::SpatialGrid::CellIndexAt).
+    PreviewPixelPoint WorldToPreviewPixel(float worldX, float worldZ) const;
+    // Inverse — preview pixel -> world. New; BuildEntityPoints never needed this direction, STEP48's
+    // picking migration does. Exact inverse of WorldToPreviewPixel only when PixelsPerPreviewCell()
+    // > 0; on an unbaked composite it answers (0, 0) via ReciprocalOrZero — callers must check
+    // PixelsPerPreviewCell() > 0 before trusting a picked world position, same discipline
+    // ResolvePreviewPixel's bInsideImage already requires callers to observe.
+    PreviewWorldPoint PreviewPixelToWorld(float pixelX, float pixelY) const;
 
     // Runs the pass sequence on the Gpu when a resource manager with a live context is
     // available, else on the Cpu twin. Reports which one it used, rather than silently
