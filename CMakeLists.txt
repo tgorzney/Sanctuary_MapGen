@@ -553,3 +553,13 @@ add_sangen_test(ApplicationShell_Layout_UI_Test
     src/ui/ApplicationShell_Visibility_UI_Test.cpp
     src/ui/ApplicationShell_Execution_UI_Test.cpp
     src/ui/ApplicationShell_AppSettings_UI_Test.cpp)
+
+# STEP84_SanmapExportFormatting_IO: the ratified `.sanmap` emission contract (R1-R10) pinned against
+# a checked-in byte-exact fixture, so nlohmann's free formatting guarantees and SanGen's own R3/R8/R10
+# enforcement cannot silently regress. `SANGEN_IO_TESTDATA_DIRECTORY` hands the test the fixture's
+# absolute source-tree location — the fixture is read from disk, and ctest's own working directory is
+# the build tree, not the source tree, so a relative path would not resolve.
+add_sangen_test(MapExporter_Formatting_IO_Test src/io/MapExporter_Formatting_IO_Test.cpp)
+target_link_libraries(MapExporter_Formatting_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+target_compile_definitions(MapExporter_Formatting_IO_Test PRIVATE
+    SANGEN_IO_TESTDATA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/src/io/testdata")
