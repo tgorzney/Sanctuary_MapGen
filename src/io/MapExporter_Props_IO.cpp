@@ -48,6 +48,7 @@ nlohmann::ordered_json BuildPropsJson(const Params::MapRecipe& recipe) {
 
         nlohmann::ordered_json groupJson;
         groupJson["blueprintPath"] = group.blueprintPath;
+        groupJson["Reclaimable"]   = group.bReclaimable;
         groupJson["transforms"]    = transforms;
         props.push_back(groupJson);
     }

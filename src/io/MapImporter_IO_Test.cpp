@@ -142,6 +142,7 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
     Check(loaded.markerRules.size() == 1 && loaded.markerRules[0].count == 8
           && loaded.markerRules[0].symmetryMask == 1, "the marker rules survive");
     Check(loaded.propRules.size() == 1 && loaded.propRules[0].bAvoidWater
+          && loaded.propRules[0].bReclaimable
           && loaded.propRules[0].bSymmetryUseGlobal == false && loaded.propRules[0].symmetryMask == 2,
           "the prop rules survive, including the per-rule symmetry override");
     Check(loaded.decalRules.size() == 1 && NearlyEqual(loaded.decalRules[0].spacingMinimum, 6.0f)
@@ -898,6 +899,7 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     Params::PropRule propRule;
     propRule.density = 0.4f;
     propRule.bAvoidWater = true;
+    propRule.bReclaimable = true;
     propRule.bSymmetryUseGlobal = false;
     propRule.symmetryMask = 2;
     // STEP16_SymmetryGlobalSettings_IO: the new sibling field, non-default (CheckSymmetryFields).

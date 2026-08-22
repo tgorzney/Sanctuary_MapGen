@@ -68,6 +68,7 @@ void ClampPropLayerIndex(Params::PropTransform& propTransform, std::size_t propL
 void ReadPropInstanceGroupJson(const nlohmann::json& json, Params::PropInstanceGroup& group,
                                int mapSize, std::size_t propLayerCount, MapImportResult& result) {
     ReadJsonText(json, "blueprintPath", group.blueprintPath);
+    ReadJsonBoolean(json, "Reclaimable", group.bReclaimable);
     if (!json.contains("transforms") || !json["transforms"].is_array()) return;
     for (const nlohmann::json& transformJson : json["transforms"]) {
         if (!transformJson.is_object()) continue;
