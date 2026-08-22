@@ -35,10 +35,41 @@ void MapCanvas::Draw(const char* canvasIdentifier, float regionSidePixels) {
     ImGui::Image(static_cast<ImTextureID>(presentationIdentifier), regionSize,
                  ImVec2(window.lowTextureCoordinateX, window.lowTextureCoordinateY),
                  ImVec2(window.highTextureCoordinateX, window.highTextureCoordinateY));
+
+    // STEP53 — the screen-space overlay icon draw pass. Composites on top of the terrain texture
+    // (§14's whole redesign), before ApplyPointerInput below (ordering here is readability only,
+    // not correctness — click-picking is off the draw list, STEP48 onward).
+    DrawOverlayIconLayerPass(regionOrigin.x, regionOrigin.y, regionSidePixels);
+
     // The hit-test surface sits exactly on the image, declared after it so it wins the hover.
     ImGui::SetCursorScreenPos(regionOrigin);
     ImGui::InvisibleButton(canvasIdentifier, regionSize);
     ApplyPointerInput(regionOrigin.x, regionOrigin.y);
+}
+
+// Missing sources (any nullptr) draw nothing — the same posture the render-only tests already
+// rely on (no overlay setters wired means no icon draw commands, not a crash).
+void MapCanvas::DrawOverlayIconLayerPass(float regionOriginX, float regionOriginY, float regionSidePixels) {
+    if (composite == nullptr) return;
+    DrawOverlayIconLayersInput iconLayerInput;
+    iconLayerInput.overlayLayerSettings = overlayLayerSettings;
+    iconLayerInput.renderingSettings    = overlayRenderingSettings;
+    iconLayerInput.placements           = overlayPlacements;
+    iconLayerInput.ruleBucketIndex      = overlayRuleBucketIndex;
+    iconLayerInput.recipe               = overlayRecipe;
+    iconLayerInput.pairingLookup        = overlayPairingLookup;
+    iconLayerInput.atlasManifest        = overlayAtlasManifest;
+    iconLayerInput.footprintSizeTable   = worldFootprintSizeTable;
+    iconLayerInput.composite            = composite;
+    iconLayerInput.view                 = &view;
+    iconLayerInput.regionOriginX        = regionOriginX;
+    iconLayerInput.regionOriginY        = regionOriginY;
+    iconLayerInput.regionSidePixels     = regionSidePixels;
+    if (HasSelection())
+        iconLayerInput.selectedInstanceKey = OverlayInstanceKey_UI{
+            PlacementCollectionKind_UI::Markers, static_cast<std::int32_t>(selectedEntityIdentifier), true};
+    DrawOverlayIconLayers(iconLayerInput, overlayLayerAabbCache, overlayIconLayerFrameCache,
+                         *ImGui::GetWindowDrawList());
 }
 
 // Wheel = zoom about the cursor; left-drag = pan; a left press that barely moved = select.

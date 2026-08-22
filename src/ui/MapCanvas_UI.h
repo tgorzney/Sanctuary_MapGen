@@ -26,10 +26,13 @@
 #include <cstdint>
 #include <functional>
 #include "MapCanvasView_UI.h"
+#include "MapCanvas_IconLayer_Ops_UI.h"
+#include "OverlayLayer_Settings_UI.h"
 #include "PreviewComposite_UI.h"
 #include "../data/EntityIdBuffer_DATA.h"
 #include "../data/PlacementInstances_DATA.h"
 #include "../data/SpatialGrid_DATA.h"
+#include "../io/WorldFootprintSizeTable_IO.h"
 #include "../sys/GpuResource_SYS.h"
 
 namespace SanmapGen {
@@ -61,6 +64,25 @@ public:
         selectionChangedCallback = std::move(selectionChanged);
     }
 
+    // STEP53 — the screen-space overlay icon draw pass's read-only sources, every one a push-in
+    // pointer (STEP48's ARCH-ruled pattern, ARCH_14_09_RenderingPerformance.md §14.9; never an
+    // Application reach-back — see this work-order's §0 correction).
+    void SetOverlayLayerSettings(const OverlayLayerSettings* settings) { overlayLayerSettings = settings; }
+    void SetOverlayRenderingSettings(const OverlayRenderingSettings* settings) { overlayRenderingSettings = settings; }
+    void SetOverlayPlacementSource(const Data::PlacementResults* placements,
+                                   const Data::RuleBucketIndexSet* ruleBucketIndex) {
+        overlayPlacements = placements;
+        overlayRuleBucketIndex = ruleBucketIndex;
+    }
+    void SetOverlayRecipe(const Params::MapRecipe* recipe) { overlayRecipe = recipe; }
+    void SetIconAtlasSource(const IconAtlasPairingLookup* pairingLookup, const IconAtlasManifest* atlasManifest) {
+        overlayPairingLookup = pairingLookup;
+        overlayAtlasManifest = atlasManifest;
+    }
+    // Mirrors SetPreviewComposite/SetMarkerPickingSource exactly (§0 above) — STEP58's placeholder
+    // table, sourced from Application::WorldFootprintSizeTable(), never reached directly.
+    void SetWorldFootprintSizeTable(const Io::WorldFootprintSizeTable* table) { worldFootprintSizeTable = table; }
+
     // One imgui frame; `regionSidePixels` is the square viewport side in screen pixels.
     void Draw(const char* canvasIdentifier, float regionSidePixels);   // MapCanvas_Draw_UI.cpp
 
@@ -85,6 +107,9 @@ private:
     void SetSelection(std::uint32_t entityIdentifier);
     // Translates the imgui pointer state over the region into the gestures (MapCanvas_Draw_UI.cpp).
     void ApplyPointerInput(float regionOriginX, float regionOriginY);
+    // STEP53 — assembles this frame's DrawOverlayIconLayersInput from the injected sources above
+    // and calls DrawOverlayIconLayers (MapCanvas_Draw_UI.cpp).
+    void DrawOverlayIconLayerPass(float regionOriginX, float regionOriginY, float regionSidePixels);
 
     MapCanvasView view;
     Sys::GpuResourceManager*        gpuResourceManager = nullptr;
@@ -97,6 +122,18 @@ private:
     std::function<void(std::uint32_t)>    selectionChangedCallback;
     PreviewPixelCoordinate lastPickedPixel;
     std::uint32_t selectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;
+
+    // STEP53 — overlay icon draw pass sources (read-only, injected) and its own per-canvas state.
+    const OverlayLayerSettings*         overlayLayerSettings    = nullptr;
+    const OverlayRenderingSettings*     overlayRenderingSettings = nullptr;
+    const Data::PlacementResults*       overlayPlacements        = nullptr;
+    const Data::RuleBucketIndexSet*     overlayRuleBucketIndex   = nullptr;
+    const Params::MapRecipe*            overlayRecipe            = nullptr;
+    const IconAtlasPairingLookup*       overlayPairingLookup     = nullptr;
+    const IconAtlasManifest*            overlayAtlasManifest     = nullptr;
+    const Io::WorldFootprintSizeTable*  worldFootprintSizeTable  = nullptr;
+    IconLayerAabbCache_UI overlayLayerAabbCache;
+    IconLayerFrameCache   overlayIconLayerFrameCache;
     float         pressTravelPixels        = 0.0f;    // how far the current press has dragged
     bool          bPressActive             = false;
 };

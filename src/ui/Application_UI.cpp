@@ -67,6 +67,14 @@ void Application::WireCallbacks() {
     canvas.SetPreviewComposite(&composite);
     canvas.SetMarkerPickingSource(&assembler.Placements().markers, &assembler.MarkerSpatialGrid());
     canvas.SetMarkerPickRadiusScreenPixels(settings.markerIconRadiusPixels);
+    // STEP53 — the screen-space overlay icon draw pass's sources, every one a push-in pointer
+    // (§0's correction: never an Application reach-back from inside MapCanvas).
+    canvas.SetOverlayLayerSettings(&overlaySettings);
+    canvas.SetOverlayRenderingSettings(&overlayIconRenderingSettings);
+    canvas.SetOverlayPlacementSource(&assembler.Placements(), &assembler.RuleBucketIndex());
+    canvas.SetOverlayRecipe(&recipe);
+    canvas.SetIconAtlasSource(&IconPairingLookup(), &IconManifest());
+    canvas.SetWorldFootprintSizeTable(&WorldFootprintSizeTable());
 }
 
 // The whole of the shell's generation duty. WHICH tier this is was derived by the driver from the

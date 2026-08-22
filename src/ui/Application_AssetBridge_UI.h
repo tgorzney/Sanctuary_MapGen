@@ -10,6 +10,7 @@
 #include "IconGridWidget_UI.h"
 #include "../io/AssetAtlasCache_IO.h"
 #include "../io/SanpackReader_IO.h"
+#include "../io/WorldFootprintSizeTable_IO.h"
 #include "../sys/AtlasResidency_SYS.h"
 
 namespace SanmapGen {
@@ -34,6 +35,10 @@ struct ApplicationAssetBridge {
     IconAtlasManifest             iconManifest;
     std::vector<std::string>      iconTemplateIdentifiers;   // iconId -> `tpId` side table
     IconAtlasPairingLookup        iconPairingLookup;          // templateIdentifier -> {thumbnail, strategic}
+    // STEP58's placeholder templateIdentifier -> baseFootprintWidth/Depth table, wired here per
+    // this ticket's §0 (STEP52/58 both explicitly declined to wire it in). Unlike iconPairingLookup
+    // its content is not atlas-derived — see Application_Assets_UI.cpp's LoadAssetAtlas().
+    Io::WorldFootprintSizeTable   worldFootprintSizeTable;
     std::string                   assetStatusMessage = "No sanpack loaded.";
     char                          sanpackPath[260] = { 0 };
     bool bAssetLoadRequested  = false;

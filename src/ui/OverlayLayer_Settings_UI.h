@@ -4,9 +4,9 @@
 // `PreviewCompositeSettings::fieldLayers` (§14.1): never recipe-serialized, no PARAMS home. A
 // SEPARATE settings object from `PreviewCompositeSettings` on purpose (see this work-order's
 // Fix section item 1) — consumed by the screen-space icon draw pass
-// (`MapCanvas_IconLayer_UI.cpp`, §14.9, unscheduled), not by `PreviewComposite`'s GPU
-// field/terrain compositor.
+// (`MapCanvas_IconLayer_UI.h`/STEP53), not by `PreviewComposite`'s GPU field/terrain compositor.
 #pragma once
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -36,6 +36,10 @@ struct OverlayLayer_UI {
     float opacity = 1.0f;                              // layer-wide alpha multiplier (§14.2/§14.8)
     std::vector<OverlaySubLayerRef_UI> subLayers;       // any mix/count of Manual + ProceduralRule
     float thumbnailLodThresholdPixels = 5.0f;           // §14.3, Constitution §8 tunable
+    // §14.3's strategic-mode fixed screen size (STEP53) — not yet ratified when §14.2 first shipped
+    // this struct; added here, per-layer-tweakable exactly like thumbnailLodThresholdPixels above,
+    // rather than a shadow field on the draw pass itself.
+    float strategicIconScreenSizePixels = 16.0f;
 };
 
 // §14.5's "UI-session defaults" half: color/iconScale for a domain with no recipe-serialized
@@ -55,6 +59,13 @@ struct OverlayLayerSettings {
     OverlaySessionAppearance alloyAppearance;
     OverlaySessionAppearance spawnsArmiesAppearance;
     OverlaySessionAppearance unitsAppearance;
+    // Monotonic, bumped by any overlayLayers mutation (reorder/opacity/enable-toggle/threshold
+    // change) — the icon draw pass's (STEP53) C2 cache invalidation key and per-layer AABB-cache
+    // rebuild key, mirroring PreviewDriver::NotifyParametersChanged()'s own hash-bump pattern
+    // (§14.7). No mutation site exists yet in this sequence (the View toolbar is Phase 4) — this is
+    // forward-compatible plumbing, not dead weight; today it simply never advances past 0.
+    std::uint64_t layerSettingsRevision = 0;
+    void BumpLayerSettingsRevision() { ++layerSettingsRevision; }
 };
 
 } // namespace Ui

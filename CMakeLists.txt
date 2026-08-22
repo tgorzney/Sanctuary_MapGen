@@ -474,6 +474,16 @@ add_sangen_test(MapCanvas_UI_Test
     src/ui/MapCanvas_Render_UI_Test.cpp
     src/ui/MapCanvas_View_UI_Test.cpp
     src/ui/MapCanvas_Picking_UI_Test.cpp)
+# STEP53 — the screen-space overlay icon draw pass. Culling/LOD, budget/decimation, and the C2
+# cache's invalidation decision are headless (no imgui frame, no GL); bucketing + the bulk vertex
+# write need one live headless imgui frame (no GL, no window backend) — mirrors MapCanvas_UI_Test's
+# own split.
+add_sangen_test(MapCanvas_IconLayer_UI_Test
+    src/ui/MapCanvas_IconLayer_UI_Test.cpp
+    src/ui/MapCanvas_IconLayer_Cull_UI_Test.cpp
+    src/ui/MapCanvas_IconLayer_Budget_UI_Test.cpp
+    src/ui/MapCanvas_IconLayer_Cache_UI_Test.cpp
+    src/ui/MapCanvas_IconLayer_Draw_UI_Test.cpp)
 add_sangen_test(PreviewIntegration_UI_Test
     src/ui/PreviewIntegration_UI_Test.cpp
     src/ui/PreviewIntegration_DirtyTier_UI_Test.cpp

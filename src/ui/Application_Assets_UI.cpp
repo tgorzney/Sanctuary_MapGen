@@ -94,6 +94,9 @@ bool Application::LoadAssetAtlas() {
     assetBridge.atlasResidency.Clear();
     assetBridge.assetPackReader.Close();
     tabState.files.assetPack = nullptr;
+    // STEP58's placeholder table (§0): hand-seeded, not atlas-derived — populated unconditionally,
+    // ahead of every early-return below, unlike iconPairingLookup.
+    assetBridge.worldFootprintSizeTable = Io::BuildPlaceholderWorldFootprintSizeTable();
     if (assetBridge.sanpackPath[0] == '\0') {
         assetBridge.assetStatusMessage = "No sanpack selected.";
         return false;

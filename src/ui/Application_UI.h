@@ -76,6 +76,9 @@ public:
     // unscheduled ticket); this accessor's contract does not change when that content lands, only
     // the resolved value does.
     const IconAtlasPairingLookup& IconPairingLookup() const { return assetBridge.iconPairingLookup; }
+    // STEP58's placeholder table (§0) — WireCallbacks() injects a pointer to this into MapCanvas;
+    // the draw pass itself never calls this accessor directly (MapCanvas_UI.h's own header comment).
+    const Io::WorldFootprintSizeTable& WorldFootprintSizeTable() const { return assetBridge.worldFootprintSizeTable; }
     const std::string& AssetStatusMessage() const { return assetBridge.assetStatusMessage; }
 
     // --- the assembled parts, exposed so the acceptance test drives the SHELL's own wiring ---
@@ -86,6 +89,9 @@ public:
     PreviewComposite&              Composite() { return composite; }
     MapCanvas&                     Canvas()    { return canvas; }
     OverlayLayerSettings&          OverlaySettings() { return overlaySettings; }
+    // STEP53's cross-layer visible-vertex budget tunables (Constitution §8) — a push-in pointer
+    // into MapCanvas, same pattern as OverlaySettings() above.
+    OverlayRenderingSettings&      OverlayIconRenderingSettings() { return overlayIconRenderingSettings; }
     ApplicationTabState&           TabState()  { return tabState; }
     ApplicationExecutionSettings&  ExecutionSettings() { return executionSettings; }
     Sys::DispatchPolicy&           ActiveDispatchPolicy() { return dispatchPolicy; }
@@ -134,6 +140,7 @@ private:
     Pipeline::PreviewDriver       previewDriver;
     MapCanvas                     canvas;
     OverlayLayerSettings          overlaySettings;   // the six-domain screen-space overlay stack
+    OverlayRenderingSettings      overlayIconRenderingSettings;   // STEP53's cross-layer budget knobs
     ApplicationTabState           tabState;
     ApplicationHostedSettings     hostedSettings;   // the tab settings with no recipe home yet
     ApplicationExecutionSettings  executionSettings;

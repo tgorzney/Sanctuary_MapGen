@@ -1,0 +1,90 @@
+// MapCanvas_IconLayer_CullInternal_UI.h — declarations shared by the three
+// MapCanvas_IconLayer_Cull*_UI.cpp translation units ONLY (§1's per-layer culling + LOD split
+// further than the ticket's 5-file minimum to stay inside Constitution §1.5's ceilings). Not part
+// of this module's public surface (MapCanvas_IconLayer_UI.h); nothing outside this trio includes
+// it. Pure, imgui-free, headless-testable — same posture as the public header.
+#pragma once
+#include "MapCanvas_IconLayer_Ops_UI.h"
+#include "OverlayLayer_Settings_UI.h"
+#include "../data/PlacementInstances_DATA.h"
+#include "../data/PlacementResults_DATA.h"
+#include "../data/RuleBucketIndexSet_DATA.h"
+
+namespace SanmapGen {
+namespace Ui {
+
+struct ViewWorldRect_UI { float lowWorldX = 0.0f, lowWorldZ = 0.0f, highWorldX = 0.0f, highWorldZ = 0.0f; };
+
+// The three top-level orchestration entry points (MapCanvas_IconLayer_Cull_UI.cpp). Declared here,
+// not in the public header, because only MapCanvas_IconLayer_Draw_UI.cpp (this module's own
+// imgui-facing translation unit) and this module's own tests call them directly.
+ViewWorldRect_UI ComputeViewWorldRect(const PreviewComposite& composite, const MapCanvasView& view,
+                                       float regionSidePixels);
+// Never touches IconLayerCullDiagnostics_UI — cache-warming is not a per-frame cost to count.
+void EnsureLayerAabbCache(const DrawOverlayIconLayersInput& input, IconLayerAabbCache_UI& aabbCache);
+void ResolveVisibleCandidates(const DrawOverlayIconLayersInput& input, IconLayerAabbCache_UI& aabbCache,
+                               IconLayerCullDiagnostics_UI* diagnostics,
+                               std::vector<OverlayVisibleInstance>& outCandidates);
+
+// §4's "run steps 1-3 fresh for only the selected instance(s)" replay-frame path — a cheap,
+// picker-scoped lookup (today: Markers only, STEP48), never an O(N) re-walk of every candidate.
+// Appends at most one instance; returns false (appends nothing) if there is no valid selection, the
+// selected instance's owning layer/sub-layer is disabled, or its collection has no picker yet.
+bool ResolveSelectedInstanceCandidate(const DrawOverlayIconLayersInput& input,
+                                       std::vector<OverlayVisibleInstance>& outCandidates);
+
+// Fixed 8-char (7 + NUL) tpId buffer -> std::string, stopping at the first NUL (Data::TemplateIdentifier
+// / Params::UnitTransform::templateIdentifier's shared shape). No existing free helper does this
+// conversion outside UI (IO must not depend upward on UI, Constitution §1) so it lives here.
+std::string TemplateIdentifierToString8(const char* characters);
+
+// §14.6: domainKind is not DATA-bucket identity. Alloy/SpawnsArmies both resolve to Markers
+// (their split already happened at OverlayLayer seed time — each rule's ruleIndex was routed into
+// exactly one of the two layers' subLayers by Application_OverlaySetup_UI.cpp's SeedMarkerDomains,
+// so no live per-instance category re-check is needed here). Reclaim has no data yet (false).
+bool TryResolveDomainCollection(OverlayDomainKind_UI domainKind, PlacementCollectionKind_UI& outCollection);
+const Data::PlacementInstances& CollectionInstances(const Data::PlacementResults& placements,
+                                                     PlacementCollectionKind_UI collection);
+const Data::RuleBucketIndex& CollectionRuleBucket(const Data::RuleBucketIndexSet& ruleBucketIndex,
+                                                   PlacementCollectionKind_UI collection);
+
+bool WorldRectsIntersect(const LayerWorldAabb_UI& aabb, const ViewWorldRect_UI& viewRect);
+void WidenAabb(LayerWorldAabb_UI& aabb, float worldX, float worldZ);
+
+// World -> screen projection, two-mode LOD (§14.3 verbatim), pairing-lookup resolution (a miss
+// draws nothing, logged at most once per unique id/session), opacity-into-tint (§14.2). Called only
+// for an instance already known to be inside the view rect (the caller's per-instance AABB test).
+void EmitCandidateIfVisible(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
+                             int layerIndex, const std::string& templateIdentifier,
+                             float worldX, float worldZ, float instanceScale,
+                             PlacementCollectionKind_UI collection, std::int32_t instanceIndex,
+                             int* stableOrderCounter, IconLayerCullDiagnostics_UI* diagnostics,
+                             std::vector<OverlayVisibleInstance>& outCandidates);
+
+// `viewRect == nullptr` is the AABB-cache-build pass: only *outAabb gets widened, per instance,
+// no pairing lookup / projection / emission (cheap; this is the "membership changed" rebuild, not
+// a per-frame cost) and `diagnostics` must be nullptr from that caller so the query-call counter
+// stays a per-FRAME count, not a cache-warm count. `viewRect != nullptr` is the real per-frame
+// walk: *outAabb is left untouched (nullptr) and the per-instance AABB test against `*viewRect`
+// gates whether EmitCandidateIfVisible runs at all.
+//
+// §1 item 3 — one recipe.*Rules[i]-resolved sub-layer, walked via STEP50's ruleIndex CSR bucket
+// (MapCanvas_IconLayer_CullProcedural_UI.cpp).
+void ResolveProceduralSubLayer(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
+                                int layerIndex, PlacementCollectionKind_UI collection, int ruleIndex,
+                                int* stableOrderCounter, LayerWorldAabb_UI* outAabb,
+                                const ViewWorldRect_UI* viewRect,
+                                IconLayerCullDiagnostics_UI* diagnostics,
+                                std::vector<OverlayVisibleInstance>& outCandidates);
+
+// §1 item 4 — one hand-authored sub-layer (Props/Decals/Units; Alloy/SpawnsArmies carry none this
+// sequence — SEQUENCE_PreviewOverlayLayering.md Phase 5) (MapCanvas_IconLayer_CullManual_UI.cpp).
+void ResolveManualSubLayer(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
+                            int layerIndex, int subLayerArrayIndex,
+                            int* stableOrderCounter, LayerWorldAabb_UI* outAabb,
+                            const ViewWorldRect_UI* viewRect,
+                            IconLayerCullDiagnostics_UI* diagnostics,
+                            std::vector<OverlayVisibleInstance>& outCandidates);
+
+} // namespace Ui
+} // namespace SanmapGen
