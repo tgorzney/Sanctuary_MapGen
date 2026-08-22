@@ -285,6 +285,10 @@ add_sangen_test(AssetPipeline_IO_Test
     src/io/MapExporter_BlueprintValidation_IO_Test.cpp)
 target_include_directories(AssetPipeline_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
+# STEP58 — asset-derived templateIdentifier -> footprint-size lookup table (not a .sanmap domain;
+# see WorldFootprintSizeTable_IO.h's own header comment). Pure unit test, no sanpack/miniz needed.
+add_sangen_test(WorldFootprintSizeTable_IO_Test src/io/WorldFootprintSizeTable_IO_Test.cpp)
+
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
 # each group below is ONE binary whose main() lives in the first file listed.
 add_sangen_test(NoiseBlend_PROC_Test
