@@ -28,6 +28,7 @@
 //     previewing every procedurally-placed prop regardless of manual-layer membership — because a
 //     tab that filtered or edited it would be the UI simulating (Constitution §1).
 #pragma once
+#include <algorithm>
 #include <string>
 #include <vector>
 #include "ColorSwatch_UI.h"
@@ -88,6 +89,16 @@ inline const char* ManualPropLayerRowLabel(const Params::PropInstanceLayer& laye
 // dictionary, so duplicate names do not collide on export the way `Army`'s do. Reused for UX
 // consistency with the Armies/Areas tabs, not because a collision would corrupt anything.
 inline std::string NextPropLayerName(int layerCount) { return NextUniqueLabel("Prop Layer", layerCount); }
+
+// The stable id a newly created layer takes: max-plus-one across the current in-memory
+// `propLayers`, or 0 if empty. Ruling 1 (ARCH_14_13_OpenItems.md §14.13 item 3): derived, never a
+// persisted counter — self-healing across manual JSON edits, ids already present in a loaded file
+// are never renumbered.
+inline int NextPropLayerId(const std::vector<Params::PropInstanceLayer>& propLayers) {
+    int maximumId = -1;
+    for (const Params::PropInstanceLayer& layer : propLayers) maximumId = std::max(maximumId, layer.layerId);
+    return maximumId + 1;
+}
 
 // Repairs `recipe.props` after a layer row is removed: every transform that named the removed layer
 // CLAMPS to layer 0 (STEP22 ruling #5 — DELIBERATE DIVERGENCE from `DropUnitRulesForRemovedArmy`: a

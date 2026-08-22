@@ -61,6 +61,7 @@ nlohmann::ordered_json BuildDecalGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["Color"] = { { "r", layer.color[0] }, { "g", layer.color[1] },
                                { "b", layer.color[2] }, { "a", layer.color[3] } };
         layerJson["IconScale"] = layer.iconScale;
+        layerJson["Id"] = layer.layerId;
         decalGroups.push_back(layerJson);
     }
     return decalGroups;

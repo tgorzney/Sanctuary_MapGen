@@ -21,6 +21,7 @@
 //     — unfiltered, unrelated to manual-layer membership, because no `layerIndex`-equivalent field
 //     exists on it to filter by.
 #pragma once
+#include <algorithm>
 #include <string>
 #include <vector>
 #include "ColorSwatch_UI.h"
@@ -79,6 +80,14 @@ inline const char* ManualDecalLayerRowLabel(const Params::DecalInstanceLayer& la
 // Cosmetic only here (STEP22 ruling #6): `DecalGroups` exports as a plain array, not a name-keyed
 // dictionary, so duplicate names do not collide on export.
 inline std::string NextDecalLayerName(int layerCount) { return NextUniqueLabel("Decal Layer", layerCount); }
+
+// The stable id a newly created layer takes: max-plus-one across the current in-memory
+// `decalLayers`, or 0 if empty. Decal-typed mirror of `NextPropLayerId`.
+inline int NextDecalLayerId(const std::vector<Params::DecalInstanceLayer>& decalLayers) {
+    int maximumId = -1;
+    for (const Params::DecalInstanceLayer& layer : decalLayers) maximumId = std::max(maximumId, layer.layerId);
+    return maximumId + 1;
+}
 
 // Repairs `recipe.decals` after a layer row is removed: every transform that named the removed
 // layer CLAMPS to layer 0 (STEP22 ruling #5 — never dropped: a decal losing its layer tag is still
