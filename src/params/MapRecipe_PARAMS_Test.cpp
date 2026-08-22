@@ -13,13 +13,13 @@ int main() {
 
     GeoLayer group; group.layers.resize(2);
     recipe.layerStack.geoLayers.push_back(group);
-    recipe.markerRules.resize(3);
+    recipe.markerRuleLayers.resize(3);
     recipe.propRules.resize(1);
 
     if (recipe.geometry.VertexSize() != 513) { std::printf("FAIL geometry\n"); ++failures; }
     if (!recipe.IsValid()) { std::printf("FAIL valid\n"); ++failures; }
     if (recipe.layerStack.GetFlatLayers().size() != 2) { std::printf("FAIL flat via recipe\n"); ++failures; }
-    if (recipe.markerRules.size() != 3 || recipe.propRules.size() != 1) { std::printf("FAIL rule counts\n"); ++failures; }
+    if (recipe.markerRuleLayers.size() != 3 || recipe.propRules.size() != 1) { std::printf("FAIL rule counts\n"); ++failures; }
     recipe.geometry.mapSize = 0;
     if (recipe.IsValid()) { std::printf("FAIL invalid geometry\n"); ++failures; }
 

@@ -32,8 +32,8 @@ nlohmann::ordered_json BuildStratumLayersJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildHeightmapStackJson(const Params::LayerStack& layerStack);
 
 // MapExporter_MarkersStack_IO.cpp / MapExporter_PropsStack_IO.cpp / MapExporter_DecalsStack_IO.cpp /
-// MapExporter_UnitsStack_IO.cpp — `recipe.markerRules`/`propRules`/`decalRules`/`unitRules` -> the
-// top-level `MarkersStack`/`PropsStack`/`DecalsStack`/`UnitsStack` bare JSON ARRAYS
+// MapExporter_UnitsStack_IO.cpp — `recipe.markerRuleLayers`/`propRules`/`decalRules`/`unitRules` ->
+// the top-level `MarkersStack`/`PropsStack`/`DecalsStack`/`UnitsStack` bare JSON ARRAYS
 // (SANMAP_FORMAT_SPEC Correction 7, ruling #1), siblings of `mapGeneratorData`, REPLACING the old
 // nested `mapGeneratorData.PlacementRules` object (relocated, not duplicated — ruling #3).
 // `BuildGlobalMarkerSettingsJson` — `recipe.globalMarkerSettings` -> the top-level

@@ -101,7 +101,7 @@ void ReadStratumGenerationSettingsJson(const nlohmann::json& document, Params::M
 
 // MapImporter_MarkersStack_IO.cpp / MapImporter_PropsStack_IO.cpp / MapImporter_DecalsStack_IO.cpp /
 // MapImporter_UnitsStack_IO.cpp — `MarkersStack`/`PropsStack`/`DecalsStack`/`UnitsStack` ->
-// `recipe.markerRules`/`propRules`/`decalRules`/`unitRules`, REPLACING the deleted
+// `recipe.markerRuleLayers`/`propRules`/`decalRules`/`unitRules`, REPLACING the deleted
 // `ReadPlacementRulesJson` (SANMAP_FORMAT_SPEC Correction 7; MapImporter_IO.h SCOPE NOTE 3).
 // `ReadGlobalMarkerSettingsJson` — the sibling `GlobalMarkerSettings` object -> `recipe.
 // globalMarkerSettings` (ARCH §11), not nested inside `MarkersStack`.
