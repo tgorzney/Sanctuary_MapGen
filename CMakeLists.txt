@@ -33,6 +33,21 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+# 4. Fetch LuaJIT (STEP65 — LuaSyntaxCheck_SYS). Vendored from the OFFICIAL upstream repository
+# (https://github.com/LuaJIT/LuaJIT, linked from luajit.org) -- never a third-party fork -- pinned
+# to one commit on the v2.1 maintenance branch for reproducibility (ARCH_15_08_ThirdPartyDependencyRuling.md
+# §15.8: LuaJIT specifically, not vanilla Lua). LuaJIT ships no CMakeLists.txt of its own, so this
+# FetchContent call only clones/checks out the pinned commit; nothing is configured or built by it.
+# The actual build (LuaJIT's own src/msvcbuild.bat) is driven further down, once SanGenV2 exists,
+# where it is linked.
+set(SANGEN_LUAJIT_COMMIT "1ee778a4e37122d8ca7d5733c590a47dafd6b15c") # LuaJIT/LuaJIT, branch v2.1
+FetchContent_Declare(
+    luajit
+    GIT_REPOSITORY https://github.com/LuaJIT/LuaJIT.git
+    GIT_TAG        ${SANGEN_LUAJIT_COMMIT}
+)
+FetchContent_MakeAvailable(luajit)
+
 # Create a library for ImGui since it doesn't provide its own CMakeLists out of the box
 add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp
@@ -201,6 +216,92 @@ target_link_libraries(SanGenV2 PUBLIC imgui)
 # header-only target is PRIVATE: consumers of SanGenV2 neither need nor inherit the json headers.
 target_link_libraries(SanGenV2 PRIVATE nlohmann_json::nlohmann_json)
 
+# ---------------------------------------------------------------------------
+# STEP65 — build genuine LuaJIT (fetched above) with its OWN upstream build script, then link the
+# resulting static archive into SanGenV2 PRIVATE. LuaJIT's upstream build system is Makefile/MSVC-
+# batch based, not CMake-native (ARCH_15_08_ThirdPartyDependencyRuling.md §15.8, §7.3 "coder's
+# call"): rather than vendor a third-party CMake wrapper around LuaJIT -- the exact supply-chain
+# shortcut STEP65's first attempt was rejected for -- this drives `src/msvcbuild.bat` (the LuaJIT
+# project's own, official Windows build script) directly via a generated wrapper batch file that
+# self-establishes an MSVC "Developer Command Prompt" environment (msvcbuild.bat early-exits
+# unless INCLUDE is already set). The wrapper locates vcvars64.bat through vswhere.exe -- the VS
+# Installer's own stable, fixed-path locator tool, not a machine-specific hardcoded path -- so the
+# custom command is self-contained regardless of whether the outer shell/generator already has an
+# MSVC environment loaded (Ninja inherits the invoking shell's env; MSBuild's own does not).
+if(WIN32)
+    # vswhere.exe's own install location is fixed by the VS Installer itself (documented, stable
+    # since VS2017) -- unlike vcvars64.bat, whose path varies by edition/drive, so locating THIS
+    # tool by a fixed path is not the machine-specific guess vswhere itself exists to avoid.
+    find_program(SANGEN_VSWHERE_EXE
+        NAMES vswhere vswhere.exe
+        PATHS "C:/Program Files (x86)/Microsoft Visual Studio/Installer"
+              "C:/Program Files/Microsoft Visual Studio/Installer")
+    if(NOT SANGEN_VSWHERE_EXE)
+        message(FATAL_ERROR "SanGen STEP65: vswhere.exe not found -- needed to locate vcvars64.bat "
+                             "for LuaJIT's msvcbuild.bat step.")
+    endif()
+    execute_process(
+        COMMAND "${SANGEN_VSWHERE_EXE}" -latest -products * -requires
+                Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        OUTPUT_VARIABLE SANGEN_VS_INSTALL_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT SANGEN_VS_INSTALL_PATH)
+        message(FATAL_ERROR "SanGen STEP65: vswhere.exe found no VS install with the C++ x86/x64 "
+                             "build tools -- needed for LuaJIT's msvcbuild.bat.")
+    endif()
+    file(TO_CMAKE_PATH "${SANGEN_VS_INSTALL_PATH}/VC/Auxiliary/Build/vcvars64.bat" SANGEN_VCVARS64_BAT)
+    if(NOT EXISTS "${SANGEN_VCVARS64_BAT}")
+        message(FATAL_ERROR "SanGen STEP65: vcvars64.bat not found at ${SANGEN_VCVARS64_BAT}")
+    endif()
+
+    # msvcbuild.bat's own "static" mode: builds a static lua51.lib to embed (no lua51.dll). It also
+    # unavoidably links a standalone luajit.exe from that same archive (the script has no flag to
+    # skip that step in static mode) -- allowed explicitly by STEP65 ("otherwise that's fine, just
+    # link the static lib"). It must run with CWD = <luajit>/src (its own DASMDIR is `..\dynasm`).
+    set(SANGEN_LUAJIT_LIB "${luajit_SOURCE_DIR}/src/lua51.lib")
+    set(SANGEN_LUAJIT_BUILD_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/BuildLuaJIT.bat")
+    # `set NoDefaultCurrentDirectoryInExePath=` restores cmd.exe's OWN out-of-the-box default (that
+    # variable is normally unset, meaning the current directory IS searched for a bare executable
+    # name) in case the invoking shell set it to harden itself -- msvcbuild.bat's internal steps
+    # invoke its own freshly-built minilua.exe/buildvm.exe by bare name from the CWD (upstream's
+    # design, not something this wrapper is entitled to rewrite), so the wrapper must not leave a
+    # non-default shell hardening setting in place that breaks that assumption.
+    file(WRITE "${SANGEN_LUAJIT_BUILD_SCRIPT}"
+"@echo off\n\
+call \"${SANGEN_VCVARS64_BAT}\" >nul\n\
+if errorlevel 1 exit /b 1\n\
+set NoDefaultCurrentDirectoryInExePath=\n\
+cd /d \"${luajit_SOURCE_DIR}/src\"\n\
+call .\\msvcbuild.bat static\n\
+exit /b %errorlevel%\n")
+
+    add_custom_command(
+        OUTPUT "${SANGEN_LUAJIT_LIB}"
+        COMMAND cmd /c "${SANGEN_LUAJIT_BUILD_SCRIPT}"
+        WORKING_DIRECTORY "${luajit_SOURCE_DIR}/src"
+        DEPENDS "${luajit_SOURCE_DIR}/src/msvcbuild.bat"
+        COMMENT "STEP65: building LuaJIT (pinned commit ${SANGEN_LUAJIT_COMMIT}) via its own msvcbuild.bat"
+        VERBATIM)
+    add_custom_target(SanGenLuaJitBuild DEPENDS "${SANGEN_LUAJIT_LIB}")
+
+    add_library(luajit STATIC IMPORTED GLOBAL)
+    set_target_properties(luajit PROPERTIES IMPORTED_LOCATION "${SANGEN_LUAJIT_LIB}")
+    add_dependencies(luajit SanGenLuaJitBuild)
+
+    # PRIVATE: no consumer of SanGenV2's public headers gains a Lua include-path dependency. CMake
+    # still propagates the static archive itself transitively to any executable that links
+    # SanGenV2 (the same behavior the miniz.c direct target_sources already relies on) -- no
+    # per-test relink line is needed below.
+    target_link_libraries(SanGenV2 PRIVATE luajit)
+
+    # LuaSyntaxCheck_SYS.cpp is the ONLY translation unit in src/ allowed to include LuaJIT headers
+    # (ARCH_15_08_ThirdPartyDependencyRuling.md §15.8) -- so the include path is scoped to that one
+    # source file via CMake's per-source-file INCLUDE_DIRECTORIES property, not the whole target.
+    set_source_files_properties(
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/sys/LuaSyntaxCheck_SYS.cpp"
+        PROPERTIES INCLUDE_DIRECTORIES "${luajit_SOURCE_DIR}/src")
+endif()
+
 # The GPU-backed units load their .glsl twins from ONE shader directory at run time
 # (Sys::GpuResourceManager resolves `<shaderDirectory>/<fileName>` — a single directory, never an
 # absolute path). Their sources deliberately live in the OWNING layer's folder (src/proc for the
@@ -273,6 +374,7 @@ add_sangen_test(GpuResource_SYS_Test
     src/sys/GpuResource_ShaderPath_SYS_Test.cpp)
 add_sangen_test(ThreadPool_SYS_Test             src/sys/ThreadPool_SYS_Test.cpp)
 add_sangen_test(AtlasResidency_SYS_Test         src/sys/AtlasResidency_SYS_Test.cpp)
+add_sangen_test(LuaSyntaxCheck_SYS_Test         src/sys/LuaSyntaxCheck_SYS_Test.cpp)
 
 # IO — the M5-4 asset pipeline. One binary whose main() lives in SanpackReader_IO_Test.cpp; the
 # synthetic sanpack it runs against is written with the miniz WRITER, so this target (unlike the
