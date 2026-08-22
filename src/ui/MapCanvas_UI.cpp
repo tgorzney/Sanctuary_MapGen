@@ -1,8 +1,9 @@
 // MapCanvas_UI.cpp — the canvas's state and its three gestures, with no imgui in sight (the
 // imgui frame is MapCanvas_Draw_UI.cpp, behind the same header). Layer: UI.
-// Every gesture is a pure transition on `MapCanvasView` plus, for a click, one `Picking_UI`
-// lookup against the entity-id buffer the composite already wrote. The canvas re-implements no
-// picking of its own and tests no placement rule — a click is one O(1) buffer read
+// Every gesture is a pure transition on `MapCanvasView` plus, for a click, STEP47's inverse
+// projection (region-local -> preview pixel -> world) composed with one `Picking_UI::PickMarker`
+// lookup against `Data::SpatialGrid` (STEP48). The canvas re-implements no picking of its own and
+// tests no placement rule — a pick walks exactly one chunk's bucket in O(1)
 // (UI_FRAMEWORK_SPEC §4), never a scan of 100k instances.
 #include "MapCanvas_UI.h"
 #include "Picking_UI.h"
@@ -25,16 +26,32 @@ unsigned long long MapCanvas::PresentationIdentifier() const {
     return gpuResourceManager->TexturePresentationIdentifier(previewTexture);
 }
 
-// A click resolves to whatever the composite RENDERED at that pixel: the id buffer is the single
-// source of truth for what is under the cursor, so preview and selection cannot disagree.
-// Off the image — or on a pixel no entity covers — selects nothing.
+// A click resolves in WORLD space: the region-local cursor becomes a preview pixel (MapCanvasView,
+// unchanged), the preview pixel becomes a world point (STEP47's PreviewComposite::PreviewPixelToWorld,
+// the exact inverse of the mapping BuildEntityPoints bakes marker marks through), and PickMarker
+// hit-tests the ONE SpatialGrid chunk that world point falls in. Off the image, no source wired, or
+// no composite baked yet — selects nothing.
 std::uint32_t MapCanvas::ApplyClick(float regionLocalX, float regionLocalY) {
     lastPickedPixel = view.ResolvePreviewPixel(regionLocalX, regionLocalY);
-    if (!lastPickedPixel.bInsideImage || entityIdentifiers == nullptr) {
+    if (!lastPickedPixel.bInsideImage || pickMarkerInstances == nullptr
+        || pickMarkerSpatialGrid == nullptr || composite == nullptr
+        || composite->PixelsPerPreviewCell() <= 0.0f) {
         SetSelection(Data::EntityIdBuffer::emptySentinel);
         return selectedEntityIdentifier;
     }
-    SetSelection(PickEntity(*entityIdentifiers, lastPickedPixel.pixelX, lastPickedPixel.pixelY));
+    const PreviewComposite::PreviewWorldPoint worldPoint =
+        composite->PreviewPixelToWorld(static_cast<float>(lastPickedPixel.pixelX),
+                                       static_cast<float>(lastPickedPixel.pixelY));
+    // Screen pixels -> preview pixels (view.PreviewPixelsPerRegionPixel()) -> world units, so the
+    // pick radius stays a constant ON-SCREEN size at every zoom level (the texel-space coupling
+    // this migration exists to remove).
+    const float pickRadiusWorldUnits = pickRadiusScreenPixels
+        * view.PreviewPixelsPerRegionPixel()
+        * composite->Settings().worldUnitsPerCell / composite->PixelsPerPreviewCell();
+    const std::int32_t pickedIndex = PickMarker(*pickMarkerSpatialGrid, *pickMarkerInstances,
+                                                worldPoint.worldX, worldPoint.worldZ,
+                                                pickRadiusWorldUnits);
+    SetSelection(static_cast<std::uint32_t>(pickedIndex));   // kNoMarkerPicked(-1) == emptySentinel
     return selectedEntityIdentifier;
 }
 

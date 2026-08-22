@@ -3,9 +3,15 @@
 // agree on the same instance index), and the preview matches the bake pixel for pixel — every
 // pixel no mark covers is exactly the ramp applied to the baked heightfield sample, so nothing
 // in the image can have come from a re-derived or re-simulated quantity (ARCH §3.2).
+// RunCanvasPickingChecks (STEP48) is the one addition this migration needs: it drives the actual
+// `MapCanvas::ApplyClick` path — STEP47's inverse projection composed with `PickMarker` against
+// `Data::SpatialGrid` — instead of exercising the two picking primitives independently, and proves
+// the specific regression the migration exists to fix: a pick that does not drift with zoom.
 #include "PreviewIntegration_TestScene_UI.h"
+#include "MapCanvas_UI.h"
 #include "Picking_UI.h"
 #include "GradientLut_UI.h"
+#include <cmath>
 #include <cstdio>
 
 using namespace SanmapGen;
@@ -14,6 +20,15 @@ using namespace SanmapGen::Ui;
 namespace {
 
 void check(bool bCondition, const char* label) { CheckPreviewExpectation(bCondition, label); }
+
+// The exact inverse of the canvas's own click resolution: world -> preview pixel (the composite's
+// own mapping) -> region-local point (MapCanvasView's inverse of ResolvePreviewPixel), so a test
+// can synthesize "the cursor position that lands on this world point" at the view's CURRENT zoom.
+RegionLocalPoint WorldToRegionLocal(const PreviewComposite& composite, const MapCanvasView& view,
+                                    float worldX, float worldZ) {
+    const PreviewComposite::PreviewPixelPoint pixel = composite.WorldToPreviewPixel(worldX, worldZ);
+    return view.ProjectPreviewPixelToRegionLocal(pixel.pixelX, pixel.pixelY);
+}
 
 // A world position at least `clearance` units from every marker — the "clicked empty ground" case.
 bool FindEmptyWorldPosition(const Data::PlacementInstances& markers, float mapWorldSize,
@@ -29,6 +44,28 @@ bool FindEmptyWorldPosition(const Data::PlacementInstances& markers, float mapWo
             if (bClear) { worldX = probeX; worldZ = probeZ; return true; }
         }
     return false;
+}
+
+// PickMarker deliberately tests only the ONE chunk the click's world point falls in (ARCH §8.3),
+// so a marker sitting near its chunk's boundary can legitimately miss a click that lands a
+// fraction of a world unit into the neighbor chunk — the world<->preview-pixel round trip has up
+// to ~1 preview pixel of reconstruction error (PreviewComposite_Prepare_UI.cpp's own contract
+// note). Pick the resolved marker with the most clearance from its chunk's edges, so this test
+// exercises the pick itself rather than that unrelated, pre-existing chunking edge case.
+std::size_t MarkerAwayFromChunkBoundary(const Data::PlacementInstances& markers,
+                                        const Data::SpatialGrid& grid) {
+    const float chunkSize = grid.MapWorldSize() / static_cast<float>(grid.ChunkResolution());
+    std::size_t best = 0;
+    float bestClearance = -1.0f;
+    for (std::size_t marker = 0; marker < markers.Count(); ++marker) {
+        const float localX = std::fmod(markers.positionX[marker], chunkSize);
+        const float localZ = std::fmod(markers.positionZ[marker], chunkSize);
+        const float clearanceX = localX < chunkSize - localX ? localX : chunkSize - localX;
+        const float clearanceZ = localZ < chunkSize - localZ ? localZ : chunkSize - localZ;
+        const float clearance = clearanceX < clearanceZ ? clearanceX : clearanceZ;
+        if (clearance > bestClearance) { bestClearance = clearance; best = marker; }
+    }
+    return best;
 }
 
 bool IsPixelUnderAnyMark(const PreviewIntegrationScene& scene, int pixelX, int pixelY) {
@@ -80,6 +117,75 @@ void RunPickingChecks(PreviewIntegrationScene& scene) {
           "the map has ground no marker occupies");
     check(PickMarker(grid, markers, emptyWorldX, emptyWorldZ, 0.5f) == kNoMarkerPicked,
           "a click on empty ground picks nothing");
+}
+
+// STEP48: the canvas itself — not the two primitives in isolation — resolves a click the same
+// way regardless of zoom (screen-space radius, world-space math), which is the whole point of
+// migrating off the baked, texel-space id buffer (ARCH_14_PreviewOverlayLayering.md §14).
+void RunCanvasPickingChecks(PreviewIntegrationScene& scene) {
+    const Data::PlacementInstances& markers = scene.assembler.Placements().markers;
+    const Data::SpatialGrid& grid = scene.assembler.MarkerSpatialGrid();
+    check(markers.Count() > 0, "there is a marker to click through the canvas");
+    if (markers.Count() == 0) return;
+
+    constexpr float canvasRegionSidePixels  = 256.0f;
+    // A generous radius for the zoom-consistency check below: this scene's preview is
+    // deliberately tiny (64 pixels over a 64-unit world — one pixel per world unit, chosen so
+    // RunBakeMatchChecks can compare pixels exactly), which makes the world<->preview-pixel round
+    // trip's own quantization (up to ~1 preview pixel, PreviewComposite_Prepare_UI.cpp) large
+    // relative to a screen-realistic pick radius once zoomed in. A real preview (default 512)
+    // makes that quantization negligible; this constant only compensates for the test scene's
+    // coarseness, not a change to the picking math itself.
+    constexpr float zoomConsistencyPickRadiusScreenPixels = 32.0f;
+    // The pick radius for the "just outside" checks below — an ordinary, screen-realistic value
+    // (matches ApplicationSettings::markerIconRadiusPixels' default).
+    constexpr float outsideRadiusPickRadiusScreenPixels = 8.0f;
+
+    MapCanvas canvas;
+    canvas.View().SetPreviewResolution(scene.composite.Resolution());
+    canvas.View().SetRegionSide(canvasRegionSidePixels);
+    canvas.SetPreviewComposite(&scene.composite);
+    canvas.SetMarkerPickingSource(&markers, &grid);
+
+    // --- The same marker is picked at zoom 1 and after zooming in — no texel-space drift.
+    canvas.SetMarkerPickRadiusScreenPixels(zoomConsistencyPickRadiusScreenPixels);
+    const std::size_t sampledMarker = MarkerAwayFromChunkBoundary(markers, grid);
+    const RegionLocalPoint atZoomOne = WorldToRegionLocal(scene.composite, canvas.View(),
+        markers.positionX[sampledMarker], markers.positionZ[sampledMarker]);
+    const std::uint32_t selectedAtZoomOne = canvas.ApplyClick(atZoomOne.regionLocalX, atZoomOne.regionLocalY);
+    check(selectedAtZoomOne != Data::EntityIdBuffer::emptySentinel,
+          "clicking a marker's exact world position selects it at zoom 1");
+
+    canvas.View().ZoomAtRegionPoint(atZoomOne.regionLocalX, atZoomOne.regionLocalY, 4.0f);
+    check(canvas.View().ZoomScale() > 1.0f, "the view actually zoomed in");
+    const RegionLocalPoint atZoomedIn = WorldToRegionLocal(scene.composite, canvas.View(),
+        markers.positionX[sampledMarker], markers.positionZ[sampledMarker]);
+    const std::uint32_t selectedZoomedIn = canvas.ApplyClick(atZoomedIn.regionLocalX, atZoomedIn.regionLocalY);
+    check(selectedZoomedIn == selectedAtZoomOne,
+          "the same marker is picked after zooming in — the click math does not scale with zoom");
+
+    // --- A click just outside every marker's screen-space pick radius selects nothing, at more
+    // than one zoom level (proves the screen-space -> world-space radius conversion, not just the
+    // world-space distance test, is correct).
+    canvas.SetMarkerPickRadiusScreenPixels(outsideRadiusPickRadiusScreenPixels);
+    canvas.View().SetPreviewResolution(scene.composite.Resolution());   // back to zoom 1
+    for (float zoomStepScale : { 1.0f, 4.0f }) {
+        if (zoomStepScale != 1.0f)
+            canvas.View().ZoomAtRegionPoint(canvasRegionSidePixels * 0.5f, canvasRegionSidePixels * 0.5f,
+                                            zoomStepScale);
+        const float pickRadiusWorldUnits = outsideRadiusPickRadiusScreenPixels
+            * canvas.View().PreviewPixelsPerRegionPixel()
+            * scene.composite.Settings().worldUnitsPerCell / scene.composite.PixelsPerPreviewCell();
+        float emptyWorldX = 0.0f, emptyWorldZ = 0.0f;
+        check(FindEmptyWorldPosition(markers, grid.MapWorldSize(), pickRadiusWorldUnits + 2.0f,
+                                     emptyWorldX, emptyWorldZ),
+              "the map has ground outside every marker's screen-space pick radius");
+        const RegionLocalPoint emptyPoint = WorldToRegionLocal(scene.composite, canvas.View(),
+                                                                emptyWorldX, emptyWorldZ);
+        const std::uint32_t selectedEmpty = canvas.ApplyClick(emptyPoint.regionLocalX, emptyPoint.regionLocalY);
+        check(selectedEmpty == Data::EntityIdBuffer::emptySentinel,
+              "a click just outside every marker's screen-space pick radius selects nothing");
+    }
 }
 
 // Preview == bake: with one Replace-blended height ramp, an uncovered pixel must equal the ramp

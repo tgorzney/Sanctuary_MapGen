@@ -62,7 +62,11 @@ void Application::WireCallbacks() {
     canvas.SetSelectionChangedCallback([this](std::uint32_t entityIdentifier) {
         lastSelectedEntityIdentifier = entityIdentifier;
     });
-    canvas.SetEntityIdentifierBuffer(&entityIdentifiers);
+    // STEP48: picking reads the resolved markers and PIPELINE's spatial index over them, in world
+    // space, instead of the baked entity-id buffer — see MapCanvas_UI.h's header comment.
+    canvas.SetPreviewComposite(&composite);
+    canvas.SetMarkerPickingSource(&assembler.Placements().markers, &assembler.MarkerSpatialGrid());
+    canvas.SetMarkerPickRadiusScreenPixels(settings.markerIconRadiusPixels);
 }
 
 // The whole of the shell's generation duty. WHICH tier this is was derived by the driver from the

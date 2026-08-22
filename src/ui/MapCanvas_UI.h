@@ -1,7 +1,11 @@
 // MapCanvas_UI.h — the map viewport. Layer: UI. Accuracy class: Visual.
 // It does exactly three things: DRAW the preview composite's GL texture (M5-5's repoint of
 // PreviewComposite_UI) in an imgui image region, PAN/ZOOM that view, and route a click through
-// `Picking_UI` (M4-4) to the entity the composite already rendered there.
+// STEP47's inverse projection + `Picking_UI::PickMarker` (M4-4) to the marker under the cursor,
+// resolved in WORLD space against `Data::SpatialGrid` — never against a baked, texel-space id
+// buffer (STEP48; the texel-space coupling was the whole reason ARCH_14_PreviewOverlayLayering.md
+// §14 exists). `Data::EntityIdBuffer`/`Picking_UI::PickEntity` still exist (a separate, larger
+// retirement, out of STEP48's scope) but this canvas no longer reads them.
 //
 // It never simulates and never spawns (ARCH §3.2, §5.3). The ~720-line `Widget_MapCanvas` it
 // replaces owned unit-grid spawning, symmetry spawn, army creation and triangle height
@@ -12,12 +16,20 @@
 //
 // The pan/zoom math is `MapCanvasView` — pure, imgui-free, so the cursor -> preview-pixel
 // contract a click depends on is testable without a UI frame. `Draw` is a thin translator from
-// imgui input to the three gesture methods below (MapCanvas_Draw_UI.cpp).
+// imgui input to the three gesture methods below (MapCanvas_Draw_UI.cpp). MapCanvas also depends
+// on `PreviewComposite_UI` (STEP48; ratified) for the composite's world<->preview-pixel mapping —
+// both are UI layer, so this is an intra-layer edge, not a layer-graph violation (ARCH §3.1). The
+// alternative (Application re-deriving and re-pushing that mapping) would keep a second copy of
+// state that must stay in sync with the composite's own live baked state, exactly the drift
+// `Data::SpatialGrid`'s header warns a second copy of world->cell arithmetic invites.
 #pragma once
 #include <cstdint>
 #include <functional>
 #include "MapCanvasView_UI.h"
+#include "PreviewComposite_UI.h"
 #include "../data/EntityIdBuffer_DATA.h"
+#include "../data/PlacementInstances_DATA.h"
+#include "../data/SpatialGrid_DATA.h"
 #include "../sys/GpuResource_SYS.h"
 
 namespace SanmapGen {
@@ -29,10 +41,22 @@ public:
     // squared. Re-pointing it at a different resolution resets the view.
     void SetPreviewTexture(Sys::GpuResourceManager* manager, Sys::GpuTextureHandle texture,
                            int previewResolution);
-    // What a click is resolved against: the composite's per-pixel id buffer, read-only.
-    void SetEntityIdentifierBuffer(const Data::EntityIdBuffer* entityIdentifierBuffer) {
-        entityIdentifiers = entityIdentifierBuffer;
+    // What is displayed, and the single source of the world<->preview-pixel mapping a click's
+    // inverse projection reuses (STEP47's `PreviewPixelToWorld`) — read-only, the canvas never
+    // composites. First MapCanvas_UI dependency on PreviewComposite_UI; see the header comment.
+    void SetPreviewComposite(const PreviewComposite* previewComposite) { composite = previewComposite; }
+    // What a click is resolved against: the resolved markers and the spatial index over them,
+    // both read-only, both owned by PIPELINE (Generation_PIPELINE, M4-5). Replaces
+    // SetEntityIdentifierBuffer — see STEP48.
+    void SetMarkerPickingSource(const Data::PlacementInstances* markerInstances,
+                                const Data::SpatialGrid* markerSpatialGrid) {
+        pickMarkerInstances = markerInstances;
+        pickMarkerSpatialGrid = markerSpatialGrid;
     }
+    // The constant on-screen radius a click must land within to hit a marker icon (Constitution
+    // §8 — a named setting, not a literal). Matches Phase 3's icon draw radius; the two must agree
+    // or a click can miss a visibly-hit icon.
+    void SetMarkerPickRadiusScreenPixels(float radius) { pickRadiusScreenPixels = radius; }
     void SetSelectionChangedCallback(std::function<void(std::uint32_t)> selectionChanged) {
         selectionChangedCallback = std::move(selectionChanged);
     }
@@ -63,9 +87,13 @@ private:
     void ApplyPointerInput(float regionOriginX, float regionOriginY);
 
     MapCanvasView view;
-    Sys::GpuResourceManager*     gpuResourceManager = nullptr;
-    Sys::GpuTextureHandle        previewTexture;
-    const Data::EntityIdBuffer*  entityIdentifiers = nullptr;
+    Sys::GpuResourceManager*        gpuResourceManager = nullptr;
+    Sys::GpuTextureHandle           previewTexture;
+    const PreviewComposite*         composite = nullptr;
+    const Data::PlacementInstances* pickMarkerInstances = nullptr;
+    const Data::SpatialGrid*        pickMarkerSpatialGrid = nullptr;
+    float                           pickRadiusScreenPixels = 8.0f;   // Constitution §8; wired from
+                                                                       // ApplicationSettings::markerIconRadiusPixels
     std::function<void(std::uint32_t)>    selectionChangedCallback;
     PreviewPixelCoordinate lastPickedPixel;
     std::uint32_t selectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;

@@ -13,6 +13,7 @@ using namespace SanmapGen::Ui;
 void RunMapUpdateTierChecks(PreviewIntegrationScene& scene);
 void RunPreviewTierChecks(PreviewIntegrationScene& scene);
 void RunPickingChecks(PreviewIntegrationScene& scene);
+void RunCanvasPickingChecks(PreviewIntegrationScene& scene);   // STEP48
 void RunBakeMatchChecks(PreviewIntegrationScene& scene);
 
 int main() {
@@ -42,6 +43,7 @@ int main() {
     RunMapUpdateTierChecks(scene);
     RunPreviewTierChecks(scene);
     RunPickingChecks(scene);
+    RunCanvasPickingChecks(scene);
     RunBakeMatchChecks(scene);
 
     if (previewTestFailureCount == 0) { std::printf("ALL PASS\n"); return 0; }

@@ -116,7 +116,8 @@ void RunMapCanvasRenderChecks(Sys::GpuResourceManager& manager) {
 
     MapCanvas canvas;
     canvas.SetPreviewTexture(&manager, composite.CompositeTexture(), composite.Resolution());
-    canvas.SetEntityIdentifierBuffer(&scene.entityIdentifiers);
+    // Render-only checks below never click, so no picking source is wired (STEP48: MapCanvas no
+    // longer reads the id buffer this scene still bakes for the other composite tests).
     check(canvas.PresentationIdentifier() != 0ull,
           "the canvas has a toolkit identifier for the composite texture");
 

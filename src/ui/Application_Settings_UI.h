@@ -35,6 +35,10 @@ struct ApplicationSettings {
                                                  // for the first frame / a degenerate 0-sized region.
     float backgroundColor[4]         = { 0.10f, 0.10f, 0.12f, 1.0f };
     int   previewResolution          = 512;
+    // The constant on-screen radius (screen pixels) a click must land within to hit a marker icon
+    // (MapCanvas::SetMarkerPickRadiusScreenPixels, STEP48). Shared with Phase 3's icon draw
+    // radius — the two must agree or a click can miss a visibly-hit icon.
+    float markerIconRadiusPixels     = 8.0f;
 
     unsigned workerThreadCount       = 0;       // 0 = hardware concurrency
     Io::AtlasBuildSettings atlasBuildSettings;  // page size / validation caps / thumbnail size
