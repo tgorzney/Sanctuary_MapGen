@@ -7,6 +7,7 @@
 #include "MarkersTab_Manual_UI.h"
 #include "Combo_UI.h"
 #include "DraggableListWidget_UI.h"
+#include "MarkersTab_ManualLayers_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
 
@@ -65,11 +66,38 @@ bool DrawMarkerInstanceListButtons(std::vector<Params::MarkerTransform>& transfo
     return bInstancesMoved;
 }
 
-// Alias (free text), Name (army picker for a Spawn group, else free text), and the three position
-// sliders. Reports whether the recipe moved, for the caller's dirty bookkeeping — never
-// Pipeline::PreviewDriver (MarkersTab_Manual_UI.h SCOPE).
+// STEP81 part (b): the Layer picker, drawn after Name and before Position. `layerIndex`'s legal
+// domain is [0, markerLayers.size()) with a 0 default; `-1` is not a valid `layerIndex` value
+// anywhere in the marker domain (that sentinel belongs to `layerId`, a different field). A direct
+// bind of `transform.layerIndex` to `DrawCombo` would let an empty `markerLayers` write -1 into a
+// live `layerIndex` (Combo_UI.h's out-of-range-resolves-to--1 contract), so the value is mirrored,
+// gated, and only a valid pick is stored — the same load/store mirror pattern MarkersTab_UI.h
+// already uses for MarkerRule's int/range fields.
+void DrawMarkerInstanceLayerPicker(Params::MarkerTransform& transform,
+                                   const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                   ManualMarkersState& state) {
+    if (markerLayers.empty()) {
+        ImGui::TextUnformatted("No marker layers yet — add one in Manual Marker Layers.");
+        return;
+    }
+    state.layerPickerLabels.clear();
+    for (const Params::MarkerInstanceLayer& layer : markerLayers)
+        state.layerPickerLabels.push_back(ManualMarkerLayerRowLabel(layer));
+    ComboOptions options;
+    options.labels = state.layerPickerLabels.data();
+    options.count  = static_cast<int>(state.layerPickerLabels.size());
+    int pickedLayerIndex = transform.layerIndex;                 // mirror, not a direct bind
+    DrawCombo("Layer", pickedLayerIndex, options);
+    if (pickedLayerIndex >= 0) transform.layerIndex = pickedLayerIndex;   // store only a valid pick
+}
+
+// Alias (free text), Name (army picker for a Spawn group, else free text), Layer (STEP81 part (b)),
+// and the three position sliders. Reports whether the recipe moved, for the caller's dirty
+// bookkeeping — never Pipeline::PreviewDriver (MarkersTab_Manual_UI.h SCOPE).
 bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params::MarkerInstanceGroup& group,
-                                const std::vector<Params::Army>& armies, ManualMarkersState& state) {
+                                const std::vector<Params::Army>& armies,
+                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                ManualMarkersState& state) {
     bool bCommitted = DrawTextInput("Alias", transform.alias).bCommitted;
 
     if (IsSpawnMarkerGroup(group)) {
@@ -89,6 +117,8 @@ bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params
         bCommitted = DrawTextInput("Name", transform.name, state.nameRules).bCommitted || bCommitted;
     }
 
+    DrawMarkerInstanceLayerPicker(transform, markerLayers, state);
+
     bCommitted = DrawSliderScalar("Position X", transform.transform.positionX, state.positionHorizontalRange,
                                   state.positionXToggle, WidgetStyle(), "%.1f").bCommitted || bCommitted;
     bCommitted = DrawSliderScalar("Position Y (Elevation)", transform.transform.positionY,
@@ -102,6 +132,7 @@ bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params
 } // namespace
 
 void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group, const std::vector<Params::Army>& armies,
+                               const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                ManualMarkersState& state) {
     bool bInstancesMoved = false;
     const DraggableListSignal signal = DrawMarkerInstanceList(group.transforms, state.selectedInstanceIndex);
@@ -111,7 +142,7 @@ void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group, const std::ve
 
     Params::MarkerTransform* const instance = SelectedMarkerInstance(group.transforms, state.selectedInstanceIndex);
     if (instance == nullptr) ImGui::TextUnformatted("Select a marker instance to edit it.");
-    else bInstancesMoved = DrawSelectedMarkerInstance(*instance, group, armies, state) || bInstancesMoved;
+    else bInstancesMoved = DrawSelectedMarkerInstance(*instance, group, armies, markerLayers, state) || bInstancesMoved;
 
     // Scoped to THIS group only: the wire format's inner dictionary key only needs uniqueness
     // within its own outer group (MarkersTab_Manual_UI.h header comment).

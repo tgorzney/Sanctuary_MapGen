@@ -13,10 +13,14 @@
 // `.cpp` files behind this one header (ARCH §1.5): group-level draw in MarkersTab_Manual_UI.cpp,
 // instance-level draw in MarkersTab_ManualInstance_UI.cpp.
 //
-// SCOPE (ARCH §8.4 — reported, not invented): no `layerIndex`/manual layers or per-marker
-// symmetry (`GAP_MarkerLayerAndSymmetry_PARAMS.md`, Gaps 1/2); no rotation/scale editing or
-// terrain-height snapping; never notifies `Pipeline::PreviewDriver` — `recipe.markers` feeds no
-// PROC stage today, same silent posture `PropsTab_Manual_UI.h` SCOPE NOTE 1 already documents.
+// SCOPE (ARCH §8.4 — reported, not invented): no per-marker symmetry
+// (`GAP_MarkerLayerAndSymmetry_PARAMS.md`, Gap 2 — the drag-follow symmetry-grouping field has
+// no field/control/consumer here); no rotation/scale editing or terrain-height snapping; never
+// notifies `Pipeline::PreviewDriver` — `recipe.markers` feeds no PROC stage today, same silent
+// posture `PropsTab_Manual_UI.h` SCOPE NOTE 1 already documents.
+// STEP81 retires the "no `layerIndex`/manual layers" half of the clause above: the Layer picker on
+// the selected instance now lives in MarkersTab_ManualInstance_UI.cpp, reading `recipe.markerLayers`
+// authored by MarkersTab_ManualLayers_UI.h's sibling block (Gap 1, closed).
 #pragma once
 #include <string>
 #include <vector>
@@ -54,6 +58,12 @@ struct ManualMarkersState {
     RealtimeToggle positionXToggle;
     RealtimeToggle positionYToggle;
     RealtimeToggle positionZToggle;
+
+    // STEP81 part (b): the selected instance's Layer picker label buffer. `ComboOptions::labels`
+    // is a borrowed `const char* const*` (Combo_UI.h) and `recipe.markerLayers` is a vector of
+    // structs, so the labels must be materialized. Rebuilt per frame with clear() + push_back();
+    // clear() keeps the capacity, so this is amortized zero-allocation after the first frames.
+    std::vector<const char*> layerPickerLabels;
 };
 
 // ---- pure helpers (headless-testable, no imgui) -----------------------------------------------
@@ -131,15 +141,22 @@ Params::MarkerInstanceGroup* DrawMarkerGroupSection(std::vector<Params::MarkerIn
                                                      ManualMarkersState& state);
 
 // MarkersTab_ManualInstance_UI.cpp — the selected group's own instance roster: the list, Add/
-// Remove, and the selected instance's Alias/Name/Position editor.
+// Remove, and the selected instance's Alias/Name/Layer/Position editor. `markerLayers` is
+// `recipe.markerLayers` (read-only here — STEP81 part (b) only picks a layer for the selected
+// instance's `layerIndex`, never adds/reorders one; that is MarkersTab_ManualLayers_UI.h's job).
 void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
-                               const std::vector<Params::Army>& armies, ManualMarkersState& state);
+                               const std::vector<Params::Army>& armies,
+                               const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                               ManualMarkersState& state);
 
 // `markers` is `recipe.markers`, `armies` is `recipe.armies` (read-only here — this block only
-// picks an army for a Spawn instance's `name`, never adds/renames one). Never touches
-// `Pipeline::PreviewDriver` (SCOPE NOTE 3 above).
+// picks an army for a Spawn instance's `name`, never adds/renames one). `markerLayers` is
+// `recipe.markerLayers` (STEP81 part (b) — read-only, see DrawMarkerInstanceSection above). Never
+// touches `Pipeline::PreviewDriver` (SCOPE NOTE 3 above).
 void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
-                       const std::vector<Params::Army>& armies, ManualMarkersState& state);
+                       const std::vector<Params::Army>& armies,
+                       const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                       ManualMarkersState& state);
 
 } // namespace Ui
 } // namespace SanmapGen

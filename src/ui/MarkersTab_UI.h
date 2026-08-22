@@ -30,6 +30,7 @@
 #include "IconGridWidget_UI.h"
 #include "LabelledDialWidget_UI.h"
 #include "MarkersTab_Globals_UI.h"
+#include "MarkersTab_ManualLayers_UI.h"
 #include "MarkersTab_Manual_UI.h"
 #include "MarkersTab_Placed_UI.h"
 #include "MarkersTab_RuleLayers_UI.h"
@@ -91,6 +92,11 @@ struct MarkersTabState {
     // STEP49: the hand-authored roster editor, a sibling block to the procedural stack and the
     // read-only placed list above (MarkersTab_Manual_UI.h).
     ManualMarkersState      manual;
+
+    // STEP81: the Manual Marker Layers block, authored before STEP49's manual roster in
+    // `DrawMarkersTab` so a layer added this frame is pickable by part (b)'s Layer combo on the
+    // same frame (MarkersTab_ManualLayers_UI.h).
+    ManualMarkerLayersState manualLayers;
 };
 
 // rule -> widget mirrors (the paired min/max fields the range sliders edit, and the int count).
