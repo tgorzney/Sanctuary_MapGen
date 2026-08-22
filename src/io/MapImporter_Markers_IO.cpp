@@ -67,6 +67,9 @@ void ReadMarkerTransformJson(const nlohmann::json& json, Params::MarkerTransform
     }
     ReadJsonText(json, "alias", markerTransform.alias);
     ReadJsonInteger(json, "layerIndex", markerTransform.layerIndex);
+    // Correction 16 (STEP68): no range to validate — 0 is always legal, any positive value
+    // accepted as-is (unlike layerIndex/radialSymmetryRepeatCount, which clamp on import).
+    ReadJsonInteger(json, "symmetryGroupIdentifier", markerTransform.symmetryGroupIdentifier);
 }
 
 // ARCH §12 / Constitution §6: an out-of-range layerIndex is a loud, logged clamp to 0, applied PER

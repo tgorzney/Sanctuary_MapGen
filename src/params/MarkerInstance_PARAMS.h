@@ -41,6 +41,10 @@ struct MarkerTransform {
     InstancedTransform transform;
     std::string alias;                 // SanGen-added, already-ratified SANMAP_FORMAT_SPEC Correction 11
     int layerIndex = 0;                // indexes recipe.markerLayers, plain vector position
+    // SanGen-added, already-ratified SANMAP_FORMAT_SPEC Correction 16 (STEP68). 0 = ungrouped, any
+    // positive value groups this instance with every other MarkerTransform sharing the same value —
+    // the field the future drag-and-follow UI (ARCH_16_MarkerLayerSymmetry.md) writes into.
+    int symmetryGroupIdentifier = 0;
 };
 
 struct MarkerInstanceGroup {

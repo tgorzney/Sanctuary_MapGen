@@ -31,6 +31,8 @@ nlohmann::ordered_json BuildMarkerTransformJson(const Params::MarkerTransform& m
                          { "z", transform.rotationZ }, { "w", transform.rotationW } };
     json["scale"]    = { { "x", transform.scaleX }, { "y", transform.scaleY }, { "z", transform.scaleZ } };
     json["alias"]    = markerTransform.alias;
+    // Correction 16 (STEP68): 0 = ungrouped, sibling of alias, same unconditional-write posture.
+    json["symmetryGroupIdentifier"] = markerTransform.symmetryGroupIdentifier;
     return json;
 }
 

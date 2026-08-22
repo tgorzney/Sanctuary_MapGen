@@ -616,6 +616,8 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
             Check(loadedMarker.alias == originalMarker.alias, "the marker's alias survives");
             Check(loadedMarker.layerIndex == originalMarker.layerIndex,
                   "the in-range marker layerIndex survives exactly");
+            Check(loadedMarker.symmetryGroupIdentifier == originalMarker.symmetryGroupIdentifier,
+                  "the marker's symmetryGroupIdentifier survives, sibling of alias (STEP68)");
             Check(NearlyEqual(loadedMarker.transform.positionX, originalMarker.transform.positionX)
                   && NearlyEqual(loadedMarker.transform.positionY, originalMarker.transform.positionY),
                   "positionX/Y survive untouched by the flip");
@@ -1105,6 +1107,7 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerTransform.transform.scaleZ = 1.75f;                        // non-unit
     markerTransform.alias = "North Mex";
     markerTransform.layerIndex = 0;                                  // in range: no clamp warning
+    markerTransform.symmetryGroupIdentifier = 3;                      // non-zero: STEP68
 
     Params::MarkerInstanceGroup group;
     group.name = "Alloys";
