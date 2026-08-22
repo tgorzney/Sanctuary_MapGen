@@ -484,6 +484,14 @@ add_sangen_test(MapCanvas_IconLayer_UI_Test
     src/ui/MapCanvas_IconLayer_Budget_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Cache_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Draw_UI_Test.cpp)
+# STEP54 — the "View" toolbar popup: Terrain/Overlays DraggableList sections over
+# PreviewCompositeSettings::fieldLayers / OverlayLayerSettings::overlayLayers. ApplyViewLayerSignal
+# is pure (no imgui frame); the cross-section payload-identifier rejection needs one live headless
+# imgui frame per pair of drag/drop frames (no GL, no window backend) — same posture
+# MapCanvas_IconLayer_UI_Test above already has.
+add_sangen_test(Application_ViewLayersPopup_UI_Test
+    src/ui/Application_ViewLayersPopup_UI_Test.cpp
+    src/ui/Application_ViewLayersPopup_CrossSection_UI_Test.cpp)
 add_sangen_test(PreviewIntegration_UI_Test
     src/ui/PreviewIntegration_UI_Test.cpp
     src/ui/PreviewIntegration_DirtyTier_UI_Test.cpp

@@ -8,10 +8,12 @@
 // Aspect .cpp units behind this header are each self-documented at their own top (ARCH §1.5): _UI
 // / _Window_UI / _Frame_UI / _Draw_UI / _LeftColumn_UI / _Panel{Terrain,Environment,System}_UI /
 // _Execution_UI / _Assets_UI / _AssetPanel_UI / _Recipe_UI / _Preview{Setup,Ramps}_UI /
-// _AppSettings_UI. Member headers (§7.1 composition, §1.5 split; none reached by any other unit):
+// _AppSettings_UI / _ViewLayersPopup_UI (STEP54, the "View" toolbar popup). Member headers (§7.1
+// composition, §1.5 split; none reached by any other unit):
 // _Settings_UI.h / _Panels_UI.h / _Visibility_UI.h / _Execution_UI.h / _HostedSettings_UI.h (no
 // `Params::MapRecipe` home yet) / _TabState_UI.h / _AssetBridge_UI.h (sanpack -> atlas ->
-// residency -> `Ui::IconAtlasManifest` bridge) / _Defaults_UI.h (launch defaults, free functions).
+// residency -> `Ui::IconAtlasManifest` bridge) / _Defaults_UI.h (launch defaults, free functions) /
+// _ViewLayersPopup_UI.h (STEP54's pure ApplyViewLayerSignal, testable with no imgui frame).
 // ApplicationMain_UI.cpp is the thin entry point, not part of the library.
 #pragma once
 #include <cstdint>
@@ -118,6 +120,7 @@ private:
     void DrawSettingsWindow();               // Application_Draw_UI.cpp
     void DrawActivePanel();                  // Application_Draw_UI.cpp
     void DrawCanvasWindow();                 // Application_Draw_UI.cpp
+    void DrawViewLayersPopup();              // Application_ViewLayersPopup_UI.cpp
     void DrawPanelSwitcher();                // Application_LeftColumn_UI.cpp
     void DrawTerrainGroupPanel();            // Application_PanelTerrain_UI.cpp
     void DrawHeightRampSection();            // Application_PanelTerrain_UI.cpp
