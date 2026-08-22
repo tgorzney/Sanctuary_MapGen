@@ -22,7 +22,7 @@ canvas that displays the composite texture, pans/zooms, and routes clicks to pic
 Display the preview texture in an imgui image region with pan/zoom; on click, map cursor →
 preview pixel and call `Picking_UI` (M4-4) to resolve the entity under it; surface the
 selection. Purely presentation + input — it asks `PIPELINE` to regenerate, it never
-simulates or spawns (ARCH §3.2).
+simulates or spawns (ARCH_03_ModuleBoundaries.md §3.2).
 
 ## Acceptance
 The composite texture renders in the canvas; pan/zoom map cursor→pixel correctly; a click

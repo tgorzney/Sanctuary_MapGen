@@ -1,4 +1,4 @@
-# Work-Order — Step 33: split `Placement_Symmetry_PROC.h` under the ARCH §1.5 ceiling
+# Work-Order — Step 33: split `Placement_Symmetry_PROC.h` under the ARCH_01_05_FileSizeCeilings.md §1.5 ceiling
 
 *Constitution §7. Executor: SanGen Coder. Generator Expert consult.*
 

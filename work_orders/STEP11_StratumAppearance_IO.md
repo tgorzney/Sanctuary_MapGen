@@ -77,7 +77,7 @@ layer["diffuseRemap"]         = { r: tintRed, g: tintGreen, b: tintBlue, a: 1.0 
                                                                              NOT appearance.diffuseRemapColor,
                                                                              which is being deleted, see above)
 layer["farColorRemap"]        <- appearance.farColorRemapColor[4]         (currently never written)
-layer["maskRemapMin"/"Max"]   — already correct, unchanged (ARCH §7.2 item 10, already shipped)
+layer["maskRemapMin"/"Max"]   — already correct, unchanged (ARCH_07_02_MaterialProportionVsSurfaceWeight.md §7.2 item 10, already shipped)
 ```
 
 ## Solution — the new importer (`ReadStratumLayersJson`)

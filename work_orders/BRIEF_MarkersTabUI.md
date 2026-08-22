@@ -14,7 +14,7 @@ home in the tree today** — there is no `Params::ManualMarker` type, so no edit
 **Markers have no layer system today**, unlike Props/Decals. Confirmed by reading
 `src/params/PropInstance_PARAMS.h`: Props and Decals got a real manual-layer authoring system —
 `PropTransform::layerIndex` / `DecalTransform::layerIndex` plus `PropInstanceLayer`/
-`DecalInstanceLayer` metadata arrays (ARCH §12, `ENTITY_AUTHORING_PARAMS_SPEC.md`, wired UI at
+`DecalInstanceLayer` metadata arrays (ARCH_12_ManualPropDecalLayers.md §12, `ENTITY_AUTHORING_PARAMS_SPEC.md`, wired UI at
 `src/ui/PropsTab_Manual_UI.h`/`.cpp`). Markers never got the equivalent — there is no
 `MarkerInstanceLayer` or `MarkerTransform::layerIndex` anywhere in `src/params/`.
 

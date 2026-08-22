@@ -1,14 +1,14 @@
 # Work-Order M3-8 (REWORK) — pipeline integration (RUN LAST, alone)
 
 *Constitution §7. Milestone M3. **Supersedes the prior M3-8** — the stage order changed
-(ARCH §7.4). Executor: SanGen Coder. Depends on M3-1…M3-7 all existing (M3-2 reworked).
+(ARCH_07_04_PipelineStageOrder.md §7.4). Executor: SanGen Coder. Depends on M3-1…M3-7 all existing (M3-2 reworked).
 Edits shared files (CMake, assembler) — never run in parallel with the stages.*
 
 ## Title
 Assemble the stages into `Generation_PIPELINE` in the ratified order, wire consumers to
 the right field, build, and prove the pipeline end-to-end.
 
-## Ratified stage order (ARCH §7.4 — supersedes the old order)
+## Ratified stage order (ARCH_07_04_PipelineStageOrder.md §7.4 — supersedes the old order)
 ```
 NoiseBlend → Erosion → Thermal → FlowAccumulation → Mask → Placement → Bake
 ```
@@ -31,14 +31,16 @@ rename **throughout** in the same commit so the tree never breaks:
 This rename mechanically touches the sim stage files (their *logic* is unchanged); it must
 land together with those files, which is why it lives here, not in a standalone DATA edit.
 
-## Consumer wiring (ARCH §7.2, single-writer)
+## Consumer wiring (ARCH_07_02_MaterialProportionVsSurfaceWeight.md §7.2, single-writer)
 - **Sims** (NoiseBlend seeds; Erosion/Thermal evolve) write `materialProportions`.
 - **Mask** is the sole writer of `surfaceStratumWeights`.
 - **Placement** gates on `surfaceStratumWeights` (visibility), **not** proportions.
-- **Bake** consumes `surfaceStratumWeights` **verbatim**; its rival remap
-  (`maskRemap*` / `RemapMaskWeight`) is **deleted** — Mask remaps once. **Re-pad the
-  `StratumKernelConfiguration` std430 stride** after removing the two floats (48-byte /
-  16-multiple), in both the C++ struct and the GLSL block (`DISPATCH_INTERFACE_SPEC §4`).
+- **Bake** consumes `surfaceStratumWeights` **verbatim**. There is no per-stratum remap
+  step anywhere in generation (`ARCH_07_02_MaterialProportionVsSurfaceWeight.md` §7.2
+  item 5). Bake's rival remap (`maskRemap*` / `RemapMaskWeight`) is **deleted** as dead
+  code, but **`StratumKernelConfiguration`'s two now-unused scalar slots are kept as
+  explicit padding** — same stride, same 16-byte multiple — precisely so the struct shape
+  does not change; do not remove them or shrink/re-pad the stride to a new 48-byte size.
 
 ## Contract
 - Two-tier dirty distinction stub (full-regen vs preview-only) for M4.

@@ -1,11 +1,11 @@
-# Work-Order — Step 29: split `MapExporter_Recipe_IO.cpp` under the ARCH §1.5 size ceiling
+# Work-Order — Step 29: split `MapExporter_Recipe_IO.cpp` under the ARCH_01_05_FileSizeCeilings.md §1.5 size ceiling
 
 *Constitution §7 (documented exception vs. actual split). Executor: SanGen Coder. Three read-only
 consults (IO Architecture Expert for the mechanical plan, ARCH Expert for naming sign-off, Format
 Expert for legacy-blob content status — content unchanged by this ticket, see out-of-scope).*
 
 ## Root problem
-`src/io/MapExporter_Recipe_IO.cpp` is 178 lines, over ARCH §1.5's 150-line hard ceiling (soft 100).
+`src/io/MapExporter_Recipe_IO.cpp` is 178 lines, over ARCH_01_05_FileSizeCeilings.md §1.5's 150-line hard ceiling (soft 100).
 No documented exception exists (Constitution §7 requires one for an over-ceiling file left as-is —
 none was filed). `BuildSanmapJsonText` alone is a 98-line function, also over §1.5's 40-line
 function cap. The bulk isn't logic — six of its call sites (`GeneralMapSettings`/`HeightmapStack`/
@@ -77,7 +77,7 @@ IO only, pure refactor — zero behavior change, zero JSON output change. Accura
 N/A.
 
 ## ARCH rules invoked
-- ARCH §1.5 — 150-line hard file ceiling, 40-line function cap, `Type_Aspect_LAYER` split pattern.
+- ARCH_01_05_FileSizeCeilings.md §1.5 — 150-line hard file ceiling, 40-line function cap, `Type_Aspect_LAYER` split pattern.
 - Constitution §7 — this ticket resolves the undocumented ceiling violation via an actual split,
   not a filed exception.
 
@@ -90,6 +90,6 @@ N/A.
    non-trivial recipe before and after the change and diff the two JSON strings; they must be
    identical. Do this as an explicit test, not just "existing tests still pass" (existing tests may
    not exercise every field).
-3. Both files pass ARCH §1.5's ceiling: `MapExporter_Recipe_IO.cpp` under 150 lines,
+3. Both files pass ARCH_01_05_FileSizeCeilings.md §1.5's ceiling: `MapExporter_Recipe_IO.cpp` under 150 lines,
    `MapExporter_StratumLayers_IO.cpp` under 150 lines, every function in both under 40 lines.
 4. Full `SanGenV2` build stays clean; every existing test continues to pass.

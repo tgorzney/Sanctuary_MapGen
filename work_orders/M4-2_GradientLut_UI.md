@@ -19,7 +19,7 @@ composite's job (M4-3).
 ## Layer & accuracy
 `UI`. Visual. Pure CPU array construction (sandbox-testable) — no GL here.
 
-**Layer note (ARCH §8.1, binding):** this is a **UI** helper. ARCH §5.4 originally said
+**Layer note (ARCH_08_01_GradientLutBakeIsUi.md §8.1, binding):** this is a **UI** helper. ARCH_05_GodObjectDismemberment.md §5.4 originally said
 "gradient LUT bake → `Gradient_PROC`"; that token is **corrected** — `Gradient_PROC` is
 retired and never existed. A color ramp is not a pipeline stage (§7.4), has no GPU twin or
 DAG node (§6.1), and building a presentation resource from PARAMS alone is not simulating
@@ -32,7 +32,7 @@ Interpolate the ramp's sorted `stops` (normalized `location` 0..1 → `color`) a
 `resolution` samples; `ramp.bSmoothInterpolation` selects smoothstep vs linear between
 adjacent stops. Sort/clamp stops defensively into a local copy (Constitution §6) — never
 mutate the PARAMS input. Ramp domain mapping is the **caller's** job: `location` is
-normalized 0..1 (ARCH §8.2), so the consumer normalizes slope degrees / flow range /
+normalized 0..1 (ARCH_08_02_GradientRampParams.md §8.2), so the consumer normalizes slope degrees / flow range /
 height range before sampling. Each colorized field owns its own ramp — the legacy
 "accumulation reuses the flow gradient" aliasing is retired.
 
@@ -45,4 +45,4 @@ pre-sorted ones; empty / one-stop input yields a safe constant LUT, no crash; th
 ## Out of scope
 Uploading the LUT to the GPU / sampling it (M4-3, the composite). Defining
 `Params::GradientRamp` itself (M4-0a — if it is not present, **stop and report**; do not
-define it here and do not include any `core/` header, ARCH §8.4).
+define it here and do not include any `core/` header, ARCH_08_04_CoderScopeLaw.md §8.4).

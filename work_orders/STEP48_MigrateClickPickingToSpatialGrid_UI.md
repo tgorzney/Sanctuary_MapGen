@@ -9,7 +9,7 @@
 `Data::EntityIdBuffer` — a per-pixel raster baked at composite time, in **texel space** — via
 `Picking_UI::PickEntity()`. This ties picking to whatever was last baked into the shared
 composite texture, the same texel-space coupling that causes markers to scale with zoom
-(ARCH §14's whole reason for existing). It is also already redundant: `Picking_UI::PickMarker()`
+(ARCH_14_PreviewOverlayLayering.md §14's whole reason for existing). It is also already redundant: `Picking_UI::PickMarker()`
 (`src/ui/Picking_UI.h:46-48`) — an O(1) `Data::SpatialGrid` chunk hit-test against
 `Data::PlacementInstances` directly, in **world space** — is fully implemented and tested
 (`Picking_UI_Test.cpp`) and is never called anywhere in `src/`.
@@ -79,16 +79,23 @@ std::uint32_t MapCanvas::ApplyClick(float regionLocalX, float regionLocalY) {
     return selectedEntityIdentifier;
 }
 ```
-⚠️ This introduces `MapCanvas`'s first dependency on `PreviewComposite` (for
-`PreviewPixelToWorld`/`PixelsPerPreviewCell`/`Settings()`) — currently `MapCanvas` only knows
-`Sys::GpuResourceManager` and `Data::EntityIdBuffer`, never a `_UI` sibling module. Confirm with
-ARCH before dispatch whether `MapCanvas` should hold a `const PreviewComposite*` directly, or
-whether `Application` should instead pass the three already-derived numbers
-(`worldUnitsPerCell`, `PixelsPerPreviewCell()`, and a `PreviewPixelToWorld`-equivalent callback)
-through the existing injection pattern (`SetRegenerationCallback`-style) to keep `MapCanvas`'s
-"knows only `MapCanvasView` + `Sys::GpuResourceManager`" boundary intact
-(`MapCanvas_UI.h`'s own header comment: "it does exactly three things"). Either is a small,
-localized decision — flagging so it isn't made silently by whichever is easiest to type.
+**RESOLVED — ARCH ruling, this introduces `MapCanvas`'s first dependency on `PreviewComposite`, and
+that's ratified as correct.** `MapCanvas` gets a `const PreviewComposite*` member, injected the
+same way it already takes `Sys::GpuResourceManager*`:
+```cpp
+// MapCanvas_UI.h
+void SetPreviewComposite(const PreviewComposite* previewComposite) { composite = previewComposite; }
+```
+wired in `Application_UI.cpp`'s `WireCallbacks()` alongside `SetMarkerPickingSource`. Ruling
+reasoning: `MapCanvas_UI` and `PreviewComposite_UI` are both `UI` layer — this is an intra-layer
+edge, not a dependency-table violation. The rejected alternative (`Application` re-pushing derived
+numbers via a callback) would create a second copy of state that must be kept in sync with
+`PreviewComposite`'s live baked state — exactly the "second copy... is exactly how a picker drifts
+from its index" anti-pattern `SpatialGrid_DATA.h`'s own header warns against, which this ticket's
+own Problem section already cites. `MapCanvas_UI.h`'s "never a `_UI` sibling module" line was a
+description of pre-STEP47/48 code, not a standing rule — update that header comment to drop it and
+document the new `PreviewComposite*` dependency plainly, same as the file documents its other
+injected pointers.
 
 ### 3. Wire the new source at the `Application` level, alongside where `SetEntityIdentifierBuffer` is removed
 ```cpp

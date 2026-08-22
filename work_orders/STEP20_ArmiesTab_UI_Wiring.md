@@ -112,7 +112,7 @@ N/A — pure UI/imgui composition.
   verbatim, no retyping of the PARAMS type itself.
 - Constitution §6 — the name-uniqueness repair prevents silent data loss on export, same principle
   Areas' existing repair already embodies.
-- ARCH §1.5 — the shared name-uniqueness helper's file placement is an open call for the ARCH
+- ARCH_01_05_FileSizeCeilings.md §1.5 — the shared name-uniqueness helper's file placement is an open call for the ARCH
   Expert, not invented by this ticket.
 
 ## Solution — `RenumberUnitRuleArmyIndicesForReorder` (exact implementation, UI-Expert-provided)

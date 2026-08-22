@@ -8,13 +8,13 @@ header (read-only). Executor: SanGen Coder.*
 The persistent chunk grid that turns "what did I click?" into a one-chunk test.
 
 ## Root problem
-ARCH §5.1 lists `SpatialGrid_DATA` as the v2 replacement for
+ARCH_05_GodObjectDismemberment.md §5.1 lists `SpatialGrid_DATA` as the v2 replacement for
 `GenerationParams::MarkerSpatialGrid` (the v1 32×32 `MarkerChunk` grid in
 `core/Parameters.h`), but it does not exist in `src/data/` yet, so M4-4's `PickMarker`
 has nothing legal to take. `Proc::SpacingGrid` (`src/proc/Placement_SpacingGrid_PROC.h`)
 is **not** this structure and must not be reused for it — it is a transient Poisson
 min-spacing accelerator whose cell size is the rule's spacing radius. Ruled in
-**ARCH §8.3** (table of the two structures).
+**ARCH_08_03_SpatialGridVsSpacingGrid.md §8.3** (table of the two structures).
 
 ## Target files
 - `src/data/SpatialGrid_DATA.h` (+ `_Test.cpp`).
@@ -23,7 +23,7 @@ min-spacing accelerator whose cell size is the rule's spacing radius. Ruled in
 `DATA`. Computed index over `Data::PlacementInstances`. No GPU handles, no PARAMS
 dependency, no sim logic.
 
-## Solution (shapes are ARCH §8.3 rulings, not coder choices)
+## Solution (shapes are ARCH_08_03_SpatialGridVsSpacingGrid.md §8.3 rulings, not coder choices)
 `class Data::SpatialGrid` — a uniform chunk grid over the square map:
 - Configuration: `chunkResolution` (tweakable, default **32** → 32×32 chunks) and
   `mapWorldSize`; both stored, neither hardcoded at a use site.
@@ -34,12 +34,12 @@ dependency, no sim logic.
   `Data::PlacementInstances` (the resolved SoA). The v1 `std::vector<std::string>
   MarkerKeys` is retired.
 - `int CellIndexAt(float worldX, float worldY) const` — the **single** world→cell
-  mapping, clamped to range, shared by the builder and the picker (ARCH §8.3: two copies
+  mapping, clamped to range, shared by the builder and the picker (ARCH_08_03_SpatialGridVsSpacingGrid.md §8.3: two copies
   of this arithmetic is how a picker drifts from its index).
 - Bucket read accessors returning the `[begin, end)` range of `instanceIndex` for a cell.
 - `void Build(const float* positionX, const float* positionY, std::int32_t count)` —
   mechanical two-pass counting fill (count per cell → prefix sum → scatter), exactly as
-  `EntityIdBuffer_DATA` exposes `Set`. **Single writer (ARCH §3.4.1 / §8.3):
+  `EntityIdBuffer_DATA` exposes `Set`. **Single writer (ARCH_03_ModuleBoundaries.md §3.4.1 / ARCH_08_03_SpatialGridVsSpacingGrid.md §8.3):
   `Generation_PIPELINE`, immediately after the Placement stage — it is the only caller.**
 - `Clear()`; empty grid is valid and answers every query with an empty range.
 

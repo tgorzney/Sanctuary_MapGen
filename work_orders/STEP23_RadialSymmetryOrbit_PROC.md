@@ -65,7 +65,7 @@ small rotation — chaining would compound float rounding linearly with turn cou
 `turn = 1 .. turnCount - 1` (`turnCount - 1` additional clones per source point, `turnCount` total
 members including the untouched source, for a `Radial`-only mask), appended through the shared
 `AppendPoint` so duplicate detection and the `maximumPoints` bound apply uniformly — this is what
-makes `Radial` correctly compose with prior bits (ARCH §13's "already structurally supported"
+makes `Radial` correctly compose with prior bits (ARCH_13_RadialSymmetry.md §13's "already structurally supported"
 claim depends on this exact pattern, confirmed against real code by the Generator Expert's review
 of this ticket).
 
@@ -79,7 +79,7 @@ Compute Optimization Expert, reconciled — see ruling 6 below for why both are 
   Additionally, clamp `turnCount` against `maximumPoints` before the loop starts (mirroring
   `MakeCandidateGridLayout`'s `gridSide` clamp in `Placement_Scatter_PROC.cpp` — a silent,
   defensive clamp at the point of consumption, not a substitute for the IO-level clamp below) —
-  this closes ARCH §13 Defect 2's actual hazard (`AppendPoint`'s existing per-point cap prevents
+  this closes ARCH_13_RadialSymmetry.md §13 Defect 2's actual hazard (`AppendPoint`'s existing per-point cap prevents
   memory corruption but still silently truncates the orbit with zero diagnostic; this ticket
   should not leave that dangling since it is the ticket that makes the overflow reachable).
 - **PARAMS/IO boundary (mandatory, folded into this ticket — see ruling 6):** clamp
@@ -228,10 +228,10 @@ consumer changes for them here.
 - **`ScatterRuleConfiguration`/GLSL struct changes** — ruled out entirely (ruling 4). Do not add
   any field or padding to either struct.
 - **The radial-count UI widget** — no slider/spinner exists for `radialSymmetryRepeatCount` on any
-  tab; a separate, not-yet-drafted UI ticket (ARCH §13's own framing).
+  tab; a separate, not-yet-drafted UI ticket (ARCH_13_RadialSymmetry.md §13's own framing).
 - **`SymmetryAxisOption::Radial`'s stale `QuarterTurns` stand-in mapping**
-  (`SymmetryTab_UI.h`/`SymmetryAxisMaskOfOption`) — explicitly flagged for the UI Expert by ARCH
-  §13, not this PROC ticket. Designers cannot reach the real `Radial` bit through the exclusive
+  (`SymmetryTab_UI.h`/`SymmetryAxisMaskOfOption`) — explicitly flagged for the UI Expert by
+  ARCH_13_RadialSymmetry.md §13, not this PROC ticket. Designers cannot reach the real `Radial` bit through the exclusive
   Symmetry tab checkbox until that UI ticket lands; per-rule OR-able checkboxes
   (`PlacementRuleSections_UI.h`) may already be able to set the raw bit if they expose it — verify
   during implementation but do not fix any UI gap found, just note it.
@@ -248,7 +248,7 @@ consumer changes for them here.
 
 ## Layer & accuracy class
 PROC (new orbit-generation branch) + PARAMS (buffer constant, clamp-range constants) + IO (clamp
-at 7 read sites). Accuracy class: Exact (placement stays CPU-authoritative, ARCH §4.2).
+at 7 read sites). Accuracy class: Exact (placement stays CPU-authoritative, ARCH_04_DispatchContract.md §4.2).
 
 ## Backend policy
 CPU only — matches STEP16's existing ruling. `ScatterRuleConfiguration`/GPU gate kernel:

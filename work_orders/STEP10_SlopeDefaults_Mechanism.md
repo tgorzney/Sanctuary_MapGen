@@ -57,9 +57,9 @@ before either backend — same as today); confirm this holds once `slopeDefaults
 - `MASKING_SPEC.md` §1.7 — binding mechanism, implement verbatim: default-vs-override is a
   **config source** decision at flattening time, not a PROC/kernel change. The per-stratum kernel
   itself must remain completely unaware whether a value came from a default or an override.
-- ARCH §7.1 ("no rival settings type") — `SlopeDefaults` is a single global record the flattening
+- ARCH_07_01_ParamsPerStratum.md §7.1 ("no rival settings type") — `SlopeDefaults` is a single global record the flattening
   step reads alongside each stratum, not a per-stratum type any stage reaches independently.
-- ARCH §3.4 (one writing stage per DATA field; stage-hash correctness) — see the flagged hash
+- ARCH_03_ModuleBoundaries.md §3.4 (one writing stage per DATA field; stage-hash correctness) — see the flagged hash
   question above; this is the one place this ticket could introduce a real dirty-flag bug if the
   hash isn't updated to match the new dependency.
 

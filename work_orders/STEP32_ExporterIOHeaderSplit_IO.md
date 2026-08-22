@@ -1,4 +1,4 @@
-# Work-Order — Step 32: split `MapExporter_IO.h` under the ARCH §1.5 ceiling
+# Work-Order — Step 32: split `MapExporter_IO.h` under the ARCH_01_05_FileSizeCeilings.md §1.5 ceiling
 
 *Constitution §7. Executor: SanGen Coder. IO Architecture Expert consult.*
 

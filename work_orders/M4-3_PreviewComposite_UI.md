@@ -8,7 +8,7 @@ files, independent of M4-4. Executor: SanGen Coder (GL).*
 Composite the preview image by **sampling the bake** — never re-simulating.
 
 ## Root problem
-`PREVIEW_COMPOSITING_SPEC` + ARCH §3.2: the legacy `PreviewRenderer` shadow-reimplements
+`PREVIEW_COMPOSITING_SPEC` + ARCH_03_ModuleBoundaries.md §3.2: the legacy `PreviewRenderer` shadow-reimplements
 slope/flow/marker filtering in its own shaders → "preview truth ≠ bake truth." v2 preview
 must colorize + composite the already-baked fields and nothing more.
 

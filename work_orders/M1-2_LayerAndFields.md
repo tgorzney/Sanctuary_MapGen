@@ -4,7 +4,7 @@
 
 ## Root problem
 Continue the god-object split: the shared enums, one height layer's settings (the
-`NoiseLayer` replacement, settings-only per ARCH §5.2), and the computed-field container
+`NoiseLayer` replacement, settings-only per ARCH_05_GodObjectDismemberment.md §5.2), and the computed-field container
 that replaces the scattered cached maps of `GenerationResult`.
 
 ## Target files
@@ -16,7 +16,7 @@ that replaces the scattered cached maps of `GenerationResult`.
 
 ## Layer & accuracy
 `PARAMS` (settings) and `DATA` (computed output). No behavior beyond `Resize`. DATA
-takes plain ints for sizing (no PARAMS coupling, ARCH §3).
+takes plain ints for sizing (no PARAMS coupling, ARCH_03_ModuleBoundaries.md §3).
 
 ## Solution
 `Layer` carries only identity/noise/reshape/blend (image-bake, per-layer erosion,

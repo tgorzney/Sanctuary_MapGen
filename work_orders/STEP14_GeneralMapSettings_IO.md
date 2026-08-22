@@ -72,7 +72,7 @@ stratum's actual per-layer `gravity` field.
 
 ## ARCH rules invoked
 - `SANMAP_FORMAT_SPEC.md` Correction 2 — binding, implement verbatim.
-- ARCH §1.6 (PascalCase top-level SanGen-owned key) — `GeneralMapSettings`.
+- ARCH_01_06_SanmapKeyCasing.md §1.6 (PascalCase top-level SanGen-owned key) — `GeneralMapSettings`.
 - Constitution §8 — `globalGravity` becoming a real, persisted setting (rather than resetting
   every session) is exactly the kind of gap this principle exists to close.
 

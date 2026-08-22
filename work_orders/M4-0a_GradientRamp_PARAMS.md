@@ -9,16 +9,16 @@ The adjustable color ramp — the v2 PARAMS type every preview colorization samp
 ## Root problem
 The v2 tree has **no** color-ramp settings type. The only one that exists is the legacy
 `core/params/Params_Gradients.h` (`GradientSettings` / `GradientStop`), and `src/` may
-never include a `core/` header (ARCH §2, hit-list #1). M4-2 (`GradientLut_UI`) cannot
-compile against a real type until this lands. Ruled in **ARCH §8.2**.
+never include a `core/` header (ARCH_02_LayerDirectoryMap.md §2, hit-list #1). M4-2 (`GradientLut_UI`) cannot
+compile against a real type until this lands. Ruled in **ARCH_08_02_GradientRampParams.md §8.2**.
 
 ## Target files
 - `src/params/GradientRamp_PARAMS.h` (+ `_Test.cpp`).
 
 ## Layer & accuracy
-`PARAMS`. Settings only — no logic, no behavior, no GL, no DATA (ARCH §3.3).
+`PARAMS`. Settings only — no logic, no behavior, no GL, no DATA (ARCH_03_ModuleBoundaries.md §3.3).
 
-## Solution (shapes are ARCH §8.2 rulings, not coder choices)
+## Solution (shapes are ARCH_08_02_GradientRampParams.md §8.2 rulings, not coder choices)
 ```
 namespace SanmapGen { namespace Params {
 struct GradientStop {
@@ -37,7 +37,7 @@ struct GradientRamp {
   **not** carried over: domain mapping (slope degrees, flow range, height range) is the
   consumer's job. Verified safe — gradients are not serialized in `mapGeneratorData`
   today (no `Gradient` key anywhere in `core/export/`), so no `.sanmap` round-trip breaks.
-- The legacy role-word name `GradientSettings` is **not** carried over (ARCH §1.1: the
+- The legacy role-word name `GradientSettings` is **not** carried over (ARCH_01_01_LiteralNames.md §1.1: the
   namespace already says settings; the type states the quantity).
 - One ramp **per colorized field** — slope, flow, accumulation, height, water each own
   their own instance. The legacy "accumulation reuses the flow ramp" aliasing is retired.

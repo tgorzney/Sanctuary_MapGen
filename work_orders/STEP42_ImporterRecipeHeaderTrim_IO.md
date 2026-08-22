@@ -4,7 +4,7 @@
 session — drafted, never dispatched. Correcting that gap now.*
 
 ## Root problem
-`src/io/MapImporter_Recipe_IO.h` is 172 lines, over ARCH §1.5's 150-line hard ceiling. Unlike
+`src/io/MapImporter_Recipe_IO.h` is 172 lines, over ARCH_01_05_FileSizeCeilings.md §1.5's 150-line hard ceiling. Unlike
 every other oversized file fixed this session, this one is NOT a logic problem — it's pure
 declarations plus one small inline helper (`ReadJsonFloatVector4`, ~10 lines). The overage is
 comment duplication: roughly a dozen declaration groups each restate a near-identical 3-8 line

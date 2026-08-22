@@ -13,7 +13,7 @@ geometry settings (part of the `GenerationParams` god object being dismembered).
 
 ## Layer & accuracy
 `DATA` (computed output) and `PARAMS` (settings). No behavior beyond accessors/derived
-helpers; no GPU handles (ARCH §3).
+helpers; no GPU handles (ARCH_03_ModuleBoundaries.md §3).
 
 ## Solution
 - `FloatField`: row-major contiguous `float` grid; `Resize/Fill/Get/Set/At/Data`,

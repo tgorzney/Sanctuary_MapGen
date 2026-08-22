@@ -5,7 +5,7 @@ Mask + Placement + composite). Run after M5-0a (both touch Placement). Executor:
 Coder.*
 
 ## Root problem
-Slope colorization isn't wired because there is no baked slope field — and per ARCH §3.2
+Slope colorization isn't wired because there is no baked slope field — and per ARCH_03_ModuleBoundaries.md §3.2
 the composite must **sample** slope, not recompute it (that was the shadow-sim defect).
 The Mask stage already computes slope for its gate; make that the one slope authority.
 
@@ -17,7 +17,7 @@ The Mask stage already computes slope for its gate; make that the one slope auth
 - `src/ui/PreviewComposite_UI.*` — sample `slope` for slope colorization.
 
 ## Layer & accuracy
-`DATA` field + `PROC` writer/reader + `UI` reader. Mask is the **single writer** (ARCH
+`DATA` field + `PROC` writer/reader + `UI` reader. Mask is the **single writer** (ARCH_03_ModuleBoundaries.md
 §3.4).
 
 ## Solution

@@ -21,7 +21,7 @@ types as `int`.
   coercion into a C# `int`.
 
 ## Target files
-- `src/params/Stratum_PARAMS.h` — widen the two fields per the ratified ARCH §7.2 item 10.
+- `src/params/Stratum_PARAMS.h` — widen the two fields per the ratified ARCH_07_02_MaterialProportionVsSurfaceWeight.md §7.2 item 10.
 - `src/io/MapExporter_Recipe_IO.cpp` — fix both write sites.
 - `src/io/MapExporter_Recipe_IO_Test.cpp` (or wherever the export round-trip test for
   this file lives — check `MapExporter_IO_Test.cpp`) — extend coverage.

@@ -16,11 +16,11 @@ The first generation stage. Today the CPU noise/blend impl is missing (`Gen_Nois
 ## Target files
 - `src/proc/NoiseBlend_PROC.h` / `.cpp` (CPU) — split across `NoiseBlend_*_PROC.cpp` if
   the ceiling is hit.
-- `src/proc/NoiseBlend_PROC.glsl` (GPU compute) — paired base name (ARCH §1.4).
+- `src/proc/NoiseBlend_PROC.glsl` (GPU compute) — paired base name (ARCH_01_04_CpuGpuKernelPairing.md §1.4).
 - `src/proc/NoiseBlend_PROC_Test.cpp`.
 
 ## Layer & accuracy class
-`PROC`. Preview = **Visual** (Gpu), Output = **Accurate** (Cpu) — ARCH §4.2 defaults.
+`PROC`. Preview = **Visual** (Gpu), Output = **Accurate** (Cpu) — ARCH_04_DispatchContract.md §4.2 defaults.
 
 ## Inputs / outputs
 - In: `Params::LayerStack` (the enabled flat layers), `Params::Geometry` (seed,

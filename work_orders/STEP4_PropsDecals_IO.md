@@ -99,10 +99,10 @@ CPU only.
   `DecalInstanceLayer` additions and the "why props/decals now need a wrapper transform type"
   supersession).
 - `SANMAP_FORMAT_SPEC.md` Correction 14 (`PropGroups`/`DecalGroups` shape and casing).
-- ARCH §12 (the `layerIndex` direct-field-injection ruling, and the range-validation-is-import-only
+- ARCH_12_ManualPropDecalLayers.md §12 (the `layerIndex` direct-field-injection ruling, and the range-validation-is-import-only
   posture).
 - Constitution §6 — total/degrade-gracefully readers; `layerIndex` out of range against
-  `propLayers`/`decalLayers` is a loud logged clamp to `0`, per-instance, not per-file (ARCH §12's
+  `propLayers`/`decalLayers` is a loud logged clamp to `0`, per-instance, not per-file (ARCH_12_ManualPropDecalLayers.md §12's
   own explicit instruction — this is the one place in this ticket where import validation logic is
   real and required, distinct from the blueprintPath question this ticket defers).
 
@@ -156,12 +156,12 @@ CPU only.
    PropGroups / DecalGroups: [ N × { Name (string), Color ({r,g,b,a}), IconScale (float) } ]
    ```
    PascalCase field names (`Name`, `Color`, `IconScale`) — this is a SanGen-owned array, casing
-   law differs from the lowerCamelCase format-native `props`/`decals` keys themselves (ARCH §1.6).
+   law differs from the lowerCamelCase format-native `props`/`decals` keys themselves (ARCH_01_06_SanmapKeyCasing.md §1.6).
    `Color` reuses the same `{r,g,b,a}` shape already confirmed and shipped for `armyColor` in
    Step 2 — same convention, not a fresh decision.
 
 6. **`layerIndex` import-time range validation is real, required logic in THIS ticket — not
-   deferred like blueprintPath.** ARCH §12: an out-of-range `layerIndex` (at or beyond
+   deferred like blueprintPath.** ARCH_12_ManualPropDecalLayers.md §12: an out-of-range `layerIndex` (at or beyond
    `propLayers.size()`/`decalLayers.size()`) is a loud, logged clamp to `0`, applied per-instance
    on import (different instances in the same file can carry different out-of-range values, so
    this cannot be a single file-scope check). This is unlike blueprintPath — it's authoring-

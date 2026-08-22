@@ -7,7 +7,7 @@ about `SymAlgorithm` this ticket resolves by consult rather than guessing.*
 
 ## Root problem
 `GlobalSymmetryMask` currently lives inside the legacy `mapGeneratorData` blob. `RadialSymmetryRepeatCount`
-(the companion count for the new `SymmetryAxis::Radial` bit, ARCH §13) doesn't exist anywhere.
+(the companion count for the new `SymmetryAxis::Radial` bit, ARCH_13_RadialSymmetry.md §13) doesn't exist anywhere.
 `SymmetryDetection` (`detectionTolerance`/`bSnapImperfectSymmetry`) has no aggregate home on
 `MapRecipe` at all today (caller-owned, per `SymmetryTab_UI.h` SCOPE NOTE 2) and no IO round-trip.
 Six more exotic-blend scalars (`SymSuperpositionBlend`/`SymmetryBlurRadius`/`CrossFadeWidth`/
@@ -27,7 +27,7 @@ Six more exotic-blend scalars (`SymSuperpositionBlend`/`SymmetryBlurRadius`/`Cro
    explicitly so it isn't mistaken for an oversight of this ticket.
 2. **`radialSymmetryRepeatCount` retrofit onto `GeoLayer`/`Layer` IS in scope** (not a separate
    ticket) — those two types already shipped `bSymmetryUseGlobal`/`symmetryMask` (a prior ticket,
-   before this ratification existed) and ARCH §13 names them as one of the homes needing their own
+   before this ratification existed) and ARCH_13_RadialSymmetry.md §13 names them as one of the homes needing their own
    `N`. Add it alongside the other 6 homes below — 7 total, not 5.
 3. **The `symmetryOrbitMaximum = 16` buffer-overflow risk stays dormant, no same-ticket fix
    needed.** Confirmed by direct read: `BuildSymmetryOrbit` (`Placement_Symmetry_PROC.h`) has
@@ -124,7 +124,7 @@ consumers (ruling #1/#3).
   ticket" above.
 - Constitution §8 — settings exist in PARAMS from the moment they're settable, no consumer
   required first (same precedent already established this session).
-- ARCH §7.1 — `SymmetryDetection` getting an aggregate home is NOT a rival settings type; it's the
+- ARCH_07_01_ParamsPerStratum.md §7.1 — `SymmetryDetection` getting an aggregate home is NOT a rival settings type; it's the
   same type gaining the one home it was always missing (its own header comment already frames
   `Params::MapRecipe::globalSymmetryMask` as "the ONE home of the mask; nothing here duplicates
   it" — this ticket doesn't touch that framing, `SymmetryDetection` is a separate concept).

@@ -26,7 +26,7 @@ grid chunk for interactive markers.
   `grid.CellIndexAt(worldX, worldY)`, walks **only** that chunk's `[begin, end)` index
   range, and returns the nearest instance index within `pickRadius`, or `-1`.
 
-**Type note (ARCH §8.3, binding):** the parameter is `const Data::SpatialGrid&` from
+**Type note (ARCH_08_03_SpatialGridVsSpacingGrid.md §8.3, binding):** the parameter is `const Data::SpatialGrid&` from
 `src/data/SpatialGrid_DATA.h`. The legacy name `MarkerSpatialGrid` (v1
 `core/Parameters.h`) must not appear in `src/`, and `Proc::SpacingGrid`
 (`src/proc/Placement_SpacingGrid_PROC.h`) is a **different structure** — a transient
@@ -49,4 +49,4 @@ ceilings.
 Reading the buffer back from the GPU (composite/SYS side, M4-3); **building** the spatial
 grid (`SpatialGrid::Build` is M4-0b; calling it after Placement is M4-5); selection state /
 highlight UI (M5). If `src/data/SpatialGrid_DATA.h` is absent, **stop and report** — do not
-create it here and do not fall back to a `core/` type (ARCH §8.4).
+create it here and do not fall back to a `core/` type (ARCH_08_04_CoderScopeLaw.md §8.4).

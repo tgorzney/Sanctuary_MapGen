@@ -135,7 +135,7 @@ CPU only — JSON text I/O.
    verbatim, no transform. Not re-opening this question — same class of decision, same answer.
 
 6. **`resource`/`bResource` casing.** `MarkerType.resource` (verbatim C# field, `SanMap.Types.
-   cs:163`) → `MarkerInstanceGroup::bResource` — verbatim word, `b`-prefixed per ARCH §1.1,
+   cs:163`) → `MarkerInstanceGroup::bResource` — verbatim word, `b`-prefixed per ARCH_01_01_LiteralNames.md §1.1,
    exactly as the spec's naming table already states. JSON key stays `"resource"` (format-native,
    lowerCamelCase, unaffected by the C++ `b`-prefix convention).
 

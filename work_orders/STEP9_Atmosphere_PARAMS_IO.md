@@ -46,8 +46,8 @@ CPU only — settings I/O, no compute.
 
 ## ARCH rules invoked
 - `ATMOSPHERE_PARAMS_SPEC.md` in full — binding, zero deviation on names/shapes/defaults.
-- ARCH §7.1 (composition, not rival types) — the aggregator-of-eight shape.
-- ARCH §1.8 — the one sanctioned retype (`skyboxIntensityModeIndex` → `skyboxIntensityMode`).
+- ARCH_07_01_ParamsPerStratum.md §7.1 (composition, not rival types) — the aggregator-of-eight shape.
+- ARCH_01_08_ParamsFieldNamingByKind.md §1.8 — the one sanctioned retype (`skyboxIntensityModeIndex` → `skyboxIntensityMode`).
 - **No `IO_MIGRATION_SPEC` version gate** — the spec explicitly rules this out: these are
   already-live format-native keys, not a new SanGen-owned section; no shape change, no version
   bump needed (same reasoning already applied to Steps 2-4's new-content-in-existing-keys cases).
@@ -75,7 +75,7 @@ writes ~49 flat `document["sunRA"] = ...` style entries directly, no wrapper obj
 field is `sunRA`/`sunDA` (not `sunRightAscension`/`sunDeclination`) and `sunVolumetricsMultiplier`/
 `sunVolumetricsShadowDimer` (not `sunVolumetricMultiplier`/`sunVolumetricShadowDimmer`,
 sic — the C# has the real typo "Dimer" not "Dimmer") — the JSON key is the format's own spelling
-verbatim (ARCH §1.1), which differs slightly from the `Params::` field's own (corrected) spelling;
+verbatim (ARCH_01_01_LiteralNames.md §1.1), which differs slightly from the `Params::` field's own (corrected) spelling;
 do not silently "fix" the JSON key to match the PARAMS field name. `sunCookie`/`skybox` are
 `TextureLoader{path}` objects in C# (`{"path": "..."}`), not bare strings — `sunCookiePath`/
 `skyboxPath` in `Params::` read/write through that one-field wrapper shape, not a bare string key.

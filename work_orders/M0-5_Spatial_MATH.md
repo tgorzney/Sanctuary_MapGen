@@ -13,7 +13,7 @@ obstacle fields. The old `Sanmath_Spatial.h` (a) duplicated the entire gallop+bi
 search driver across the two clearance scorers, (b) used `short` seed coords (32767
 grid cap), (c) copied the whole JFA buffer every pass instead of ping-ponging, (d)
 returned an always-zero "variance" (dead API), and (e) `#include`d the DATA-layer
-`FloatMask` — a MATH→DATA layer violation (ARCH §3).
+`FloatMask` — a MATH→DATA layer violation (ARCH_03_ModuleBoundaries.md §3).
 
 ## Target files
 - `src/math/RadialClearance_MATH.h` + `RadialClearance_MATH_Test.cpp`

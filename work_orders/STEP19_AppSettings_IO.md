@@ -33,12 +33,12 @@ see "Explicit out-of-scope" for why each is excluded rather than resurrected.
    icon/thumbnail cache), it becomes ONE FIELD inside this bootstrap file, not the file's own
    location.
 3. **Format:** `nlohmann::json`, flat top-level object, direct 1:1 with C++ member names — no
-   PascalCase-section convention (that's an ARCH §1.6 `.sanmap` rule; this isn't a `.sanmap`
+   PascalCase-section convention (that's an ARCH_01_06_SanmapKeyCasing.md §1.6 `.sanmap` rule; this isn't a `.sanmap`
    document and carries no `SanGenVersion`).
 4. **Load/save timing:**
    - Load inside `Ui::Application`'s constructor/early `Initialize()` — mirror where
      `LoadAssetAtlas()` already runs. **Never in `ApplicationMain_UI.cpp`** — that file's own
-     header comment says it is deliberately "nothing but the entry point" (ARCH §5.5 retired the
+     header comment says it is deliberately "nothing but the entry point" (ARCH_05_GodObjectDismemberment.md §5.5 retired the
      v1 pattern of loading everything in `main.cpp`; loading settings there would resurrect it).
    - After load: seed `ApplicationExecutionSettings`'s three fields + `SystemTabState::
      bDeterministic` from the loaded struct, then call the ALREADY-EXISTING
@@ -92,7 +92,7 @@ CPU only, one-time at startup/shutdown — not a per-frame or per-generation con
   precedent exactly.
 - Constitution §6 — total, never-throwing load; a bad/missing file degrades to compiled defaults,
   logged, never crashes the app.
-- ARCH §5.5 — `ApplicationMain_UI.cpp` stays entry-point-only; do not load settings there.
+- ARCH_05_GodObjectDismemberment.md §5.5 — `ApplicationMain_UI.cpp` stays entry-point-only; do not load settings there.
 
 ## Solution — `AppSettings` field list
 ```cpp
@@ -110,7 +110,7 @@ struct AppSettings {
 ```
 
 **Flagged, not blocking this ticket:** `bUseGpuMarkers` has a real live target
-(`placementStage`'s own `Sys::DispatchPolicy`, per ARCH §4.2) but no UI toggle wired to it yet.
+(`placementStage`'s own `Sys::DispatchPolicy`, per ARCH_04_DispatchContract.md §4.2) but no UI toggle wired to it yet.
 This ticket gives it a settings-file home and seeds it into that policy at startup (the same
 one-line pattern `bUseGpuTerrain`/`bUseGpuFlow`/`bWysiwygBaking` already use via
 `ApplyExecutionSettings`) — but does NOT add a checkbox to `SystemTab_UI`; that's separate UI
@@ -124,7 +124,7 @@ minimally to accept one rather than leaving the loaded value unused.
 - **`GPUPreviewIterations`** — confirmed retired (`Thermal_Kernel_PROC.h`'s own comment: collapsed
   into one shared per-project `iterationCount` constant, one value for both backends now). Do not
   carry it forward as a dead field.
-- **`FastPreviewMode`** — human-ratified drop (no live v2 target, possibly subsumed by ARCH §4.4's
+- **`FastPreviewMode`** — human-ratified drop (no live v2 target, possibly subsumed by ARCH_04_DispatchContract.md §4.4's
   idle-escalation auto-refine, not confirmed either way). Not included in `AppSettings`.
 - **A UI toggle for `bUseGpuMarkers`** — the settings-file plumbing is in scope, the checkbox is
   not (see "Flagged, not blocking" above).

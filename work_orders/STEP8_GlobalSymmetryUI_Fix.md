@@ -22,7 +22,7 @@ presets — a workaround for the bug, not a fix.
 Separately, `SymmetryAxisOption::Radial` (labelled `"Radial"` in the UI) maps to
 `Params::SymmetryAxis::QuarterTurns` (`SymmetryTab_UI.h:53`) — a fixed 4-way rotation, not
 adjustable-fold radial symmetry. Real Radial N-fold symmetry (`SymmetryAxis::Radial`,
-`radialSymmetryRepeatCount`, ARCH §13) does not exist in code anywhere yet — this is confirmed by
+`radialSymmetryRepeatCount`, ARCH_13_RadialSymmetry.md §13) does not exist in code anywhere yet — this is confirmed by
 grep across the whole tree. So `"Radial"` here has always been a misleading label for
 `QuarterTurns`, exactly as `INDEX.md` describes, and this ticket does NOT implement real Radial
 symmetry (that remains its own future, larger, deferred feature) — it only removes the mislabeling.
@@ -111,7 +111,7 @@ N/A — pure UI/imgui composition, no dispatch.
    fix, still correctly out of scope.
 
 ## Explicit out-of-scope
-- **Real Radial N-fold symmetry** (`SymmetryAxis::Radial`, `radialSymmetryRepeatCount`, ARCH §13) —
+- **Real Radial N-fold symmetry** (`SymmetryAxis::Radial`, `radialSymmetryRepeatCount`, ARCH_13_RadialSymmetry.md §13) —
   not implemented by this ticket. This ticket only removes the misleading `"Radial"` label that
   incorrectly stood in for `QuarterTurns`; it does not add a new axis or a fold-count setting.
 - **The 16-slot symmetry-orbit buffer** — separate, unrelated defect; not pursued this round since

@@ -55,7 +55,7 @@ today"). This is the same "settings from the moment they are settable" posture a
 - `SANMAP_FORMAT_SPEC.md` Correction 3 — binding, implement verbatim.
 - `LAYER_SYSTEM_SPEC.md` — confirms the flat `LayerStack` → `GeoLayer` → `Layer` model is unchanged
   by this ticket; no grouping tier is introduced.
-- ARCH §1.1 (`b`-prefix), Constitution §8 (real settings, not hardcoded).
+- ARCH_01_01_LiteralNames.md §1.1 (`b`-prefix), Constitution §8 (real settings, not hardcoded).
 
 ## Solution — shape
 ```

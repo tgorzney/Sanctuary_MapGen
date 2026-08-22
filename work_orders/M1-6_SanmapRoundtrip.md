@@ -19,7 +19,7 @@ shared-generation mode transmits (settings + seed regenerate the map).
 - `src/io/SanmapRecipe_IO_Test.cpp`.
 
 ## Layer & accuracy
-`IO / BRIDGE`. The format seam — loads/saves only, never simulates (ARCH §3). GPU-free.
+`IO / BRIDGE`. The format seam — loads/saves only, never simulates (ARCH_03_ModuleBoundaries.md §3). GPU-free.
 
 ## Key constraints (read the existing code first)
 - **Use the project's existing JSON approach.** Read `core/export/Export_Metadata.cpp`

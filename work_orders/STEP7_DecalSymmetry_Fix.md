@@ -66,7 +66,7 @@ shared by every other rule family; adding a fourth caller changes no dispatch be
   one rule family that was missed, not redesigned.
 - Constitution §8 (total tweakability) — every rule family gets the same override capability;
   decals silently not having one is exactly the kind of inconsistency this principle forbids.
-- ARCH §1.1 (`b`-prefix boolean naming) — `bSymmetryUseGlobal`, matching the existing three.
+- ARCH_01_01_LiteralNames.md §1.1 (`b`-prefix boolean naming) — `bSymmetryUseGlobal`, matching the existing three.
 
 ## Solution
 Four mechanical, precedent-matched edits (PARAMS field, PROC resolution call, IO read/write pair,

@@ -16,7 +16,7 @@ presentation type. No Decals equivalent exists at all — decals are drawn as a 
 ## Ruled by this ticket (UI Expert consult — binding; corrects a real misreading of this domain)
 1. **`ManualPropGroup` IS the right retype target for `Params::PropInstanceLayer`** — confirmed
    not a coincidental shape match: `ENTITY_AUTHORING_PARAMS_SPEC.md` states outright the two are
-   "the same kind of authoring-convenience metadata," and `ARCH §12` confirms `PropInstanceLayer`'s
+   "the same kind of authoring-convenience metadata," and `ARCH_12_ManualPropDecalLayers.md §12` confirms `PropInstanceLayer`'s
    shape was deliberately matched to the already-live `ManualPropGroup` identifier.
 2. **The retype reaches ONLY the group-metadata list, never the transform list.** Read
    `PropsTab_Manual_UI.cpp`'s actual logic (not just the header): today's "groups" list and
@@ -40,7 +40,7 @@ presentation type. No Decals equivalent exists at all — decals are drawn as a 
    DELIBERATE DIVERGENCE on delete: an orphaned `UnitRule` is dropped (a unit with no army is
    meaningless); an orphaned `PropTransform` must NEVER be dropped (a prop losing its layer tag is
    still a real, still-rendered prop, just ungrouped). **Clamp to layer `0` on delete, exactly the
-   semantic ARCH §12 already ratified for out-of-range import** — never remove the prop/decal
+   semantic ARCH_12_ManualPropDecalLayers.md §12 already ratified for out-of-range import** — never remove the prop/decal
    instance itself.
 6. **Name uniqueness is cosmetic here, not a data-loss fix.** `PropGroups`/`DecalGroups` export as
    plain arrays (Step 4 finding 5), not name-keyed dicts — duplicate layer names don't collide on
@@ -50,7 +50,7 @@ presentation type. No Decals equivalent exists at all — decals are drawn as a 
 7. **The Decals block is a new sibling file, NOT a new tab.** There is no "Decals tab" — confirmed
    by reading `PropsTab_UI.cpp`: decals are a sub-block drawn inside `DrawPropsTab`. The manual-
    decal-layers block belongs there too: `PropsTab_ManualDecals_UI.h`/`.cpp`. Inventing a new
-   top-level tab would violate ARCH §8.4 (a coder never invents a missing structural element).
+   top-level tab would violate ARCH_08_04_CoderScopeLaw.md §8.4 (a coder never invents a missing structural element).
 8. **`DrawPropsTab` needs a new `placedDecals` parameter** (nullable, mirrors the existing
    `placedProps`) — it doesn't receive one today. Find and update its one call site.
 9. **Dirty-flag posture: unchanged, stays silent** — same reasoning as Step 20's Army ruling:
@@ -86,16 +86,16 @@ correctness-critical for hand-placed/imported prop and decal data).
 N/A — pure UI/imgui composition plus plain vector-repair logic (no rendering dependency).
 
 ## ARCH rules invoked
-- `ENTITY_AUTHORING_PARAMS_SPEC.md`, ARCH §12 — the ratified `PropInstanceLayer`/
+- `ENTITY_AUTHORING_PARAMS_SPEC.md`, ARCH_12_ManualPropDecalLayers.md §12 — the ratified `PropInstanceLayer`/
   `DecalInstanceLayer` shape and the `layerIndex` clamp-to-0-on-out-of-range semantic this
   ticket's delete-repair reuses (already the ratified import-time behavior, now also the
   UI-delete-time behavior — same rule, two trigger points).
-- ARCH §8.4 — no new tab invented; the Decals block joins the existing Props tab as a sibling file.
+- ARCH_08_04_CoderScopeLaw.md §8.4 — no new tab invented; the Decals block joins the existing Props tab as a sibling file.
 - Constitution §6 — deleting a layer never destroys the prop/decal instance that referenced it.
 
 ## Solution — repair functions (exact shape, UI-Expert-provided)
 ```cpp
-// Mirrors DropUnitRulesForRemovedArmy, but layerIndex is authoring metadata (ARCH §12) — clamp
+// Mirrors DropUnitRulesForRemovedArmy, but layerIndex is authoring metadata (ARCH_12_ManualPropDecalLayers.md §12) — clamp
 // to layer 0, never drop the instance. Deleting a LAYER must never delete an imported PROP.
 inline bool ClampPropLayerIndicesForRemovedLayer(std::vector<Params::PropInstanceGroup>& props,
                                                   int removedLayerIndex) {

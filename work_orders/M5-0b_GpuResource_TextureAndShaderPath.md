@@ -9,7 +9,7 @@ Two M4 follow-ups, both in `GpuResource_SYS`:
 1. It has no GL **image/texture** primitive — M4's "GL_RGBA8 image" is a packed SSBO.
    On-screen display (MapCanvas, M5) needs a real sampleable/blittable GL texture.
 2. Its shader loader resolves **one** directory, so M4-5 had to stage every `.glsl` into a
-   single output dir — breaking the `.cpp`/`.glsl` co-location rule (ARCH §1.4).
+   single output dir — breaking the `.cpp`/`.glsl` co-location rule (ARCH_01_04_CpuGpuKernelPairing.md §1.4).
 
 ## Target files
 - `src/sys/GpuResource_SYS.*` (+ test where feasible).
@@ -20,7 +20,7 @@ Two M4 follow-ups, both in `GpuResource_SYS`:
 ## Solution
 1. Add a managed **GL texture** resource (create/resize/upload/bind, RGBA8 + the formats
    the composite/canvas need), owned + lifecycle-managed like the existing programs/SSBOs
-   (opaque handle, GL types stay inside the SYS seam, ARCH §5). The composite can then
+   (opaque handle, GL types stay inside the SYS seam, ARCH_05_GodObjectDismemberment.md §5). The composite can then
    write a real texture the canvas samples.
 2. Give the shader loader a **configurable search path** (ordered list of directories);
    resolve a shader by scanning the path. Keeps `.glsl` beside their `_PROC`/`_UI` twins;

@@ -155,7 +155,7 @@ it is a re-ratification, not a quiet drop. Neither expert found a non-entity con
 terrain-cell pick) while reading, but confirm before removal is scoped into a work-order.
 
 ## WYSIWYG fidelity (UI Expert)
-- Constant-screen-size icons are the *correct* fidelity model for editor glyphs — ARCH §3.2
+- Constant-screen-size icons are the *correct* fidelity model for editor glyphs — ARCH_03_ModuleBoundaries.md §3.2
   already establishes the preview never re-simulates in-game rendering, so "matches the bake's
   placement" is the right WYSIWYG bar, not "matches a hypothetical in-game pixel footprint."
 - No new occlusion regression — the preview is flat top-down 2D with no depth concept today;

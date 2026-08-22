@@ -21,7 +21,7 @@ verified against real shipped-code comments — use these, not any earlier draft
   `CylinderZScale`, `TorusMajorRadius`, `TorusMinorRadius` — 9 fields (NOT `SymAlgorithm`, which
   `MapExporter_Symmetry_IO.cpp` and the spec both confirm doesn't exist anywhere in `src/` —
   explicitly out of scope, STEP16 ruling #1; also NOT `RadialSymmetryRepeatCount`, genuinely new,
-  ARCH §13, defaults to 3 already).
+  ARCH_13_RadialSymmetry.md §13, defaults to 3 already).
 - `Accumulation_Migrate_V2`: no legacy fields — reserves the empty `Accumulation` top-level key.
 - `DetailNormal_Migrate_V2`: `DetailNormalMapSize` — 1 field.
 

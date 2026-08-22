@@ -62,7 +62,7 @@ is built from)
 
 **New IO (mirrors the existing per-domain split — `MapExporter_Props_IO.cpp`/
 `MapExporter_Decals_IO.cpp` precedent — one exporter/importer pair per domain, each comfortably
-under the ARCH §1.5 100-line soft ceiling):**
+under the ARCH_01_05_FileSizeCeilings.md §1.5 100-line soft ceiling):**
 - `src/io/MapExporter_ScatterTransform_IO.cpp`/`.h` (new) — `BuildScatterTransformJson`, extracted
   verbatim from `MapExporter_Rules_IO.cpp` (unchanged body) since it is now shared plumbing across
   4 sibling files, not local to one.
@@ -139,7 +139,7 @@ Per-rule field spellings are **unchanged verbatim** from the current `PlacementR
 the container, not the per-rule field names. `GlobalMarkerSettings`'s wire keys keep the
 `Global*`/`Marker*`-prefixed spelling already ratified in `SANMAP_FORMAT_SPEC` Correction 7
 (`GlobalIconAlloy`, `MarkerColorAlloy`, `MarkerScaleAlloy`, ...) even though the C++ field names
-drop those prefixes (ARCH §11's naming note — wire spelling and C++ spelling diverge here by
+drop those prefixes (ARCH_11_GlobalMarkerSettings.md §11's naming note — wire spelling and C++ spelling diverge here by
 design, same as `layerIndex`/`PropGroups` elsewhere in this format).
 
 **Cardinality:** none of the four Stacks or `GlobalMarkerSettings` have a fixed count — designer-
@@ -159,7 +159,7 @@ needed (unlike `StratumGenerationSettings`'s fixed-9 requirement).
 - **Any change to `ScatterTransform`, `MarkerRule`'s existing fields, or `PropRule`/`DecalRule`/
   `UnitRule`'s shape** beyond the 4 new `MarkerRule` fields named above.
 - **Wiring `GlobalMarkerSettings` into any UI tab** (icon/color/scale pickers) — PARAMS + IO shape
-  only, per ARCH §11's own "shape only, not wiring" scope note.
+  only, per ARCH_11_GlobalMarkerSettings.md §11's own "shape only, not wiring" scope note.
 - **Tightening Correction 7's contradictory "sub-key" wording in `SANMAP_FORMAT_SPEC.md` itself** —
   flagged to the ARCH Expert as a docs-only follow-up (ruling #2 above), not this ticket's job
   (only the ARCH Expert writes `sangen_arch_pack/`).

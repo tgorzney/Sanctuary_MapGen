@@ -24,7 +24,7 @@ managed GL resources that method needs.
 
 ## Layer & accuracy class
 `SYS`. Accuracy N/A (resource plumbing). GPU/GL state lives ONLY here (Constitution §1 /
-ARCH §3.2 — never in DATA/PARAMS/UI).
+ARCH_03_ModuleBoundaries.md §3.2 — never in DATA/PARAMS/UI).
 
 ## Backend policy
 The GPU backend infrastructure itself. Provides the resources the GPU kernels use; the
@@ -33,7 +33,7 @@ CPU/GPU choice is made by `Dispatch_SYS` (M0-8).
 ## ARCH rules invoked
 - §1.1 fully-spelled names; §1.2 `_SYS` suffix; §1.5 ceilings (split impl across files
   as needed).
-- ARCH §4 / `DISPATCH_INTERFACE_SPEC §3` — the resource-manager contract.
+- ARCH_04_DispatchContract.md §4 / `DISPATCH_INTERFACE_SPEC §3` — the resource-manager contract.
 - §5 portability — keep GL behind this seam; do not leak GL handles upward.
 
 ## Solution (model on the GOOD existing pattern, not the bad one)

@@ -8,7 +8,7 @@ The single CPU/GPU dispatch vocabulary, backend resolver, and router seam.
 
 ## Root problem
 Backend selection today is N ad-hoc `UseGPUx` booleans branched at scattered call
-sites, some orphaned, some silently no-op. ARCH §4 mandates one `DispatchPolicy` and one
+sites, some orphaned, some silently no-op. ARCH_04_DispatchContract.md §4 mandates one `DispatchPolicy` and one
 resolution rule that every stage goes through — no stage reads a raw toggle.
 
 ## Target files

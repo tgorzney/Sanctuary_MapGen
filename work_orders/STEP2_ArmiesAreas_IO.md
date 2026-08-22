@@ -81,7 +81,7 @@ CPU only — JSON text I/O, not a dispatchable calculation.
   retype or rename anything here without a fresh ruling.
 - `SANMAP_FORMAT_SPEC.md` "Entity collections" section and Correction 11 (`armyColor`/`alias`
   merge into `armies[key]`).
-- ARCH §1.8 (naming law) — already applied by the spec; this work-order does not re-derive it.
+- ARCH_01_08_ParamsFieldNamingByKind.md §1.8 (naming law) — already applied by the spec; this work-order does not re-derive it.
 - Constitution §6 — every field is validated on import; a missing/wrong-typed key falls back to
   default and is logged, never crashes or silently corrupts.
 - Constitution §8 — no format string literal at more than one write site; reuse the existing
@@ -261,7 +261,7 @@ alone — the specs deliberately left some of this open for "the entity-export w
 
 5. **`MapExporter_Armies_IO.cpp`** (new, own file — separate from Areas per the same ruling; this
    is the more complex of the two, with three levels of recursion, a `Color`-shaped field, and the
-   bounded `tpid` buffer copy, so keeping it apart from `Areas` also protects the ARCH §1.5
+   bounded `tpid` buffer copy, so keeping it apart from `Areas` also protects the ARCH_01_05_FileSizeCeilings.md §1.5
    file-size ceiling). One public function:
    ```cpp
    nlohmann::ordered_json BuildArmiesJson(const Params::MapRecipe& recipe);

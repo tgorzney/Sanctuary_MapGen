@@ -43,9 +43,9 @@ implemented in `src/` yet except where noted in §4.
 | `Params::GlobalMarkerSettings` | `SANMAP_FORMAT_SPEC.md` Correction 7 | |
 | `StratumGenerationSettings` (soil physics + slope-gate override) + `stratumLayers` appearance export/import fix | `SANMAP_FORMAT_SPEC.md` Corrections 12/13 | Appearance importer doesn't exist at all yet — real gap, not just incomplete |
 | `MarkerInstanceGroup`/`MarkerTransform`, `PropInstanceGroup`, `DecalInstanceGroup`, `MarkerChain`/`ChainMarker`, shared `InstancedTransform` base | `ENTITY_AUTHORING_PARAMS_SPEC.md` (3rd session) | The "no PARAMS home for baked instances" gap, closed |
-| Props/decals manual layering (`layerIndex` field + `PropGroups`/`DecalGroups`) | `ARCH.md` §12, `ENTITY_AUTHORING_PARAMS_SPEC.md` (4th revision) | |
-| Radial N-fold symmetry | `ARCH.md` §13, `SANMAP_FORMAT_SPEC.md` Correction 4 amendment | Default axis = Point, default blend = Superposition (once `SymAlgorithm` exists) |
-| Naming law | `ARCH.md` §1.8 | Pass-through/authored data → format spelling; generative settings → SanGen's own names. Named exceptions documented inline. |
+| Props/decals manual layering (`layerIndex` field + `PropGroups`/`DecalGroups`) | `ARCH_12_ManualPropDecalLayers.md` §12, `ENTITY_AUTHORING_PARAMS_SPEC.md` (4th revision) | |
+| Radial N-fold symmetry | `ARCH_13_RadialSymmetry.md` §13, `SANMAP_FORMAT_SPEC.md` Correction 4 amendment | Default axis = Point, default blend = Superposition (once `SymAlgorithm` exists) |
+| Naming law | `ARCH_01_08_ParamsFieldNamingByKind.md` §1.8 | Pass-through/authored data → format spelling; generative settings → SanGen's own names. Named exceptions documented inline. |
 | Two shipping export bugs | Fixed in code, see §4 | `maskRemapMin/Max` → real `Vector4`; `height` → rounds to int |
 
 ## 4. Actually implemented in `src/` (small list — check `git log`/`git status` for current truth)

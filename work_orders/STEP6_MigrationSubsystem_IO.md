@@ -64,7 +64,7 @@ CPU only.
 - `SANMAP_FORMAT_SPEC.md` Correction 1 (`SanGenVersion` field, top-level, replaces
   `MapGeneratorDataVersion`).
 - Constitution §6 — the refusal law IS this ticket's core deliverable.
-- ARCH §1.5 (`Type_Aspect_LAYER` file-split pattern) — `IO_MIGRATION_SPEC.md` §1 already confirms
+- ARCH_01_05_FileSizeCeilings.md §1.5 (`Type_Aspect_LAYER` file-split pattern) — `IO_MIGRATION_SPEC.md` §1 already confirms
   the migration-unit naming is an instance of this existing law, not a new exception.
 
 ## Why this ticket stops short of the schema cutover

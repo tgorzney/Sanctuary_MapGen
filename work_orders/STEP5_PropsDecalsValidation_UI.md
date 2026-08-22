@@ -34,7 +34,7 @@ silently block.
 - `src/io/MapExporter_IO.h` — `BlueprintValidationReport` struct declaration; `ExportSanmapOnly`/
   `ExportAll` gain a trailing `const SanpackReader* assetPack = nullptr` parameter; declare
   `ValidatePropAndDecalBlueprintPaths`. **File-size ceiling warning (ARCH Expert flag):** this
-  file is already 142 lines against ARCH §1.5's soft-100/hard-150 ceiling before this ticket's
+  file is already 142 lines against ARCH_01_05_FileSizeCeilings.md §1.5's soft-100/hard-150 ceiling before this ticket's
   additions. If the new struct + declarations + an updated SCOPE NOTE 1 push it past 150, trim
   SCOPE NOTE 1's prose rather than silently drifting over — or take the §1.5 documented-exception
   path if a trim genuinely isn't enough. Do not discover this mid-edit; check line count as you go.

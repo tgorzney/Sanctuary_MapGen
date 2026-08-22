@@ -13,7 +13,7 @@ has an inverse, and no function composes them:
 2. **Region-local screen -> preview-pixel:** `MapCanvasView::ResolvePreviewPixel()`
    (`src/ui/MapCanvasView_UI.h:77-91`), public, pure, imgui-free.
 
-ARCH §14's overlay redesign needs the **composition of both, in both directions**:
+ARCH_14_PreviewOverlayLayering.md §14's overlay redesign needs the **composition of both, in both directions**:
 world -> screen (to place an icon) and screen -> world (to pick one, STEP48). Building that
 composition without extracting shared functions first would create a second copy of each mapping
 — exactly the class of drift `SpatialGrid_DATA.h`'s own header already warns against
@@ -82,7 +82,7 @@ struct PreviewPixelPoint  { float pixelX = 0.0f; float pixelY = 0.0f; };
 
 // World (positionX/positionZ — the horizontal plane; positionY is height, PlacementInstance_DATA)
 // -> preview pixel. The exact mapping BuildEntityPoints already bakes marks through; extracted so
-// there is exactly one copy (ARCH §8.3's "one copy" principle, same class of rule as
+// there is exactly one copy (ARCH_08_03_SpatialGridVsSpacingGrid.md §8.3's "one copy" principle, same class of rule as
 // Data::SpatialGrid::CellIndexAt).
 PreviewPixelPoint WorldToPreviewPixel(float worldX, float worldZ) const;
 // Inverse — preview pixel -> world. New; BuildEntityPoints never needed this direction, STEP48's

@@ -42,7 +42,7 @@ CPU only.
 - `SANMAP_FORMAT_SPEC.md` Correction 12 — binding, implement verbatim.
 - `MASKING_SPEC.md` §1.7 — the `bSlopeUseGlobal` mechanism this correction gives an IO home to
   (already shipped, Step 10 — this ticket does not touch the PROC/hash side again).
-- ARCH §7.1 — **no new C++ type.** Every field is already a member of the single `Params::Stratum`
+- ARCH_07_01_ParamsPerStratum.md §7.1 — **no new C++ type.** Every field is already a member of the single `Params::Stratum`
   (`soilPhysics` sub-struct + the 8 slope-gate fields directly on `Stratum`). This ticket is purely
   a new IO surface for fields that already have a PARAMS home — it must not invent a rival
   per-stratum settings type or a rival top-level array.
@@ -72,7 +72,7 @@ StratumGenerationSettings: [ 9 × {
 ```
 Casing: PascalCase, `b`-prefix dropped — matches this section's own established convention
 (`GeneralMapSettings`, the legacy `BuildStratumJson`'s own keys) — this is a SanGen-owned array's
-internal field spelling, unconstrained by ARCH §1.6 (which governs top-level KEYS and format-native
+internal field spelling, unconstrained by ARCH_01_06_SanmapKeyCasing.md §1.6 (which governs top-level KEYS and format-native
 COLLECTION MEMBERS, not a SanGen section's own internal shape).
 
 **Cardinality:** always write exactly `sanmapStratumCount` entries (the shared constant,
