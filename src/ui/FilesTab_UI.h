@@ -21,10 +21,12 @@
 //     With no destination bound the recipe still loads; the textures are simply skipped.
 #pragma once
 #include "ConfirmDialog_UI.h"
+#include "MigrationReconciliationDialog_UI.h"
 #include "Section_UI.h"
 #include "../io/MapExporter_IO.h"
 #include "../io/MapImporter_IO.h"
 #include <string>
+#include <vector>
 
 namespace SanmapGen {
 namespace Data { class MapFields; }
@@ -101,6 +103,14 @@ struct FilesTabState {
     FilesTabAction      pendingConfirmAction  = FilesTabAction::ExportSanmapOnly;
     bool                bConfirmActionPending = false;
     std::string         confirmDialogBodyText;
+
+    // STEP26B: the "Check for Migrations..." dialog's own state — a DIFFERENT payload shape from the
+    // blueprintPath confirm block above, so a parallel field, never folded into it.
+    // `bLastOpenHadNoVersionMarker` mirrors the last Open's MapImportResult::bNoVersionMarkerFound
+    // (set in RunOpenSanmap) and gates the button that opens the dialog: post-load review, never a
+    // load gate (ruling 1).
+    MigrationReconciliationDialogState migrationDialogState;
+    bool bLastOpenHadNoVersionMarker = false;
 };
 
 // Appends one block to the log and holds it inside its budget by dropping WHOLE lines off the
@@ -129,6 +139,21 @@ inline void AppendFilesTabLog(FilesTabState& state, const std::string& text) {
 // FilesTab_Actions_UI.cpp — headless: no imgui frame, no window, no GL context.
 bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapRecipe& recipe,
                        Data::MapFields* fields, bool bBlueprintValidationAcknowledged = false);
+
+// STEP26B: the "Check for Migrations..." button's action (ruling 1) — a fresh, read-only re-derive
+// of `state.sanmapPath` into a preview report, copied into `state.migrationDialogState` with
+// `bOpenRequested` set. Never mutates the document, never touches `recipe`. Headless
+// (FilesTab_MigrationImport_Actions_UI.cpp).
+bool RunCheckForMigrations(FilesTabState& state);
+
+// The dialog's "Apply Selected" action: re-derives the document from `state.sanmapPath` (a fresh
+// read, independent of Open), applies `selectedMigrationNames` via
+// `Io::ApplySelectedSanmapMigrations`, then re-parses with `Io::MapImporter::ParseSanmapJsonText` —
+// that fresh result REPLACES `recipe`/`fields`'s baked textures/`state.unknownImportData` entirely,
+// never merged with what Open already produced. Headless (FilesTab_MigrationImport_Actions_UI.cpp).
+bool RunSelectiveMigrationImport(FilesTabState& state, Params::MapRecipe& recipe,
+                                 Data::MapFields* fields,
+                                 const std::vector<std::string>& selectedMigrationNames);
 
 // Draws the tab. Every pointer is nullable; the tab still edits its own state with nothing bound.
 void DrawFilesTab(Params::MapRecipe& recipe, FilesTabState& state, Data::MapFields* fields,

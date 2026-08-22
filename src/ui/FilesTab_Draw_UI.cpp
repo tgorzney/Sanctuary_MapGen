@@ -7,6 +7,7 @@
 // never changes.
 #include "FilesTab_UI.h"
 #include "FilesTab_Browse_UI.h"
+#include "FilesTab_MigrationDialog_Draw_UI.h"
 #include "Checkbox_UI.h"
 #include "ConfirmDialog_UI.h"
 #include "TextInput_UI.h"
@@ -90,6 +91,12 @@ void DrawOpenSection(FilesTabState& state, Params::MapRecipe& recipe, Data::MapF
         const bool bSucceeded = RunFilesTabAction(FilesTabAction::OpenSanmap, state, recipe, fields);
         if (bSucceeded && previewDriver != nullptr) previewDriver->RequestMapUpdate();
     }
+    // STEP26B ruling 1: only a completed Open that found no version marker at all may offer this —
+    // the dialog is a post-load review, never a load gate.
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!state.bLastOpenHadNoVersionMarker);
+    if (ImGui::Button("Check for Migrations...")) RunCheckForMigrations(state);
+    ImGui::EndDisabled();
     ImGui::Separator();
     DrawFilesTabPathRow("SupCom Save Lua", FilesTabBrowseKind::SupComLuaDocument, state.supComLuaPath);
     DrawActionButton(FilesTabAction::ImportSupComLua, state, recipe, fields, previewDriver);
@@ -149,6 +156,8 @@ void DrawFilesTab(Params::MapRecipe& recipe, FilesTabState& state, Data::MapFiel
     // Unconditional (Files-tab flow item 4): a warning triggered from inside the (possibly now
     // collapsed) Export section must still get its popup frame every frame it might be open.
     DrawPendingBlueprintWarningDialog(state, recipe, fields);
+    // Same unconditional posture (STEP26B) — the reconciliation dialog's own popup.
+    DrawFilesTabMigrationReconciliationDialog(state, recipe, fields, previewDriver);
     ImGui::PopID();
 }
 
