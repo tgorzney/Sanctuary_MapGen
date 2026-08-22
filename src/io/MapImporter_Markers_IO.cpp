@@ -76,9 +76,15 @@ void ReadMarkerTransformJson(const nlohmann::json& json, Params::MarkerTransform
 // INSTANCE while walking `transforms` — different instances in the same file can carry different
 // out-of-range values, so this cannot be a single file-scope check. Identical shape to
 // `ClampPropLayerIndex` (`MapImporter_Props_IO.cpp`).
+// ARCH_12_ManualPropDecalLayers.md: "a missing layerIndex key on an older/foreign file degrades for
+// free to 0 (the field's own default)" — 0 is therefore never out-of-range, even against zero
+// declared `MarkerGroups` entries (every hand-authored/legacy `markers` group with no manual layers
+// at all defaults every transform's layerIndex to 0). Only a genuinely out-of-range POSITIVE or
+// negative value clamps and warns.
 void ClampMarkerLayerIndex(Params::MarkerTransform& markerTransform, std::size_t markerLayerCount,
                            MapImportResult& result) {
-    if (markerTransform.layerIndex >= 0
+    if (markerTransform.layerIndex == 0) return;
+    if (markerTransform.layerIndex > 0
         && static_cast<std::size_t>(markerTransform.layerIndex) < markerLayerCount)
         return;
     result.Warn("Marker transform layerIndex " + std::to_string(markerTransform.layerIndex)

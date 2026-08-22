@@ -662,11 +662,13 @@
     "areas": {},
     "armies": {},
     "markers": {},
+    "MarkerGroups": [],
     "chains": {},
     "decals": [],
     "props": [
         {
             "blueprintPath": "Environment/Rocks/rock01.sanmodel",
+            "Reclaimable": false,
             "transforms": [
                 {
                     "position": {
@@ -692,6 +694,32 @@
     ],
     "PropGroups": [],
     "DecalGroups": [],
+    "Scenarios": {
+        "PatternScenarios": [],
+        "CountScenarios": [],
+        "DefaultScenario": {
+            "Name": "",
+            "Area": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 0.0,
+                "height": 0.0
+            },
+            "Navy": false,
+            "AlloyMode": "occupancy",
+            "Spawns": [],
+            "Alloys": [],
+            "AlloysToAdd": [],
+            "AlloysToRemove": [],
+            "AuthoringNote": "",
+            "NavalFleet": {
+                "Fleet": [],
+                "PondSideByArmy": [],
+                "SideBiasDistance": 90.0
+            }
+        },
+        "MaxArmySlotCount": 16
+    },
     "MarkersStack": [],
     "PropsStack": [],
     "DecalsStack": [],
