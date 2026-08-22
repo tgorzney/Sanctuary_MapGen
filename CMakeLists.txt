@@ -476,6 +476,9 @@ add_sangen_test(PlacementRuleSections_UI_Test src/ui/PlacementRuleSections_UI_Te
 # tab binary spans two (main() in FilesTab_UI_Test.cpp): tab state, then the Export All -> Open
 # Sanmap round trip through a scratch folder. All headless — no imgui frame, no window, no GL.
 add_sangen_test(FileDialog_IO_Test        src/io/FileDialog_IO_Test.cpp)
+# LuaTableWriter_IO — the generic Lua-literal rendering toolkit (STEP63), the Lua-text twin of
+# JsonPrimitives_IO. Pure string-building; no JSON type in sight, so no nlohmann link is needed.
+add_sangen_test(LuaTableWriter_IO_Test    src/io/LuaTableWriter_IO_Test.cpp)
 add_sangen_test(MapExporter_IO_Test       src/io/MapExporter_IO_Test.cpp)
 # This test parses the exported document's raw JSON text itself (the Vector4/int-shape acceptance
 # checks, STEP1_ShippingBugFixes), so it needs nlohmann's headers directly — unlike every other
