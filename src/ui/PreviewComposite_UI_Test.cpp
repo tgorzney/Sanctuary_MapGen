@@ -136,6 +136,33 @@ void TestSlopeLayerSamplesTheBakedField() {
     check(ChannelNear(composite.CompositeTexels()[0], 0, 0.25f), "the layer samples the live bake");
 }
 
+// STEP47: WorldToPreviewPixel / PreviewPixelToWorld are exact inverses once baked
+// (PixelsPerPreviewCell() > 0), and PreviewPixelToWorld degrades to (0,0) rather than dividing by
+// zero before the first bake — the same discipline ResolvePreviewPixel's bInsideImage requires.
+void TestWorldPreviewPixelRoundTrip() {
+    Ui::PreviewTestScene scene;
+    Ui::BuildPreviewTestScene(scene);
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+                                   scene.instances, scene.entityIdentifiers);
+    check(composite.PixelsPerPreviewCell() == 0.0f,
+          "an un-composed composite has not baked a cell scale yet");
+    const Ui::PreviewComposite::PreviewWorldPoint unbaked = composite.PreviewPixelToWorld(3.0f, 5.0f);
+    check(unbaked.worldX == 0.0f && unbaked.worldZ == 0.0f,
+          "picking on an unbaked composite answers (0,0) instead of dividing by zero");
+
+    Ui::ConfigurePreviewSettings(composite.Settings());
+    composite.Compose();
+    check(composite.PixelsPerPreviewCell() > 0.0f, "a composed composite has a positive cell scale");
+    const Ui::PreviewComposite::PreviewPixelPoint pixel = composite.WorldToPreviewPixel(2.0f, 3.0f);
+    const Ui::PreviewComposite::PreviewWorldPoint world =
+        composite.PreviewPixelToWorld(pixel.pixelX, pixel.pixelY);
+    const float differenceX = world.worldX - 2.0f;
+    const float differenceZ = world.worldZ - 3.0f;
+    check((differenceX < 0.001f && differenceX > -0.001f)
+       && (differenceZ < 0.001f && differenceZ > -0.001f),
+          "world -> preview pixel -> world is an exact round trip once baked");
+}
+
 } // namespace
 
 int main() {
@@ -144,6 +171,7 @@ int main() {
     TestPassOrderingAndClear();
     TestResolutionIsTweakable();
     TestSlopeLayerSamplesTheBakedField();
+    TestWorldPreviewPixelRoundTrip();
     if (Ui::previewTestFailureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", Ui::previewTestFailureCount);
     return 1;

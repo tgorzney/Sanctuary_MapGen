@@ -73,6 +73,36 @@ void PreviewComposite::BuildLayerConfigurations() {
     configuration.layerCount = static_cast<int>(layerConfigurations.size());
 }
 
+// Preview pixels per one world-space "cell" of the baked field grid. Zero if no field grid is
+// baked yet (mirrors Resolution()'s own zero-when-unbaked contract).
+float PreviewComposite::PixelsPerPreviewCell() const {
+    const int vertexSize = mapFields.VertexSize();
+    if (vertexSize < 2) return 0.0f;
+    return static_cast<float>(configuration.previewResolution) / static_cast<float>(vertexSize - 1);
+}
+
+// World (positionX/positionZ) -> preview pixel. The exact mapping BuildEntityPoints bakes marks
+// through; extracted so there is exactly one copy.
+PreviewComposite::PreviewPixelPoint PreviewComposite::WorldToPreviewPixel(float worldX, float worldZ) const {
+    const float cellsPerWorldUnit = ReciprocalOrZero(settings.worldUnitsPerCell);
+    const float pixelsPerCell = PixelsPerPreviewCell();
+    PreviewPixelPoint point;
+    point.pixelX = worldX * cellsPerWorldUnit * pixelsPerCell - 0.5f;
+    point.pixelY = worldZ * cellsPerWorldUnit * pixelsPerCell - 0.5f;
+    return point;
+}
+
+// Inverse — preview pixel -> world. See the header's contract note: answers (0,0) when the
+// composite has not baked yet (PixelsPerPreviewCell() == 0).
+PreviewComposite::PreviewWorldPoint PreviewComposite::PreviewPixelToWorld(float pixelX, float pixelY) const {
+    const float pixelsPerCell = PixelsPerPreviewCell();
+    const float cellReciprocal = ReciprocalOrZero(pixelsPerCell);
+    PreviewWorldPoint point;
+    point.worldX = (pixelX + 0.5f) * settings.worldUnitsPerCell * cellReciprocal;
+    point.worldZ = (pixelY + 0.5f) * settings.worldUnitsPerCell * cellReciprocal;
+    return point;
+}
+
 // The resolved instances Placement accepted, mapped onto preview pixels. The mark is DRAWN, it
 // is never re-tested against a placement rule (ARCH §3.2, the legacy SSBO-6 rule re-filter):
 // a marker the bake rejected is simply not in this array, so it cannot paint here.
@@ -80,17 +110,15 @@ void PreviewComposite::BuildLayerConfigurations() {
 void PreviewComposite::BuildEntityPoints() {
     entityPoints.clear();
     configuration.entityCount = 0;
-    const int vertexSize = mapFields.VertexSize();
-    if (!settings.bEntitiesEnabled || vertexSize < 2 || instances.IsEmpty()) return;
-    const float cellsPerWorldUnit = ReciprocalOrZero(settings.worldUnitsPerCell);
-    const float pixelsPerCell = static_cast<float>(configuration.previewResolution)
-                              / static_cast<float>(vertexSize - 1);
+    if (!settings.bEntitiesEnabled || PixelsPerPreviewCell() <= 0.0f || instances.IsEmpty()) return;
     entityPoints.reserve(instances.Count());
     for (std::size_t instance = 0; instance < instances.Count(); ++instance) {
         PreviewEntityPoint point;
         // positionY is height; the horizontal plane is X/Z (PlacementInstance_DATA).
-        point.pixelX = instances.positionX[instance] * cellsPerWorldUnit * pixelsPerCell - 0.5f;
-        point.pixelY = instances.positionZ[instance] * cellsPerWorldUnit * pixelsPerCell - 0.5f;
+        const PreviewPixelPoint pixel = WorldToPreviewPixel(instances.positionX[instance],
+                                                             instances.positionZ[instance]);
+        point.pixelX = pixel.pixelX;
+        point.pixelY = pixel.pixelY;
         point.entityIdentifier = static_cast<unsigned int>(instance);
         entityPoints.push_back(point);
     }

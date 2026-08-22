@@ -19,6 +19,10 @@ struct PreviewPixelCoordinate {
     bool bInsideImage = false;
 };
 
+// A point in region-local screen space (screen pixels from the region's top-left corner) — the
+// inverse-direction counterpart of PreviewPixelCoordinate.
+struct RegionLocalPoint { float regionLocalX = 0.0f; float regionLocalY = 0.0f; };
+
 // The visible window of the image in normalized texture coordinates — the low/high corner an
 // image draw takes. At zoom 1 it is the whole image.
 struct MapCanvasTextureWindow {
@@ -90,10 +94,30 @@ public:
         return resolved;
     }
 
+    // Preview pixel -> region-local point (inverse of ResolvePreviewPixel). Degenerate view state
+    // (non-positive previewResolution/regionSidePixels/zoomScale) answers (0,0), mirroring
+    // ResolvePreviewPixel's own early-return-zeroed contract — callers must have valid state already.
+    RegionLocalPoint ProjectPreviewPixelToRegionLocal(float pixelX, float pixelY) const {
+        RegionLocalPoint point;
+        if (previewResolution <= 0 || regionSidePixels <= 0.0f) return point;
+        const float span = VisibleSpanPixels();
+        if (span <= 0.0f) return point;
+        const float spanReciprocal = 1.0f / span;
+        point.regionLocalX = regionSidePixels * (0.5f + (pixelX - viewCenterPixelX) * spanReciprocal);
+        point.regionLocalY = regionSidePixels * (0.5f + (pixelY - viewCenterPixelY) * spanReciprocal);
+        return point;
+    }
+
+    // Preview texels covered by one screen pixel at the current zoom/region size. Zero if
+    // regionSidePixels is not yet set (mirrors VisibleSpanPixels()'s own zero-when-unset contract).
+    float PreviewPixelsPerRegionPixel() const {
+        return regionSidePixels > 0.0f ? VisibleSpanPixels() / regionSidePixels : 0.0f;
+    }
+
     // A drag of the cursor moves the image WITH the cursor, so the window travels the other way.
     void PanByRegionPixels(float deltaRegionPixelsX, float deltaRegionPixelsY) {
         if (regionSidePixels <= 0.0f) return;
-        const float pixelsPerRegionPixel = VisibleSpanPixels() / regionSidePixels;
+        const float pixelsPerRegionPixel = PreviewPixelsPerRegionPixel();
         viewCenterPixelX -= deltaRegionPixelsX * pixelsPerRegionPixel;
         viewCenterPixelY -= deltaRegionPixelsY * pixelsPerRegionPixel;
         ClampViewCenter();
