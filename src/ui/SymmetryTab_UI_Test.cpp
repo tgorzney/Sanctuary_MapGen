@@ -95,7 +95,7 @@ void RunMirrorChecks() {
     const int strayBit = 1 << 20;
     recipe.globalSymmetryMask = Params::SymmetryAxis::MirrorAcrossX | strayBit;
     Check(ResolvedPlacementSymmetryMask(recipe.globalSymmetryMask) == Params::SymmetryAxis::MirrorAcrossX,
-          "a stray bit outside the four real axes is dropped by the repair");
+          "a stray bit outside the five real axes is dropped by the repair");
 }
 
 // The two settings this work-order promoted into Symmetry_PARAMS.h.

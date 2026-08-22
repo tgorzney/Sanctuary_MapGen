@@ -24,7 +24,7 @@ void DrawPlacementSymmetryAxes(const char* label, bool& bSymmetryUseGlobal, int&
     ImGui::PopID();
 }
 
-// Four independent tick boxes over the real bit mask. The mask is REPAIRED on the way in, so a
+// Five independent tick boxes over the real bit mask. The mask is REPAIRED on the way in, so a
 // bit no v2 axis owns is dropped the moment the row is drawn rather than at the next click
 // (Constitution §6) — for every caller, not just the per-rule override.
 void DrawIndependentSymmetryAxes(int& symmetryMask, Pipeline::PreviewDriver* previewDriver) {

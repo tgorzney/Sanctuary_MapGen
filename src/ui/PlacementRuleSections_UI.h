@@ -20,14 +20,15 @@ namespace SanmapGen {
 namespace Pipeline { class PreviewDriver; }
 namespace Ui {
 
-// v1 offered five EXCLUSIVE symmetry choices (Point/X/Z/XY/Radial); v2's Params::SymmetryAxis is
-// an OR-able flag set in which "XY" is simply MirrorAcrossX|MirrorAcrossZ, so the five collapse
-// onto four independent bits. Independent tick boxes are drawn rather than Checkbox_UI's
-// exclusive row: an exclusive row cannot express X|Z, and dropping a combination a recipe already
-// holds would be a widget overruling PARAMS.
-enum : int { kPlacementSymmetryAxisCount = 4 };
+// v2's Params::SymmetryAxis is an OR-able flag set of five real bits (MirrorAcrossX,
+// MirrorAcrossZ, RotateHalfTurn, QuarterTurns, Radial). Independent tick boxes are drawn rather
+// than Checkbox_UI's exclusive row: an exclusive row cannot express e.g. X|Z, and dropping a
+// combination a recipe already holds would be a widget overruling PARAMS. Radial's companion
+// count field, `radialSymmetryRepeatCount`, is NOT drawn by this file — a real, separately
+// tracked gap (STEP95 "Explicit out-of-scope"), not an oversight of this table.
+enum : int { kPlacementSymmetryAxisCount = 5 };
 inline const char* const placementSymmetryAxisLabels[kPlacementSymmetryAxisCount] = {
-    "Mirror X", "Mirror Z", "Half Turn", "Quarter Turns"
+    "Mirror X", "Mirror Z", "Half Turn", "Quarter Turns", "Radial"
 };
 
 inline int PlacementSymmetryAxisBit(int axisIndex) {
@@ -36,6 +37,7 @@ inline int PlacementSymmetryAxisBit(int axisIndex) {
         case 1:  return Params::SymmetryAxis::MirrorAcrossZ;
         case 2:  return Params::SymmetryAxis::RotateHalfTurn;
         case 3:  return Params::SymmetryAxis::QuarterTurns;
+        case 4:  return Params::SymmetryAxis::Radial;
         default: return Params::SymmetryAxis::None;
     }
 }
@@ -111,7 +113,7 @@ void NotifyPlacementChange(bool bCommitted, Pipeline::PreviewDriver* previewDriv
 
 void DrawPlacementSymmetryAxes(const char* label, bool& bSymmetryUseGlobal, int& symmetryMask,
                                Pipeline::PreviewDriver* previewDriver);
-// Four independent tick boxes over the real bit mask — no "Use Global" wrapper, for callers
+// Five independent tick boxes over the real bit mask — no "Use Global" wrapper, for callers
 // that ARE the global setting itself (unlike DrawPlacementSymmetryAxes's per-rule override use).
 // The mask is REPAIRED (Constitution §6) before the boxes are drawn, so both this function and
 // DrawPlacementSymmetryAxes give a hand-edited or otherwise-arrived-at mask identical treatment.

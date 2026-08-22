@@ -58,6 +58,15 @@ void RunSymmetryRepairChecks() {
           "and a bit no axis owns is dropped");
     Check(ResolvedPlacementSymmetryMask(strayBit) == Params::SymmetryAxis::None,
           "a mask of nothing but stray bits repairs to no symmetry at all");
+
+    // STEP95 regression: the repair table used to omit Radial (the fifth bit), so the repair
+    // silently cleared it from every mask that carried it. It must now survive intact, alone and
+    // combined with another axis.
+    Check(ResolvedPlacementSymmetryMask(Params::SymmetryAxis::Radial) == Params::SymmetryAxis::Radial,
+          "STEP95 regression: Radial alone survives the repair unchanged");
+    const int radialCombinedMask = Params::SymmetryAxis::Radial | Params::SymmetryAxis::MirrorAcrossX;
+    Check(ResolvedPlacementSymmetryMask(radialCombinedMask) == radialCombinedMask,
+          "STEP95 regression: Radial | MirrorAcrossX survives the repair unchanged");
 }
 
 // The transform mirrors. The PARAMS default is a scale band of exactly 1..1 ("no random scale"),
