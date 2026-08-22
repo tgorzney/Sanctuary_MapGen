@@ -20,6 +20,12 @@
 // functions STEP40B-E already shipped and individually tested, and bumped this constant from 2 to
 // 3 to match. A `.sanmap` at version 2 now genuinely walks forward on import; a document already at
 // 3 is an unaffected zero-step passthrough (`Sanmap_MigrationRunner_IO.cpp` §4.2).
+//
+// `kCurrentSanGenVersion = 4` — STEP67 added the V3->V4 step (sourceVersion 3), wiring in
+// `MarkersStack_Migrate_V3` (the flat-array -> two-level `MarkerRuleLayer` reshape STEP66's new
+// importer/exporter expect), and bumped this constant from 3 to 4 to match. A `.sanmap` at version
+// 3 now walks forward one more step on import; a document already at 4 is an unaffected zero-step
+// passthrough.
 #pragma once
 #include <nlohmann/json.hpp>
 #include <vector>
@@ -27,7 +33,7 @@
 namespace SanmapGen {
 namespace Io {
 
-inline constexpr int kCurrentSanGenVersion = 3;
+inline constexpr int kCurrentSanGenVersion = 4;
 
 // One free function per migration file, operating on the WHOLE parsed document in place
 // (IO_MIGRATION_SPEC.md §2 — cross-domain compensation needs the whole document, not a fragment).

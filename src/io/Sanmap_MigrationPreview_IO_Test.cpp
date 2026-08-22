@@ -16,8 +16,10 @@
 //      "Verify" summary ("leaves every OTHER migration's target key absent") is imprecise shorthand
 //      against that more specific, twice-stated rule; this test asserts the actual, spec-correct
 //      behavior rather than the loosely-worded paraphrase.
-//  (3) ApplySelectedSanmapMigrations with every one of the 9 names selected: SanGenVersion == 3, every
-//      target key present, and the shared legacy blob is deleted (full-step application).
+//  (3) ApplySelectedSanmapMigrations with every one of the manifest's names selected (all 9
+//      sourceVersion-2 entries plus STEP67's sourceVersion-3 MarkersStack_Migrate_V3): SanGenVersion
+//      == kCurrentSanGenVersion, every target key present, and the shared legacy blob is deleted
+//      (full-step application).
 #include "Sanmap_MigrationPreview_IO.h"
 #include "Sanmap_MigrationManifest_IO.h"
 #include "MapImporter_IO.h"
@@ -126,11 +128,16 @@ void CheckSelectiveApplyOfAllNineIsFull() {
         "DetailNormal_Migrate_V2", "Flow_Migrate_V2", "GlobalMarkerSettings_Migrate_V2",
         "SlopeDefaults_Migrate_V2", "StratumGenerationSettings_Migrate_V2",
         "EntityCollections_Migrate_V2",
+        // STEP67: the sourceVersion-3 step's one entry — without it selected too, the walk stops
+        // after sourceVersion 2 (NoneSelected at sourceVersion 3) and never reaches
+        // kCurrentSanGenVersion, since a "full" selection must cover every step the live manifest
+        // now defines, not just the original 9.
+        "MarkersStack_Migrate_V3",
     };
     Io::ApplySelectedSanmapMigrations(document, allNames, result);
 
     Check(document.contains("SanGenVersion") && document["SanGenVersion"] == Io::kCurrentSanGenVersion,
-          "a full selection stamps SanGenVersion == kCurrentSanGenVersion (3)");
+          "a full selection stamps SanGenVersion == kCurrentSanGenVersion");
     Check(document.contains("GeneralMapSettings") && document.contains("Symmetry")
           && document.contains("Accumulation") && document.contains("DetailNormal")
           && document.contains("Flow") && document.contains("GlobalMarkerSettings")

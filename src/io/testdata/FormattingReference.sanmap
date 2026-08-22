@@ -1,7 +1,7 @@
 {
     "fileVersion": 3,
     "mapVersion": 1,
-    "SanGenVersion": 3,
+    "SanGenVersion": 4,
     "name": "FormattingReferenceMap",
     "credits": "SanGen Test Fixture",
     "width": 2048,

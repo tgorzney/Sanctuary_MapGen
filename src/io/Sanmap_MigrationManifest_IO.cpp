@@ -23,6 +23,7 @@
 #include "SlopeDefaults_Migrate_V2_IO.h"
 #include "StratumGenerationSettings_Migrate_V2_IO.h"
 #include "EntityCollections_Migrate_V2_IO.h"
+#include "MarkersStack_Migrate_V3_IO.h"
 
 namespace SanmapGen {
 namespace Io {
@@ -81,6 +82,24 @@ const std::vector<MigrationStep>& SanmapMigrationManifest() {
                     /*bLosslessIfSkipped=*/ false },
             },
             /*legacyKeysToDelete=*/ { "mapGeneratorData", "MapGeneratorDataVersion", "mapGeneratorDataVersion" }
+        },
+        // STEP67: the V3->V4 step. `MarkersStack` reshapes in place (flat array -> two-level
+        // `MarkerRuleLayer`); nothing moves to a different top-level key, so `legacyKeysToDelete`
+        // stays empty.
+        MigrationStep{
+            /*sourceVersion=*/ 3,
+            /*migrations=*/ {
+                MigrationEntry{ MarkersStack_Migrate_V3, "MarkersStack_Migrate_V3",
+                    "Groups the flat MarkersStack rule array into MarkerRuleLayer objects by "
+                    "contiguous shared symmetry triplet, moving each group's SymmetryUseGlobal/"
+                    "SymmetryMask/RadialSymmetryRepeatCount up onto the layer.",
+                    /*bIndependentlySelectable=*/ true,
+                    // bLosslessIfSkipped = false: reshapes real, load-bearing per-rule fields (the
+                    // symmetry triplet) with no fallback reader for the old flat shape once STEP66's
+                    // importer expects the layer-wrapped one.
+                    /*bLosslessIfSkipped=*/ false },
+            },
+            /*legacyKeysToDelete=*/ {}
         }
     };
     return manifest;

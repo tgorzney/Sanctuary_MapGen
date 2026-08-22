@@ -654,6 +654,11 @@ add_sangen_test(Accumulation_Migrate_V2_IO_Test src/io/Accumulation_Migrate_V2_I
 target_link_libraries(Accumulation_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 add_sangen_test(DetailNormal_Migrate_V2_IO_Test src/io/DetailNormal_Migrate_V2_IO_Test.cpp)
 target_link_libraries(DetailNormal_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+# STEP67_MarkersStackSymmetryMigration_IO: the V3->V4 MarkersStack reshape migration. Same
+# glob'd-into-SANGEN_V2_SOURCES / direct-fixture-construction reasoning as the STEP40B/C migrations
+# above — only the _Test.cpp is listed here.
+add_sangen_test(MarkersStack_Migrate_V3_IO_Test src/io/MarkersStack_Migrate_V3_IO_Test.cpp)
+target_link_libraries(MarkersStack_Migrate_V3_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 
 # STEP76_ArmyIdentityNaming_IO: the machine-owned ARMY_XX identity helper (pure, headless — no
 # nlohmann needed) and its import-side normalizer, which constructs nlohmann::json document fixtures
