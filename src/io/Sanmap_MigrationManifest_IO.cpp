@@ -5,6 +5,14 @@
 // `StratumGenerationSettings_Migrate_V2` — both share their read source
 // (`mapGeneratorData.Stratums[]`) and write destination (`StratumGenerationSettings[i]`); see
 // either migration's own header for the additive-write discipline that ordering protects.
+//
+// STEP26A: `bLosslessIfSkipped` audited for all 9 shipped migrations against the real reader
+// architecture (`MapImporter_IO.h`, `MapImporter_ParseDocument_IO.cpp`) — block readers are
+// current-shape-only by law; only Geometry/Water/StrataSettings have a legacy-`mapGeneratorData`-
+// gated fallback reader, and none of these 9 migrations target those three domains, so only a
+// migration that relocates NOTHING (pure key-reservation) can honestly claim `true`. Only
+// `Accumulation_Migrate_V2` qualifies. Each `false` declaration below carries its own one-line
+// reason, per this same audit.
 #include "Sanmap_MigrationManifest_IO.h"
 #include "GeneralMapSettings_Migrate_V2_IO.h"
 #include "Symmetry_Migrate_V2_IO.h"
@@ -26,32 +34,51 @@ const std::vector<MigrationStep>& SanmapMigrationManifest() {
             /*migrations=*/ {
                 MigrationEntry{ GeneralMapSettings_Migrate_V2, "GeneralMapSettings_Migrate_V2",
                     "Relocates Seed/ScaleFeaturesToMapSize/TerrainMinHeight/WorldUnitsPerCell out of "
-                    "mapGeneratorData into GeneralMapSettings.", /*bIndependentlySelectable=*/ true },
+                    "mapGeneratorData into GeneralMapSettings.", /*bIndependentlySelectable=*/ true,
+                    // bLosslessIfSkipped = false: relocates real fields, no fallback reader.
+                    /*bLosslessIfSkipped=*/ false },
                 MigrationEntry{ Symmetry_Migrate_V2, "Symmetry_Migrate_V2",
                     "Relocates the 9 legacy global symmetry scalars out of mapGeneratorData into "
-                    "Symmetry.", /*bIndependentlySelectable=*/ true },
+                    "Symmetry.", /*bIndependentlySelectable=*/ true,
+                    // bLosslessIfSkipped = false: relocates real fields, no fallback reader for Symmetry.
+                    /*bLosslessIfSkipped=*/ false },
                 MigrationEntry{ Accumulation_Migrate_V2, "Accumulation_Migrate_V2",
-                    "Reserves the empty Accumulation top-level key.", /*bIndependentlySelectable=*/ true },
+                    "Reserves the empty Accumulation top-level key.", /*bIndependentlySelectable=*/ true,
+                    // bLosslessIfSkipped = true: pure key reservation — nothing to relocate.
+                    /*bLosslessIfSkipped=*/ true },
                 MigrationEntry{ DetailNormal_Migrate_V2, "DetailNormal_Migrate_V2",
                     "Relocates DetailNormalMapSize out of mapGeneratorData into DetailNormal.",
-                    /*bIndependentlySelectable=*/ true },
+                    /*bIndependentlySelectable=*/ true,
+                    // bLosslessIfSkipped = false: relocates real fields, no fallback reader for
+                    // DetailNormal.
+                    /*bLosslessIfSkipped=*/ false },
                 MigrationEntry{ Flow_Migrate_V2, "Flow_Migrate_V2",
                     "Converts the legacy FlowMapColor array into the {r,g,b,a} object shape under "
-                    "Flow.", /*bIndependentlySelectable=*/ false },
+                    "Flow.", /*bIndependentlySelectable=*/ false,
+                    // bLosslessIfSkipped = false: relocates real fields, no fallback reader for Flow.
+                    /*bLosslessIfSkipped=*/ false },
                 MigrationEntry{ GlobalMarkerSettings_Migrate_V2, "GlobalMarkerSettings_Migrate_V2",
                     "Relocates the 9 legacy global marker fields (icons/colors/scales) into "
-                    "GlobalMarkerSettings.", /*bIndependentlySelectable=*/ false },
+                    "GlobalMarkerSettings.", /*bIndependentlySelectable=*/ false,
+                    // bLosslessIfSkipped = false: relocates real fields, no fallback reader.
+                    /*bLosslessIfSkipped=*/ false },
                 MigrationEntry{ SlopeDefaults_Migrate_V2, "SlopeDefaults_Migrate_V2",
                     "Synthesizes a global SlopeDefaults from each stratum's legacy slope-gate fields "
-                    "and sets each stratum's SlopeUseGlobal.", /*bIndependentlySelectable=*/ false },
+                    "and sets each stratum's SlopeUseGlobal.", /*bIndependentlySelectable=*/ false,
+                    // bLosslessIfSkipped = false: relocates real fields, no fallback reader.
+                    /*bLosslessIfSkipped=*/ false },
                 MigrationEntry{ StratumGenerationSettings_Migrate_V2, "StratumGenerationSettings_Migrate_V2",
                     "Relocates each stratum's legacy slope-gate fields verbatim into "
                     "StratumGenerationSettings, index-aligned and padded to 9.",
-                    /*bIndependentlySelectable=*/ false },
+                    /*bIndependentlySelectable=*/ false,
+                    // bLosslessIfSkipped = false: relocates real fields, no fallback reader.
+                    /*bLosslessIfSkipped=*/ false },
                 MigrationEntry{ EntityCollections_Migrate_V2, "EntityCollections_Migrate_V2",
                     "Converts each army's legacy Color array into armyColor, and folds the legacy "
                     "mapGeneratorData.Aliases dictionary into markers[].alias.",
-                    /*bIndependentlySelectable=*/ false },
+                    /*bIndependentlySelectable=*/ false,
+                    // bLosslessIfSkipped = false: relocates real fields, no fallback reader.
+                    /*bLosslessIfSkipped=*/ false },
             },
             /*legacyKeysToDelete=*/ { "mapGeneratorData", "MapGeneratorDataVersion", "mapGeneratorDataVersion" }
         }
