@@ -2,14 +2,14 @@
 // drives the tab's PURE logic — the rule<->widget mirrors, the enum mirrors, the label fallbacks,
 // the global scale rows and the placed-list selection fence — so the binary needs no imgui frame,
 // no window and no GL context, exactly like the M5-6 parameter-tab tests.
-// NOT YET REGISTERED IN CMake — WO C4 does not own CMakeLists.txt (gate CD-int registers it).
+// Owns main() and `Check`/`failureCount`, shared with the sibling TU MarkersTab_RuleLayers_UI_Test.cpp
+// (STEP80's two-level list acceptance) — ARCH §1.5's "one binary, split translation units", the same
+// pattern ParameterTabs_UI_Test.cpp's four files already use.
 #include "MarkersTab_UI.h"
 #include <cstdio>
 
 using namespace SanmapGen;
 using namespace SanmapGen::Ui;
-
-namespace {
 
 int failureCount = 0;
 
@@ -18,6 +18,10 @@ void Check(bool bCondition, const char* label) {
     std::printf("FAIL %s\n", label);
     ++failureCount;
 }
+
+void RunMarkerRuleLayerAcceptanceChecks();   // MarkersTab_RuleLayers_UI_Test.cpp
+
+namespace {
 
 // The mirrors are the whole contract between a range slider and PARAMS: a load followed by a store
 // must be the identity, and a store must report honestly whether the recipe actually moved —
@@ -114,6 +118,7 @@ int main() {
     RunPlanLimitChecks();
     RunEnumMirrorChecks();
     RunSelectionFenceChecks();
+    RunMarkerRuleLayerAcceptanceChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

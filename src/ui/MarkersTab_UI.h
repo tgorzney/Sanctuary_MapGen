@@ -1,8 +1,9 @@
 // MarkersTab_UI.h — the marker tab: the global section, the procedural rule stack, the
 // hand-authored manual roster, and the resolved placed-marker list. Layer: UI. Accuracy class:
-// Visual. Edits `recipe.markerRules` (the procedural rules) and `recipe.markers` (the manual
-// roster, STEP49, MarkersTab_Manual_UI.h); reads `recipe.armies` for the manual roster's Spawn
-// army picker. TAB_REBUILD_PLAN "§ Markers"; extended by tab-rebuild WO C4.
+// Visual. Edits `recipe.markerRuleLayers` (the procedural rules, STEP66/STEP80's two-level
+// MarkerRuleLayer/MarkerRule shape) and `recipe.markers` (the manual roster, STEP49,
+// MarkersTab_Manual_UI.h); reads `recipe.armies` for the manual roster's Spawn army picker.
+// TAB_REBUILD_PLAN "§ Markers"; extended by tab-rebuild WO C4.
 //
 // The three shared list widgets each do the job they exist for: the procedural rules are a
 // DraggableList (an ORDERED stack of tens of rows, every row a drop target), the placed markers
@@ -25,11 +26,13 @@
 //     — see that header, not this one, for the hand-authored roster's shape.
 //  3. The global section holds NO recipe content — see MarkersTab_Globals_UI.h.
 #pragma once
+#include "ConfirmDialog_UI.h"
 #include "IconGridWidget_UI.h"
 #include "LabelledDialWidget_UI.h"
 #include "MarkersTab_Globals_UI.h"
 #include "MarkersTab_Manual_UI.h"
 #include "MarkersTab_Placed_UI.h"
+#include "MarkersTab_RuleLayers_UI.h"
 #include "MarkersTab_Rules_UI.h"
 #include "RangeSliderWidget_UI.h"
 #include "../params/MarkerRule_PARAMS.h"
@@ -63,7 +66,15 @@ struct MarkersTabState {
     RealtimeToggle obstacleDistanceToggle;
 
     IconGridState iconGridState;
-    int   selectedRuleIndex = 0;
+    // STEP80: the two-level selection — which MarkerRuleLayer, then which MarkerRule inside it.
+    // `selectedRuleIndex` is the SAME field the pre-STEP80 flat stack used; it now means "within
+    // the selected layer" rather than "within the flat vector."
+    int   selectedRuleLayerIndex = 0;
+    int   selectedRuleIndex      = 0;
+    // The non-empty-layer Delete confirm's pending target (STEP80 §4): -1 when no delete is
+    // pending. Re-validated against the vector's current size before it is ever applied.
+    int   pendingDeleteRuleLayerIndex = -1;
+    ConfirmDialogState deleteRuleLayerConfirmState;
     float countValue        = 4.0f;        // int mirror
     RangeSliderValues slopeValues{ 0.0f, 89.9f };
     RangeSliderValues heightValues{ 0.0f, 1.0f };
@@ -107,8 +118,10 @@ inline bool StoreMarkerRuleValues(const MarkersTabState& state, Params::MarkerRu
     return bMoved;
 }
 
-// The rule the detail controls edit, or null when the selection points at nothing.
-Params::MarkerRule* SelectedMarkerRule(std::vector<Params::MarkerRule>& markerRules,
+// The rule the detail controls edit, or null when either index misses: an out-of-range layer, or
+// an in-range layer whose rule index misses (STEP80's two-index walk, mirroring `SelectedLayer`,
+// LayersTab_UI.cpp:120-127).
+Params::MarkerRule* SelectedMarkerRule(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
                                        const MarkersTabState& state);
 
 // `iconManifest` and `placedMarkers` are both nullable: with no resident atlas the picker degrades

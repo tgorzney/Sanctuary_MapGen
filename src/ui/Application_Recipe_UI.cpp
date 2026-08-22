@@ -52,6 +52,10 @@ void AddDefaultStrata(Params::MapRecipe& recipe) {
     recipe.strata[2].tintRed = 0.29f; recipe.strata[2].tintGreen = 0.44f; recipe.strata[2].tintBlue = 0.22f;
 }
 
+// STEP80 §5: the same spawn MarkerRule as before, now seeded inside one default MarkerRuleLayer
+// ("Spawn Layer") rather than pushed onto a flat vector. The layer's `symmetry` keeps
+// SymmetrySetting's defaults (bSymmetryUseGlobal = true) — identical effective behaviour to the
+// old rule-level default, so no default map changes shape.
 void AddDefaultPlacementRules(Params::MapRecipe& recipe) {
     Params::MarkerRule spawnRule;
     spawnRule.category         = Params::MarkerCategory::Spawn;
@@ -59,7 +63,10 @@ void AddDefaultPlacementRules(Params::MapRecipe& recipe) {
     spawnRule.clearanceSpacing = 24.0f;
     spawnRule.mapEdgePadding   = 12;
     spawnRule.bRandomSelection = true;
-    recipe.markerRules.push_back(spawnRule);
+    Params::MarkerRuleLayer spawnLayer;
+    spawnLayer.name = "Spawn Layer";
+    spawnLayer.rules.push_back(spawnRule);
+    recipe.markerRuleLayers.push_back(spawnLayer);
 
     Params::PropRule propRule;
     propRule.density        = 0.15f;
