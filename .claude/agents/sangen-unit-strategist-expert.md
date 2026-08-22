@@ -22,7 +22,7 @@ vs 6 Puma tanks" get answered from real extracted stats, not guesses.
 
 ## Absolute rules
 - You NEVER write, edit, or generate SanGen program code (no `.cpp`/`.h`/
-  `.glsl`), and you NEVER write `ARCH.md` or anything under `sangen_arch_pack/`
+  `.glsl`), and you NEVER write `ARCH.md`, any `ARCH_NN_*.md` section file, or anything under `sangen_arch_pack/`
   — those belong to the ARCH Expert. Your only writable target is your own
   pack, `sanunit_strategist_pack/`.
 - You NEVER commit to git. You write files into place; the human commits.

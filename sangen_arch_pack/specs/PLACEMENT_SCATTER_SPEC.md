@@ -46,6 +46,12 @@ CheckMaxRadius`, `AreaHeightRange` (variance tolerance). Quantity/selection:
 (`MarkerPriority: Priority_LargestArea/SmallestArea/LeastVariance`). Spatial
 weighting: `FocusGradient` (`Gradient_None/CenterFocus/EdgeFocus/Torus`) +
 `FocusGradientRadius/Strength/Contrast`. Symmetry: `SymmetryUseGlobal/SymmetryMask`.
+**Moved (ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15):** this symmetry triplet
+(`SymmetryUseGlobal`/`SymmetryMask`, plus `RadialSymmetryRepeatCount`) no longer
+lives on `MarkerRule` itself — it moved up one tier to the new `MarkerRuleLayer`
+wrapper (`MarkersStack`'s new Group tier, see the "IO wrapping" section below).
+`PropRule`/`DecalRule`/`UnitRule` are unaffected — they keep the triplet exactly
+as described in this paragraph.
 **No biome gate and no mask-texture gate** exist — filtering is height+slope+radial
 clearance only. `PropRule`: `Density, MinSlope/MaxSlope/MinHeight/MaxHeight,
 AvoidWater, NearCliffs`. `DecalRule`: same shape (but decals aren't previewed —
@@ -67,6 +73,14 @@ PropsStack   → Params::PropRule     (this page, "PropRule")
 DecalsStack  → Params::DecalRule    (this page, "DecalRule")
 UnitsStack   → Params::UnitRule     (NEW type — see below)
 ```
+**`MarkersStack` is no longer flat like the other three Stacks (ARCH §16,
+`SANMAP_FORMAT_SPEC` Correction 15).** It upgraded from the bare `Params::MarkerRule`
+array shown above to a one-tier Group(`MarkerRuleLayer`)→Rule(`MarkerRule`) wrapper —
+the first concrete slice of this section's own deferred Group/Layer hierarchy,
+scoped to exactly what layer-scoped marker symmetry needs. `PropsStack`/
+`DecalsStack`/`UnitsStack` remain the flat arrays described above; only
+`MarkersStack` changed shape. Full wire shape: `SANMAP_FORMAT_SPEC` Correction 15.
+
 Each of `MarkerRule`/`PropRule`/`DecalRule` gains a **`name`** field (author-facing
 identity, distinct from any format key) and, once the Group container design lands,
 Group membership — reserved by this correction, not built.
@@ -237,3 +251,32 @@ code read (`ScatterRule_PARAMS.h`, `Placement_Rules_PROC.cpp`,
 work-order — `DecalRule`'s `bSymmetryUseGlobal`/`symmetryMask` pair and its
 `AppendDecalRules` wiring, re-confirmed live by code read. **Defect 2 remains
 open.**
+
+## Layer-scoped marker symmetry (ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15)
+
+Ratified alongside the Markers Tab redesign: `Params::MarkerRule` loses its own
+per-rule `bSymmetryUseGlobal`/`symmetryMask`/`radialSymmetryRepeatCount` triplet;
+those three fields move up one tier onto the new `Params::MarkerRuleLayer` wrapper
+(a shared `Params::SymmetrySetting` struct, ARCH §16.1) that groups a named,
+enable/hide-able set of `MarkerRule`s (`MarkersStack`'s new Group tier — wire shape:
+`SANMAP_FORMAT_SPEC` Correction 15). `PropRule`/`DecalRule`/`UnitRule` are
+unaffected — the triplet stays exactly where "Rules — `MarkerRule`" and the "IO
+wrapping" section above describe it for those three types; only `MarkerRule` moved.
+
+`Params::MarkerInstanceLayer` (extends the earlier Gap 1 shape,
+`GAP_MarkerLayerAndSymmetry_PARAMS.md`) gets the same `SymmetrySetting` field for
+the manual/hand-placed marker layer side (`MarkerGroups`, `SANMAP_FORMAT_SPEC`
+Correction 16); `MarkerTransform` gains `symmetryGroupIdentifier` (spelled in full,
+not abbreviated — ARCH §16.5) alongside the already-carried `layerIndex`.
+
+The module-boundary question this ratification also settled — whether `UI` could
+reach PROC's `BuildSymmetryOrbit`/`ResolveSymmetryMask` directly — is resolved
+**without** relocating either function to MATH and **without** a new UI→PROC
+dependency exception: `PIPELINE` gains a narrow, explicitly-scoped stateless query
+passthrough (ARCH §3.3, §16.3) for this one case, not a general precedent for UI to
+reach into PROC.
+
+This is a genuine breaking `.sanmap` schema change on an already-shipped field
+family (`MarkerRule`'s symmetry triplet). Migration mechanics are the IO
+Architecture Expert's domain (ARCH §16.6), not ratified on this page.
+</content>

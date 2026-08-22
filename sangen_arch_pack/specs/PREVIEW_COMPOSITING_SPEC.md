@@ -160,7 +160,7 @@ full below.
 ## Overlay layering (v2, ARCH §14) — markers/armies/props/decals/reclaim are screen-space, not baked-texture
 
 **Ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`. Binding law; see
-`ARCH.md` §14 for the full ruling text and reasoning — this section is the
+`ARCH_14_PreviewOverlayLayering.md` §14 for the full ruling text and reasoning — this section is the
 implementation-facing summary a coder actually reaches for.** Supersedes the
 markers-only framing of the historical, superseded `DESIGN_MarkerPreviewLayering_R1.md`
 — do not consult R1 as current.
@@ -200,11 +200,11 @@ Sub-layer → data mapping, LOD icon rendering, the View-toolbar's two-section p
 the four dirty-flag tiers (A/B/C/C2), the mandatory perf requirements (bulk vertex
 writes, cross-layer budget + decimation, atlas page bucketing), the "Regenerate"
 retirement, the GPU-readback bug, and the determinism guardrail are all specified in
-full in `ARCH.md` §14.1–§14.11 — not duplicated here to avoid a second copy drifting
-out of sync. Read `ARCH.md` §14 alongside this section before implementing any part
+full in `ARCH_14_PreviewOverlayLayering.md` §14.1–§14.11 — not duplicated here to avoid a second copy drifting
+out of sync. Read `ARCH_14_PreviewOverlayLayering.md` §14 alongside this section before implementing any part
 of the overlay pipeline.
 
-### Open items — not settled by this ratification (`ARCH.md` §14.13)
+### Open items — not settled by this ratification (`ARCH_14_13_OpenItems.md` §14.13)
 1. Real world-footprint-size data source (placeholder-per-domain only, today).
 2. Cross-layer visible-vertex budget default and Tier B per-resolution costs — both
    are rough-estimate placeholders pending a real microbenchmark.
@@ -217,16 +217,16 @@ of the overlay pipeline.
    Needs both a stable id on the layer-metadata types and a new correlation column
    (or side table) on `Data::PlacementInstances`. Manual/authored decals additionally
    don't resolve into `results.decals` at all yet (separate from procedural Decals,
-   item 4). Full statement: `ARCH.md` §14.13 item 3.
+   item 4). Full statement: `ARCH_14_13_OpenItems.md` §14.13 item 3.
 4. ✅ **CLOSED.** Confirmed: procedural Decals route through `Data::PlacementInstances`
    exactly like Props/Units/Markers (`Data::PlacementResults::decals`, same SoA type,
    same `ruleIndex`/`category` columns) — the §14.9 CSR bucket scheme covers Decals
    with no special-case. Only the draw-pass consumer is still unbuilt. Full statement:
-   `ARCH.md` §14.13 item 4.
+   `ARCH_14_13_OpenItems.md` §14.13 item 4.
 5. ✅ **CLOSED.** `OverlayLayer_UI::blendMode` is retired; `opacity: float` replaces it
    (struct above). `Ui::PreviewBlendMode` is a GPU raster-compositing enum with no
    meaning for an icon-quad draw under ImGui's single global blend equation. Full
-   statement: `ARCH.md` §14.13 item 5.
+   statement: `ARCH_14_13_OpenItems.md` §14.13 item 5.
 
 Items 1 and 2 remain genuinely open, not resolved by this document's existence. Items
 3-5 above reflect their current (mixed open/closed) status; do not re-open 4 or 5

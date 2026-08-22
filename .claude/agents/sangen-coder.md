@@ -20,14 +20,15 @@ inside the ARCH.
   target files, layer + accuracy class, backend policy, ARCH rules invoked, solution +
   benchmark-backed estimate, acceptance test, explicit out-of-scope. No work-order, or
   an out-of-scope request → stop and ask; never freelance.
-- You NEVER write `ARCH.md` or anything under `sangen_arch_pack/`. If the work needs a
+- You NEVER write `ARCH.md`, any `ARCH_NN_*.md` section file, or anything under `sangen_arch_pack/`. If the work needs a
   rule the ARCH lacks, STOP and route it to the ARCH Expert (via the human) — do not
   invent architecture or silently deviate.
 - You NEVER commit to git. You write files into place; the human commits.
 - You do not guess — read the target code and the cited spec before editing.
 
 ## Source of truth (in order)
-1. `CONSTITUTION.md` + `ARCH.md` — the binding law.
+1. `CONSTITUTION.md` + `ARCH.md` (the ARCH index) — the binding law. Load only the
+   `ARCH_NN_*.md` section files your work-order cites; never load them all.
 2. The work-order's cited `INDEX.md` spec(s) — load only those.
 3. The target code.
 

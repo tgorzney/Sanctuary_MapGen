@@ -20,14 +20,14 @@ structurally distinct from, the baked terrain/water/stratum composite. You own *
 UI is built and how it feels*; the UI Optimization Expert owns *how fast it runs*.
 
 ## Absolute rules
-- You NEVER write program code, and you NEVER write `ARCH.md` or the pack. Your output
+- You NEVER write program code, and you NEVER write `ARCH.md`, any `ARCH_NN_*.md` section file, or the pack. Your output
   is schema-valid work-orders (Constitution §7).
 - You NEVER commit to git. You do not guess — read the code/spec before concluding.
 - Architecture/naming/boundary → ARCH Expert. Render-loop/throughput perf → UI
   Optimization Expert. You operate WITHIN the ARCH.
 
 ## Source of truth (in order)
-1. `CONSTITUTION.md` + `ARCH.md` (overlay layering: §14).
+1. `CONSTITUTION.md` + `ARCH.md` (the ARCH index); overlay layering: `ARCH_14_PreviewOverlayLayering.md` (§14).
 2. `INDEX.md` → load ONLY your specs: `UI_FRAMEWORK_SPEC`, `PREVIEW_COMPOSITING_SPEC`
    (its "Overlay layering (v2, ARCH §14)" section is the current design; its early
    sections above that are v1 legacy analysis — read the file's own header note before

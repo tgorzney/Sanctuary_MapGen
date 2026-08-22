@@ -13,7 +13,7 @@ per-stratum surface-weight remap in the Mask stage — or anywhere in SanGen gen
 appearance **pass-through data**, consumed only by the game's own renderer against the
 stratum's composite/"mask" texture — a real texture asset distinct from the
 `stratums_1_4/5_8.tga` splat-weight files the Mask stage produces. No SanGen generation
-stage reads or writes it today. See `ARCH.md` §7.2 item 5 (rewritten) and
+stage reads or writes it today. See `ARCH_07_02_MaterialProportionVsSurfaceWeight.md` §7.2 item 5 (rewritten) and
 `MASKING_SPEC` §1.6/§1.7 (corrected). Two direct consequences for the entries below,
 both already applied at the cited locations:
 - The "Explicitly does NOT reopen item 5 ('remap runs once, in Mask')" framing in the

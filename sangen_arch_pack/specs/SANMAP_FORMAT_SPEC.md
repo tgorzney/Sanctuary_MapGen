@@ -38,10 +38,17 @@ layer's import/export must target this exactly.
     below)** — lowerCamelCase because they merge into this existing
     format-native dictionary rather than forming a new SanGen-owned section
     (ARCH §1.6).
+  - **The dictionary key itself is `ARMY_XX`, machine-owned by SanGen as of
+    Correction 18 below** — the human-authored label lives in the new
+    `displayName` field, not the key.
 - `markers`: Dictionary<string, MarkerType{ resource:bool, transforms:
-  Dict<string,MarkerTransform{ ..., alias }> }>
+  Dict<string,MarkerTransform{ ..., alias, layerIndex, symmetryGroupIdentifier }> }>
   - **`alias` is a SanGen-added field (Correction 11)** — same lowerCamelCase
     rule as `armyColor` above.
+  - **`layerIndex`/`symmetryGroupIdentifier` are SanGen-added fields (schema v3,
+    Correction 15/16 below)** — same lowerCamelCase merge rule, applied to a
+    dictionary-value object. Companion metadata lives in the new top-level
+    `MarkerGroups` section (Correction 16).
 - `chains`: Dictionary<string, MarkerChain.Marker[]{ type, name }>
 - `decals`: DecalType[]{ blueprintPath, transforms: DecalTransform[]{ ...,
   layerIndex } }
@@ -443,6 +450,14 @@ hand-placed instance *layers* (a manual authoring concept). The two "Group"/
 `ENTITY_AUTHORING_PARAMS_SPEC`'s naming for the manual concept was chosen
 specifically (`PropGroups`, not `PropLayers`) to avoid colliding the two.
 
+**`MarkersStack` is no longer flat like the other three Stacks — see
+Correction 15 below.** `PropsStack`/`DecalsStack`/`UnitsStack` remain exactly
+the flat rule arrays described in this correction; `MarkersStack` alone gains
+the one-tier Group(`MarkerRuleLayer`)→Rule(`MarkerRule`) wrapper (ARCH §16),
+the first concrete slice of this correction's own long-deferred Group/Layer
+hierarchy, scoped to exactly what layer-scoped marker symmetry needs — not a
+retroactive redesign of the other three Stacks.
+
 **Confirmed cardinality change, new fields required:**
 ```
 HydroMultiplier   ReclaimDensity   MexDensity   SpawnPointCount
@@ -736,6 +751,205 @@ as `StratumGenerationSettings`/`GeneralMapSettings`.
 the same file can carry different out-of-range values. Never a hard refusal —
 this is authoring-convenience metadata, not gameplay-authoritative data, and a
 missing/foreign file simply degrades every instance to layer `0`.
+
+### `MarkersStack` — Correction 15 (layer-scoped symmetry, ARCH §16) — amends Correction 7 for `MarkersStack` only
+`MarkersStack` upgrades from Correction 7's flat `Params::MarkerRule` array to a one-tier
+Group→Rule wrapper — the first concrete slice of Correction 7's long-deferred Group/Layer/LayerType
+hierarchy, scoped exactly to what ARCH §16's layer-scoped marker symmetry needs. `PropsStack`/
+`DecalsStack`/`UnitsStack` are UNCHANGED — still flat rule arrays per Correction 7.
+
+```
+MarkersStack → [ N × {
+    Name                       (string)  // Params::MarkerRuleLayer::name
+    Enabled                    (bool)    // bEnabled, "b" dropped per this array's established
+                                          // casing convention (Correction 12/14 precedent)
+    Hidden                     (bool)    // bHidden, same
+    SymmetryUseGlobal          (bool)    // Params::SymmetrySetting::bSymmetryUseGlobal
+    SymmetryMask               (int)     // Params::SymmetrySetting::symmetryMask
+    RadialSymmetryRepeatCount  (int)     // Params::SymmetrySetting::radialSymmetryRepeatCount
+    Rules                      ([...])   // Params::MarkerRuleLayer::rules — NEW nested array, ruled below
+} ]
+```
+
+**`Rules` — the nested-array key spelling, ruled.** `Rules`, PascalCase, bare plural of the contained
+type's role ("rule"), no qualifier prefix. Based on this codebase's only existing nested-array
+precedent inside a Stack-shaped/Group-shaped container: Correction 3's `HeightmapStack`, whose real,
+live file shape is confirmed (`GeoLayers.Layers[]`) to name its own nested array the bare plural of
+the contained type ("Layer" → `Layers`), not a qualified form like `GeoLayerLayers` or
+`CompositionLayers`. Applying the same pattern here (contained type "MarkerRule" → bare plural
+`Rules`, not `MarkerRules`) keeps the convention uniform across the format's two nested-array sites
+rather than inventing a second spelling rule. `MarkerRuleLayer::rules` (the PARAMS field, fixed by
+ARCH §16.1) is the C++ home; only the JSON key was open, and it is `Rules`.
+
+**`SymmetrySetting` flattens to sibling keys, not a nested `"Symmetry"` sub-object** — same
+established convention `StratumGenerationSettings` (Correction 12) already applies to
+`StratumSoilPhysics` (a C++ wrapper struct flattened to sibling wire keys, no nested JSON object).
+`SymmetryUseGlobal`/`SymmetryMask`/`RadialSymmetryRepeatCount` are the same three keys already
+confirmed live at the per-rule tier (Correction 4) — reused verbatim at this new per-layer tier, not
+renamed, so a reader recognizes the triplet immediately regardless of which tier it's reading.
+
+**Consequence for `MarkerRule` itself — the triplet is REMOVED from the per-rule object.** ARCH §16.1
+moves `bSymmetryUseGlobal`/`symmetryMask`/`radialSymmetryRepeatCount` up one tier, off `MarkerRule`
+and onto the new `MarkerRuleLayer` wrapper. `PLACEMENT_SCATTER_SPEC`'s "Rules — MarkerRule" section
+("Symmetry: `SymmetryUseGlobal/SymmetryMask`") is now stale for `MarkerRule` specifically — see the
+follow-up edit below. `PropRule`/`DecalRule`/`UnitRule` keep the triplet exactly where it is; only
+`MarkerRule` loses it. **This is a genuine breaking `.sanmap` schema change on an already-shipped
+field family — the actual migration mechanics are the IO Architecture Expert's domain (ARCH §16.6),
+not this correction's concern; this correction states only the new/target shape.**
+
+### `MarkerGroups` — Correction 16 (manual-layer metadata, ARCH §16, extends Correction 14)
+New top-level SanGen-owned key (ARCH §1.6: single-token PascalCase, no spaces), sibling of
+`PropGroups`/`DecalGroups`/`markers`. Companion metadata array for `MarkerTransform::layerIndex`
+(new, see the `markers[type].transforms[name]` merge below), serializing
+`std::vector<Params::MarkerInstanceLayer>` — array order is the layer's identity, same convention as
+`PropGroups`/`DecalGroups` (Correction 14).
+
+```
+MarkerGroups: [ N × {
+    Name                       (string)   // Params::MarkerInstanceLayer::name
+    Color                      ({r,g,b,a})// Params::MarkerInstanceLayer::color[4]
+    IconScale                  (float)    // Params::MarkerInstanceLayer::iconScale
+    Id                         (int)      // Params::MarkerInstanceLayer::layerId — stable id,
+                                           // legacy-backfill by array index on import when absent
+    SymmetryUseGlobal          (bool)     // Params::MarkerInstanceLayer::symmetry.bSymmetryUseGlobal
+    SymmetryMask               (int)      // Params::MarkerInstanceLayer::symmetry.symmetryMask
+    RadialSymmetryRepeatCount  (int)      // Params::MarkerInstanceLayer::symmetry.radialSymmetryRepeatCount
+} ]
+```
+
+Confirms the shape parallels `PropGroups`/`DecalGroups`' `Name`/`Color`/`IconScale` exactly (Correction
+14), PLUS two things Props/Decals' manual layers don't carry: the stable `Id` key (already specified
+for markers specifically, `MarkerInstanceLayer::layerId`/STEP60 §3 `BuildMarkerGroupsJson`, since
+markers introduce `layerId` from day one rather than retrofitting it as Props/Decals did via STEP56)
+and the new `SymmetrySetting` triplet (ARCH §16.1), flattened to sibling keys using the exact same
+spelling already ruled for `MarkersStack` above — the two new "Layer" types (`MarkerRuleLayer`/
+`MarkerInstanceLayer`) both carry a `SymmetrySetting`, and both get the identical three wire keys, so
+a reader/importer can share one flattening helper across both new arrays if convenient (not mandated,
+just enabled by the consistent spelling).
+
+**Import validation** for the symmetry triplet: no range to validate (unlike `layerIndex`) —
+`SymmetryMask`/`RadialSymmetryRepeatCount` are free integers, tolerated the same way `Symmetry`
+(Correction 4)'s existing per-rule fields are — no new validation rule introduced here.
+
+**Naming note flagged, not re-ruled here:** `MarkerInstanceLayer::layerId` (STEP60 §1) is spelled with
+the same "Id" abbreviation ARCH §16.5 just ruled OUT for the sibling new field
+`symmetryGroupIdentifier` on `MarkerTransform`, on the grounds that "Id" is not on §1.1's permitted
+abbreviation list and the codebase carries zero precedent for it under `src/params/`. `layerId`
+predates that ruling (STEP56/STEP60, drafted before ARCH §16) and shares the exact same defect by the
+same reasoning — flagged for ARCH/the IO Architecture Expert's attention as a probable follow-up
+naming correction (`layerId` → `layerIdentifier`, wire key `"Id"` → `"Identifier"`, matching
+`PropInstanceLayer`/`DecalInstanceLayer::layerId` too, since all three share the same STEP56 pattern),
+not silently fixed by this correction, and not blocking — STEP60/STEP56 are still undispatched
+work-orders, so no shipped code needs migrating if ARCH acts before either lands.
+
+### `markers[type].transforms[name]` — two new merged fields (extends Correction 11's `alias`/ARCH §12's `layerIndex` precedent)
+Both new, both **direct field injection** (ARCH §16.5) into the existing format-native
+`MarkerTransform` object, both **lowerCamelCase**, merged the same way `alias` (Correction 11) and
+`armyColor` are — this is a format-native dictionary-value object, not a new SanGen-owned array, so
+ARCH §1.6's camelCase merge rule applies, not the PascalCase rule governing the new top-level
+`MarkerGroups`/`MarkersStack` sections above:
+
+- **`layerIndex`** (`int`, default `0`) — indexes `recipe.markerLayers` (`MarkerGroups` above).
+  Spelled **identically** to the already-live `PropTransform`/`DecalTransform::layerIndex` wire key
+  (`ENTITY_AUTHORING_PARAMS_SPEC`, ARCH §12) — same name, same casing, same default, same
+  direct-injection placement; no marker-specific divergence. Import validation: out-of-range against
+  `MarkerGroups.size()` is a loud, logged clamp to `0` (Constitution §6), identical rule to
+  Props/Decals.
+- **`symmetryGroupIdentifier`** (`int`, default `0`, `0` = ungrouped) — NEW. Spelled in full per ARCH
+  §16.5's naming amendment (no abbreviation); the wire key matches the C++ field name verbatim,
+  lowerCamelCase, same merge rule as `layerIndex` above. No range to validate on import — `0` is
+  always legal (ungrouped), any positive value is accepted as-is; no clamp logic is needed.
+
+Both fields are genuinely novel scalars with no format-native competing home, so both use direct field
+injection rather than a side table — the same §1.8/§12 rule already governing `armyColor`/`alias`/
+`layerIndex`, applied consistently (ARCH §16.5's own framing, restated here as format truth).
+
+### STEP49 export-time-warning ticket scope — ruled (ARCH §16.8/§16.10 routing)
+**Ruling: yes — the future export-time "warn on missing Spawn content" ticket (STEP49's own
+"Explicit out-of-scope" bullet, same class as the existing `blueprintPath` warn-dialog) should be
+scoped per-`Army`, not per-group, and that formulation already subsumes the missing-group case — it
+is not two separate checks.**
+
+Concretely, whenever that ticket is built: for every `Army` in `recipe.armies`, check whether at least
+one `markers["Spawn"].transforms[...]` entry's `name` (the STEP49-established army-picker convention,
+`transform.name` set from the chosen army's name/alias) matches that `Army`'s identity; if none does,
+warn. This single per-Army scan already covers the "no `Spawn` group at all" case for free (every
+`Army` fails the same check when the group is absent or empty) — there is no reason to special-case
+"group entirely missing" separately from "group exists but this one Army's marker was orphaned by a
+symmetry-group shrink" (ARCH §16.8/`DESIGN_MarkerLayerSymmetry_R2.md` §2); both are the exact same
+observable failure ("this army gets no commander at spawn") from the exporter's point of view, and a
+per-Army check is the strictly more general, superset formulation of the per-group check STEP49
+originally sketched. No new PARAMS field is needed (ARCH §16.8 already confirmed `Army` carries no
+back-reference) — the check is a pure export-time scan over already-existing data, same posture as
+the existing `blueprintPath` resolution check it's modeled on. **Built, since:
+`work_orders/STEP82_ArmySpawnMarkerValidation_IO.md`**, which also corrects (in its own text) an
+imprecision in this paragraph and in `ARCH_16_08_SpawnArmyShrink.md`'s original wording: the match key
+against `Army::name` is `MarkerTransform::name` (the format's `transforms` dictionary key) only —
+never `MarkerTransform::alias`, a SanGen-added field (Correction 11) the engine never reads for this
+purpose.
+
+### `armies[key]` gains `displayName` — Correction 18 (army engine-identity/display-name split, ARCH ruling — `work_orders/STEP76_ArmyIdentityNaming_IO.md`)
+**Ruling: `Army::name` becomes machine-owned format truth; the human-authored label moves to a new,
+merged `displayName` field.** STEP76 ("`ARMY_XX` engine identity vs. `displayName`") establishes that
+SanGen — not the human — owns the `armies` dictionary key outright:
+
+- **`Army::name` keeps its existing role as the folded-in `armies[key]` dictionary key** (ARCH §1.8's
+  "`Dictionary<string, X>` → `std::vector<X>` with the dictionary key folded in as `name`" rule is
+  unchanged) — but it is now always the auto-generated, zero-padded `ARMY_XX` engine identity (`ARMY_`
+  + 1-based roster position, at least two digits, so an alphabetical sort of the roster's keys equals
+  roster order — the property `common/gameUtils.lua`'s `CreateArmies()` relies on to assign lobby
+  slots). It is **never human-settable** — no text box, no import-time override, no escape hatch.
+- **`displayName`** (`string`, new) — the human-authored organization label. **Merged directly into
+  the existing format-native `armies[<ARMY_XX>]` object, lowerCamelCase, as a sibling of the
+  already-shipped `armyColor`/`alias` (Correction 11)** — direct field injection (ARCH §1.8), not a
+  new top-level section and not a side table, because it is genuinely novel per-army scalar data with
+  no competing format-native home, the same test `armyColor`/`alias`/`layerIndex` already passed:
+  ```jsonc
+  "armies": {
+    "ARMY_01": {
+      "faction": 0, "alloys": 500.0, "energy": 500.0, "groups": {},
+      "armyColor": { "r": 1.0, "g": 0.2, "b": 0.2, "a": 1.0 },
+      "alias": "",
+      "displayName": "North Ridge"
+    }
+  }
+  ```
+  Free-form, may be empty, **not** required to be unique — two armies may both display as "North";
+  they remain `ARMY_01`/`ARMY_02` to the engine regardless. `displayName` is a genuinely new field; it
+  does **not** reuse `alias` (already-shipped, already human-editable via the STEP49 marker
+  army-picker convention — folding a migrated legacy name into it would silently overwrite authored
+  data, the exact discard Constitution §6 forbids).
+
+**Confidence-limited reasoning, stated explicitly rather than silently assumed (STEP76 §2).** Two
+distinct consumers read a `.sanmap`, and this ruling is on different footing for each:
+- **The Lua engine (`LoadMapData`) — settled, no risk.** It whitelists `armies` at the *top level*
+  only and has no per-army-object schema; an extra key inside an army object is simply inert.
+- **The C# `EM.Map` deserializer — safe by inference plus production evidence, not by a direct read
+  of the deserialization call site.** `EM.Map.Army` (`SanMap.Types.cs`) declares exactly four fields
+  and carries neither `[JsonObject(MissingMemberHandling=...)]` nor `[JsonExtensionData]`; Newtonsoft's
+  default `MissingMemberHandling` is `Ignore`. The actual `JsonSerializerSettings` at the call site
+  could **not** be located in the vendored ground truth (`D:\Projects\Sanctuary\Sanmap File Format\`),
+  so this is not proven outright — but `armyColor` and `alias` **already ship** into this exact
+  position today (Correction 11) and maps load without issue, which is production evidence that
+  whatever the real settings are, they tolerate an extra key here. `displayName` is the third instance
+  of an already-settled, in-production pattern, not a new risk class.
+
+**Rejected alternative, recorded so it is not re-proposed:** a top-level SanGen-owned
+`ArmyDisplayNames` PascalCase section (`{ "ARMY_01": "North Ridge", ... }`), which would drive the
+residual C#-deserializer risk to provably zero (dropped by `LoadMapData`'s whitelist; no member for it
+on `SanMap` either). **Not adopted** — it splits one entity's data across two places for a risk
+already disproven in production, contradicts §1.8's direct-injection branch, and adds a second
+key-synchronization surface (`ArmyDisplayNames` keys would need re-mapping on every `ARMY_XX`
+re-mint). Left on the shelf only if the human ever wants zero residual risk regardless of cost.
+
+**No `SanGenVersion` bump.** Purely additive, same precedent as Corrections 12/14/17: a new field
+merged into an existing collection, no reshape of anything an existing migration step would need to
+touch. **Import tolerance:** an army object with no `displayName` key (any pre-STEP76 export) reads as
+an empty string — ordinary Constitution §6 "absent key" tolerance, matching Correction 14's "missing
+`PropGroups` → zero manual layers" precedent. **Legacy name recovery on import** (an already-shipped
+`.sanmap` whose `armies[key]` was itself a human-authored string like `"Army_0"`, not yet `ARMY_XX`)
+is IO/BRIDGE mechanism, not format truth, and is `STEP76`'s own §4 to specify — flagged `⚠️ ASSUMPTION`
+in that ticket, not re-litigated here.
 
 ### Verified deletions (pure duplicates — delete outright)
 Confirmed line-for-line against a real map — no replacement needed, each

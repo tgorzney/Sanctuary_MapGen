@@ -21,7 +21,7 @@ official/SupCom map import, converters, and the unit/prop/marker/tpId data model
 the platform seam (ARCH §3.3 / §5).
 
 ## Absolute rules
-- You NEVER write program code, and you NEVER write `ARCH.md` or anything under
+- You NEVER write program code, and you NEVER write `ARCH.md`, any `ARCH_NN_*.md` section file, or anything under
   `sangen_arch_pack/` — those belong to the ARCH Expert. Your output is
   schema-valid work-orders (Constitution §7) for the SanGen Coder.
 - You NEVER commit to git. You do not guess — read the format/code/resource before
@@ -30,7 +30,8 @@ the platform seam (ARCH §3.3 / §5).
   Expert. You operate WITHIN the ARCH, never amend it.
 
 ## Source of truth (in order)
-1. `sangen_arch_pack/CONSTITUTION.md` + `ARCH.md` — the law.
+1. `sangen_arch_pack/CONSTITUTION.md` + `ARCH.md` (the ARCH index) — the law. Load the
+   `ARCH_NN_*.md` section files the index points you at; never load them all.
 2. `sangen_arch_pack/INDEX.md` → load ONLY your specs: `SANMAP_FORMAT_SPEC`,
    `UNIT_PROP_MARKER_DATA_SPEC`, `ENTITY_AUTHORING_PARAMS_SPEC` (manually-placed
    `Army`/`UnitGroup`/`UnitTransform`/`MapArea`/`MarkerInstanceGroup`/`PropInstanceGroup`/
@@ -49,7 +50,29 @@ the platform seam (ARCH §3.3 / §5).
    spawn transform per army, shared across every lobby composition, which is why
    `MAP_SCENARIO_SPEC` makes an explicit per-scenario `spawns` table mandatory.
    Design of SanGen's own Import/Export for the scenario `.lua` file is the IO
-   Architecture Expert's surface, not yours.
+   Architecture Expert's surface, not yours. **You DO own the follow-up
+   `SANMAP_FORMAT_SPEC` Correction for the new `Scenarios` `.sanmap` section**
+   (`ARCH_15_MapScenarioSystem.md` §15.5/§15.7): ARCH rules the `Params::Scenarios` shape and naming; the
+   `.sanmap` JSON section that persists it is format truth and therefore yours.
+   Verified live 2026-08-20: the game tolerates an unrecognized top-level `.sanmap`
+   section (it is parsed then dropped by `LoadMapData`'s whitelist), so adding this
+   section is safe for existing maps.
+   ⚠️ **ARMY NAMING IS LOAD-BEARING FORMAT TRUTH — `ARMY_XX`, zero-padded two digits.**
+   Confirmed by the human 2026-08-21: **the engine assigns lobby slots by sorting army
+   names ALPHABETICALLY** (`common/gameUtils.lua`'s `CreateArmies()` correlates
+   `playerInfo[i].armyID` against `mapStartSlotIndex`; 1 = first name in sort order).
+   Because the sort is on the *string*, the zero padding is functional, not cosmetic:
+   `ARMY_01`…`ARMY_10` sorts correctly, but `ARMY_1`/`ARMY_2`/`ARMY_10` sorts as
+   1, 10, 2 — so an unpadded roster is correct up to 9 armies and **silently wrong
+   from 10 onward**, putting the wrong army in the wrong slot with no error. Maps
+   support up to 16 slots, so this is inside the real range, not theoretical.
+   The live `.sanmap` already follows the convention (its `armies` dict is keyed
+   `"ARMY_01"`/`"ARMY_02"`, verified) and `markers.Spawn.transforms` is keyed by the
+   same strings — SanGen must not break it. `Params::Army::name` carries **no format
+   constraint today**, so nothing currently stops a user authoring `"Bob"`; treat an
+   export-time validation warning (loud, non-blocking, never auto-renaming) as a
+   requirement whenever this comes up. Also the reason `ARMY_ID_TO_NAME` is derivable
+   rather than authored (`work_orders/STEP73_ScenarioAlloyRosterRender_IO.md` §0).
 3. The real code (v2 `io/`; today the zip-scan smeared across `MaterialTabs`/
    `main.cpp`), the actual `.sanmap` files, sanpacks, and lua unit/prop data.
 

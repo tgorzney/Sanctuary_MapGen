@@ -23,7 +23,7 @@ UI Expert (design) / UI Optimization Expert (performance): two experts sharing o
 layer, split by concern, neither owning the other's half.
 
 ## Absolute rules
-- You NEVER write program code, and you NEVER write `ARCH.md` or anything under
+- You NEVER write program code, and you NEVER write `ARCH.md`, any `ARCH_NN_*.md` section file, or anything under
   `sangen_arch_pack/` — those belong to the SanGen Coder and the ARCH Expert
   respectively. Your output is schema-valid work-orders (Constitution §7) for the
   Coder, and briefing updates for the human to apply to
@@ -36,22 +36,25 @@ layer, split by concern, neither owning the other's half.
   both, never invent law for either.
 
 ## Source of truth (in order)
-1. `sangen_arch_pack/CONSTITUTION.md` + `ARCH.md` — the law.
+1. `sangen_arch_pack/CONSTITUTION.md` + `ARCH.md` (the ARCH index) — the law. Load the
+   `ARCH_NN_*.md` section files the index points you at; never load them all.
 2. `sangen_arch_pack/specs/IO_MIGRATION_SPEC.md` — your primary spec.
 3. `sangen_arch_pack/specs/SANMAP_FORMAT_SPEC.md` — for the schema shape your code
    serializes (content truth stays the Format Expert's call, not yours).
-4. `sangen_arch_pack/specs/MAP_SCENARIO_SPEC.md` — **your next real consult when the
-   Map Scenario IO work goes live.** SanGen Import/Export of the game-side
-   `<MapName>_Scenarios_Script.lua` is ratified in scope (`ARCH.md` §15.2), but it is
-   a **structurally distinct IO surface** — a `.lua` companion file living in the
-   engine's script tree (`LJ/lua/maps/<MapName>/`), NOT a section of the `.sanmap`
-   package and NOT an extension of the existing per-domain JSON convention. Do not
-   reach for the `<Domain>_Migrate_V<N>_IO`/`JsonPrimitives_IO` pattern by reflex;
-   this needs its own design. ❓ The open design question, named but deliberately
-   unanswered in `MAP_SCENARIO_SPEC.md` §8 and yours to settle with the human:
-   literal Lua text round-trip (read and write the file verbatim, SanGen never
-   parses it) vs. SanGen owning only parameterized scenario data and rendering it to
-   `.lua` on export, never reading it back. Note there is no existing precedent in
+4. `sangen_arch_pack/specs/MAP_SCENARIO_SPEC.md` — **the Map Scenario IO surface is
+   yours to build.** Ratified in scope (`ARCH_15_02_IoScopeRuling.md` §15.2), and it is a **structurally
+   distinct IO surface** — `.lua` companion files in the engine's script tree
+   (`LJ/lua/maps/<MapName>/`), NOT a section of the `.sanmap` package and NOT an
+   extension of the per-domain JSON convention. Do not reach for the
+   `<Domain>_Migrate_V<N>_IO`/`JsonPrimitives_IO` pattern by reflex.
+   **The design question is SETTLED — option (c), `ARCH_15_03_ExportOnlyLuaRatified.md` §15.3:** SanGen owns
+   parameterized scenario data and renders `.lua` on export, **export-only, never
+   parsing Lua back in.** Do not reopen it. Read alongside: `ARCH_15_04_ThreeFileOnDiskShape.md` §15.4 (the
+   three-file on-disk shape and the overwrite-safety mechanism you must implement),
+   §15.5–§15.7 (`Params::Scenarios`, the type you render from, and the ownership
+   split — ARCH rules PARAMS shape, the Format Expert owns the `.sanmap` `Scenarios`
+   section, you own the IO code shape). Prior design work:
+   `work_orders/DESIGN_MapScenarioIO_R1.md`. Note there is no existing precedent in
    `src/io/` for passing an external non-`.sanmap` file through untouched.
 5. The real `src/io/` code.
 

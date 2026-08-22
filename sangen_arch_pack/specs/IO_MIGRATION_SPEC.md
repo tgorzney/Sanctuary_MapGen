@@ -108,7 +108,8 @@ happens **after** every migration that still needs to read the old location has 
   reader silently drift apart.
 - **`MigrationEntry` — the manifest's element type.** Each entry in a step's migration
   list is `MigrationEntry { MigrationFunction function; const char* name; const char*
-  description; bool bIndependentlySelectable = false; }`, not a bare function pointer.
+  description; bool bIndependentlySelectable = false; bool bLosslessIfSkipped = false; }`,
+  not a bare function pointer.
   - `name` is the migration's own identifier (e.g. `"GeneralMapSettings_Migrate_V2"`) —
     what the UI-layer selective-apply feature (§6) shows a human, and what any log line
     naming "which migration did this" refers to.
@@ -136,6 +137,42 @@ happens **after** every migration that still needs to read the old location has 
     not trusted by inspection — this is that same law applied to the narrower claim
     `bIndependentlySelectable` makes. `bIndependentlySelectable = true` without this test
     is a spec violation, not an accepted lesser practice.
+- **`bLosslessIfSkipped` — a second, orthogonal, author-declared, individually-justified
+  exception (ARCH ruling, added during the STEP26 design pass, following a real-code audit
+  of the first 9 shipped migrations that found `bIndependentlySelectable` alone cannot
+  honestly drive a selective-skip dialog).** `bIndependentlySelectable` answers "is this
+  migration safe to run out of order relative to its siblings" — an **ordering** question.
+  It does **not** answer "is this migration safe to omit without losing data" — a
+  **data-safety** question. The two were conflated by proximity in the original design;
+  they answer genuinely different questions and can, in principle, diverge in either
+  direction for a future migration. Defaults to `false`. May only be set `true` by the
+  migration's own author, with a one-line justification comment at the declaration site,
+  and only once the author has verified — against the **readers**, not just the
+  migration's own transform — that every field this migration would have relocated is
+  still recoverable by some current-shape reader or an existing legacy-
+  `mapGeneratorData`-gated fallback reader (`MapImporter_ParseDocument_IO.cpp`'s tail
+  block) when this migration alone is skipped and every sibling in the step still runs.
+  Pure key-reservation migrations (nothing to relocate, e.g. `Accumulation_Migrate_V2`)
+  are the trivial case.
+  - **Required paired test, same discipline as `bIndependentlySelectable`'s own, above.**
+    A migration declared `bLosslessIfSkipped = true` must add an assertion to its
+    `<Domain>_Migrate_V<N>_IO_Test.cpp` (§1): given the step's OLD-shape fixture, running
+    every *other* migration in the step (never this one, and never the step's
+    `legacyKeysToDelete` — matching §6's partial-application rule below), then reading the
+    resulting document with the current-shape block readers, recovers the same data this
+    migration would have carried — or confirms there was never any data to carry.
+    `bLosslessIfSkipped = true` without this test is a spec violation, exactly as an
+    untested `bIndependentlySelectable = true` already is.
+  - **Dialog gating law, binding on any selective-apply UI (§6's STEP26 feature):** such a
+    dialog may only offer a genuine "skip this" checkbox for an entry where
+    `bIndependentlySelectable == true` **AND** `bLosslessIfSkipped == true`. An entry
+    failing either test still runs unconditionally whenever the step it belongs to runs
+    at all — full-step semantics, unchanged. An entry that is independently-selectable but
+    not lossless-if-skipped may still be *shown* to the human (`name`/`description` are
+    already surfaced) — but never as an offer to omit it without losing data; the exact
+    presentation for such a row (disabled/greyed, informational-only, omitted from the
+    list) is a UI-layer call, not decided here. Full worked ruling, including the 9
+    shipped migrations' actual values: `ARCH.md` §17.
 - **`legacyKeysToDelete` fires only on whole-step application.** A selective/partial
   application (§6) — one or more `bIndependentlySelectable` entries applied without the
   rest of their step — never runs the step's `legacyKeysToDelete`, even if every
@@ -248,12 +285,13 @@ correct in the proposal and is unchanged.
   **sole committed result of an ordinary import call for this case: no guessing, ever.**
   A separate, **UI-layer-only** feature may *preview* what treating this document as an
   assumed version `1` and walking the full migration chain would find, without mutating
-  anything, and let a human selectively apply some or all of it (down to individual
-  `bIndependentlySelectable` migrations, §3) — if they do, that second pass's result,
-  Unknown Import bag included, **replaces** the direct-read result entirely; the two are
-  never merged. This preview/apply feature is scoped only to this no-version-marker case
-  — the "newer than `kCurrentSanGenVersion`" clause above and the "old, in-range version"
-  clause below are unchanged and remain fully automatic.
+  anything, and let a human selectively apply some or all of it — **down to individual
+  migrations that are both `bIndependentlySelectable` and `bLosslessIfSkipped` (§3)** — if
+  they do, that second pass's result, Unknown Import bag included, **replaces** the
+  direct-read result entirely; the two are never merged. This preview/apply feature is
+  scoped only to this no-version-marker case — the "newer than `kCurrentSanGenVersion`"
+  clause above and the "old, in-range version" clause below are unchanged and remain fully
+  automatic.
 - **Old, in-range version** (present, less than `kCurrentSanGenVersion`) → unchanged from
   before: walk forward per §4, loud-logged. This was never a refusal case.
 - **Unknown Import passthrough.** Any top-level key the manifest's migration steps do not

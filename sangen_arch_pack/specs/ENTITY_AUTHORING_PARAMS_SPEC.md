@@ -8,15 +8,18 @@ third-party tool — never read or cite that tree for this domain). `SANMAP_FORM
 collections" section documents the wire shape; this spec documents the concrete `Params::` C++
 shape and the naming derivation (ARCH §1.8) that produced it.
 
-This spec was ratified in three sessions. The first covered `Army`/`UnitGroup`/`UnitTransform`/
+This spec was ratified in four sessions. The first covered `Army`/`UnitGroup`/`UnitTransform`/
 `MapArea` — the hand-placed *army/unit* and *area-rectangle* domains. The second extended the exact
 same pass-through bucket to the four remaining resolved/baked entity domains: `markers`, `props`,
-`decals`, `chains`. The third (this revision, ARCH §12) adds **manual-layer authoring** for
+`decals`, `chains`. The third (ARCH §12) adds **manual-layer authoring** for
 hand-placed props/decals — `PropTransform`/`DecalTransform::layerIndex` plus the separate
 `PropInstanceLayer`/`DecalInstanceLayer` metadata arrays — and, in doing so, **supersedes** the
 second session's "props/decals need no wrapper transform type" ruling (see that section below for
-the correction). All three sessions share one framing, one naming rule (ARCH §1.8), and one home
-file family — see the Scope section below.
+the correction). The fourth (ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15/16) extends the same
+manual-layer pattern to markers — `MarkerTransform::layerIndex`/`symmetryGroupIdentifier` plus the
+new `MarkerInstanceLayer` metadata array — and adds the new per-layer `SymmetrySetting` field family
+to that array. All four sessions share one framing, one naming rule (ARCH §1.8), and one home file
+family — see the Scope section below.
 
 ## Scope — why this is a separate type family from `PLACEMENT_SCATTER_SPEC`
 `Params::MarkerRule`/`PropRule`/`DecalRule`/`UnitRule` (`PLACEMENT_SCATTER_SPEC`) are **procedural
@@ -32,8 +35,9 @@ spec) and the procedural `UnitRule`s that spawn more units for the same army
 had. The same pattern repeats for markers: `MarkersTab_UI` shows both hand-placed marker instances
 (`MarkerInstanceGroup`, this spec) and the procedural `MarkerRule`s that generate more
 (`MarkerRule_PARAMS.h`) — two independent producers of the same `markers[]` collection. The manual
-prop/decal *layer* concept this third session adds (`PropInstanceLayer`/`DecalInstanceLayer`) is
-the same kind of authoring-convenience metadata as `ManualPropGroup`
+prop/decal *layer* concept the third session adds (`PropInstanceLayer`/`DecalInstanceLayer`), and
+the manual marker-layer concept the fourth session adds (`MarkerInstanceLayer`), are the same kind
+of authoring-convenience metadata as `ManualPropGroup`
 (`PropsTab_Manual_UI.h`) — organizational grouping for hand-placed instances, not a procedural rule.
 
 ## Structural ruling — recursive tree preserved, dictionaries become vectors + `name`
@@ -94,12 +98,14 @@ shape, not naming). **Noted as an optional future consistency pass — not part 
 ratification, not to be inferred as "already decided" by a coder.**
 
 ## The naming derivation (ARCH §1.8 applied)
-All types across the three sessions sit in the same "pass-through" bucket: format spelling by
+All types across the four sessions sit in the same "pass-through" bucket: format spelling by
 default, case-converted, with named exceptions. See ARCH §1.8 for the general rule; this table is
 its application here. Rows above the first divider are the first session (`Army`/`UnitGroup`/
 `UnitTransform`/`MapArea`); rows between the dividers are the second session (`markers`/`props`/
-`decals`/`chains`); the final rows are the third session (`layerIndex`, ARCH §12 — see the dedicated
-section below for the full reasoning, not re-derived in the table alone).
+`decals`/`chains`); the next row is the third session (`layerIndex`, ARCH §12 — see the dedicated
+section below for the full reasoning, not re-derived in the table alone); the final two rows are the
+fourth session (`MarkerTransform::layerIndex`/`symmetryGroupIdentifier`, ARCH §16 — see the "ARCH
+§16" section below).
 
 | Format field | PARAMS field | Rule applied |
 | --- | --- | --- |
@@ -133,6 +139,8 @@ section below for the full reasoning, not re-derived in the table alone).
 | `Marker.type` | `ChainMarker::type` | verbatim |
 | `Marker.name` | `ChainMarker::name` | verbatim |
 | *(no format field — SanGen-added)* | `PropTransform::layerIndex` / `DecalTransform::layerIndex` | ARCH §12, direct field injection — see below |
+| *(no format field — SanGen-added)* | `MarkerTransform::layerIndex` | ARCH §16, direct field injection, spelled identically to the ARCH §12 `layerIndex` above — see "ARCH §16" section below |
+| *(no format field — SanGen-added)* | `MarkerTransform::symmetryGroupIdentifier` | ARCH §16.5, direct field injection, spelled in full — NOT `symmetryGroupId`, an abbreviation this ratification rejected (§1.1/§1.8) |
 
 ## `armyColor` / `alias` — the two already-ratified `armies[key]` additions
 `SANMAP_FORMAT_SPEC` Correction 11 already ratified `armyColor` and `alias` as SanGen-added,
@@ -182,6 +190,27 @@ tree"). Full reasoning and the format-native-injection-vs-separate-array general
   `DecalGroups` array size is a loud logged clamp to `0` (Constitution §6) — never a hard refusal,
   because this is authoring-convenience metadata, not gameplay-authoritative data. A missing
   `layerIndex` key on an older/foreign file degrades for free to `0` (the field's own default).
+
+## `MarkerTransform::layerIndex` / `symmetryGroupIdentifier` / `MarkerGroups` — layer-scoped marker symmetry (ARCH §16)
+Fourth session. Extends the exact ARCH §12 pattern above to markers, plus one genuinely new field
+`layerIndex` has no analog for: `symmetryGroupIdentifier`. Full reasoning: ARCH §16.5;
+wire-format placement and casing: `SANMAP_FORMAT_SPEC` Correction 15/16. Summary:
+
+- **`MarkerTransform::layerIndex`** (`int`, default `0`) — same direct-field-injection shape as
+  `PropTransform`/`DecalTransform::layerIndex` above, same reasoning (external-reorder desync
+  avoidance), indexes the new `MapRecipe::markerLayers` (`MarkerGroups` on disk). Not on shared
+  `InstancedTransform`, for the same reason `PropTransform`/`DecalTransform::layerIndex` isn't.
+- **`MarkerTransform::symmetryGroupIdentifier`** (`int`, default `0`, `0` = ungrouped) — NEW, no
+  Prop/Decal analog. Names which symmetry-linked clone set a hand-placed marker belongs to. Spelled
+  in full — **not** `symmetryGroupId`, an abbreviation the underlying design proposed and ARCH §16.5
+  corrected, since "Id" is not on ARCH §1.1's permitted abbreviation list and `src/params/` carries
+  zero existing precedent for it.
+- **`MarkerInstanceLayer`** (below) is the `MarkerGroups`-backing metadata array, mirroring
+  `PropInstanceLayer`/`DecalInstanceLayer` but carrying two things those don't: a stable `layerId`
+  and a per-layer `SymmetrySetting` (ARCH §16.1) — see the type definition below.
+- **Import validation:** `layerIndex` follows the identical loud-clamp-to-`0` rule as
+  `PropTransform`/`DecalTransform::layerIndex`. `symmetryGroupIdentifier` has no range to validate —
+  `0` is always legal (ungrouped), any positive value is accepted as-is.
 
 ## Why props/decals now need a wrapper transform type — SUPERSEDES the second session's ruling
 The second session ruled `PropTransform`/`DecalTransform` need no wrapper type at all, because
@@ -322,10 +351,32 @@ struct DecalInstanceLayer { std::string name; float color[4] = {1.0f,1.0f,1.0f,1
 ```
 
 ```
+// Fourth session (ARCH §16): MarkerInstanceLayer — the marker-side manual-layer metadata array,
+// mirroring PropInstanceLayer/DecalInstanceLayer above but with two additions markers carry from
+// day one rather than retrofitting later (as Props/Decals did via the earlier STEP56 work-order):
+// a stable layerId, and a per-layer SymmetrySetting (ARCH §16.1 — the same shared struct also
+// used by the procedural MarkerRuleLayer wrapper, PLACEMENT_SCATTER_SPEC). `layerId` is flagged,
+// not re-ruled, as a probable follow-up naming correction (SANMAP_FORMAT_SPEC Correction 16) —
+// kept as proposed here, not renamed by this ratification.
+struct MarkerInstanceLayer {
+    std::string name;
+    float color[4] = {1.0f,1.0f,1.0f,1.0f};
+    float iconScale = 1.0f;
+    int layerId = 0;              // stable id — legacy-backfill by array index on import when absent
+    SymmetrySetting symmetry;     // ARCH §16.1 — bSymmetryUseGlobal / symmetryMask / radialSymmetryRepeatCount
+};
+```
+
+```
 struct MarkerTransform {
     std::string name;             // folded-in inner dict key — instance name (e.g. "Mex 0")
     InstancedTransform transform;
     std::string alias;            // SanGen-added, already-ratified SANMAP_FORMAT_SPEC Correction 11
+    int layerIndex = 0;                // SanGen-added, ARCH §16 — indexes MapRecipe::markerLayers
+                                        // (MarkerGroups); same shape/reasoning as PropTransform/
+                                        // DecalTransform::layerIndex above
+    int symmetryGroupIdentifier = 0;   // SanGen-added, ARCH §16.5 — spelled in full (NOT
+                                        // symmetryGroupId); 0 = ungrouped
 };
 
 struct MarkerInstanceGroup {
@@ -382,7 +433,8 @@ carves out for `Area.height` → `length`, applied to a type name instead of a f
   and `MapArea` respectively (unchanged since).
 - `InstancedTransform_PARAMS.h` — the shared base, added in the second session. Depended on by
   `MarkerInstance_PARAMS.h` and `PropInstance_PARAMS.h` below.
-- `MarkerInstance_PARAMS.h` — `MarkerTransform`, `MarkerInstanceGroup`.
+- `MarkerInstance_PARAMS.h` — `MarkerTransform`, `MarkerInstanceGroup`, and, as of the fourth
+  session (ARCH §16), `MarkerInstanceLayer` (depends on `Params::SymmetrySetting`, ARCH §16.1).
 - `PropInstance_PARAMS.h` — `PropTransform`, `DecalTransform`, `PropInstanceGroup`,
   `DecalInstanceGroup`, `PropInstanceLayer`, `DecalInstanceLayer` together, mirroring the existing
   `ScatterRule_PARAMS.h` multi-type-per-file precedent (`PropRule`/`DecalRule`/`UnitRule` already
@@ -403,6 +455,7 @@ std::vector<DecalInstanceGroup>  decals;
 std::vector<MarkerChain>         chains;
 std::vector<PropInstanceLayer>   propLayers;    // ARCH §12 — metadata for schema v3 `PropGroups`
 std::vector<DecalInstanceLayer>  decalLayers;   // ARCH §12 — metadata for schema v3 `DecalGroups`
+std::vector<MarkerInstanceLayer> markerLayers;  // ARCH §16 — metadata for schema v3 `MarkerGroups`
 ```
 
 That edit, the matching IO round-trip (`MapImporter`/`MapExporter`, mirroring the existing
@@ -465,3 +518,6 @@ below; items 2–4 remain open exactly as originally flagged:
    `layerIndex` at or beyond `propLayers.size()`/`decalLayers.size()` is a loud, logged clamp to
    `0` (Constitution §6) — the work-order implementing the importer must apply this per-instance,
    not just once at file scope, since different instances can carry different out-of-range values.
+   **The same rule applies to `MarkerTransform::layerIndex` against `markerLayers.size()` (ARCH
+   §16), added by the fourth session.**
+</content>

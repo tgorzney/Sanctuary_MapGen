@@ -64,5 +64,5 @@ making the whole engine fixed-point.)
 
 ## Rule
 Every pillar application is a work-order with a **benchmark-backed** estimate
-(Constitution §12 basis tags) and respects **§8 total tweakability** (exposed
+(Constitution §7 basis tags) and respects **§8 total tweakability** (exposed
 parameters, no hardcoded constants).

@@ -13,7 +13,7 @@ map onto the live `Params::*` types, and (b) how those types map onto the
 `.sanmap` schema v3 top-level sections that own their round-trip
 (`SANMAP_FORMAT_SPEC`, ratified by work-order `SPEC-4`). It is a **refresh**
 pass (`SPEC-4`), not a new design — the module boundaries themselves were
-already settled in `ARCH.md` §5.
+already settled in `ARCH_05_GodObjectDismemberment.md` §5.
 
 ## Ownership map — v1 god object → v2 `Params::*` → `.sanmap` v3 section
 
