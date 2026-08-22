@@ -233,13 +233,34 @@ add_custom_command(TARGET SanGenV3App POST_BUILD
             "${SANGEN_V2_SHADER_DIRECTORY}" "$<TARGET_FILE_DIR:SanGenV3App>/sangen_shaders"
     COMMENT "Staging SanGen v2 GPU kernels beside the application")
 
+# The bundled Map Scenario runtime Lua text ships BESIDE the executable, mirroring the .glsl
+# kernel staging above verbatim (`ARCH_15_04_ThreeFileOnDiskShape.md` §15.4, DESIGN_MapScenarioIO_R1.md §3, STEP72) —
+# ScenarioScript_RuntimeResource_IO::LoadScenarioRuntimeText resolves
+# `<exeDir>/sangen_lua_resources/SanGenScenarioRuntime.lua` when no override path is set.
+# resources/lua/ is a shipped-resource top-level tree, the SAME category shaders/ already is —
+# ARCH_02_LayerDirectoryMap.md §2's layer map governs src/ subdirectories only, so this needs no new ARCH layer.
+file(GLOB SANGEN_V2_LUA_RESOURCES CONFIGURE_DEPENDS "resources/lua/*.lua")
+set_source_files_properties(${SANGEN_V2_LUA_RESOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
+set(SANGEN_V2_LUA_RESOURCE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/sangen_lua_resources")
+foreach(luaResourceFile ${SANGEN_V2_LUA_RESOURCES})
+    get_filename_component(luaResourceName "${luaResourceFile}" NAME)
+    configure_file("${luaResourceFile}" "${SANGEN_V2_LUA_RESOURCE_DIRECTORY}/${luaResourceName}" COPYONLY)
+endforeach()
+
+add_custom_command(TARGET SanGenV3App POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${SANGEN_V2_LUA_RESOURCE_DIRECTORY}" "$<TARGET_FILE_DIR:SanGenV3App>/sangen_lua_resources"
+    COMMENT "Staging SanGen v2 bundled Map Scenario Lua resources beside the application")
+
 # add_sangen_test(<name> <source>...) — one acceptance-test executable, registered
 # with CTest and handed the shader directory as argv[1] (ignored by tests that do
-# not need a GL context).
+# not need a GL context) and the bundled Map Scenario Lua resource directory as
+# argv[2] (ignored by tests that do not need it — STEP72, same "handed to every
+# test, most ignore it" precedent as argv[1]).
 function(add_sangen_test testName)
     add_executable(${testName} ${ARGN})
     target_link_libraries(${testName} PRIVATE SanGenV2)
-    add_test(NAME ${testName} COMMAND ${testName} "${SANGEN_V2_SHADER_DIRECTORY}")
+    add_test(NAME ${testName} COMMAND ${testName} "${SANGEN_V2_SHADER_DIRECTORY}" "${SANGEN_V2_LUA_RESOURCE_DIRECTORY}")
     set_property(TARGET ${testName} PROPERTY FOLDER "SanGenV2 Tests")
 endfunction()
 
@@ -541,6 +562,11 @@ add_sangen_test(FilesTab_UI_Test
 # cache — a scratch-folder Save/Load round trip plus the missing-directory/missing-file/corrupt-JSON
 # degrade-gracefully paths and the platform seam's own plausibility check.
 add_sangen_test(AppSettings_IO_Test src/io/AppSettings_IO_Test.cpp)
+
+# STEP72_ScenarioRuntimeResource_IO: bundled/override resolution for the Map Scenario runtime Lua
+# text — override-readable / bundled-fallback / loud-degrade / neither-readable paths, plus a
+# real-resource self-check against the CMake-staged SANGEN_V2_LUA_RESOURCE_DIRECTORY (argv[2]).
+add_sangen_test(ScenarioScript_RuntimeResource_IO_Test src/io/ScenarioScript_RuntimeResource_IO_Test.cpp)
 
 # Tab-rebuild batch E — the host shell. One binary over four translation units (main() lives in
 # ApplicationShell_Layout_UI_Test.cpp): the left column's catalogue is pure data, so the v1 layout is

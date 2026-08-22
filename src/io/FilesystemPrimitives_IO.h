@@ -24,5 +24,12 @@ bool EnsureFolderExists(const std::string& folderPath, std::string& outErrorMess
 // Writes a blob to disk in one call. False on any stream failure — never a partial success.
 bool WriteBinaryFileBytes(const std::string& filePath, const void* bytes, std::size_t byteCount);
 
+// Reads filePath's entire contents as text. false + outText left EMPTY if the file does not exist
+// or cannot be opened for read -- never throws, never partial-fills outText on failure. The read
+// counterpart to WriteBinaryFileBytes, first needed by ScenarioScript_RuntimeResource_IO's
+// (STEP72) bundled/override resolution and later reused by ScenarioScript_Export_IO's (STEP71)
+// overwrite-safety banner check.
+bool ReadTextFileBytes(const std::string& filePath, std::string& outText);
+
 } // namespace Io
 } // namespace SanmapGen
