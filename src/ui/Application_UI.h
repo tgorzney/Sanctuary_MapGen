@@ -25,6 +25,7 @@
 #include "Application_Settings_UI.h"
 #include "Application_TabState_UI.h"
 #include "MapCanvas_UI.h"
+#include "OverlayLayer_Settings_UI.h"
 #include "PreviewComposite_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/GenerationAssembler_PIPELINE.h"
@@ -84,6 +85,7 @@ public:
     Pipeline::PreviewDriver&       Driver()    { return previewDriver; }
     PreviewComposite&              Composite() { return composite; }
     MapCanvas&                     Canvas()    { return canvas; }
+    OverlayLayerSettings&          OverlaySettings() { return overlaySettings; }
     ApplicationTabState&           TabState()  { return tabState; }
     ApplicationExecutionSettings&  ExecutionSettings() { return executionSettings; }
     Sys::DispatchPolicy&           ActiveDispatchPolicy() { return dispatchPolicy; }
@@ -131,6 +133,7 @@ private:
     PreviewComposite              composite;
     Pipeline::PreviewDriver       previewDriver;
     MapCanvas                     canvas;
+    OverlayLayerSettings          overlaySettings;   // the six-domain screen-space overlay stack
     ApplicationTabState           tabState;
     ApplicationHostedSettings     hostedSettings;   // the tab settings with no recipe home yet
     ApplicationExecutionSettings  executionSettings;

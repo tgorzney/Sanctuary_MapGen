@@ -561,6 +561,7 @@ add_sangen_test(HeightmapTab_UI_Test      src/ui/HeightmapTab_UI_Test.cpp)
 # own main(), so each is its own binary and none needs an imgui frame, a window or a GL context.
 add_sangen_test(SymmetryTab_UI_Test       src/ui/SymmetryTab_UI_Test.cpp)
 add_sangen_test(SlopeTab_UI_Test          src/ui/SlopeTab_UI_Test.cpp)
+add_sangen_test(OverlayLayer_Settings_UI_Test src/ui/OverlayLayer_Settings_UI_Test.cpp)
 add_sangen_test(FlowTab_UI_Test           src/ui/FlowTab_UI_Test.cpp)
 add_sangen_test(AccumulationTab_UI_Test   src/ui/AccumulationTab_UI_Test.cpp)
 

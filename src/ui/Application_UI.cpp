@@ -38,6 +38,7 @@ Application::Application(ApplicationSettings applicationSettings)
     tabState.files.unknownImportData = assetBridge.unknownImportData.get();
     ConfigureDefaultPreview(composite.Settings(), settings.previewResolution,
                             assembler.WorldUnitsPerCell());
+    ConfigureDefaultOverlayLayers(overlaySettings, recipe);
     // The left column's `[O]`/`[ ]` rows are the composite's layer flags from the first frame on,
     // so the column and the image agree before anything is clicked (Application_Visibility_UI.h).
     ApplyPanelVisibility(tabState.visibility, composite.Settings());
