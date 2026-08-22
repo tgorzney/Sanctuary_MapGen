@@ -31,7 +31,11 @@ void BuildDocumentEnvelopeJson(const Params::MapRecipe& recipe, nlohmann::ordere
     document["heightmapResolution"] = geometry.VertexSize();
 
     document["hasWater"]   = recipe.water.bEnabled;
-    document["waterLevel"] = recipe.water.waterLevelMaximum;
+    // The format types `waterLevel` as a C# int too (STEP84 §6.2, measured: reference shows
+    // "waterLevel": 78, never "78.0") — same `.0`-vs-bare-integer distinction as `height` above, same
+    // fix (round, don't truncate). `waterDepth` is NOT one of these: the reference shows a genuine
+    // fractional double there (`"waterDepth": 30.615638732910156`) — do not "tidy" it.
+    document["waterLevel"] = static_cast<int>(std::lround(recipe.water.waterLevelMaximum));
     document["waterDepth"] = recipe.water.deepWaterDepthMaximum;
     // STEP30_LegacyBlobFieldHoming_IO: a 4th sibling of the STEP27 trio above, camelCase to match
     // (the official format's own Water region uses camelCase, unlike SanGen-owned PascalCase

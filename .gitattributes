@@ -4,6 +4,12 @@
 * text=auto
 
 ###############################################################################
+# STEP84_SanmapExportFormatting_IO: `.sanmap` fixtures (and every real `.sanmap`) are LF-only,
+# byte-exact test data — never let git normalize their line endings on checkout/checkin.
+###############################################################################
+*.sanmap -text
+
+###############################################################################
 # Set default behavior for command prompt diff.
 #
 # This is need for earlier builds of msysgit that does not have it on by

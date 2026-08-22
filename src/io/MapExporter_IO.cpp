@@ -28,6 +28,20 @@ bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe&
     // export-run-only option).
     const std::string documentPath = JoinExportPath(folderPath, recipe.mapName + ".sanmap");
     const std::string documentText = MapExporter::BuildSanmapJsonText(recipe, options, unknownData);
+    // R10 (STEP84_SanmapExportFormattingContract_IO): `BuildSanmapJsonText` returns an empty string
+    // when `dump()` hit invalid UTF-8 (caught in MapExporter_Recipe_IO.cpp) — a hard failure, not a
+    // legitimately-empty document (the envelope alone is never empty). Refuse to write a truncated
+    // `.sanmap` rather than silently succeeding on 0 bytes.
+    if (documentText.empty()) {
+        result.Log("Failed to write " + documentPath + ": the document text is empty (build failed).");
+        return false;
+    }
+    // STEP84_SanmapExportFormattingContract_IO / R3: WriteBinaryFileBytes goes through
+    // std::ios::binary specifically so nlohmann's `\n` line endings are NOT translated to `\r\n` by
+    // Windows text mode. Shipped `.sanmap` files are LF-only (measured against
+    // "Pandemonium Isthmus.sanmap"). Dropping `std::ios::binary` here silently reproduces the exact
+    // defect that damaged that live reference map on 2026-08-21 (every `\n` became `\r\n`) — do not
+    // "simplify" this to a text-mode write.
     if (!WriteBinaryFileBytes(documentPath, documentText.data(), documentText.size())) {
         result.Log("Failed to write " + documentPath);
         return false;
