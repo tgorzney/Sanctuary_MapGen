@@ -1,6 +1,6 @@
 // MapCanvas_Picking_UI_Test.cpp — acceptance test, part 3: a click on a known entity resolves
-// that entity, a click on empty space resolves nothing, and the only work the canvas can cause is
-// the injected regeneration callback. One translation unit of the MapCanvas_UI_Test binary.
+// that entity, a click on empty space resolves nothing — the canvas causes no work of its own —
+// draw, pick, pan/zoom only. One translation unit of the MapCanvas_UI_Test binary.
 // The scene is composited first (the composite writes the entity-id buffer), then clicked
 // through the canvas — i.e. the test goes through the same path the user does.
 #include "MapCanvas_UI.h"
@@ -65,12 +65,6 @@ void RunMapCanvasPickingChecks() {
     check(canvas.View().ZoomScale() > 1.0f, "the wheel zooms the view in");
     check(canvas.ApplyClick(128.0f, 128.0f) == 0u,
           "the entity under the cursor is still resolved after zooming");
-
-    int regenerationCount = 0;
-    canvas.SetRegenerationCallback([&]() { ++regenerationCount; });
-    canvas.RequestRegeneration();
-    check(regenerationCount == 1 && canvas.RegenerationRequestCount() == 1,
-          "the canvas asks for a regeneration through the injected callback and nothing else");
 }
 
 } // namespace Ui

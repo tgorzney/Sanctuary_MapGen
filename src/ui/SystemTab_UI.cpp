@@ -64,6 +64,11 @@ void DrawSystemTab(SystemTabState& state, Sys::DispatchPolicy* dispatchPolicy,
     ImGui::InputText("Asset Cache Directory", state.assetCacheDirectory,
                      IM_ARRAYSIZE(state.assetCacheDirectory));
     ImGui::TextUnformatted("Execution settings are NOT recipe content and never serialize with it.");
+
+    ImGui::Separator();
+    ImGui::TextWrapped("Force a full regeneration for a change no parameter hash can see: a resize, "
+                       "a recipe reload, or new stratum art.");
+    if (ImGui::Button("Force Regenerate")) RequestRegeneration(previewDriver);
     ImGui::PopID();
 }
 

@@ -44,8 +44,6 @@ void Application::DrawActivePanel() {
 
 void Application::DrawCanvasWindow() {
     ImGui::Begin("Map Preview");
-    if (ImGui::Button("Regenerate")) canvas.RequestRegeneration();
-    ImGui::SameLine();
     if (canvas.HasSelection()) ImGui::Text("Selected entity: %u", canvas.SelectedEntityIdentifier());
     else                       ImGui::TextUnformatted("Selected entity: none");
     const ImVec2 available = ImGui::GetContentRegionAvail();
