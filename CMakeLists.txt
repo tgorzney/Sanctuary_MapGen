@@ -327,6 +327,7 @@ add_sangen_test(GenerationAssembler_PIPELINE_Test
     src/pipeline/GenerationAssembler_PIPELINE_Test.cpp
     src/pipeline/GenerationAssembler_Outputs_PIPELINE_Test.cpp
     src/pipeline/GenerationAssembler_Dirty_PIPELINE_Test.cpp)
+add_sangen_test(SymmetryOrbitQuery_PIPELINE_Test  src/pipeline/SymmetryOrbitQuery_PIPELINE_Test.cpp)
 
 # UI — each composite acceptance test declares its own main(), so each is its own binary; the
 # M4-5 integration test is one binary spanning three translation units.

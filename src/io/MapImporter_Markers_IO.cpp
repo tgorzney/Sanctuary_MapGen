@@ -60,6 +60,9 @@ void ReadMarkerTransformJson(const nlohmann::json& json, Params::MarkerTransform
         ReadJsonFloat(scale, "z", transform.scaleZ);
     }
     ReadJsonText(json, "alias", markerTransform.alias);
+    // Correction 16 (STEP68): no range to validate — 0 is always legal, any positive value
+    // accepted as-is (unlike layerIndex/radialSymmetryRepeatCount, which clamp on import).
+    ReadJsonInteger(json, "symmetryGroupIdentifier", markerTransform.symmetryGroupIdentifier);
 }
 
 void ReadMarkerInstanceGroupJson(const nlohmann::json& json, Params::MarkerInstanceGroup& group,

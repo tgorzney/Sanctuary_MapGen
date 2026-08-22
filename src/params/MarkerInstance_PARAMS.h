@@ -18,6 +18,10 @@ struct MarkerTransform {
     std::string name;                  // folded-in inner dict key — instance name (e.g. "Mex 0")
     InstancedTransform transform;
     std::string alias;                 // SanGen-added, already-ratified SANMAP_FORMAT_SPEC Correction 11
+    // SanGen-added, already-ratified SANMAP_FORMAT_SPEC Correction 16 (STEP68). 0 = ungrouped, any
+    // positive value groups this instance with every other MarkerTransform sharing the same value —
+    // the field the future drag-and-follow UI (ARCH_16_MarkerLayerSymmetry.md) writes into.
+    int symmetryGroupIdentifier = 0;
 };
 
 struct MarkerInstanceGroup {
