@@ -485,6 +485,10 @@ target_link_libraries(MapImporter_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 # ParseSanmapJsonText entirely, since those are not wired to call these functions yet.
 add_sangen_test(PropsDecals_IO_Test       src/io/MapImporter_PropsDecals_IO_Test.cpp)
 target_link_libraries(PropsDecals_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+# STEP69_ParamsScenariosRoundTrip_IO: the pure Scenarios JSON round trip (BuildScenariosJson/
+# ReadScenariosJson) plus one live-document check through BuildSanmapJsonText/ParseSanmapJsonText.
+add_sangen_test(Scenarios_IO_Test src/io/MapImporter_Scenarios_IO_Test.cpp)
+target_link_libraries(Scenarios_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 # STEP6_MigrationSubsystem_IO: the shared JSON transform-primitive toolkit and the version-
 # resolution/refusal-law runner. Both construct nlohmann::json fixtures directly, so both link the
 # library the same way MapExporter_IO_Test/PropsDecals_IO_Test already do.

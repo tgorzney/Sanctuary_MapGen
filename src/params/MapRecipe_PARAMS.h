@@ -21,6 +21,7 @@
 #include "MarkerRule_PARAMS.h"
 #include "PropInstance_PARAMS.h"
 #include "ScatterRule_PARAMS.h"
+#include "Scenario_PARAMS.h"
 #include "SlopeDefaults_PARAMS.h"
 #include "Stratum_PARAMS.h"
 #include "Symmetry_PARAMS.h"
@@ -100,6 +101,9 @@ struct MapRecipe {
     std::vector<MapArea>             areas;
     std::vector<MarkerInstanceGroup> markers;
     std::vector<MarkerChain>         chains;
+    // Lobby-resolved spawn/alloy scenario data (ARCH_15_05_ParamsScenariosType.md §15.5, amended by
+    // ARCH_15_10 §15.10) — same hand-authored, pass-through posture as armies/areas/markers/chains.
+    Params::Scenarios                scenarios;
     // PARAMS types + pure JSON round-trip only (STEP4_PropsDecals_IO) — NOT yet live-wired into
     // BuildSanmapJsonText/ParseSanmapJsonText. See MapExporter_IO.h/MapImporter_IO.h SCOPE NOTES.
     std::vector<PropInstanceGroup>   props;

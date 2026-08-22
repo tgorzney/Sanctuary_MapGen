@@ -56,6 +56,23 @@ inline bool ReadJsonEnumeration(const nlohmann::json& parent, const char* key, i
     return true;
 }
 
+// Reads a STRING-valued enum (unlike ReadJsonEnumeration's integer-valued one — the first
+// string-spelled enum anywhere in src/io/, needed by the Scenarios domain's `AlloyMode`/`Field`/
+// `Comparator`). `spellings[0..spellingCount)` are the exact candidate strings, index order IS the
+// enum's integer value on a match. Unrecognized text is treated the same as an absent key: returns
+// false, `destination` untouched — the caller's own pre-loaded current/default value survives,
+// exactly ReadJsonEnumeration's posture on out-of-range.
+inline bool ReadJsonEnumerationText(const nlohmann::json& parent, const char* key,
+                                    const char* const* spellings, int spellingCount,
+                                    int& destination) {
+    std::string text;
+    if (!ReadJsonText(parent, key, text)) return false;
+    for (int index = 0; index < spellingCount; ++index) {
+        if (text == spellings[index]) { destination = index; return true; }
+    }
+    return false;
+}
+
 // Reads an integer and CLAMPS it into [minimum, maximum], OVERWRITING `destination` with the
 // clamped result — unlike `ReadJsonEnumeration`, which REJECTS an out-of-range value and leaves
 // `destination` at its prior/default. A saved 500 imports as `maximum`, not as whatever the
