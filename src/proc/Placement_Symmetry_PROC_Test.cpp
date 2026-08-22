@@ -7,6 +7,7 @@
 //      ..\sys\GpuResource_Buffer_SYS.cpp ..\sys\GpuResource_ProgramParts_SYS.cpp
 //      ..\sys\GpuGlFunctions_SYS.cpp opengl32.lib
 #include "Placement_PROC.h"
+#include "Placement_RuleAppend_PROC.h"
 #include "Placement_RuleBuild_PROC.h"
 #include "Placement_Test_Terrain.h"
 #include <cstdio>
@@ -19,6 +20,16 @@ using namespace SanmapGen;
 static int failures = 0;
 static void Check(bool bCondition, const char* label) {
     if (!bCondition) { std::printf("FAIL: %s\n", label); ++failures; }
+}
+
+// Minimal rule for the flat-seed/hash unit tests below: only the enable/hide gate matters --
+// AppendMarkerRules and ComputeParameterHash are exercised directly, no terrain/Scatter pass.
+static Params::MarkerRule MakeFlatTestRule(bool bEnabled, bool bHidden) {
+    Params::MarkerRule rule;
+    rule.bEnabled = bEnabled;
+    rule.bHidden  = bHidden;
+    rule.transform = PlacementTest::MakeTransform("m002", 1.0f, 1.0f);
+    return rule;
 }
 
 static Params::MapRecipe MakeSymmetricRecipe(int symmetryMask) {
@@ -36,9 +47,11 @@ static Params::MapRecipe MakeSymmetricRecipe(int symmetryMask) {
     spawnRule.minHeight = 0.4f; spawnRule.maxHeight = 0.6f;
     spawnRule.maxSlope = 10.0f;
     spawnRule.bRandomSelection = true;
-    spawnRule.bSymmetryUseGlobal = true;
     spawnRule.transform = PlacementTest::MakeTransform("m002", 1.0f, 1.0f);
-    recipe.markerRules.push_back(spawnRule);
+    Params::MarkerRuleLayer spawnLayer;
+    spawnLayer.symmetry.bSymmetryUseGlobal = true;    // STEP66: the triplet moved up onto the layer
+    spawnLayer.rules.push_back(spawnRule);
+    recipe.markerRuleLayers.push_back(spawnLayer);
     return recipe;
 }
 
@@ -320,7 +333,7 @@ int main() {
 
     // --- Acceptance test 8: end-to-end (not just unit-level) local-override coverage. Runs the
     // FULL pipeline (BuildRuleConfigurations -> AcceptCandidates -> BuildSymmetryOrbit) with a
-    // rule's bSymmetryUseGlobal = false and a rule-local radialSymmetryRepeatCount that DIFFERS
+    // layer's bSymmetryUseGlobal = false and a layer-local radialSymmetryRepeatCount that DIFFERS
     // from recipe.radialSymmetryRepeatCount — the exact bug STEP16 flagged: "local override ...
     // silently inherit the global N". A unit test of ResolveRadialSymmetryRepeatCount alone cannot
     // catch a broken array-threading implementation between BuildRuleConfigurations and
@@ -341,11 +354,14 @@ int main() {
         overrideRule.minHeight = 0.4f; overrideRule.maxHeight = 0.6f;
         overrideRule.maxSlope = 10.0f;
         overrideRule.bRandomSelection = true;
-        overrideRule.bSymmetryUseGlobal = false;          // LOCAL override, not the global mask...
-        overrideRule.symmetryMask = Params::SymmetryAxis::Radial;
-        overrideRule.radialSymmetryRepeatCount = 9;       // ...and a LOCAL count distinct from global
         overrideRule.transform = PlacementTest::MakeTransform("m002", 1.0f, 1.0f);
-        overrideRecipe.markerRules.push_back(overrideRule);
+
+        Params::MarkerRuleLayer overrideLayer;
+        overrideLayer.symmetry.bSymmetryUseGlobal = false;   // LOCAL override, not the global mask...
+        overrideLayer.symmetry.symmetryMask = Params::SymmetryAxis::Radial;
+        overrideLayer.symmetry.radialSymmetryRepeatCount = 9; // ...and a LOCAL count distinct from global
+        overrideLayer.rules.push_back(overrideRule);
+        overrideRecipe.markerRuleLayers.push_back(overrideLayer);
 
         Data::PlacementResults overrideResults;
         Proc::PlacementStage overrideStage(overrideRecipe, fields, overrideResults);
@@ -367,13 +383,13 @@ int main() {
     {
         Params::MapRecipe typicalRecipe = MakeSymmetricRecipe(Params::SymmetryAxis::Radial);
         typicalRecipe.radialSymmetryRepeatCount = 4;
-        typicalRecipe.markerRules[0].count = 40;
-        typicalRecipe.markerRules[0].clearanceSpacing = 4.0f;
+        typicalRecipe.markerRuleLayers[0].rules[0].count = 40;
+        typicalRecipe.markerRuleLayers[0].rules[0].clearanceSpacing = 4.0f;
 
         Params::MapRecipe worstRecipe = MakeSymmetricRecipe(worstCaseMask);
         worstRecipe.radialSymmetryRepeatCount = 12;
-        worstRecipe.markerRules[0].count = 40;
-        worstRecipe.markerRules[0].clearanceSpacing = 4.0f;
+        worstRecipe.markerRuleLayers[0].rules[0].count = 40;
+        worstRecipe.markerRuleLayers[0].rules[0].clearanceSpacing = 4.0f;
 
         Data::PlacementResults typicalResults, worstResults;
         Proc::PlacementStage typicalStage(typicalRecipe, fields, typicalResults);
@@ -404,6 +420,175 @@ int main() {
           "rule's own distinct local count");
     Check(Proc::ResolveRadialSymmetryRepeatCount(false, 9, 4) == 9,
           "ResolveRadialSymmetryRepeatCount(bUseGlobal=false) returns the rule's own local count");
+
+    // ============================================================================================
+    // STEP79_MarkerRuleLayerProcConsumer_PROC — the two-level markerRuleLayers walk. Exercises
+    // Proc::AppendMarkerRules / PlacementStage::ComputeParameterHash directly (no terrain, no
+    // Scatter/Accept pass needed for these unit-level determinism/hash checks).
+    // ============================================================================================
+
+    // --- Acceptance test 11: THE FLAT SEED COUNTER — the determinism guard. ruleIndex/ruleSeed
+    // must keep today's exact flat numbering across the layer boundary, including through a
+    // fully-suppressed layer.
+    {
+        Proc::PlacementConstants constants;
+        Params::MapRecipe recipe;
+        recipe.geometry.seed = 999u;
+
+        // Five rules, flat positions 1 and 3 suppressed (own bEnabled=false, bHidden=false),
+        // distributed 2 / 1 / 2 across three enabled layers.
+        Params::MarkerRuleLayer layerA, layerB, layerC;
+        layerA.rules.push_back(MakeFlatTestRule(true, false));    // flat 0 -- survives
+        layerA.rules.push_back(MakeFlatTestRule(false, false));   // flat 1 -- suppressed (rule gate)
+        layerB.rules.push_back(MakeFlatTestRule(true, false));    // flat 2 -- survives
+        layerC.rules.push_back(MakeFlatTestRule(false, false));   // flat 3 -- suppressed
+        layerC.rules.push_back(MakeFlatTestRule(true, false));    // flat 4 -- survives
+        recipe.markerRuleLayers.push_back(layerA);
+        recipe.markerRuleLayers.push_back(layerB);
+        recipe.markerRuleLayers.push_back(layerC);
+
+        std::vector<Proc::ScatterRuleConfiguration> configurations;
+        std::vector<Data::TemplateIdentifier> identifiers;
+        std::vector<int> radialCounts;
+        Proc::AppendMarkerRules(constants, recipe, configurations, identifiers, radialCounts);
+
+        Check(configurations.size() == 3, "3 of 5 rules survive suppression");
+        bool bIndicesCorrect = configurations.size() == 3
+            && configurations[0].ruleIndex == 0 && configurations[1].ruleIndex == 2
+            && configurations[2].ruleIndex == 4;
+        Check(bIndicesCorrect, "surviving configurations carry ruleIndex 0, 2, 4 -- not 0, 1, 2");
+
+        bool bSeedsCorrect = configurations.size() == 3
+            && configurations[0].ruleSeed == Proc::MakeRuleSeed(constants, recipe.geometry.seed, 0, 0)
+            && configurations[1].ruleSeed == Proc::MakeRuleSeed(constants, recipe.geometry.seed, 0, 2)
+            && configurations[2].ruleSeed == Proc::MakeRuleSeed(constants, recipe.geometry.seed, 0, 4);
+        Check(bSeedsCorrect, "ruleSeed values match MakeRuleSeed(constants, seed, 0, {0,2,4}) exactly");
+
+        // A fourth, fully DISABLED layer holding 2 rules, inserted between layerB and layerC: the
+        // counter must advance through it too, so layerC's surviving rule (flat 4 without the
+        // gap) is now seeded 6, not 4 -- the counter did not reset or skip the suppressed layer.
+        Params::MarkerRuleLayer gapLayer;
+        gapLayer.bEnabled = false;
+        gapLayer.bHidden  = false;
+        gapLayer.rules.push_back(MakeFlatTestRule(true, false));
+        gapLayer.rules.push_back(MakeFlatTestRule(true, false));
+
+        Params::MapRecipe recipeWithGap;
+        recipeWithGap.geometry.seed = 999u;
+        recipeWithGap.markerRuleLayers.push_back(layerA);
+        recipeWithGap.markerRuleLayers.push_back(layerB);
+        recipeWithGap.markerRuleLayers.push_back(gapLayer);   // inserted in the middle
+        recipeWithGap.markerRuleLayers.push_back(layerC);
+
+        std::vector<Proc::ScatterRuleConfiguration> gapConfigurations;
+        std::vector<Data::TemplateIdentifier> gapIdentifiers;
+        std::vector<int> gapRadialCounts;
+        Proc::AppendMarkerRules(constants, recipeWithGap, gapConfigurations, gapIdentifiers, gapRadialCounts);
+
+        Check(gapConfigurations.size() == 3, "3 of 7 rules survive with the disabled layer inserted");
+        bool bGapIndexCorrect = gapConfigurations.size() == 3 && gapConfigurations[2].ruleIndex == 6;
+        Check(bGapIndexCorrect, "the counter advances through a fully-suppressed layer inserted "
+                                "mid-sequence: the surviving rule after it is seeded 6 (shifted by "
+                                "the 2-rule gap), not 4");
+    }
+
+    // --- Acceptance test 12: suppression matrix. The layer/rule OR-combination, and the
+    // hidden-still-generates semantic preserved at BOTH tiers.
+    {
+        Proc::PlacementConstants constants;
+        Params::MapRecipe recipe;
+        recipe.geometry.seed = 1234u;
+
+        Params::MarkerRuleLayer disabledVisibleLayer;   // layer disabled, NOT hidden: a real gate
+        disabledVisibleLayer.bEnabled = false;
+        disabledVisibleLayer.bHidden  = false;
+        disabledVisibleLayer.rules.push_back(MakeFlatTestRule(true, false));  // rule itself enabled
+
+        Params::MarkerRuleLayer enabledLayer;           // layer enabled: the rule tier governs
+        enabledLayer.rules.push_back(MakeFlatTestRule(false, false)); // disabled, NOT hidden: suppressed
+        enabledLayer.rules.push_back(MakeFlatTestRule(false, true));  // disabled but HIDDEN: still generates
+
+        recipe.markerRuleLayers.push_back(disabledVisibleLayer);
+        recipe.markerRuleLayers.push_back(enabledLayer);
+
+        std::vector<Proc::ScatterRuleConfiguration> configurations;
+        std::vector<Data::TemplateIdentifier> identifiers;
+        std::vector<int> radialCounts;
+        Proc::AppendMarkerRules(constants, recipe, configurations, identifiers, radialCounts);
+
+        Check(configurations.size() == 1, "only the disabled-but-hidden rule survives suppression");
+        bool bHiddenFlagSet = configurations.size() == 1
+            && (configurations[0].selectionFlags & Proc::ScatterSelectionFlag::Hidden) != 0;
+        Check(bHiddenFlagSet, "the surviving disabled-but-hidden rule still carries "
+                              "ScatterSelectionFlag::Hidden");
+    }
+
+    // --- Acceptance test 13: dirty-hash reactivity, the silent-failure guard (Placement_Hash_PROC.cpp
+    // fails silently, not at compile time, if not migrated in lockstep). Flip ONE symmetry/enable/
+    // hidden field at a time and require ComputeParameterHash() to react every time; also confirm
+    // layer STRUCTURE (how the same rules are grouped) is itself a hash input.
+    {
+        auto MakeHashRecipe = []() {
+            Params::MapRecipe recipe;
+            recipe.geometry.seed = 55u;
+            Params::MarkerRuleLayer layer;
+            layer.rules.push_back(MakeFlatTestRule(true, false));
+            layer.rules.push_back(MakeFlatTestRule(true, false));
+            recipe.markerRuleLayers.push_back(layer);
+            return recipe;
+        };
+        auto HashOf = [&](const Params::MapRecipe& recipe) {
+            Data::PlacementResults results;
+            Proc::PlacementStage stage(recipe, fields, results);
+            return stage.ComputeParameterHash();
+        };
+
+        const std::size_t baselineHash = HashOf(MakeHashRecipe());
+
+        Params::MapRecipe changedMask = MakeHashRecipe();
+        changedMask.markerRuleLayers[0].symmetry.symmetryMask = Params::SymmetryAxis::Radial;
+        Check(HashOf(changedMask) != baselineHash, "flipping symmetry.symmetryMask dirties the hash");
+
+        Params::MapRecipe changedUseGlobal = MakeHashRecipe();
+        changedUseGlobal.markerRuleLayers[0].symmetry.bSymmetryUseGlobal = false;
+        Check(HashOf(changedUseGlobal) != baselineHash, "flipping symmetry.bSymmetryUseGlobal dirties the hash");
+
+        Params::MapRecipe changedRadialCount = MakeHashRecipe();
+        changedRadialCount.markerRuleLayers[0].symmetry.radialSymmetryRepeatCount = 9;
+        Check(HashOf(changedRadialCount) != baselineHash, "flipping symmetry.radialSymmetryRepeatCount "
+                                                          "dirties the hash (closes a pre-existing gap)");
+
+        Params::MapRecipe changedLayerEnabled = MakeHashRecipe();
+        changedLayerEnabled.markerRuleLayers[0].bEnabled = false;
+        Check(HashOf(changedLayerEnabled) != baselineHash, "flipping layer.bEnabled dirties the hash");
+
+        Params::MapRecipe changedLayerHidden = MakeHashRecipe();
+        changedLayerHidden.markerRuleLayers[0].bHidden = true;
+        Check(HashOf(changedLayerHidden) != baselineHash, "flipping layer.bHidden dirties the hash");
+
+        // The same rules distributed 2/1 vs 1/2 across layers (identical symmetry settings on
+        // every layer) must hash differently -- layer structure is a real input.
+        Params::MapRecipe splitTwoOne;
+        splitTwoOne.geometry.seed = 77u;
+        Params::MarkerRuleLayer twoRuleLayer, oneRuleLayerA;
+        twoRuleLayer.rules.push_back(MakeFlatTestRule(true, false));
+        twoRuleLayer.rules.push_back(MakeFlatTestRule(true, false));
+        oneRuleLayerA.rules.push_back(MakeFlatTestRule(true, false));
+        splitTwoOne.markerRuleLayers.push_back(twoRuleLayer);
+        splitTwoOne.markerRuleLayers.push_back(oneRuleLayerA);
+
+        Params::MapRecipe splitOneTwo;
+        splitOneTwo.geometry.seed = 77u;
+        Params::MarkerRuleLayer oneRuleLayerB, twoRuleLayerB;
+        oneRuleLayerB.rules.push_back(MakeFlatTestRule(true, false));
+        twoRuleLayerB.rules.push_back(MakeFlatTestRule(true, false));
+        twoRuleLayerB.rules.push_back(MakeFlatTestRule(true, false));
+        splitOneTwo.markerRuleLayers.push_back(oneRuleLayerB);
+        splitOneTwo.markerRuleLayers.push_back(twoRuleLayerB);
+
+        Check(HashOf(splitTwoOne) != HashOf(splitOneTwo), "the same rules distributed 2/1 vs 1/2 "
+                                                          "across layers hash differently");
+    }
 
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);

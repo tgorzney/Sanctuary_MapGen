@@ -68,7 +68,9 @@ static Params::MapRecipe MakeParityRecipe() {
     markerRule.maxSlope = 12.0f;
     markerRule.bRandomSelection = true;
     markerRule.transform = PlacementTest::MakeTransform("alloy01", 1.0f, 1.0f);
-    recipe.markerRules.push_back(markerRule);
+    Params::MarkerRuleLayer markerLayer;
+    markerLayer.rules.push_back(markerRule);
+    recipe.markerRuleLayers.push_back(markerLayer);
 
     Params::PropRule propRule;
     propRule.density = 0.4f;
