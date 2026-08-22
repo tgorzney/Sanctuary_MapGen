@@ -495,9 +495,17 @@ void CheckHostileV2DocumentImportsToExpectedRecipe() {
           && recipe.strata[0].bSlopeGateEnabled && recipe.strata[0].minimumSlopeDegrees == 10.0f
           && recipe.strata[0].slopeGateStrength == 0.5f,
           "both StratumGenerationSettings co-writers' fields land together on recipe.strata[0]");
-    Check(recipe.armies.size() == 1 && recipe.armies[0].name == "commander"
+    // STEP76_ArmyIdentityNaming_IO §4: `ParseSanmapJsonText` now unconditionally normalizes the
+    // army identity AFTER the V2->V3 migration walk recovers this document. "commander" is not
+    // ARMY_XX-shaped, so it normalizes to ARMY_01 and survives instead as `displayName` — proving
+    // the migration chain and the STEP76 normalizer compose correctly, not a weakening of this
+    // assertion (this WAS "recipe.armies[0].name == \"commander\"" before STEP76 retired `name` as
+    // a human-authored field).
+    Check(recipe.armies.size() == 1 && recipe.armies[0].name == "ARMY_01"
+          && recipe.armies[0].displayName == "commander"
           && recipe.armies[0].armyColor[0] == 0.25f && recipe.armies[0].armyColor[2] == 0.75f,
-          "the legacy army Color array lands on recipe.armies[0].armyColor");
+          "the legacy army Color array lands on recipe.armies[0].armyColor, and the legacy army "
+          "name normalizes to ARMY_01 while surviving as displayName");
     bool bFoundAliasedTransform = false;
     for (const Params::MarkerInstanceGroup& group : recipe.markers)
         for (const Params::MarkerTransform& transform : group.transforms)

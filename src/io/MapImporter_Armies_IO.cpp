@@ -105,6 +105,10 @@ void ReadArmyJson(const nlohmann::json& armyJson, Params::Army& army, int mapSiz
                         });
     ReadArmyColorJson(armyJson, army.armyColor);
     ReadJsonText(armyJson, "alias", army.alias);
+    // STEP76 §2/§8: `displayName` merges into the format-native `armies[<ARMY_XX>]` object, a
+    // sibling of `alias`. `name` itself (the outer dict key) is re-minted unconditionally right
+    // after this by NormalizeArmyIdentities — never trusted as authoritative from the document.
+    ReadJsonText(armyJson, "displayName", army.displayName);
 }
 
 } // namespace

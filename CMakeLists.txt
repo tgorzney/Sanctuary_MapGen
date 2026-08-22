@@ -648,6 +648,15 @@ target_link_libraries(Accumulation_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlo
 add_sangen_test(DetailNormal_Migrate_V2_IO_Test src/io/DetailNormal_Migrate_V2_IO_Test.cpp)
 target_link_libraries(DetailNormal_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 
+# STEP76_ArmyIdentityNaming_IO: the machine-owned ARMY_XX identity helper (pure, headless — no
+# nlohmann needed) and its import-side normalizer, which constructs nlohmann::json document fixtures
+# / calls BuildSanmapJsonText/ParseSanmapJsonText directly, same linking need as the migration
+# binaries just above. Target names match the ticket's own registration, shorter than their source
+# files' own prefixes (PropsDecals_IO_Test precedent).
+add_sangen_test(ArmyIdentity_IO_Test src/io/Sanmap_ArmyIdentity_IO_Test.cpp)
+add_sangen_test(ArmyIdentityNormalize_IO_Test src/io/MapImporter_ArmyIdentityNormalize_IO_Test.cpp)
+target_link_libraries(ArmyIdentityNormalize_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+
 # STEP40C_ColorConversionMigrations_IO: the two V2->V3 migrations that compose MoveKey with
 # ConvertColorArrayToRgbaObject (STEP40A) — not wired into the manifest yet (STEP40F's job). Same
 # glob'd-into-SANGEN_V2_SOURCES / direct-fixture-construction reasoning as STEP40B above.

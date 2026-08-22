@@ -4,6 +4,7 @@
 #include "MapExporter_IO.h"
 #include "FilesystemPrimitives_IO.h"
 #include "MapExporter_BlueprintValidation_IO.h"
+#include "MapExporter_Recipe_IO.h"
 #include "UnknownImportBag_IO.h"
 #include "../data/MapFields_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -15,6 +16,13 @@ namespace {
 bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe& recipe,
                          const MapExportOptions& options, MapExportResult& result,
                          const UnknownImportBag* unknownData) {
+    // STEP76_ArmyIdentityNaming_IO §3c option (ii): verify-and-warn, not rewrite (BuildArmiesJson
+    // stays const, never a const_cast). This is the one place both public export actions
+    // (ExportSanmapOnly/ExportAll) share, so it is the natural home for the backstop — it fires
+    // before the document is even assembled, and `result` is already the sink the Files tab's log
+    // panel reads.
+    CheckArmyIdentitiesWellFormed(recipe.armies, result);
+
     // The output file name matches the document's own `mapName` (STEP25_MapNameCredits_IO moved
     // this off `MapExportOptions` onto the recipe — it is real, importable document content, not an
     // export-run-only option).

@@ -2,7 +2,9 @@
 // Layer: IO. Own file (not shared with Areas): the more complex of the two domains — three levels
 // of recursion (Army -> UnitGroup -> UnitGroup*/UnitTransform*), a Color-shaped field, and the
 // bounded `tpid` buffer copy (IO Architecture Expert ruling, STEP2_ArmiesAreas_IO).
+#include "MapExporter_IO.h"
 #include "MapExporter_Recipe_IO.h"
+#include "Sanmap_ArmyIdentity_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {
@@ -72,9 +74,34 @@ nlohmann::ordered_json BuildArmiesJson(const Params::MapRecipe& recipe) {
         armyJson["armyColor"] = { { "r", army.armyColor[0] }, { "g", army.armyColor[1] },
                                   { "b", army.armyColor[2] }, { "a", army.armyColor[3] } };
         armyJson["alias"] = army.alias;
+        // STEP76 §2: `displayName` merges directly into the format-native `armies[<ARMY_XX>]`
+        // object, lowerCamelCase, alongside `armyColor`/`alias` (ARCH_01_06_SanmapKeyCasing.md §1.6,
+        // §1.8's direct-injection branch) — NOT a new top-level section.
+        armyJson["displayName"] = army.displayName;
         armies[army.name] = armyJson;
     }
     return armies;
+}
+
+// STEP76 §3c — the export-time guard. `ArmiesTab_UI.cpp`'s own re-mint (§3b) keeps
+// `recipe.armies` correct on every roster mutation reachable through the tab; this exists only for
+// the paths that don't go through it — a recipe built by a test, a future headless/CLI export, or
+// any caller that mutates `recipe.armies` directly. Option (ii) from the ticket: VERIFIES and warns,
+// never rewrites — `BuildArmiesJson` above stays pure/const, and this never needs a `const_cast`.
+// Should fire zero times on a recipe that ever passed through the tab (AssignArmyIdentities is
+// idempotent, so a caller that DID go through the tab sees no warning here either).
+void CheckArmyIdentitiesWellFormed(const std::vector<Params::Army>& armies, MapExportResult& result) {
+    for (std::size_t armyIndex = 0u; armyIndex < armies.size(); ++armyIndex) {
+        const std::string expectedIdentity =
+            ArmyIdentityForRosterPosition(static_cast<int>(armyIndex) + 1);
+        if (armies[armyIndex].name == expectedIdentity) continue;
+        result.Log("SANGEN: army \"" + armies[armyIndex].name + "\" (roster position "
+                   + std::to_string(armyIndex + 1) + ") is not the expected engine identity \""
+                   + expectedIdentity + "\". The engine assigns lobby slots by ALPHABETICAL name "
+                   "order, so a non-conforming name silently maps armies to the wrong slots once a "
+                   "map has 10 or more armies. Scenario spawn positions and alloy occupancy will be "
+                   "assigned to the wrong armies.");
+    }
 }
 
 } // namespace Io
