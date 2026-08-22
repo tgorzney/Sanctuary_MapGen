@@ -38,5 +38,12 @@ bool WriteBinaryFileBytes(const std::string& filePath, const void* bytes, std::s
     return static_cast<bool>(outputStream);
 }
 
+bool ReadTextFileBytes(const std::string& filePath, std::string& outText) {
+    std::ifstream inputStream(filePath, std::ios::binary);
+    if (!inputStream) return false;
+    outText.assign(std::istreambuf_iterator<char>(inputStream), std::istreambuf_iterator<char>());
+    return true;
+}
+
 } // namespace Io
 } // namespace SanmapGen
