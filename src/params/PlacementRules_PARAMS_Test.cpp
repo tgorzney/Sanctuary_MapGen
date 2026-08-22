@@ -13,8 +13,14 @@ int main() {
     MarkerRule marker;
     if (marker.maxSlope != 89.9f || marker.count != 4 || marker.priority != MarkerPriority::LargestArea)
         { std::printf("FAIL marker defaults\n"); ++failures; }
-    if (marker.focusGradient != FocusGradient::None || !marker.bSymmetryUseGlobal)
-        { std::printf("FAIL marker focus/symmetry\n"); ++failures; }
+    if (marker.focusGradient != FocusGradient::None)
+        { std::printf("FAIL marker focus\n"); ++failures; }
+
+    // STEP66: the symmetry triplet moved up one tier, off MarkerRule onto MarkerRuleLayer.
+    MarkerRuleLayer markerLayer;
+    if (!markerLayer.bEnabled || markerLayer.bHidden || !markerLayer.symmetry.bSymmetryUseGlobal
+        || markerLayer.symmetry.symmetryMask != 0 || markerLayer.symmetry.radialSymmetryRepeatCount != 3)
+        { std::printf("FAIL marker rule layer defaults\n"); ++failures; }
 
     PropRule prop;
     if (prop.density != 0.5f || prop.bAvoidWater || prop.bNearCliffs || prop.bReclaimable)

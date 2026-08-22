@@ -6,6 +6,7 @@
 #include "MapImporter_IO.h"
 #include "MapImporter_Recipe_IO.h"
 #include "MapExporter_IO.h"
+#include "MapExporter_Recipe_IO.h"
 #include "Sanmap_MigrationManifest_IO.h"
 #include "Sanmap_KnownTopLevelKeys_IO.h"
 
@@ -139,8 +140,9 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
     Check(!loaded.strata.empty() && loaded.strata[0].bSlopeGateEnabled
           && NearlyEqual(loaded.strata[0].maximumSlopeDegrees, 55.0f)
           && NearlyEqual(loaded.strata[0].tileCount, 24.0f), "the stratum settings survive");
-    Check(loaded.markerRules.size() == 1 && loaded.markerRules[0].count == 8
-          && loaded.markerRules[0].symmetryMask == 1, "the marker rules survive");
+    Check(loaded.markerRuleLayers.size() == 1 && loaded.markerRuleLayers[0].rules.size() == 1
+          && loaded.markerRuleLayers[0].rules[0].count == 8
+          && loaded.markerRuleLayers[0].symmetry.symmetryMask == 1, "the marker rules survive");
     Check(loaded.propRules.size() == 1 && loaded.propRules[0].bAvoidWater
           && loaded.propRules[0].bReclaimable
           && loaded.propRules[0].bSymmetryUseGlobal == false && loaded.propRules[0].symmetryMask == 2,
@@ -212,10 +214,12 @@ void CheckSymmetryFields(const Params::MapRecipe& original, const Params::MapRec
           && NearlyEqual(loadedBlend.torusMinorRadius, originalBlend.torusMinorRadius),
           "recipe.symmetryBlend survives, all six exotic-blend scalars");
 
-    Check(!loaded.markerRules.empty()
-          && loaded.markerRules[0].radialSymmetryRepeatCount == original.markerRules[0].radialSymmetryRepeatCount
-          && original.markerRules[0].radialSymmetryRepeatCount == 6,
-          "MarkerRule::radialSymmetryRepeatCount survives, sibling of SymmetryMask");
+    Check(!loaded.markerRuleLayers.empty()
+          && loaded.markerRuleLayers[0].symmetry.radialSymmetryRepeatCount
+                 == original.markerRuleLayers[0].symmetry.radialSymmetryRepeatCount
+          && original.markerRuleLayers[0].symmetry.radialSymmetryRepeatCount == 6,
+          "MarkerRuleLayer::symmetry.radialSymmetryRepeatCount survives, sibling of SymmetryMask "
+          "(STEP66: promoted off the individual MarkerRule)");
     Check(!loaded.propRules.empty()
           && loaded.propRules[0].radialSymmetryRepeatCount == original.propRules[0].radialSymmetryRepeatCount
           && original.propRules[0].radialSymmetryRepeatCount == 7,
@@ -252,11 +256,16 @@ void CheckSymmetryFields(const Params::MapRecipe& original, const Params::MapRec
 // `GlobalMarkerSettings` keys — REPLACING the deleted `mapGeneratorData.PlacementRules` object.
 void CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(const Params::MapRecipe& original,
                                                      const Params::MapRecipe& loaded) {
-    Check(!loaded.markerRules.empty()
-          && NearlyEqual(loaded.markerRules[0].hydroMultiplier, original.markerRules[0].hydroMultiplier)
-          && NearlyEqual(loaded.markerRules[0].reclaimDensity, original.markerRules[0].reclaimDensity)
-          && NearlyEqual(loaded.markerRules[0].mexDensity, original.markerRules[0].mexDensity)
-          && loaded.markerRules[0].spawnPointCount == original.markerRules[0].spawnPointCount,
+    Check(!loaded.markerRuleLayers.empty() && !loaded.markerRuleLayers[0].rules.empty()
+          && !original.markerRuleLayers[0].rules.empty()
+          && NearlyEqual(loaded.markerRuleLayers[0].rules[0].hydroMultiplier,
+                        original.markerRuleLayers[0].rules[0].hydroMultiplier)
+          && NearlyEqual(loaded.markerRuleLayers[0].rules[0].reclaimDensity,
+                        original.markerRuleLayers[0].rules[0].reclaimDensity)
+          && NearlyEqual(loaded.markerRuleLayers[0].rules[0].mexDensity,
+                        original.markerRuleLayers[0].rules[0].mexDensity)
+          && loaded.markerRuleLayers[0].rules[0].spawnPointCount
+                 == original.markerRuleLayers[0].rules[0].spawnPointCount,
           "hydroMultiplier/reclaimDensity/mexDensity/spawnPointCount survive on MarkerRule "
           "(previously write-only-to-nothing)");
 
@@ -277,6 +286,100 @@ void CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(const Params::MapRecipe& or
           && NearlyEqual(loadedSettings.scalePlasma, originalSettings.scalePlasma)
           && NearlyEqual(loadedSettings.scaleSpawn, originalSettings.scaleSpawn),
           "GlobalMarkerSettings's three scales survive");
+}
+
+// STEP66_MarkerRuleLayer_PARAMS acceptance test: a recipe with 2 `MarkerRuleLayer`s (different
+// symmetry settings, 2+ rules each, including non-default per-rule fields) round-trips exactly
+// through `MarkersStack`'s two-level shape (ARCH_16_01_NewParamsShapes.md §16.1,
+// SANMAP_FORMAT_SPEC Correction 15). Confirms, via the raw JSON TEXT (not just call sites), that no
+// `MarkerRule` object carries `SymmetryUseGlobal`/`SymmetryMask`/`RadialSymmetryRepeatCount`, and
+// that each layer carries its own three symmetry keys exactly once, at the layer level.
+void CheckMarkerRuleLayerTwoLevelRoundTrip() {
+    Params::MapRecipe original;
+
+    Params::MarkerRuleLayer layerOne;
+    layerOne.name = "Expansions";
+    layerOne.bEnabled = true;
+    layerOne.bHidden  = false;
+    layerOne.symmetry.bSymmetryUseGlobal = false;
+    layerOne.symmetry.symmetryMask = Params::SymmetryAxis::MirrorAcrossX;
+    layerOne.symmetry.radialSymmetryRepeatCount = 4;
+    Params::MarkerRule ruleOneA; ruleOneA.count = 3; ruleOneA.hydroMultiplier = 1.4f;
+    Params::MarkerRule ruleOneB; ruleOneB.count = 5; ruleOneB.mexDensity = 0.25f;
+    layerOne.rules.push_back(ruleOneA);
+    layerOne.rules.push_back(ruleOneB);
+    original.markerRuleLayers.push_back(layerOne);
+
+    Params::MarkerRuleLayer layerTwo;
+    layerTwo.name = "Start Alloys";
+    layerTwo.bEnabled = false;   // a real generation gate — must survive as false, not just Hidden
+    layerTwo.bHidden  = true;
+    layerTwo.symmetry.bSymmetryUseGlobal = true;
+    layerTwo.symmetry.symmetryMask = Params::SymmetryAxis::Radial;
+    layerTwo.symmetry.radialSymmetryRepeatCount = 6;
+    Params::MarkerRule ruleTwoA; ruleTwoA.reclaimDensity = 0.6f; ruleTwoA.spawnPointCount = 2;
+    Params::MarkerRule ruleTwoB; ruleTwoB.count = 7; ruleTwoB.hydroMultiplier = 2.2f;
+    layerTwo.rules.push_back(ruleTwoA);
+    layerTwo.rules.push_back(ruleTwoB);
+    original.markerRuleLayers.push_back(layerTwo);
+
+    const nlohmann::ordered_json markersStackJson = Io::BuildMarkersStackJson(original);
+    const std::string markersStackText = markersStackJson.dump();
+    Check(markersStackText.find("SymmetryUseGlobal") != std::string::npos
+          && markersStackText.find("SymmetryMask") != std::string::npos
+          && markersStackText.find("RadialSymmetryRepeatCount") != std::string::npos,
+          "the layer's own three symmetry keys are present in the exported MarkersStack");
+
+    // Confirm each `Rules[]` element (not the layer object itself) carries no symmetry keys, by
+    // walking the parsed structure directly rather than a flat text search (a flat search can't
+    // distinguish "present on the layer" from "present on a rule").
+    bool bAnyRuleCarriesSymmetryKey = false;
+    int  layerSymmetryUseGlobalKeyCount = 0;
+    for (const nlohmann::ordered_json& layerJson : markersStackJson) {
+        if (layerJson.contains("SymmetryUseGlobal")) ++layerSymmetryUseGlobalKeyCount;
+        if (!layerJson.contains("Rules")) continue;
+        for (const nlohmann::ordered_json& ruleJson : layerJson["Rules"]) {
+            if (ruleJson.contains("SymmetryUseGlobal") || ruleJson.contains("SymmetryMask")
+                || ruleJson.contains("RadialSymmetryRepeatCount"))
+                bAnyRuleCarriesSymmetryKey = true;
+        }
+    }
+    Check(!bAnyRuleCarriesSymmetryKey,
+          "no MarkerRule JSON object in the exported document contains SymmetryUseGlobal/"
+          "SymmetryMask/RadialSymmetryRepeatCount");
+    Check(layerSymmetryUseGlobalKeyCount == static_cast<int>(original.markerRuleLayers.size()),
+          "the layer's own SymmetryUseGlobal key appears exactly once per layer");
+
+    nlohmann::json document;
+    document["MarkersStack"] = markersStackJson;
+    Params::MapRecipe loaded;
+    Io::ReadMarkersStackJson(document, loaded);
+
+    Check(loaded.markerRuleLayers.size() == 2, "both MarkerRuleLayers survive the round trip");
+    for (std::size_t layerIndex = 0; layerIndex < original.markerRuleLayers.size(); ++layerIndex) {
+        const Params::MarkerRuleLayer& originalLayer = original.markerRuleLayers[layerIndex];
+        const Params::MarkerRuleLayer& loadedLayer   = loaded.markerRuleLayers[layerIndex];
+        Check(loadedLayer.name == originalLayer.name
+              && loadedLayer.bEnabled == originalLayer.bEnabled
+              && loadedLayer.bHidden == originalLayer.bHidden
+              && loadedLayer.symmetry.bSymmetryUseGlobal == originalLayer.symmetry.bSymmetryUseGlobal
+              && loadedLayer.symmetry.symmetryMask == originalLayer.symmetry.symmetryMask
+              && loadedLayer.symmetry.radialSymmetryRepeatCount
+                     == originalLayer.symmetry.radialSymmetryRepeatCount
+              && loadedLayer.rules.size() == originalLayer.rules.size(),
+              "the layer's own fields (Name/Enabled/Hidden/symmetry) and rule count survive");
+        for (std::size_t ruleIndex = 0; ruleIndex < originalLayer.rules.size(); ++ruleIndex) {
+            const Params::MarkerRule& originalRule = originalLayer.rules[ruleIndex];
+            const Params::MarkerRule& loadedRule   = loadedLayer.rules[ruleIndex];
+            Check(loadedRule.count == originalRule.count
+                  && NearlyEqual(loadedRule.hydroMultiplier, originalRule.hydroMultiplier)
+                  && NearlyEqual(loadedRule.reclaimDensity, originalRule.reclaimDensity)
+                  && NearlyEqual(loadedRule.mexDensity, originalRule.mexDensity)
+                  && loadedRule.spawnPointCount == originalRule.spawnPointCount,
+                  "each rule's own fields (count/HydroMultiplier/ReclaimDensity/MexDensity/"
+                  "SpawnPointCount) survive independent of the layer's symmetry");
+        }
+    }
 }
 
 // SANMAP_FORMAT_SPEC Correction 7, ruling #3: `PlacementRules` is RELOCATED, not dual-written, into
@@ -883,19 +986,24 @@ void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
 }
 
 void FillFixturePlacementRules(Params::MapRecipe& recipe) {
+    // STEP66_MarkerRuleLayer_PARAMS: the symmetry triplet moved up one tier, off MarkerRule onto
+    // its wrapping MarkerRuleLayer.
+    Params::MarkerRuleLayer markerRuleLayer;
+    markerRuleLayer.name = "Fixture Marker Layer";
+    markerRuleLayer.symmetry.symmetryMask = 1;
+    // STEP16_SymmetryGlobalSettings_IO: the new sibling field, non-default (CheckSymmetryFields).
+    markerRuleLayer.symmetry.radialSymmetryRepeatCount = 6;
     Params::MarkerRule markerRule;
     markerRule.count = 8;
     markerRule.clearanceSpacing = 14.0f;
-    markerRule.symmetryMask = 1;
-    // STEP16_SymmetryGlobalSettings_IO: the new sibling field, non-default (CheckSymmetryFields).
-    markerRule.radialSymmetryRepeatCount = 6;
     // STEP13_PlacementStacks_IO: the 4 new per-layer fields, non-default
     // (CheckMarkerRuleNewFieldsAndGlobalMarkerSettings).
     markerRule.hydroMultiplier = 1.8f;
     markerRule.reclaimDensity  = 0.35f;
     markerRule.mexDensity      = 0.6f;
     markerRule.spawnPointCount = 6;
-    recipe.markerRules.push_back(markerRule);
+    markerRuleLayer.rules.push_back(markerRule);
+    recipe.markerRuleLayers.push_back(markerRuleLayer);
     Params::PropRule propRule;
     propRule.density = 0.4f;
     propRule.bAvoidWater = true;
@@ -1390,30 +1498,35 @@ void CheckRadialSymmetryRepeatCountClampsOnImport() {
               "[2, 12] minimum, overwriting destination");
     }
 
-    // --- one per-rule stack (MarkersStack): the same clamp behavior on MarkerRule::
-    // radialSymmetryRepeatCount, confirming the wiring is not Symmetry-section-specific.
+    // --- one per-rule stack (MarkersStack): the same clamp behavior on MarkerRuleLayer::
+    // symmetry.radialSymmetryRepeatCount (STEP66: promoted from the individual MarkerRule onto its
+    // wrapping MarkerRuleLayer), confirming the wiring is not Symmetry-section-specific.
     {
         nlohmann::json document;
         document["MarkersStack"] = nlohmann::json::array();
-        nlohmann::json markerJson;
-        markerJson["RadialSymmetryRepeatCount"] = 0;
-        document["MarkersStack"].push_back(markerJson);
+        nlohmann::json layerJson;
+        layerJson["RadialSymmetryRepeatCount"] = 0;
+        layerJson["Rules"] = nlohmann::json::array();
+        document["MarkersStack"].push_back(layerJson);
         Params::MapRecipe loaded;
         Io::ReadMarkersStackJson(document, loaded);
-        Check(!loaded.markerRules.empty()
-              && loaded.markerRules[0].radialSymmetryRepeatCount == Params::radialSymmetryRepeatCountMinimum,
+        Check(!loaded.markerRuleLayers.empty()
+              && loaded.markerRuleLayers[0].symmetry.radialSymmetryRepeatCount
+                     == Params::radialSymmetryRepeatCountMinimum,
               "MarkersStack[0].RadialSymmetryRepeatCount clamps 0 up to the [2, 12] minimum on import");
     }
     {
         nlohmann::json document;
         document["MarkersStack"] = nlohmann::json::array();
-        nlohmann::json markerJson;
-        markerJson["RadialSymmetryRepeatCount"] = 500;
-        document["MarkersStack"].push_back(markerJson);
+        nlohmann::json layerJson;
+        layerJson["RadialSymmetryRepeatCount"] = 500;
+        layerJson["Rules"] = nlohmann::json::array();
+        document["MarkersStack"].push_back(layerJson);
         Params::MapRecipe loaded;
         Io::ReadMarkersStackJson(document, loaded);
-        Check(!loaded.markerRules.empty()
-              && loaded.markerRules[0].radialSymmetryRepeatCount == Params::radialSymmetryRepeatCountMaximum,
+        Check(!loaded.markerRuleLayers.empty()
+              && loaded.markerRuleLayers[0].symmetry.radialSymmetryRepeatCount
+                     == Params::radialSymmetryRepeatCountMaximum,
               "MarkersStack[0].RadialSymmetryRepeatCount clamps 500 down to the [2, 12] maximum on import");
     }
 }
@@ -1774,6 +1887,7 @@ int main() {
     SanmapGen::MapFormatTest::CheckStratumGenerationSettingsCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::CheckAccumulationReaderToleratesUnrecognizedKeys();
     SanmapGen::MapFormatTest::CheckRadialSymmetryRepeatCountClampsOnImport();
+    SanmapGen::MapFormatTest::CheckMarkerRuleLayerTwoLevelRoundTrip();
     SanmapGen::MapFormatTest::CheckMapNameFallsBackWhenMissingOrEmpty();
     SanmapGen::MapFormatTest::CheckMapCreditsHasNoFallbackWhenEmpty();
     SanmapGen::MapFormatTest::CheckWaterImportsFromTopLevelWhenNoGeneratorData();

@@ -1,7 +1,11 @@
-// MarkerRule_PARAMS.h — one procedural marker rule (spawns / resources / areas).
+// MarkerRule_PARAMS.h — one procedural marker rule (spawns / resources / areas), and the
+// MarkerRuleLayer that wraps a group of them (ARCH_16_01_NewParamsShapes.md §16.1, STEP66).
 // Layer: PARAMS. Settings only (PLACEMENT_SCATTER_SPEC). Placement math lives in PROC.
 #pragma once
+#include <string>
+#include <vector>
 #include "ScatterTransform_PARAMS.h"
+#include "Symmetry_PARAMS.h"
 
 namespace SanmapGen {
 namespace Params {
@@ -54,15 +58,6 @@ struct MarkerRule {
     float         focusGradientStrength = 0.0f;
     float         focusGradientContrast = 1.0f;
 
-    // Symmetry
-    bool bSymmetryUseGlobal = true;
-    int  symmetryMask       = 0;
-    // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
-    // `symmetryMask`. Consumed by `AppendRadialTurns`/`BuildSymmetryOrbit` via
-    // `ResolveRadialSymmetryRepeatCount` (STEP23), the same `bSymmetryUseGlobal` switch
-    // `ResolveSymmetryMask` already uses for `symmetryMask`.
-    int  radialSymmetryRepeatCount = 3;
-
     // Per-layer resource/spawn tuning (SANMAP_FORMAT_SPEC Correction 7): moved from v1's global
     // scalars to per-`MarkerRule` fields, so different marker layers (e.g. an "outer expansions"
     // layer vs. a "start Alloys" layer) can tune these independently (Constitution §8).
@@ -73,6 +68,21 @@ struct MarkerRule {
 
     // Instance transform (scale/rotation/align ranges + tpId).
     ScatterTransform transform;
+};
+
+// The wrapping tier `ARCH_16_01_NewParamsShapes.md §16.1` promotes onto `MapRecipe::markerRuleLayers`
+// (STEP66) — the procedural-marker counterpart to `HeightmapStack`'s `GeoLayer`/`Layer` two-level
+// model. Owns the symmetry triplet the individual `MarkerRule`s used to carry directly (moved up one
+// tier, not duplicated — ARCH §7.1).
+struct MarkerRuleLayer {
+    std::string name;
+    // Generation gate, not a display toggle: disabling a layer means it is NOT calculated at all
+    // (ruled by the human, STEP66) — the identical semantic `MarkerRule::bEnabled` already carried,
+    // promoted one tier. Stays stored, ready to re-enable.
+    bool bEnabled = true;
+    bool bHidden  = false;   // still generates (clearance/fairness), just doesn't render — unchanged
+    SymmetrySetting symmetry;
+    std::vector<MarkerRule> rules;
 };
 
 } // namespace Params

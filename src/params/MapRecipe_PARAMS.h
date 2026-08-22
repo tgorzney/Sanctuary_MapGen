@@ -53,12 +53,15 @@ struct MapRecipe {
     // gate against (MASKING_SPEC §1.7) — a single global record, not a per-stratum type
     // (ARCH §7.1).
     SlopeDefaults           slopeDefaults;
-    std::vector<MarkerRule> markerRules;
+    // Two-level layer tier (ARCH_16_01_NewParamsShapes.md §16.1, STEP66) — the procedural-marker
+    // counterpart to `HeightmapStack`'s `GeoLayer`/`Layer` model; each layer owns its own symmetry
+    // setting (`MarkerRuleLayer::symmetry`), promoted up off the individual `MarkerRule`s.
+    std::vector<MarkerRuleLayer> markerRuleLayers;
     std::vector<PropRule>   propRules;
     std::vector<DecalRule>  decalRules;
     std::vector<UnitRule>   unitRules;
     // Map-wide default icon/color/scale for the three resource marker kinds (ARCH §11, completes
-    // SANMAP_FORMAT_SPEC Correction 7) — a flat sibling of `markerRules`, for now (a future
+    // SANMAP_FORMAT_SPEC Correction 7) — a flat sibling of `markerRuleLayers`, for now (a future
     // MarkersStack Group/Layer wrapper may fold this inside it later; not designed here).
     GlobalMarkerSettings    globalMarkerSettings;
     Water                   water;

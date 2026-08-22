@@ -36,6 +36,20 @@ constexpr int radialSymmetryRepeatCountMaximum = 12;
 // 16 * 12 = 192; 256 leaves one page / power-of-two headroom against future symmetry families).
 constexpr int symmetryOrbitMaximum = 256;
 
+// The symmetry triplet promoted up one tier off individual rules onto their wrapping layer
+// (ARCH_16_01_NewParamsShapes.md §16.1, STEP66) — `MarkerRuleLayer` (MarkerRule_PARAMS.h) is the
+// first consumer; other rule-layer families adopt the same shape as they gain a layer tier.
+// Field meanings are unchanged from the per-rule fields they replace: `bSymmetryUseGlobal` selects
+// between this record and `MapRecipe::globalSymmetryMask`/`radialSymmetryRepeatCount`;
+// `symmetryMask` is an OR of `SymmetryAxis` bits; `radialSymmetryRepeatCount` is the companion
+// count for the `SymmetryAxis::Radial` bit, clamped to
+// `[radialSymmetryRepeatCountMinimum, radialSymmetryRepeatCountMaximum]` at every IO read site.
+struct SymmetrySetting {
+    bool bSymmetryUseGlobal = true;
+    int  symmetryMask       = 0;
+    int  radialSymmetryRepeatCount = 3;
+};
+
 // The two settings the Symmetry tab promotes out of v1 (WO C1). They are about RECOGNISING
 // symmetry in a heightfield that already exists — an imported map, or an authored stack that is
 // nearly but not exactly symmetric — which is why they are a separate record from the axis mask

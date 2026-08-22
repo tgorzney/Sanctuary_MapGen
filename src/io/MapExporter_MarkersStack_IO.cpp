@@ -1,10 +1,11 @@
-// MapExporter_MarkersStack_IO.cpp — `recipe.markerRules` -> the top-level `MarkersStack` array,
-// plus `recipe.globalMarkerSettings` -> the top-level `GlobalMarkerSettings` object.
-// Layer: IO. SANMAP_FORMAT_SPEC Correction 7 (ruling #1: a bare top-level array, same shape as
-// `PropGroups`/`DecalGroups`/`StratumGenerationSettings`) + ARCH §11 (ruling #2: `GlobalMarkerSettings`
-// is its own top-level key, a SIBLING of `MarkersStack`, not nested inside it — a JSON array cannot
-// structurally host a nested key). `BuildMarkerRuleJson`'s body is relocated verbatim from the
-// deleted MapExporter_Rules_IO.cpp; only its container changed.
+// MapExporter_MarkersStack_IO.cpp — `recipe.markerRuleLayers` -> the top-level `MarkersStack` array
+// (one element per `MarkerRuleLayer`, each carrying a nested `Rules` array), plus
+// `recipe.globalMarkerSettings` -> the top-level `GlobalMarkerSettings` object.
+// Layer: IO. SANMAP_FORMAT_SPEC Correction 15 (two-level shape, `Rules` key) + ARCH_16_01_
+// NewParamsShapes.md §16.1 (the symmetry triplet promoted onto the layer) + ARCH §11 (ruling #2:
+// `GlobalMarkerSettings` is its own top-level key, a SIBLING of `MarkersStack`, not nested inside
+// it — a JSON array cannot structurally host a nested key). `BuildMarkerRuleJson`'s body is
+// relocated verbatim from the deleted MapExporter_Rules_IO.cpp; only its container changed.
 #include "MapExporter_Recipe_IO.h"
 #include "MapExporter_ScatterTransform_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -43,10 +44,25 @@ nlohmann::ordered_json BuildMarkerRuleJson(const Params::MarkerRule& rule) {
     json["ReclaimDensity"]  = rule.reclaimDensity;
     json["MexDensity"]      = rule.mexDensity;
     json["SpawnPointCount"] = rule.spawnPointCount;
-    json["SymmetryUseGlobal"] = rule.bSymmetryUseGlobal;
-    json["SymmetryMask"] = rule.symmetryMask;
-    json["RadialSymmetryRepeatCount"] = rule.radialSymmetryRepeatCount;
     json["Transform"] = BuildScatterTransformJson(rule.transform);
+    return json;
+}
+
+// The `MarkerRuleLayer` wrapper (Correction 15): `Name`/`Enabled`/`Hidden` plus the symmetry
+// triplet flattened as sibling keys, then `Rules` = each contained `MarkerRule` via
+// `BuildMarkerRuleJson` above (which no longer writes the 3 symmetry keys itself).
+nlohmann::ordered_json BuildMarkerRuleLayerJson(const Params::MarkerRuleLayer& layer) {
+    nlohmann::ordered_json json;
+    json["Name"] = layer.name;
+    json["Enabled"] = layer.bEnabled;
+    json["Hidden"] = layer.bHidden;
+    json["SymmetryUseGlobal"] = layer.symmetry.bSymmetryUseGlobal;
+    json["SymmetryMask"] = layer.symmetry.symmetryMask;
+    json["RadialSymmetryRepeatCount"] = layer.symmetry.radialSymmetryRepeatCount;
+    nlohmann::ordered_json rules = nlohmann::ordered_json::array();
+    for (const Params::MarkerRule& rule : layer.rules)
+        rules.push_back(BuildMarkerRuleJson(rule));
+    json["Rules"] = std::move(rules);
     return json;
 }
 
@@ -54,8 +70,8 @@ nlohmann::ordered_json BuildMarkerRuleJson(const Params::MarkerRule& rule) {
 
 nlohmann::ordered_json BuildMarkersStackJson(const Params::MapRecipe& recipe) {
     nlohmann::ordered_json markersStack = nlohmann::ordered_json::array();
-    for (const Params::MarkerRule& rule : recipe.markerRules)
-        markersStack.push_back(BuildMarkerRuleJson(rule));
+    for (const Params::MarkerRuleLayer& layer : recipe.markerRuleLayers)
+        markersStack.push_back(BuildMarkerRuleLayerJson(layer));
     return markersStack;
 }
 

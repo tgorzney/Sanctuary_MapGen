@@ -1,5 +1,6 @@
-// MapImporter_MarkersStack_IO.cpp — the top-level `MarkersStack` array -> `recipe.markerRules`,
-// plus the top-level `GlobalMarkerSettings` object -> `recipe.globalMarkerSettings`.
+// MapImporter_MarkersStack_IO.cpp — the top-level `MarkersStack` array -> `recipe.markerRuleLayers`
+// (one `MarkerRuleLayer` per element, each carrying a nested `Rules` array), plus the top-level
+// `GlobalMarkerSettings` object -> `recipe.globalMarkerSettings`.
 // Layer: IO. The exact inverse of MapExporter_MarkersStack_IO.cpp. `ReadMarkerRuleJson`'s body is
 // relocated verbatim from the deleted MapImporter_Rules_IO.cpp; only its container changed. Same
 // tier/calling contract as `areas`/`armies`/`PropGroups`/etc.: both readers take the top-level
@@ -46,10 +47,21 @@ void ReadMarkerRuleJson(const nlohmann::json& json, Params::MarkerRule& rule) {
     ReadJsonFloat(json, "ReclaimDensity", rule.reclaimDensity);
     ReadJsonFloat(json, "MexDensity", rule.mexDensity);
     ReadJsonInteger(json, "SpawnPointCount", rule.spawnPointCount);
-    ReadJsonBoolean(json, "SymmetryUseGlobal", rule.bSymmetryUseGlobal);
-    ReadJsonInteger(json, "SymmetryMask", rule.symmetryMask);
+}
+
+// The `MarkerRuleLayer` wrapper (Correction 15): `Name`/`Enabled`/`Hidden` plus the symmetry
+// triplet read from sibling keys (relocated here from the old per-rule read), then `Rules` walked
+// via the existing `ReadRuleArray` helper into `layer.rules`.
+void ReadMarkerRuleLayerJson(const nlohmann::json& json, Params::MarkerRuleLayer& layer) {
+    ReadJsonText(json, "Name", layer.name);
+    ReadJsonBoolean(json, "Enabled", layer.bEnabled);
+    ReadJsonBoolean(json, "Hidden", layer.bHidden);
+    ReadJsonBoolean(json, "SymmetryUseGlobal", layer.symmetry.bSymmetryUseGlobal);
+    ReadJsonInteger(json, "SymmetryMask", layer.symmetry.symmetryMask);
     ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,
-                          Params::radialSymmetryRepeatCountMaximum, rule.radialSymmetryRepeatCount);
+                          Params::radialSymmetryRepeatCountMaximum,
+                          layer.symmetry.radialSymmetryRepeatCount);
+    ReadRuleArray(json, "Rules", layer.rules, ReadMarkerRuleJson);
 }
 
 // The inverse of `BuildGlobalMarkerSettingsJson`'s `{r,g,b,a}` shape.
@@ -67,7 +79,7 @@ bool ReadJsonColorRgba(const nlohmann::json& parent, const char* key, float dest
 } // namespace
 
 void ReadMarkersStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
-    ReadRuleArray(document, "MarkersStack", outRecipe.markerRules, ReadMarkerRuleJson);
+    ReadRuleArray(document, "MarkersStack", outRecipe.markerRuleLayers, ReadMarkerRuleLayerJson);
 }
 
 void ReadGlobalMarkerSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
