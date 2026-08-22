@@ -35,9 +35,8 @@ Sub-layer → data mapping (binding; not to be re-derived per domain in a work-o
 | Props | `recipe.propLayers[i]` (`PropInstanceLayer`) | `recipe.propRules[i]` |
 | Decals | `recipe.decalLayers[i]` (`DecalInstanceLayer`) | `recipe.decalRules[i]` |
 | Units | one sub-layer per top-level `Army.groups[name]` — **flat**, §14.4 | `recipe.unitRules[i]` |
-| Alloy / Spawns-Armies | ⚠️ was blocked — `Params::MarkerInstanceLayer` now exists (ARCH §16); this row's data mapping updates to match §16.1's `recipe.markerLayers[i]`/`recipe.markerRuleLayers[i].rules[j]` shape, superseding the placeholder "single undifferentiated Manual bucket" text below. | `recipe.markerRules[i]`, filtered by `category` (Spawn vs. rest), §14.6 — **superseded by §16.1's `recipe.markerRuleLayers[i].rules[j]`** |
+| Alloy / Spawns-Armies | `recipe.markerLayers[i]` (`MarkerInstanceLayer`), routed **per-transform** by the owning `MarkerInstanceGroup::name` — never per-layer-entry; one `markerLayers[i]` may appear under both domains at once when it mixes types (§14.14, binding) | `recipe.markerRuleLayers[i].rules[j]` (§16.1), filtered by `category` (Spawn vs. rest), §14.6 |
 | Reclaim | n/a — no data yet | n/a — no rule type yet; slot reserved, zero cost until it ships |
 
 Sub-layer authoring (add/remove/toggle) lives in each domain's own tab (Props/Decals/Armies/
 Markers) — never the View toolbar, which only orders/blends/hides whole `OverlayLayer_UI`s.
-

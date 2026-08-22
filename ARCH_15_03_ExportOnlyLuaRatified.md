@@ -27,3 +27,11 @@ Pandemonium `.sanmap` is ~965 KB, so option B would JSON-decode roughly 1 MB twi
   the whitelist reads it — it exists for SanGen's own authoring/export round-trip, not for the
   game to consume directly (yet — §15.9).
 
+**Scope note, added in response to `DESIGN_SantpFootprintIngestion_R1.md` §7 Q1 (ARCH §18.1):**
+the "SanGen never calls into a Lua parser to read this file, or any scenario content, back" rule
+above is scoped to the **Map Scenario system's own authored/exported content** — it does not
+extend to reading a different corpus in a different direction, such as game-shipped
+`.santp`/`.sanprop` template data via the separate, explicitly sandboxed, execution-capped
+`LuaTableEvaluate_SYS` primitive (§18.1). That is read-only ingestion of external game data with no
+round-trip back into a `.sanmap` or scenario file, not scenario content, and is not barred by this
+section.

@@ -30,3 +30,4 @@ adding more without a code-shape change.
 | §14.11 | [ARCH_14_11_Determinism.md](ARCH_14_11_Determinism.md) | Determinism |
 | §14.12 | [ARCH_14_12_Naming.md](ARCH_14_12_Naming.md) | Naming |
 | §14.13 | [ARCH_14_13_OpenItems.md](ARCH_14_13_OpenItems.md) | Open items — status as of this ratification (closed items marked) |
+| §14.14 | [ARCH_14_14_AlloySpawnsArmiesManualRouting.md](ARCH_14_14_AlloySpawnsArmiesManualRouting.md) | Alloy/SpawnsArmies Manual sub-layer routing — no discriminator field on `MarkerInstanceLayer`; routed per-transform by the reserved `"Spawn"` group name (responds to `STEP97_AlloySpawnsArmiesManualSubLayers_UI.md`) |

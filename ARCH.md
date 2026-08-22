@@ -76,7 +76,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | **§11** | [ARCH_11_GlobalMarkerSettings.md](ARCH_11_GlobalMarkerSettings.md) | `Params::GlobalMarkerSettings` (ARCH ruling, completes `SANMAP_FORMAT_SPEC` Correction 7) | 40 lines |
 | **§12** | [ARCH_12_ManualPropDecalLayers.md](ARCH_12_ManualPropDecalLayers.md) | Manual-layer authoring for props/decals — `layerIndex` + `PropGroups`/`DecalGroups` (ARCH ruling, revises `ENTITY_AUTHORING_PARAMS_SPEC`) | 59 lines |
 | **§13** | [ARCH_13_RadialSymmetry.md](ARCH_13_RadialSymmetry.md) | Radial N-fold symmetry — `SymmetryAxis::Radial` + `radialSymmetryRepeatCount` (ARCH ruling, amends `Symmetry_PARAMS.h`, `SANMAP_FORMAT_SPEC` Correction 4) | 70 lines |
-| **§14** | [ARCH_14_PreviewOverlayLayering.md](ARCH_14_PreviewOverlayLayering.md) | Preview overlay layering — six-domain screen-space compositor (ARCH ruling, ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`) | index → 13 subsection files |
+| **§14** | [ARCH_14_PreviewOverlayLayering.md](ARCH_14_PreviewOverlayLayering.md) | Preview overlay layering — six-domain screen-space compositor (ARCH ruling, ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`) | index → 14 subsection files |
 | §14.1 | [ARCH_14_01_ModuleBoundaryDataVsParams.md](ARCH_14_01_ModuleBoundaryDataVsParams.md) | Module boundary and the DATA-vs-PARAMS split | 16 lines |
 | §14.2 | [ARCH_14_02_DataModel.md](ARCH_14_02_DataModel.md) | Data model (binding shape) | 43 lines |
 | §14.3 | [ARCH_14_03_IconRenderingLod.md](ARCH_14_03_IconRenderingLod.md) | Icon rendering — two-mode LOD, not constant-screen-size-only | 32 lines |
@@ -90,10 +90,11 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §14.11 | [ARCH_14_11_Determinism.md](ARCH_14_11_Determinism.md) | Determinism | 10 lines |
 | §14.12 | [ARCH_14_12_Naming.md](ARCH_14_12_Naming.md) | Naming | 6 lines |
 | §14.13 | [ARCH_14_13_OpenItems.md](ARCH_14_13_OpenItems.md) | Open items — status as of this ratification (closed items marked) | 137 lines |
+| §14.14 | [ARCH_14_14_AlloySpawnsArmiesManualRouting.md](ARCH_14_14_AlloySpawnsArmiesManualRouting.md) | Alloy/SpawnsArmies Manual sub-layer routing — no discriminator field on `MarkerInstanceLayer`; routed per-transform by the reserved `"Spawn"` group name (responds to `STEP97_AlloySpawnsArmiesManualSubLayers_UI.md`) | 51 lines |
 | **§15** | [ARCH_15_MapScenarioSystem.md](ARCH_15_MapScenarioSystem.md) | The SanGen Map Scenario system — formalized as first-class law (ratifies `MAP_SCENARIO_SPEC.md`) | index → 10 subsection files |
 | §15.1 | [ARCH_15_01_LayerClassification.md](ARCH_15_01_LayerClassification.md) | Layer classification | 13 lines |
 | §15.2 | [ARCH_15_02_IoScopeRuling.md](ARCH_15_02_IoScopeRuling.md) | IO scope ruling — corrects an earlier assumption, does not reverse it | 39 lines |
-| §15.3 | [ARCH_15_03_ExportOnlyLuaRatified.md](ARCH_15_03_ExportOnlyLuaRatified.md) | Design ratified: option (c) — export-only, SanGen never parses Lua back (resolves §15.2's open question / `MAP_SCENARIO_SPEC.md` §8) | 29 lines |
+| §15.3 | [ARCH_15_03_ExportOnlyLuaRatified.md](ARCH_15_03_ExportOnlyLuaRatified.md) | Design ratified: option (c) — export-only, SanGen never parses Lua back (resolves §15.2's open question / `MAP_SCENARIO_SPEC.md` §8); amended with a template-ingestion scope-clarifying sentence, §18 | 38 lines |
 | §15.4 | [ARCH_15_04_ThreeFileOnDiskShape.md](ARCH_15_04_ThreeFileOnDiskShape.md) | Three-file on-disk shape + overwrite safety (ratifies `MAP_SCENARIO_SPEC.md` §2/§2.1/§2.2) | 37 lines |
 | §15.5 | [ARCH_15_05_ParamsScenariosType.md](ARCH_15_05_ParamsScenariosType.md) | `Params::Scenarios` — the new PARAMS type (shape ruling) | 118 lines |
 | §15.6 | [ARCH_15_06_CountScenariosOrdering.md](ARCH_15_06_CountScenariosOrdering.md) | `COUNT_SCENARIOS` ordering — array order IS the match-priority authoring action | 18 lines |
@@ -113,9 +114,10 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §16.9 | [ARCH_16_09_NonArchItems.md](ARCH_16_09_NonArchItems.md) | Non-ARCH items — confirmed out of scope for this ratification | 9 lines |
 | §16.10 | [ARCH_16_10_ConsultRoutingSummary.md](ARCH_16_10_ConsultRoutingSummary.md) | Consult routing summary — what remains before a coder work-order can be written; item 3 corrected — two PROC consumers, not one, per `STEP79_MarkerRuleLayerProcConsumer_PROC.md` | 42 lines |
 | **§17** | [ARCH_17_MigrationValuesRegistry.md](ARCH_17_MigrationValuesRegistry.md) | `bLosslessIfSkipped` values for the 9 shipped `SanGenVersion` 2→3 migrations (ARCH ruling, ratifies `IO_MIGRATION_SPEC.md` §3, backfills `STEP26A_MigrationLosslessFlagAndPreview_IO.md`) | 66 lines |
-| **§18** | [ARCH_18_SantpFootprintIngestion.md](ARCH_18_SantpFootprintIngestion.md) | `.santp`/`.sanprop` template ingestion — sandboxed execution primitive + determinism ruling (responds to `DESIGN_SantpFootprintIngestion_R1.md`) | index → 2 subsection files |
+| **§18** | [ARCH_18_SantpFootprintIngestion.md](ARCH_18_SantpFootprintIngestion.md) | `.santp`/`.sanprop` template ingestion — sandboxed execution primitive + determinism ruling (responds to `DESIGN_SantpFootprintIngestion_R1.md`) | index → 3 subsection files |
 | §18.1 | [ARCH_18_01_SandboxedExecutionPrimitive.md](ARCH_18_01_SandboxedExecutionPrimitive.md) | `LuaTableEvaluate_SYS`/`LuaTableValue_SYS` — a sibling `SYS` primitive to `LuaSyntaxCheck_SYS`, sharing only the vendored LuaJIT library; the execution safety contract, binding | 59 lines |
 | §18.2 | [ARCH_18_02_IngestedDataDeterminism.md](ARCH_18_02_IngestedDataDeterminism.md) | Determinism ruling — ingested footprint data may influence generation only after being baked into `PARAMS`; never read live by `PROC` | 69 lines |
+| §18.3 | [ARCH_18_03_CatalogDataOwnership.md](ARCH_18_03_CatalogDataOwnership.md) | Q3 ruled — richer catalog data (footprint + tags, the two artifacts tickets 89/92 need) stays `IO`-owned, asset-derived, matching `AssetAtlasCache_*`; no new `DATA`-layer catalog type; `economy.harvest`/`collisionInfo`/`displayName` explicitly deferred | 33 lines |
 
 ### Oversized files — known, accepted
 

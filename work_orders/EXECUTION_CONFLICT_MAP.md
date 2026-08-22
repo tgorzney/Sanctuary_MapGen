@@ -171,11 +171,55 @@ all already satisfied by what precedes each entry:
 21. **STEP83** (← STEP62 hard; STEP51, STEP53 soft/adaptive — both will already be landed by this point, so STEP83 takes its cleaner "already-landed" code path rather than the fold-in path)
 22. **STEP94** (← STEP47, STEP48, STEP68, STEP49, STEP81)
 
-**Not yet schedulable, excluded from both lists above:**
-- `STEP96` — needs tickets 85–91 (unwritten) from `DESIGN_SantpFootprintIngestion_R1.md` §7.
-- `STEP97` — needs STEP51+STEP60+STEP66 landed (all three will be, by the end of step 5 above)
-  *and* a still-open ARCH routing-discriminator ruling. Re-check after step 5 whether that ruling
-  has landed; if so, STEP97 becomes real backlog, not a permanent block.
+**Update 2026-08-22 (later same day) — STEP96/STEP97's blockers substantially resolved:**
+
+- **STEP97's ARCH ruling landed.** `ARCH_14_14_AlloySpawnsArmiesManualRouting.md` §14.14 rules:
+  no new field on `MarkerInstanceLayer` — routing is per-transform via the already-load-bearing
+  `MarkerInstanceGroup::name == "Spawn"` literal, now promoted to `Params::kSpawnMarkerGroupName`.
+  STEP97 still needs STEP51 landed (item 3 in §3's sequential list below) before it can be
+  redrafted against the real shipped shape — not done automatically here, flagged for a future
+  session once STEP51 lands.
+- **STEP96's prerequisite tickets 85–92 are now drafted** (`work_orders/STEP85_LuaTableEvaluate_SYS.md`
+  through `STEP92_ReclaimableTagBake_IO.md`), following 3 more ARCH rulings
+  (`ARCH_18_01_SandboxedExecutionPrimitive.md`, `ARCH_18_02_IngestedDataDeterminism.md`,
+  `ARCH_18_03_CatalogDataOwnership.md`) and 2 human UX decisions (ingestion runs on an explicit
+  button press only, cached thereafter; reuses the existing `assetCacheDirectory` setting rather
+  than a new dedicated cache path). Landing order, per each ticket's own stated dependencies:
+  **85 → 86 → 87 → 88 → 89** is a strict chain; **90 is parallel** with that whole chain (no code
+  dependency); **91 depends on 89 and 90**; **92 depends on 89** (and on STEP62, already shipped).
+  A design-doc-proposed ticket 93 (fix STEP64's subpath) was investigated and found **moot** — the
+  real shipped code already has the correct subpath, not drafted.
+- **Verification pass completed** (5 parallel checks: 3 grouped completeness audits against real
+  `src/`, 1 file-conflict check against the remaining 20-ticket backlog, 1 cross-ticket consistency
+  read of the set of 8). Found and fixed 6 real problems, all now corrected in place:
+  - **STEP87** — a "never includes `LuaTableEvaluate_SYS.h`" claim was false and wouldn't compile
+    (the `.cpp` dereferences `LuaTableEvaluateResult` members, which live only in that header, not
+    the `LuaTableValue_SYS.h` it claimed was sufficient).
+  - **STEP88** — `ReadJsonInteger` (fixed `int&`) can't bind the ticket's four `uint64_t` fields;
+    corrected to direct `nlohmann::json` accessors for those four fields specifically.
+  - **STEP89** — two false precedent citations: misattributed a per-slot-write pattern to
+    `AssetAtlasCache::PackImages` (which only reads that array, never writes it — the real
+    precedent is `BuildFromSanpack`'s `decodeOne` gating) and mischaracterized its own
+    null-`ThreadPool*` fallback as "reusing `ThreadPool`'s zero-worker contract" when it's actually
+    the ticket's own explicit gate. Also closed a minor gap: two of ticket 86's diagnostic counters
+    (`skippedOversizeFileCount`/`skippedUnreadableFileCount`) were computed and tested but never
+    surfaced on `TemplateIngestReport` — now carried through.
+  - **STEP91** — claimed an existing test file could be "extended"; verified none exists
+    (`Application_AssetPanel_UI_Test.cpp` is a NEW file, confirmed by grep across all of
+    `src/ui/*Test*`), corrected throughout.
+  - **STEP85** — a citation error (claimed the design doc was "silent" on a parameter it actually
+    specifies at `DESIGN_SantpFootprintIngestion_R1.md:315`) — the ticket's own engineering
+    decision to omit that parameter still stands, corrected to frame it as a deliberate override,
+    not filling a silence.
+  - **Merge-order note**: STEP90 and STEP77 (already in the 20-ticket sequential backlog) likely
+    edit the same functions in `src/ui/Application_AppSettings_UI.cpp` — land STEP90 first (its
+    insertion point is precisely pinned; STEP77's is not) and diff both functions before merging.
+  Everything else across all 8 tickets — type/signature consistency, dependency-order correctness,
+  file-conflict analysis against the 20-ticket backlog, every other live-code citation — came back
+  clean. STEP85–92 are now held to the same verification bar as the rest of this backlog.
+- STEP96 itself can be considered schedulable once 85→89 and 91 land (its two real dependencies,
+  per its own §0/§2) — not yet added to §2/§3's ordered lists below (a purely organizational gap,
+  not a readiness one).
 
 ## 4. Verification method
 

@@ -267,3 +267,42 @@ real source before ruling:**
   exists — a prior attempt died mid-write against the old monolithic `ARCH.md`; the now-split
   per-section file layout carries it without issue. Values transcribed unchanged from STEP26A's
   own audit, cross-checked against the shipped `src/io/Sanmap_MigrationManifest_IO.cpp`.
+
+**Three-ruling pass (2026-08-22), clearing STEP97's block and closing `DESIGN_SantpFootprintIngestion_R1.md`
+§7's remaining ARCH-gated open questions (Q1, Q3):**
+- **New `ARCH_14_14_AlloySpawnsArmiesManualRouting.md` §14.14.** Answers STEP97's open routing
+  question: `Params::MarkerInstanceLayer` gains **no** discriminator field. `MarkerInstanceLayer`
+  is a cross-cutting display bucket that can legally mix Spawn- and non-Spawn-type instances under
+  one `layerIndex`, so a layer-level field cannot resolve the split. The real signal already exists
+  one level down — `MarkerInstanceGroup::name`, a format-reserved literal (`"Spawn"`, already
+  load-bearing in `MapImporter_ArmyIdentityNormalize_IO.cpp` and `MarkersTab_Manual_UI.h`'s
+  `kSpawnMarkerGroupName`) — mirroring §14.6's already-ratified procedural-side 2-way split
+  (`MarkerRule::category`, Spawn vs. rest). `SeedMarkerDomains` therefore routes **per-transform**,
+  not per-`markerLayers[i]` entry: a single manual layer may legally contribute Manual sub-layer
+  refs to both Alloy's and SpawnsArmies' `subLayers` simultaneously. `kSpawnMarkerGroupName` is
+  promoted from its current UI-only home to `Params::kSpawnMarkerGroupName`
+  (`MarkerInstance_PARAMS.h`) so `IO`'s existing independent literal and this new UI consumer share
+  one named source of truth instead of a third duplicated string. `ARCH_14_02_DataModel.md` §14.2's
+  Alloy/SpawnsArmies table row is rewritten in place to its final (non-placeholder) shape.
+- **`ARCH_15_03_ExportOnlyLuaRatified.md` §15.3 amended** with the design doc's own recommended
+  Q1 clarifying sentence (option (a)): its "never parses Lua back" rule is scoped to the Map
+  Scenario system's own authored content and does not bar the separate, sandboxed
+  `LuaTableEvaluate_SYS` template-ingestion primitive (§18.1) from reading a different corpus in a
+  different, non-round-tripping direction. Supersedes the prior session's "confirmation lives only
+  in §18.1, §15.3 itself stays unamended" call — reconsidered because that left exactly the
+  misreading risk the design doc warned about for a coder who reads §15.3 in isolation.
+  `ARCH_18_SantpFootprintIngestion.md`'s own Q1 paragraph is updated to match.
+- **New `ARCH_18_03_CatalogDataOwnership.md` §18.3.** Rules Q3 as the design recommended: footprint
+  (ticket 89) and tags (ticket 92, the `bReclaimable` auto-population signal) both stay `IO`-owned,
+  asset-derived lookup tables — the same category `AssetAtlasCache_*`/`WorldFootprintSizeTable`
+  already occupy, read exactly once at §18.2's human-triggered `PARAMS` bake, never live by `PROC`.
+  A new `DATA`-layer catalog type (option (b)) is rejected on the same Constitution §1 grounds §18.2
+  already used for footprint. `economy.harvest`/`collisionInfo`/`collider`/`general.displayName`
+  are explicitly deferred to the not-yet-scoped texture/asset importer, not ruled on now.
+- **Verified, not ARCH-actioned: `DESIGN_SantpFootprintIngestion_R1.md`'s flagged item 4 (proposed
+  ticket 93) is moot.** `STEP64_GameInstallLocation_IO.md` already shipped (commit `d84ba6e`,
+  `SanGen-v3`) with its own in-place correction to the exact subpath the design doc flags; the real
+  `src/io/GameInstallLocation_IO.cpp` builds `mapAssetPath` as
+  `JoinExportPath(JoinExportPath(candidateRoot, "engine"), "Sanctuary_Data/Maps")` —
+  `<root>/engine/Sanctuary_Data/Maps`, matching the design doc's own "correct" value, not the wrong
+  one it flags. No ticket 93 needed; nothing to re-fix.
