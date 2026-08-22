@@ -482,6 +482,21 @@ void CheckArmiesAndAreas(const Params::MapRecipe& original, const Params::MapRec
 // Since `mapSize` never leaves the fixture, this asserts flip-then-unflip is the identity without
 // the test needing to know the map-size constant, mirroring CheckArmiesAndAreas's exact style.
 void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(loaded.markerLayers.size() == 1, "one marker layer survives");
+    if (!loaded.markerLayers.empty()) {
+        const Params::MarkerInstanceLayer& originalLayer = original.markerLayers[0];
+        const Params::MarkerInstanceLayer& loadedLayer = loaded.markerLayers[0];
+        Check(loadedLayer.name == originalLayer.name, "MarkerInstanceLayer::name survives");
+        Check(NearlyEqual(loadedLayer.color[0], originalLayer.color[0])
+              && NearlyEqual(loadedLayer.color[1], originalLayer.color[1])
+              && NearlyEqual(loadedLayer.color[2], originalLayer.color[2])
+              && NearlyEqual(loadedLayer.color[3], originalLayer.color[3]),
+              "MarkerInstanceLayer::color survives all four components");
+        Check(NearlyEqual(loadedLayer.iconScale, originalLayer.iconScale),
+              "MarkerInstanceLayer::iconScale survives");
+        Check(loadedLayer.layerId == originalLayer.layerId, "MarkerInstanceLayer::layerId (7) survives");
+    }
+
     Check(loaded.markers.size() == 1, "one marker group survives");
     if (!loaded.markers.empty()) {
         const Params::MarkerInstanceGroup& originalGroup = original.markers[0];
@@ -495,6 +510,8 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
             const Params::MarkerTransform& loadedMarker = loadedGroup.transforms[0];
             Check(loadedMarker.name == originalMarker.name, "the marker's name survives");
             Check(loadedMarker.alias == originalMarker.alias, "the marker's alias survives");
+            Check(loadedMarker.layerIndex == originalMarker.layerIndex,
+                  "the in-range marker layerIndex survives exactly");
             Check(NearlyEqual(loadedMarker.transform.positionX, originalMarker.transform.positionX)
                   && NearlyEqual(loadedMarker.transform.positionY, originalMarker.transform.positionY),
                   "positionX/Y survive untouched by the flip");
@@ -948,7 +965,19 @@ void FillFixtureArmiesAndAreas(Params::MapRecipe& recipe) {
     recipe.armies.push_back(army);
 }
 
+// STEP60_MarkerInstanceLayer_PARAMS: one MarkerInstanceLayer with a non-default layerId (7), and
+// the fixture marker transform's layerIndex set to 0 (in range against the one MarkerGroups
+// entry) — this fixture feeds RunRoundTripTests's "no warning" assertion, same constraint
+// CheckPropsAndDecals's own comment states.
 void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
+    Params::MarkerInstanceLayer markerLayer;
+    markerLayer.name = "Resource Markers";
+    markerLayer.color[0] = 0.2f; markerLayer.color[1] = 0.4f;
+    markerLayer.color[2] = 0.6f; markerLayer.color[3] = 0.8f;
+    markerLayer.iconScale = 1.25f;
+    markerLayer.layerId = 7;                                          // non-default, survives verbatim
+    recipe.markerLayers.push_back(markerLayer);
+
     Params::MarkerTransform markerTransform;
     markerTransform.name = "Mex 0";
     markerTransform.transform.positionX = 8.0f;
@@ -959,6 +988,7 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerTransform.transform.scaleX = 1.5f; markerTransform.transform.scaleY = 1.25f;
     markerTransform.transform.scaleZ = 1.75f;                        // non-unit
     markerTransform.alias = "North Mex";
+    markerTransform.layerIndex = 0;                                  // in range: no clamp warning
 
     Params::MarkerInstanceGroup group;
     group.name = "Alloys";
@@ -1680,6 +1710,49 @@ void CheckKnownTopLevelSanmapKeysCoverage() {
     }
 }
 
+// STEP60_MarkerInstanceLayer_PARAMS: a hand-built `MarkerGroups` array with two entries, neither
+// carrying an `"Id"` key, must legacy-backfill by array index — mirrors `ReadPropGroupsJson`'s
+// own (future) STEP56-era retrofit convention, exercised directly here since Props/Decals'
+// `layerId` had not landed yet at the time this ticket was authored.
+void CheckMarkerGroupsLegacyBackfill() {
+    nlohmann::json document;
+    document["MarkerGroups"] = nlohmann::json::array();
+    document["MarkerGroups"].push_back(nlohmann::json::object({ { "Name", "First" } }));
+    document["MarkerGroups"].push_back(nlohmann::json::object({ { "Name", "Second" } }));
+
+    Params::MapRecipe recipe;
+    Io::ReadMarkerGroupsJson(document, recipe);
+    Check(recipe.markerLayers.size() == 2, "both legacy MarkerGroups entries survive");
+    if (recipe.markerLayers.size() == 2) {
+        Check(recipe.markerLayers[0].layerId == 0, "the first entry legacy-backfills layerId 0");
+        Check(recipe.markerLayers[1].layerId == 1, "the second entry legacy-backfills layerId 1");
+    }
+}
+
+// STEP60_MarkerInstanceLayer_PARAMS: a hand-built `markers` entry with an out-of-range
+// `layerIndex` (5, against zero MarkerGroups entries) must clamp to 0 on import and log a
+// warning — mirrors MapImporter_PropsDecals_IO_Test.cpp's own `ClampPropLayerIndex` coverage.
+void CheckMarkerLayerIndexClampsOnImport() {
+    nlohmann::json document;
+    nlohmann::json transformJson;
+    transformJson["layerIndex"] = 5;
+    nlohmann::json groupJson;
+    groupJson["resource"] = false;
+    groupJson["transforms"] = nlohmann::json::object({ { "Mex 0", transformJson } });
+    document["markers"] = nlohmann::json::object({ { "Alloys", groupJson } });
+
+    Params::MapRecipe recipe;   // outRecipe.markerLayers is empty: 5 is out of range against it
+    Io::MapImportResult result;
+    Io::ReadMarkersJson(document, recipe, result);
+
+    Check(recipe.markers.size() == 1, "one marker group survives");
+    if (!recipe.markers.empty() && !recipe.markers[0].transforms.empty()) {
+        Check(recipe.markers[0].transforms[0].layerIndex == 0,
+              "the out-of-range marker layerIndex (5) clamps to 0 on import");
+    }
+    Check(result.warningCount > 0, "the out-of-range marker layerIndex clamp is logged as a warning");
+}
+
 } // namespace MapFormatTest
 } // namespace SanmapGen
 
@@ -1701,6 +1774,8 @@ int main() {
     SanmapGen::MapFormatTest::CheckDeepWaterDepthMinImportsFromTopLevelWhenNoGeneratorData();
     SanmapGen::MapFormatTest::CheckLegacyBlobWinsOverAllFourNewFieldHomesOnDisagreement();
     SanmapGen::MapFormatTest::CheckPureOldShapedDocumentStillImportsFromLegacyBlobAlone();
+    SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyBackfill();
+    SanmapGen::MapFormatTest::CheckMarkerLayerIndexClampsOnImport();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

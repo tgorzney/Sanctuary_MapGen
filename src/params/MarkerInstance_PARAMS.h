@@ -10,14 +10,37 @@
 #include <string>
 #include <vector>
 #include "InstancedTransform_PARAMS.h"
+#include "Symmetry_PARAMS.h"
 
 namespace SanmapGen {
 namespace Params {
+
+// STEP60: the manual-layer metadata array, one entry per authored marker layer, indexed by
+// MarkerTransform::layerIndex. Same shape as PropInstanceLayer/DecalInstanceLayer (ARCH §12),
+// plus the "Id" field/`symmetry` sub-record those two don't carry yet. Wire key is `MarkerGroups`
+// (a fresh top-level array, PascalCase, no prior format precedent), a plain sibling of the
+// `markers` name-keyed dictionary below, NOT nested inside it.
+struct MarkerInstanceLayer {
+    std::string name;
+    float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    float iconScale = 1.0f;
+    int   layerId = -1;   // stable id, present from day one — `-1` is the "unassigned" sentinel,
+                           // identical convention to PropInstanceLayer::layerId/
+                           // DecalInstanceLayer::layerId (STEP56 §1) once those land.
+    Params::SymmetrySetting symmetry;   // ARCH_16_01_NewParamsShapes.md §16.1, SANMAP_FORMAT_SPEC
+                                         // Correction 16. The layer's own mirror-mask setting; what
+                                         // a future "place with symmetry" tool would resolve
+                                         // against. No consumer/writer UI exists yet (that's
+                                         // separate, unratified-as-a-ticket work) — this ticket
+                                         // only gives the field its PARAMS+IO home, same posture as
+                                         // `layerIndex` before STEP49's tab existed.
+};
 
 struct MarkerTransform {
     std::string name;                  // folded-in inner dict key — instance name (e.g. "Mex 0")
     InstancedTransform transform;
     std::string alias;                 // SanGen-added, already-ratified SANMAP_FORMAT_SPEC Correction 11
+    int layerIndex = 0;                // indexes recipe.markerLayers, plain vector position
 };
 
 struct MarkerInstanceGroup {

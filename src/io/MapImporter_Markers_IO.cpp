@@ -4,7 +4,13 @@
 // file-local `ReadNameKeyedObject` walker, kept file-local per the IO Architecture Expert ruling
 // applied from Step 2 (promote only if a THIRD domain later needs the identical shape; `chains`
 // does not, since it is an object-of-arrays, not an object-of-objects).
+//
+// `MarkerGroups` -> `recipe.markerLayers` (STEP60_MarkerInstanceLayer_PARAMS), a plain array walk,
+// same shape as `ReadPropGroupsJson` (`MapImporter_Props_IO.cpp`). `ReadMarkerGroupsJson` MUST run
+// before `ReadMarkersJson`: the `layerIndex` range-clamp validates against
+// `outRecipe.markerLayers.size()`, which `ReadMarkerGroupsJson` populates.
 #include "JsonPrimitives_IO.h"
+#include "MapImporter_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {
@@ -60,27 +66,78 @@ void ReadMarkerTransformJson(const nlohmann::json& json, Params::MarkerTransform
         ReadJsonFloat(scale, "z", transform.scaleZ);
     }
     ReadJsonText(json, "alias", markerTransform.alias);
+    ReadJsonInteger(json, "layerIndex", markerTransform.layerIndex);
+}
+
+// ARCH §12 / Constitution §6: an out-of-range layerIndex is a loud, logged clamp to 0, applied PER
+// INSTANCE while walking `transforms` — different instances in the same file can carry different
+// out-of-range values, so this cannot be a single file-scope check. Identical shape to
+// `ClampPropLayerIndex` (`MapImporter_Props_IO.cpp`).
+void ClampMarkerLayerIndex(Params::MarkerTransform& markerTransform, std::size_t markerLayerCount,
+                           MapImportResult& result) {
+    if (markerTransform.layerIndex >= 0
+        && static_cast<std::size_t>(markerTransform.layerIndex) < markerLayerCount)
+        return;
+    result.Warn("Marker transform layerIndex " + std::to_string(markerTransform.layerIndex)
+               + " is out of range against " + std::to_string(markerLayerCount)
+               + " MarkerGroups entries; clamped to 0.");
+    markerTransform.layerIndex = 0;
 }
 
 void ReadMarkerInstanceGroupJson(const nlohmann::json& json, Params::MarkerInstanceGroup& group,
-                                 int mapSize) {
+                                 int mapSize, std::size_t markerLayerCount, MapImportResult& result) {
     ReadJsonBoolean(json, "resource", group.bResource);
     ReadNameKeyedObject(json, "transforms", group.transforms,
-                        [mapSize](const nlohmann::json& transformJson, Params::MarkerTransform& markerTransform) {
+                        [mapSize, markerLayerCount, &result](const nlohmann::json& transformJson,
+                                                             Params::MarkerTransform& markerTransform) {
                             ReadMarkerTransformJson(transformJson, markerTransform, mapSize);
+                            ClampMarkerLayerIndex(markerTransform, markerLayerCount, result);
                         });
 }
 
 } // namespace
 
-void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
+// `MarkerGroups` — a plain array walk, same shape as `ReadPropGroupsJson`'s `{r,g,b,a}` read
+// (STEP60_MarkerInstanceLayer_PARAMS). `layerId` legacy-backfills by array index — a file with no
+// `"Id"` key on an entry lands it on the vector position it was read at, the same convention
+// `ReadPropGroupsJson`'s own STEP56-era `Id` retrofit will use once that ticket lands.
+void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
+    if (!document.contains("MarkerGroups") || !document["MarkerGroups"].is_array()) return;
+    outRecipe.markerLayers.clear();
+    for (const nlohmann::json& layerJson : document["MarkerGroups"]) {
+        Params::MarkerInstanceLayer layer;
+        layer.layerId = static_cast<int>(outRecipe.markerLayers.size());   // legacy-backfill default
+        if (layerJson.is_object()) {
+            ReadJsonText(layerJson, "Name", layer.name);
+            if (layerJson.contains("Color") && layerJson["Color"].is_object()) {
+                const nlohmann::json& color = layerJson["Color"];
+                ReadJsonFloat(color, "r", layer.color[0]);
+                ReadJsonFloat(color, "g", layer.color[1]);
+                ReadJsonFloat(color, "b", layer.color[2]);
+                ReadJsonFloat(color, "a", layer.color[3]);
+            }
+            ReadJsonFloat(layerJson, "IconScale", layer.iconScale);
+            ReadJsonInteger(layerJson, "Id", layer.layerId);
+            // Correction 16. No range to validate (free integers, same tolerance as the per-rule/
+            // MarkersStack tiers) — absent keys keep SymmetrySetting's own defaults.
+            ReadJsonBoolean(layerJson, "SymmetryUseGlobal", layer.symmetry.bSymmetryUseGlobal);
+            ReadJsonInteger(layerJson, "SymmetryMask", layer.symmetry.symmetryMask);
+            ReadJsonInteger(layerJson, "RadialSymmetryRepeatCount", layer.symmetry.radialSymmetryRepeatCount);
+        }
+        outRecipe.markerLayers.push_back(layer);
+    }
+}
+
+void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result) {
     if (!document.contains("markers") || !document["markers"].is_object()) return;
     const int mapSize = outRecipe.geometry.mapSize;   // already populated from top-level `width`
                                                        // before this is called — see the "Critical
                                                        // wiring correction" note in MapImporter_IO.cpp.
+    const std::size_t markerLayerCount = outRecipe.markerLayers.size();
     ReadNameKeyedObject(document, "markers", outRecipe.markers,
-                        [mapSize](const nlohmann::json& groupJson, Params::MarkerInstanceGroup& group) {
-                            ReadMarkerInstanceGroupJson(groupJson, group, mapSize);
+                        [mapSize, markerLayerCount, &result](const nlohmann::json& groupJson,
+                                                             Params::MarkerInstanceGroup& group) {
+                            ReadMarkerInstanceGroupJson(groupJson, group, mapSize, markerLayerCount, result);
                         });
 }
 

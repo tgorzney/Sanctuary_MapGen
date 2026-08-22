@@ -52,5 +52,28 @@ nlohmann::ordered_json BuildMarkersJson(const Params::MapRecipe& recipe) {
     return markers;
 }
 
+// `MarkerGroups` — SanGen-owned manual-layer metadata, top-level PascalCase array (STEP60), a
+// fresh sibling of `markers`, mirroring `PropGroups`/`DecalGroups`'s `Name`/`Color`/`IconScale`
+// shape plus the `Id` field directly (no separate follow-up ticket, unlike Props/Decals) and
+// Correction 16's SymmetrySetting triplet, flattened as sibling keys — the same three spellings
+// already live at the per-rule tier (Correction 4) and the MarkersStack tier (Correction 15),
+// reused verbatim, not renamed.
+nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe) {
+    nlohmann::ordered_json markerGroups = nlohmann::ordered_json::array();
+    for (const Params::MarkerInstanceLayer& layer : recipe.markerLayers) {
+        nlohmann::ordered_json layerJson;
+        layerJson["Name"]  = layer.name;
+        layerJson["Color"] = { { "r", layer.color[0] }, { "g", layer.color[1] },
+                               { "b", layer.color[2] }, { "a", layer.color[3] } };
+        layerJson["IconScale"] = layer.iconScale;
+        layerJson["Id"] = layer.layerId;
+        layerJson["SymmetryUseGlobal"] = layer.symmetry.bSymmetryUseGlobal;
+        layerJson["SymmetryMask"] = layer.symmetry.symmetryMask;
+        layerJson["RadialSymmetryRepeatCount"] = layer.symmetry.radialSymmetryRepeatCount;
+        markerGroups.push_back(layerJson);
+    }
+    return markerGroups;
+}
+
 } // namespace Io
 } // namespace SanmapGen

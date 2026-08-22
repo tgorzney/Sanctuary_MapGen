@@ -50,19 +50,22 @@ void ParseDocumentEnvelopeJson(const nlohmann::json& document, const MapImportOp
         outRecipe.geometry.mapSize = mapWidth;
 }
 
-// `areas`/`armies`/`markers`/`chains`/`PropGroups`/`props`/`DecalGroups`/`decals`/`stratumLayers`/
-// `StratumGenerationSettings` — top-level `.sanmap` keys, siblings of `mapGeneratorData`, read
-// unconditionally so hand-authored content survives even with no generator block
-// (STEP2/STEP3/STEP5). *Groups readers run before the instance readers (the layerIndex clamp,
-// ARCH §12, validates against the layer arrays *Groups populates); `StratumGenerationSettings`
-// runs after `stratumLayers` so its cardinality check sees that array's already-grown length. NOT
-// alongside `ReadStrataSettingsJson` (ParseSanmapJsonText's gated tail): that one merges the
-// separate legacy `mapGeneratorData.Stratums` blob onto whatever this function already wrote.
+// `areas`/`armies`/`markers`/`MarkerGroups`/`chains`/`PropGroups`/`props`/`DecalGroups`/`decals`/
+// `stratumLayers`/`StratumGenerationSettings` — top-level `.sanmap` keys, siblings of
+// `mapGeneratorData`, read unconditionally so hand-authored content survives even with no
+// generator block (STEP2/STEP3/STEP5). *Groups readers run before the instance readers (the
+// layerIndex clamp, ARCH §12, validates against the layer arrays *Groups populates) — new for
+// markers this ticket (STEP60_MarkerInstanceLayer_PARAMS), same ordering Props/Decals already
+// use; `StratumGenerationSettings` runs after `stratumLayers` so its cardinality check sees that
+// array's already-grown length. NOT alongside `ReadStrataSettingsJson` (ParseSanmapJsonText's
+// gated tail): that one merges the separate legacy `mapGeneratorData.Stratums` blob onto whatever
+// this function already wrote.
 void ParseEntityDomainsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
                             MapImportResult& result) {
     ReadAreasJson(document, outRecipe);
     ReadArmiesJson(document, outRecipe);
-    ReadMarkersJson(document, outRecipe);
+    ReadMarkerGroupsJson(document, outRecipe);
+    ReadMarkersJson(document, outRecipe, result);
     ReadChainsJson(document, outRecipe);
     ReadPropGroupsJson(document, outRecipe);
     ReadPropsJson(document, outRecipe, result);
