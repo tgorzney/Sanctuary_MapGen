@@ -43,6 +43,8 @@ void RunShellAppSettingsChecks() {
     seeded.sanpackPath         = "C:/Fixtures/preseeded.sanpack";
     seeded.assetCacheDirectory = "C:/Fixtures/AtlasCache";
     seeded.environmentPackPath = "C:/Fixtures/environment.sanpack";
+    seeded.gameInstallRoot               = "C:/Fixtures/GameInstall";
+    seeded.scenarioRuntimeOverridePath   = "C:/Fixtures/CustomRuntime.lua";
     seeded.bUseGpuTerrain = false;
     seeded.bUseGpuFlow    = false;
     seeded.bWysiwygBaking = true;
@@ -56,6 +58,10 @@ void RunShellAppSettingsChecks() {
           "and the SystemTab's asset cache directory");
     Check(application.TabState().stratums.environmentPackPath == seeded.environmentPackPath,
           "and the StratumsTab's environment pack path");
+    Check(application.gameInstallRoot == seeded.gameInstallRoot,
+          "and gameInstallRoot (STEP64)");
+    Check(application.scenarioRuntimeOverridePath == seeded.scenarioRuntimeOverridePath,
+          "and scenarioRuntimeOverridePath (STEP64)");
     Check(application.ExecutionSettings().bUseGpuTerrain == false
               && application.ExecutionSettings().bUseGpuFlow == false
               && application.ExecutionSettings().bWysiwygBaking == true,
@@ -71,6 +77,8 @@ void RunShellAppSettingsChecks() {
     SetTruncated(application.TabState().system.assetCacheDirectory,
                 sizeof(application.TabState().system.assetCacheDirectory), "C:/Fixtures/ChangedCache");
     application.TabState().stratums.environmentPackPath = "C:/Fixtures/changed-environment.sanpack";
+    application.gameInstallRoot               = "C:/Fixtures/changed-GameInstall";
+    application.scenarioRuntimeOverridePath   = "C:/Fixtures/changed-CustomRuntime.lua";
     application.ExecutionSettings().bUseGpuTerrain = true;
     application.SaveAppSettingsAtShutdown();
 
@@ -81,6 +89,10 @@ void RunShellAppSettingsChecks() {
           "and the current asset cache directory");
     Check(reloaded.environmentPackPath == "C:/Fixtures/changed-environment.sanpack",
           "and the current environment pack path");
+    Check(reloaded.gameInstallRoot == "C:/Fixtures/changed-GameInstall",
+          "and the current gameInstallRoot (STEP64)");
+    Check(reloaded.scenarioRuntimeOverridePath == "C:/Fixtures/changed-CustomRuntime.lua",
+          "and the current scenarioRuntimeOverridePath (STEP64)");
     Check(reloaded.bUseGpuTerrain == true, "and the current execution toggles");
     Check(reloaded.bWysiwygBaking == true, "including one that was left unchanged since the seed");
     Check(reloaded.bUseGpuMarkers == true, "bUseGpuMarkers round-trips even with no UI to edit it");

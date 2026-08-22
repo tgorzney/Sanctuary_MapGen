@@ -31,6 +31,8 @@ static void TestRoundTripSurvivesExactly() {
     written.sanpackPath         = "D:/Fixtures/roundtrip.sanpack";
     written.assetCacheDirectory = "D:/Fixtures/AtlasCache";
     written.environmentPackPath = "D:/Fixtures/environment.sanpack";
+    written.gameInstallRoot               = "D:/Fixtures/GameInstall";
+    written.scenarioRuntimeOverridePath   = "D:/Fixtures/CustomRuntime.lua";
     written.bUseGpuTerrain = false;
     written.bUseGpuFlow    = true;
     written.bWysiwygBaking = true;
@@ -43,6 +45,10 @@ static void TestRoundTripSurvivesExactly() {
           "assetCacheDirectory survives Save->Load exactly");
     Check(read.environmentPackPath == written.environmentPackPath,
           "environmentPackPath survives Save->Load exactly");
+    Check(read.gameInstallRoot == written.gameInstallRoot,
+          "gameInstallRoot survives Save->Load exactly");
+    Check(read.scenarioRuntimeOverridePath == written.scenarioRuntimeOverridePath,
+          "scenarioRuntimeOverridePath survives Save->Load exactly");
     Check(read.bUseGpuTerrain == written.bUseGpuTerrain, "bUseGpuTerrain survives Save->Load exactly");
     Check(read.bUseGpuFlow == written.bUseGpuFlow, "bUseGpuFlow survives Save->Load exactly");
     Check(read.bWysiwygBaking == written.bWysiwygBaking, "bWysiwygBaking survives Save->Load exactly");
@@ -55,7 +61,8 @@ static void TestMissingDirectoryDegradesToDefaults() {
         Io::JoinExportPath(ScratchFolderPath(), "ThisFolderWasNeverCreated");
     const Io::AppSettings read = Io::LoadAppSettings(missingFolder);
     Check(read.sanpackPath.empty() && read.assetCacheDirectory.empty() &&
-              read.environmentPackPath.empty(),
+              read.environmentPackPath.empty() && read.gameInstallRoot.empty() &&
+              read.scenarioRuntimeOverridePath.empty(),
           "a missing directory degrades to default-constructed strings, never a crash");
     Check(read.bUseGpuTerrain == defaults.bUseGpuTerrain && read.bUseGpuFlow == defaults.bUseGpuFlow &&
               read.bWysiwygBaking == defaults.bWysiwygBaking && read.bUseGpuMarkers == defaults.bUseGpuMarkers,
@@ -83,6 +90,9 @@ static void TestCorruptJsonDegradesToDefaults() {
     const Io::AppSettings defaults;
     Check(read.sanpackPath == defaults.sanpackPath && read.bUseGpuTerrain == defaults.bUseGpuTerrain,
           "malformed JSON degrades to compiled defaults, never a crash");
+    Check(read.gameInstallRoot == defaults.gameInstallRoot &&
+              read.scenarioRuntimeOverridePath == defaults.scenarioRuntimeOverridePath,
+          "including the two new fields");
 }
 
 static void TestDefaultDirectoryIsPlausible() {

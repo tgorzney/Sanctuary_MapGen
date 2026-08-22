@@ -542,6 +542,10 @@ add_sangen_test(FilesTab_UI_Test
 # degrade-gracefully paths and the platform seam's own plausibility check.
 add_sangen_test(AppSettings_IO_Test src/io/AppSettings_IO_Test.cpp)
 
+# STEP64_GameInstallLocation_IO: pure filesystem validation of a candidate game install root for the
+# Map Scenario Lua export leg (ARCH_15_04_ThreeFileOnDiskShape.md §15.4) — no platform dialog, no UI.
+add_sangen_test(GameInstallLocation_IO_Test src/io/GameInstallLocation_IO_Test.cpp)
+
 # Tab-rebuild batch E — the host shell. One binary over four translation units (main() lives in
 # ApplicationShell_Layout_UI_Test.cpp): the left column's catalogue is pure data, so the v1 layout is
 # asserted rather than eyeballed; the other three drive a REAL Ui::Application on the Cpu twin, so the

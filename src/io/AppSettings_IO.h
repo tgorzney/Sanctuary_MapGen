@@ -25,6 +25,11 @@ struct AppSettings {
     std::string sanpackPath;
     std::string assetCacheDirectory;
     std::string environmentPackPath;
+    std::string gameInstallRoot;               // root of the game install; GameInstallLocation_IO's
+                                               // ValidateGameInstallRoot checks <root>/engine/LJ/lua
+                                               // and <root>/engine/Sanctuary_Data/Maps
+    std::string scenarioRuntimeOverridePath;   // empty => bundled SanGenScenarioRuntime.lua default
+                                               // (DESIGN_MapScenarioIO_R1.md §3)
     bool bUseGpuTerrain = true;    // ApplicationExecutionSettings' real default, Application_Execution_UI.h
     bool bUseGpuFlow    = true;    // ditto
     bool bWysiwygBaking = false;   // ditto

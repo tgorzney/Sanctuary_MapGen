@@ -37,6 +37,8 @@ void Application::LoadAppSettingsAtStartup() {
     CopyTruncated(loaded.assetCacheDirectory, tabState.system.assetCacheDirectory,
                  sizeof(tabState.system.assetCacheDirectory));
     tabState.stratums.environmentPackPath = loaded.environmentPackPath;
+    gameInstallRoot             = loaded.gameInstallRoot;
+    scenarioRuntimeOverridePath = loaded.scenarioRuntimeOverridePath;
 
     executionSettings.bUseGpuTerrain = loaded.bUseGpuTerrain;
     executionSettings.bUseGpuFlow    = loaded.bUseGpuFlow;
@@ -53,6 +55,8 @@ void Application::SaveAppSettingsAtShutdown() {
     current.sanpackPath          = SanpackPath();
     current.assetCacheDirectory  = tabState.system.assetCacheDirectory;
     current.environmentPackPath  = tabState.stratums.environmentPackPath;
+    current.gameInstallRoot             = gameInstallRoot;
+    current.scenarioRuntimeOverridePath = scenarioRuntimeOverridePath;
     current.bUseGpuTerrain       = executionSettings.bUseGpuTerrain;
     current.bUseGpuFlow          = executionSettings.bUseGpuFlow;
     current.bWysiwygBaking       = executionSettings.bWysiwygBaking;
