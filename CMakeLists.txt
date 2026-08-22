@@ -454,6 +454,7 @@ add_sangen_test(AtmosphereTab_UI_Test     src/ui/AtmosphereTab_UI_Test.cpp)
 # test is its own binary rather than a translation unit of one tab's: it asserts the symmetry mask
 # arithmetic and the transform mirrors ONCE, for all four tabs, so no tab owns it.
 add_sangen_test(MarkersTab_UI_Test        src/ui/MarkersTab_UI_Test.cpp)
+add_sangen_test(MarkersTab_Manual_UI_Test src/ui/MarkersTab_Manual_UI_Test.cpp)
 add_sangen_test(ArmiesTab_UI_Test         src/ui/ArmiesTab_UI_Test.cpp)
 add_sangen_test(PropsTab_UI_Test          src/ui/PropsTab_UI_Test.cpp)
 add_sangen_test(PropsTab_ManualDecals_UI_Test src/ui/PropsTab_ManualDecals_UI_Test.cpp)
