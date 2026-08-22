@@ -50,13 +50,6 @@ void MapCanvas::ApplyScroll(float regionLocalX, float regionLocalY, float wheelS
     view.ZoomAtRegionPoint(regionLocalX, regionLocalY, zoomStepScale);
 }
 
-// The one thing this widget can make happen. It calls the callback the owner injected — it does
-// not know a stage, a processor or a pipeline shape exists (ARCH §3.1/§3.2).
-void MapCanvas::RequestRegeneration() {
-    ++regenerationRequestCount;
-    if (regenerationCallback) regenerationCallback();
-}
-
 void MapCanvas::SetSelection(std::uint32_t entityIdentifier) {
     if (entityIdentifier == selectedEntityIdentifier) return;
     selectedEntityIdentifier = entityIdentifier;

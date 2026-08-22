@@ -5,9 +5,8 @@
 //
 // It never simulates and never spawns (ARCH §3.2, §5.3). The ~720-line `Widget_MapCanvas` it
 // replaces owned unit-grid spawning, symmetry spawn, army creation and triangle height
-// interpolation; all of that is Placement/PROC reached through PIPELINE, and the ONLY way this
-// widget can cause work to happen is the injected regenerate callback
-// (`Pipeline::PreviewDriver::SetPreviewCompositeCallback` is the same pattern). Nothing here
+// interpolation; all of that is Placement/PROC reached through PIPELINE, and this widget causes
+// no work to happen at all — it is draw + pick + pan/zoom only. Nothing here
 // includes a `_PROC` header, and it holds no GL handle: the texture stays behind
 // `Sys::GpuResourceManager` and the canvas only carries its opaque presentation identifier.
 //
@@ -34,10 +33,6 @@ public:
     void SetEntityIdentifierBuffer(const Data::EntityIdBuffer* entityIdentifierBuffer) {
         entityIdentifiers = entityIdentifierBuffer;
     }
-    // Injected by the caller that owns PIPELINE. The canvas asks; it never generates.
-    void SetRegenerationCallback(std::function<void()> requestRegeneration) {
-        regenerationCallback = std::move(requestRegeneration);
-    }
     void SetSelectionChangedCallback(std::function<void(std::uint32_t)> selectionChanged) {
         selectionChangedCallback = std::move(selectionChanged);
     }
@@ -49,7 +44,6 @@ public:
     std::uint32_t ApplyClick(float regionLocalX, float regionLocalY);
     void ApplyDrag(float deltaRegionPixelsX, float deltaRegionPixelsY);
     void ApplyScroll(float regionLocalX, float regionLocalY, float wheelSteps);
-    void RequestRegeneration();
 
     MapCanvasView& View() { return view; }
     const MapCanvasView& View() const { return view; }
@@ -62,7 +56,6 @@ public:
     const PreviewPixelCoordinate& LastPickedPixel() const { return lastPickedPixel; }
     // The toolkit identifier the image draw uses; zero when nothing has been composited yet.
     unsigned long long PresentationIdentifier() const;
-    int RegenerationRequestCount() const { return regenerationRequestCount; }
 
 private:
     void SetSelection(std::uint32_t entityIdentifier);
@@ -73,13 +66,11 @@ private:
     Sys::GpuResourceManager*     gpuResourceManager = nullptr;
     Sys::GpuTextureHandle        previewTexture;
     const Data::EntityIdBuffer*  entityIdentifiers = nullptr;
-    std::function<void()>                 regenerationCallback;
     std::function<void(std::uint32_t)>    selectionChangedCallback;
     PreviewPixelCoordinate lastPickedPixel;
     std::uint32_t selectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;
     float         pressTravelPixels        = 0.0f;    // how far the current press has dragged
     bool          bPressActive             = false;
-    int           regenerationRequestCount = 0;
 };
 
 } // namespace Ui
