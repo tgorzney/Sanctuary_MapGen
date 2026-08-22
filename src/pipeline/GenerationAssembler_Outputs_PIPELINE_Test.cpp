@@ -4,7 +4,9 @@
 // gate and the two slump/carve passes actually contributed — so "the stage ran" is proved by
 // its effect on the output, not merely by its counter.
 #include "GenerationAssembler_TestScene_PIPELINE.h"
+#include <cstdint>
 #include <cstdio>
+#include <vector>
 
 using namespace SanmapGen;
 using namespace AssemblerTest;
@@ -46,6 +48,53 @@ void CheckPlacement(const Data::PlacementResults& placements) {
     }
     AssemblerCheck(bInsideMap, "every placed instance sits inside the map");
     std::printf("markers=%zu props=%zu\n", placements.markers.Count(), placements.props.Count());
+}
+
+// STEP50: the CSR bucket index is derived infrastructure over placementResults, built at the same
+// lifecycle point as markerSpatialGrid (right after Placement). This is the one integration check
+// that proves the PIPELINE wiring actually fires, not just the standalone type (that is
+// RuleBucketIndex_DATA_Test.cpp's job). AssemblerTest::MakeRecipe registers exactly 1 marker rule
+// (inside 1 markerRuleLayer) and 1 prop rule, and 0 unit/decal rules.
+void CheckRuleBucketIndex(const Pipeline::GenerationAssembler& assembler) {
+    const Data::RuleBucketIndexSet& buckets = assembler.RuleBucketIndex();
+    const Data::PlacementResults& placements = assembler.Placements();
+
+    const std::int32_t markersBegin = buckets.markers.BucketBegin(0);
+    const std::int32_t markersEnd   = buckets.markers.BucketEnd(0);
+    AssemblerCheck(buckets.markers.BucketCount() == 1, "one marker rule registered -> one bucket");
+    AssemblerCheck(markersEnd - markersBegin == static_cast<std::int32_t>(placements.markers.Count()),
+                   "the single marker bucket contains every placed marker");
+    std::vector<bool> markerSeen(placements.markers.Count(), false);
+    for (std::int32_t position = markersBegin; position < markersEnd; ++position) {
+        const std::int32_t instance = buckets.markers.InstanceIndexAt(position);
+        AssemblerCheck(instance >= 0 && static_cast<std::size_t>(instance) < placements.markers.Count(),
+                       "marker bucket entries resolve inside the markers collection");
+        markerSeen[static_cast<std::size_t>(instance)] = true;
+    }
+    bool bEveryMarkerInBucket = true;
+    for (bool seen : markerSeen) if (!seen) bEveryMarkerInBucket = false;
+    AssemblerCheck(bEveryMarkerInBucket, "no marker index sits outside the single bucket");
+
+    const std::int32_t propsBegin = buckets.props.BucketBegin(0);
+    const std::int32_t propsEnd   = buckets.props.BucketEnd(0);
+    AssemblerCheck(buckets.props.BucketCount() == 1, "one prop rule registered -> one bucket");
+    AssemblerCheck(propsEnd - propsBegin == static_cast<std::int32_t>(placements.props.Count()),
+                   "the single prop bucket contains every placed prop");
+    std::vector<bool> propSeen(placements.props.Count(), false);
+    for (std::int32_t position = propsBegin; position < propsEnd; ++position) {
+        const std::int32_t instance = buckets.props.InstanceIndexAt(position);
+        AssemblerCheck(instance >= 0 && static_cast<std::size_t>(instance) < placements.props.Count(),
+                       "prop bucket entries resolve inside the props collection");
+        propSeen[static_cast<std::size_t>(instance)] = true;
+    }
+    bool bEveryPropInBucket = true;
+    for (bool seen : propSeen) if (!seen) bEveryPropInBucket = false;
+    AssemblerCheck(bEveryPropInBucket, "no prop index sits outside the single bucket");
+
+    AssemblerCheck(buckets.units.IsEmpty() && buckets.units.BucketCount() == 0,
+                   "zero unit rules registered -> empty units index (real bucketTotal==0 path)");
+    AssemblerCheck(buckets.decals.IsEmpty() && buckets.decals.BucketCount() == 0,
+                   "zero decal rules registered -> empty decals index (real bucketTotal==0 path)");
 }
 
 void CheckBake(const Proc::BakedTextureSet& textures) {
@@ -112,6 +161,7 @@ void CheckMaskGateReachedOutput(const Pipeline::GenerationAssembler& assembler,
 void RunOutputChecks(Pipeline::GenerationAssembler& assembler, const Params::MapRecipe& recipe) {
     CheckSimulationFields(assembler);
     CheckPlacement(assembler.Placements());
+    CheckRuleBucketIndex(assembler);
     CheckBake(assembler.BakedTextures());
     CheckSimulationChangedTerrain(assembler, recipe);
     CheckMaskGateReachedOutput(assembler, recipe);

@@ -17,6 +17,7 @@
 #include "Generation_PIPELINE.h"
 #include "../data/MapFields_DATA.h"
 #include "../data/PlacementResults_DATA.h"
+#include "../data/RuleBucketIndexSet_DATA.h"
 #include "../data/SpatialGrid_DATA.h"
 #include "../data/StratumArt_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -72,6 +73,12 @@ public:
     // Chunk count of that index — a tweakable (Constitution §8), applied on the next build.
     void SetSpatialGridChunkResolution(int resolution) { spatialGridChunkResolution = resolution; }
 
+    // The procedural sub-layer index (ARCH_14_09_RenderingPerformance.md §14.9). Same lifecycle as MarkerSpatialGrid: PIPELINE is
+    // its single writer (§3.4.1), rebuilt inside the Placement stage's registered run, so a refresh
+    // that does not re-run Placement cannot move it. One Data::RuleBucketIndex per PlacementResults
+    // collection — see RuleBucketIndexSet_DATA.h.
+    const Data::RuleBucketIndexSet& RuleBucketIndex() const { return ruleBucketIndex; }
+
     // Heightfield cell -> game units (X/Z): map geometry (`Params::Geometry`, M5-0a), the ONE
     // value Placement emitted its instance positions with. The preview composite needs the same
     // number to map an instance onto a pixel; it reads it here so caller and stage can never
@@ -107,6 +114,7 @@ public:
 private:
     void RegisterStages();                // GenerationAssembler_Stages_PIPELINE.cpp
     void BuildMarkerSpatialGrid();        // GenerationAssembler_Stages_PIPELINE.cpp
+    void BuildRuleBucketIndex();          // GenerationAssembler_Stages_PIPELINE.cpp
     void AddStage(const std::string& stageName, RegenerationTier tier,
                   std::function<std::size_t()> computeParameterHash, std::function<void()> run);
 
@@ -117,6 +125,7 @@ private:
     Data::PlacementResults placementResults;
     Proc::BakedTextureSet  bakedTextures;
     Data::SpatialGrid      markerSpatialGrid;  // derived index over placementResults.markers
+    Data::RuleBucketIndexSet ruleBucketIndex;  // derived per-collection CSR index over placementResults
 
     Proc::NoiseBlendStage       noiseBlendStage;
     Proc::ErosionStage          erosionStage;

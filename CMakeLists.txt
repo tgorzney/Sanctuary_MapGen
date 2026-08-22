@@ -377,6 +377,7 @@ add_sangen_test(Trigonometry_MATH_Test          src/math/Trigonometry_MATH_Test.
 add_sangen_test(EntityIdBuffer_DATA_Test        src/data/EntityIdBuffer_DATA_Test.cpp)
 add_sangen_test(FloatField_DATA_Test            src/data/FloatField_DATA_Test.cpp)
 add_sangen_test(MapFields_DATA_Test             src/data/MapFields_DATA_Test.cpp)
+add_sangen_test(RuleBucketIndex_DATA_Test       src/data/RuleBucketIndex_DATA_Test.cpp)
 add_sangen_test(SpatialGrid_DATA_Test           src/data/SpatialGrid_DATA_Test.cpp)
 
 # PARAMS
