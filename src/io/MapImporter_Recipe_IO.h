@@ -55,8 +55,12 @@ void ReadAreasJson(const nlohmann::json& document, Params::MapRecipe& outRecipe)
 void ReadArmiesJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 
 // MapImporter_Markers_IO.cpp / MapImporter_Chains_IO.cpp — `markers`/`chains` -> `recipe.markers`/
-// `recipe.chains` (STEP3_MarkersChains_IO; MapImporter_IO.h SCOPE NOTE 3).
-void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+// `recipe.chains` (STEP3_MarkersChains_IO; MapImporter_IO.h SCOPE NOTE 3). `MarkerGroups` ->
+// `recipe.markerLayers` (STEP60_MarkerInstanceLayer_PARAMS) — `ReadMarkerGroupsJson` MUST run
+// before `ReadMarkersJson`: the `layerIndex` range-clamp validates against
+// `outRecipe.markerLayers.size()`, which `ReadMarkerGroupsJson` populates.
+void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
 void ReadChainsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 
 // MapImporter_Props_IO.cpp / MapImporter_Decals_IO.cpp — `props`/`decals`/`PropGroups`/

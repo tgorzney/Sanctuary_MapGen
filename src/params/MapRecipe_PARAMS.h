@@ -100,6 +100,11 @@ struct MapRecipe {
     std::vector<MapArea>             areas;
     std::vector<MarkerInstanceGroup> markers;
     std::vector<MarkerChain>         chains;
+    // The manual marker layers' own metadata array (STEP60), indexed by
+    // `MarkerTransform::layerIndex` above — parallel to `propLayers`/`decalLayers` below, but
+    // ships already wired end-to-end (export/import) by the same ticket that adds it, unlike
+    // those two (see their own comment).
+    std::vector<MarkerInstanceLayer> markerLayers;
     // PARAMS types + pure JSON round-trip only (STEP4_PropsDecals_IO) — NOT yet live-wired into
     // BuildSanmapJsonText/ParseSanmapJsonText. See MapExporter_IO.h/MapImporter_IO.h SCOPE NOTES.
     std::vector<PropInstanceGroup>   props;

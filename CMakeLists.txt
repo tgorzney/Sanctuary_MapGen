@@ -460,6 +460,10 @@ add_sangen_test(AtmosphereTab_UI_Test     src/ui/AtmosphereTab_UI_Test.cpp)
 # arithmetic and the transform mirrors ONCE, for all four tabs, so no tab owns it.
 add_sangen_test(MarkersTab_UI_Test        src/ui/MarkersTab_UI_Test.cpp)
 add_sangen_test(MarkersTab_Manual_UI_Test src/ui/MarkersTab_Manual_UI_Test.cpp)
+# STEP60_MarkerInstanceLayer_PARAMS: `NextMarkerLayerId`'s own single-function header has no
+# `MarkersTab_ManualLayers_UI.h` host to be a translation unit of yet (Phase 2, not built here) —
+# its own small binary, mirroring Section_UI_Test's pure-decision shape.
+add_sangen_test(MarkerLayerId_UI_Test     src/ui/MarkerLayerId_UI_Test.cpp)
 add_sangen_test(ArmiesTab_UI_Test         src/ui/ArmiesTab_UI_Test.cpp)
 add_sangen_test(PropsTab_UI_Test          src/ui/PropsTab_UI_Test.cpp)
 add_sangen_test(PropsTab_ManualDecals_UI_Test src/ui/PropsTab_ManualDecals_UI_Test.cpp)

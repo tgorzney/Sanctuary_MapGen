@@ -55,8 +55,12 @@ nlohmann::ordered_json BuildArmiesJson(const Params::MapRecipe& recipe);
 
 // MapExporter_Markers_IO.cpp — `recipe.markers` -> the top-level `markers` dictionary (two-level
 // JSON object keyed by MarkerInstanceGroup::name / MarkerTransform::name). Applies the coordinate
-// flip to MarkerTransform.transform.positionZ (STEP3_MarkersChains_IO).
+// flip to MarkerTransform.transform.positionZ (STEP3_MarkersChains_IO). `recipe.markerLayers` ->
+// the top-level `MarkerGroups` PascalCase array (STEP60_MarkerInstanceLayer_PARAMS), a fresh
+// sibling of `markers`, mirroring `PropGroups`/`DecalGroups`'s shape plus `Id` and Correction 16's
+// SymmetrySetting triplet, flattened.
 nlohmann::ordered_json BuildMarkersJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe);
 
 // MapExporter_Chains_IO.cpp — `recipe.chains` -> the top-level `chains` dictionary (JSON object
 // keyed by MarkerChain::name, each value a bare array of {type,name} objects, not a wrapping

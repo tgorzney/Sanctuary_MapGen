@@ -69,5 +69,19 @@ struct SymmetryBlend {
     float torusMinorRadius   = 16.0f;  // Torus3D minor radius, in cells
 };
 
+// A single manual-layer/rule's own mirror-mask setting (ARCH_16_01_NewParamsShapes.md §16.1,
+// SANMAP_FORMAT_SPEC Correction 16) — what a "place with symmetry" tool resolves against.
+// `bSymmetryUseGlobal` mirrors the `bSlopeUseGlobal` switch `SlopeDefaults` already established
+// (MASKING_SPEC §1.7): true resolves against `MapRecipe::globalSymmetryMask`/
+// `radialSymmetryRepeatCount`, false uses this record's own `symmetryMask`/
+// `radialSymmetryRepeatCount` instead. First landed by STEP60/STEP66 (whichever lands first
+// defines it; the other checks for its existence before re-adding it, same "first ticket to land
+// wins" rule already used elsewhere in this backlog).
+struct SymmetrySetting {
+    bool bSymmetryUseGlobal = true;
+    int  symmetryMask       = 0;
+    int  radialSymmetryRepeatCount = 3;
+};
+
 } // namespace Params
 } // namespace SanmapGen
