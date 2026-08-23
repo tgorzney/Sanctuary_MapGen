@@ -757,6 +757,13 @@ add_sangen_test(GameInstallLocation_IO_Test src/io/GameInstallLocation_IO_Test.c
 # real-resource self-check against the CMake-staged SANGEN_V2_LUA_RESOURCE_DIRECTORY (argv[2]).
 add_sangen_test(ScenarioScript_RuntimeResource_IO_Test src/io/ScenarioScript_RuntimeResource_IO_Test.cpp)
 
+# STEP71_ScenarioScriptExport_IO: the Map Scenario export orchestrator — writes
+# <MapName>_Scenarios_Data.lua (STEP70) and <MapName>_Scenarios_Runtime.lua (STEP72) into
+# LJ/lua/maps/<MapName>/ under symmetric banner-gated overwrite safety, with a Sys::CheckLuaSyntax
+# (STEP65) pre-write safety net on both rendered texts. Pure string-building + std::filesystem, no
+# JSON type in sight — no nlohmann link needed, same posture as ScenarioScript_DataLua_IO_Test.
+add_sangen_test(ScenarioScript_Export_IO_Test src/io/ScenarioScript_Export_IO_Test.cpp)
+
 # Tab-rebuild batch E — the host shell. One binary over four translation units (main() lives in
 # ApplicationShell_Layout_UI_Test.cpp): the left column's catalogue is pure data, so the v1 layout is
 # asserted rather than eyeballed; the other three drive a REAL Ui::Application on the Cpu twin, so the
