@@ -68,8 +68,10 @@ struct MapExportResult {
     bool                     bSucceeded = false;
     std::vector<std::string> writtenFilePaths;
     std::string              debugLog;
+    int  warningCount = 0;
 
     void Log(const std::string& line) { debugLog += line; debugLog += '\n'; }
+    void Warn(const std::string& line) { ++warningCount; Log("WARNING: " + line); }
     void RecordWrittenFile(const std::string& filePath) { writtenFilePaths.push_back(filePath); }
     int WrittenFileCount() const { return static_cast<int>(writtenFilePaths.size()); }
 };

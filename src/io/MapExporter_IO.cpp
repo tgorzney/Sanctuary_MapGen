@@ -3,6 +3,7 @@
 // produced so the tab's log panel can show the result rather than a silent success.
 #include "MapExporter_IO.h"
 #include "FilesystemPrimitives_IO.h"
+#include "MapExporter_ArmySpawnMarkerValidation_IO.h"
 #include "MapExporter_BlueprintValidation_IO.h"
 #include "MapExporter_Recipe_IO.h"
 #include "UnknownImportBag_IO.h"
@@ -69,6 +70,15 @@ bool CheckBlueprintValidationGate(const Params::MapRecipe& recipe, const Sanpack
     return false;
 }
 
+// STEP82: warn-only, never gates. Returns void BY DESIGN -- an orphaned army is a legal, tolerated
+// state (ARCH_16_08_SpawnArmyShrink.md §16.8) and must never influence whether an export proceeds.
+// If a future edit is tempted to make this bool, that is the ARCH ruling it would be breaking.
+void ReportArmiesWithoutSpawnMarkers(const Params::MapRecipe& recipe, MapExportResult& result) {
+    const ArmySpawnMarkerValidationReport report = ValidateArmiesHaveSpawnMarkers(recipe);
+    if (report.AllArmiesHaveSpawnMarkers()) return;
+    result.Warn(report.SummaryText());
+}
+
 } // namespace
 
 bool EnsureExportFolderExists(const std::string& folderPath, MapExportResult& result) {
@@ -85,6 +95,7 @@ MapExportResult MapExporter::ExportSanmapOnly(const std::string& folderPath,
                                               bool bBlueprintValidationAcknowledged) {
     MapExportResult result;
     if (!recipe.IsValid()) { result.Log("Export refused: the recipe's geometry is not valid."); return result; }
+    ReportArmiesWithoutSpawnMarkers(recipe, result);
     if (!CheckBlueprintValidationGate(recipe, assetPack, bBlueprintValidationAcknowledged, result))
         return result;
     if (!EnsureExportFolderExists(folderPath, result)) return result;
@@ -99,6 +110,7 @@ MapExportResult MapExporter::ExportAll(const std::string& folderPath, const Para
                                        bool bBlueprintValidationAcknowledged) {
     MapExportResult result;
     if (!recipe.IsValid()) { result.Log("Export refused: the recipe's geometry is not valid."); return result; }
+    ReportArmiesWithoutSpawnMarkers(recipe, result);
     if (!CheckBlueprintValidationGate(recipe, assetPack, bBlueprintValidationAcknowledged, result))
         return result;
     if (!EnsureExportFolderExists(folderPath, result)) return result;
