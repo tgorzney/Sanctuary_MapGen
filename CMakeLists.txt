@@ -446,6 +446,12 @@ target_include_directories(AssetPipeline_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_
 # see WorldFootprintSizeTable_IO.h's own header comment). Pure unit test, no sanpack/miniz needed.
 add_sangen_test(WorldFootprintSizeTable_IO_Test src/io/WorldFootprintSizeTable_IO_Test.cpp)
 
+# STEP86 — .santp/.sanprop template source root walk (raw text only, no interpretation). Its own
+# sanpack-fallback case writes a real synthetic zip with the miniz WRITER, so like AssetPipeline_IO_Test
+# it needs the vendored header on its include path.
+add_sangen_test(TemplateSourceScan_IO_Test src/io/TemplateSourceScan_IO_Test.cpp)
+target_include_directories(TemplateSourceScan_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
+
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
 # each group below is ONE binary whose main() lives in the first file listed.
 add_sangen_test(NoiseBlend_PROC_Test
