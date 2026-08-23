@@ -75,12 +75,17 @@ void ResolveUnitsManual(const DrawOverlayIconLayersInput& input, const OverlayLa
                               stableOrderCounter, outAabb, viewRect, diagnostics, outCandidates);
 }
 
+// STEP83 §5/Item 2: Props/Reclaim partition by bReclaimable, evaluated ONCE PER GROUP — never per
+// PropTransform, never inside the PrimReserve/PrimWrite region (§14.9); a skipped group is en bloc.
 void ResolvePropsManual(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
                         int layerIndex, int subLayerArrayIndex, int* stableOrderCounter,
                         LayerWorldAabb_UI* outAabb, const ViewWorldRect_UI* viewRect,
                         IconLayerCullDiagnostics_UI* diagnostics,
                         std::vector<OverlayVisibleInstance>& outCandidates) {
+    const bool bWantReclaimable = (layer.domainKind == OverlayDomainKind_UI::Reclaim);
     for (const Params::PropInstanceGroup& group : input.recipe->props) {
+        if (diagnostics != nullptr) ++diagnostics->reclaimGroupPredicateEvaluations;
+        if (group.bReclaimable != bWantReclaimable) continue;   // en bloc, before any transform
         const std::string templateIdentifier = TemplateIdentifierFromBlueprintPath(group.blueprintPath);
         for (std::size_t index = 0; index < group.transforms.size(); ++index) {
             const Params::PropTransform& propTransform = group.transforms[index];
@@ -128,6 +133,7 @@ void ResolveManualSubLayer(const DrawOverlayIconLayersInput& input, const Overla
                                viewRect, diagnostics, outCandidates);
             return;
         case OverlayDomainKind_UI::Props:
+        case OverlayDomainKind_UI::Reclaim:   // STEP62/STEP83 bReclaimable partition; group-level filter above
             ResolvePropsManual(input, layer, layerIndex, subLayerArrayIndex, stableOrderCounter, outAabb,
                                viewRect, diagnostics, outCandidates);
             return;
@@ -135,7 +141,7 @@ void ResolveManualSubLayer(const DrawOverlayIconLayersInput& input, const Overla
             ResolveDecalsManual(input, layer, layerIndex, subLayerArrayIndex, stableOrderCounter, outAabb,
                                 viewRect, diagnostics, outCandidates);
             return;
-        default: return;   // Alloy/SpawnsArmies/Reclaim carry no Manual sub-layers this sequence
+        default: return;   // Alloy/SpawnsArmies carry no Manual sub-layers this sequence
     }
 }
 

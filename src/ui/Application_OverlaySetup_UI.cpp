@@ -7,45 +7,17 @@
 
 namespace SanmapGen {
 namespace Ui {
-namespace {
 
-void PushProceduralRefs(std::vector<OverlaySubLayerRef_UI>& subLayers, int ruleCount) {
-    for (int index = 0; index < ruleCount; ++index)
-        subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, index, true});
-}
-
-void PushManualRefs(std::vector<OverlaySubLayerRef_UI>& subLayers, int recordCount) {
-    for (int index = 0; index < recordCount; ++index)
-        subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, index, true});
-}
-
-// CONFIRMED (STEP79 "Downstream authority ruling"): flat/global index over the layer-concatenated
-// rule sequence — see this ticket's header note and STEP50's matching, now-confirmed assumption.
-// Zero Manual refs for either domain (STEP51 scope; Manual Alloy/SpawnsArmies routing over
-// `recipe.markerLayers` is a later, ARCH_14_14-ruled successor ticket, gated on this one landing).
+// Defined in the sibling seed-helper translation unit (Application_OverlaySetup_Seed_UI.cpp,
+// ARCH_01_05_FileSizeCeilings.md §1.5 split, STEP83 Item 1). Not part of this module's public
+// surface — only ConfigureDefaultOverlayLayers below calls them.
+void PushProceduralRefs(std::vector<OverlaySubLayerRef_UI>& subLayers, int ruleCount);
+void PushManualRefs(std::vector<OverlaySubLayerRef_UI>& subLayers, int recordCount);
 void SeedMarkerDomains(OverlayLayer_UI& alloyLayer, OverlayLayer_UI& spawnsArmiesLayer,
-                       const Params::MapRecipe& recipe) {
-    int flatIndex = 0;
-    for (const Params::MarkerRuleLayer& layer : recipe.markerRuleLayers) {
-        for (const Params::MarkerRule& rule : layer.rules) {
-            OverlayLayer_UI& target = rule.category == Params::MarkerCategory::Spawn
-                                           ? spawnsArmiesLayer : alloyLayer;
-            target.subLayers.push_back(OverlaySubLayerRef_UI{
-                OverlaySubLayerKind_UI::ProceduralRule, flatIndex, true});
-            ++flatIndex;
-        }
-    }
-}
-
-void SeedUnitsManualSubLayers(OverlayLayer_UI& unitsLayer, const Params::MapRecipe& recipe) {
-    int flatIndex = 0;
-    for (const Params::Army& army : recipe.armies)
-        for (std::size_t group = 0; group < army.groups.size(); ++group)
-            unitsLayer.subLayers.push_back(
-                OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, flatIndex++, true});
-}
-
-} // namespace
+                       const Params::MapRecipe& recipe);
+void SeedUnitsManualSubLayers(OverlayLayer_UI& unitsLayer, const Params::MapRecipe& recipe);
+void SeedPropReclaimDomains(OverlayLayer_UI& propsLayer, OverlayLayer_UI& reclaimLayer,
+                            const Params::MapRecipe& recipe);
 
 void ConfigureDefaultOverlayLayers(OverlayLayerSettings& overlaySettings,
                                     const Params::MapRecipe& recipe) {
@@ -60,13 +32,11 @@ void ConfigureDefaultOverlayLayers(OverlayLayerSettings& overlaySettings,
     SeedUnitsManualSubLayers(unitsLayer, recipe);
     PushProceduralRefs(unitsLayer.subLayers, static_cast<int>(recipe.unitRules.size()));
 
-    OverlayLayer_UI propsLayer; propsLayer.name = "Props";
-    propsLayer.domainKind = OverlayDomainKind_UI::Props;
-    PushManualRefs(propsLayer.subLayers, static_cast<int>(recipe.propLayers.size()));
-    PushProceduralRefs(propsLayer.subLayers, static_cast<int>(recipe.propRules.size()));
-
+    OverlayLayer_UI propsLayer;   propsLayer.name   = "Props";
+    propsLayer.domainKind   = OverlayDomainKind_UI::Props;
     OverlayLayer_UI reclaimLayer; reclaimLayer.name = "Reclaim";
-    reclaimLayer.domainKind = OverlayDomainKind_UI::Reclaim;   // stays empty — no data/rule yet
+    reclaimLayer.domainKind = OverlayDomainKind_UI::Reclaim;
+    SeedPropReclaimDomains(propsLayer, reclaimLayer, recipe);
 
     OverlayLayer_UI decalsLayer; decalsLayer.name = "Decals";
     decalsLayer.domainKind = OverlayDomainKind_UI::Decals;

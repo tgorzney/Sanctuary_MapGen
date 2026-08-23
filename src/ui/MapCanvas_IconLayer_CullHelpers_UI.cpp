@@ -19,10 +19,15 @@ bool TryResolveDomainCollection(OverlayDomainKind_UI domainKind, PlacementCollec
     switch (domainKind) {
         case OverlayDomainKind_UI::Alloy:
         case OverlayDomainKind_UI::SpawnsArmies: outCollection = PlacementCollectionKind_UI::Markers; return true;
-        case OverlayDomainKind_UI::Props:        outCollection = PlacementCollectionKind_UI::Props;   return true;
+        // Props/Reclaim both resolve to the Props collection (§14.6: domain != DATA-bucket
+        // identity) — STEP83's SeedPropReclaimDomains already routed each recipe.propRules[i]
+        // into exactly one of the two layers' ProceduralRule refs, so whichever layer a ref
+        // shows up in, STEP50's props CSR bucket (keyed by that same global rule index) is the
+        // right one to read; no second index, no per-instance re-check here.
+        case OverlayDomainKind_UI::Props:
+        case OverlayDomainKind_UI::Reclaim:      outCollection = PlacementCollectionKind_UI::Props;   return true;
         case OverlayDomainKind_UI::Units:        outCollection = PlacementCollectionKind_UI::Units;   return true;
         case OverlayDomainKind_UI::Decals:       outCollection = PlacementCollectionKind_UI::Decals;  return true;
-        case OverlayDomainKind_UI::Reclaim:      return false;   // no data/rule type yet (§14.2)
     }
     return false;
 }

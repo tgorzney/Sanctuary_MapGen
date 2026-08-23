@@ -130,6 +130,97 @@ void RunManualProceduralOrderingChecks() {
     checkManualThenProcedural(decalsLayer, "Decals: 2 Manual then 3 ProceduralRule, each own-index");
 }
 
+// STEP83 §8 — the seed-time Props/Reclaim partition. Four propRules, alternating bReclaimable, so
+// the partition, the trap (per-domain renumbering), the mutual-exclusivity, and the two all-one-way
+// edges are each independently provable from one fixture family.
+void RunPropReclaimPartitionChecks() {
+    Params::MapRecipe recipe;
+    recipe.propRules.assign(4, Params::PropRule());
+    recipe.propRules[0].bReclaimable = false;
+    recipe.propRules[1].bReclaimable = true;
+    recipe.propRules[2].bReclaimable = false;
+    recipe.propRules[3].bReclaimable = true;
+
+    OverlayLayerSettings overlaySettings;
+    ConfigureDefaultOverlayLayers(overlaySettings, recipe);
+    const OverlayLayer_UI& propsLayer   = overlaySettings.overlayLayers[3];
+    const OverlayLayer_UI& reclaimLayer = overlaySettings.overlayLayers[4];
+
+    // The indices ARE the assertion: a per-domain renumbering bug would produce {0,1} here instead
+    // of the real recipe.propRules positions {0,2}/{1,3}.
+    Check(propsLayer.subLayers.size() == 2
+          && propsLayer.subLayers[0].kind == OverlaySubLayerKind_UI::ProceduralRule
+          && propsLayer.subLayers[0].index == 0
+          && propsLayer.subLayers[1].index == 2,
+          "Props' procedural refs are exactly {ProceduralRule,0},{ProceduralRule,2} — global indices, not renumbered");
+    Check(reclaimLayer.subLayers.size() == 2
+          && reclaimLayer.subLayers[0].kind == OverlaySubLayerKind_UI::ProceduralRule
+          && reclaimLayer.subLayers[0].index == 1
+          && reclaimLayer.subLayers[1].index == 3,
+          "Reclaim's procedural refs are exactly {ProceduralRule,1},{ProceduralRule,3} — global indices, not renumbered");
+
+    // Mutual exclusivity, mechanically: every recipe.propRules index appears in exactly one set,
+    // union covers [0, propRules.size()) with no gap, order-preserving within each domain.
+    bool seenInProps[4]   = {false, false, false, false};
+    bool seenInReclaim[4] = {false, false, false, false};
+    for (const OverlaySubLayerRef_UI& ref : propsLayer.subLayers)   seenInProps[ref.index]   = true;
+    for (const OverlaySubLayerRef_UI& ref : reclaimLayer.subLayers) seenInReclaim[ref.index] = true;
+    for (int i = 0; i < 4; ++i) {
+        Check(seenInProps[i] != seenInReclaim[i],
+              "each recipe.propRules index appears in exactly one of Props/Reclaim, never both, never neither");
+    }
+
+    // Edge: all four reclaimable.
+    Params::MapRecipe allReclaimable;
+    allReclaimable.propRules.assign(4, Params::PropRule());
+    for (Params::PropRule& rule : allReclaimable.propRules) rule.bReclaimable = true;
+    OverlayLayerSettings allReclaimableSettings;
+    ConfigureDefaultOverlayLayers(allReclaimableSettings, allReclaimable);
+    Check(allReclaimableSettings.overlayLayers[3].subLayers.empty(),
+          "all-reclaimable: Props gets zero procedural refs");
+    Check(allReclaimableSettings.overlayLayers[4].subLayers.size() == 4,
+          "all-reclaimable: Reclaim gets all four procedural refs");
+    Check(allReclaimableSettings.overlayLayers.size() == 6,
+          "all-reclaimable: both Props and Reclaim rows still exist for the View toolbar");
+
+    // Edge: all four non-reclaimable.
+    Params::MapRecipe noneReclaimable;
+    noneReclaimable.propRules.assign(4, Params::PropRule());
+    OverlayLayerSettings noneReclaimableSettings;
+    ConfigureDefaultOverlayLayers(noneReclaimableSettings, noneReclaimable);
+    Check(noneReclaimableSettings.overlayLayers[3].subLayers.size() == 4,
+          "none-reclaimable: Props gets all four procedural refs");
+    Check(noneReclaimableSettings.overlayLayers[4].subLayers.empty(),
+          "none-reclaimable: Reclaim gets zero procedural refs");
+    Check(noneReclaimableSettings.overlayLayers.size() == 6,
+          "none-reclaimable: both Props and Reclaim rows still exist for the View toolbar");
+
+    // Manual refs go to BOTH domains, Manual-before-Procedural order preserved in both.
+    Params::MapRecipe manualRecipe;
+    manualRecipe.propLayers.assign(3, Params::PropInstanceLayer());
+    OverlayLayerSettings manualSettings;
+    ConfigureDefaultOverlayLayers(manualSettings, manualRecipe);
+    auto checkThreeManualRefs = [](const OverlayLayer_UI& layerToCheck, const char* label) {
+        Check(layerToCheck.subLayers.size() == 3, label);
+        for (int i = 0; i < 3; ++i) {
+            Check(layerToCheck.subLayers[static_cast<std::size_t>(i)].kind == OverlaySubLayerKind_UI::Manual, label);
+            Check(layerToCheck.subLayers[static_cast<std::size_t>(i)].index == i, label);
+        }
+    };
+    checkThreeManualRefs(manualSettings.overlayLayers[3], "Props carries [{Manual,0},{Manual,1},{Manual,2}]");
+    checkThreeManualRefs(manualSettings.overlayLayers[4], "Reclaim carries [{Manual,0},{Manual,1},{Manual,2}]");
+
+    // Unchanged domains: Alloy/SpawnsArmies/Units/Decals are byte-identical to STEP51's own seeding
+    // (none of these fixtures touch markerRuleLayers/armies/unitRules/decalRules/decalLayers).
+    for (const OverlayLayerSettings* settings : {&overlaySettings, &allReclaimableSettings,
+                                                  &noneReclaimableSettings, &manualSettings}) {
+        Check(settings->overlayLayers[0].subLayers.empty(), "Alloy stays empty across every fixture above");
+        Check(settings->overlayLayers[1].subLayers.empty(), "SpawnsArmies stays empty across every fixture above");
+        Check(settings->overlayLayers[2].subLayers.empty(), "Units stays empty across every fixture above");
+        Check(settings->overlayLayers[5].subLayers.empty(), "Decals stays empty across every fixture above");
+    }
+}
+
 void RunResolveUnitsManualSubLayerChecks() {
     Params::MapRecipe recipe;
     Params::Army armyZero; armyZero.groups.assign(2, Params::UnitGroup());
@@ -202,6 +293,7 @@ int main() {
     RunDefaultSeedingChecks();
     RunCategorySplitChecks();
     RunManualProceduralOrderingChecks();
+    RunPropReclaimPartitionChecks();
     RunResolveUnitsManualSubLayerChecks();
     RunReadWriteCorrectnessChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }

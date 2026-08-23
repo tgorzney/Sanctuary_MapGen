@@ -24,6 +24,10 @@ struct IconAtlasManifest;
 // "the grid/bucket was never touched" / "logged once, not per instance" / "generated exactly once".
 struct IconLayerCullDiagnostics_UI {
     int subLayerWalksIssued = 0;    // bumped once per sub-layer bucket/manual-array actually walked
+    // STEP83 §8 — bumped once per Params::PropInstanceGroup visited by the Props/Reclaim Manual
+    // walk's group-level bReclaimable predicate; proves the predicate sits at group granularity,
+    // never per-transform (a per-instance regression would instead tally the transform count).
+    int reclaimGroupPredicateEvaluations = 0;
     std::vector<std::string> loggedMissingTemplateIdentifiers;
     bool HasLoggedMissing(const std::string& templateIdentifier) const {
         for (const std::string& logged : loggedMissingTemplateIdentifiers)

@@ -38,10 +38,11 @@ bool ResolveSelectedInstanceCandidate(const DrawOverlayIconLayersInput& input,
 // conversion outside UI (IO must not depend upward on UI, Constitution §1) so it lives here.
 std::string TemplateIdentifierToString8(const char* characters);
 
-// §14.6: domainKind is not DATA-bucket identity. Alloy/SpawnsArmies both resolve to Markers
-// (their split already happened at OverlayLayer seed time — each rule's ruleIndex was routed into
-// exactly one of the two layers' subLayers by Application_OverlaySetup_UI.cpp's SeedMarkerDomains,
-// so no live per-instance category re-check is needed here). Reclaim has no data yet (false).
+// §14.6: domainKind is not DATA-bucket identity. Alloy/SpawnsArmies both resolve to Markers, and
+// Props/Reclaim both resolve to Props (their splits already happened at OverlayLayer seed time —
+// each rule's ruleIndex was routed into exactly one of the two layers' subLayers by
+// Application_OverlaySetup_Seed_UI.cpp's SeedMarkerDomains/SeedPropReclaimDomains, so no live
+// per-instance category/reclaim re-check is needed here — STEP83 §0/§5).
 bool TryResolveDomainCollection(OverlayDomainKind_UI domainKind, PlacementCollectionKind_UI& outCollection);
 const Data::PlacementInstances& CollectionInstances(const Data::PlacementResults& placements,
                                                      PlacementCollectionKind_UI collection);
@@ -77,8 +78,8 @@ void ResolveProceduralSubLayer(const DrawOverlayIconLayersInput& input, const Ov
                                 IconLayerCullDiagnostics_UI* diagnostics,
                                 std::vector<OverlayVisibleInstance>& outCandidates);
 
-// §1 item 4 — one hand-authored sub-layer (Props/Decals/Units; Alloy/SpawnsArmies carry none this
-// sequence — SEQUENCE_PreviewOverlayLayering.md Phase 5) (MapCanvas_IconLayer_CullManual_UI.cpp).
+// §1 item 4 — one hand-authored sub-layer (Props/Reclaim/Decals/Units; Alloy/SpawnsArmies carry
+// none this sequence — SEQUENCE_PreviewOverlayLayering.md Phase 5) (MapCanvas_IconLayer_CullManual_UI.cpp).
 void ResolveManualSubLayer(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
                             int layerIndex, int subLayerArrayIndex,
                             int* stableOrderCounter, LayerWorldAabb_UI* outAabb,
