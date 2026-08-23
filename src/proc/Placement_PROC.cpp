@@ -47,6 +47,8 @@ void PlacementStage::RunScatter(bool bUseGpuGate) {
     bGpuFieldsUploaded      = false;
     if (!recipe.IsValid() || !mapFields.IsSized()) return;
 
+    ResolveManualPropsAndDecals();   // no dependency on rule configs or derived fields
+
     BuildRuleConfigurations();
     BuildDerivedFields();
 

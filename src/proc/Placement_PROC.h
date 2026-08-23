@@ -59,6 +59,9 @@ public:
     const Data::FloatField& ObstacleDistanceField() const { return obstacleDistanceField; }
 
 private:
+    // Placement_Manual_PROC.cpp — hand-authored props/decals, straight 1:1 copy-through, no
+    // symmetry-orbit expansion (ARCH_14_13_OpenItems.md §14.13 item 3, "WORK-ORDER B").
+    void ResolveManualPropsAndDecals();
     // Placement_Rules_PROC.cpp — flattens every enabled rule into the shared kernel record.
     void BuildRuleConfigurations();
     // Placement_Fields_PROC.cpp — the Jump-Flood exclusion field and the gate field. Slope is

@@ -444,6 +444,10 @@ add_sangen_test(FlowAccumulation_PROC_Test
 add_sangen_test(Placement_PROC_Test             src/proc/Placement_PROC_Test.cpp)
 add_sangen_test(Placement_Symmetry_PROC_Test    src/proc/Placement_Symmetry_PROC_Test.cpp)
 add_sangen_test(Placement_Gpu_PROC_Test         src/proc/Placement_Gpu_PROC_Test.cpp)
+# STEP57 — manual props/decals PROC resolution (ResolveManualPropsAndDecals) + the
+# manualLayerId correlation column. Own binary, matching the Placement_Symmetry_PROC_Test
+# precedent of one test file per concern, so neither existing Placement test needs editing.
+add_sangen_test(Placement_Manual_PROC_Test      src/proc/Placement_Manual_PROC_Test.cpp)
 add_sangen_test(Bake_PROC_Test
     src/proc/Bake_PROC_Test.cpp
     src/proc/Bake_Weights_PROC_Test.cpp

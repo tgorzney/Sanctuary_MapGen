@@ -48,6 +48,7 @@ struct PlacementInstance {
     int  symmetryIdentifier = 0; // clones of one source share this id
     int  biomeStratumIndex = 0;  // dominant material mask at the position
     int  armyIndex         = -1; // units only; -1 for markers/props/decals
+    int  manualLayerId     = -1; // manual props/decals only; -1 for procedurally-scattered instances
     bool bCollidable       = false;  // collidable props are gameplay (AI_HOSTCLIENT_SPEC)
 };
 

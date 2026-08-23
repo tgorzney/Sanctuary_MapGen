@@ -25,6 +25,7 @@ public:
     std::vector<int>  symmetryIdentifier;
     std::vector<int>  biomeStratumIndex;
     std::vector<int>  armyIndex;
+    std::vector<int>  manualLayerId;   // -1 for procedurally-scattered; STEP56's layerId for manual
     std::vector<unsigned char> bCollidable;   // 1 byte per instance, addressable
 
     std::size_t Count() const { return positionX.size(); }
@@ -36,6 +37,7 @@ public:
         scaleX.clear(); scaleY.clear(); scaleZ.clear();
         templateIdentifier.clear(); ruleIndex.clear(); category.clear();
         symmetryIdentifier.clear(); biomeStratumIndex.clear(); armyIndex.clear();
+        manualLayerId.clear();
         bCollidable.clear();
     }
 
@@ -47,6 +49,7 @@ public:
         templateIdentifier.reserve(instanceCount); ruleIndex.reserve(instanceCount);
         category.reserve(instanceCount); symmetryIdentifier.reserve(instanceCount);
         biomeStratumIndex.reserve(instanceCount); armyIndex.reserve(instanceCount);
+        manualLayerId.reserve(instanceCount);
         bCollidable.reserve(instanceCount);
     }
 
@@ -67,6 +70,7 @@ public:
         symmetryIdentifier.push_back(instance.symmetryIdentifier);
         biomeStratumIndex.push_back(instance.biomeStratumIndex);
         armyIndex.push_back(instance.armyIndex);
+        manualLayerId.push_back(instance.manualLayerId);
         bCollidable.push_back(instance.bCollidable ? 1u : 0u);
         return positionX.size() - 1;
     }
@@ -84,6 +88,7 @@ public:
         instance.symmetryIdentifier = symmetryIdentifier[index];
         instance.biomeStratumIndex = biomeStratumIndex[index];
         instance.armyIndex = armyIndex[index];
+        instance.manualLayerId = manualLayerId[index];
         instance.bCollidable = bCollidable[index] != 0u;
         return instance;
     }
