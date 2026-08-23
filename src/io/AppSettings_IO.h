@@ -30,6 +30,13 @@ struct AppSettings {
                                                // and <root>/engine/Sanctuary_Data/Maps
     std::string scenarioRuntimeOverridePath;   // empty => bundled SanGenScenarioRuntime.lua default
                                                // (DESIGN_MapScenarioIO_R1.md §3)
+    std::string lastTemplateIngestTimestamp;   // ISO-8601 UTC; empty = never ingested on this app
+                                               // installation (Constitution §6: not an error state, an
+                                               // ordinary "hasn't happened yet")
+    int  lastTemplateIngestEntryCount = 0;     // ingestedFootprintRecordCount from the last completed
+                                               // ingest (Io::TemplateIngestReport, STEP89)
+    bool bTemplateIngestEnabled = true;        // durable opt-out: false hides the ticket 91 ingestion
+                                               // controls entirely, never deletes an existing disk cache
     bool bUseGpuTerrain = true;    // ApplicationExecutionSettings' real default, Application_Execution_UI.h
     bool bUseGpuFlow    = true;    // ditto
     bool bWysiwygBaking = false;   // ditto

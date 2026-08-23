@@ -39,6 +39,9 @@ void Application::LoadAppSettingsAtStartup() {
     tabState.stratums.environmentPackPath = loaded.environmentPackPath;
     gameInstallRoot             = loaded.gameInstallRoot;
     scenarioRuntimeOverridePath = loaded.scenarioRuntimeOverridePath;
+    lastTemplateIngestTimestamp  = loaded.lastTemplateIngestTimestamp;
+    lastTemplateIngestEntryCount = loaded.lastTemplateIngestEntryCount;
+    bTemplateIngestEnabled       = loaded.bTemplateIngestEnabled;
 
     executionSettings.bUseGpuTerrain = loaded.bUseGpuTerrain;
     executionSettings.bUseGpuFlow    = loaded.bUseGpuFlow;
@@ -57,6 +60,9 @@ void Application::SaveAppSettingsAtShutdown() {
     current.environmentPackPath  = tabState.stratums.environmentPackPath;
     current.gameInstallRoot             = gameInstallRoot;
     current.scenarioRuntimeOverridePath = scenarioRuntimeOverridePath;
+    current.lastTemplateIngestTimestamp  = lastTemplateIngestTimestamp;
+    current.lastTemplateIngestEntryCount = lastTemplateIngestEntryCount;
+    current.bTemplateIngestEnabled       = bTemplateIngestEnabled;
     current.bUseGpuTerrain       = executionSettings.bUseGpuTerrain;
     current.bUseGpuFlow          = executionSettings.bUseGpuFlow;
     current.bWysiwygBaking       = executionSettings.bWysiwygBaking;

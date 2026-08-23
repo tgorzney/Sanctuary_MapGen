@@ -112,6 +112,13 @@ public:
     std::string gameInstallRoot;
     std::string scenarioRuntimeOverridePath;
 
+    // Template-ingest durable state (STEP90_TemplateIngestSettings_IO) — the informational home ticket
+    // 91's "Ingest game templates" button reads/writes; no ingestion call happens here, no picker/
+    // button exists yet, same "field ships before its UI trigger" posture as the pair above.
+    std::string lastTemplateIngestTimestamp;    // ISO-8601 UTC; empty = never ingested; ticket 91 writes
+    int         lastTemplateIngestEntryCount = 0;
+    bool        bTemplateIngestEnabled = true;   // opt-out; ticket 91 reads to hide its own controls
+
 private:
     void WireCallbacks();                    // Application_UI.cpp
     void BindCompositeToCanvas();            // Application_UI.cpp

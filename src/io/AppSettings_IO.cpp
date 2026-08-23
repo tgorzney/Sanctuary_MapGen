@@ -22,6 +22,9 @@ nlohmann::json ToJson(const AppSettings& settings) {
     document["environmentPackPath"]  = settings.environmentPackPath;
     document["gameInstallRoot"]              = settings.gameInstallRoot;
     document["scenarioRuntimeOverridePath"]  = settings.scenarioRuntimeOverridePath;
+    document["lastTemplateIngestTimestamp"]  = settings.lastTemplateIngestTimestamp;
+    document["lastTemplateIngestEntryCount"] = settings.lastTemplateIngestEntryCount;
+    document["bTemplateIngestEnabled"]       = settings.bTemplateIngestEnabled;
     document["bUseGpuTerrain"]       = settings.bUseGpuTerrain;
     document["bUseGpuFlow"]          = settings.bUseGpuFlow;
     document["bWysiwygBaking"]       = settings.bWysiwygBaking;
@@ -38,6 +41,9 @@ void FromJson(const nlohmann::json& document, AppSettings& outSettings) {
     ReadJsonText(document, "environmentPackPath", outSettings.environmentPackPath);
     ReadJsonText(document, "gameInstallRoot", outSettings.gameInstallRoot);
     ReadJsonText(document, "scenarioRuntimeOverridePath", outSettings.scenarioRuntimeOverridePath);
+    ReadJsonText(document, "lastTemplateIngestTimestamp", outSettings.lastTemplateIngestTimestamp);
+    ReadJsonInteger(document, "lastTemplateIngestEntryCount", outSettings.lastTemplateIngestEntryCount);
+    ReadJsonBoolean(document, "bTemplateIngestEnabled", outSettings.bTemplateIngestEnabled);
     ReadJsonBoolean(document, "bUseGpuTerrain", outSettings.bUseGpuTerrain);
     ReadJsonBoolean(document, "bUseGpuFlow", outSettings.bUseGpuFlow);
     ReadJsonBoolean(document, "bWysiwygBaking", outSettings.bWysiwygBaking);

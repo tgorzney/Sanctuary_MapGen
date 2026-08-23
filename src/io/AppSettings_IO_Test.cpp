@@ -33,6 +33,9 @@ static void TestRoundTripSurvivesExactly() {
     written.environmentPackPath = "D:/Fixtures/environment.sanpack";
     written.gameInstallRoot               = "D:/Fixtures/GameInstall";
     written.scenarioRuntimeOverridePath   = "D:/Fixtures/CustomRuntime.lua";
+    written.lastTemplateIngestTimestamp   = "2026-08-23T12:34:56Z";
+    written.lastTemplateIngestEntryCount  = 217;
+    written.bTemplateIngestEnabled        = false;
     written.bUseGpuTerrain = false;
     written.bUseGpuFlow    = true;
     written.bWysiwygBaking = true;
@@ -49,6 +52,12 @@ static void TestRoundTripSurvivesExactly() {
           "gameInstallRoot survives Save->Load exactly");
     Check(read.scenarioRuntimeOverridePath == written.scenarioRuntimeOverridePath,
           "scenarioRuntimeOverridePath survives Save->Load exactly");
+    Check(read.lastTemplateIngestTimestamp == written.lastTemplateIngestTimestamp,
+          "lastTemplateIngestTimestamp survives Save->Load exactly");
+    Check(read.lastTemplateIngestEntryCount == written.lastTemplateIngestEntryCount,
+          "lastTemplateIngestEntryCount survives Save->Load exactly");
+    Check(read.bTemplateIngestEnabled == written.bTemplateIngestEnabled,
+          "bTemplateIngestEnabled survives Save->Load exactly");
     Check(read.bUseGpuTerrain == written.bUseGpuTerrain, "bUseGpuTerrain survives Save->Load exactly");
     Check(read.bUseGpuFlow == written.bUseGpuFlow, "bUseGpuFlow survives Save->Load exactly");
     Check(read.bWysiwygBaking == written.bWysiwygBaking, "bWysiwygBaking survives Save->Load exactly");
@@ -62,10 +71,13 @@ static void TestMissingDirectoryDegradesToDefaults() {
     const Io::AppSettings read = Io::LoadAppSettings(missingFolder);
     Check(read.sanpackPath.empty() && read.assetCacheDirectory.empty() &&
               read.environmentPackPath.empty() && read.gameInstallRoot.empty() &&
-              read.scenarioRuntimeOverridePath.empty(),
+              read.scenarioRuntimeOverridePath.empty() && read.lastTemplateIngestTimestamp.empty(),
           "a missing directory degrades to default-constructed strings, never a crash");
+    Check(read.lastTemplateIngestEntryCount == defaults.lastTemplateIngestEntryCount,
+          "and lastTemplateIngestEntryCount keeps its compiled default (0)");
     Check(read.bUseGpuTerrain == defaults.bUseGpuTerrain && read.bUseGpuFlow == defaults.bUseGpuFlow &&
-              read.bWysiwygBaking == defaults.bWysiwygBaking && read.bUseGpuMarkers == defaults.bUseGpuMarkers,
+              read.bWysiwygBaking == defaults.bWysiwygBaking && read.bUseGpuMarkers == defaults.bUseGpuMarkers &&
+              read.bTemplateIngestEnabled == defaults.bTemplateIngestEnabled,
           "and every bool keeps its compiled default");
 }
 
@@ -93,6 +105,10 @@ static void TestCorruptJsonDegradesToDefaults() {
     Check(read.gameInstallRoot == defaults.gameInstallRoot &&
               read.scenarioRuntimeOverridePath == defaults.scenarioRuntimeOverridePath,
           "including the two new fields");
+    Check(read.lastTemplateIngestTimestamp == defaults.lastTemplateIngestTimestamp &&
+              read.lastTemplateIngestEntryCount == defaults.lastTemplateIngestEntryCount &&
+              read.bTemplateIngestEnabled == defaults.bTemplateIngestEnabled,
+          "including the three template-ingest fields (STEP90)");
 }
 
 static void TestDefaultDirectoryIsPlausible() {

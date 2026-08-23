@@ -45,6 +45,9 @@ void RunShellAppSettingsChecks() {
     seeded.environmentPackPath = "C:/Fixtures/environment.sanpack";
     seeded.gameInstallRoot               = "C:/Fixtures/GameInstall";
     seeded.scenarioRuntimeOverridePath   = "C:/Fixtures/CustomRuntime.lua";
+    seeded.lastTemplateIngestTimestamp   = "2026-08-20T09:00:00Z";
+    seeded.lastTemplateIngestEntryCount  = 42;
+    seeded.bTemplateIngestEnabled        = false;
     seeded.bUseGpuTerrain = false;
     seeded.bUseGpuFlow    = false;
     seeded.bWysiwygBaking = true;
@@ -62,6 +65,12 @@ void RunShellAppSettingsChecks() {
           "and gameInstallRoot (STEP64)");
     Check(application.scenarioRuntimeOverridePath == seeded.scenarioRuntimeOverridePath,
           "and scenarioRuntimeOverridePath (STEP64)");
+    Check(application.lastTemplateIngestTimestamp == seeded.lastTemplateIngestTimestamp,
+          "and lastTemplateIngestTimestamp (STEP90)");
+    Check(application.lastTemplateIngestEntryCount == seeded.lastTemplateIngestEntryCount,
+          "and lastTemplateIngestEntryCount (STEP90)");
+    Check(application.bTemplateIngestEnabled == seeded.bTemplateIngestEnabled,
+          "and bTemplateIngestEnabled (STEP90)");
     Check(application.ExecutionSettings().bUseGpuTerrain == false
               && application.ExecutionSettings().bUseGpuFlow == false
               && application.ExecutionSettings().bWysiwygBaking == true,
@@ -79,6 +88,9 @@ void RunShellAppSettingsChecks() {
     application.TabState().stratums.environmentPackPath = "C:/Fixtures/changed-environment.sanpack";
     application.gameInstallRoot               = "C:/Fixtures/changed-GameInstall";
     application.scenarioRuntimeOverridePath   = "C:/Fixtures/changed-CustomRuntime.lua";
+    application.lastTemplateIngestTimestamp   = "2026-08-23T15:30:00Z";
+    application.lastTemplateIngestEntryCount  = 99;
+    application.bTemplateIngestEnabled        = true;
     application.ExecutionSettings().bUseGpuTerrain = true;
     application.SaveAppSettingsAtShutdown();
 
@@ -93,6 +105,12 @@ void RunShellAppSettingsChecks() {
           "and the current gameInstallRoot (STEP64)");
     Check(reloaded.scenarioRuntimeOverridePath == "C:/Fixtures/changed-CustomRuntime.lua",
           "and the current scenarioRuntimeOverridePath (STEP64)");
+    Check(reloaded.lastTemplateIngestTimestamp == "2026-08-23T15:30:00Z",
+          "and the current lastTemplateIngestTimestamp (STEP90)");
+    Check(reloaded.lastTemplateIngestEntryCount == 99,
+          "and the current lastTemplateIngestEntryCount (STEP90)");
+    Check(reloaded.bTemplateIngestEnabled == true,
+          "and the current bTemplateIngestEnabled (STEP90), not the original seed's false");
     Check(reloaded.bUseGpuTerrain == true, "and the current execution toggles");
     Check(reloaded.bWysiwygBaking == true, "including one that was left unchanged since the seed");
     Check(reloaded.bUseGpuMarkers == true, "bUseGpuMarkers round-trips even with no UI to edit it");
