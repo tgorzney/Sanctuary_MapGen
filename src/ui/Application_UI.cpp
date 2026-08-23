@@ -45,6 +45,8 @@ Application::Application(ApplicationSettings applicationSettings)
     tabState.files.scenarioRuntimeResourceDirectory   = settings.scenarioRuntimeResourceDirectory;
     tabState.scenarios.scenarioRuntimeOverridePath      = &scenarioRuntimeOverridePath;
     tabState.scenarios.scenarioRuntimeResourceDirectory = settings.scenarioRuntimeResourceDirectory;
+    // STEP78 — same one-time wiring posture as the pair above.
+    tabState.scenarios.scenarioEditModeState = &scenarioEditMode;
     ConfigureDefaultPreview(composite.Settings(), settings.previewResolution,
                             assembler.WorldUnitsPerCell());
     ConfigureDefaultOverlayLayers(overlaySettings, recipe);
@@ -84,6 +86,8 @@ void Application::WireCallbacks() {
     canvas.SetOverlayRecipe(&recipe);
     canvas.SetIconAtlasSource(&IconPairingLookup(), &IconManifest());
     canvas.SetWorldFootprintSizeTable(&WorldFootprintSizeTable());
+    // STEP78 — Scenario Edit Mode's own state; see MapCanvas_UI.h's SetScenarioEditModeState.
+    canvas.SetScenarioEditModeState(&scenarioEditMode);
 }
 
 // The whole of the shell's generation duty. WHICH tier this is was derived by the driver from the

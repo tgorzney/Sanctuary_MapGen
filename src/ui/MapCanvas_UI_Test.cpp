@@ -15,6 +15,8 @@ namespace Ui {
 void RunMapCanvasRenderChecks(Sys::GpuResourceManager& manager);  // MapCanvas_Render_UI_Test.cpp
 void RunMapCanvasViewChecks();                                    // MapCanvas_View_UI_Test.cpp
 void RunMapCanvasPickingChecks();                                 // MapCanvas_Picking_UI_Test.cpp
+// STEP78 acceptance test 4 — MapCanvas_ScenarioEditModeOwnership_UI_Test.cpp.
+void RunMapCanvasScenarioEditModeOwnershipChecks(Sys::GpuResourceManager& manager);
 } // namespace Ui
 } // namespace SanmapGen
 
@@ -33,6 +35,7 @@ int main(int argumentCount, char** argumentValues) {
     Sys::GpuResourceManager manager(shaderDirectory);
     Ui::CheckPreviewExpectation(manager.Initialize(), "the Gpu resource manager initializes");
     Ui::RunMapCanvasRenderChecks(manager);
+    Ui::RunMapCanvasScenarioEditModeOwnershipChecks(manager);
     wglMakeCurrent(nullptr, nullptr);
     wglDeleteContext(glContext);
     ReleaseDC(window, deviceContext);

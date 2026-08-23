@@ -43,6 +43,11 @@ void Application::DrawActivePanel() {
 }
 
 void Application::DrawCanvasWindow() {
+    // STEP78 — auto-exit: browsing away from the Scenarios panel closes its detail panel in every
+    // practical sense, so Scenario Edit Mode must not keep exclusive canvas ownership behind it.
+    if (scenarioEditMode.IsActive() && tabState.activePanel != ApplicationPanel::Scenarios)
+        scenarioEditMode.Deactivate();
+
     ImGui::Begin("Map Preview");
     if (ImGui::Button("View")) ImGui::OpenPopup("ViewLayersPopup");
     if (ImGui::BeginPopup("ViewLayersPopup")) {
@@ -52,6 +57,8 @@ void Application::DrawCanvasWindow() {
     ImGui::SameLine();
     if (canvas.HasSelection()) ImGui::Text("Selected entity: %u", canvas.SelectedEntityIdentifier());
     else                       ImGui::TextUnformatted("Selected entity: none");
+    // STEP78 — the legend strip + "Preview As" toggle row, drawn above the canvas image itself.
+    DrawScenarioEditModeChrome(scenarioEditMode, recipe.armies, recipe.scenarios.maxArmySlotCount);
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const float  fittedSide = std::min(available.x, available.y);
     const float  regionSide = fittedSide > 0.0f ? fittedSide : settings.canvasRegionSidePixels;

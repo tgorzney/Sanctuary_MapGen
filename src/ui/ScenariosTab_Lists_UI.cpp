@@ -49,7 +49,8 @@ void DrawScenarioPatternTier(Params::Scenarios& scenarios, ScenariosTabState& st
     else {
         DrawSlotPatternToggleRow(scenario->slotPattern, armies, scenarios.maxArmySlotCount);
         DrawScenarioSpawnsWarningBanner(scenario->body, armies);
-        DrawScenarioBodyFields(scenario->body, armies);
+        DrawScenarioBodyFields(scenario->body, armies, state.scenarioEditModeState, &scenario->slotPattern,
+                               nullptr, scenarios.maxArmySlotCount);
     }
     DrawSectionEnd();
     ImGui::PopID();
@@ -72,7 +73,8 @@ void DrawScenarioCountTier(Params::Scenarios& scenarios, ScenariosTabState& stat
     else {
         DrawScenarioCountConditionsEditor(scenario->conditions);
         DrawScenarioSpawnsWarningBanner(scenario->body, armies);
-        DrawScenarioBodyFields(scenario->body, armies);
+        DrawScenarioBodyFields(scenario->body, armies, state.scenarioEditModeState, nullptr,
+                               &scenario->conditions, scenarios.maxArmySlotCount);
     }
     DrawSectionEnd();
     ImGui::PopID();
@@ -87,7 +89,8 @@ void DrawScenarioDefaultTier(Params::Scenarios& scenarios, ScenariosTabState& st
     ImGui::TextWrapped("The catch-all: whatever no Tier 1/2 rule claims lands here.");
     SelectScenarioDefaultTier(state);
     // Tier 3 is never spawns-flagged (see ScenariosTab_UI.h) — no warning banner drawn.
-    DrawScenarioBodyFields(scenarios.defaultScenario, armies);
+    DrawScenarioBodyFields(scenarios.defaultScenario, armies, state.scenarioEditModeState, nullptr,
+                           nullptr, scenarios.maxArmySlotCount);
     DrawSectionEnd();
     ImGui::PopID();
 }

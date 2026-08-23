@@ -507,7 +507,8 @@ add_sangen_test(MapCanvas_UI_Test
     src/ui/MapCanvas_UI_Test.cpp
     src/ui/MapCanvas_Render_UI_Test.cpp
     src/ui/MapCanvas_View_UI_Test.cpp
-    src/ui/MapCanvas_Picking_UI_Test.cpp)
+    src/ui/MapCanvas_Picking_UI_Test.cpp
+    src/ui/MapCanvas_ScenarioEditModeOwnership_UI_Test.cpp)
 # STEP53 — the screen-space overlay icon draw pass. Culling/LOD, budget/decimation, and the C2
 # cache's invalidation decision are headless (no imgui frame, no GL); bucketing + the bulk vertex
 # write need one live headless imgui frame (no GL, no window backend) — mirrors MapCanvas_UI_Test's
@@ -546,6 +547,18 @@ add_sangen_test(PreviewIntegration_UI_Test
     src/ui/PreviewIntegration_UI_Test.cpp
     src/ui/PreviewIntegration_DirtyTier_UI_Test.cpp
     src/ui/PreviewIntegration_Picking_UI_Test.cpp)
+# STEP78 — the interactive Scenario Edit Mode canvas overlay. Classification/interaction/commit/
+# Preview-As are headless (no imgui frame, no GL); the draw pass needs one live headless imgui
+# frame (no GL, no window backend) — mirrors MapCanvas_IconLayer_UI_Test's own split. The
+# state-ownership acceptance test (test 4) is GL-backed and lives in MapCanvas_UI_Test instead,
+# since it needs a real presentation identifier to drive MapCanvas::Draw() itself.
+add_sangen_test(MapCanvas_ScenarioEditMode_UI_Test
+    src/ui/MapCanvas_ScenarioEditMode_UI_Test.cpp
+    src/ui/MapCanvas_ScenarioEditMode_Classify_UI_Test.cpp
+    src/ui/MapCanvas_ScenarioEditMode_Interaction_UI_Test.cpp
+    src/ui/MapCanvas_ScenarioEditMode_Commit_UI_Test.cpp
+    src/ui/MapCanvas_ScenarioEditMode_PreviewAs_UI_Test.cpp
+    src/ui/MapCanvas_ScenarioEditMode_DrawMarkers_UI_Test.cpp)
 
 # M5-1 core input widgets. Each test drives the widget's PURE logic (clamping, snapping, the
 # press/drag/release state machine) with a synthetic pointer sequence, so none of them needs an

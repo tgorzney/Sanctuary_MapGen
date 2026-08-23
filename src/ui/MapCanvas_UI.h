@@ -27,6 +27,7 @@
 #include <functional>
 #include "MapCanvasView_UI.h"
 #include "MapCanvas_IconLayer_Ops_UI.h"
+#include "MapCanvas_ScenarioEditMode_Ops_UI.h"
 #include "OverlayLayer_Settings_UI.h"
 #include "PreviewComposite_UI.h"
 #include "../data/EntityIdBuffer_DATA.h"
@@ -83,6 +84,10 @@ public:
     // table, sourced from Application::WorldFootprintSizeTable(), never reached directly.
     void SetWorldFootprintSizeTable(const Io::WorldFootprintSizeTable* table) { worldFootprintSizeTable = table; }
 
+    // STEP78 — while IsActive(), ApplyPointerInput (MapCanvas_Draw_UI.cpp) takes EXCLUSIVE
+    // interaction ownership: drag/click route to Scenario Edit Mode, not the normal pan/pick path.
+    void SetScenarioEditModeState(ScenarioEditModeState* state) { scenarioEditModeState = state; }
+
     // One imgui frame; `regionSidePixels` is the square viewport side in screen pixels.
     void Draw(const char* canvasIdentifier, float regionSidePixels);   // MapCanvas_Draw_UI.cpp
 
@@ -110,6 +115,9 @@ private:
     // STEP53 — assembles this frame's DrawOverlayIconLayersInput from the injected sources above
     // and calls DrawOverlayIconLayers (MapCanvas_Draw_UI.cpp).
     void DrawOverlayIconLayerPass(float regionOriginX, float regionOriginY, float regionSidePixels);
+    // STEP78 — draws Scenario Edit Mode's overlay when active, from the SAME overlay* sources
+    // above (MapCanvas_Draw_UI.cpp).
+    void DrawScenarioEditModeOverlayPass(float regionOriginX, float regionOriginY);
 
     MapCanvasView view;
     Sys::GpuResourceManager*        gpuResourceManager = nullptr;
@@ -136,6 +144,9 @@ private:
     IconLayerFrameCache   overlayIconLayerFrameCache;
     float         pressTravelPixels        = 0.0f;    // how far the current press has dragged
     bool          bPressActive             = false;
+
+    // STEP78 — Scenario Edit Mode's own state (Application-owned, injected).
+    ScenarioEditModeState* scenarioEditModeState = nullptr;
 };
 
 } // namespace Ui
