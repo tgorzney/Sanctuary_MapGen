@@ -36,6 +36,15 @@ Application::Application(ApplicationSettings applicationSettings)
     // JSON-bearing value itself.
     assetBridge.unknownImportData = std::make_unique<Io::UnknownImportBag>();
     tabState.files.unknownImportData = assetBridge.unknownImportData.get();
+    // STEP77 §5: the SAME one-time wiring posture — `gameInstallRoot`/`scenarioRuntimeOverridePath`
+    // are plain Application members (STEP64), stable addresses for the whole process lifetime, so
+    // both tabs that need them (Files, Scenarios) are pointed at them exactly once here.
+    // `scenarioRuntimeResourceDirectory` is COPIED, never pointed — it never changes after launch.
+    tabState.files.gameInstallRoot                    = &gameInstallRoot;
+    tabState.files.scenarioRuntimeOverridePath        = &scenarioRuntimeOverridePath;
+    tabState.files.scenarioRuntimeResourceDirectory   = settings.scenarioRuntimeResourceDirectory;
+    tabState.scenarios.scenarioRuntimeOverridePath      = &scenarioRuntimeOverridePath;
+    tabState.scenarios.scenarioRuntimeResourceDirectory = settings.scenarioRuntimeResourceDirectory;
     ConfigureDefaultPreview(composite.Settings(), settings.previewResolution,
                             assembler.WorldUnitsPerCell());
     ConfigureDefaultOverlayLayers(overlaySettings, recipe);

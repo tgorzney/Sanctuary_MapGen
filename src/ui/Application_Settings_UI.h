@@ -49,6 +49,12 @@ struct ApplicationSettings {
     // instead, so no automated run ever touches the real user's roaming profile
     // (STEP19_AppSettings_IO).
     std::string appSettingsDirectoryOverride;
+
+    // STEP77 — mirrors shaderSearchDirectories' resolution posture exactly, but
+    // Io::LoadScenarioRuntimeText (STEP72) takes ONE directory, never a search list: resolved by
+    // ApplicationMain_UI.cpp's ResolveScenarioRuntimeResourceDirectory, staged beside the
+    // executable at build time as `sangen_lua_resources` (CMakeLists.txt).
+    std::string scenarioRuntimeResourceDirectory;
 };
 
 } // namespace Ui

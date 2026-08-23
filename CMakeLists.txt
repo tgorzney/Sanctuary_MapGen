@@ -48,6 +48,23 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(luajit)
 
+# 5. Fetch ImGuiColorTextEdit (STEP77 -- LuaCodeEditor_UI). Vendored from the CANONICAL, original
+# upstream repository (https://github.com/BalazsJako/ImGuiColorTextEdit -- the author's own repo,
+# `fork: false`, 1.7k+ stars, actively maintained -- never a third-party fork), pinned to one commit
+# on its `master` branch for reproducibility (ARCH_15_08_ThirdPartyDependencyRuling.md §15.8:
+# "FetchContent for the full library ... the coder's call", §7.3's existing precedent). It ships no
+# CMakeLists.txt of its own -- just TextEditor.h/TextEditor.cpp -- so, mirroring STEP65's "no
+# third-party CMake wrapper" posture, this FetchContent call only clones the pinned commit; the two
+# files are compiled straight into SanGenV2 below (target_sources), no separate library target and
+# no upstream build script to drive, since (unlike LuaJIT) there IS none.
+set(SANGEN_IMGUICOLORTEXTEDIT_COMMIT "ca2f9f1462e3b60e56351bc466acda448c5ea50d") # BalazsJako/ImGuiColorTextEdit, branch master
+FetchContent_Declare(
+    imguicolortextedit
+    GIT_REPOSITORY https://github.com/BalazsJako/ImGuiColorTextEdit.git
+    GIT_TAG        ${SANGEN_IMGUICOLORTEXTEDIT_COMMIT}
+)
+FetchContent_MakeAvailable(imguicolortextedit)
+
 # Create a library for ImGui since it doesn't provide its own CMakeLists out of the box
 add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp
@@ -301,6 +318,19 @@ exit /b %errorlevel%\n")
         "${CMAKE_CURRENT_SOURCE_DIR}/src/sys/LuaSyntaxCheck_SYS.cpp"
         PROPERTIES INCLUDE_DIRECTORIES "${luajit_SOURCE_DIR}/src")
 endif()
+
+# STEP77 -- ImGuiColorTextEdit's own TextEditor.cpp compiled straight into SanGenV2 (PRIVATE), the
+# same "vendored third-party .c/.cpp added directly via target_sources" posture as core/miniz.c
+# above. It resolves its own sibling "TextEditor.h" via the compiler's quote-include-searches-the-
+# including-file's-own-directory rule, and imgui.h through SanGenV2's existing PRIVATE imgui include
+# path (set earlier on this same target) -- so it needs no INCLUDE_DIRECTORIES override of its own.
+target_sources(SanGenV2 PRIVATE "${imguicolortextedit_SOURCE_DIR}/TextEditor.cpp")
+# LuaCodeEditor_UI.cpp is the ONLY translation unit in src/ allowed to include TextEditor.h
+# (ARCH_15_08_ThirdPartyDependencyRuling.md §15.8's "THE SPLIT") -- scoped per-source-file exactly
+# like LuaSyntaxCheck_SYS.cpp's LuaJIT include path above, not the whole target.
+set_source_files_properties(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/LuaCodeEditor_UI.cpp"
+    PROPERTIES INCLUDE_DIRECTORIES "${imguicolortextedit_SOURCE_DIR}")
 
 # The GPU-backed units load their .glsl twins from ONE shader directory at run time
 # (Sys::GpuResourceManager resolves `<shaderDirectory>/<fileName>` — a single directory, never an
@@ -582,6 +612,11 @@ add_sangen_test(FilePathPicker_UI_Test   src/ui/FilePathPicker_UI_Test.cpp)
 add_sangen_test(Levels_UI_Test           src/ui/Levels_UI_Test.cpp)
 add_sangen_test(Section_UI_Test          src/ui/Section_UI_Test.cpp)
 
+# STEP77_ScenariosLuaEditorAndExportFlow_UI: LuaCodeEditor_UI's pure surface -- the focus-loss-only
+# validation trigger policy and Sys::CheckLuaSyntax wiring -- drivable with no imgui frame at all
+# (ImGuiColorTextEdit's own TextEditor is exercised only through the real, non-test draw path).
+add_sangen_test(LuaCodeEditor_UI_Test    src/ui/LuaCodeEditor_UI_Test.cpp)
+
 # Tab-rebuild batch B — the Layer Editor and the Heightmap tab that hosts it. The editor's draw
 # path is split across five translation units under the ARCH §1.5 ceilings, but everything the
 # tests assert on (the scalar catalogue, the value mirrors, the row actions, the one-frame signal
@@ -748,7 +783,8 @@ add_sangen_test(EntityCollections_Migrate_V2_IO_Test src/io/EntityCollections_Mi
 target_link_libraries(EntityCollections_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 add_sangen_test(FilesTab_UI_Test
     src/ui/FilesTab_UI_Test.cpp
-    src/ui/FilesTab_Roundtrip_UI_Test.cpp)
+    src/ui/FilesTab_Roundtrip_UI_Test.cpp
+    src/ui/FilesTab_ScenarioExport_UI_Test.cpp)
 
 # STEP19_AppSettings_IO: the app's first persistent file outside `.sanmap` and the asset atlas
 # cache — a scratch-folder Save/Load round trip plus the missing-directory/missing-file/corrupt-JSON

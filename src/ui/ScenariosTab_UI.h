@@ -20,6 +20,8 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "ConfirmDialog_UI.h"
+#include "LuaCodeEditor_UI.h"
 #include "Section_UI.h"
 #include "UniqueNameList_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -36,8 +38,25 @@ struct ScenariosTabState {
     SectionState countSection;         // Tier 2 DraggableList
     SectionState defaultSection;       // Tier 3 fixed panel
     SectionState matrixSection;        // live composition preview
-    // STEP77 adds its own runtime-script state as a SIBLING member here once it lands — this
-    // ticket does not reserve a forward-declared, unused slot for it.
+
+    // STEP77 — the file-based runtime-script editor (Fix §2; the correction over
+    // DESIGN_ScenariosTabAndLuaEditor_R1.md §7's buffer-in-PARAMS assumption, this ticket's own
+    // top-of-file note). `runtimeScriptSection` is collapsed by default — "advanced".
+    SectionState       runtimeScriptSection{false};
+    LuaCodeEditorState  runtimeScriptEditor;
+    bool                bRuntimeScriptLoaded = false;   // one-shot load-on-first-open guard
+    ConfirmDialogState  runtimeScriptResetConfirm;       // "Reset to bundled default"'s own gate
+    bool                bRuntimeScriptDiffBannerDismissed = false;   // re-armed on each fresh load
+    bool                bViewingBundledDefaultPanel       = false;   // "[View Bundled Default]"
+    // Io::LoadScenarioRuntimeText's OWN resolution outcome (neither bundled nor override readable)
+    // — DISTINCT from runtimeScriptEditor's Sys::CheckLuaSyntax result: a file that failed to
+    // resolve was never even handed to the syntax checker.
+    bool                bRuntimeScriptResolutionSucceeded = true;
+    std::string         runtimeScriptResolutionAdvisory;
+    // Caller-owned pointer/copy into Application-level machine-local settings (STEP64/§5) — same
+    // nullable posture as FilesTabState's own pair; nullptr degrades to "not configured" safely.
+    std::string*        scenarioRuntimeOverridePath = nullptr;
+    std::string         scenarioRuntimeResourceDirectory;   // resolved once at startup, copied
 
     ScenarioSelectedTier selectedTier  = ScenarioSelectedTier::None;
     int                  selectedIndex = -1;   // position in patternScenarios/countScenarios;
@@ -125,6 +144,13 @@ void DrawScenarioMatrix(const Params::Scenarios& scenarios, SectionState& matrix
 
 void DrawScenarioSettings(Params::Scenarios& scenarios, SectionState& settingsSection,
                           const std::vector<Params::Army>& armies);                  // Settings.cpp
+
+// STEP77 Fix §2 — the file-based Runtime Script editor. Reads `state.scenarioRuntimeOverridePath`/
+// `scenarioRuntimeResourceDirectory` only; touches no PARAMS field (RuntimeScript.cpp).
+void DrawScenarioRuntimeScriptSection(ScenariosTabState& state);
+// The simplified bundled-vs-override diff banner — split out of RuntimeScript.cpp for the ARCH
+// §1.5 ceiling (RuntimeScriptDiff.cpp). Called only while an override is active.
+void DrawScenarioRuntimeScriptDiffBanner(ScenariosTabState& state);
 
 // `recipe.scenarios` is edited directly; see the previewDriver note above.
 void DrawScenariosTab(Params::MapRecipe& recipe, ScenariosTabState& state,

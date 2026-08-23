@@ -13,6 +13,7 @@
 namespace {
 
 const char* const stagedShaderDirectoryName = "sangen_shaders";
+const char* const stagedLuaResourceDirectoryName = "sangen_lua_resources";
 
 // The directory part of argv[0], with its trailing separator; empty when it carries none.
 std::string ExecutableDirectory(const char* executablePath) {
@@ -32,11 +33,20 @@ std::vector<std::string> ResolveShaderSearchDirectories(int argumentCount, char*
     return searchDirectories;
 }
 
+// STEP77 — same shape as ResolveShaderSearchDirectories above but SINGLE-directory:
+// Io::LoadScenarioRuntimeText takes one directory, not a search list.
+std::string ResolveScenarioRuntimeResourceDirectory(int argumentCount, char** arguments) {
+    return ExecutableDirectory(argumentCount > 0 ? arguments[0] : nullptr) +
+          stagedLuaResourceDirectoryName;
+}
+
 } // namespace
 
 int main(int argumentCount, char** arguments) {
     SanmapGen::Ui::ApplicationSettings settings;
     settings.shaderSearchDirectories = ResolveShaderSearchDirectories(argumentCount, arguments);
+    settings.scenarioRuntimeResourceDirectory =
+        ResolveScenarioRuntimeResourceDirectory(argumentCount, arguments);
     // The atlas ingests the sprite families ASSET_LOADING_SPEC names; the caps travel in settings.
     settings.assetEntryFilter.extensions.push_back(".dds");
     SanmapGen::Ui::Application application(std::move(settings));

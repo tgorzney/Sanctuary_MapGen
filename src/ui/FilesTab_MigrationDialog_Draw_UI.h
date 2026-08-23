@@ -15,8 +15,8 @@ namespace Ui {
 struct FilesTabState;
 
 // Drawn every frame, unconditionally, regardless of whether the dialog is currently open —
-// `DrawPendingBlueprintWarningDialog`'s own precedent (FilesTab_Draw_UI.cpp): an imgui modal popup
-// must be given the chance to run its own frame every frame it might be open. "Apply Selected" runs
+// `DrawPendingExportWarningDialog`'s own precedent (FilesTab_ExportGate_UI.cpp): an imgui modal
+// popup must be given the chance to run its own frame every frame it might be open. "Apply Selected" runs
 // `RunSelectiveMigrationImport` and (on success) requests a full map update, matching
 // `DrawOpenSection`'s own Open behavior; "Close" dismisses with nothing re-read, nothing mutated.
 void DrawFilesTabMigrationReconciliationDialog(FilesTabState& state, Params::MapRecipe& recipe,

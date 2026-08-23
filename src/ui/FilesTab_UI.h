@@ -25,6 +25,7 @@
 #include "Section_UI.h"
 #include "../io/MapExporter_IO.h"
 #include "../io/MapImporter_IO.h"
+#include "../io/ScenarioScript_Export_IO.h"
 #include <string>
 #include <vector>
 
@@ -42,9 +43,10 @@ using SupComLuaImportFunction = bool (*)(void* userData, const char* luaFilePath
 // Every button on the tab, in the order the plan lists them.
 enum class FilesTabAction {
     OpenSanmap, ImportSupComLua, ExportSanmapOnly, ExportAll,
-    ExportHeightmapRaw, ExportSlopeImage, ExportFlowImage, ExportStratumMasks
+    ExportHeightmapRaw, ExportSlopeImage, ExportFlowImage, ExportStratumMasks,
+    ExportScenarioScript,       // STEP77 — Io::ExportMapScenario (STEP71), machine-local settings
 };
-inline constexpr int filesTabActionCount = 8;
+inline constexpr int filesTabActionCount = 9;
 
 // The button caption. Never a literal at the draw site (Constitution §8).
 const char* FilesTabActionLabel(FilesTabAction action);
@@ -62,6 +64,7 @@ inline bool FilesTabActionNeedsBakedFields(FilesTabAction action) {
 struct FilesTabState {
     SectionState openSection;
     SectionState exportSection;
+    SectionState scenarioExportSection;   // STEP77 — "Export Scenario Script" + its own settings
     SectionState logSection;
 
     std::string sanmapPath;         // the .sanmap file OR the map folder the user picked
@@ -111,6 +114,15 @@ struct FilesTabState {
     // load gate (ruling 1).
     MigrationReconciliationDialogState migrationDialogState;
     bool bLastOpenHadNoVersionMarker = false;
+
+    // STEP77: caller-owned pointers into Application-level machine-local settings (STEP64) — same
+    // posture as `assetPack`: non-null once Application wires them; nullptr degrades the row to a
+    // clear "not configured" state rather than crashing.
+    std::string* gameInstallRoot             = nullptr;
+    std::string* scenarioRuntimeOverridePath = nullptr;
+    std::string  scenarioRuntimeResourceDirectory;   // resolved once at startup (§5), copied not
+                                                     // pointed — it never changes after launch
+    Io::ScenarioExportResult lastScenarioExportResult;
 };
 
 // Appends one block to the log and holds it inside its budget by dropping WHOLE lines off the
@@ -133,9 +145,9 @@ inline void AppendFilesTabLog(FilesTabState& state, const std::string& text) {
 // `fields` is nullable (SCOPE NOTE 2). `bBlueprintValidationAcknowledged` reaches
 // `MapExporter::ExportSanmapOnly`/`ExportAll` unchanged (STEP39_BlueprintValidationGate_IO) — every
 // action but the two recipe exports ignores it. Default false is exactly right for
-// `DrawGatedExportButton`'s normal click (`FilesTab_Draw_UI.cpp`'s own pre-check already guarantees
-// every path resolves before this runs); `DrawPendingBlueprintWarningDialog`'s "Export Anyway" click
-// is the one call site that passes true. Returns whether the action reported success.
+// `DrawGatedExportButton`'s normal click (`FilesTab_ExportGate_UI.cpp`'s own pre-check already
+// guarantees every path resolves before this runs); `DrawPendingExportWarningDialog`'s "Export
+// Anyway" click is the one call site that passes true. Returns whether the action reported success.
 // FilesTab_Actions_UI.cpp — headless: no imgui frame, no window, no GL context.
 bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapRecipe& recipe,
                        Data::MapFields* fields, bool bBlueprintValidationAcknowledged = false);

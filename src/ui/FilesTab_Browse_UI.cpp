@@ -17,6 +17,13 @@ const Io::FileDialogFilter sanmapDialogFilters[] = {
     { "Sanctuary map", "*.sanmap" }, { "All files", "*.*" } };
 const Io::FileDialogFilter supComLuaDialogFilters[] = {
     { "Supreme Commander save", "*.lua" }, { "All files", "*.*" } };
+const Io::FileDialogFilter luaDialogFilters[] = {
+    { "Lua script", "*.lua" }, { "All files", "*.*" } };
+
+// True for the two DIRECTORY kinds — RunBrowseDialog's own switch below.
+bool IsDirectoryBrowseKind(FilesTabBrowseKind kind) {
+    return kind == FilesTabBrowseKind::ExportFolder || kind == FilesTabBrowseKind::GameInstallRoot;
+}
 
 Io::FileDialogRequest BuildDialogRequest(FilesTabBrowseKind kind, const std::string& startingPath) {
     Io::FileDialogRequest request;
@@ -26,11 +33,15 @@ Io::FileDialogRequest BuildDialogRequest(FilesTabBrowseKind kind, const std::str
         request.defaultExtension = ".sanmap";
         request.filters          = sanmapDialogFilters;
         request.filterCount      = 2;
-    } else if (kind == FilesTabBrowseKind::SupComLuaDocument) {
-        request.title            = "Import Supreme Commander Lua";
+    } else if (kind == FilesTabBrowseKind::SupComLuaDocument
+            || kind == FilesTabBrowseKind::ScenarioRuntimeOverrideLua) {
+        request.title            = kind == FilesTabBrowseKind::SupComLuaDocument
+                                       ? "Import Supreme Commander Lua" : "Locate Runtime Script Override";
         request.defaultExtension = ".lua";
-        request.filters          = supComLuaDialogFilters;
+        request.filters          = luaDialogFilters;
         request.filterCount      = 2;
+    } else if (kind == FilesTabBrowseKind::GameInstallRoot) {
+        request.title = "Locate the game install folder";
     } else {
         request.title = "Choose the destination map folder";
     }
@@ -40,17 +51,19 @@ Io::FileDialogRequest BuildDialogRequest(FilesTabBrowseKind kind, const std::str
 bool RunBrowseDialog(FilesTabBrowseKind kind, const std::string& startingPath,
                      std::string& outChosenPath) {
     const Io::FileDialogRequest request = BuildDialogRequest(kind, startingPath);
-    if (kind == FilesTabBrowseKind::ExportFolder)
+    if (IsDirectoryBrowseKind(kind))
         return Io::FileDialog::SelectDirectoryPath(request, outChosenPath);
     return Io::FileDialog::OpenFilePath(request, outChosenPath);
 }
 
 // The extension fence, per kind. A `.sanmap` row is deliberately UNFENCED: the importer resolves
 // either the document or the map folder that holds it (MapImporter_IO.h), so an extension test
-// would reject a perfectly good folder. The `.lua` row is fenced, since only a save file parses.
+// would reject a perfectly good folder. The `.lua` rows are fenced, since only such a file parses.
 FilePathPickerOptions BuildPickerOptions(FilesTabBrowseKind kind) {
     FilePathPickerOptions options;
-    options.allowedExtensions = kind == FilesTabBrowseKind::SupComLuaDocument ? ".lua" : nullptr;
+    options.allowedExtensions = (kind == FilesTabBrowseKind::SupComLuaDocument
+                                 || kind == FilesTabBrowseKind::ScenarioRuntimeOverrideLua)
+                                    ? ".lua" : nullptr;
     options.browseButtonLabel = "Browse...";
     return options;
 }

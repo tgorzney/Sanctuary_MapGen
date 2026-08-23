@@ -1,4 +1,5 @@
-// FilesTab_Actions_UI.cpp — the eight Files-tab actions, headless. Layer: UI.
+// FilesTab_Actions_UI.cpp — the Files-tab actions, headless. Layer: UI. The scenario-script export
+// leg (STEP77) is split out into FilesTab_ScenarioExport_Actions_UI.cpp for the §1.5 ceiling.
 // No imgui frame, no window, no GL context: an action is a path plus one call into IO, so the
 // whole of the tab's behavior is drivable from a test (FilesTab_UI_Test.cpp).
 //
@@ -6,6 +7,7 @@
 // SupCom seam and an ungenerated field set each answer false and say why (Constitution §6). The
 // tab writes no byte and creates no folder itself — `Io::EnsureExportFolderExists` is the door.
 #include "FilesTab_UI.h"
+#include "FilesTab_ScenarioExport_Actions_UI.h"
 #include "../data/MapFields_DATA.h"
 #include "../io/FilesystemPrimitives_IO.h"
 #include "../io/UnknownImportBag_IO.h"
@@ -119,6 +121,7 @@ const char* FilesTabActionLabel(FilesTabAction action) {
     case FilesTabAction::ExportSlopeImage:   return "Export Slope PNG";
     case FilesTabAction::ExportFlowImage:    return "Export Flow PNG";
     case FilesTabAction::ExportStratumMasks: return "Export Stratums TGA";
+    case FilesTabAction::ExportScenarioScript: return "Export Scenario Script";
     }
     return "";
 }
@@ -134,6 +137,8 @@ bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapR
     if (action == FilesTabAction::ImportSupComLua) return RunImportSupComLua(state, recipe);
     if (action == FilesTabAction::ExportSanmapOnly || action == FilesTabAction::ExportAll)
         return RunRecipeExport(action, state, recipe, fields, bBlueprintValidationAcknowledged);
+    if (action == FilesTabAction::ExportScenarioScript)
+        return RunScenarioScriptExport(state, recipe);
     return RunTextureExport(action, state, *fields);
 }
 

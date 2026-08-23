@@ -18,7 +18,9 @@ namespace Ui {
 enum class FilesTabBrowseKind {
     SanmapDocument,      // an EXISTING .sanmap file (the importer also resolves a map folder)
     SupComLuaDocument,   // an EXISTING Supreme Commander `_save.lua`
-    ExportFolder         // the destination map FOLDER — "a map on disk is a folder"
+    ExportFolder,        // the destination map FOLDER — "a map on disk is a folder"
+    GameInstallRoot,     // STEP77: the game install FOLDER (GameInstallLocation_IO validates it)
+    ScenarioRuntimeOverrideLua,   // STEP77: an EXISTING Runtime Script override `.lua`
 };
 
 // Draws one labelled picker row and runs the native dialog when its Browse button is pressed.

@@ -15,7 +15,7 @@ namespace SanmapGen {
 namespace Ui {
 
 // Drawn every frame a delete might still be pending, so its own modal popup gets the chance to run
-// every frame it might be open (the FilesTab_Draw_UI.cpp DrawPendingBlueprintWarningDialog
+// every frame it might be open (the FilesTab_ExportGate_UI.cpp DrawPendingExportWarningDialog
 // pattern). The pending index is RE-VALIDATED against the vector's CURRENT size — it may have moved
 // between the request frame and this one (Constitution §6: an index is clamped or rejected, never
 // trusted).

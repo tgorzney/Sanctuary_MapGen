@@ -102,6 +102,7 @@ void DrawScenariosTab(Params::MapRecipe& recipe, ScenariosTabState& state, Pipel
     DrawScenarioCountTier(scenarios, state, recipe.armies);
     DrawScenarioDefaultTier(scenarios, state, recipe.armies);
     DrawScenarioMatrix(scenarios, state.matrixSection);
+    DrawScenarioRuntimeScriptSection(state);
     ImGui::PopID();
 }
 

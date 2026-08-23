@@ -25,6 +25,7 @@ inline std::string ScratchFolderPath(const char* folderName) {
 
 void RunTabStateTests();      // FilesTab_UI_Test.cpp — labels, the log budget, the refusals
 void RunRoundTripTests();     // FilesTab_Roundtrip_UI_Test.cpp — the injected seam + export/open
+void RunScenarioExportTests();   // FilesTab_ScenarioExport_UI_Test.cpp — STEP77
 
 } // namespace FilesTabTest
 } // namespace SanmapGen
