@@ -36,5 +36,17 @@ int BuildWorldSymmetryOrbit(const Params::Geometry& geometry, int symmetryMask,
                             float worldPositionZ, WorldSymmetryOrbitPoint* outPoints,
                             int maximumPoints);
 
+// STEP75: composes `sourceRotation` with a hardcoded 180-degree yaw about the vertical (Y) axis
+// (x=0, y=1, z=0, w=0 — sin(90deg)=1, cos(90deg)=0, hardcoded rather than computed via trig to
+// avoid float error). A pure sibling of BuildWorldSymmetryOrbit's position half, so a UI caller
+// mirroring an entity 180 degrees about map center (`RotateHalfTurn`) can also mirror its
+// orientation without reaching into PROC directly (ARCH_03_ModuleBoundaries.md SS3.1: `UI ->
+// PIPELINE -> PROC` is legal, `UI -> PROC` is not). ONLY valid for RotateHalfTurn (a pure
+// rotation) -- do NOT reuse this for a mirror axis (MirrorAcrossX/MirrorAcrossZ), which reflects
+// rather than rotates and needs a separate, verified design.
+void ApplyHalfTurnYaw(float sourceRotationX, float sourceRotationY, float sourceRotationZ,
+                      float sourceRotationW, float& outRotationX, float& outRotationY,
+                      float& outRotationZ, float& outRotationW);
+
 } // namespace Pipeline
 } // namespace SanmapGen

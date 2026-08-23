@@ -63,6 +63,30 @@ int main() {
             { std::printf("FAIL mirror-line collapse point\n"); ++failures; }
     }
 
+    // 4. ApplyHalfTurnYaw (STEP75): an identity source rotation composes to exactly the hardcoded
+    //    180-degree yaw quaternion (0, 1, 0, 0).
+    {
+        float outX, outY, outZ, outW;
+        Pipeline::ApplyHalfTurnYaw(0.0f, 0.0f, 0.0f, 1.0f, outX, outY, outZ, outW);
+        if (!NearlyEqual(outX, 0.0f) || !NearlyEqual(outY, 1.0f) || !NearlyEqual(outZ, 0.0f)
+            || !NearlyEqual(outW, 0.0f)) {
+            std::printf("FAIL ApplyHalfTurnYaw identity-source case\n");
+            ++failures;
+        }
+    }
+
+    // 5. A non-identity (90-degree yaw) source rotation, hand-computed: compose(180-yaw, 90-yaw) =
+    //    270-yaw = (0, sin(135deg), 0, cos(135deg)).
+    {
+        float outX, outY, outZ, outW;
+        Pipeline::ApplyHalfTurnYaw(0.0f, 0.70710678f, 0.0f, 0.70710678f, outX, outY, outZ, outW);
+        if (!NearlyEqual(outX, 0.0f) || !NearlyEqual(outY, 0.70710678f) || !NearlyEqual(outZ, 0.0f)
+            || !NearlyEqual(outW, -0.70710678f)) {
+            std::printf("FAIL ApplyHalfTurnYaw non-identity-source case\n");
+            ++failures;
+        }
+    }
+
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

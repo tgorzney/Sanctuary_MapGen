@@ -73,12 +73,12 @@ bool DrawArmiesGlobals(std::vector<Params::Army>& armies, ArmiesTabState& state)
     return bArmiesMoved;
 }
 
-// The selected army's own fields: the read-only engine identity, the human-authored display name,
-// alias, team color, faction and starting resources. None of it notifies the driver (SCOPE NOTE 1)
-// — nothing hashes or previews an army's own fields yet. STEP76: the "Name" text input now binds
-// `displayName`, never the machine-owned `name` (ruling 2) — nothing downstream repairs a display
-// name, so nothing is reported back.
-void DrawArmySettings(Params::Army& army, ArmiesTabState& state) {
+// The selected army's own fields (SCOPE NOTE 1: none of it notifies the driver). STEP76: "Name"
+// binds `displayName`, never machine-owned `name` (ruling 2). STEP75: also draws the mirror-onto-
+// next-army button (ruling 1); its confirm dialog is drawn separately by DrawArmiesTab so it stays
+// reachable on a frame this function does not run (DrawPendingDeleteRuleLayerDialog's pattern).
+void DrawArmySettings(std::vector<Params::Army>& armies, int selectedArmyIndex, ArmiesTabState& state) {
+    Params::Army& army = armies[static_cast<std::size_t>(selectedArmyIndex)];
     ImGui::TextDisabled("Engine ID: %s", army.name.c_str());   // machine-owned, ruling 2 — no input
 
     TextInputRules displayNameRules;
@@ -105,6 +105,9 @@ void DrawArmySettings(Params::Army& army, ArmiesTabState& state) {
                      WidgetStyle(), "%.0f");
     DrawSliderScalar("Starting Energy", army.energy, state.energyRange, state.energyToggle,
                      WidgetStyle(), "%.0f");
+
+    DrawMirrorArmyButton(armies, selectedArmyIndex, state.pendingMirrorSourceArmyIndex,
+                         state.mirrorConfirmDialogState);
 }
 
 } // namespace
@@ -126,10 +129,13 @@ void DrawArmiesTab(Params::MapRecipe& recipe, ArmiesTabState& state,
         if (army == nullptr) {
             ImGui::TextUnformatted("Add or select an army to edit it.");
         } else {
-            DrawArmySettings(*army, state);
+            DrawArmySettings(recipe.armies, state.selectedArmyIndex, state);
             DrawArmyUnitList(recipe.unitRules, state.selectedArmyIndex, state.units, previewDriver,
                              iconManifest);
         }
+        // Ruling 5: not threaded into NotifyPlacementChange/bRosterMutated — Army.groups has no reader.
+        DrawPendingMirrorArmyConfirmDialog(recipe.armies, state.pendingMirrorSourceArmyIndex,
+                                           state.mirrorConfirmDialogState, recipe.geometry);
         DrawSectionEnd();
     }
     // STEP76: the export keys armies by an identity SanGen now owns outright (ARMY_XX), not a

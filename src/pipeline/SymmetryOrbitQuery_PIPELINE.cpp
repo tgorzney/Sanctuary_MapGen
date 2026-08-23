@@ -3,6 +3,7 @@
 #include "../params/Symmetry_PARAMS.h"
 #include "../proc/Placement_Symmetry_PROC.h"
 #include "../proc/Placement_Kernel_PROC.h"
+#include "../proc/Placement_Transform_PROC.h"
 
 namespace SanmapGen {
 namespace Pipeline {
@@ -34,6 +35,24 @@ int BuildWorldSymmetryOrbit(const Params::Geometry& geometry, int symmetryMask,
         outPoints[index].worldPositionZ = cellOrbit[index].positionY * geometry.worldUnitsPerCell;
     }
     return orbitCount;
+}
+
+void ApplyHalfTurnYaw(float sourceRotationX, float sourceRotationY, float sourceRotationZ,
+                      float sourceRotationW, float& outRotationX, float& outRotationY,
+                      float& outRotationZ, float& outRotationW) {
+    // Hardcoded 180-degree yaw quaternion about world Y (sin(90deg)=1, cos(90deg)=0 exactly).
+    constexpr float halfTurnYawX = 0.0f, halfTurnYawY = 1.0f, halfTurnYawZ = 0.0f, halfTurnYawW = 0.0f;
+    // World-space (extrinsic) composition: the source rotation applies first (locally), then the
+    // 180-degree yaw rotates the whole result about the world's vertical axis -- QuaternionMultiply
+    // applies its SECOND argument first, so the yaw is `first` here.
+    Proc::SampledInstanceTransform composed;
+    Proc::QuaternionMultiply(halfTurnYawX, halfTurnYawY, halfTurnYawZ, halfTurnYawW,
+                             sourceRotationX, sourceRotationY, sourceRotationZ, sourceRotationW,
+                             composed);
+    outRotationX = composed.rotationX;
+    outRotationY = composed.rotationY;
+    outRotationZ = composed.rotationZ;
+    outRotationW = composed.rotationW;
 }
 
 } // namespace Pipeline

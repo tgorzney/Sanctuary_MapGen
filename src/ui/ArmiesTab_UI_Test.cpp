@@ -8,6 +8,7 @@
 #include "ArmiesTab_UI.h"
 #include "DraggableListWidget_UI.h"
 #include "../io/Sanmap_ArmyIdentity_IO.h"
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -24,6 +25,8 @@ void Check(bool bCondition, const char* label) {
     std::printf("FAIL %s\n", label);
     ++failureCount;
 }
+
+bool NearlyEqual(float a, float b) { return std::fabs(a - b) < 0.001f; }
 
 // Four rules across three armies, in recipe order: 0, 1, 0, 2.
 std::vector<Params::UnitRule> MakeUnitRules() {
@@ -240,6 +243,86 @@ void RunArmyDisplayNameDefaultsChecks() {
           "a colliding displayName is legal and left exactly as authored — no repair runs");
 }
 
+// STEP75 acceptance: MirrorArmyGroupsOntoNextArmy on a synthetic tree with a nested child group
+// (not just top-level units) — position mirrors as `newX = 2*centerX - X` in world units (matching
+// BuildWorldSymmetryOrbit's own convention), rotation composes against a hand-computed expected
+// quaternion for a non-identity source rotation, and elevation (positionY) is untouched by a yaw.
+// STEP76 amendment: `name`/`displayName` for BOTH armies must be untouched by the call.
+void RunMirrorArmyGroupsChecks() {
+    Params::Geometry geometry;
+    geometry.mapSize          = 100;     // cells
+    geometry.worldUnitsPerCell = 2.0f;   // world center = 100*2/2 = 100 world units per axis
+
+    std::vector<Params::Army> armies(2);
+    armies[0].name = "ARMY_01"; armies[0].displayName = "North";
+    armies[1].name = "ARMY_02"; armies[1].displayName = "South";
+
+    Params::UnitGroup topLevelGroup;
+    topLevelGroup.name = "Alpha";
+    Params::UnitTransform identityRotationUnit;
+    identityRotationUnit.positionX = 30.0f; identityRotationUnit.positionY = 5.0f;
+    identityRotationUnit.positionZ = 40.0f;
+    identityRotationUnit.rotationX = 0.0f; identityRotationUnit.rotationY = 0.0f;
+    identityRotationUnit.rotationZ = 0.0f; identityRotationUnit.rotationW = 1.0f;
+    topLevelGroup.units.push_back(identityRotationUnit);
+
+    Params::UnitGroup nestedChildGroup;   // proves both units AND nested groups are recursed
+    nestedChildGroup.name = "Beta";
+    Params::UnitTransform ninetyDegreeYawUnit;
+    ninetyDegreeYawUnit.positionX = 10.0f; ninetyDegreeYawUnit.positionY = 7.0f;
+    ninetyDegreeYawUnit.positionZ = 20.0f;
+    // 90-degree yaw about Y: (0, sin(45deg), 0, cos(45deg)).
+    ninetyDegreeYawUnit.rotationX = 0.0f; ninetyDegreeYawUnit.rotationY = 0.70710678f;
+    ninetyDegreeYawUnit.rotationZ = 0.0f; ninetyDegreeYawUnit.rotationW = 0.70710678f;
+    nestedChildGroup.units.push_back(ninetyDegreeYawUnit);
+    topLevelGroup.groups.push_back(nestedChildGroup);
+
+    armies[0].groups.push_back(topLevelGroup);
+
+    MirrorArmyGroupsOntoNextArmy(armies, 0, geometry);
+
+    Check(armies[1].groups.size() == 1u, "the target's groups tree was replaced with a mirrored copy");
+    const Params::UnitGroup& mirroredTopLevel = armies[1].groups[0];
+    Check(mirroredTopLevel.units.size() == 1u, "the top-level group's own unit survived the copy");
+    const Params::UnitTransform& mirroredIdentityUnit = mirroredTopLevel.units[0];
+    Check(NearlyEqual(mirroredIdentityUnit.positionX, 170.0f)
+          && NearlyEqual(mirroredIdentityUnit.positionZ, 160.0f),
+          "position mirrors as newX = 2*centerX - X, matching BuildWorldSymmetryOrbit's convention");
+    Check(NearlyEqual(mirroredIdentityUnit.positionY, 5.0f), "elevation is untouched by a yaw");
+    Check(NearlyEqual(mirroredIdentityUnit.rotationX, 0.0f)
+          && NearlyEqual(mirroredIdentityUnit.rotationY, 1.0f)
+          && NearlyEqual(mirroredIdentityUnit.rotationZ, 0.0f)
+          && NearlyEqual(mirroredIdentityUnit.rotationW, 0.0f),
+          "an identity source rotation composes to exactly the 180-degree yaw quaternion");
+
+    Check(mirroredTopLevel.groups.size() == 1u, "the nested CHILD group was recursed, not skipped");
+    const Params::UnitTransform& mirroredYawUnit = mirroredTopLevel.groups[0].units[0];
+    Check(NearlyEqual(mirroredYawUnit.positionX, 190.0f) && NearlyEqual(mirroredYawUnit.positionZ, 180.0f),
+          "a nested child group's own leaf position mirrors correctly too");
+    // Hand-computed: compose(180-yaw, 90-yaw) = 270-yaw = (0, sin(135deg), 0, cos(135deg)).
+    Check(NearlyEqual(mirroredYawUnit.rotationX, 0.0f)
+          && NearlyEqual(mirroredYawUnit.rotationY, 0.70710678f)
+          && NearlyEqual(mirroredYawUnit.rotationZ, 0.0f)
+          && NearlyEqual(mirroredYawUnit.rotationW, -0.70710678f),
+          "a non-identity (90-degree) source rotation composes against the hand-computed quaternion");
+
+    Check(armies[0].name == "ARMY_01" && armies[1].name == "ARMY_02",
+          "STEP76 amendment: neither army's machine-owned `name` is read or written");
+    Check(armies[0].displayName == "North" && armies[1].displayName == "South",
+          "STEP76 amendment: neither army's `displayName` is read or written either");
+    Check(armies[0].groups.size() == 1u && armies[0].groups[0].units[0].positionX == 30.0f,
+          "the SOURCE army's own groups are left untouched (a copy, not a move)");
+
+    // The last army in the roster has no successor: a documented no-op, not a crash.
+    std::vector<Params::Army> singleArmyRoster(1);
+    MirrorArmyGroupsOntoNextArmy(singleArmyRoster, 0, geometry);
+    Check(singleArmyRoster[0].groups.empty(), "mirroring the last army in the roster is a safe no-op");
+
+    Check(CanMirrorArmy(armies, 0), "an even-0-indexed army (Army1) with a successor can mirror");
+    Check(!CanMirrorArmy(armies, 1), "an odd-0-indexed army (Army2) cannot -- ruling 1's gate");
+    Check(!CanMirrorArmy(singleArmyRoster, 0), "an even-0-indexed army with NO successor cannot either");
+}
+
 } // namespace
 
 int main() {
@@ -251,6 +334,7 @@ int main() {
     RunUnitRuleMirrorChecks();
     RunArmySelectionChecks();
     RunArmyDisplayNameDefaultsChecks();
+    RunMirrorArmyGroupsChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

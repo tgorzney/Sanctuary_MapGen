@@ -11,9 +11,11 @@
 // SCOPE NOTES (ARCH §8.4 — a coder never invents a missing type; reported, not invented):
 //  1. Hand-placed `Army.groups`/`UnitGroup`/`UnitTransform` authoring has NO widget here (STEP20
 //     ruling #8, out of scope) — it stays reachable only by hand-editing/import until a dedicated
-//     ticket designs that canvas/manual-entry UI. `DrawArmySettings` binds the army's own fields
-//     only, and none of them notify `Pipeline::PreviewDriver`: no stage hashes a team color, alias
-//     or resource total (SCOPE NOTE was "no home"; now it has one, `Army_PARAMS.h`, but nothing
+//     ticket designs that canvas/manual-entry UI. STEP75's mirror button (ArmiesTab_Mirror_UI.h) is
+//     a narrow exception -- a one-time programmatic duplicate-and-rotate, not a canvas -- so this
+//     carve-out still stands. `DrawArmySettings` binds the army's own fields only, and none of them
+//     notify `Pipeline::PreviewDriver`: no stage hashes a team color, alias, resource total, or (as
+//     of STEP75) `groups` (SCOPE NOTE was "no home"; now it has one, `Army_PARAMS.h`, but nothing
 //     downstream reads it yet — asking for a regeneration a tint cannot affect is the "cheap tweak
 //     triggers a full regen" defect).
 //  2. The GAMEDATA ROOT is reported to the host, never read here: loading gamedata is the IO
@@ -23,8 +25,10 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "ArmiesTab_Mirror_UI.h"
 #include "ArmiesTab_Units_UI.h"
 #include "ColorSwatch_UI.h"
+#include "ConfirmDialog_UI.h"
 #include "FilePathPicker_UI.h"
 #include "UniqueNameList_UI.h"
 #include "../params/Army_PARAMS.h"
@@ -58,6 +62,13 @@ struct ArmiesTabState {
     RealtimeToggle    alloysToggle;
     RealtimeToggle    energyToggle;
     ArmyUnitListState units;
+
+    // STEP75: the mirror-onto-next-army confirm gate (ArmiesTab_Mirror_UI.h). The pending index is
+    // separate from `selectedArmyIndex` because the roster can move between the button click and the
+    // confirm frame (Constitution SS6 -- re-validated, never trusted, by
+    // DrawPendingMirrorArmyConfirmDialog).
+    int                pendingMirrorSourceArmyIndex = -1;
+    ConfirmDialogState mirrorConfirmDialogState;
 };
 
 // The army the per-army controls edit, or null when the selection points at nothing.
