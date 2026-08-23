@@ -635,6 +635,10 @@ add_sangen_test(PropsTab_ManualDecals_UI_Test src/ui/PropsTab_ManualDecals_UI_Te
 add_sangen_test(AreasTab_UI_Test          src/ui/AreasTab_UI_Test.cpp)
 add_sangen_test(PlacementRuleSections_UI_Test src/ui/PlacementRuleSections_UI_Test.cpp)
 
+# STEP74 — the Scenarios tab: three-tier list management, match-rule authoring, live composition
+# matrix, mandatory-spawns surfacing, maxArmySlotCount authoring. All pure, no imgui frame needed.
+add_sangen_test(ScenariosTab_UI_Test      src/ui/ScenariosTab_UI_Test.cpp)
+
 # Tab-rebuild batch D — Files/Save and the `.sanmap` IO behind it. The importer binary spans three
 # translation units (main() in MapImporter_IO_Test.cpp): the JSON round trip, the Constitution §6
 # refusal checks, and the baked-field half that reads a REAL exported map back off disk. The Files

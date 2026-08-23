@@ -11,6 +11,7 @@
 #include "AtmosphereTab_UI.h"
 #include "MarkersTab_UI.h"
 #include "PropsTab_UI.h"
+#include "ScenariosTab_UI.h"
 #include "WaterTab_UI.h"
 
 namespace SanmapGen {
@@ -44,6 +45,11 @@ void Application::DrawEnvironmentGroupPanel() {
             break;
         case ApplicationPanel::Areas:
             DrawAreasTab(recipe, tabState.areas, &previewDriver);
+            break;
+        case ApplicationPanel::Scenarios:
+            // Passed for interface parity only, exactly like every other tab's call site here —
+            // DrawScenariosTab itself never calls it (see ScenariosTab_UI.h's own note).
+            DrawScenariosTab(recipe, tabState.scenarios, &previewDriver);
             break;
         default: break;
     }

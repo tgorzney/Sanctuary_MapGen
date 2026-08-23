@@ -25,7 +25,7 @@ inline const char* const applicationPanelGroupLabels[kApplicationPanelGroupCount
 // Every panel the shell hosts. Declaration order IS the left column's order.
 enum class ApplicationPanel : int {
     Symmetry, Heightmap, Slope, Flow, Accumulation, Stratums, DetailNormal, Tint, Holes, Smoothness,
-    Water, Atmosphere, Markers, Armies, Props, Areas,
+    Water, Atmosphere, Markers, Armies, Props, Areas, Scenarios,
     Performance, Files, Count
 };
 
@@ -81,6 +81,10 @@ inline constexpr ApplicationPanelEntry applicationPanelEntries[kApplicationPanel
       true,  false, PreviewVisibilityTarget::Entities,   PreviewLayerKind::HeightRamp },
     { ApplicationPanel::Areas,        "Areas",         ApplicationPanelGroup::Environment,
       true,  false, PreviewVisibilityTarget::None,       PreviewLayerKind::HeightRamp },
+    // STEP74: no [O]/[ ] toggle — `recipe.scenarios` feeds no PROC stage, so the composite has
+    // nothing this row could drive (see ScenariosTab_UI.h's own previewDriver note).
+    { ApplicationPanel::Scenarios,    "Scenarios",     ApplicationPanelGroup::Environment,
+      false, false, PreviewVisibilityTarget::None,       PreviewLayerKind::HeightRamp },
     { ApplicationPanel::Performance,  "Performance",   ApplicationPanelGroup::System,
       false, false, PreviewVisibilityTarget::None,       PreviewLayerKind::HeightRamp },
     { ApplicationPanel::Files,        "Files",         ApplicationPanelGroup::System,

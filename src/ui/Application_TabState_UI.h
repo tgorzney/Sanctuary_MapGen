@@ -25,6 +25,7 @@
 #include "MarkersTab_UI.h"
 #include "MaskLayerTab_UI.h"
 #include "PropsTab_UI.h"
+#include "ScenariosTab_UI.h"
 #include "Section_UI.h"
 #include "SlopeTab_UI.h"
 #include "StratumsTab_UI.h"
@@ -55,6 +56,7 @@ struct ApplicationTabState {
     ArmiesTabState       armies;
     PropsTabState        props;
     AreasTabState        areas;
+    ScenariosTabState    scenarios;
 
     // --- SYSTEM
     SystemTabState       system;
