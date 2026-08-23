@@ -71,21 +71,24 @@ void FlushIconLayerBucket(ImDrawList& drawList, const AtlasPageBucket& bucket) {
     if (bucket.quads.empty()) return;   // never a zero-quad draw command
     drawList.PushTextureID(static_cast<ImTextureID>(bucket.textureIdentifier));
     const int quadCount = static_cast<int>(bucket.quads.size());
-    drawList.PrimReserve(quadCount * 6, quadCount * 4);
-    for (const OverlayVisibleInstance& instance : bucket.quads) {
-        const float half = instance.screenSize * 0.5f;
-        const ImU32 tint = ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, instance.tintAlpha));
-        const ImDrawIdx base = static_cast<ImDrawIdx>(drawList._VtxCurrentIdx);
-        drawList.PrimWriteIdx(base);     drawList.PrimWriteIdx(base + 1); drawList.PrimWriteIdx(base + 2);
-        drawList.PrimWriteIdx(base);     drawList.PrimWriteIdx(base + 2); drawList.PrimWriteIdx(base + 3);
-        drawList.PrimWriteVtx(ImVec2(instance.screenCenterX - half, instance.screenCenterY - half),
-                              ImVec2(instance.uvMinimumX, instance.uvMinimumY), tint);
-        drawList.PrimWriteVtx(ImVec2(instance.screenCenterX + half, instance.screenCenterY - half),
-                              ImVec2(instance.uvMaximumX, instance.uvMinimumY), tint);
-        drawList.PrimWriteVtx(ImVec2(instance.screenCenterX + half, instance.screenCenterY + half),
-                              ImVec2(instance.uvMaximumX, instance.uvMaximumY), tint);
-        drawList.PrimWriteVtx(ImVec2(instance.screenCenterX - half, instance.screenCenterY + half),
-                              ImVec2(instance.uvMinimumX, instance.uvMaximumY), tint);
+    for (const IconLayerBucketChunkRange_UI& chunk : ComputeIconLayerBucketChunks(quadCount)) {
+        drawList.PrimReserve(chunk.quadCount * 6, chunk.quadCount * 4);
+        for (int i = 0; i < chunk.quadCount; ++i) {
+            const OverlayVisibleInstance& instance = bucket.quads[chunk.quadStart + i];
+            const float half = instance.screenSize * 0.5f;
+            const ImU32 tint = ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, instance.tintAlpha));
+            const ImDrawIdx base = static_cast<ImDrawIdx>(drawList._VtxCurrentIdx);
+            drawList.PrimWriteIdx(base);     drawList.PrimWriteIdx(base + 1); drawList.PrimWriteIdx(base + 2);
+            drawList.PrimWriteIdx(base);     drawList.PrimWriteIdx(base + 2); drawList.PrimWriteIdx(base + 3);
+            drawList.PrimWriteVtx(ImVec2(instance.screenCenterX - half, instance.screenCenterY - half),
+                                  ImVec2(instance.uvMinimumX, instance.uvMinimumY), tint);
+            drawList.PrimWriteVtx(ImVec2(instance.screenCenterX + half, instance.screenCenterY - half),
+                                  ImVec2(instance.uvMaximumX, instance.uvMinimumY), tint);
+            drawList.PrimWriteVtx(ImVec2(instance.screenCenterX + half, instance.screenCenterY + half),
+                                  ImVec2(instance.uvMaximumX, instance.uvMaximumY), tint);
+            drawList.PrimWriteVtx(ImVec2(instance.screenCenterX - half, instance.screenCenterY + half),
+                                  ImVec2(instance.uvMinimumX, instance.uvMaximumY), tint);
+        }
     }
     drawList.PopTextureID();
 }

@@ -487,7 +487,10 @@ add_sangen_test(MapCanvas_IconLayer_UI_Test
     src/ui/MapCanvas_IconLayer_Cull_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Budget_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Cache_UI_Test.cpp
-    src/ui/MapCanvas_IconLayer_Draw_UI_Test.cpp)
+    src/ui/MapCanvas_IconLayer_Draw_UI_Test.cpp
+    src/ui/MapCanvas_IconLayer_DrawChunk_UI.cpp
+    src/ui/MapCanvas_IconLayer_DrawChunk_UI_Test.cpp
+    src/ui/MapCanvas_IconLayer_DrawChunkCache_UI_Test.cpp)
 # STEP59 — §14.9's own-named microbenchmark: STEP53's real transform+cull+compaction candidate-list
 # build and real FlushIconLayerBucket-shaped bulk write, timed directly (not reimplemented), plus a
 # naive per-instance AddImage() comparison written only in this test binary. Own binary (not folded

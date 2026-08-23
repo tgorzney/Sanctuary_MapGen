@@ -11,6 +11,7 @@ void RunMapCanvasIconLayerCullChecks();     // MapCanvas_IconLayer_Cull_UI_Test.
 void RunMapCanvasIconLayerBudgetChecks();   // MapCanvas_IconLayer_Budget_UI_Test.cpp
 void RunMapCanvasIconLayerCacheChecks();    // MapCanvas_IconLayer_Cache_UI_Test.cpp
 void RunMapCanvasIconLayerDrawChecks();     // MapCanvas_IconLayer_Draw_UI_Test.cpp
+void RunMapCanvasIconLayerDrawChunkChecks();  // MapCanvas_IconLayer_DrawChunk_UI_Test.cpp
 } // namespace Ui
 } // namespace SanmapGen
 
@@ -21,6 +22,7 @@ int main() {
     Ui::RunMapCanvasIconLayerBudgetChecks();
     Ui::RunMapCanvasIconLayerCacheChecks();
     Ui::RunMapCanvasIconLayerDrawChecks();
+    Ui::RunMapCanvasIconLayerDrawChunkChecks();
 
     if (Ui::previewTestFailureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", Ui::previewTestFailureCount);

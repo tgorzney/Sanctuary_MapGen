@@ -15,6 +15,26 @@ namespace Ui {
 
 std::vector<AtlasPageBucket> BucketByAtlasPage(const std::vector<OverlayVisibleInstance>& instances);
 
+// The 16-bit ImDrawIdx ceiling (imconfig.h's 32-bit override is commented out in this project's
+// vendored copy) means a single PrimReserve call spanning more than 65,536 vertices free-runs
+// _VtxCurrentIdx past the point where imgui's own automatic VtxOffset bump can help — that bump
+// only fires once, at the TOP of a PrimReserve call, checking the pre-call _VtxCurrentIdx
+// (imgui_draw.cpp:739-762). kIconLayerBucketChunkQuadCap keeps every single PrimReserve call's
+// own vertex span (chunkQuadCount * 4) safely under that ceiling. Fixed internal constant, NOT a
+// Constitution §8 tweakable — it is dictated by the vendored index type, not a design dial
+// (Constitution §6: exposing it would let a designer reintroduce 16-bit index wraparound).
+constexpr int kIconLayerBucketChunkQuadCap = 16000;   // 16,000 quads = 64,000 vertices < 65,536
+
+// One contiguous sub-range of a bucket's quad list, sized to stay under
+// kIconLayerBucketChunkQuadCap. Pure/deterministic given totalQuadCount — build (FlushIconLayerBucket,
+// CaptureAndCacheBuckets' BuildLocalIndexPattern) and replay (ReplayCachedBuckets) call
+// ComputeIconLayerBucketChunks identically, so chunk boundaries never need to be separately cached.
+struct IconLayerBucketChunkRange_UI {
+    int quadStart = 0;
+    int quadCount = 0;
+};
+std::vector<IconLayerBucketChunkRange_UI> ComputeIconLayerBucketChunks(int totalQuadCount);
+
 // §3, confirmed against this project's vendored imgui (PrimReserve/PrimWriteVtx/PrimWriteIdx,
 // imgui.h ~3585-3595): ONE PrimReserve per bucket — PrimRectUV/PrimQuadUV each reserve internally,
 // so calling them per-quad here would double-reserve and reintroduce per-instance call cost.

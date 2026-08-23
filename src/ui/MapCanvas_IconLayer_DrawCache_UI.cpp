@@ -14,13 +14,18 @@ namespace {
 // self-contained numbering the cache owns, decoupled from whatever absolute base imgui's own
 // VtxOffset bookkeeping used at build time (imgui.h: "_VtxCurrentIdx ... resets to 0" past 64K
 // vertices) so replay's rebase below is correct regardless of that internal detail.
+// STEP98: chunk-relative — each chunk's own quads numbered from 0 (not a bucket-global quad * 4),
+// so these stay correct once ReplayCachedBuckets gets a fresh per-chunk base (the same 16-bit
+// ImDrawIdx ceiling that forces FlushIconLayerBucket's own chunking applies here identically).
 std::vector<ImDrawIdx> BuildLocalIndexPattern(int quadCount) {
     std::vector<ImDrawIdx> indices;
     indices.reserve(static_cast<std::size_t>(quadCount) * 6);
-    for (int quad = 0; quad < quadCount; ++quad) {
-        const ImDrawIdx base = static_cast<ImDrawIdx>(quad * 4);
-        indices.push_back(base);     indices.push_back(base + 1); indices.push_back(base + 2);
-        indices.push_back(base);     indices.push_back(base + 2); indices.push_back(base + 3);
+    for (const IconLayerBucketChunkRange_UI& chunk : ComputeIconLayerBucketChunks(quadCount)) {
+        for (int quadInChunk = 0; quadInChunk < chunk.quadCount; ++quadInChunk) {
+            const ImDrawIdx base = static_cast<ImDrawIdx>(quadInChunk * 4);
+            indices.push_back(base);     indices.push_back(base + 1); indices.push_back(base + 2);
+            indices.push_back(base);     indices.push_back(base + 2); indices.push_back(base + 3);
+        }
     }
     return indices;
 }
@@ -50,21 +55,23 @@ void ReplayCachedBuckets(ImDrawList& drawList, const IconLayerFrameCache& frameC
     std::size_t vertexByteOffset = 0, indexByteOffset = 0;
     for (const CachedIconLayerBucketLayout_UI& bucketLayout : frameCache.cachedBucketLayout) {
         if (bucketLayout.quadCount <= 0) continue;
-        const int vertexCount = bucketLayout.quadCount * 4, indexCount = bucketLayout.quadCount * 6;
         drawList.PushTextureID(static_cast<ImTextureID>(bucketLayout.textureIdentifier));
-        drawList.PrimReserve(indexCount, vertexCount);
-        const ImDrawIdx base = static_cast<ImDrawIdx>(drawList._VtxCurrentIdx);
-        std::memcpy(drawList._VtxWritePtr, frameCache.cachedVertexBytes.data() + vertexByteOffset,
-                   static_cast<std::size_t>(vertexCount) * sizeof(ImDrawVert));
-        drawList._VtxWritePtr += vertexCount;
-        drawList._VtxCurrentIdx += static_cast<unsigned int>(vertexCount);
-        const ImDrawIdx* localIndices =
-            reinterpret_cast<const ImDrawIdx*>(frameCache.cachedIndexBytes.data() + indexByteOffset);
-        for (int index = 0; index < indexCount; ++index)
-            drawList.PrimWriteIdx(static_cast<ImDrawIdx>(base + localIndices[index]));
+        for (const IconLayerBucketChunkRange_UI& chunk : ComputeIconLayerBucketChunks(bucketLayout.quadCount)) {
+            const int vertexCount = chunk.quadCount * 4, indexCount = chunk.quadCount * 6;
+            drawList.PrimReserve(indexCount, vertexCount);
+            const ImDrawIdx base = static_cast<ImDrawIdx>(drawList._VtxCurrentIdx);
+            std::memcpy(drawList._VtxWritePtr, frameCache.cachedVertexBytes.data() + vertexByteOffset,
+                       static_cast<std::size_t>(vertexCount) * sizeof(ImDrawVert));
+            drawList._VtxWritePtr += vertexCount;
+            drawList._VtxCurrentIdx += static_cast<unsigned int>(vertexCount);
+            const ImDrawIdx* localIndices =
+                reinterpret_cast<const ImDrawIdx*>(frameCache.cachedIndexBytes.data() + indexByteOffset);
+            for (int index = 0; index < indexCount; ++index)
+                drawList.PrimWriteIdx(static_cast<ImDrawIdx>(base + localIndices[index]));
+            vertexByteOffset += static_cast<std::size_t>(vertexCount) * sizeof(ImDrawVert);
+            indexByteOffset += static_cast<std::size_t>(indexCount) * sizeof(ImDrawIdx);
+        }
         drawList.PopTextureID();
-        vertexByteOffset += static_cast<std::size_t>(vertexCount) * sizeof(ImDrawVert);
-        indexByteOffset += static_cast<std::size_t>(indexCount) * sizeof(ImDrawIdx);
     }
 }
 
