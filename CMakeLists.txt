@@ -488,6 +488,19 @@ add_sangen_test(MapCanvas_IconLayer_UI_Test
     src/ui/MapCanvas_IconLayer_Budget_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Cache_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Draw_UI_Test.cpp)
+# STEP59 — §14.9's own-named microbenchmark: STEP53's real transform+cull+compaction candidate-list
+# build and real FlushIconLayerBucket-shaped bulk write, timed directly (not reimplemented), plus a
+# naive per-instance AddImage() comparison written only in this test binary. Own binary (not folded
+# into MapCanvas_IconLayer_UI_Test above) so the correctness suite's own wall-clock cost never grows
+# with N=600k synthetic runs. Kept in the default gate deliberately: every Check() here is a loose
+# structural sanity check (candidate counts, vertex/index counts, apples-to-apples instance counts),
+# never a timing threshold, so it carries zero flakiness risk, and its own estimated total run time
+# is low seconds (Constitution §7 REASONED-PLACEHOLDER basis, STEP59's own solution estimate) —
+# comparable to or cheaper than several PROC/IO binaries already in this same gate.
+add_sangen_test(MapCanvas_IconLayer_Microbenchmark_UI_Test
+    src/ui/MapCanvas_IconLayer_Microbenchmark_UI_Test.cpp
+    src/ui/MapCanvas_IconLayer_MicrobenchmarkScenarios_UI_Test.cpp
+    src/ui/MapCanvas_IconLayer_MicrobenchmarkFrameOps_UI_Test.cpp)
 # STEP54 — the "View" toolbar popup: Terrain/Overlays DraggableList sections over
 # PreviewCompositeSettings::fieldLayers / OverlayLayerSettings::overlayLayers. ApplyViewLayerSignal
 # is pure (no imgui frame); the cross-section payload-identifier rejection needs one live headless
