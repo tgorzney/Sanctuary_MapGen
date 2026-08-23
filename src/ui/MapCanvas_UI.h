@@ -25,9 +25,11 @@
 #pragma once
 #include <cstdint>
 #include <functional>
+#include <vector>
 #include "MapCanvasView_UI.h"
 #include "MapCanvas_IconLayer_Ops_UI.h"
 #include "MapCanvas_ScenarioEditMode_Ops_UI.h"
+#include "MarkerDragGesture_UI.h"
 #include "OverlayLayer_Settings_UI.h"
 #include "PreviewComposite_UI.h"
 #include "../data/EntityIdBuffer_DATA.h"
@@ -88,6 +90,20 @@ public:
     // interaction ownership: drag/click route to Scenario Edit Mode, not the normal pan/pick path.
     void SetScenarioEditModeState(ScenarioEditModeState* state) { scenarioEditModeState = state; }
 
+    // STEP94 — the manual-marker drag-and-follow source: `markers` is the ONLY mutable pointer
+    // here (a drag writes straight into `recipe.markers`, Constitution §1 — UI sets PARAMS, never
+    // simulates); everything else is read-only. Mirrors SetPreviewComposite/SetMarkerPickingSource's
+    // own injected-pointer shape exactly (MapCanvas_UI.h header comment's "second copy" ruling).
+    void SetManualMarkerDragSource(std::vector<Params::MarkerInstanceGroup>* markers,
+                                   const std::vector<Params::MarkerInstanceLayer>* markerLayers,
+                                   const Params::Geometry* geometry,
+                                   const Params::MapRecipe* recipeForGlobalSymmetry) {
+        manualMarkerDragMarkers  = markers;
+        manualMarkerDragLayers   = markerLayers;
+        manualMarkerDragGeometry = geometry;
+        manualMarkerDragRecipe   = recipeForGlobalSymmetry;
+    }
+
     // One imgui frame; `regionSidePixels` is the square viewport side in screen pixels.
     void Draw(const char* canvasIdentifier, float regionSidePixels);   // MapCanvas_Draw_UI.cpp
 
@@ -118,6 +134,14 @@ private:
     // STEP78 — draws Scenario Edit Mode's overlay when active, from the SAME overlay* sources
     // above (MapCanvas_Draw_UI.cpp).
     void DrawScenarioEditModeOverlayPass(float regionOriginX, float regionOriginY);
+    // STEP94 — Gap 6's minimal stopgap draw + the live gesture's ghost/refused-tint dots
+    // (MapCanvas_MarkerDrag_UI.cpp).
+    void DrawManualMarkerDragPass(float regionOriginX, float regionOriginY);
+    // STEP94 — the drag gesture's three lifecycle calls (MapCanvas_MarkerDrag_UI.cpp), tried at
+    // press-time before the existing pan-vs-click disambiguation (MapCanvas_Draw_UI.cpp).
+    bool TryBeginManualMarkerDrag(float regionLocalX, float regionLocalY);
+    void ContinueManualMarkerDrag(float regionLocalX, float regionLocalY);
+    void EndManualMarkerDrag();
 
     MapCanvasView view;
     Sys::GpuResourceManager*        gpuResourceManager = nullptr;
@@ -147,6 +171,15 @@ private:
 
     // STEP78 — Scenario Edit Mode's own state (Application-owned, injected).
     ScenarioEditModeState* scenarioEditModeState = nullptr;
+
+    // STEP94 — the manual-marker drag-and-follow source (injected, see SetManualMarkerDragSource)
+    // and this canvas's own live gesture state.
+    std::vector<Params::MarkerInstanceGroup>*       manualMarkerDragMarkers  = nullptr;
+    const std::vector<Params::MarkerInstanceLayer>* manualMarkerDragLayers   = nullptr;
+    const Params::Geometry*                         manualMarkerDragGeometry = nullptr;
+    const Params::MapRecipe*                        manualMarkerDragRecipe   = nullptr;
+    MarkerDragGestureState manualMarkerDragState;
+    bool                   bManualMarkerDragActive = false;   // this press started on a manual marker
 };
 
 } // namespace Ui

@@ -88,6 +88,10 @@ void Application::WireCallbacks() {
     canvas.SetWorldFootprintSizeTable(&WorldFootprintSizeTable());
     // STEP78 — Scenario Edit Mode's own state; see MapCanvas_UI.h's SetScenarioEditModeState.
     canvas.SetScenarioEditModeState(&scenarioEditMode);
+    // STEP94 — the manual-marker drag-and-follow source; see MapCanvas_UI.h's
+    // SetManualMarkerDragSource. `markers`/`markerLayers` are the SAME vectors the Markers tab
+    // edits (recipe.markers/recipe.markerLayers) — one source of truth, never a second copy.
+    canvas.SetManualMarkerDragSource(&recipe.markers, &recipe.markerLayers, &recipe.geometry, &recipe);
 }
 
 // The whole of the shell's generation duty. WHICH tier this is was derived by the driver from the

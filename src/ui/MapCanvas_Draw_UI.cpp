@@ -41,6 +41,8 @@ void MapCanvas::Draw(const char* canvasIdentifier, float regionSidePixels) {
     // (§14's whole redesign), before ApplyPointerInput below (ordering here is readability only,
     // not correctness — click-picking is off the draw list, STEP48 onward).
     DrawOverlayIconLayerPass(regionOrigin.x, regionOrigin.y, regionSidePixels);
+    // STEP94 — Gap 6's minimal stopgap manual-marker draw, on top of the terrain/overlay stack.
+    DrawManualMarkerDragPass(regionOrigin.x, regionOrigin.y);
     // STEP78 — Scenario Edit Mode's own overlay, on top of the normal overlay stack.
     DrawScenarioEditModeOverlayPass(regionOrigin.x, regionOrigin.y);
 
@@ -120,16 +122,30 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
         return;
     }
 
-    if (ImGui::IsItemActivated()) { bPressActive = true; pressTravelPixels = 0.0f; }
+    // STEP94 — before the existing pan-vs-click disambiguation: a press that lands on a manual
+    // marker starts a drag gesture instead (a hit on an ungrouped marker still starts one, with an
+    // empty correspondence table); a miss falls through to the pan/click path below unchanged.
+    if (ImGui::IsItemActivated()) {
+        bPressActive = true; pressTravelPixels = 0.0f;
+        bManualMarkerDragActive = TryBeginManualMarkerDrag(regionLocalX, regionLocalY);
+    }
     if (bPressActive && ImGui::IsItemActive()) {
-        pressTravelPixels += std::fabs(io.MouseDelta.x) + std::fabs(io.MouseDelta.y);
-        if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)
-            ApplyDrag(io.MouseDelta.x, io.MouseDelta.y);
+        if (bManualMarkerDragActive) {
+            ContinueManualMarkerDrag(regionLocalX, regionLocalY);
+        } else {
+            pressTravelPixels += std::fabs(io.MouseDelta.x) + std::fabs(io.MouseDelta.y);
+            if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)
+                ApplyDrag(io.MouseDelta.x, io.MouseDelta.y);
+        }
     }
     if (bPressActive && ImGui::IsItemDeactivated()) {
         bPressActive = false;
-        if (pressTravelPixels <= view.settings.clickDragTolerancePixels)
+        if (bManualMarkerDragActive) {
+            EndManualMarkerDrag();
+            bManualMarkerDragActive = false;
+        } else if (pressTravelPixels <= view.settings.clickDragTolerancePixels) {
             ApplyClick(regionLocalX, regionLocalY);
+        }
     }
 }
 

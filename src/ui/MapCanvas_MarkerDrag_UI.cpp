@@ -1,0 +1,142 @@
+// MapCanvas_MarkerDrag_UI.cpp — see MapCanvas_MarkerDrag_UI.h for the file's rationale. Also
+// defines MapCanvas's own three gesture-lifecycle methods (declared in MapCanvas_UI.h, defined
+// here rather than MapCanvas_UI.cpp/MapCanvas_Draw_UI.cpp so those two keep their existing single
+// job — pan/zoom/pick state and imgui pointer routing respectively).
+#include "MapCanvas_MarkerDrag_UI.h"
+#include "MapCanvas_UI.h"
+#include "PreviewComposite_UI.h"
+#include "../params/MapRecipe_PARAMS.h"
+#include <imgui.h>
+
+namespace SanmapGen {
+namespace Ui {
+namespace {
+
+constexpr float kManualMarkerDotRadiusScreenPixels = 6.0f;
+
+ImVec2 ProjectWorldToScreen(const PreviewComposite& composite, const MapCanvasView& view,
+                            float worldX, float worldZ, float regionOriginX, float regionOriginY) {
+    const PreviewComposite::PreviewPixelPoint previewPixel = composite.WorldToPreviewPixel(worldX, worldZ);
+    const RegionLocalPoint regionLocal = view.ProjectPreviewPixelToRegionLocal(previewPixel.pixelX, previewPixel.pixelY);
+    return ImVec2(regionOriginX + regionLocal.regionLocalX, regionOriginY + regionLocal.regionLocalY);
+}
+
+ImU32 ManualMarkerTint(const std::vector<Params::MarkerInstanceLayer>& markerLayers, int layerIndex) {
+    if (layerIndex < 0 || layerIndex >= static_cast<int>(markerLayers.size()))
+        return IM_COL32(220, 220, 220, 255);
+    const float* color = markerLayers[static_cast<std::size_t>(layerIndex)].color;
+    return ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], color[3]));
+}
+
+} // namespace
+
+bool HitTestManualMarkers(const std::vector<Params::MarkerInstanceGroup>& markers,
+                          const PreviewComposite& composite, const MapCanvasView& view,
+                          float regionLocalX, float regionLocalY, float pickRadiusScreenPixels,
+                          int& outGroupIndex, int& outTransformIndex) {
+    outGroupIndex = -1; outTransformIndex = -1;
+    if (composite.PixelsPerPreviewCell() <= 0.0f) return false;
+    const float radiusSquared = pickRadiusScreenPixels * pickRadiusScreenPixels;
+    float bestDistanceSquared = radiusSquared;
+    for (std::size_t groupIndex = 0; groupIndex < markers.size(); ++groupIndex) {
+        const std::vector<Params::MarkerTransform>& transforms = markers[groupIndex].transforms;
+        for (std::size_t transformIndex = 0; transformIndex < transforms.size(); ++transformIndex) {
+            const Params::MarkerTransform& transform = transforms[transformIndex];
+            const PreviewComposite::PreviewPixelPoint previewPixel =
+                composite.WorldToPreviewPixel(transform.transform.positionX, transform.transform.positionZ);
+            const RegionLocalPoint screenPoint =
+                view.ProjectPreviewPixelToRegionLocal(previewPixel.pixelX, previewPixel.pixelY);
+            const float deltaX = screenPoint.regionLocalX - regionLocalX;
+            const float deltaY = screenPoint.regionLocalY - regionLocalY;
+            const float distanceSquared = deltaX * deltaX + deltaY * deltaY;
+            // Strict `<` once a candidate is already held, mirroring Picking_UI::PickMarker's own
+            // tie convention exactly: the FIRST (lowest group, then lowest transform) marker within
+            // radius wins a tie, never a later one silently overwriting it. `distanceSquared <=
+            // radiusSquared` (not `<`) still admits a marker sitting exactly on the pick radius.
+            if (distanceSquared <= radiusSquared
+                && (outGroupIndex < 0 || distanceSquared < bestDistanceSquared)) {
+                bestDistanceSquared = distanceSquared;
+                outGroupIndex = static_cast<int>(groupIndex);
+                outTransformIndex = static_cast<int>(transformIndex);
+            }
+        }
+    }
+    return outGroupIndex >= 0;
+}
+
+void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& markers,
+                            const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                            const MarkerDragGestureState& dragState, const PreviewComposite& composite,
+                            const MapCanvasView& view, float regionOriginX, float regionOriginY,
+                            ImDrawList& drawList) {
+    if (composite.PixelsPerPreviewCell() <= 0.0f) return;
+    const ImU32 refusedTint = IM_COL32(220, 60, 40, 255);
+    const ImU32 ghostTint   = IM_COL32(200, 200, 200, 130);
+
+    for (std::size_t groupIndex = 0; groupIndex < markers.size(); ++groupIndex) {
+        const Params::MarkerInstanceGroup& group = markers[groupIndex];
+        const bool bThisGroupDragging = dragState.bActive && dragState.groupIndex == static_cast<int>(groupIndex);
+        for (std::size_t transformIndex = 0; transformIndex < group.transforms.size(); ++transformIndex) {
+            if (bThisGroupDragging
+                && IsMarkerSoftHiddenThisFrame(dragState, static_cast<int>(groupIndex), static_cast<int>(transformIndex)))
+                continue;
+            const Params::MarkerTransform& transform = group.transforms[transformIndex];
+            const ImVec2 screenCenter = ProjectWorldToScreen(composite, view, transform.transform.positionX,
+                                                             transform.transform.positionZ, regionOriginX, regionOriginY);
+            const ImU32 tint = (bThisGroupDragging && dragState.bSpawnCardinalityRefused)
+                              ? refusedTint : ManualMarkerTint(markerLayers, transform.layerIndex);
+            drawList.AddCircleFilled(screenCenter, kManualMarkerDotRadiusScreenPixels, tint);
+        }
+        if (bThisGroupDragging)
+            for (const Pipeline::WorldSymmetryOrbitPoint& ghost : dragState.currentGhostPoints) {
+                const ImVec2 screenCenter = ProjectWorldToScreen(composite, view, ghost.worldPositionX,
+                                                                 ghost.worldPositionZ, regionOriginX, regionOriginY);
+                drawList.AddCircle(screenCenter, kManualMarkerDotRadiusScreenPixels, ghostTint, 0, 2.0f);
+            }
+    }
+    if (dragState.bActive && dragState.bSpawnCardinalityRefused)
+        ImGui::SetTooltip("Spawn count is fixed - drag limited.");
+}
+
+bool MapCanvas::TryBeginManualMarkerDrag(float regionLocalX, float regionLocalY) {
+    if (manualMarkerDragMarkers == nullptr || manualMarkerDragGeometry == nullptr
+        || manualMarkerDragRecipe == nullptr || composite == nullptr) return false;
+    int hitGroupIndex = -1, hitTransformIndex = -1;
+    if (!HitTestManualMarkers(*manualMarkerDragMarkers, *composite, view, regionLocalX, regionLocalY,
+                              pickRadiusScreenPixels, hitGroupIndex, hitTransformIndex))
+        return false;
+    static const std::vector<Params::MarkerInstanceLayer> kNoLayers;
+    return BeginMarkerDragGesture(manualMarkerDragState, *manualMarkerDragMarkers,
+                                  manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoLayers,
+                                  *manualMarkerDragGeometry, manualMarkerDragRecipe->globalSymmetryMask,
+                                  manualMarkerDragRecipe->radialSymmetryRepeatCount,
+                                  hitGroupIndex, hitTransformIndex);
+}
+
+void MapCanvas::ContinueManualMarkerDrag(float regionLocalX, float regionLocalY) {
+    if (manualMarkerDragMarkers == nullptr || manualMarkerDragGeometry == nullptr || composite == nullptr) return;
+    const PreviewPixelCoordinate previewPixel = view.ResolvePreviewPixel(regionLocalX, regionLocalY);
+    const PreviewComposite::PreviewWorldPoint worldPoint = composite->PreviewPixelToWorld(
+        static_cast<float>(previewPixel.pixelX), static_cast<float>(previewPixel.pixelY));
+    UpdateMarkerDragGesture(manualMarkerDragState, *manualMarkerDragMarkers, *manualMarkerDragGeometry,
+                           worldPoint.worldX, worldPoint.worldZ);
+}
+
+void MapCanvas::EndManualMarkerDrag() {
+    if (manualMarkerDragMarkers == nullptr || manualMarkerDragGeometry == nullptr) {
+        manualMarkerDragState = MarkerDragGestureState{};
+        return;
+    }
+    EndMarkerDragGesture(manualMarkerDragState, *manualMarkerDragMarkers, *manualMarkerDragGeometry);
+}
+
+void MapCanvas::DrawManualMarkerDragPass(float regionOriginX, float regionOriginY) {
+    if (composite == nullptr || manualMarkerDragMarkers == nullptr) return;
+    static const std::vector<Params::MarkerInstanceLayer> kNoLayers;
+    DrawManualMarkerRoster(*manualMarkerDragMarkers, manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoLayers,
+                          manualMarkerDragState, *composite, view, regionOriginX, regionOriginY,
+                          *ImGui::GetWindowDrawList());
+}
+
+} // namespace Ui
+} // namespace SanmapGen

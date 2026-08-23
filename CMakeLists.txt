@@ -680,6 +680,14 @@ add_sangen_test(MarkerLayerId_UI_Test     src/ui/MarkerLayerId_UI_Test.cpp)
 # the layerId-never-touched regression guard, and the Combo-binding store guard — all pure, no
 # imgui frame needed (MarkerLayerIndexRepair_UI.h).
 add_sangen_test(MarkerLayerIndexRepair_UI_Test src/ui/MarkerLayerIndexRepair_UI_Test.cpp)
+# STEP94: MarkerDragGesture_UI's pure gesture state machine (correspondence build/match, live
+# per-frame writes, cardinality growth/shrink, Spawn-refusal freeze, ungrouped free-drag) and
+# RepositionSymmetryGroupMember (R2 §4's roster-slider counterpart) — pure/imgui-free, no window.
+add_sangen_test(MarkerDragGesture_UI_Test src/ui/MarkerDragGesture_UI_Test.cpp)
+# STEP94: MapCanvas_MarkerDrag_UI's one imgui-including half — the linear hit-test (including its
+# Picking_UI::PickMarker-mirrored first-match-wins tie rule) and the stopgap at-rest/soft-hide/
+# ghost/Spawn-refused-tint draw. One live headless imgui frame, no window/GL.
+add_sangen_test(MapCanvas_MarkerDrag_UI_Test src/ui/MapCanvas_MarkerDrag_UI_Test.cpp)
 add_sangen_test(ArmiesTab_UI_Test         src/ui/ArmiesTab_UI_Test.cpp)
 add_sangen_test(PropsTab_UI_Test          src/ui/PropsTab_UI_Test.cpp)
 add_sangen_test(PropsTab_ManualDecals_UI_Test src/ui/PropsTab_ManualDecals_UI_Test.cpp)
