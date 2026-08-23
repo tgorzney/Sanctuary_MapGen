@@ -10,6 +10,8 @@
 #include "ScenarioScript_DataLua_IO.h"
 #include "LuaTableWriter_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include <algorithm>
+#include <utility>
 
 namespace SanmapGen {
 namespace Io {
@@ -195,6 +197,88 @@ std::string BuildDefaultScenarioTable(const Params::ScenarioBody& body, int mapS
     return out;
 }
 
+using AlloyRosterEntry = std::pair<std::string, std::string>;  // (armyName, markerName)
+
+// Every (armyName, markerName) pair a ScenarioBody's alloy fields reference -- alloys/alloysToAdd/
+// alloysToRemove ALL carry both fields (`ARCH_15_05_ParamsScenariosType.md` §15.5), so all three contribute to the roster.
+void CollectScenarioBodyAlloyRosterEntries(const Params::ScenarioBody& body,
+                                            std::vector<AlloyRosterEntry>& outEntries) {
+    for (const auto& row : body.alloys)         outEntries.emplace_back(row.armyName, row.markerName);
+    for (const auto& row : body.alloysToAdd)    outEntries.emplace_back(row.armyName, row.markerName);
+    for (const auto& row : body.alloysToRemove) outEntries.emplace_back(row.armyName, row.markerName);
+}
+
+// ⚠️ ATTENTION -- EXTERNAL ENGINE BEHAVIOR, NOT INDEPENDENTLY VERIFIED (STEP73 §0). mapStartSlotIndex
+// (what player.armyID is matched against, common/gameUtils.lua's CreateArmies()) is claimed -- by a
+// comment in the live reference's own _data.lua (lines 51-54) -- to assign 1..N to this map's
+// authored armies IN ALPHABETICAL NAME ORDER. This pack cannot read gameUtils.lua directly; the
+// claim is inherited from that comment, not re-derived. IF IN-GAME ARMY SLOT ASSIGNMENT EVER LOOKS
+// WRONG (the wrong army spawns in the wrong lobby slot), THIS IS THE FIRST PLACE TO LOOK.
+// NOTE (STEP76): Army::name is now machine-minted by AssignArmyIdentities from the roster's own
+// 1-based position specifically so that an alphabetical sort equals roster order; sorting here is
+// still performed explicitly rather than trusted, so this function's own correctness never depends
+// on that upstream invariant holding.
+std::string BuildArmyIdToNameTable(const std::vector<Params::Army>& armies) {
+    std::vector<std::string> sortedNames;
+    sortedNames.reserve(armies.size());
+    for (const auto& army : armies) sortedNames.push_back(army.name);
+    std::sort(sortedNames.begin(), sortedNames.end());
+
+    std::string out;
+    OpenTable(out, 0, "ARMY_ID_TO_NAME");
+    for (std::size_t i = 0; i < sortedNames.size(); ++i) {
+        AppendKeyValueLine(out, 1, "[" + std::to_string(i + 1) + "]", QuotedLuaString(sortedNames[i]));
+    }
+    CloseTable(out, 0, false);
+    return out;
+}
+
+// KNOWN_ALLOY_MARKERS is the union, per army, of every alloy marker name recipe.scenarios itself
+// already references (STEP73 §0) -- NOT authored anywhere separately. Collected in a FIXED,
+// deterministic order (pattern tier, then count tier -- each in its own vector order -- then the
+// single default), matching BuildScenarioDataLuaText's own tier-emission order, so output is
+// reproducible byte-for-byte from the same recipe with no staging container that could reorder
+// (same discipline `ARCH_15_06_CountScenariosOrdering.md` §15.6 requires of CountScenarios itself).
+std::string BuildKnownAlloyMarkersTable(const Params::Scenarios& scenarios) {
+    std::vector<AlloyRosterEntry> allEntries;
+    for (const auto& entry : scenarios.patternScenarios) CollectScenarioBodyAlloyRosterEntries(entry.body, allEntries);
+    for (const auto& entry : scenarios.countScenarios)   CollectScenarioBodyAlloyRosterEntries(entry.body, allEntries);
+    CollectScenarioBodyAlloyRosterEntries(scenarios.defaultScenario, allEntries);
+
+    // Group by armyName (first-seen order), dedup markerName within each group (first-seen order).
+    // Linear scan, not a hash map -- typical roster sizes are tiny, and this sidesteps any
+    // container-iteration-order question outright.
+    std::vector<std::string> armyOrder;
+    std::vector<std::vector<std::string>> markersPerArmy;
+    for (const auto& [armyName, markerName] : allEntries) {
+        std::size_t armyIndex = 0;
+        for (; armyIndex < armyOrder.size(); ++armyIndex) {
+            if (armyOrder[armyIndex] == armyName) break;
+        }
+        if (armyIndex == armyOrder.size()) {
+            armyOrder.push_back(armyName);
+            markersPerArmy.emplace_back();
+        }
+        std::vector<std::string>& markers = markersPerArmy[armyIndex];
+        if (std::find(markers.begin(), markers.end(), markerName) == markers.end()) {
+            markers.push_back(markerName);
+        }
+    }
+
+    std::string out;
+    OpenTable(out, 0, "KNOWN_ALLOY_MARKERS");
+    for (std::size_t i = 0; i < armyOrder.size(); ++i) {
+        // Bracket-string key (["ARMY_01"] = {...}), never a bare identifier -- Army::name is a
+        // free-form authored string (Army_PARAMS.h imposes no identifier-safety constraint on it),
+        // so this is the one form guaranteed valid regardless of what characters the name contains.
+        // Functionally identical for pairs()/[] lookup either way -- STEP72's runtime reads
+        // KNOWN_ALLOY_MARKERS[armyName], which works against either syntax.
+        AppendArrayOfQuotedStrings(out, 1, "[" + QuotedLuaString(armyOrder[i]) + "]", markersPerArmy[i]);
+    }
+    CloseTable(out, 0, false);
+    return out;
+}
+
 } // namespace
 
 std::string BuildScenarioDataLuaText(const Params::MapRecipe& recipe) {
@@ -209,6 +293,12 @@ std::string BuildScenarioDataLuaText(const Params::MapRecipe& recipe) {
     // emits a trailing comma for a table member; this is a file-level global statement). Global,
     // never `local` -- the runtime Import()s this file and captures only globals.
     out += "MAX_ARMY_SLOT_COUNT = " + RenderLuaNumber(scenarios.maxArmySlotCount) + "\n\n";
+
+    // ARMY_ID_TO_NAME / KNOWN_ALLOY_MARKERS -- both DERIVED from data already in `recipe`, never
+    // authored separately (STEP73 §0). Map-wide, non-tiered globals like MAX_ARMY_SLOT_COUNT above,
+    // so they are grouped with it, ahead of the three scenario tier tables.
+    out += BuildArmyIdToNameTable(recipe.armies) + "\n";
+    out += BuildKnownAlloyMarkersTable(scenarios) + "\n";
 
     out += BuildPatternScenariosTable(scenarios.patternScenarios, mapSize);
     out += "\n";

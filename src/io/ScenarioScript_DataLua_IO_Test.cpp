@@ -99,6 +99,213 @@ void TestGlobalDeclarationsNotLocal() {
           "this file does not declare the Scenario global (WO6's job)");
     Check(output.find("Scenario.ResolveAndApply") == std::string::npos,
           "this file does not reference Scenario.ResolveAndApply (WO6's job)");
+
+    // STEP73 acceptance item 2: ARMY_ID_TO_NAME / KNOWN_ALLOY_MARKERS are ALSO global, never local.
+    Check(output.find("ARMY_ID_TO_NAME = {") != std::string::npos, "ARMY_ID_TO_NAME declared as a global");
+    Check(output.find("KNOWN_ALLOY_MARKERS = {") != std::string::npos, "KNOWN_ALLOY_MARKERS declared as a global");
+    Check(output.find("local ARMY_ID_TO_NAME") == std::string::npos, "no local ARMY_ID_TO_NAME");
+    Check(output.find("local KNOWN_ALLOY_MARKERS") == std::string::npos, "no local KNOWN_ALLOY_MARKERS");
+}
+
+// STEP73 item 1: alphabetical-order proof -- armies authored out of order still render in sorted
+// [1]/[2]/[3] slot order.
+void TestArmyIdToNameAlphabeticalOrder() {
+    Params::MapRecipe recipe;
+    Params::Army armyThree; armyThree.name = "ARMY_03";
+    Params::Army armyOne;   armyOne.name   = "ARMY_01";
+    Params::Army armyTwo;   armyTwo.name   = "ARMY_02";
+    recipe.armies = { armyThree, armyOne, armyTwo };   // deliberately out of order
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    const std::size_t slotOnePosition   = output.find("[1] = \"ARMY_01\"");
+    const std::size_t slotTwoPosition   = output.find("[2] = \"ARMY_02\"");
+    const std::size_t slotThreePosition = output.find("[3] = \"ARMY_03\"");
+    Check(slotOnePosition != std::string::npos && slotTwoPosition != std::string::npos
+          && slotThreePosition != std::string::npos, "all three ARMY_ID_TO_NAME slots appear in the output");
+    Check(slotOnePosition < slotTwoPosition && slotTwoPosition < slotThreePosition,
+          "ARMY_ID_TO_NAME renders in alphabetically-sorted order regardless of authored (roster) order");
+}
+
+// STEP73 item 3: an empty armies list still renders a present, empty ARMY_ID_TO_NAME table.
+void TestEmptyArmiesRendersEmptyArmyIdToNameTable() {
+    Params::MapRecipe recipe;   // recipe.armies is default-empty
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    Check(output.find("ARMY_ID_TO_NAME = {\n}") != std::string::npos,
+          "an empty armies roster still renders ARMY_ID_TO_NAME = {\\n}, never omitted");
+}
+
+// STEP73 item 4: union-across-tiers, dedup proof -- the same (army, marker) pair appearing in a
+// PatternScenario's alloys AND a different CountScenario's alloysToAdd renders exactly once.
+void TestKnownAlloyMarkersUnionAcrossTiersDedup() {
+    Params::MapRecipe recipe;
+
+    Params::PatternScenario pattern;
+    pattern.slotPattern = "OO";
+    Params::ScenarioAlloyOverride patternAlloy;
+    patternAlloy.armyName = "ARMY_01"; patternAlloy.markerName = "AlloyMarker_X";
+    pattern.body.alloys.push_back(patternAlloy);
+    recipe.scenarios.patternScenarios.push_back(pattern);
+
+    Params::CountScenario countScenario;
+    Params::ScenarioAlloyOverride countAlloyToAdd;
+    countAlloyToAdd.armyName = "ARMY_01"; countAlloyToAdd.markerName = "AlloyMarker_X";  // same pair
+    countScenario.body.alloysToAdd.push_back(countAlloyToAdd);
+    recipe.scenarios.countScenarios.push_back(countScenario);
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    // Scope the dedup check to the KNOWN_ALLOY_MARKERS block itself -- "AlloyMarker_X" legitimately
+    // appears a second time elsewhere in the output too (inside the PATTERN_SCENARIOS/COUNT_SCENARIOS
+    // scenario-body alloys/alloysToAdd rows themselves, which are NOT deduplicated -- that is
+    // authored source data, not the derived roster).
+    const std::size_t knownAlloyMarkersStart = output.find("KNOWN_ALLOY_MARKERS = {");
+    const std::size_t knownAlloyMarkersEnd   = output.find("PATTERN_SCENARIOS", knownAlloyMarkersStart);
+    Check(knownAlloyMarkersStart != std::string::npos && knownAlloyMarkersEnd != std::string::npos,
+          "KNOWN_ALLOY_MARKERS block is present and precedes PATTERN_SCENARIOS");
+    const std::string knownAlloyMarkersBlock =
+        output.substr(knownAlloyMarkersStart, knownAlloyMarkersEnd - knownAlloyMarkersStart);
+
+    const std::size_t firstOccurrence  = knownAlloyMarkersBlock.find("\"AlloyMarker_X\"");
+    const std::size_t secondOccurrence = knownAlloyMarkersBlock.find("\"AlloyMarker_X\"", firstOccurrence + 1);
+    Check(firstOccurrence != std::string::npos, "AlloyMarker_X appears at least once inside KNOWN_ALLOY_MARKERS");
+    Check(secondOccurrence == std::string::npos,
+          "AlloyMarker_X appearing in both a PatternScenario's alloys and a CountScenario's "
+          "alloysToAdd is deduplicated to exactly one occurrence in KNOWN_ALLOY_MARKERS");
+}
+
+// STEP73 item 5: an army appearing ONLY in defaultScenario.alloysToRemove is still included.
+void TestKnownAlloyMarkersAlloysToRemoveOnlyArmyIncluded() {
+    Params::MapRecipe recipe;
+    Params::ScenarioAlloyRemoval removal;
+    removal.armyName = "ARMY_02"; removal.markerName = "AlloyMarker_Removed";
+    recipe.scenarios.defaultScenario.alloysToRemove.push_back(removal);
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    const std::size_t knownAlloyMarkersPosition = output.find("KNOWN_ALLOY_MARKERS = {");
+    const std::size_t army02KeyPosition = output.find("[\"ARMY_02\"]");
+    Check(knownAlloyMarkersPosition != std::string::npos && army02KeyPosition != std::string::npos
+          && army02KeyPosition > knownAlloyMarkersPosition, "[\"ARMY_02\"] appears inside KNOWN_ALLOY_MARKERS");
+    Check(output.find("\"AlloyMarker_Removed\"") != std::string::npos,
+          "an army referenced ONLY via alloysToRemove still contributes its marker to KNOWN_ALLOY_MARKERS");
+}
+
+// STEP73 item 6: an authored army never mentioned in any scenario's alloy fields is absent from
+// KNOWN_ALLOY_MARKERS entirely -- not rendered as an empty ["ARMY_0N"] = {},.
+void TestKnownAlloyMarkersZeroReferenceArmyAbsent() {
+    Params::MapRecipe recipe;
+    Params::Army unreferencedArmy; unreferencedArmy.name = "ARMY_09";
+    recipe.armies.push_back(unreferencedArmy);   // authored, but never referenced by any alloy row
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    Check(output.find("[\"ARMY_09\"]") == std::string::npos,
+          "an army with zero derived alloy-marker references does not appear in KNOWN_ALLOY_MARKERS at all");
+}
+
+// STEP73 item 7: bracket-string key form, never a bare identifier.
+void TestKnownAlloyMarkersBracketStringKeyForm() {
+    Params::MapRecipe recipe;
+    Params::ScenarioAlloyOverride alloy;
+    alloy.armyName = "ARMY_01"; alloy.markerName = "AlloyMarker_1";
+    recipe.scenarios.defaultScenario.alloys.push_back(alloy);
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    Check(output.find("[\"ARMY_01\"] = { \"AlloyMarker_1\" },") != std::string::npos,
+          "KNOWN_ALLOY_MARKERS renders a bracket-string key, [\"ARMY_01\"] = { ... },");
+    Check(output.find("\n    ARMY_01 = {") == std::string::npos,
+          "KNOWN_ALLOY_MARKERS never renders a bare-identifier key ARMY_01 = {...}");
+}
+
+// STEP73 item 8: live-reference parity self-check -- a fixture hand-transcribing Pandemonium
+// Isthmus's real 4-army roster (3 markers each) renders the same army-to-marker-set membership and
+// the same 1..4 slot index order as the live hand-authored table (ARMY_01's exact marker set is
+// quoted verbatim in STEP73 §0: AlloyMarker_219/237/97; the other three armies' marker names are
+// representative -- their real values are not reproduced in this pack -- but the derivation being
+// proven (union of alloys/alloysToAdd/alloysToRemove per army, in roster-alphabetical slot order) is
+// identical regardless of the literal marker names).
+void TestLiveReferenceParitySelfCheck() {
+    Params::MapRecipe recipe;
+
+    Params::Army armyOne;   armyOne.name   = "ARMY_01";
+    Params::Army armyTwo;   armyTwo.name   = "ARMY_02";
+    Params::Army armyThree; armyThree.name = "ARMY_03";
+    Params::Army armyFour;  armyFour.name  = "ARMY_04";
+    recipe.armies = { armyOne, armyTwo, armyThree, armyFour };
+
+    auto addAlloy = [](Params::ScenarioBody& body, const char* armyName, const char* markerName) {
+        Params::ScenarioAlloyOverride alloy;
+        alloy.armyName = armyName; alloy.markerName = markerName;
+        body.alloys.push_back(alloy);
+    };
+
+    // "1v1" pattern scenario -- ARMY_01 and ARMY_02's rosters (ARMY_01's set matches STEP73 §0 verbatim).
+    Params::PatternScenario oneVOne;
+    oneVOne.slotPattern = "OO";
+    addAlloy(oneVOne.body, "ARMY_01", "AlloyMarker_219");
+    addAlloy(oneVOne.body, "ARMY_01", "AlloyMarker_237");
+    addAlloy(oneVOne.body, "ARMY_01", "AlloyMarker_97");
+    addAlloy(oneVOne.body, "ARMY_02", "AlloyMarker_301");
+    addAlloy(oneVOne.body, "ARMY_02", "AlloyMarker_302");
+    addAlloy(oneVOne.body, "ARMY_02", "AlloyMarker_303");
+    recipe.scenarios.patternScenarios.push_back(oneVOne);
+
+    // "4human" count scenario -- ARMY_03's roster.
+    Params::CountScenario fourHuman;
+    addAlloy(fourHuman.body, "ARMY_03", "AlloyMarker_401");
+    addAlloy(fourHuman.body, "ARMY_03", "AlloyMarker_402");
+    addAlloy(fourHuman.body, "ARMY_03", "AlloyMarker_403");
+    recipe.scenarios.countScenarios.push_back(fourHuman);
+
+    // "1h3ai" count scenario -- ARMY_04's roster.
+    Params::CountScenario oneHumanThreeAi;
+    addAlloy(oneHumanThreeAi.body, "ARMY_04", "AlloyMarker_501");
+    addAlloy(oneHumanThreeAi.body, "ARMY_04", "AlloyMarker_502");
+    addAlloy(oneHumanThreeAi.body, "ARMY_04", "AlloyMarker_503");
+    recipe.scenarios.countScenarios.push_back(oneHumanThreeAi);
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    // Same 1..4 slot index order.
+    const std::size_t slot1 = output.find("[1] = \"ARMY_01\"");
+    const std::size_t slot2 = output.find("[2] = \"ARMY_02\"");
+    const std::size_t slot3 = output.find("[3] = \"ARMY_03\"");
+    const std::size_t slot4 = output.find("[4] = \"ARMY_04\"");
+    Check(slot1 != std::string::npos && slot2 != std::string::npos && slot3 != std::string::npos
+          && slot4 != std::string::npos && slot1 < slot2 && slot2 < slot3 && slot3 < slot4,
+          "ARMY_ID_TO_NAME renders ARMY_01..ARMY_04 in slots 1..4, matching the live reference's order");
+
+    // Same army -> marker-set membership.
+    Check(output.find("[\"ARMY_01\"] = { \"AlloyMarker_219\", \"AlloyMarker_237\", \"AlloyMarker_97\" },")
+          != std::string::npos, "ARMY_01's rendered marker set matches STEP73 §0's live-reference quote verbatim");
+    Check(output.find("[\"ARMY_02\"]") != std::string::npos, "ARMY_02 present in KNOWN_ALLOY_MARKERS");
+    Check(output.find("[\"ARMY_03\"]") != std::string::npos, "ARMY_03 present in KNOWN_ALLOY_MARKERS");
+    Check(output.find("[\"ARMY_04\"]") != std::string::npos, "ARMY_04 present in KNOWN_ALLOY_MARKERS");
+}
+
+// STEP73 item 9: both new globals render between MAX_ARMY_SLOT_COUNT and PATTERN_SCENARIOS.
+void TestArmyRosterPositionInFile() {
+    Params::MapRecipe recipe;
+    Params::Army army; army.name = "ARMY_01";
+    recipe.armies.push_back(army);
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    const std::size_t maxArmySlotCountPosition = output.find("MAX_ARMY_SLOT_COUNT");
+    const std::size_t armyIdToNamePosition     = output.find("ARMY_ID_TO_NAME = {");
+    const std::size_t knownAlloyMarkersPosition = output.find("KNOWN_ALLOY_MARKERS = {");
+    const std::size_t patternScenariosPosition = output.find("PATTERN_SCENARIOS");
+
+    Check(maxArmySlotCountPosition != std::string::npos && armyIdToNamePosition != std::string::npos
+          && knownAlloyMarkersPosition != std::string::npos && patternScenariosPosition != std::string::npos,
+          "all four anchors appear in the output");
+    Check(maxArmySlotCountPosition < armyIdToNamePosition
+          && armyIdToNamePosition < knownAlloyMarkersPosition
+          && knownAlloyMarkersPosition < patternScenariosPosition,
+          "ARMY_ID_TO_NAME then KNOWN_ALLOY_MARKERS render between MAX_ARMY_SLOT_COUNT and PATTERN_SCENARIOS");
 }
 
 // 3. Banner first line exact match.
@@ -234,12 +441,17 @@ void TestMaxArmySlotCountBareGlobalBeforeTables() {
           "no trailing comma after the value -- a global statement, not a table member");
 }
 
-// 10. Self-check via STEP65: a fixture covering every field/tier/enum value is syntactically valid Lua.
+// 10. Self-check via STEP65: a fixture covering every field/tier/enum value -- including the STEP73
+// ARMY_ID_TO_NAME/KNOWN_ALLOY_MARKERS globals -- is syntactically valid Lua.
 void TestSelfCheckViaLuaSyntaxCheck() {
     Params::MapRecipe recipe;
     recipe.mapName = "TestMap";
     recipe.geometry.mapSize = 512;
     recipe.scenarios.maxArmySlotCount = 12;
+
+    Params::Army armyOne; armyOne.name = "ARMY_01";
+    Params::Army armyTwo; armyTwo.name = "ARMY_02";
+    recipe.armies = { armyOne, armyTwo };
 
     Params::PatternScenario pattern;
     pattern.slotPattern = "OOOOXXXX";
@@ -257,6 +469,12 @@ void TestSelfCheckViaLuaSyntaxCheck() {
     PopulateFullScenarioBody(recipe.scenarios.defaultScenario, "Default");
 
     const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    Check(output.find("ARMY_ID_TO_NAME = {") != std::string::npos,
+          "the syntax-check fixture's output includes ARMY_ID_TO_NAME");
+    Check(output.find("KNOWN_ALLOY_MARKERS = {") != std::string::npos,
+          "the syntax-check fixture's output includes KNOWN_ALLOY_MARKERS");
+
     const Sys::LuaSyntaxCheckResult result = Sys::CheckLuaSyntax(output);
     Check(result.bSucceeded, "the renderer's own output is syntactically valid Lua (Sys::CheckLuaSyntax)");
     if (!result.bSucceeded) {
@@ -277,6 +495,14 @@ int main() {
     TestPondSideRawSignedInteger();
     TestEmptyScenariosRendersCompleteFile();
     TestMaxArmySlotCountBareGlobalBeforeTables();
+    TestArmyIdToNameAlphabeticalOrder();
+    TestEmptyArmiesRendersEmptyArmyIdToNameTable();
+    TestKnownAlloyMarkersUnionAcrossTiersDedup();
+    TestKnownAlloyMarkersAlloysToRemoveOnlyArmyIncluded();
+    TestKnownAlloyMarkersZeroReferenceArmyAbsent();
+    TestKnownAlloyMarkersBracketStringKeyForm();
+    TestLiveReferenceParitySelfCheck();
+    TestArmyRosterPositionInFile();
     TestSelfCheckViaLuaSyntaxCheck();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

@@ -100,6 +100,27 @@ void CheckAppendArrayOfTables() {
     Check(empty == "    alloys = {\n    },\n", "AppendArrayOfTables with an empty row list still opens/closes the table");
 }
 
+// STEP73: AppendArrayOfQuotedStrings -- flat array-of-strings counterpart to AppendArrayOfTables.
+void CheckAppendArrayOfQuotedStrings() {
+    std::string empty;
+    Io::AppendArrayOfQuotedStrings(empty, 1, "markers", {});
+    Check(empty == "    markers = {},\n", "AppendArrayOfQuotedStrings with an empty vector still renders a present, empty table");
+
+    std::string one;
+    Io::AppendArrayOfQuotedStrings(one, 1, "markers", { "AlloyMarker_1" });
+    Check(one == "    markers = { \"AlloyMarker_1\" },\n", "AppendArrayOfQuotedStrings with one element");
+
+    std::string many;
+    Io::AppendArrayOfQuotedStrings(many, 1, "markers", { "AlloyMarker_1", "AlloyMarker_2", "AlloyMarker_3" });
+    Check(many == "    markers = { \"AlloyMarker_1\", \"AlloyMarker_2\", \"AlloyMarker_3\" },\n",
+          "AppendArrayOfQuotedStrings with multiple elements, comma-joined on one line");
+
+    std::string escaped;
+    Io::AppendArrayOfQuotedStrings(escaped, 0, "names", { "Alice's \"Base\"" });
+    Check(escaped == "names = { \"Alice's \\\"Base\\\"\" },\n",
+          "AppendArrayOfQuotedStrings runs each element through QuotedLuaString escaping");
+}
+
 } // namespace
 
 int main() {
@@ -111,6 +132,7 @@ int main() {
     CheckAppendKeyValueLine();
     CheckOpenCloseTable();
     CheckAppendArrayOfTables();
+    CheckAppendArrayOfQuotedStrings();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

@@ -98,5 +98,20 @@ inline void AppendArrayOfTables(std::string& out, int indentLevel, const std::st
     CloseTable(out, indentLevel, true);
 }
 
+// Renders `<indent>key = { "s1", "s2", ... },\n` on ONE line -- a flat array of raw strings, each
+// independently escaped/quoted via QuotedLuaString. The scalar-array counterpart to
+// AppendArrayOfTables (which wraps each row in `{ ... }`). Empty rawStrings still renders
+// `key = {},\n` -- never omitted (Constitution §6, matches AppendArrayOfTables's own empty-table
+// posture). First caller: KNOWN_ALLOY_MARKERS (ScenarioScript_DataLua_IO, STEP73).
+inline void AppendArrayOfQuotedStrings(std::string& out, int indentLevel, const std::string& key,
+                                        const std::vector<std::string>& rawStrings) {
+    out += LuaIndent(indentLevel) + key + " = {";
+    for (std::size_t i = 0; i < rawStrings.size(); ++i) {
+        out += (i == 0 ? " " : ", ") + QuotedLuaString(rawStrings[i]);
+    }
+    out += rawStrings.empty() ? "}" : " }";
+    out += ",\n";
+}
+
 } // namespace Io
 } // namespace SanmapGen

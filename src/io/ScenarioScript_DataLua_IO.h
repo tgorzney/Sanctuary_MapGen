@@ -32,6 +32,13 @@ inline constexpr const char* kScenarioGeneratedFileBannerLine =
 // the filesystem. Takes the whole MapRecipe (not just Params::Scenarios) for the same reason
 // BuildScenariosJson (STEP69) does: recipe.geometry.mapSize is needed for the position Z-flip (§3
 // below), and recipe.mapName seeds the file's own header comment.
+//
+// STEP73: the rendered output also includes two DERIVED globals, ARMY_ID_TO_NAME (1-based slot
+// index -> alphabetically-sorted army name, from recipe.armies) and KNOWN_ALLOY_MARKERS (army name
+// -> deduplicated alloy marker names, from the union of recipe.scenarios' own alloys/alloysToAdd/
+// alloysToRemove rows). Neither is authored data and neither has -- or should ever get -- a
+// matching Params::Scenarios field; a future reader must not add one "to match". The derivation
+// IS the permanent design (`ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 point 3).
 std::string BuildScenarioDataLuaText(const Params::MapRecipe& recipe);
 
 } // namespace Io
