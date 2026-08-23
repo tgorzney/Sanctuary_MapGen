@@ -311,11 +311,13 @@ exit /b %errorlevel%\n")
     # per-test relink line is needed below.
     target_link_libraries(SanGenV2 PRIVATE luajit)
 
-    # LuaSyntaxCheck_SYS.cpp is the ONLY translation unit in src/ allowed to include LuaJIT headers
-    # (ARCH_15_08_ThirdPartyDependencyRuling.md §15.8) -- so the include path is scoped to that one
-    # source file via CMake's per-source-file INCLUDE_DIRECTORIES property, not the whole target.
+    # LuaSyntaxCheck_SYS.cpp AND LuaTableEvaluate_SYS.cpp are the ONLY two translation units in src/
+    # allowed to include LuaJIT headers (ARCH_18_01_SandboxedExecutionPrimitive.md §18.1) -- the
+    # include path is scoped to exactly these two source files via CMake's per-source-file
+    # INCLUDE_DIRECTORIES property, not the whole target.
     set_source_files_properties(
         "${CMAKE_CURRENT_SOURCE_DIR}/src/sys/LuaSyntaxCheck_SYS.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/sys/LuaTableEvaluate_SYS.cpp"
         PROPERTIES INCLUDE_DIRECTORIES "${luajit_SOURCE_DIR}/src")
 endif()
 
@@ -427,6 +429,7 @@ add_sangen_test(GpuResource_SYS_Test
 add_sangen_test(ThreadPool_SYS_Test             src/sys/ThreadPool_SYS_Test.cpp)
 add_sangen_test(AtlasResidency_SYS_Test         src/sys/AtlasResidency_SYS_Test.cpp)
 add_sangen_test(LuaSyntaxCheck_SYS_Test         src/sys/LuaSyntaxCheck_SYS_Test.cpp)
+add_sangen_test(LuaTableEvaluate_SYS_Test       src/sys/LuaTableEvaluate_SYS_Test.cpp)
 
 # IO — the M5-4 asset pipeline. One binary whose main() lives in SanpackReader_IO_Test.cpp; the
 # synthetic sanpack it runs against is written with the miniz WRITER, so this target (unlike the
