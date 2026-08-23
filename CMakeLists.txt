@@ -667,6 +667,12 @@ target_link_libraries(PropsDecals_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 # ReadScenariosJson) plus one live-document check through BuildSanmapJsonText/ParseSanmapJsonText.
 add_sangen_test(Scenarios_IO_Test src/io/MapImporter_Scenarios_IO_Test.cpp)
 target_link_libraries(Scenarios_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+# STEP70_ScenarioScriptDataLua_IO: Params::Scenarios -> <MapName>_Scenarios_Data.lua text
+# (BuildScenarioDataLuaText), composing only LuaTableWriter_IO.h's primitives (STEP63). Pure
+# string-building, no JSON type in sight -- no nlohmann link needed, same posture as
+# LuaTableWriter_IO_Test above. Test-only, optional STEP65 self-check (Sys::CheckLuaSyntax) is
+# resolved transitively via the SanGenV2 link, same precedent as ScenarioScript_RuntimeResource_IO_Test.
+add_sangen_test(ScenarioScript_DataLua_IO_Test src/io/ScenarioScript_DataLua_IO_Test.cpp)
 # STEP6_MigrationSubsystem_IO: the shared JSON transform-primitive toolkit and the version-
 # resolution/refusal-law runner. Both construct nlohmann::json fixtures directly, so both link the
 # library the same way MapExporter_IO_Test/PropsDecals_IO_Test already do.
