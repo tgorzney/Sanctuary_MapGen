@@ -355,7 +355,7 @@ endforeach()
 # ---------------------------------------------------------------------------
 add_executable(SanGenV3App src/ui/ApplicationMain_UI.cpp)
 target_link_libraries(SanGenV3App PRIVATE SanGenV2)
-set_property(TARGET SanGenV3App PROPERTY FOLDER "SanGenV2")
+set_property(TARGET SanGenV3App PROPERTY FOLDER "App")
 
 # The kernels ship BESIDE the executable: ApplicationMain_UI.cpp resolves `<exeDir>/sangen_shaders`
 # when no explicit directory is given, so a copied-out build finds its .glsl twins with no absolute
