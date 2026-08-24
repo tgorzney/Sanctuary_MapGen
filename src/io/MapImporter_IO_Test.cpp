@@ -97,6 +97,15 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
                   && layer.bLocked == originalLayer.bLocked
                   && layer.stratumIndex == originalLayer.stratumIndex,
                   "the layer's identity/stack-control fields survive");
+            // STEP99_BakedImageLayer_PARAMS: bBaked=true, a non-default bakedImagePath, and a
+            // non--1 layerIdentifier all round-trip exactly.
+            Check(layer.bBaked == originalLayer.bBaked && originalLayer.bBaked == true
+                  && layer.bakedImagePath == originalLayer.bakedImagePath
+                  && originalLayer.bakedImagePath == "Textures/imported_ridge.raw"
+                  && layer.layerIdentifier == originalLayer.layerIdentifier
+                  && originalLayer.layerIdentifier == 42,
+                  "the layer's baked/image-source fields survive (bBaked/bakedImagePath/"
+                  "layerIdentifier, STEP99)");
             Check(layer.noiseType == originalLayer.noiseType
                   && layer.fractalType == originalLayer.fractalType
                   && NearlyEqual(layer.frequency, originalLayer.frequency)
@@ -935,6 +944,11 @@ void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     layer.bEnabled = false;
     layer.bLocked = true;
     layer.stratumIndex = 4;
+    // STEP99_BakedImageLayer_PARAMS: non-default, so the round trip exercises all three new
+    // baked/image-source fields for real (CheckLayerStackAndRules).
+    layer.bBaked = true;
+    layer.bakedImagePath = "Textures/imported_ridge.raw";
+    layer.layerIdentifier = 42;
     layer.noiseType = Params::NoiseType::Cellular;
     layer.fractalType = Params::FractalType::Ridged;
     layer.frequency = 0.031f;
@@ -1953,6 +1967,53 @@ void CheckMarkerLayerIndexClampsOnImport() {
     Check(result.warningCount > 0, "the out-of-range marker layerIndex clamp is logged as a warning");
 }
 
+// STEP99_BakedImageLayer_PARAMS acceptance test: a document with none of the three keys
+// (Baked/BakedImagePath/LayerIdentifier) present leaves a freshly constructed Layer's defaults
+// (false/empty/-1) untouched — mirrors CheckStratumAppearanceIdentityFieldsMissingKeysImportWithSaneFallback's
+// own style, routed through the real public entry point (ReadHeightmapStackJson), not the file-
+// local ReadLayerJson directly.
+void CheckLayerMissingBakedKeysLeaveDefaults() {
+    nlohmann::json document;
+    nlohmann::json layerJson = nlohmann::json::object();   // no Baked/BakedImagePath/LayerIdentifier
+    nlohmann::json geoLayerJson;
+    geoLayerJson["Layers"] = nlohmann::json::array({ layerJson });
+    document["HeightmapStack"]["GeoLayers"] = nlohmann::json::array({ geoLayerJson });
+
+    Params::LayerStack layerStack;
+    Io::ReadHeightmapStackJson(document, layerStack);
+
+    Check(layerStack.geoLayers.size() == 1 && layerStack.geoLayers[0].layers.size() == 1,
+          "the hand-built document still yields one GeoLayer with one Layer");
+    if (layerStack.geoLayers.empty() || layerStack.geoLayers[0].layers.empty()) return;
+    const Params::Layer& layer = layerStack.geoLayers[0].layers[0];
+    Check(layer.bBaked == false && layer.bakedImagePath.empty() && layer.layerIdentifier == -1,
+          "a document with none of the three baked/image-source keys leaves the freshly "
+          "constructed Layer's defaults (false/empty/-1) untouched");
+}
+
+// STEP99_BakedImageLayer_PARAMS acceptance test: NextLayerIdentifier on an empty stack returns 0;
+// on a stack containing identifiers {0, 2} across two different GeoLayers returns 3.
+void CheckNextLayerIdentifier() {
+    Params::LayerStack emptyStack;
+    Check(Params::NextLayerIdentifier(emptyStack) == 0,
+          "NextLayerIdentifier on an empty stack returns 0");
+
+    Params::LayerStack populatedStack;
+    Params::GeoLayer geoLayerA;
+    Params::Layer layerA; layerA.layerIdentifier = 0;
+    geoLayerA.layers.push_back(layerA);
+    populatedStack.geoLayers.push_back(geoLayerA);
+
+    Params::GeoLayer geoLayerB;
+    Params::Layer layerB; layerB.layerIdentifier = 2;
+    geoLayerB.layers.push_back(layerB);
+    populatedStack.geoLayers.push_back(geoLayerB);
+
+    Check(Params::NextLayerIdentifier(populatedStack) == 3,
+          "NextLayerIdentifier on a stack containing identifiers {0, 2} across two different "
+          "GeoLayers returns 3");
+}
+
 } // namespace MapFormatTest
 } // namespace SanmapGen
 
@@ -1977,6 +2038,8 @@ int main() {
     SanmapGen::MapFormatTest::CheckPureOldShapedDocumentStillImportsFromLegacyBlobAlone();
     SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyBackfill();
     SanmapGen::MapFormatTest::CheckMarkerLayerIndexClampsOnImport();
+    SanmapGen::MapFormatTest::CheckLayerMissingBakedKeysLeaveDefaults();
+    SanmapGen::MapFormatTest::CheckNextLayerIdentifier();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

@@ -28,6 +28,14 @@ void ReadLayerJson(const nlohmann::json& json, Params::Layer& layer) {
     ReadJsonBoolean(json, "Locked", layer.bLocked);
     ReadJsonInteger(json, "StratumIndex", layer.stratumIndex);
 
+    // STEP99_BakedImageLayer_PARAMS: a document written before this ticket has none of the three
+    // keys — ReadJson* already leaves the struct's default (false/empty/-1) untouched when a key
+    // is absent, no explicit legacy-backfill branch needed (layerIdentifier has no prior meaning
+    // to reconstruct from, unlike STEP56's layerId).
+    ReadJsonBoolean(json, "Baked", layer.bBaked);
+    ReadJsonText(json, "BakedImagePath", layer.bakedImagePath);
+    ReadJsonInteger(json, "LayerIdentifier", layer.layerIdentifier);
+
     int enumerationValue = static_cast<int>(layer.noiseType);
     if (ReadJsonEnumeration(json, "NoiseType", noiseTypeCount, enumerationValue))
         layer.noiseType = static_cast<Params::NoiseType>(enumerationValue);

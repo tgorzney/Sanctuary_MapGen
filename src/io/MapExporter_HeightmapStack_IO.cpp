@@ -20,6 +20,13 @@ nlohmann::ordered_json BuildLayerJson(const Params::Layer& layer) {
     json["Locked"]       = layer.bLocked;
     json["StratumIndex"] = layer.stratumIndex;
 
+    // STEP99_BakedImageLayer_PARAMS: baked/image-source state. NOT one-way (see Layer_PARAMS.h) —
+    // a baked NOISE layer's recipe below still round-trips verbatim so it can resume live
+    // generation when unbaked.
+    json["Baked"]           = layer.bBaked;
+    json["BakedImagePath"]  = layer.bakedImagePath;
+    json["LayerIdentifier"] = layer.layerIdentifier;
+
     json["NoiseType"]        = static_cast<int>(layer.noiseType);
     json["FractalType"]      = static_cast<int>(layer.fractalType);
     json["Frequency"]        = layer.frequency;

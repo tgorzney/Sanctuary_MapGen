@@ -18,6 +18,37 @@ struct Layer {
     bool bLocked       = false;
     int  stratumIndex  = 0;      // 0..8
 
+    // Baked/image-source state (ARCH_05_GodObjectDismemberment.md §5.2's "image-bake state -> a
+    // bake concern in PROC" gap, closed by STEP99/100/101/102). Baking is NOT one-way — a baked
+    // procedural layer keeps its recipe (every noise field below) and can resume live generation
+    // when unbaked; only an imported/decomposed layer with no recipe degenerates to flat
+    // (NoiseType::None's existing default behavior, not a special case).
+    bool bBaked = false;          // frozen: PROC (STEP100) reads a stored image instead of
+                                   // regenerating live noise for this layer. NOT one-way — see
+                                   // above. Meaningless combined with a fresh, never-baked layer:
+                                   // bBaked==true with no matching Data::BakedLayerImage entry
+                                   // (layerIdentifier not found) degrades to flat, never a crash
+                                   // (Constitution §6) — STEP100.
+    std::string bakedImagePath;   // pass-through metadata: the on-disk 16-bit RAW file this
+                                   // layer's baked pixels came from (Import RAW, picked through
+                                   // LayerEditor_Group_UI.cpp's existing picker). EMPTY for a
+                                   // layer baked by the .sanmap per-stratum import decomposition
+                                   // (STEP101) — its source is the map's own already-loaded
+                                   // Textures/ payload, not a standalone file. Never read by PROC
+                                   // (ARCH: PROC has no IO dependency) — IO/UI resolve it into the
+                                   // DATA cache (STEP100's Data::BakedLayerImage) at load/bake time.
+    int layerIdentifier = -1;     // stable identity — the key into the PIPELINE-owned
+                                   // Data::BakedLayerImage cache (STEP100), so a baked layer's
+                                   // frozen pixels survive reorder/duplicate/insert elsewhere in
+                                   // the stack (Params::Layer is a plain value inside
+                                   // std::vector<Layer>; reorder/copy moves this struct, but a
+                                   // side-cache keyed by flat stack POSITION would not survive it —
+                                   // see STEP100). -1 = unassigned/never baked. Derive-on-create,
+                                   // NOT a persisted counter — same posture STEP56 ratified for
+                                   // PropInstanceLayer::layerId/DecalInstanceLayer::layerId,
+                                   // spelled in full here (layerIdentifier, not layerId) per
+                                   // ARCH's own recorded correction for that abbreviation.
+
     // Noise source
     NoiseType   noiseType        = NoiseType::OpenSimplex2;
     FractalType fractalType      = FractalType::FractionalBrownian;
