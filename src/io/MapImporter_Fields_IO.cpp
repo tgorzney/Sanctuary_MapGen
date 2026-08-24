@@ -7,6 +7,8 @@
 // texture is not an error — a .sanmap exported "sanmap only" simply has none.
 #include "MapImporter_IO.h"
 #include "FilesystemPrimitives_IO.h"
+#include "MapImporter_HeightmapDecomposition_IO.h"
+#include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cstdint>
@@ -87,7 +89,11 @@ bool LoadStratumMaskTga(const std::string& filePath, int firstWeightIndex, int s
             for (int channel = 0; channel < 4; ++channel) {
                 const int weightIndex = firstWeightIndex + bgraWeightOrder[channel];
                 if (weightIndex >= Data::MapFields::stratumCount) continue;
-                outFields.surfaceStratumWeights[weightIndex].Set(
+                // MASKING_SPEC §1.5/§1.6: IO seeds the PHYSICAL field (materialProportions) from an
+                // imported mask — a physical-field approximation, never surfaceStratumWeights (the
+                // Mask stage's own exclusive, VISIBLE-field output; ARCH §3.4 single-writer rule,
+                // STEP101 gap 1).
+                outFields.materialProportions[weightIndex].Set(
                     column, row, static_cast<float>(bytes[pixelStart + channel]) * (1.0f / 255.0f));
             }
         }
@@ -99,9 +105,10 @@ bool LoadStratumMaskTga(const std::string& filePath, int firstWeightIndex, int s
 
 } // namespace
 
-bool MapImporter::LoadBakedFields(const std::string& folderPath, const Params::MapRecipe& recipe,
+bool MapImporter::LoadBakedFields(const std::string& folderPath, Params::MapRecipe& recipe,
                                   Data::MapFields& outFields, const MapImportOptions& options,
-                                  MapImportResult& result) {
+                                  MapImportResult& result,
+                                  std::vector<Data::BakedLayerImage>& outBakedLayerImages) {
     const int vertexSize = recipe.geometry.VertexSize();
     if (vertexSize < 2) { result.Warn("The recipe's geometry is too small to size the fields."); return false; }
     outFields.Resize(vertexSize, 0.0f);
@@ -115,6 +122,9 @@ bool MapImporter::LoadBakedFields(const std::string& folderPath, const Params::M
     const bool bHighLoaded = LoadStratumMaskTga(
         JoinExportPath(texturesFolder, options.stratumMaskHighName), 4, vertexSize - 1, outFields,
         options, result);
+    // STEP101: only once the heightmap itself is present -- with none, DecomposeBakedHeightmapIntoLayers
+    // would synthesize/re-derive an all-zero bake, which is strictly worse than leaving the recipe alone.
+    if (bHeightmapLoaded) DecomposeBakedHeightmapIntoLayers(recipe, outFields, outBakedLayerImages);
     return bHeightmapLoaded || bLowLoaded || bHighLoaded;
 }
 

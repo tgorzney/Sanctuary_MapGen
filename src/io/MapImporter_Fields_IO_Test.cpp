@@ -49,10 +49,17 @@ void CheckBakedFieldsComeBack(const std::string& folderPath, const Params::MapRe
           "the heightmap sample round-trips through the 16-bit RAW");
     Check(NearlyEqual(loadedFields.heightfield.Get(0, 0), 0.0f),
           "and an untouched vertex stays at the floor");
-    Check(NearlyEqual(loadedFields.surfaceStratumWeights[0].Get(1, 1), 1.0f),
-          "a low-slice stratum weight round-trips through its TGA");
-    Check(NearlyEqual(loadedFields.surfaceStratumWeights[5].Get(2, 3), 1.0f),
+    // STEP101 gap 1: the loader seeds the PHYSICAL field (materialProportions), never the
+    // Mask-stage-exclusive surfaceStratumWeights (MASKING_SPEC §1.5/§1.6, ARCH §3.4 single-writer
+    // rule) — even though the fixture itself wrote surfaceStratumWeights before export (that field
+    // is what the EXPORTER reads, unaffected by this fix).
+    Check(NearlyEqual(loadedFields.materialProportions[0].Get(1, 1), 1.0f),
+          "a low-slice stratum weight round-trips through its TGA into materialProportions");
+    Check(NearlyEqual(loadedFields.materialProportions[5].Get(2, 3), 1.0f),
           "and so does a high-slice one");
+    Check(NearlyEqual(loadedFields.surfaceStratumWeights[0].Get(1, 1), 0.0f)
+          && NearlyEqual(loadedFields.surfaceStratumWeights[5].Get(2, 3), 0.0f),
+          "surfaceStratumWeights stays at MapFields::Resize's zero-fill -- import never writes it");
 }
 
 void CheckTheFieldDestinationIsOptional(const std::string& folderPath) {

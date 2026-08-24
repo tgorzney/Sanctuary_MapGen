@@ -9,6 +9,7 @@
 // RunFilesTabAction, so both actions here are drivable from a test with no imgui frame.
 #include "FilesTab_UI.h"
 #include "MigrationReconciliationDialog_UI.h"
+#include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
 #include "../io/FilesystemPrimitives_IO.h"
 #include "../io/Sanmap_MigrationPreview_IO.h"
@@ -90,7 +91,8 @@ bool RunCheckForMigrations(FilesTabState& state) {
 // (never merged).
 bool RunSelectiveMigrationImport(FilesTabState& state, Params::MapRecipe& recipe,
                                  Data::MapFields* fields,
-                                 const std::vector<std::string>& selectedMigrationNames) {
+                                 const std::vector<std::string>& selectedMigrationNames,
+                                 std::vector<Data::BakedLayerImage>* outBakedLayerImages) {
     if (state.sanmapPath.empty()) {
         AppendFilesTabLog(state, "Selective migration apply refused: no .sanmap file or map folder "
                                  "is set.");
@@ -120,8 +122,15 @@ bool RunSelectiveMigrationImport(FilesTabState& state, Params::MapRecipe& recipe
     if (state.unknownImportData != nullptr) *state.unknownImportData = Io::UnknownImportBag();
     const bool bRecipeLoaded = Io::MapImporter::ParseSanmapJsonText(document.dump(), recipe, options,
                                                                     result, state.unknownImportData);
-    if (bRecipeLoaded && options.bLoadBakedFields && fields != nullptr)
-        Io::MapImporter::LoadBakedFields(folderPath, recipe, *fields, options, result);
+    if (bRecipeLoaded && options.bLoadBakedFields && fields != nullptr) {
+        // outBakedLayerImages is nullable, same posture as RunOpenSanmap's own scratch fallback
+        // (MapImporter_IO.cpp) -- with nothing bound, the decomposed layers still land in `recipe`,
+        // only their pixels have nowhere to go.
+        std::vector<Data::BakedLayerImage> scratchBakedLayerImages;
+        std::vector<Data::BakedLayerImage>& bakedLayerImages =
+            outBakedLayerImages != nullptr ? *outBakedLayerImages : scratchBakedLayerImages;
+        Io::MapImporter::LoadBakedFields(folderPath, recipe, *fields, options, result, bakedLayerImages);
+    }
 
     AppendFilesTabLog(state, result.debugLog);
     return bRecipeLoaded;

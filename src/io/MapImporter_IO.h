@@ -35,9 +35,10 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace SanmapGen {
-namespace Data { class MapFields; }
+namespace Data { class MapFields; struct BakedLayerImage; }
 namespace Params { struct MapRecipe; }
 namespace Io {
 
@@ -99,11 +100,18 @@ public:
     // Io::CheckFootprintBakeStaleness pass runs and, if not AllFresh(), surfaces exactly one
     // aggregate `result.Warn(...)`. With nullptr (the default -- no install configured, or nothing
     // ingested this session) the check is skipped entirely, never forcing an ingest.
+    // `outBakedLayerImages` is nullable, same caller-owned posture as `outFields` (STEP101): when
+    // given, it receives LoadBakedFields's own per-stratum decomposition output (the pixels behind
+    // the layers DecomposeBakedHeightmapIntoLayers injects into `outRecipe.layerStack`) — normally
+    // `Pipeline::GenerationAssembler::BakedLayerImages()`, so NoiseBlendStage (STEP100) can read
+    // them straight back. With nullptr the recipe/fields still load; the decomposed pixels are
+    // simply discarded once this call returns.
     static MapImportResult LoadSanmap(const std::string& pathOrFolder, Params::MapRecipe& outRecipe,
                                       Data::MapFields* outFields,
                                       const MapImportOptions& options = MapImportOptions(),
                                       UnknownImportBag* outUnknownData = nullptr,
-                                      const TemplateIngestReport* currentTemplateIngestReport = nullptr);
+                                      const TemplateIngestReport* currentTemplateIngestReport = nullptr,
+                                      std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr);
 
     // Document text -> recipe, with no disk access at all. This is the half the round-trip
     // acceptance test drives against MapExporter::BuildSanmapJsonText. `outUnknownData` — see
@@ -114,9 +122,13 @@ public:
 
     // `<folder>/Textures/*` -> the caller's fields. The fields are RESIZED to the recipe's
     // geometry first, so a payload that disagrees with the document is clipped, never trusted.
-    static bool LoadBakedFields(const std::string& folderPath, const Params::MapRecipe& recipe,
+    // `recipe` is non-const (STEP101): once the heightmap itself loads, this injects/re-derives the
+    // per-stratum decomposed layers (MapImporter_HeightmapDecomposition_IO.h) straight into
+    // `recipe.layerStack`, with their pixels landing in `outBakedLayerImages`.
+    static bool LoadBakedFields(const std::string& folderPath, Params::MapRecipe& recipe,
                                 Data::MapFields& outFields, const MapImportOptions& options,
-                                MapImportResult& result);
+                                MapImportResult& result,
+                                std::vector<Data::BakedLayerImage>& outBakedLayerImages);
 };
 
 } // namespace Io

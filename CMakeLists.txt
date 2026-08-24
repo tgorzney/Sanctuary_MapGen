@@ -779,6 +779,15 @@ add_sangen_test(MapImporter_IO_Test
 # Io::ReadAtmosphereJson directly against a hand-built nlohmann::json fixture, so this target now
 # needs nlohmann's headers directly too — same reasoning as the MapExporter_IO_Test note above.
 target_link_libraries(MapImporter_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+# STEP101_BakedHeightmapPerStratumDecomposition_IO: the reported bug's own end-to-end proof --
+# import decomposes a baked heightmap + stratum mask into per-stratum baked layers, and running a
+# real Pipeline::GenerationAssembler reproduces the original heightfield. Its own binary, not folded
+# into MapImporter_IO_Test's three-TU group, since it is the first IO acceptance test that reaches
+# into Pipeline (GenerationAssembler_PIPELINE.h) to run the full stage stack rather than just
+# parse/round-trip a document -- MapImporter_HeightmapDecomposition_IO.cpp itself is already part of
+# SANGEN_V2_SOURCES (glob'd from src/io/*.cpp) and reaches this test through the SanGenV2 link.
+add_sangen_test(MapImporter_HeightmapDecomposition_IO_Test
+    src/io/MapImporter_HeightmapDecomposition_IO_Test.cpp)
 # STEP4_PropsDecals_IO: the pure (disk-free) props/decals JSON round trip, deliberately kept OUT of
 # MapImporter_IO_Test.exe — it calls BuildPropsJson/BuildDecalsJson/BuildPropGroupsJson/
 # BuildDecalGroupsJson and their reader inverses directly, bypassing BuildSanmapJsonText/

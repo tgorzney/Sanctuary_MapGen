@@ -7,6 +7,7 @@
 #include "MapImporter_IO.h"
 #include "FootprintBakeStaleness_IO.h"
 #include "TemplateIngest_IO.h"
+#include "../data/BakedLayerImage_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <filesystem>
 #include <fstream>
@@ -67,7 +68,8 @@ bool ResolveSanmapDocumentPath(const std::string& pathOrFolder, std::string& out
 MapImportResult MapImporter::LoadSanmap(const std::string& pathOrFolder, Params::MapRecipe& outRecipe,
                                         Data::MapFields* outFields, const MapImportOptions& options,
                                         UnknownImportBag* outUnknownData,
-                                        const TemplateIngestReport* currentTemplateIngestReport) {
+                                        const TemplateIngestReport* currentTemplateIngestReport,
+                                        std::vector<Data::BakedLayerImage>* outBakedLayerImages) {
     MapImportResult result;
     result.Log("Loading " + pathOrFolder);
     if (!ResolveSanmapDocumentPath(pathOrFolder, result.resolvedDocumentPath, result.resolvedFolderPath)) {
@@ -94,9 +96,17 @@ MapImportResult MapImporter::LoadSanmap(const std::string& pathOrFolder, Params:
         if (!stalenessReport.AllFresh()) result.Warn(stalenessReport.SummaryText());
     }
 
-    if (options.bLoadBakedFields && outFields != nullptr)
+    if (options.bLoadBakedFields && outFields != nullptr) {
+        // outBakedLayerImages is nullable (caller-owned, `outFields`'s own precedent) -- with
+        // nothing bound, LoadBakedFields still runs and still injects the decomposed layers into
+        // outRecipe.layerStack; only their pixels have nowhere to land, so this scratch vector
+        // simply falls away once the call returns.
+        std::vector<Data::BakedLayerImage> scratchBakedLayerImages;
+        std::vector<Data::BakedLayerImage>& bakedLayerImages =
+            outBakedLayerImages != nullptr ? *outBakedLayerImages : scratchBakedLayerImages;
         result.bBakedFieldsLoaded = LoadBakedFields(result.resolvedFolderPath, outRecipe, *outFields,
-                                                    options, result);
+                                                    options, result, bakedLayerImages);
+    }
     return result;
 }
 

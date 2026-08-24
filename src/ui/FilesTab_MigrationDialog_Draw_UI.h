@@ -5,9 +5,10 @@
 // click through the headless actions (FilesTab_MigrationImport_Actions_UI.cpp). Nothing outside the
 // FilesTab module includes this header; it declares no new public type (ARCH §8.4).
 #pragma once
+#include <vector>
 
 namespace SanmapGen {
-namespace Data { class MapFields; }
+namespace Data { class MapFields; struct BakedLayerImage; }
 namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
 namespace Ui {
@@ -19,9 +20,12 @@ struct FilesTabState;
 // popup must be given the chance to run its own frame every frame it might be open. "Apply Selected" runs
 // `RunSelectiveMigrationImport` and (on success) requests a full map update, matching
 // `DrawOpenSection`'s own Open behavior; "Close" dismisses with nothing re-read, nothing mutated.
+// `outBakedLayerImages` — see `RunFilesTabAction` (FilesTab_UI.h, STEP101), same nullable posture,
+// forwarded straight to `RunSelectiveMigrationImport`.
 void DrawFilesTabMigrationReconciliationDialog(FilesTabState& state, Params::MapRecipe& recipe,
                                                Data::MapFields* fields,
-                                               Pipeline::PreviewDriver* previewDriver);
+                                               Pipeline::PreviewDriver* previewDriver,
+                                               std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr);
 
 } // namespace Ui
 } // namespace SanmapGen

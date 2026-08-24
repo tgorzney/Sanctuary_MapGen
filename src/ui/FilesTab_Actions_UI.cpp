@@ -8,6 +8,7 @@
 // tab writes no byte and creates no folder itself — `Io::EnsureExportFolderExists` is the door.
 #include "FilesTab_UI.h"
 #include "FilesTab_ScenarioExport_Actions_UI.h"
+#include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
 #include "../io/FilesystemPrimitives_IO.h"
 #include "../io/UnknownImportBag_IO.h"
@@ -29,7 +30,8 @@ bool ResolveTexturesFolderPath(FilesTabState& state, Io::MapExportResult& result
     return Io::EnsureExportFolderExists(outTexturesFolderPath, result);
 }
 
-bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFields* fields) {
+bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFields* fields,
+                   std::vector<Data::BakedLayerImage>* outBakedLayerImages) {
     if (state.sanmapPath.empty()) {
         AppendFilesTabLog(state, "Open refused: no .sanmap file or map folder is set.");
         return false;
@@ -43,7 +45,7 @@ bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFie
     if (state.unknownImportData != nullptr) *state.unknownImportData = Io::UnknownImportBag();
     const Io::MapImportResult result =
         Io::MapImporter::LoadSanmap(state.sanmapPath, recipe, fields, options, state.unknownImportData,
-                                    state.templateIngestReport);
+                                    state.templateIngestReport, outBakedLayerImages);
     AppendFilesTabLog(state, result.debugLog);
     // STEP26B_MigrationReconciliationDialog_UI ruling 1: gates the "Check for Migrations..." button
     // — only a completed Open that found no version marker at all may offer the dialog.
@@ -128,13 +130,14 @@ const char* FilesTabActionLabel(FilesTabAction action) {
 }
 
 bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapRecipe& recipe,
-                       Data::MapFields* fields, bool bBlueprintValidationAcknowledged) {
+                       Data::MapFields* fields, bool bBlueprintValidationAcknowledged,
+                       std::vector<Data::BakedLayerImage>* outBakedLayerImages) {
     if (FilesTabActionNeedsBakedFields(action) && (fields == nullptr || !fields->IsSized())) {
         AppendFilesTabLog(state, std::string(FilesTabActionLabel(action))
                           + " refused: nothing is generated yet, so there is no baked field to write.");
         return false;
     }
-    if (action == FilesTabAction::OpenSanmap)      return RunOpenSanmap(state, recipe, fields);
+    if (action == FilesTabAction::OpenSanmap) return RunOpenSanmap(state, recipe, fields, outBakedLayerImages);
     if (action == FilesTabAction::ImportSupComLua) return RunImportSupComLua(state, recipe);
     if (action == FilesTabAction::ExportSanmapOnly || action == FilesTabAction::ExportAll)
         return RunRecipeExport(action, state, recipe, fields, bBlueprintValidationAcknowledged);
