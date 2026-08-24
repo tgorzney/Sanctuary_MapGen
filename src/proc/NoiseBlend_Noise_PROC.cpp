@@ -33,11 +33,37 @@ FastNoiseLite::FractalType TranslateFractalType(Params::FractalType fractalType)
     }
 }
 
+// Fills `target` with a baked layer's frozen pixels: an exact copy at matching resolution, a
+// bilinear resample if the map size changed since baking, or a flat 0 contribution if no image
+// has been recorded yet for this layerIdentifier (Constitution §6 — degrade, never crash).
+void FillBakedLayerCpu(const Params::Layer& layer,
+                       const std::vector<Data::BakedLayerImage>& bakedLayerImages,
+                       Data::FloatField& target) {
+    const Data::FloatField* baked = Data::FindBakedLayerImage(bakedLayerImages, layer.layerIdentifier);
+    if (baked == nullptr) { target.Fill(0.0f); return; }
+    const int vertexSize = target.Width();
+    if (baked->Width() == vertexSize && baked->Height() == vertexSize) {
+        target = *baked;
+        return;
+    }
+    const float scaleX = vertexSize > 1 ? (baked->Width()  - 1) / static_cast<float>(vertexSize - 1) : 0.0f;
+    const float scaleY = vertexSize > 1 ? (baked->Height() - 1) / static_cast<float>(vertexSize - 1) : 0.0f;
+    for (int y = 0; y < vertexSize; ++y)
+        for (int x = 0; x < vertexSize; ++x)
+            target.Set(x, y, baked->SampleBilinear(x * scaleX, y * scaleY));
+}
+
 } // namespace
 
 void NoiseBlendStage::GenerateLayerNoiseCpu(std::size_t layerIndex) {
-    const LayerKernelConfiguration& configuration = layerConfigurations[layerIndex];
+    const std::vector<const Params::Layer*> flatLayers = layerStack.GetFlatLayers();
     Data::FloatField& target = cachedRawNoiseCpu[layerIndex];
+    if (layerIndex < flatLayers.size() && flatLayers[layerIndex]->bBaked) {
+        FillBakedLayerCpu(*flatLayers[layerIndex], bakedLayerImages, target);
+        return;
+    }
+
+    const LayerKernelConfiguration& configuration = layerConfigurations[layerIndex];
     if (configuration.noiseType == static_cast<int>(Params::NoiseType::None)) {
         target.Fill(0.0f);
         return;

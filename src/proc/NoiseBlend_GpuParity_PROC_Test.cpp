@@ -16,6 +16,7 @@ void NoiseBlendCheck(bool bPassed, const char* label);             // NoiseBlend
 void CheckGpuBlendModes(Sys::GpuResourceManager& manager);         // NoiseBlend_GpuBlend_PROC_Test.cpp
 void CheckDispatchRouting(Sys::GpuResourceManager& manager);       // NoiseBlend_GpuBlend_PROC_Test.cpp
 void CheckNoiseTypeParity(Sys::GpuResourceManager& manager);       // NoiseBlend_GpuBlend_PROC_Test.cpp
+void CheckBakedLayerForcesCpuFallback(Sys::GpuResourceManager& manager); // NoiseBlend_GpuBlend_PROC_Test.cpp
 
 namespace {
 
@@ -48,8 +49,9 @@ void CheckStackParity(Sys::GpuResourceManager& manager) {
     Params::LayerStack stack = Proc::MakeRepresentativeStack();
     Data::MapFields cpuFields;
     Data::MapFields gpuFields;
-    Proc::NoiseBlendStage cpuStage(geometry, stack, cpuFields);
-    Proc::NoiseBlendStage gpuStage(geometry, stack, gpuFields);
+    static const std::vector<Data::BakedLayerImage> noBakedLayerImages;
+    Proc::NoiseBlendStage cpuStage(geometry, stack, cpuFields, noBakedLayerImages);
+    Proc::NoiseBlendStage gpuStage(geometry, stack, gpuFields, noBakedLayerImages);
     gpuStage.SetGpuResourceManager(&manager);
     cpuStage.RunOnCpu();
     gpuStage.RunOnGpu();
@@ -81,6 +83,7 @@ void RunNoiseBlendGpuParityChecks(const char* shaderDirectory) {
     CheckNoiseTypeParity(manager);
     CheckGpuBlendModes(manager);
     CheckDispatchRouting(manager);
+    CheckBakedLayerForcesCpuFallback(manager);
     std::printf("  gpu programCompiles=%d bufferReallocations=%d\n",
                 manager.CompileCount(), manager.ReallocationCount());
     wglMakeCurrent(nullptr, nullptr);

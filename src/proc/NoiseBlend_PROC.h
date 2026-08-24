@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <vector>
 #include "NoiseBlend_Kernel_PROC.h"
+#include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
 #include "../params/Geometry_PARAMS.h"
 #include "../params/LayerStack_PARAMS.h"
@@ -24,7 +25,8 @@ namespace Proc {
 class NoiseBlendStage {
 public:
     NoiseBlendStage(const Params::Geometry& geometrySettings, const Params::LayerStack& layerStackSettings,
-                    Data::MapFields& outputFields);
+                    Data::MapFields& outputFields,
+                    const std::vector<Data::BakedLayerImage>& bakedLayerImagesSettings);
 
     // Configuration (all optional; sane defaults per ARCH §4.2 for the Noise stage).
     NoiseBlendConstants& Constants() { return constants; }
@@ -55,6 +57,10 @@ public:
     bool WasLastRunSkipped() const { return bLastRunSkipped; }
     bool IsGpuAvailable() const { return bGpuProgramReady; }
     const std::vector<LayerKernelConfiguration>& LayerConfigurations() const { return layerConfigurations; }
+    // The stage's own cached raw noise, one FloatField per flattened layer, exposed so
+    // STEP102's "Bake a live noise layer" UI action can snapshot a layer's CURRENT computed
+    // output into a new Data::BakedLayerImage before flipping bBaked = true.
+    const std::vector<Data::FloatField>& CachedRawNoiseCpu() const { return cachedRawNoiseCpu; }
 
 private:
     // Flattens the enabled layers into LayerKernelConfiguration records and sizes the caches.
@@ -80,6 +86,7 @@ private:
     const Params::Geometry&   geometry;
     const Params::LayerStack& layerStack;
     Data::MapFields&          mapFields;
+    const std::vector<Data::BakedLayerImage>& bakedLayerImages;
     NoiseBlendConstants       constants;
 
     Sys::DispatchPolicy      dispatchPolicy;                                   // ARCH §4.2 defaults

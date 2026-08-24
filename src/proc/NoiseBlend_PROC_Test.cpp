@@ -23,6 +23,10 @@ using namespace SanmapGen;
 
 void RunNoiseBlendGpuParityChecks(const char* shaderDirectory);  // NoiseBlend_GpuParity_PROC_Test.cpp
 
+// No stack in this file bakes a layer, so every stage under test gets an empty image cache —
+// shared so every construction site below can stay a plain 3-arg call plus this reference.
+const std::vector<Data::BakedLayerImage> noBakedLayerImages;
+
 int noiseBlendTestFailures = 0;
 void NoiseBlendCheck(bool bPassed, const char* label) {
     if (!bPassed) { std::printf("FAIL: %s\n", label); ++noiseBlendTestFailures; }
@@ -38,7 +42,7 @@ void CheckBlendModes() {
     for (const Proc::BlendModeExpectation& expected : Proc::BlendModeExpectations()) {
         Params::LayerStack stack = Proc::MakeConstantTwoLayerStack(expected.mode, expected.opacity);
         Data::MapFields fields;
-        Proc::NoiseBlendStage stage(geometry, stack, fields);
+        Proc::NoiseBlendStage stage(geometry, stack, fields, noBakedLayerImages);
         stage.RunOnCpu();
         NoiseBlendCheck(std::fabs(fields.heightfield.Get(3, 5) - expected.height) < 1e-6f, expected.label);
     }
@@ -46,7 +50,7 @@ void CheckBlendModes() {
     // 0.6 from the base stratum, the remaining 0.4 from the layer above).
     Params::LayerStack stack = Proc::MakeConstantTwoLayerStack(Params::HeightBlendMode::Add, 1.0f);
     Data::MapFields fields;
-    Proc::NoiseBlendStage stage(geometry, stack, fields);
+    Proc::NoiseBlendStage stage(geometry, stack, fields, noBakedLayerImages);
     stage.RunOnCpu();
     NoiseBlendCheck(std::fabs(fields.materialProportions[0].Get(3, 5) - 0.6f) < 1e-6f, "stratum 0 mask = 0.6");
     NoiseBlendCheck(std::fabs(fields.materialProportions[1].Get(3, 5) - 0.4f) < 1e-6f, "stratum 1 mask = 0.4");
@@ -59,7 +63,7 @@ void CheckDirtyHash() {
     Params::Geometry geometry;
     Params::LayerStack stack = Proc::MakeRepresentativeStack();
     Data::MapFields fields;
-    Proc::NoiseBlendStage stage(geometry, stack, fields);
+    Proc::NoiseBlendStage stage(geometry, stack, fields, noBakedLayerImages);
     Pipeline::GenerationPipeline pipeline;
     pipeline.AddStage("NoiseBlend", [&] { return stage.ComputeParameterHash(); }, [&] { stage.Run(); });
 
@@ -84,8 +88,8 @@ void CheckDeterminism() {
     Params::LayerStack stack = Proc::MakeRepresentativeStack();
     Data::MapFields firstFields;
     Data::MapFields secondFields;
-    Proc::NoiseBlendStage firstStage(geometry, stack, firstFields);
-    Proc::NoiseBlendStage secondStage(geometry, stack, secondFields);
+    Proc::NoiseBlendStage firstStage(geometry, stack, firstFields, noBakedLayerImages);
+    Proc::NoiseBlendStage secondStage(geometry, stack, secondFields, noBakedLayerImages);
     Sys::ThreadPool pool(4);
     secondStage.SetThreadPool(&pool);
     firstStage.RunOnCpu();

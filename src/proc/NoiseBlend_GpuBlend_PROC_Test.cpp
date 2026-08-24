@@ -6,12 +6,16 @@
 #include "NoiseBlend_PROC.h"
 #include "NoiseBlend_TestStacks_PROC.h"
 #include "NoiseBlend_TestSupport_PROC.h"
+#include "../data/BakedLayerImage_DATA.h"
 #include "../sys/GpuResource_SYS.h"
 #include <cmath>
 
 using namespace SanmapGen;
 
 void NoiseBlendCheck(bool bPassed, const char* label);   // NoiseBlend_PROC_Test.cpp
+
+// Most checks below carry no baked layer at all.
+const std::vector<Data::BakedLayerImage> noBakedLayerImages;
 
 // Every HeightBlendMode reproduced exactly on the Gpu — constant inputs and an integer-selected
 // branch, so this is an equality check, not a tolerance one.
@@ -21,7 +25,7 @@ void CheckGpuBlendModes(Sys::GpuResourceManager& manager) {
     for (const Proc::BlendModeExpectation& expected : Proc::BlendModeExpectations()) {
         Params::LayerStack stack = Proc::MakeConstantTwoLayerStack(expected.mode, expected.opacity);
         Data::MapFields fields;
-        Proc::NoiseBlendStage stage(geometry, stack, fields);
+        Proc::NoiseBlendStage stage(geometry, stack, fields, noBakedLayerImages);
         stage.SetGpuResourceManager(&manager);
         stage.RunOnGpu();
         NoiseBlendCheck(stage.LastBackend() == Sys::ComputeBackend::Gpu
@@ -49,8 +53,8 @@ void CheckNoiseTypeParity(Sys::GpuResourceManager& manager) {
             Params::LayerStack stack = Proc::MakeSingleNoiseStack(noiseType, fractalType);
             Data::MapFields cpuFields;
             Data::MapFields gpuFields;
-            Proc::NoiseBlendStage cpuStage(geometry, stack, cpuFields);
-            Proc::NoiseBlendStage gpuStage(geometry, stack, gpuFields);
+            Proc::NoiseBlendStage cpuStage(geometry, stack, cpuFields, noBakedLayerImages);
+            Proc::NoiseBlendStage gpuStage(geometry, stack, gpuFields, noBakedLayerImages);
             gpuStage.SetGpuResourceManager(&manager);
             cpuStage.RunOnCpu();
             gpuStage.RunOnGpu();
@@ -68,7 +72,7 @@ void CheckDispatchRouting(Sys::GpuResourceManager& manager) {
     geometry.mapSize = 63;
     Params::LayerStack stack = Proc::MakeRepresentativeStack();
     Data::MapFields fields;
-    Proc::NoiseBlendStage stage(geometry, stack, fields);
+    Proc::NoiseBlendStage stage(geometry, stack, fields, noBakedLayerImages);
     stage.SetGpuResourceManager(&manager);
     stage.SetDispatchPolicy(Sys::DispatchPolicy{});
     stage.SetGenerationContext(Sys::GenerationContext::Preview);
@@ -77,8 +81,36 @@ void CheckDispatchRouting(Sys::GpuResourceManager& manager) {
     NoiseBlendCheck(stage.Run() == Sys::ComputeBackend::Cpu, "Output context routes to the Cpu");
     // No GL manager at all: the Gpu path must fall back to the Cpu, not produce nothing.
     Data::MapFields fallbackFields;
-    Proc::NoiseBlendStage fallbackStage(geometry, stack, fallbackFields);
+    Proc::NoiseBlendStage fallbackStage(geometry, stack, fallbackFields, noBakedLayerImages);
     fallbackStage.RunOnGpu();
     NoiseBlendCheck(fallbackStage.LastBackend() == Sys::ComputeBackend::Cpu,
                     "no GL manager falls the Gpu path back to the Cpu");
+}
+
+// STEP100: a baked layer forces the Cpu path even with a fully working Gpu program — the Gpu
+// kernel twin is explicit out-of-scope, so RunOnGpu() must refuse and fall back rather than
+// silently regenerating live noise on the Gpu for a layer that has none.
+void CheckBakedLayerForcesCpuFallback(Sys::GpuResourceManager& manager) {
+    Params::Geometry geometry;
+    geometry.mapSize = 7;
+    Params::Layer layer;
+    layer.bBaked = true;
+    layer.layerIdentifier = 0;
+    Params::GeoLayer group;
+    group.layers.push_back(layer);
+    Params::LayerStack stack;
+    stack.geoLayers.push_back(group);
+
+    std::vector<Data::BakedLayerImage> bakedImages(1);
+    bakedImages[0].layerIdentifier = 0;
+    bakedImages[0].image = Data::FloatField(geometry.VertexSize(), geometry.VertexSize(), 0.42f);
+
+    Data::MapFields fields;
+    Proc::NoiseBlendStage stage(geometry, stack, fields, bakedImages);
+    stage.SetGpuResourceManager(&manager);
+    stage.RunOnGpu();
+    NoiseBlendCheck(stage.LastBackend() == Sys::ComputeBackend::Cpu,
+                    "a baked layer forces the Gpu path back to the Cpu even with a working GL program");
+    NoiseBlendCheck(std::fabs(fields.heightfield.Get(3, 3) - 0.42f) < 1e-6f,
+                    "and the fallback Cpu run actually reads the baked pixels");
 }

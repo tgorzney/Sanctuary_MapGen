@@ -11,6 +11,9 @@ using namespace SanmapGen;
 
 namespace {
 
+// No stack in this file bakes a layer.
+const std::vector<Data::BakedLayerImage> noBakedLayerImages;
+
 int failureCount = 0;
 
 void Check(bool bCondition, const char* label) {
@@ -53,7 +56,7 @@ Params::LayerStack OneLayerStack(float frequency) {
 // so proving the scale lands there proves Cpu/Gpu parity for this feature by construction.
 float FlattenedFrequency(Params::Geometry& geometry, Params::LayerStack& layerStack) {
     Data::MapFields fields;
-    Proc::NoiseBlendStage stage(geometry, layerStack, fields);
+    Proc::NoiseBlendStage stage(geometry, layerStack, fields, noBakedLayerImages);
     stage.RunOnCpu();
     return stage.LayerConfigurations().empty() ? -1.0f : stage.LayerConfigurations()[0].frequency;
 }
@@ -84,7 +87,7 @@ void RunDirtyHashChecks() {
     Params::Geometry geometry;
     geometry.mapSize = 256;
     Data::MapFields fields;
-    Proc::NoiseBlendStage stage(geometry, layerStack, fields);
+    Proc::NoiseBlendStage stage(geometry, layerStack, fields, noBakedLayerImages);
 
     geometry.bScaleFeaturesToMapSize = false;
     const std::size_t unscaledHash = stage.ComputeParameterHash();

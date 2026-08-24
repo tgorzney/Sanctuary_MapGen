@@ -11,7 +11,7 @@ namespace Pipeline {
 GenerationAssembler::GenerationAssembler(const Params::MapRecipe& recipeSettings)
     : recipe(recipeSettings),
       stratumArt(static_cast<std::size_t>(Data::MapFields::stratumCount)),
-      noiseBlendStage(recipeSettings.geometry, recipeSettings.layerStack, mapFields),
+      noiseBlendStage(recipeSettings.geometry, recipeSettings.layerStack, mapFields, bakedLayerImages),
       erosionStage(recipeSettings.geometry, mapFields),
       thermalStage(recipeSettings.geometry, mapFields),
       flowAccumulationStage(recipeSettings.geometry, mapFields),

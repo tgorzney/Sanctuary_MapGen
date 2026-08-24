@@ -64,12 +64,19 @@ bool NoiseBlendStage::WaitForGpuFence() {
 
 void NoiseBlendStage::RunOnGpu() {
     PrepareRun();
+    // A baked layer has no Gpu kernel twin (STEP100 explicit out-of-scope) — refuse the Gpu
+    // outright rather than silently regenerating live noise on a layer that has none; the Cpu
+    // path already knows how to read the frozen pixels.
+    bool bAnyLayerBaked = false;
+    for (const Params::Layer* layer : layerStack.GetFlatLayers())
+        if (layer->bBaked) { bAnyLayerBaked = true; break; }
+
     // No layers, a stack deeper than the Gpu scratch bound, or no GL program at all: the Cpu
     // twin is always legal, so take it and record that it is what ran.
     const bool bStackFitsKernel =
         !layerConfigurations.empty()
         && layerConfigurations.size() <= static_cast<std::size_t>(constants.maximumGpuLayerCount);
-    if (!bStackFitsKernel || !EnsureGpuResources()) { RunOnCpu(); return; }
+    if (bAnyLayerBaked || !bStackFitsKernel || !EnsureGpuResources()) { RunOnCpu(); return; }
 
     const std::size_t blendHash = ComputeBlendHash();
     if (bBlendCacheValid && blendHash == cachedBlendHash && cachedBlendBackend == Sys::ComputeBackend::Gpu) {

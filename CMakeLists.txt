@@ -498,6 +498,11 @@ add_sangen_test(NoiseBlend_PROC_Test
 # group above, so landing it needed no edit to that binary's main(): it drives only the flatten and
 # the dirty hash, so it needs neither a GL context nor the parity fixtures those files carry.
 add_sangen_test(NoiseBlend_FeatureScale_PROC_Test src/proc/NoiseBlend_FeatureScale_PROC_Test.cpp)
+# STEP100 "baked layer reads a frozen image instead of live noise". Own binary for the same
+# reason as NoiseBlend_FeatureScale_PROC_Test above: pure Cpu path, no GL context needed. The
+# Gpu-fallback-with-a-working-program half of the acceptance test rides inside the group above
+# (NoiseBlend_GpuBlend_PROC_Test.cpp's CheckBakedLayerForcesCpuFallback).
+add_sangen_test(NoiseBlend_Baked_PROC_Test src/proc/NoiseBlend_Baked_PROC_Test.cpp)
 add_sangen_test(Mask_PROC_Test
     src/proc/Mask_PROC_Test.cpp
     src/proc/Mask_Slope_PROC_Test.cpp

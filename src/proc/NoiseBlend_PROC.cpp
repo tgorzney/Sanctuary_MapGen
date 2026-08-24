@@ -43,7 +43,11 @@ std::size_t HashLayerStructure(std::size_t seed, const Params::Layer& layer, int
     seed = HashFloat(seed, layer.lacunarity);
     seed = HashFloat(seed, layer.weightedStrength);
     seed = HashFloat(seed, layer.pingPongStrength);
-    return HashFloat(seed, layer.cellularJitter);
+    seed = HashFloat(seed, layer.cellularJitter);
+    // A bake/unbake toggle or an identifier change is itself a structural change: it decides
+    // whether GenerateLayerNoiseCpu reads frozen pixels or rolls FastNoiseLite at all (STEP100).
+    seed = HashInteger(seed, layer.bBaked ? 1 : 0);
+    return HashInteger(seed, layer.layerIdentifier);
 }
 
 // Everything that only affects the blended result, not the raw noise.
@@ -69,8 +73,10 @@ std::size_t HashLayerShaping(std::size_t seed, const Params::Layer& layer) {
 
 NoiseBlendStage::NoiseBlendStage(const Params::Geometry& geometrySettings,
                                  const Params::LayerStack& layerStackSettings,
-                                 Data::MapFields& outputFields)
-    : geometry(geometrySettings), layerStack(layerStackSettings), mapFields(outputFields) {}
+                                 Data::MapFields& outputFields,
+                                 const std::vector<Data::BakedLayerImage>& bakedLayerImagesSettings)
+    : geometry(geometrySettings), layerStack(layerStackSettings), mapFields(outputFields),
+      bakedLayerImages(bakedLayerImagesSettings) {}
 
 // The frequency the kernels will actually be handed for `layer` (NoiseBlend_Kernel_PROC.h) —
 // resolved here so the hash and NoiseBlend_Prepare_PROC.cpp can never disagree about it.

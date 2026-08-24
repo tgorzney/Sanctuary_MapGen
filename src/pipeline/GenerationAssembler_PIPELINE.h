@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include "Generation_PIPELINE.h"
+#include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
 #include "../data/PlacementResults_DATA.h"
 #include "../data/RuleBucketIndexSet_DATA.h"
@@ -103,6 +104,8 @@ public:
     // The loaded stratum art (imported masks + albedo texels) the Mask and Bake stages read.
     // Settings live in the recipe's `strata`; only the loaded pixels live here (ARCH §7.1).
     std::vector<Data::StratumArt>& StratumArt() { return stratumArt; }
+    // Baked/frozen height images a bBaked layer reads instead of live noise (STEP100), keyed by layerIdentifier — same "loaded art the stages read" grouping as above.
+    std::vector<Data::BakedLayerImage>& BakedLayerImages() { return bakedLayerImages; }
 
     // Two-tier dirty distinction.
     const std::vector<StageDescription>& StageDescriptions() const { return stageDescriptions; }
@@ -120,6 +123,7 @@ private:
 
     const Params::MapRecipe&      recipe;
     std::vector<Data::StratumArt> stratumArt;
+    std::vector<Data::BakedLayerImage> bakedLayerImages;
 
     Data::MapFields        mapFields;          // declared before the stages that reference them
     Data::PlacementResults placementResults;
