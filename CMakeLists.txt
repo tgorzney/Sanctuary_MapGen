@@ -456,6 +456,15 @@ target_include_directories(TemplateSourceScan_IO_Test PRIVATE ${CMAKE_CURRENT_SO
 # extracts footprint/tpId/tags, detects tpId collisions. Pure/stateless, builds fixtures directly.
 add_sangen_test(TemplateDialect_IO_Test src/io/TemplateDialect_IO_Test.cpp)
 
+# STEP88 — fingerprinted disk cache (nlohmann::json, not AssetAtlasCache's binary ByteCursor) for a
+# whole ingestion run's TemplateRecord set. TemplateIngestCache_IO.cpp and TemplateIngestCache_Record_IO.cpp
+# (its ARCH §1.5 aspect split) are already picked up by SANGEN_V2_SOURCES's src/io/*.cpp glob and
+# reach this test through SanGenV2, same as every other IO test target.
+add_sangen_test(TemplateIngestCache_IO_Test src/io/TemplateIngestCache_IO_Test.cpp)
+# The test builds/rewrites nlohmann::json fixtures directly (format-version-mismatch case), so it
+# needs nlohmann's headers directly too -- same reasoning as the MapExporter_IO_Test note above.
+target_link_libraries(TemplateIngestCache_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
 # each group below is ONE binary whose main() lives in the first file listed.
 add_sangen_test(NoiseBlend_PROC_Test
