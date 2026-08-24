@@ -13,6 +13,7 @@
 #include "../io/FilesystemPrimitives_IO.h"
 #include "../io/UnknownImportBag_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include <utility>
 
 namespace SanmapGen {
 namespace Ui {
@@ -30,6 +31,15 @@ bool ResolveTexturesFolderPath(FilesTabState& state, Io::MapExportResult& result
     return Io::EnsureExportFolderExists(outTexturesFolderPath, result);
 }
 
+// STEP103: an Open REPLACES the whole live recipe/fields/baked-image cache, never merges onto
+// whatever a previous file/session left behind — `Application`'s live `recipe` starts seeded with
+// two default procedural noise layers, and a real `.sanmap` with no `HeightmapStack` section left
+// them in place, defeating STEP101's empty-stack fresh-synthesis gate (silent noise-over-terrain).
+// `*outBakedLayerImages` is a persistent vector too; left uncleared it can bleed a stale entry with a
+// colliding `layerIdentifier` from a previous Open into the new file (`FindBakedLayerImage`'s
+// first-match scan). Fix: load onto FRESH scratch state (`Params::MapRecipe()`, not
+// `MakeDefaultMapRecipe()`) and commit (move) it onto the live objects only when the load succeeds —
+// a refused/failed Open must leave the live session untouched (Constitution §6).
 bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFields* fields,
                    std::vector<Data::BakedLayerImage>* outBakedLayerImages) {
     if (state.sanmapPath.empty()) {
@@ -38,18 +48,31 @@ bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFie
     }
     Io::MapImportOptions options = state.importOptions;
     options.bLoadBakedFields = state.bLoadBakedFieldsOnImport;
-    // STEP24_ImportNeverRefuses_IO ruling 4: a fresh open replaces whatever the prior session's bag
-    // held — it describes THIS document, not a merge of two unrelated documents' unknown data.
-    // `unknownImportData` is nullable (caller-owned, `FilesTab_UI.h`'s own comment) — nothing to
-    // reset/thread when no caller bound one.
+    // STEP24_ImportNeverRefuses_IO ruling 4: describes THIS document, not a merge of two unrelated
+    // documents' unknown data. Left as an unconditional eager reset (unlike the scratch state below)
+    // — its blast radius is a scratch JSON bag, not a designer's authored recipe.
     if (state.unknownImportData != nullptr) *state.unknownImportData = Io::UnknownImportBag();
-    const Io::MapImportResult result =
-        Io::MapImporter::LoadSanmap(state.sanmapPath, recipe, fields, options, state.unknownImportData,
-                                    state.templateIngestReport, outBakedLayerImages);
+
+    Params::MapRecipe scratchRecipe;                        // genuinely empty, no seeded layers
+    Data::MapFields scratchFields;                          // fresh/unsized (IsSized() == false)
+    std::vector<Data::BakedLayerImage> scratchBakedImages;  // fresh/empty, no stale identifiers
+    const Io::MapImportResult result = Io::MapImporter::LoadSanmap(
+        state.sanmapPath, scratchRecipe, fields != nullptr ? &scratchFields : nullptr, options,
+        state.unknownImportData, state.templateIngestReport, &scratchBakedImages);
     AppendFilesTabLog(state, result.debugLog);
     // STEP26B_MigrationReconciliationDialog_UI ruling 1: gates the "Check for Migrations..." button
     // — only a completed Open that found no version marker at all may offer the dialog.
     state.bLastOpenHadNoVersionMarker = result.bNoVersionMarkerFound;
+
+    // `bSucceeded` is set the moment the recipe parse succeeds, before LoadBakedFields runs, so a
+    // document that parses but has a missing/corrupt heightmap.raw still counts as success (logged
+    // warning, not a refusal) — unchanged; only WHAT gets committed changes (a fresh baseline, never
+    // the stale live objects), and nothing is touched at all on an actual refusal.
+    if (result.bSucceeded) {
+        recipe = std::move(scratchRecipe);
+        if (fields != nullptr) *fields = std::move(scratchFields);
+        if (outBakedLayerImages != nullptr) *outBakedLayerImages = std::move(scratchBakedImages);
+    }
     return result.bSucceeded;
 }
 

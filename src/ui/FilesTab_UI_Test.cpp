@@ -101,6 +101,7 @@ int main() {
     SanmapGen::FilesTabTest::RunTabStateTests();
     SanmapGen::FilesTabTest::RunRoundTripTests();
     SanmapGen::FilesTabTest::RunScenarioExportTests();
+    SanmapGen::FilesTabTest::RunResetOnOpenTests();
     if (SanmapGen::FilesTabTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", SanmapGen::FilesTabTest::FailureCount());
     return 1;
