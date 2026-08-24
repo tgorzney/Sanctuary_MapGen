@@ -43,9 +43,10 @@ bool DrawSectionBegin(const char* label, SectionState& state, const SectionOptio
                       const WidgetStyle& style) {
     ImGui::PushID(label);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
-    const float barWidth  = ImGui::GetContentRegionAvail().x;
+    const float rawBarWidth = ImGui::GetContentRegionAvail().x - options.reservedRightWidth;
+    const float barWidth  = rawBarWidth > 1.0f ? rawBarWidth : 1.0f;
     const float barHeight = ResolveWidgetTrackHeight(style);
-    ImGui::InvisibleButton("##header", ImVec2(barWidth > 1.0f ? barWidth : 1.0f, barHeight));
+    ImGui::InvisibleButton("##header", ImVec2(barWidth, barHeight));
     const bool bHeaderClicked = ImGui::IsItemClicked();
     const bool bHeaderHovered = ImGui::IsItemHovered();
 

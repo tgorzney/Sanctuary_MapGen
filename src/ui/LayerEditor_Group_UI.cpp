@@ -53,9 +53,14 @@ void DrawLayerRowActions(int groupIndex, int rowIndex, LayerEditorState& state,
 }
 
 // The group's layer list. Only the SELECTED group renders one, so a drag can never carry a row
-// index from one group onto another group's list.
+// index from one group onto another group's list. STEP104: each row's body, whenever the row's
+// own CollapsingHeader is open (DraggableList's own per-row expand/collapse state — never gated on
+// `state.selectedLayerIndex`), draws that row's OWN noise/soil/erosion sections directly below its
+// row actions, so an expanded row never shows another row's settings.
 void DrawGroupLayerList(Params::GeoLayer& group, int groupIndex, LayerEditorState& state,
-                        LayerEditorFrameSignals& signals) {
+                        LayerEditorFrameSignals& signals,
+                        Pipeline::GenerationAssembler* generationAssembler,
+                        Pipeline::PreviewDriver* previewDriver) {
     if (ImGui::SmallButton("Add Layer"))
         RecordLayerEditorAction(signals.action, LayerEditorActionKind::AddLayer, groupIndex);
     // Borrowed by describeRow for the duration of this Render only. Wide enough for a full-length
@@ -76,6 +81,14 @@ void DrawGroupLayerList(Params::GeoLayer& group, int groupIndex, LayerEditorStat
         [&](int rowIndex) {
             if (rowIndex == state.selectedLayerIndex) DrawLayerRowActions(groupIndex, rowIndex, state, signals);
             else ImGui::TextUnformatted("Select this layer to edit it.");
+            ImGui::Separator();
+            // Own row, own layer, own settings — the same three panels DrawSelectedLayerPanels
+            // used to draw once at the bottom for whatever was "selected" (LayerEditor_UI.cpp,
+            // pre-STEP104), now drawn inline per expanded row so they can never bleed across rows.
+            Params::Layer& layer = group.layers[static_cast<std::size_t>(rowIndex)];
+            DrawLayerEditorLayerSections(layer, state, previewDriver);
+            DrawLayerEditorSoilSection(layer.stratumIndex, state, generationAssembler, previewDriver);
+            DrawLayerEditorErosionSections(layer.stratumIndex, state, generationAssembler, previewDriver);
         },
         state.selectedLayerIndex);
     if (signal.bHasSignal()) { signals.layerSignal = signal; signals.layerSignalGroupIndex = groupIndex; }
@@ -85,6 +98,7 @@ void DrawGroupLayerList(Params::GeoLayer& group, int groupIndex, LayerEditorStat
 
 void DrawLayerEditorGroupBody(Params::LayerStack& layerStack, int groupIndex,
                               LayerEditorState& state, LayerEditorFrameSignals& signals,
+                              Pipeline::GenerationAssembler* generationAssembler,
                               Pipeline::PreviewDriver* previewDriver) {
     if (groupIndex < 0 || groupIndex >= static_cast<int>(layerStack.geoLayers.size())) return;
     Params::GeoLayer& group = layerStack.geoLayers[static_cast<std::size_t>(groupIndex)];
@@ -95,7 +109,7 @@ void DrawLayerEditorGroupBody(Params::LayerStack& layerStack, int groupIndex,
     }
     DrawGroupSettings(group, state, previewDriver);
     ImGui::Separator();
-    DrawGroupLayerList(group, groupIndex, state, signals);
+    DrawGroupLayerList(group, groupIndex, state, signals, generationAssembler, previewDriver);
 }
 
 } // namespace Ui

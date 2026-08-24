@@ -69,11 +69,14 @@ void DrawLayerEditorAdvancedSection(int stratumIndex, LayerEditorState& state,
                                     Pipeline::PreviewDriver* previewDriver);
 
 // One GeoLayer row's expanded body: the group settings and — for the SELECTED group only — its
-// layer list with the per-row Import RAW / Duplicate / Bake affordances. It MUTATES NOTHING; what
-// the user asked for lands in `signals`, which the caller applies once the lists are closed
-// (LayerEditor_Signals_UI.h). LayerEditor_Group_UI.cpp.
+// layer list, each layer row showing its own row actions (STEP104: Import RAW / Duplicate / Bake,
+// SELECTED row only) followed by its OWN noise/soil/erosion sections inline, right under its own
+// header (never another row's — STEP104 Fix part 1). It MUTATES NOTHING; what the user asked for
+// lands in `signals`, which the caller applies once the lists are closed (LayerEditor_Signals_UI.h).
+// LayerEditor_Group_UI.cpp.
 void DrawLayerEditorGroupBody(Params::LayerStack& layerStack, int groupIndex,
                               LayerEditorState& state, LayerEditorFrameSignals& signals,
+                              Pipeline::GenerationAssembler* generationAssembler,
                               Pipeline::PreviewDriver* previewDriver);
 
 } // namespace Ui

@@ -21,6 +21,10 @@ struct SectionOptions {
     bool  bArrowShown    = true;
     float indentWidth    = 0.0f;    // <= 0: imgui's own indent for the section body
     float headerRounding = -1.0f;   // < 0: the WidgetStyle/theme rounding
+    // Pixels of the header bar's right edge left undrawn/unclickable, for a caller to compose a
+    // button into via SameLine() immediately after DrawSectionBegin returns. 0 = today's exact
+    // behavior, a full-width header (STEP104).
+    float reservedRightWidth = 0.0f;
 };
 
 // The caller-owned bit. One per section instance.

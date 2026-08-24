@@ -688,16 +688,21 @@ add_sangen_test(Section_UI_Test          src/ui/Section_UI_Test.cpp)
 add_sangen_test(LuaCodeEditor_UI_Test    src/ui/LuaCodeEditor_UI_Test.cpp)
 
 # Tab-rebuild batch B — the Layer Editor and the Heightmap tab that hosts it. The editor's draw
-# path is split across five translation units under the ARCH §1.5 ceilings, but everything the
-# tests assert on (the scalar catalogue, the value mirrors, the row actions, the one-frame signal
-# order, the soil presets and the gravity bulk write) is PURE, so neither binary needs an imgui
-# frame, a window or a GL context. The erosion checks drive a real Pipeline::GenerationAssembler
-# (they edit constants reached through it) without ever running it.
+# path is split across five translation units under the ARCH §1.5 ceilings; most of what the tests
+# assert on (the scalar catalogue, the value mirrors, the row actions, the one-frame signal order,
+# the soil presets and the gravity bulk write) is PURE and needs no imgui frame, window or GL
+# context. The erosion checks drive a real Pipeline::GenerationAssembler (they edit constants
+# reached through it) without ever running it.
+# STEP104: LayerEditor_InlineSettings_UI_Test.cpp is the one imgui-including translation unit of
+# this binary (mirrors MapCanvas_MarkerDrag_UI_Test.cpp's "one live headless imgui frame, no
+# window/GL" posture) — the per-row inline settings draw and the repositioned "Add GeoLayer"
+# button's real click-through both need a real ImGui frame; every other TU here stays pure.
 add_sangen_test(LayerEditor_UI_Test
     src/ui/LayerEditor_UI_Test.cpp
     src/ui/LayerEditor_Signals_UI_Test.cpp
     src/ui/LayerEditor_Erosion_UI_Test.cpp
-    src/ui/LayerEditor_BakedImage_UI_Test.cpp)
+    src/ui/LayerEditor_BakedImage_UI_Test.cpp
+    src/ui/LayerEditor_InlineSettings_UI_Test.cpp)
 add_sangen_test(HeightmapTab_UI_Test      src/ui/HeightmapTab_UI_Test.cpp)
 
 # Tab-rebuild batch C1 — the four terrain view tabs. Each test drives its tab's PURE logic (the

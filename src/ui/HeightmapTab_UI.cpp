@@ -18,6 +18,22 @@ void NotifyChange(bool bCommitted, Pipeline::PreviewDriver* previewDriver) {
     if (bCommitted && previewDriver != nullptr) previewDriver->NotifyParametersChanged();
 }
 
+// The gap between the "GeoLayers" header bar's own drawn content and the "Add GeoLayer" button
+// composed into its reserved right edge (STEP104 Fix part 2 — Constitution §8: a named constant,
+// never a bare literal at the call site).
+constexpr float kGeoLayerAddButtonSpacingPixels = 8.0f;
+
+// The reserved-right-width `SectionOptions` for the "GeoLayers" header: exactly the "Add GeoLayer"
+// button's own measured width plus the fixed spacing above, so `DrawSectionBegin`'s hit-region
+// stops before the button rather than overlapping it.
+SectionOptions GeoLayerSectionOptions() {
+    SectionOptions options;
+    const float buttonWidth =
+        ImGui::CalcTextSize("Add GeoLayer").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    options.reservedRightWidth = buttonWidth + kGeoLayerAddButtonSpacingPixels;
+    return options;
+}
+
 // The seed and the map size are INTEGER settings edited through mirrors; the two heights are
 // floats the geometry stores directly.
 void DrawMapSettings(Params::Geometry& geometry, HeightmapTabState& state,
@@ -83,8 +99,14 @@ void DrawHeightmapTab(Params::MapRecipe& recipe, HeightmapTabState& state,
         DrawGlobalGravity(state, generationAssembler, previewDriver);
         DrawSectionEnd();
     }
-    if (DrawSectionBegin("GeoLayers", state.geoLayerSection)) {
-        DrawLayerEditor(recipe.layerStack, state.layerEditor, generationAssembler, previewDriver);
+    if (DrawSectionBegin("GeoLayers", state.geoLayerSection, GeoLayerSectionOptions())) {
+        // The reserved gap at the header bar's right edge (GeoLayerSectionOptions above), same
+        // row as the "GeoLayers" title and disclosure arrow, right-aligned, not overlapping — the
+        // header's own hit-region already stops short of it (Section_UI.cpp).
+        ImGui::SameLine();
+        const bool bAddGeoLayerClicked = ImGui::SmallButton("Add GeoLayer");
+        DrawLayerEditor(recipe.layerStack, state.layerEditor, generationAssembler, previewDriver,
+                        /*bDrawOwnAddGeoLayerButton=*/false, bAddGeoLayerClicked);
         DrawSectionEnd();
     }
     ImGui::PopID();

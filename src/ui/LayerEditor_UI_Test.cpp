@@ -1,9 +1,11 @@
 // LayerEditor_UI_Test.cpp — tab-rebuild B acceptance, part 1: the scalar catalogue, the editor
-// state and the value mirrors. Every check drives the PURE functions with synthetic values, so no
-// imgui frame, no window and no GL context is needed — the same split every batch-A widget test
-// relies on. This file owns main(); the row actions and one-frame signal order are
-// LayerEditor_Signals_UI_Test.cpp, and the soil / erosion / gravity checks are
-// LayerEditor_Erosion_UI_Test.cpp (ARCH §1.5 — one binary, three translation units).
+// state and the value mirrors. Every check in THIS file drives the PURE functions with synthetic
+// values, so no imgui frame, no window and no GL context is needed — the same split every batch-A
+// widget test relies on. This file owns main(); the row actions and one-frame signal order are
+// LayerEditor_Signals_UI_Test.cpp, the soil / erosion / gravity checks are
+// LayerEditor_Erosion_UI_Test.cpp, and STEP104's per-row inline settings / repositioned "Add
+// GeoLayer" button (the one imgui-including half of this binary) are
+// LayerEditor_InlineSettings_UI_Test.cpp (ARCH §1.5 — one binary, several translation units).
 #include "LayerEditor_TestSupport_UI.h"
 #include "LayerEditor_UI.h"
 
@@ -13,6 +15,7 @@ using namespace SanmapGen::Ui;
 void RunLayerEditorSignalChecks();
 void RunLayerEditorErosionChecks();
 void RunLayerEditorBakedImageChecks();
+void RunLayerEditorInlineSettingsChecks();
 
 namespace {
 
@@ -120,5 +123,6 @@ int main() {
     RunLayerEditorSignalChecks();
     RunLayerEditorErosionChecks();
     RunLayerEditorBakedImageChecks();
+    RunLayerEditorInlineSettingsChecks();
     return ReportLayerEditorTestResult();
 }

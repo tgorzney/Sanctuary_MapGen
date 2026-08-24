@@ -130,12 +130,21 @@ inline bool StoreLayerEditorValues(const LayerEditorState& state, Params::Layer&
 // The layer the per-layer sections edit, or null when the selection points at nothing.
 Params::Layer* SelectedLayerEditorLayer(Params::LayerStack& layerStack, const LayerEditorState& state);
 
-// Draws the whole editor: the GeoLayer groups, the selected group's layers, and the selected
-// layer's sections. Both pointers are nullable — an editor drawn with no pipeline behind it still
-// edits the stack; the soil/erosion sections simply report that they have nothing to bind to.
+// Draws the whole editor: the GeoLayer groups, each row's own noise/soil/erosion sections drawn
+// inline right under that row whenever ITS OWN CollapsingHeader is open (STEP104 Fix part 1 — never
+// bled from whatever else happens to be "selected"). Both pipeline pointers are nullable.
+//
+// `bDrawOwnAddGeoLayerButton` (default true) draws "Add GeoLayer" internally, above the list — the
+// original behavior, for callers with no reserved header space (MaskLayerTab_UI.cpp's Tint/Holes/
+// Smoothness/Props). A caller that reserved space via `SectionOptions::reservedRightWidth` (Fix
+// part 2 — HeightmapTab_UI.cpp's "GeoLayers" section) passes false and reports its OWN click via
+// `bAddGeoLayerRequestedExternally`; the action still fires from RecordLayerEditorAction — only
+// WHERE the button is drawn moves.
 void DrawLayerEditor(Params::LayerStack& layerStack, LayerEditorState& state,
                      Pipeline::GenerationAssembler* generationAssembler,
-                     Pipeline::PreviewDriver* previewDriver);
+                     Pipeline::PreviewDriver* previewDriver,
+                     bool bDrawOwnAddGeoLayerButton = true,
+                     bool bAddGeoLayerRequestedExternally = false);
 
 } // namespace Ui
 } // namespace SanmapGen
