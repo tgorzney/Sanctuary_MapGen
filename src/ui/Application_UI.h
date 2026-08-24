@@ -83,6 +83,10 @@ public:
     // the draw pass itself never calls this accessor directly (MapCanvas_UI.h's own header comment).
     const Io::WorldFootprintSizeTable& WorldFootprintSizeTable() const { return assetBridge.worldFootprintSizeTable; }
     const std::string& AssetStatusMessage() const { return assetBridge.assetStatusMessage; }
+    // Ticket 91's own acceptance test drives the "Ingest game templates" button's two-phase request
+    // flags and reads its report directly, the same "exposed so the acceptance test drives the
+    // SHELL's own wiring" posture as TabState() below — no other production call site needs this.
+    ApplicationAssetBridge& AssetBridge() { return assetBridge; }
 
     // --- the assembled parts, exposed so the acceptance test drives the SHELL's own wiring ---
     ApplicationSettings&           Settings()  { return settings; }
@@ -141,6 +145,7 @@ private:
     bool UploadAtlasPages();                 // Application_Assets_UI.cpp
     void DrawAssetPanel();                   // Application_AssetPanel_UI.cpp
     bool ServiceAssetLoadRequest();          // Application_AssetPanel_UI.cpp
+    bool ServiceTemplateIngestRequest();      // Application_AssetPanel_UI.cpp
     bool ApplyIconSelection(int selectedIconId, int& lastIconId,
                             char (&templateIdentifier)[8]);   // Application_AssetPanel_UI.cpp
     const IconAtlasManifest* ActiveIconManifest() const;   // null until an atlas is resident

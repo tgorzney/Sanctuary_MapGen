@@ -648,6 +648,13 @@ target_include_directories(ApplicationShell_UI_Test PRIVATE ${CMAKE_CURRENT_SOUR
 # exactly as the GPU parity tests do.
 add_sangen_test(ApplicationShell_Window_UI_Test src/ui/ApplicationShell_Window_UI_Test.cpp)
 
+# STEP91 — the System tab's "Ingest game templates" button and its durable status display. Same
+# real-hidden-GL-window / SKIP-on-no-context posture as ApplicationShell_Window_UI_Test.cpp above,
+# plus a real Io::IngestTemplates run against a scratch install fixture (ticket 89) and a real
+# settings flush/reload round-trip (ticket 90) — loose fixture files only, no synthetic zip, so no
+# extra vendored-header include path is needed.
+add_sangen_test(Application_AssetPanel_UI_Test src/ui/Application_AssetPanel_UI_Test.cpp)
+
 # Tab-rebuild batch A — the shared widget library every rebuilt tab is assembled from. As with the
 # M5-1 core inputs, each test drives its widget's PURE logic (clamping, commit/cancel, the collapse
 # and picker state machines, the Levels transfer curve) with synthetic input, so none needs an imgui

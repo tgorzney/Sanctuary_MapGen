@@ -41,6 +41,11 @@ bool Application::RunOneFrame() {
         ++frameCount;
         return IsWindowOpen();
     }
+    if (ServiceTemplateIngestRequest()) {  // same announce-then-perform pattern, ticket 91
+        EndImguiFrame();
+        ++frameCount;
+        return IsWindowOpen();
+    }
     DrawSettingsWindow();
     ApplyExecutionPolicy();
     ResolveIconSelections();

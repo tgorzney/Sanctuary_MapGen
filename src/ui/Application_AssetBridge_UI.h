@@ -10,6 +10,7 @@
 #include "IconGridWidget_UI.h"
 #include "../io/AssetAtlasCache_IO.h"
 #include "../io/SanpackReader_IO.h"
+#include "../io/TemplateIngest_IO.h"
 #include "../io/WorldFootprintSizeTable_IO.h"
 #include "../sys/AtlasResidency_SYS.h"
 
@@ -43,6 +44,14 @@ struct ApplicationAssetBridge {
     char                          sanpackPath[260] = { 0 };
     bool bAssetLoadRequested  = false;
     bool bAssetLoadAnnounced  = false;
+
+    // Ticket 91 — live-session ingestion state. Empty/default until "Ingest game templates" is pressed;
+    // per Q4's literal resolution (STEP90's own "Design note"), NOTHING populates this automatically at
+    // startup — it starts empty every session until the button is pressed, even when a warm disk cache
+    // exists (pressing the button that same session is still required; it is just fast on a cache hit).
+    Io::TemplateIngestReport templateIngestReport;
+    bool bTemplateIngestRequested = false;
+    bool bTemplateIngestAnnounced = false;
 };
 
 } // namespace Ui
