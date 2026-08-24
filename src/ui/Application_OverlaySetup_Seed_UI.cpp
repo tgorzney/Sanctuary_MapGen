@@ -20,10 +20,37 @@ void PushManualRefs(std::vector<OverlaySubLayerRef_UI>& subLayers, int recordCou
 
 // CONFIRMED (STEP79 "Downstream authority ruling"): flat/global index over the layer-concatenated
 // rule sequence — see this ticket's header note and STEP50's matching, now-confirmed assumption.
-// Zero Manual refs for either domain (STEP51 scope; Manual Alloy/SpawnsArmies routing over
-// `recipe.markerLayers` is a later, ARCH_14_14-ruled successor ticket, gated on this one landing).
+// Manual (ARCH_14_14, STEP97): route per-TRANSFORM, not per recipe.markerLayers[i] entry. A layer
+// is a cross-cutting display bucket with no category field of its own (§16.1) — a single
+// layerIndex legally mixes a Spawn-type transform and a non-Spawn transform, so it can legally
+// push a ref into BOTH domains. Existence-checked, not unconditional (contrast
+// SeedPropReclaimDomains' push-both-then-filter-at-draw pattern — deliberately NOT reused here,
+// this ticket's precedent cross-check).
 void SeedMarkerDomains(OverlayLayer_UI& alloyLayer, OverlayLayer_UI& spawnsArmiesLayer,
                        const Params::MapRecipe& recipe) {
+    const std::size_t manualLayerCount = recipe.markerLayers.size();
+    std::vector<bool> hasSpawnContribution(manualLayerCount, false);
+    std::vector<bool> hasAlloyContribution(manualLayerCount, false);
+    for (const Params::MarkerInstanceGroup& group : recipe.markers) {
+        const bool bIsSpawnGroup = group.name == Params::kSpawnMarkerGroupName;
+        for (const Params::MarkerTransform& transform : group.transforms) {
+            if (transform.layerIndex < 0
+                || static_cast<std::size_t>(transform.layerIndex) >= manualLayerCount) continue;
+            const std::size_t layerIndex = static_cast<std::size_t>(transform.layerIndex);
+            if (bIsSpawnGroup) hasSpawnContribution[layerIndex] = true;
+            else               hasAlloyContribution[layerIndex] = true;
+        }
+    }
+    for (std::size_t layerIndex = 0; layerIndex < manualLayerCount; ++layerIndex) {
+        if (hasSpawnContribution[layerIndex])
+            spawnsArmiesLayer.subLayers.push_back(OverlaySubLayerRef_UI{
+                OverlaySubLayerKind_UI::Manual, static_cast<int>(layerIndex), true});
+        if (hasAlloyContribution[layerIndex])
+            alloyLayer.subLayers.push_back(OverlaySubLayerRef_UI{
+                OverlaySubLayerKind_UI::Manual, static_cast<int>(layerIndex), true});
+    }
+
+    // Procedural — unchanged from STEP51's shipped body.
     int flatIndex = 0;
     for (const Params::MarkerRuleLayer& layer : recipe.markerRuleLayers) {
         for (const Params::MarkerRule& rule : layer.rules) {

@@ -55,5 +55,10 @@ struct MarkerInstanceGroup {
     std::vector<MarkerTransform> transforms;
 };
 
+// The fixed group name SANMAP_FORMAT_SPEC reserves for the commander-spawn roster (moved from
+// UI-only `MarkersTab_Manual_UI.h::kSpawnMarkerGroupName`, ARCH_14_14, so IO/UI/PIPELINE consumers
+// share one symbol instead of three independent occurrences of the same literal).
+inline constexpr const char* kSpawnMarkerGroupName = "Spawn";
+
 } // namespace Params
 } // namespace SanmapGen

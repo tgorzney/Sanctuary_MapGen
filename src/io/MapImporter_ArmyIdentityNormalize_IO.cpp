@@ -4,6 +4,7 @@
 #include "MapImporter_IO.h"
 #include "Sanmap_ArmyIdentity_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include "../params/MarkerInstance_PARAMS.h"
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -56,7 +57,7 @@ int RewriteSpawnMarkerKeys(std::vector<Params::MarkerInstanceGroup>& markers,
                            const std::vector<ArmyIdentityRename>& renames) {
     int rewrittenCount = 0;
     for (Params::MarkerInstanceGroup& group : markers) {
-        if (group.name != "Spawn") continue;
+        if (group.name != Params::kSpawnMarkerGroupName) continue;
         for (Params::MarkerTransform& transform : group.transforms) {
             for (const ArmyIdentityRename& rename : renames) {
                 if (transform.name != rename.oldName) continue;

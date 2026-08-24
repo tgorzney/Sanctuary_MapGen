@@ -46,9 +46,10 @@ struct OverlayLayer_UI {
 // layer-metadata record yet. Props/Decals do NOT use this — they read/write
 // `Params::PropInstanceLayer`/`DecalInstanceLayer` directly through each Manual sub-layer's own
 // `index` (no shadow copy, §14.5, see Fix item 3). One entry per such domain, not per sub-layer:
-// Units' `Army.groups` carries no per-group appearance field to mirror, and Alloy/SpawnsArmies
-// carry zero Manual sub-layers this sequence (blocked — `SEQUENCE_PreviewOverlayLayering.md`'s
-// Phase 5 table, "Manual Alloy/SpawnsArmies sub-layers... outside this sequence").
+// Units' `Army.groups` carries no per-group appearance field to mirror, and Alloy/SpawnsArmies'
+// Manual sub-layers (STEP97, ARCH_14_14) read/write their `OverlaySubLayerRef_UI::index` against
+// `recipe.markerLayers` directly, same no-shadow-copy posture Props/Decals already use — so they
+// need no `OverlaySessionAppearance` slot of their own either.
 struct OverlaySessionAppearance { float color[4] = {1.0f, 1.0f, 1.0f, 1.0f}; float iconScale = 1.0f; };
 
 // The session container itself (§14.1's `overlayLayers: vector<OverlayLayer_UI>`), plus its

@@ -37,8 +37,10 @@ namespace Ui {
 
 // The fixed group name SANMAP_FORMAT_SPEC reserves for the commander-spawn roster: its inner
 // dictionary is keyed by ARMY name, not a free-form instance name (confirmed live in-game,
-// `session_findings_2026-08-17_unit_spawning.md`).
-inline constexpr const char* kSpawnMarkerGroupName = "Spawn";
+// `session_findings_2026-08-17_unit_spawning.md`). Promoted to `Params::kSpawnMarkerGroupName`
+// (ARCH_14_14) so IO/UI/PIPELINE share one symbol; this `using` keeps every unqualified
+// `kSpawnMarkerGroupName` call site in `namespace Ui` compiling unchanged.
+using Params::kSpawnMarkerGroupName;
 
 struct ManualMarkersState {
     SectionState   section;

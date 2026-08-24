@@ -221,6 +221,137 @@ void RunPropReclaimPartitionChecks() {
     }
 }
 
+// STEP97 (ARCH_14_14) — Manual Alloy/SpawnsArmies routing, per-transform existence check, not
+// SeedPropReclaimDomains' unconditional dual-push. Mirrors RunPropReclaimPartitionChecks' fixture
+// shape while proving the deliberately-different "existence-checked" behavior.
+void RunMarkerManualPartitionChecks() {
+    // 1. Pure-Spawn layer: one markerLayers entry, one Spawn group with two transforms at
+    // layerIndex 0. Only SpawnsArmies gets the Manual ref.
+    {
+        Params::MapRecipe recipe;
+        recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+        Params::MarkerInstanceGroup spawnGroup; spawnGroup.name = "Spawn";
+        spawnGroup.transforms.assign(2, Params::MarkerTransform());
+        spawnGroup.transforms[0].layerIndex = 0;
+        spawnGroup.transforms[1].layerIndex = 0;
+        recipe.markers = {spawnGroup};
+
+        OverlayLayerSettings overlaySettings;
+        ConfigureDefaultOverlayLayers(overlaySettings, recipe);
+        const OverlayLayer_UI& alloyLayer        = overlaySettings.overlayLayers[0];
+        const OverlayLayer_UI& spawnsArmiesLayer = overlaySettings.overlayLayers[1];
+        Check(spawnsArmiesLayer.subLayers.size() == 1
+              && spawnsArmiesLayer.subLayers[0].kind == OverlaySubLayerKind_UI::Manual
+              && spawnsArmiesLayer.subLayers[0].index == 0,
+              "pure-Spawn layer: SpawnsArmies gets exactly {Manual, 0}");
+        Check(alloyLayer.subLayers.empty(), "pure-Spawn layer: Alloy gets nothing");
+    }
+
+    // 2. Pure-non-Spawn layer: same shape, group name "Alloys". Mirror image of case 1.
+    {
+        Params::MapRecipe recipe;
+        recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+        Params::MarkerInstanceGroup alloysGroup; alloysGroup.name = "Alloys";
+        alloysGroup.transforms.assign(2, Params::MarkerTransform());
+        alloysGroup.transforms[0].layerIndex = 0;
+        alloysGroup.transforms[1].layerIndex = 0;
+        recipe.markers = {alloysGroup};
+
+        OverlayLayerSettings overlaySettings;
+        ConfigureDefaultOverlayLayers(overlaySettings, recipe);
+        const OverlayLayer_UI& alloyLayer        = overlaySettings.overlayLayers[0];
+        const OverlayLayer_UI& spawnsArmiesLayer = overlaySettings.overlayLayers[1];
+        Check(alloyLayer.subLayers.size() == 1
+              && alloyLayer.subLayers[0].kind == OverlaySubLayerKind_UI::Manual
+              && alloyLayer.subLayers[0].index == 0,
+              "pure-non-Spawn layer: Alloy gets exactly {Manual, 0}");
+        Check(spawnsArmiesLayer.subLayers.empty(), "pure-non-Spawn layer: SpawnsArmies gets nothing");
+    }
+
+    // 3. Mixed layer — the case STEP97/ARCH_14_14 exists for: one markerLayers entry, two groups
+    // ("Spawn" and "Alloys") each contributing one transform at layerIndex 0. Both domains get the
+    // same {Manual, 0} ref — legal, not a bug.
+    {
+        Params::MapRecipe recipe;
+        recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+        Params::MarkerInstanceGroup spawnGroup; spawnGroup.name = "Spawn";
+        spawnGroup.transforms.assign(1, Params::MarkerTransform());
+        spawnGroup.transforms[0].layerIndex = 0;
+        Params::MarkerInstanceGroup alloysGroup; alloysGroup.name = "Alloys";
+        alloysGroup.transforms.assign(1, Params::MarkerTransform());
+        alloysGroup.transforms[0].layerIndex = 0;
+        recipe.markers = {spawnGroup, alloysGroup};
+
+        OverlayLayerSettings overlaySettings;
+        ConfigureDefaultOverlayLayers(overlaySettings, recipe);
+        const OverlayLayer_UI& alloyLayer        = overlaySettings.overlayLayers[0];
+        const OverlayLayer_UI& spawnsArmiesLayer = overlaySettings.overlayLayers[1];
+        Check(alloyLayer.subLayers.size() == 1
+              && alloyLayer.subLayers[0].kind == OverlaySubLayerKind_UI::Manual
+              && alloyLayer.subLayers[0].index == 0,
+              "mixed layer: Alloy also gets {Manual, 0}");
+        Check(spawnsArmiesLayer.subLayers.size() == 1
+              && spawnsArmiesLayer.subLayers[0].kind == OverlaySubLayerKind_UI::Manual
+              && spawnsArmiesLayer.subLayers[0].index == 0,
+              "mixed layer: SpawnsArmies also gets {Manual, 0} — legal dual membership");
+    }
+
+    // 4. Untouched layer: markerLayers[1] has no contributing transform at all (every transform in
+    // this fixture uses layerIndex 0). Neither domain gets a {Manual, 1} ref — proves the
+    // existence-check, not a blanket PushManualRefs(markerLayerCount).
+    {
+        Params::MapRecipe recipe;
+        recipe.markerLayers.assign(2, Params::MarkerInstanceLayer());
+        Params::MarkerInstanceGroup spawnGroup; spawnGroup.name = "Spawn";
+        spawnGroup.transforms.assign(1, Params::MarkerTransform());
+        spawnGroup.transforms[0].layerIndex = 0;
+        recipe.markers = {spawnGroup};
+
+        OverlayLayerSettings overlaySettings;
+        ConfigureDefaultOverlayLayers(overlaySettings, recipe);
+        const OverlayLayer_UI& alloyLayer        = overlaySettings.overlayLayers[0];
+        const OverlayLayer_UI& spawnsArmiesLayer = overlaySettings.overlayLayers[1];
+        for (const OverlaySubLayerRef_UI& ref : alloyLayer.subLayers)
+            Check(ref.index != 1, "untouched layer: Alloy gets no {Manual, 1} ref");
+        for (const OverlaySubLayerRef_UI& ref : spawnsArmiesLayer.subLayers)
+            Check(ref.index != 1, "untouched layer: SpawnsArmies gets no {Manual, 1} ref");
+    }
+
+    // 5. Manual-before-Procedural ordering: the pure-Spawn recipe from case 1, extended with one
+    // markerRuleLayers Spawn rule. SpawnsArmies must be [{Manual, 0}, {ProceduralRule, 0}].
+    OverlayLayerSettings orderingSettings;
+    {
+        Params::MapRecipe recipe;
+        recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+        Params::MarkerInstanceGroup spawnGroup; spawnGroup.name = "Spawn";
+        spawnGroup.transforms.assign(2, Params::MarkerTransform());
+        spawnGroup.transforms[0].layerIndex = 0;
+        spawnGroup.transforms[1].layerIndex = 0;
+        recipe.markers = {spawnGroup};
+
+        Params::MarkerRuleLayer ruleLayer;
+        Params::MarkerRule spawnRule; spawnRule.category = Params::MarkerCategory::Spawn;
+        ruleLayer.rules = {spawnRule};
+        recipe.markerRuleLayers = {ruleLayer};
+
+        ConfigureDefaultOverlayLayers(orderingSettings, recipe);
+        const OverlayLayer_UI& spawnsArmiesLayer = orderingSettings.overlayLayers[1];
+        Check(spawnsArmiesLayer.subLayers.size() == 2
+              && spawnsArmiesLayer.subLayers[0].kind == OverlaySubLayerKind_UI::Manual
+              && spawnsArmiesLayer.subLayers[0].index == 0
+              && spawnsArmiesLayer.subLayers[1].kind == OverlaySubLayerKind_UI::ProceduralRule
+              && spawnsArmiesLayer.subLayers[1].index == 0,
+              "Manual-before-Procedural: SpawnsArmies is [{Manual,0},{ProceduralRule,0}] in that order");
+    }
+
+    // 6. Unchanged-domain guard: Units/Props/Reclaim/Decals stay empty across every fixture above
+    // (none populate armies/propRules/propLayers/decalRules/decalLayers).
+    Check(orderingSettings.overlayLayers[2].subLayers.empty(), "unchanged-domain guard: Units stays empty");
+    Check(orderingSettings.overlayLayers[3].subLayers.empty(), "unchanged-domain guard: Props stays empty");
+    Check(orderingSettings.overlayLayers[4].subLayers.empty(), "unchanged-domain guard: Reclaim stays empty");
+    Check(orderingSettings.overlayLayers[5].subLayers.empty(), "unchanged-domain guard: Decals stays empty");
+}
+
 void RunResolveUnitsManualSubLayerChecks() {
     Params::MapRecipe recipe;
     Params::Army armyZero; armyZero.groups.assign(2, Params::UnitGroup());
@@ -294,6 +425,7 @@ int main() {
     RunCategorySplitChecks();
     RunManualProceduralOrderingChecks();
     RunPropReclaimPartitionChecks();
+    RunMarkerManualPartitionChecks();
     RunResolveUnitsManualSubLayerChecks();
     RunReadWriteCorrectnessChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
