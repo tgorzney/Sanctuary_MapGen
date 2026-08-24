@@ -4,6 +4,7 @@
 // MapImporter_Fields_IO.cpp's LoadBakedFields is the only caller, from its own tail once the
 // heightmap itself has loaded.
 #pragma once
+#include <string>
 #include <vector>
 
 namespace SanmapGen {
@@ -23,9 +24,11 @@ struct MapImportResult;
 //   1. FRESH SYNTHESIS: `recipe.layerStack` is empty — a genuine externally-authored `.sanmap` with
 //      no SanGen HeightmapStack section (the reported bug's exact scenario). Exactly ONE baked
 //      `Params::Layer`, at its default `stratumIndex == 0` (`LAYER_SYSTEM_SPEC`'s "Stratum 0 = the
-//      always-present base"), is minted into a new "Imported Bake" GeoLayer holding the loaded
-//      heightfield verbatim, so NoiseBlendStage (STEP100) reproduces the loaded heightfield instead
-//      of silently discarding it.
+//      always-present base"), is minted into a new GeoLayer holding the loaded heightfield verbatim,
+//      so NoiseBlendStage (STEP100) reproduces the loaded heightfield instead of silently discarding
+//      it. STEP109: the new GeoLayer's name is derived from `sourceFileName` (the document's own
+//      filename stem, underscores replaced with spaces — `DeriveLayerNameFromFileName`, the .cpp),
+//      never from the document's own JSON `"name"` field.
 //   2. RE-HYDRATION: `recipe.layerStack` already has content (e.g. re-opening a `.sanmap` SanGen
 //      itself exported after this feature shipped). Every EXISTING bBaked layer with no
 //      `bakedImagePath` (never an Import-RAW layer — STEP102) is re-derived verbatim from the
@@ -34,9 +37,13 @@ struct MapImportResult;
 //      the height. A `.sanmap` still carrying more than one such layer under one GeoLayer (a
 //      STEP101-era per-stratum export, now stale) is flagged via `result.Warn(...)` rather than
 //      migrated — see the .cpp for the reasoning.
+// `sourceFileName` (STEP109) is the imported document's own filename STEM (never its JSON
+// `"name"` field), computed once by the caller (`LoadBakedFields`, `MapImporter_Fields_IO.cpp`) via
+// `std::filesystem::path(documentPath).stem().string()`. Only consumed by the FRESH-SYNTHESIS
+// branch — the re-hydration branch never renames an existing, possibly hand-renamed, GeoLayer.
 void DecomposeBakedHeightmapIntoLayers(Params::MapRecipe& recipe, Data::MapFields& fields,
                                        std::vector<Data::BakedLayerImage>& outBakedLayerImages,
-                                       MapImportResult& result);
+                                       MapImportResult& result, const std::string& sourceFileName);
 
 } // namespace Io
 } // namespace SanmapGen

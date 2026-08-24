@@ -1,12 +1,15 @@
-// MapImporter_HeightmapDecomposition_IO_Test.cpp — STEP105 acceptance (revises STEP101's own): a
-// genuinely externally-authored `.sanmap` (recipe.layerStack empty, exactly the reported bug's
-// scenario) synthesizes exactly ONE flattened baked height layer, and its stratum-1 mask art feeds
-// `Data::StratumArt::importedMask` / `Params::Stratum::importedMaskMode` rather than splitting the
-// height. Running the full GenerationAssembler pipeline once reproduces the ORIGINAL imported
-// heightfield AND, via `ImportedMaskMode::StaticOverride`, the original imported mask -- the real
-// end-to-end proof this ticket's second half works. Its own binary (not folded into MapImporter_IO_Test's
-// three-TU group) since it is the first IO acceptance test that reaches into Pipeline to run a real
-// GenerationAssembler, not just parse/round-trip a document.
+// MapImporter_HeightmapDecomposition_IO_Test.cpp — STEP105 acceptance (revises STEP101's own),
+// extended by STEP109: a genuinely externally-authored `.sanmap` (recipe.layerStack empty, exactly
+// the reported bug's scenario) synthesizes exactly ONE flattened baked height layer, and its
+// stratum-1 mask art feeds `Data::StratumArt::importedMask` / `Params::Stratum::importedMaskMode`
+// rather than splitting the height. Running the full GenerationAssembler pipeline once reproduces
+// the ORIGINAL imported heightfield AND, via `ImportedMaskMode::StaticOverride`, the original
+// imported mask -- the real end-to-end proof this ticket's second half works. Its own binary (not
+// folded into MapImporter_IO_Test's three-TU group) since it is the first IO acceptance test that
+// reaches into Pipeline to run a real GenerationAssembler, not just parse/round-trip a document.
+// STEP109 adds: the fresh-synthesis GeoLayer's name derives from the document's own FILENAME stem
+// (underscores -> spaces, trimmed, "Imported Bake" fallback), never the JSON "Name"/mapName field,
+// and a hand-renamed group survives a re-import round trip untouched.
 #include "MapImporter_IO.h"
 #include "MapExporter_IO.h"
 #include "../data/BakedLayerImage_DATA.h"
@@ -85,6 +88,25 @@ bool FieldMatches(const Data::FloatField& assembled, const Data::FloatField& ori
         for (int x = 0; x < original.Width(); ++x)
             if (!NearlyEqual(assembled.Get(x, y), original.Get(x, y), tolerance)) return false;
     return true;
+}
+
+// STEP109: finds the single `.sanmap` document WriteSyntheticExternalMap already wrote into
+// `folderPath` and renames it so its STEM becomes `newStem` -- lets these tests control the file
+// stem independent of the recipe's own `mapName`/JSON `"Name"` field (the ticket's own explicit
+// contrast: derived from the FILENAME, never `general.name`). Returns the new document path.
+std::string RenameSanmapDocumentStem(const std::string& folderPath, const std::string& newStem) {
+    std::error_code walkError;
+    std::string oldDocumentPath;
+    for (const std::filesystem::directory_entry& entry :
+         std::filesystem::directory_iterator(folderPath, walkError)) {
+        if (entry.path().extension().string() == ".sanmap") { oldDocumentPath = entry.path().string(); break; }
+    }
+    if (oldDocumentPath.empty()) return std::string();
+    const std::filesystem::path newDocumentPath =
+        std::filesystem::path(folderPath) / (newStem + ".sanmap");
+    std::error_code renameError;
+    std::filesystem::rename(oldDocumentPath, newDocumentPath, renameError);
+    return renameError ? std::string() : newDocumentPath.string();
 }
 
 void CheckFreshImportSynthesizesOneLayerAndFeedsMask(const std::string& folderPath) {
@@ -204,6 +226,107 @@ void CheckReimportAfterRoundTripDoesNotDuplicate(const std::string& firstFolderP
           "the re-imported recipe reproduces the same (already-decomposed-once) heightfield");
 }
 
+// STEP109: the fresh-synthesis GeoLayer's name is derived from the document's own FILENAME stem
+// (underscores -> spaces), never the JSON "Name"/mapName field -- WriteSyntheticExternalMap's
+// recipe.mapName stays at its own default ("mapdef"), so a match here can only be explained by the
+// renamed FILE stem, not the document's own name field.
+void CheckFreshImportDerivesNameFromFilenameStem() {
+    const std::string folderPath = ScratchFolderPath("SanGenHeightmapDecompositionStemTest");
+    WriteSyntheticExternalMap(folderPath);
+    Check(!RenameSanmapDocumentStem(folderPath, "Test_Map_One").empty(),
+          "the exported document was found and renamed to Test_Map_One.sanmap");
+
+    Params::MapRecipe loadedRecipe;
+    Data::MapFields loadedFields;
+    std::vector<Data::BakedLayerImage> bakedLayerImages;
+    std::vector<Data::StratumArt> stratumArt;
+    const Io::MapImportResult result = Io::MapImporter::LoadSanmap(
+        folderPath, loadedRecipe, &loadedFields, Io::MapImportOptions(), nullptr, nullptr,
+        &bakedLayerImages, &stratumArt);
+    Check(result.bSucceeded, "the renamed document loads");
+    Check(loadedRecipe.layerStack.geoLayers.size() == 1, "exactly one fresh-synthesis GeoLayer");
+    Check(!loadedRecipe.layerStack.geoLayers.empty()
+          && loadedRecipe.layerStack.geoLayers[0].name == "Test Map One",
+          "\"Test_Map_One\" -> \"Test Map One\" -- derived from the FILENAME stem, not mapName "
+          "(still \"mapdef\")");
+}
+
+void CheckLeadingUnderscoreIsTrimmed() {
+    const std::string folderPath = ScratchFolderPath("SanGenHeightmapDecompositionLeadingUnderscoreTest");
+    WriteSyntheticExternalMap(folderPath);
+    Check(!RenameSanmapDocumentStem(folderPath, "_leading").empty(),
+          "the exported document was found and renamed to _leading.sanmap");
+
+    Params::MapRecipe loadedRecipe;
+    Data::MapFields loadedFields;
+    std::vector<Data::BakedLayerImage> bakedLayerImages;
+    std::vector<Data::StratumArt> stratumArt;
+    Io::MapImporter::LoadSanmap(folderPath, loadedRecipe, &loadedFields, Io::MapImportOptions(),
+                                nullptr, nullptr, &bakedLayerImages, &stratumArt);
+    Check(!loadedRecipe.layerStack.geoLayers.empty()
+          && loadedRecipe.layerStack.geoLayers[0].name == "leading",
+          "a leading underscore is trimmed after the underscore->space swap (\"_leading\" -> \"leading\")");
+}
+
+void CheckDegenerateStemFallsBackToImportedBake() {
+    const std::string folderPath = ScratchFolderPath("SanGenHeightmapDecompositionDegenerateStemTest");
+    WriteSyntheticExternalMap(folderPath);
+    Check(!RenameSanmapDocumentStem(folderPath, "___").empty(),
+          "the exported document was found and renamed to ___.sanmap");
+
+    Params::MapRecipe loadedRecipe;
+    Data::MapFields loadedFields;
+    std::vector<Data::BakedLayerImage> bakedLayerImages;
+    std::vector<Data::StratumArt> stratumArt;
+    Io::MapImporter::LoadSanmap(folderPath, loadedRecipe, &loadedFields, Io::MapImportOptions(),
+                                nullptr, nullptr, &bakedLayerImages, &stratumArt);
+    Check(!loadedRecipe.layerStack.geoLayers.empty()
+          && loadedRecipe.layerStack.geoLayers[0].name == "Imported Bake",
+          "an all-underscore (whitespace-only after the swap) stem falls back to \"Imported Bake\"");
+}
+
+// The out-of-scope guard, restated as its own acceptance case: a designer's hand rename of the
+// imported GeoLayer must survive a round trip through export + re-import -- the re-hydration branch
+// (recipe.layerStack already populated) never re-derives an existing group's name.
+void CheckReimportAfterHandRenameDoesNotRevertName() {
+    const std::string firstFolderPath = ScratchFolderPath("SanGenHeightmapDecompositionHandRenameTest");
+    WriteSyntheticExternalMap(firstFolderPath);
+
+    Params::MapRecipe firstRecipe;
+    Data::MapFields firstFields;
+    std::vector<Data::BakedLayerImage> firstBakedLayerImages;
+    std::vector<Data::StratumArt> firstStratumArt;
+    Io::MapImporter::LoadSanmap(firstFolderPath, firstRecipe, &firstFields, Io::MapImportOptions(),
+                                nullptr, nullptr, &firstBakedLayerImages, &firstStratumArt);
+    Check(firstRecipe.layerStack.geoLayers.size() == 1, "the fresh import synthesized one GeoLayer");
+    if (firstRecipe.layerStack.geoLayers.empty()) return;
+
+    firstRecipe.layerStack.geoLayers[0].name = "Hand Renamed By Designer";   // simulated Layer Editor edit
+
+    Pipeline::GenerationAssembler assembler(firstRecipe);
+    RunAssembler(assembler, firstBakedLayerImages, firstStratumArt);
+
+    const std::string secondFolderPath =
+        ScratchFolderPath("SanGenHeightmapDecompositionHandRenameRoundTrip");
+    Io::MapExportOptions exportOptions;
+    const Io::MapExportResult exportResult =
+        Io::MapExporter::ExportAll(secondFolderPath, firstRecipe, assembler.Fields(), exportOptions);
+    Check(exportResult.bSucceeded, "the hand-renamed recipe round-trips back out through export");
+
+    Params::MapRecipe secondRecipe;
+    Data::MapFields secondFields;
+    std::vector<Data::BakedLayerImage> secondBakedLayerImages;
+    std::vector<Data::StratumArt> secondStratumArt;
+    const Io::MapImportResult secondResult = Io::MapImporter::LoadSanmap(
+        secondFolderPath, secondRecipe, &secondFields, Io::MapImportOptions(), nullptr, nullptr,
+        &secondBakedLayerImages, &secondStratumArt);
+    Check(secondResult.bSucceeded, "the re-exported, hand-renamed map re-imports");
+    Check(!secondRecipe.layerStack.geoLayers.empty()
+          && secondRecipe.layerStack.geoLayers[0].name == "Hand Renamed By Designer",
+          "re-importing a .sanmap whose group was hand-renamed does NOT revert the name -- the "
+          "re-hydration branch never re-derives an existing GeoLayer's name");
+}
+
 } // namespace
 
 int main() {
@@ -211,6 +334,10 @@ int main() {
     WriteSyntheticExternalMap(folderPath);
     CheckFreshImportSynthesizesOneLayerAndFeedsMask(folderPath);
     CheckReimportAfterRoundTripDoesNotDuplicate(folderPath);
+    CheckFreshImportDerivesNameFromFilenameStem();
+    CheckLeadingUnderscoreIsTrimmed();
+    CheckDegenerateStemFallsBackToImportedBake();
+    CheckReimportAfterHandRenameDoesNotRevertName();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

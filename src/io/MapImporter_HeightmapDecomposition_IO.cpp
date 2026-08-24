@@ -11,10 +11,27 @@
 
 namespace SanmapGen {
 namespace Io {
+namespace {
+
+// STEP109: the fresh-synthesis GeoLayer's own name, derived from the imported document's filename
+// stem rather than a hardcoded literal or the document's own JSON `"name"` field — underscores
+// become spaces, and any leading/trailing space left by a stem that started/ended with '_' is
+// trimmed. An empty/whitespace-only stem (or no stem at all) falls back to "Imported Bake" so a
+// GeoLayer's name is never empty.
+std::string DeriveLayerNameFromFileName(const std::string& fileStem) {
+    std::string name = fileStem;
+    for (char& character : name) if (character == '_') character = ' ';
+    const std::size_t first = name.find_first_not_of(' ');
+    if (first == std::string::npos) return "Imported Bake";
+    const std::size_t last = name.find_last_not_of(' ');
+    return name.substr(first, last - first + 1);
+}
+
+} // namespace
 
 void DecomposeBakedHeightmapIntoLayers(Params::MapRecipe& recipe, Data::MapFields& fields,
                                        std::vector<Data::BakedLayerImage>& outBakedLayerImages,
-                                       MapImportResult& result) {
+                                       MapImportResult& result, const std::string& sourceFileName) {
     const int vertexSize = fields.VertexSize();
     if (vertexSize < 2) return;
 
@@ -48,7 +65,7 @@ void DecomposeBakedHeightmapIntoLayers(Params::MapRecipe& recipe, Data::MapField
     }
 
     Params::GeoLayer importedGroup;
-    importedGroup.name      = "Imported Bake";
+    importedGroup.name      = DeriveLayerNameFromFileName(sourceFileName);   // STEP109
     importedGroup.mode      = Params::GeoLayerMode::Material;
     importedGroup.blendMode = Params::HeightBlendMode::Add;
 

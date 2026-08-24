@@ -24,21 +24,22 @@ namespace {
 
 // Resolves + reads + size-caps state.sanmapPath's raw document text (Constitution §6) — the same
 // cap RunOpenSanmap's own read already enforced (FilesTab_Actions_UI.cpp); a second, independent
-// read must not silently skip it just because Open already succeeded once.
+// read must not silently skip it just because Open already succeeded once. `outDocumentPath`
+// (STEP109) is the resolved document path itself — RunSelectiveMigrationImport threads it into
+// LoadBakedFields the same way MapImporter::LoadSanmap threads its own resolvedDocumentPath.
 bool ReadSanmapDocumentText(FilesTabState& state, const Io::MapImportOptions& options,
-                            std::string& outFolderPath, std::string& outDocumentText,
-                            Io::MapImportResult& result) {
-    std::string documentPath;
-    if (!Io::ResolveSanmapDocumentPath(state.sanmapPath, documentPath, outFolderPath)) {
+                            std::string& outFolderPath, std::string& outDocumentPath,
+                            std::string& outDocumentText, Io::MapImportResult& result) {
+    if (!Io::ResolveSanmapDocumentPath(state.sanmapPath, outDocumentPath, outFolderPath)) {
         result.Log("No .sanmap document was found at that path.");
         return false;
     }
-    if (!Io::ReadTextFileBytes(documentPath, outDocumentText)) {
-        result.Log("Could not read " + documentPath);
+    if (!Io::ReadTextFileBytes(outDocumentPath, outDocumentText)) {
+        result.Log("Could not read " + outDocumentPath);
         return false;
     }
     if (outDocumentText.size() > options.safetyLimits.maximumDocumentByteSize) {
-        result.Log(documentPath + " is larger than the safety limit.");
+        result.Log(outDocumentPath + " is larger than the safety limit.");
         return false;
     }
     return true;
@@ -68,8 +69,10 @@ bool RunCheckForMigrations(FilesTabState& state) {
     Io::MapImportResult result;
     result.Log("Checking " + state.sanmapPath + " for a migration walk.");
     std::string folderPath;
+    std::string documentPath;
     std::string documentText;
-    if (!ReadSanmapDocumentText(state, state.importOptions, folderPath, documentText, result)) {
+    if (!ReadSanmapDocumentText(state, state.importOptions, folderPath, documentPath, documentText,
+                                result)) {
         AppendFilesTabLog(state, result.debugLog);
         return false;
     }
@@ -105,8 +108,9 @@ bool RunSelectiveMigrationImport(FilesTabState& state, Params::MapRecipe& recipe
 
     Io::MapImportResult result;
     std::string folderPath;
+    std::string documentPath;
     std::string documentText;
-    if (!ReadSanmapDocumentText(state, options, folderPath, documentText, result)) {
+    if (!ReadSanmapDocumentText(state, options, folderPath, documentPath, documentText, result)) {
         AppendFilesTabLog(state, result.debugLog);
         return false;
     }
@@ -134,8 +138,8 @@ bool RunSelectiveMigrationImport(FilesTabState& state, Params::MapRecipe& recipe
         std::vector<Data::StratumArt> scratchStratumArt;
         std::vector<Data::StratumArt>& stratumArt =
             outStratumArt != nullptr ? *outStratumArt : scratchStratumArt;
-        Io::MapImporter::LoadBakedFields(folderPath, recipe, *fields, options, result, bakedLayerImages,
-                                         stratumArt);
+        Io::MapImporter::LoadBakedFields(folderPath, documentPath, recipe, *fields, options, result,
+                                         bakedLayerImages, stratumArt);
     }
 
     AppendFilesTabLog(state, result.debugLog);

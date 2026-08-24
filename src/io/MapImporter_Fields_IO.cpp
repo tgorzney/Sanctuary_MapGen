@@ -130,11 +130,15 @@ bool MapImporter::LoadRawHeightmapIntoField(const std::string& filePath, int ver
     return readableSamples > 0;
 }
 
-bool MapImporter::LoadBakedFields(const std::string& folderPath, Params::MapRecipe& recipe,
+bool MapImporter::LoadBakedFields(const std::string& folderPath, const std::string& documentPath,
+                                  Params::MapRecipe& recipe,
                                   Data::MapFields& outFields, const MapImportOptions& options,
                                   MapImportResult& result,
                                   std::vector<Data::BakedLayerImage>& outBakedLayerImages,
                                   std::vector<Data::StratumArt>& outStratumArt) {
+    // STEP109: computed once here (never duplicated into DecomposeBakedHeightmapIntoLayers) — the
+    // fresh-synthesis GeoLayer's own name source, never the document's own JSON "name" field.
+    const std::string sourceFileName = std::filesystem::path(documentPath).stem().string();
     const int vertexSize = recipe.geometry.VertexSize();
     if (vertexSize < 2) { result.Warn("The recipe's geometry is too small to size the fields."); return false; }
     outFields.Resize(vertexSize, 0.0f);
@@ -151,7 +155,8 @@ bool MapImporter::LoadBakedFields(const std::string& folderPath, Params::MapReci
         outStratumArt, options, result);
     // STEP105: only once the heightmap itself is present -- with none, DecomposeBakedHeightmapIntoLayers
     // would synthesize/re-derive an all-zero bake, which is strictly worse than leaving the recipe alone.
-    if (bHeightmapLoaded) DecomposeBakedHeightmapIntoLayers(recipe, outFields, outBakedLayerImages, result);
+    if (bHeightmapLoaded)
+        DecomposeBakedHeightmapIntoLayers(recipe, outFields, outBakedLayerImages, result, sourceFileName);
 
     // STEP105 §3: default a stratum's importedMaskMode to StaticOverride ONLY when it was never
     // explicitly configured by the imported document.

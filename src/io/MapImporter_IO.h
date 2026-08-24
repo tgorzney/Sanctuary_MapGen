@@ -129,6 +129,9 @@ public:
 
     // `<folder>/Textures/*` -> the caller's fields. The fields are RESIZED to the recipe's
     // geometry first, so a payload that disagrees with the document is clipped, never trusted.
+    // `documentPath` (STEP109) is the resolved `.sanmap` document path (e.g.
+    // `result.resolvedDocumentPath`) — its filename STEM (underscores -> spaces) becomes a
+    // fresh-synthesis GeoLayer's own name; see MapImporter_HeightmapDecomposition_IO.h.
     // `recipe` is non-const: once the heightmap itself loads, this injects/re-derives the single
     // baked layer (MapImporter_HeightmapDecomposition_IO.h, STEP105) straight into
     // `recipe.layerStack`, with its pixel landing in `outBakedLayerImages`. `outStratumArt` (STEP105)
@@ -140,7 +143,8 @@ public:
     // to 9 by the time this runs for ANY exported `.sanmap` — see MapImporter_Fields_IO.cpp's own
     // comment for the verified trace.) An already-non-Disabled value (a real SanGen-authored
     // round-tripped map, or this same call's own prior default) is never overwritten.
-    static bool LoadBakedFields(const std::string& folderPath, Params::MapRecipe& recipe,
+    static bool LoadBakedFields(const std::string& folderPath, const std::string& documentPath,
+                                Params::MapRecipe& recipe,
                                 Data::MapFields& outFields, const MapImportOptions& options,
                                 MapImportResult& result,
                                 std::vector<Data::BakedLayerImage>& outBakedLayerImages,

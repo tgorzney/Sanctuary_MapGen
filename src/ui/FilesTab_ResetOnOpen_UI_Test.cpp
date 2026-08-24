@@ -68,9 +68,15 @@ void CheckOpenReplacesDefaultNoiseLayersAndReproducesTheImportedTerrain() {
                                 &assembler.BakedLayerImages()),
           "Open succeeds on the synthetic external map");
 
+    // STEP109: the fresh-synthesis group's name derives from the document's own FILENAME stem
+    // (underscores -> spaces), never a hardcoded literal. WriteSyntheticExternalMap exports through
+    // a default-constructed Params::MapRecipe, whose mapName ("mapdef", MapRecipe_PARAMS.h's own
+    // default) becomes the document's filename -- "mapdef.sanmap" -- so the derived name is "mapdef"
+    // verbatim (no underscore to swap).
     Check(recipe.layerStack.geoLayers.size() == 1
-          && recipe.layerStack.geoLayers[0].name == "Imported Bake",
-          "the two default noise layers are gone; exactly one 'Imported Bake' group replaces them");
+          && recipe.layerStack.geoLayers[0].name == "mapdef",
+          "the two default noise layers are gone; exactly one fresh-synthesis group (named from the "
+          "document's own filename stem) replaces them");
     bool bEveryLayerBaked = true;
     for (const Params::GeoLayer& group : recipe.layerStack.geoLayers)
         for (const Params::Layer& layer : group.layers)

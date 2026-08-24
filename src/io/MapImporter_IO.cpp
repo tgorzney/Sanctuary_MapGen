@@ -110,8 +110,9 @@ MapImportResult MapImporter::LoadSanmap(const std::string& pathOrFolder, Params:
         std::vector<Data::StratumArt> scratchStratumArt;
         std::vector<Data::StratumArt>& stratumArt =
             outStratumArt != nullptr ? *outStratumArt : scratchStratumArt;
-        result.bBakedFieldsLoaded = LoadBakedFields(result.resolvedFolderPath, outRecipe, *outFields,
-                                                    options, result, bakedLayerImages, stratumArt);
+        result.bBakedFieldsLoaded = LoadBakedFields(result.resolvedFolderPath, result.resolvedDocumentPath,
+                                                    outRecipe, *outFields, options, result,
+                                                    bakedLayerImages, stratumArt);
     }
     return result;
 }
