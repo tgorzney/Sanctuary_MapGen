@@ -3,6 +3,7 @@
 // The group list is the shared DraggableList; every group body, every layer row and every scalar
 // below is a shared widget composed through LayerEditor_Draw_UI.h. Nothing here mutates the stack
 // while a list is open — the whole frame is applied once, in LayerEditor_Signals_UI.h's order.
+#include "LayerEditor_BakedImage_UI.h"
 #include "LayerEditor_Draw_UI.h"
 #include "imgui.h"
 
@@ -61,8 +62,19 @@ void DrawLayerEditor(Params::LayerStack& layerStack, LayerEditorState& state,
                      Pipeline::PreviewDriver* previewDriver) {
     ImGui::PushID("layerEditor");
     const LayerEditorFrameSignals signals = DrawGeoLayerList(layerStack, state, previewDriver);
-    const bool bRecipeMoved = ApplyLayerEditorFrameSignals(
+    bool bRecipeMoved = ApplyLayerEditorFrameSignals(
         layerStack, signals, state.selectedGeoLayerIndex, state.selectedLayerIndex);
+    // Import RAW / Bake, AFTER the structural signals above so the index shifts from
+    // Add/Duplicate/Delete are already resolved (LayerEditor_Action_UI.h's own action carries
+    // indices, not pointers, for exactly this reason). Both need a real pipeline behind them
+    // (STEP102) -- with none bound, the affordance is drawn but does nothing, same posture as the
+    // soil/erosion sections just below.
+    if (generationAssembler != nullptr
+        && (signals.action.kind == LayerEditorActionKind::ImportRawRequested
+            || signals.action.kind == LayerEditorActionKind::BakeToggleRequested)) {
+        bRecipeMoved = ApplyBakedImageAction(signals.action, layerStack, *generationAssembler)
+                     || bRecipeMoved;
+    }
     ClampLayerEditorSelection(layerStack, state.selectedGeoLayerIndex, state.selectedLayerIndex);
     NotifyLayerEditorChange(bRecipeMoved, previewDriver);
 

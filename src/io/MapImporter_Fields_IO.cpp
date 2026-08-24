@@ -39,28 +39,6 @@ bool ReadWholeFile(const std::string& filePath, std::uint64_t maximumByteSize,
     return static_cast<bool>(inputStream);
 }
 
-bool LoadHeightmapRaw(const std::string& filePath, int vertexSize, Data::MapFields& outFields,
-                      const MapImportOptions& options, MapImportResult& result) {
-    std::vector<unsigned char> bytes;
-    if (!ReadWholeFile(filePath, options.safetyLimits.maximumTextureByteSize, bytes)) return false;
-    const std::size_t expectedSampleCount = static_cast<std::size_t>(vertexSize) * vertexSize;
-    if (bytes.size() < expectedSampleCount * 2u) {
-        result.Warn("heightmap.raw is smaller than the map's grid; the tail was left flat.");
-    }
-    const std::size_t readableSamples = bytes.size() / 2u < expectedSampleCount
-        ? bytes.size() / 2u : expectedSampleCount;
-    for (std::size_t sampleIndex = 0; sampleIndex < readableSamples; ++sampleIndex) {
-        const unsigned int lowByte  = bytes[sampleIndex * 2u];
-        const unsigned int highByte = bytes[sampleIndex * 2u + 1u];
-        const unsigned int sample = lowByte | (highByte << 8);
-        const int column = static_cast<int>(sampleIndex % static_cast<std::size_t>(vertexSize));
-        const int row    = static_cast<int>(sampleIndex / static_cast<std::size_t>(vertexSize));
-        outFields.heightfield.Set(column, row, static_cast<float>(sample) * (1.0f / 65535.0f));
-    }
-    result.Log("Loaded heightmap RAW: " + std::to_string(readableSamples) + " sample(s).");
-    return readableSamples > 0;
-}
-
 // One uncompressed BGRA TGA into four consecutive surface-weight fields.
 bool LoadStratumMaskTga(const std::string& filePath, int firstWeightIndex, int sampleSize,
                         Data::MapFields& outFields, const MapImportOptions& options,
@@ -105,6 +83,33 @@ bool LoadStratumMaskTga(const std::string& filePath, int firstWeightIndex, int s
 
 } // namespace
 
+// A validated 16-bit little-endian RAW heightmap into a caller-supplied field (STEP102's public
+// primitive) — see MapImporter_IO.h for the full contract. `outField` is resized here, so a
+// payload that disagrees with `vertexSize` is clipped/flat-padded, never trusted (Constitution §6).
+bool MapImporter::LoadRawHeightmapIntoField(const std::string& filePath, int vertexSize,
+                                            Data::FloatField& outField, const MapImportOptions& options,
+                                            MapImportResult& result) {
+    outField.Resize(vertexSize, vertexSize, 0.0f);
+    std::vector<unsigned char> bytes;
+    if (!ReadWholeFile(filePath, options.safetyLimits.maximumTextureByteSize, bytes)) return false;
+    const std::size_t expectedSampleCount = static_cast<std::size_t>(vertexSize) * vertexSize;
+    if (bytes.size() < expectedSampleCount * 2u) {
+        result.Warn("heightmap RAW is smaller than the map's grid; the tail was left flat.");
+    }
+    const std::size_t readableSamples = bytes.size() / 2u < expectedSampleCount
+        ? bytes.size() / 2u : expectedSampleCount;
+    for (std::size_t sampleIndex = 0; sampleIndex < readableSamples; ++sampleIndex) {
+        const unsigned int lowByte  = bytes[sampleIndex * 2u];
+        const unsigned int highByte = bytes[sampleIndex * 2u + 1u];
+        const unsigned int sample = lowByte | (highByte << 8);
+        const int column = static_cast<int>(sampleIndex % static_cast<std::size_t>(vertexSize));
+        const int row    = static_cast<int>(sampleIndex / static_cast<std::size_t>(vertexSize));
+        outField.Set(column, row, static_cast<float>(sample) * (1.0f / 65535.0f));
+    }
+    result.Log("Loaded heightmap RAW: " + std::to_string(readableSamples) + " sample(s).");
+    return readableSamples > 0;
+}
+
 bool MapImporter::LoadBakedFields(const std::string& folderPath, Params::MapRecipe& recipe,
                                   Data::MapFields& outFields, const MapImportOptions& options,
                                   MapImportResult& result,
@@ -113,8 +118,9 @@ bool MapImporter::LoadBakedFields(const std::string& folderPath, Params::MapReci
     if (vertexSize < 2) { result.Warn("The recipe's geometry is too small to size the fields."); return false; }
     outFields.Resize(vertexSize, 0.0f);
     const std::string texturesFolder = JoinExportPath(folderPath, options.texturesFolderName);
-    const bool bHeightmapLoaded = LoadHeightmapRaw(
-        JoinExportPath(texturesFolder, options.heightmapRawName), vertexSize, outFields, options, result);
+    const bool bHeightmapLoaded = LoadRawHeightmapIntoField(
+        JoinExportPath(texturesFolder, options.heightmapRawName), vertexSize, outFields.heightfield,
+        options, result);
     if (!bHeightmapLoaded) result.Log("No heightmap.raw beside the document; the heightfield is flat.");
     const bool bLowLoaded = LoadStratumMaskTga(
         JoinExportPath(texturesFolder, options.stratumMaskLowName), 0, vertexSize - 1, outFields,

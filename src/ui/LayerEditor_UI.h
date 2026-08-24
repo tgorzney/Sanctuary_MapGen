@@ -17,7 +17,11 @@
 //  1. `Params::Layer` has no per-layer symmetry (`bUseGlobalSymmetry` + axis mask), no blend
 //     SHARPNESS and no image BRIGHTNESS, so none of the three is drawn. (The per-layer `name`
 //     this note used to list was landed by WO B2 and IS drawn, in the layer header row.)
-//  2. Import RAW / Bake are detected, never applied — see LayerEditor_Action_UI.h.
+//  2. (CLOSED by STEP102) Import RAW / Bake used to be detected, never applied — now
+//     LayerEditor_BakedImage_UI.h's `ApplyBakedImageAction`, called from DrawLayerEditor
+//     alongside `ApplyLayerEditorFrameSignals`, is the applier. `ApplyLayerEditorAction`
+//     (LayerEditor_Action_UI.h) still refuses both kinds itself — it stays IO-free by
+//     contract; the baked-image applier is the one place that legitimately needs IO.
 //  3. "Base Absorption" is per-MATERIAL in v2 (soil physics), not per-erosion-layer, so it is
 //     exposed exactly once, in Soil Physics. A second copy would be a rival control (ARCH §4).
 #pragma once

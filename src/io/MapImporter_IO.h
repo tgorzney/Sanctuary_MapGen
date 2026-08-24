@@ -38,7 +38,7 @@
 #include <vector>
 
 namespace SanmapGen {
-namespace Data { class MapFields; struct BakedLayerImage; }
+namespace Data { class MapFields; class FloatField; struct BakedLayerImage; }
 namespace Params { struct MapRecipe; }
 namespace Io {
 
@@ -129,6 +129,17 @@ public:
                                 Data::MapFields& outFields, const MapImportOptions& options,
                                 MapImportResult& result,
                                 std::vector<Data::BakedLayerImage>& outBakedLayerImages);
+
+    // A validated 16-bit little-endian RAW heightmap into a CALLER-supplied field (STEP102) —
+    // `outField` is resized to `vertexSize` x `vertexSize` first, so a payload that disagrees
+    // with the caller's request is clipped/flat-padded, never trusted (Constitution §6). This is
+    // the same validated body `LoadBakedFields` has always used for `heightmap.raw` (that call
+    // site is unchanged — it still targets `outFields.heightfield`); exposed as a public primitive
+    // so the Layer Editor's "Import RAW" action (LayerEditor_BakedImage_UI.cpp) can target any
+    // `Data::FloatField`, not only the baked-fields destination.
+    static bool LoadRawHeightmapIntoField(const std::string& filePath, int vertexSize,
+                                          Data::FloatField& outField, const MapImportOptions& options,
+                                          MapImportResult& result);
 };
 
 } // namespace Io

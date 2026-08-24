@@ -12,6 +12,7 @@ using namespace SanmapGen::Ui;
 
 void RunLayerEditorSignalChecks();
 void RunLayerEditorErosionChecks();
+void RunLayerEditorBakedImageChecks();
 
 namespace {
 
@@ -118,5 +119,6 @@ int main() {
     RunValueMirrorChecks();
     RunLayerEditorSignalChecks();
     RunLayerEditorErosionChecks();
+    RunLayerEditorBakedImageChecks();
     return ReportLayerEditorTestResult();
 }

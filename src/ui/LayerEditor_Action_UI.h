@@ -7,12 +7,14 @@
 // with no window open, and it is why an action carries indices rather than pointers — a vector
 // that grows during Apply would invalidate them.
 //
-// SCOPE NOTE (ARCH §8.4 — a coder never invents a missing field; reported, not invented):
-// `ImportRawRequested` and `BakeToggleRequested` are DETECTED and never applied here.
-// `Params::Layer` carries no imported-image path and no baked-state flag — ARCH §5.2 evicted the
-// god-object's image-bake state from the layer record and did not give it a new home, so there is
-// nothing legal to write. The affordances, the picker's extension fence and the signal are
-// complete; the PARAMS field and the bake itself need their own work-order.
+// SCOPE NOTE (updated by STEP102 — CLOSED, kept for history): `ImportRawRequested` and
+// `BakeToggleRequested` are still DETECTED and refused by `ApplyLayerEditorAction` below — that
+// stays true, on purpose, since this header remains IO-free by contract (no imgui, no draw, no
+// disk access). `Params::Layer` DOES now carry `bBaked`/`bakedImagePath`/`layerIdentifier`
+// (STEP99) and both actions DO have a real applier: `LayerEditor_BakedImage_UI.h`'s
+// `ApplyBakedImageAction`, the one place in this row-action family that legitimately needs IO to
+// read an imported file (STEP100/101/102). `DrawLayerEditor` (LayerEditor_UI.cpp) calls it
+// alongside `ApplyLayerEditorFrameSignals`, not instead of it.
 #pragma once
 #include <string>
 #include "../params/LayerStack_PARAMS.h"
@@ -75,7 +77,14 @@ inline bool ApplyLayerEditorAction(Params::LayerStack& layerStack, const LayerEd
     if (!LayerEditorActionNamesLayer(layerStack, action.geoLayerIndex, action.layerIndex)) return false;
     // The copy lands directly ABOVE its source, where the v1 duplicate put it, so a duplicate is
     // adjacent to what it was cloned from rather than at the bottom of a forty-row stack.
-    const Params::Layer duplicatedLayer = group.layers[static_cast<std::size_t>(action.layerIndex)];
+    Params::Layer duplicatedLayer = group.layers[static_cast<std::size_t>(action.layerIndex)];
+    // STEP99's flagged identity bug: `layerIdentifier` is the key into the PIPELINE-owned
+    // Data::BakedLayerImage cache (STEP100), so a naive value-copy would leave source and copy
+    // sharing one cache key — editing/baking either would silently corrupt the other. The copy
+    // is reset to unbaked/unassigned; `bakedImagePath` and every noise field stay copied verbatim
+    // (its own recipe is legitimately shared until the copy is baked again on its own identifier).
+    duplicatedLayer.layerIdentifier = -1;
+    duplicatedLayer.bBaked          = false;
     group.layers.insert(group.layers.begin() + action.layerIndex, duplicatedLayer);
     selectedGeoLayerIndex = action.geoLayerIndex;
     selectedLayerIndex    = action.layerIndex;

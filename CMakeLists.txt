@@ -696,7 +696,8 @@ add_sangen_test(LuaCodeEditor_UI_Test    src/ui/LuaCodeEditor_UI_Test.cpp)
 add_sangen_test(LayerEditor_UI_Test
     src/ui/LayerEditor_UI_Test.cpp
     src/ui/LayerEditor_Signals_UI_Test.cpp
-    src/ui/LayerEditor_Erosion_UI_Test.cpp)
+    src/ui/LayerEditor_Erosion_UI_Test.cpp
+    src/ui/LayerEditor_BakedImage_UI_Test.cpp)
 add_sangen_test(HeightmapTab_UI_Test      src/ui/HeightmapTab_UI_Test.cpp)
 
 # Tab-rebuild batch C1 — the four terrain view tabs. Each test drives its tab's PURE logic (the

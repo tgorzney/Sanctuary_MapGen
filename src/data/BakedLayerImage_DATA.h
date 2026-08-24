@@ -27,5 +27,17 @@ inline const FloatField* FindBakedLayerImage(const std::vector<BakedLayerImage>&
     return nullptr;
 }
 
+// Mutable counterpart (STEP102): the entry a fresh Import RAW / Bake action writes into. Returns
+// the EXISTING entry when `layerIdentifier` already has one (re-baking overwrites its pixels
+// rather than accumulating a duplicate), or appends a fresh zero-initialized entry otherwise.
+inline BakedLayerImage& FindOrAddBakedLayerImage(std::vector<BakedLayerImage>& images,
+                                                 int layerIdentifier) {
+    for (BakedLayerImage& entry : images)
+        if (entry.layerIdentifier == layerIdentifier) return entry;
+    images.push_back(BakedLayerImage());
+    images.back().layerIdentifier = layerIdentifier;
+    return images.back();
+}
+
 } // namespace Data
 } // namespace SanmapGen

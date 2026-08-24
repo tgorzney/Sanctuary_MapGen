@@ -1,0 +1,176 @@
+// LayerEditor_BakedImage_UI_Test.cpp — STEP102 acceptance: ApplyBakedImageAction wires Import RAW
+// and the Bake/Unbake toggle to a real Pipeline::GenerationAssembler. Unlike the erosion checks
+// (LayerEditor_Erosion_UI_Test.cpp), which only edit constants reached through the assembler, this
+// drives real `Run()`s -- the whole point is observing what the NEXT run puts in
+// `assembler.Fields().heightfield`. main() lives in LayerEditor_UI_Test.cpp.
+#include "LayerEditor_BakedImage_UI.h"
+#include "LayerEditor_TestSupport_UI.h"
+#include "../io/FilesystemPrimitives_IO.h"
+#include "../params/MapRecipe_PARAMS.h"
+#include "../pipeline/GenerationAssembler_PIPELINE.h"
+#include <cstdint>
+#include <filesystem>
+#include <vector>
+
+using namespace SanmapGen;
+using namespace SanmapGen::Ui;
+
+namespace {
+
+constexpr int kFixtureMapSize = 15;   // vertexSize 16 -- small and fast, matches
+                                      // NoiseBlend_Baked_PROC_Test.cpp's own scale.
+
+// A private, EMPTY scratch folder -- same posture as MapFormat_TestSupport_IO.h's own helper
+// (not reused directly: that header lives in src/io and carries its own MapFormatTest::Check).
+std::string ScratchFolderPath(const char* folderName) {
+    std::error_code pathError;
+    const std::filesystem::path folder = std::filesystem::temp_directory_path(pathError) / folderName;
+    std::filesystem::remove_all(folder, pathError);
+    std::filesystem::create_directories(folder, pathError);
+    return folder.string();
+}
+
+// A real 16-bit LE RAW heightmap sized to the fixture map: one full-height sample at (1, 1),
+// everything else at the floor.
+std::string WriteFixtureRawFile(const std::string& folderPath, int vertexSize) {
+    std::vector<std::uint16_t> samples(static_cast<std::size_t>(vertexSize) * vertexSize, 0);
+    samples[static_cast<std::size_t>(vertexSize) + 1u] = 65535u;   // column 1, row 1
+    const std::string filePath = folderPath + "/fixture.raw";
+    Io::WriteBinaryFileBytes(filePath, samples.data(), samples.size() * sizeof(std::uint16_t));
+    return filePath;
+}
+
+// One GeoLayer, one Layer, small geometry -- Params::MapRecipe's documented "strata past the end
+// run on their defaults" posture means an empty `strata`/rule array degrades gracefully rather
+// than needing to be fully populated for a real Run() to be safe.
+Params::MapRecipe FixtureRecipe() {
+    Params::MapRecipe recipe;
+    recipe.geometry.mapSize = kFixtureMapSize;
+    Params::GeoLayer group;
+    group.layers.push_back(Params::Layer());
+    recipe.layerStack.geoLayers.push_back(group);
+    return recipe;
+}
+
+void RunImportRawChecks() {
+    const std::string folderPath = ScratchFolderPath("SanGenLayerEditorBakedImageTest");
+    Params::MapRecipe recipe = FixtureRecipe();
+    const std::string rawPath = WriteFixtureRawFile(folderPath, recipe.geometry.VertexSize());
+
+    Pipeline::GenerationAssembler assembler(recipe);
+    // Thermal relaxation is on by default and would slump a single imported spike toward its flat
+    // neighbours before this test ever reads it -- disabled to isolate the mechanism under test,
+    // same precedent as MapImporter_HeightmapDecomposition_IO_Test.cpp's own comment (Erosion is
+    // already a no-op by default -- ErosionLayerSettings::bEnabled starts false).
+    assembler.Thermal().Constants().iterationCount = 0;
+    // Fields() is sized by NoiseBlend's own PrepareRun(), not by construction (GenerationAssembler
+    // stays zero-sized until the first Run()) -- exactly the state the REAL app is already past by
+    // the time a user reaches the Layer Editor's Import RAW button, since the assembler runs once
+    // on open before any tab draws. Matched here rather than papered over.
+    assembler.Run();
+    Params::Layer& layer = recipe.layerStack.geoLayers[0].layers[0];
+
+    LayerEditorAction action;
+    action.kind           = LayerEditorActionKind::ImportRawRequested;
+    action.geoLayerIndex  = 0;
+    action.layerIndex     = 0;
+    action.importRawPath  = rawPath;
+    CheckLayerEditor(ApplyBakedImageAction(action, recipe.layerStack, assembler),
+                     "Import RAW on a real file reports the recipe moved");
+    CheckLayerEditor(layer.bBaked, "and the layer becomes baked");
+    CheckLayerEditor(layer.bakedImagePath == rawPath, "with the picked path recorded");
+    CheckLayerEditor(layer.layerIdentifier >= 0, "and a stable identifier is assigned");
+    const Data::FloatField* image =
+        Data::FindBakedLayerImage(assembler.BakedLayerImages(), layer.layerIdentifier);
+    CheckLayerEditor(image != nullptr, "a matching Data::BakedLayerImage appears in BakedLayerImages()");
+
+    assembler.Run();
+    CheckLayerEditor(assembler.Fields().heightfield.Get(1, 1)
+                    > assembler.Fields().heightfield.Get(0, 0) + 0.5f,
+                     "the NEXT Run() reproduces the file's contents in mapFields.heightfield");
+}
+
+// A rejected/unreadable path leaves the layer untouched (Constitution §6 -- no crash, no partial
+// write). The picker's own extension fence (DrawFilePathPicker) is what usually keeps a bad
+// extension from reaching this far; this exercises the IO-level refusal underneath it.
+void RunImportRawFailureChecks() {
+    Params::MapRecipe recipe = FixtureRecipe();
+    Pipeline::GenerationAssembler assembler(recipe);
+    Params::Layer& layer = recipe.layerStack.geoLayers[0].layers[0];
+
+    LayerEditorAction action;
+    action.kind           = LayerEditorActionKind::ImportRawRequested;
+    action.geoLayerIndex  = 0;
+    action.layerIndex     = 0;
+    action.importRawPath  = "C:/SanGenTest/does/not/exist.raw";
+    CheckLayerEditor(!ApplyBakedImageAction(action, recipe.layerStack, assembler),
+                     "Import RAW on an unreadable file reports the recipe untouched");
+    CheckLayerEditor(!layer.bBaked && layer.bakedImagePath.empty() && layer.layerIdentifier == -1,
+                     "and the layer's baked state stays exactly as it was, no crash");
+}
+
+void RunBakeToggleChecks() {
+    Params::MapRecipe recipe = FixtureRecipe();
+    Pipeline::GenerationAssembler assembler(recipe);
+    Params::Layer& layer = recipe.layerStack.geoLayers[0].layers[0];
+
+    assembler.Run();
+    const float liveHeight = assembler.Fields().heightfield.Get(1, 1);
+
+    LayerEditorAction bake;
+    bake.kind          = LayerEditorActionKind::BakeToggleRequested;
+    bake.geoLayerIndex  = 0;
+    bake.layerIndex     = 0;
+    CheckLayerEditor(ApplyBakedImageAction(bake, recipe.layerStack, assembler),
+                     "Bake on a live noise layer reports the recipe moved");
+    CheckLayerEditor(layer.bBaked, "and flips the layer to baked");
+    CheckLayerEditor(layer.bakedImagePath.empty(),
+                     "with no file path -- sourced from live noise, not a file");
+    const Data::FloatField* image =
+        Data::FindBakedLayerImage(assembler.BakedLayerImages(), layer.layerIdentifier);
+    CheckLayerEditor(image != nullptr, "and a Data::BakedLayerImage snapshot appears");
+
+    layer.frequency = 0.9f;   // a parameter edit that WOULD move a live layer's noise
+    assembler.Run();
+    CheckLayerEditor(assembler.Fields().heightfield.Get(1, 1) == liveHeight,
+                     "a parameter edit after Bake does not move the frozen height, until Unbake");
+
+    LayerEditorAction unbake;
+    unbake.kind          = LayerEditorActionKind::BakeToggleRequested;
+    unbake.geoLayerIndex  = 0;
+    unbake.layerIndex     = 0;
+    CheckLayerEditor(ApplyBakedImageAction(unbake, recipe.layerStack, assembler),
+                     "Unbake reports the recipe moved");
+    CheckLayerEditor(!layer.bBaked, "and flips the layer back to live");
+    assembler.Run();
+    CheckLayerEditor(assembler.Fields().heightfield.Get(1, 1) != liveHeight,
+                     "and resumes live generation -- the edited frequency now DOES take effect");
+}
+
+void RunNamesLayerAndKindFenceChecks() {
+    Params::MapRecipe recipe = FixtureRecipe();
+    Pipeline::GenerationAssembler assembler(recipe);
+
+    LayerEditorAction badIndex;
+    badIndex.kind          = LayerEditorActionKind::BakeToggleRequested;
+    badIndex.geoLayerIndex  = 4;
+    badIndex.layerIndex     = 0;
+    CheckLayerEditor(!ApplyBakedImageAction(badIndex, recipe.layerStack, assembler),
+                     "an action naming no layer is refused");
+
+    LayerEditorAction wrongKind;
+    wrongKind.kind          = LayerEditorActionKind::AddLayer;
+    wrongKind.geoLayerIndex  = 0;
+    wrongKind.layerIndex     = 0;
+    CheckLayerEditor(!ApplyBakedImageAction(wrongKind, recipe.layerStack, assembler),
+                     "a structural kind is not this function's to apply");
+}
+
+} // namespace
+
+void RunLayerEditorBakedImageChecks() {
+    RunImportRawChecks();
+    RunImportRawFailureChecks();
+    RunBakeToggleChecks();
+    RunNamesLayerAndKindFenceChecks();
+}

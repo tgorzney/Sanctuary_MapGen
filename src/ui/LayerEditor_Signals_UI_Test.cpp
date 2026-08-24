@@ -41,6 +41,26 @@ void RunRowActionChecks() {
                      "and the duplicate carries the source's name (WO B2)");
     CheckLayerEditor(selectedLayer == 1, "and the selection follows the copy");
 
+    // STEP102: duplicating a BAKED layer must reset the copy's identity (layerIdentifier/bBaked),
+    // or source and copy would share one Data::BakedLayerImage cache key (STEP99's flagged bug).
+    layerStack.geoLayers[0].layers[1].bBaked          = true;
+    layerStack.geoLayers[0].layers[1].bakedImagePath  = "heightmap.raw";
+    layerStack.geoLayers[0].layers[1].layerIdentifier = 7;
+    LayerEditorAction duplicateBaked;
+    RecordLayerEditorAction(duplicateBaked, LayerEditorActionKind::DuplicateLayer, 0, 1);
+    CheckLayerEditor(ApplyLayerEditorAction(layerStack, duplicateBaked, selectedGroup, selectedLayer),
+                     "Duplicate on a baked layer moves the recipe");
+    // "The copy lands directly ABOVE its source" (line 38's own precedent): insert() takes the
+    // source's OLD index for the copy and shifts the source itself one slot later.
+    CheckLayerEditor(!layerStack.geoLayers[0].layers[1].bBaked
+                     && layerStack.geoLayers[0].layers[1].layerIdentifier == -1,
+                     "the copy lands unbaked with a distinct (unassigned) identifier");
+    CheckLayerEditor(layerStack.geoLayers[0].layers[2].bBaked
+                     && layerStack.geoLayers[0].layers[2].layerIdentifier == 7,
+                     "and the (shifted) source layer's own baked identity is untouched");
+    CheckLayerEditor(layerStack.geoLayers[0].layers[1].bakedImagePath == "heightmap.raw",
+                     "while bakedImagePath and every noise field still copy verbatim");
+
     LayerEditorAction addLayer;
     RecordLayerEditorAction(addLayer, LayerEditorActionKind::AddLayer, 1);
     ApplyLayerEditorAction(layerStack, addLayer, selectedGroup, selectedLayer);
