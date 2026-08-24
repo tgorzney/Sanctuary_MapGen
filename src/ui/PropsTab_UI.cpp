@@ -13,10 +13,17 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-// The procedural prop STACK. MUTATES NOTHING while drawing: the signal is applied after the list
-// has closed, so the vector never moves under a live row.
-DraggableListSignal DrawRuleList(const std::vector<Params::PropRule>& propRules,
-                                 const PropsTabState& state) {
+// The procedural prop STACK. STEP110: each row's own body draws that row's OWN Gates/Affinities/
+// Gate/Symmetry/Transform/TemplatePicker/Resolve-Footprint sections, directly under its own
+// header, whenever ITS OWN CollapsingHeader is open (DraggableList's own per-row expand/collapse
+// state — never gated on `state.selectedRuleIndex`), so an expanded row never shows another row's
+// settings. `propRules` is mutated live by those sections (the widgets write straight through the
+// row's own reference); only the STRUCTURAL signal (reorder/delete/select) is still applied once
+// the list has closed, by the caller.
+DraggableListSignal DrawRuleList(std::vector<Params::PropRule>& propRules, PropsTabState& state,
+                                 Pipeline::PreviewDriver* previewDriver,
+                                 const IconAtlasManifest* iconManifest,
+                                 const Io::TemplateIngestReport* templateIngestReport) {
     char rowLabel[48] = { 0 };
     return DraggableList<Params::PropRule>::Render(
         "propRules", propRules,
@@ -30,7 +37,27 @@ DraggableListSignal DrawRuleList(const std::vector<Params::PropRule>& propRules,
             row.bVisible = rule.bEnabled;
             return row;
         },
-        [](int) {},
+        [&](int rowIndex) {
+            Params::PropRule& rule = propRules[static_cast<std::size_t>(rowIndex)];
+            // Own row, own rule, own settings — the same sections DrawRuleStack used to draw once
+            // at the bottom for whatever was "selected" (pre-STEP110), now drawn inline per
+            // expanded row so they can never bleed across rows.
+            if (!state.slopeToggle.IsCommitDeferred() && !state.heightToggle.IsCommitDeferred())
+                LoadPropRuleValues(rule, state);
+            DrawPropRuleGates(rule, state, previewDriver);
+            DrawPropRuleAffinities(rule, state, previewDriver);
+            DrawPlacementGateSection(rule.maskStratumIndex, rule.maskWeightMinimum,
+                                     rule.mapEdgePadding, state.gate, previewDriver);
+            DrawPlacementSymmetryAxes("propSymmetry", rule.bSymmetryUseGlobal, rule.symmetryMask,
+                                      previewDriver);
+            DrawPlacementTransformSection(rule.transform, state.transform, previewDriver);
+            DrawPlacementTemplatePicker(rule.transform, state.iconGridState, state.iconGridHeight,
+                                       iconManifest, previewDriver);
+            // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — NOT inside DrawPlacementTemplatePicker
+            // (PlacementRuleSections_UI.cpp): baseFootprintWidth/Depth/footprintBakeFingerprint live
+            // on PropRule itself, not on the shared ScatterTransform that function edits.
+            DrawResolvePropFootprintButton(rule, state, templateIngestReport);
+        },
         state.selectedRuleIndex);
 }
 
@@ -63,36 +90,21 @@ bool DrawRuleListButtons(std::vector<Params::PropRule>& propRules, PropsTabState
     return bRecipeMoved;
 }
 
-// The whole procedural stack: the list, its buttons, and the selected rule's sections.
+// The whole procedural stack: the list plus its buttons. STEP110: no trailing "selected rule"
+// panel draw here any more — each row's own body (DrawRuleList) draws that row's settings inline,
+// right under its own header, whenever ITS OWN CollapsingHeader is open. `selectedRuleIndex` stays
+// (ApplyRuleListSignal, the DraggableList "Selected" highlight, and the Remove button's own
+// `SelectedPropRule` lookup still need it) — only the redundant full-panel draw that used to run
+// once at the bottom for whatever it pointed at is gone.
 void DrawRuleStack(Params::MapRecipe& recipe, PropsTabState& state,
                    Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                    const Io::TemplateIngestReport* templateIngestReport) {
     if (!DrawSectionBegin("Procedural Props", state.ruleStackSection)) return;
-    const DraggableListSignal signal = DrawRuleList(recipe.propRules, state);
+    const DraggableListSignal signal =
+        DrawRuleList(recipe.propRules, state, previewDriver, iconManifest, templateIngestReport);
     bool bRecipeMoved = signal.bHasSignal() && ApplyRuleListSignal(recipe.propRules, state, signal);
     bRecipeMoved = DrawRuleListButtons(recipe.propRules, state) || bRecipeMoved;
     NotifyPlacementChange(bRecipeMoved, previewDriver);
-    Params::PropRule* const rule = SelectedPropRule(recipe.propRules, state);
-    if (rule == nullptr) {
-        ImGui::TextUnformatted("Select a prop rule to edit it.");
-        DrawSectionEnd();
-        return;
-    }
-    if (!state.slopeToggle.IsCommitDeferred() && !state.heightToggle.IsCommitDeferred())
-        LoadPropRuleValues(*rule, state);
-    DrawPropRuleGates(*rule, state, previewDriver);
-    DrawPropRuleAffinities(*rule, state, previewDriver);
-    DrawPlacementGateSection(rule->maskStratumIndex, rule->maskWeightMinimum, rule->mapEdgePadding,
-                             state.gate, previewDriver);
-    DrawPlacementSymmetryAxes("propSymmetry", rule->bSymmetryUseGlobal, rule->symmetryMask,
-                              previewDriver);
-    DrawPlacementTransformSection(rule->transform, state.transform, previewDriver);
-    DrawPlacementTemplatePicker(rule->transform, state.iconGridState, state.iconGridHeight,
-                                iconManifest, previewDriver);
-    // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — NOT inside DrawPlacementTemplatePicker
-    // (PlacementRuleSections_UI.cpp): baseFootprintWidth/Depth/footprintBakeFingerprint live on
-    // PropRule itself, not on the shared ScatterTransform that function edits.
-    DrawResolvePropFootprintButton(*rule, state, templateIngestReport);
     DrawSectionEnd();
 }
 

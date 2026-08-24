@@ -10,9 +10,37 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-// MUTATES NOTHING while drawing: the signal is applied after the list has closed.
-DraggableListSignal DrawDecalList(const std::vector<Params::DecalRule>& decalRules,
-                                  const DecalRuleStackState& state) {
+// What terrain a decal may land on, and how densely it lands.
+void DrawDecalGates(Params::DecalRule& rule, DecalRuleStackState& state,
+                    Pipeline::PreviewDriver* previewDriver) {
+    if (!DrawSectionBegin("Decal Gates", state.gateSection)) return;
+    WidgetChange change = DrawRangeSlider("Slope Range (degrees)", state.slopeValues,
+                                          state.slopeBounds, state.slopeToggle, WidgetStyle(), "%.1f");
+    if (change.bValueChanged) StoreDecalRuleValues(state, rule);
+    NotifyPlacementChange(change.bCommitted, previewDriver);
+    change = DrawRangeSlider("Height Range (normalized)", state.heightValues, state.heightBounds,
+                             state.heightToggle);
+    if (change.bValueChanged) StoreDecalRuleValues(state, rule);
+    NotifyPlacementChange(change.bCommitted, previewDriver);
+    NotifyPlacementChange(DrawLabelledDial("Density", rule.density, state.densityRange,
+                                           state.densityToggle, WidgetStyle(), "%.4f").bCommitted,
+                          previewDriver);
+    NotifyPlacementChange(DrawLabelledDial("Spacing Minimum (cells)", rule.spacingMinimum,
+                                           state.spacingRange, state.spacingToggle, WidgetStyle(),
+                                           "%.2f").bCommitted, previewDriver);
+    DrawSectionEnd();
+}
+
+// STEP110: each row's own body draws that row's OWN Gates/Gate/Symmetry/Transform/TemplatePicker
+// sections, directly under its own header, whenever ITS OWN CollapsingHeader is open (DraggableList's
+// own per-row expand/collapse state — never gated on `state.selectedRuleIndex`), so an expanded row
+// never shows another row's settings. `decalRules` is mutated live by those sections (the widgets
+// write straight through the row's own reference); only the STRUCTURAL signal (reorder/delete/select)
+// is still applied once the list has closed, by the caller.
+DraggableListSignal DrawDecalList(std::vector<Params::DecalRule>& decalRules,
+                                  DecalRuleStackState& state,
+                                  Pipeline::PreviewDriver* previewDriver,
+                                  const IconAtlasManifest* iconManifest) {
     char rowLabel[48] = { 0 };
     return DraggableList<Params::DecalRule>::Render(
         "decalRules", decalRules,
@@ -26,7 +54,22 @@ DraggableListSignal DrawDecalList(const std::vector<Params::DecalRule>& decalRul
             row.bVisible = rule.bEnabled;
             return row;
         },
-        [](int) {},
+        [&](int rowIndex) {
+            Params::DecalRule& rule = decalRules[static_cast<std::size_t>(rowIndex)];
+            // Own row, own rule, own settings — the same sections DrawDecalRuleStack used to draw
+            // once at the bottom for whatever was "selected" (pre-STEP110), now drawn inline per
+            // expanded row so they can never bleed across rows.
+            if (!state.slopeToggle.IsCommitDeferred() && !state.heightToggle.IsCommitDeferred())
+                LoadDecalRuleValues(rule, state);
+            DrawDecalGates(rule, state, previewDriver);
+            DrawPlacementGateSection(rule.maskStratumIndex, rule.maskWeightMinimum,
+                                     rule.mapEdgePadding, state.gate, previewDriver);
+            DrawPlacementSymmetryAxes("decalSymmetry", rule.bSymmetryUseGlobal, rule.symmetryMask,
+                                      previewDriver);
+            DrawPlacementTransformSection(rule.transform, state.transform, previewDriver);
+            DrawPlacementTemplatePicker(rule.transform, state.iconGridState, state.iconGridHeight,
+                                       iconManifest, previewDriver);
+        },
         state.selectedRuleIndex);
 }
 
@@ -59,27 +102,6 @@ bool DrawDecalListButtons(std::vector<Params::DecalRule>& decalRules, DecalRuleS
     return bRecipeMoved;
 }
 
-// What terrain a decal may land on, and how densely it lands.
-void DrawDecalGates(Params::DecalRule& rule, DecalRuleStackState& state,
-                    Pipeline::PreviewDriver* previewDriver) {
-    if (!DrawSectionBegin("Decal Gates", state.gateSection)) return;
-    WidgetChange change = DrawRangeSlider("Slope Range (degrees)", state.slopeValues,
-                                          state.slopeBounds, state.slopeToggle, WidgetStyle(), "%.1f");
-    if (change.bValueChanged) StoreDecalRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
-    change = DrawRangeSlider("Height Range (normalized)", state.heightValues, state.heightBounds,
-                             state.heightToggle);
-    if (change.bValueChanged) StoreDecalRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
-    NotifyPlacementChange(DrawLabelledDial("Density", rule.density, state.densityRange,
-                                           state.densityToggle, WidgetStyle(), "%.4f").bCommitted,
-                          previewDriver);
-    NotifyPlacementChange(DrawLabelledDial("Spacing Minimum (cells)", rule.spacingMinimum,
-                                           state.spacingRange, state.spacingToggle, WidgetStyle(),
-                                           "%.2f").bCommitted, previewDriver);
-    DrawSectionEnd();
-}
-
 } // namespace
 
 Params::DecalRule* SelectedDecalRule(std::vector<Params::DecalRule>& decalRules,
@@ -89,30 +111,20 @@ Params::DecalRule* SelectedDecalRule(std::vector<Params::DecalRule>& decalRules,
     return &decalRules[static_cast<std::size_t>(state.selectedRuleIndex)];
 }
 
+// The whole decal stack: the list plus its buttons. STEP110: no trailing "selected rule" panel
+// draw here any more — each row's own body (DrawDecalList) draws that row's settings inline, right
+// under its own header, whenever ITS OWN CollapsingHeader is open. `selectedRuleIndex` stays
+// (ApplyDecalListSignal, the DraggableList "Selected" highlight, and the Remove button's own
+// `SelectedDecalRule` lookup still need it) — only the redundant full-panel draw that used to run
+// once at the bottom for whatever it pointed at is gone.
 void DrawDecalRuleStack(std::vector<Params::DecalRule>& decalRules, DecalRuleStackState& state,
                         Pipeline::PreviewDriver* previewDriver,
                         const IconAtlasManifest* iconManifest) {
     if (!DrawSectionBegin("Decal Rules", state.stackSection)) return;
-    const DraggableListSignal signal = DrawDecalList(decalRules, state);
+    const DraggableListSignal signal = DrawDecalList(decalRules, state, previewDriver, iconManifest);
     bool bRecipeMoved = signal.bHasSignal() && ApplyDecalListSignal(decalRules, state, signal);
     bRecipeMoved = DrawDecalListButtons(decalRules, state) || bRecipeMoved;
     NotifyPlacementChange(bRecipeMoved, previewDriver);
-    Params::DecalRule* const rule = SelectedDecalRule(decalRules, state);
-    if (rule == nullptr) {
-        ImGui::TextUnformatted("Select a decal rule to edit it.");
-        DrawSectionEnd();
-        return;
-    }
-    if (!state.slopeToggle.IsCommitDeferred() && !state.heightToggle.IsCommitDeferred())
-        LoadDecalRuleValues(*rule, state);
-    DrawDecalGates(*rule, state, previewDriver);
-    DrawPlacementGateSection(rule->maskStratumIndex, rule->maskWeightMinimum, rule->mapEdgePadding,
-                             state.gate, previewDriver);
-    DrawPlacementSymmetryAxes("decalSymmetry", rule->bSymmetryUseGlobal, rule->symmetryMask,
-                              previewDriver);
-    DrawPlacementTransformSection(rule->transform, state.transform, previewDriver);
-    DrawPlacementTemplatePicker(rule->transform, state.iconGridState, state.iconGridHeight,
-                                iconManifest, previewDriver);
     DrawSectionEnd();
 }
 
