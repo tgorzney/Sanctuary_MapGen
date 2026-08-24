@@ -11,6 +11,7 @@
 #include "FilesTab_UI.h"
 #include "Section_UI.h"
 #include "SystemTab_UI.h"
+#include "../io/FootprintBakeStaleness_IO.h"
 #include <imgui.h>
 
 namespace SanmapGen {
@@ -34,7 +35,18 @@ void Application::DrawPerformancePanel() {
         DrawSectionEnd();
     }
     ImGui::Separator();
-    DrawSystemTab(tabState.system, &dispatchPolicy, &assembler, &previewDriver);
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md §3.1 call site 2: the staleness check runs ONLY
+    // after a real "Force Regenerate" click (never every frame, never inside PreviewDriver's own
+    // continuous recompute — ARCH_18_02_IngestedDataDeterminism.md §18.2 rule 2) and NEVER gates the
+    // click itself — DrawSystemTab already called RequestMapUpdate() unconditionally before
+    // returning here. This is the one place both `recipe` and `assetBridge.templateIngestReport` are
+    // reachable alongside the button — SystemTab_UI.cpp itself still touches neither.
+    if (DrawSystemTab(tabState.system, &dispatchPolicy, &assembler, &previewDriver)) {
+        const Io::FootprintBakeStalenessReport stalenessReport =
+            Io::CheckFootprintBakeStaleness(recipe, assetBridge.templateIngestReport);
+        tabState.system.lastRegenerateStalenessWarning =
+            stalenessReport.AllFresh() ? std::string() : stalenessReport.SummaryText();
+    }
     ImGui::Separator();
     DrawAssetPanel();
 }

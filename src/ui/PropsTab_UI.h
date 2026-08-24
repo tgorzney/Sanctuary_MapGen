@@ -30,9 +30,11 @@
 #include "PropsTab_Rules_UI.h"
 #include "RangeSliderWidget_UI.h"
 #include "../params/ScatterRule_PARAMS.h"
+#include <string>
 
 namespace SanmapGen {
 namespace Data { class PlacementInstances; }
+namespace Io { class TemplateIngestReport; }
 namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
 namespace Ui {
@@ -70,6 +72,12 @@ struct PropsTabState {
     ManualPropLayersState   manualLayers;
     ManualDecalLayersState  manualDecalLayers;
     DecalRuleStackState     decalStack;
+
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — the selected rule's own "Resolve Footprint"
+    // inline message (a bake-not-found notice; empty otherwise). One shared slot, same posture as
+    // every other single-selection editor mirror on this state (only the selected rule's controls
+    // ever draw).
+    std::string bakeFootprintMessage;
 };
 
 // rule -> widget mirrors (the paired min/max fields the range sliders edit).
@@ -100,11 +108,14 @@ Params::PropRule* SelectedPropRule(std::vector<Params::PropRule>& propRules,
 // `iconManifest`, `placedProps` and `placedDecals` are all nullable: with no resident atlas the
 // picker degrades to the typed tpId, and before the first generation the transform lists simply
 // say so. `placedDecals` is STEP22-new, mirroring the existing `placedProps`.
+// `templateIngestReport` is nullable (STEP90/91's session-scoped ingestion state) — the "Resolve
+// Footprint" button degrades to its "no ingested data" inline message with nothing bound.
 void DrawPropsTab(Params::MapRecipe& recipe, PropsTabState& state,
                   Pipeline::PreviewDriver* previewDriver,
                   const IconAtlasManifest* iconManifest = nullptr,
                   const Data::PlacementInstances* placedProps = nullptr,
-                  const Data::PlacementInstances* placedDecals = nullptr);
+                  const Data::PlacementInstances* placedDecals = nullptr,
+                  const Io::TemplateIngestReport* templateIngestReport = nullptr);
 
 } // namespace Ui
 } // namespace SanmapGen

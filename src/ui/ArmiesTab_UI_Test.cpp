@@ -190,6 +190,35 @@ void RunUnitRuleMirrorChecks() {
     Check(state.pendingUnitCount >= 1, "and the Add Units picker opens on at least one unit");
 }
 
+// STEP96_FootprintBakeAndStalenessCheck_IO.md acceptance tests 1/2: ApplyResolvedFootprintBake is
+// the bake button's pure core (imgui-free) — identical contract to PropsTab_Rules_UI.h's PropRule
+// twin (PropsTab_UI_Test.cpp's own RunResolveFootprintBakeChecks).
+void RunResolveUnitFootprintBakeChecks() {
+    Params::UnitRule rule;
+    rule.spacingMinimum = 7.5f;   // must survive a bake untouched
+    Check(!ApplyResolvedFootprintBake(rule, nullptr),
+          "a miss (nullptr record) reports no bake and changes nothing");
+    Check(!rule.footprintBakeFingerprint.IsValid() && rule.baseFootprintWidth == 2.0f,
+          "the rule keeps its never-baked default after a miss");
+
+    Io::TemplateFootprintRecord record;
+    record.baseFootprintWidth = 1.4f;
+    record.baseFootprintDepth = 1.6f;
+    record.sourceFingerprint.sourcePath   = "Templates/Units/uca1001.santp";
+    record.sourceFingerprint.byteSize     = 2048ull;
+    record.sourceFingerprint.modifiedTime = 1650000000ull;
+    record.sourceFingerprint.contentHash  = 987654321ull;
+    Check(ApplyResolvedFootprintBake(rule, &record), "a found record reports a real bake");
+    Check(rule.baseFootprintWidth == 1.4f && rule.baseFootprintDepth == 1.6f
+          && rule.footprintBakeFingerprint.IsValid()
+          && rule.footprintBakeFingerprint.sourcePath == "Templates/Units/uca1001.santp"
+          && rule.footprintBakeFingerprint.byteSize == 2048ull
+          && rule.footprintBakeFingerprint.modifiedTime == 1650000000ull
+          && rule.footprintBakeFingerprint.contentHash == 987654321ull,
+          "baseFootprintWidth/Depth and every fingerprint field land on the rule");
+    Check(rule.spacingMinimum == 7.5f, "spacingMinimum is never touched by a bake");
+}
+
 // An army is real recipe content now (STEP20): these are its selection/labelling invariants — the
 // label never renders empty, the selection is fenced, and the faction combo names the RATIFIED
 // enum, not the v1-leftover Supreme Commander names.
@@ -332,6 +361,7 @@ int main() {
     RunReorderPreservesArmyIdentityOrderChecks();
     RunUnitRuleFilterChecks();
     RunUnitRuleMirrorChecks();
+    RunResolveUnitFootprintBakeChecks();
     RunArmySelectionChecks();
     RunArmyDisplayNameDefaultsChecks();
     RunMirrorArmyGroupsChecks();

@@ -65,7 +65,8 @@ bool DrawRuleListButtons(std::vector<Params::PropRule>& propRules, PropsTabState
 
 // The whole procedural stack: the list, its buttons, and the selected rule's sections.
 void DrawRuleStack(Params::MapRecipe& recipe, PropsTabState& state,
-                   Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
+                   Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                   const Io::TemplateIngestReport* templateIngestReport) {
     if (!DrawSectionBegin("Procedural Props", state.ruleStackSection)) return;
     const DraggableListSignal signal = DrawRuleList(recipe.propRules, state);
     bool bRecipeMoved = signal.bHasSignal() && ApplyRuleListSignal(recipe.propRules, state, signal);
@@ -88,6 +89,10 @@ void DrawRuleStack(Params::MapRecipe& recipe, PropsTabState& state,
     DrawPlacementTransformSection(rule->transform, state.transform, previewDriver);
     DrawPlacementTemplatePicker(rule->transform, state.iconGridState, state.iconGridHeight,
                                 iconManifest, previewDriver);
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — NOT inside DrawPlacementTemplatePicker
+    // (PlacementRuleSections_UI.cpp): baseFootprintWidth/Depth/footprintBakeFingerprint live on
+    // PropRule itself, not on the shared ScatterTransform that function edits.
+    DrawResolvePropFootprintButton(*rule, state, templateIngestReport);
     DrawSectionEnd();
 }
 
@@ -103,10 +108,11 @@ Params::PropRule* SelectedPropRule(std::vector<Params::PropRule>& propRules,
 void DrawPropsTab(Params::MapRecipe& recipe, PropsTabState& state,
                   Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                   const Data::PlacementInstances* placedProps,
-                  const Data::PlacementInstances* placedDecals) {
+                  const Data::PlacementInstances* placedDecals,
+                  const Io::TemplateIngestReport* templateIngestReport) {
     ImGui::PushID("propsTab");
     DrawManualPropLayers(state.manualLayers, recipe.propLayers, recipe.props, placedProps);
-    DrawRuleStack(recipe, state, previewDriver, iconManifest);
+    DrawRuleStack(recipe, state, previewDriver, iconManifest, templateIngestReport);
     DrawManualDecalLayers(state.manualDecalLayers, recipe.decalLayers, recipe.decals, placedDecals);
     DrawDecalRuleStack(recipe.decalRules, state.decalStack, previewDriver, iconManifest);
     ImGui::PopID();

@@ -5,6 +5,8 @@
 // the in-memory JSON-assembly orchestrator lives there now; this file keeps only the disk/path
 // aspect: resolve, read, and the top-level LoadSanmap action that sequences the two).
 #include "MapImporter_IO.h"
+#include "FootprintBakeStaleness_IO.h"
+#include "TemplateIngest_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <filesystem>
 #include <fstream>
@@ -64,7 +66,8 @@ bool ResolveSanmapDocumentPath(const std::string& pathOrFolder, std::string& out
 
 MapImportResult MapImporter::LoadSanmap(const std::string& pathOrFolder, Params::MapRecipe& outRecipe,
                                         Data::MapFields* outFields, const MapImportOptions& options,
-                                        UnknownImportBag* outUnknownData) {
+                                        UnknownImportBag* outUnknownData,
+                                        const TemplateIngestReport* currentTemplateIngestReport) {
     MapImportResult result;
     result.Log("Loading " + pathOrFolder);
     if (!ResolveSanmapDocumentPath(pathOrFolder, result.resolvedDocumentPath, result.resolvedFolderPath)) {
@@ -82,6 +85,14 @@ MapImportResult MapImporter::LoadSanmap(const std::string& pathOrFolder, Params:
     result.bSucceeded = true;
     result.Log("Recipe loaded: map size " + std::to_string(outRecipe.geometry.mapSize)
                + ", " + std::to_string(outRecipe.layerStack.TotalLayerCount()) + " layer(s).");
+
+    // STEP96 §3.1 call site 1: a sibling pre-flight, same tier as STEP82's export-time spawn-marker
+    // check. Never forces an ingest -- skipped entirely when the caller has none resident.
+    if (currentTemplateIngestReport != nullptr) {
+        const FootprintBakeStalenessReport stalenessReport =
+            CheckFootprintBakeStaleness(outRecipe, *currentTemplateIngestReport);
+        if (!stalenessReport.AllFresh()) result.Warn(stalenessReport.SummaryText());
+    }
 
     if (options.bLoadBakedFields && outFields != nullptr)
         result.bBakedFieldsLoaded = LoadBakedFields(result.resolvedFolderPath, outRecipe, *outFields,

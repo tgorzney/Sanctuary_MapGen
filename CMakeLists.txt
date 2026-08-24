@@ -479,6 +479,15 @@ target_include_directories(TemplateIngest_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE
 # call site (see the work-order's "Design note").
 add_sangen_test(PropReclaimableBake_IO_Test src/io/PropReclaimableBake_IO_Test.cpp)
 
+# STEP96 — the ARCH_18_02_IngestedDataDeterminism.md §18.2 bake action's PARAMS-side fingerprint
+# wire-mapping/cross-type compare, and the staleness scan over recipe.propRules/unitRules. The
+# fingerprint test builds nlohmann::json fixtures directly (Build/Read round trip), so it needs
+# nlohmann's headers -- same reasoning as MapExporter_IO_Test's own note above; the staleness test
+# stays at the Params::MapRecipe/Io::TemplateIngestReport level, no json type in sight.
+add_sangen_test(FootprintBakeFingerprint_IO_Test src/io/FootprintBakeFingerprint_IO_Test.cpp)
+target_link_libraries(FootprintBakeFingerprint_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+add_sangen_test(FootprintBakeStaleness_IO_Test src/io/FootprintBakeStaleness_IO_Test.cpp)
+
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
 # each group below is ONE binary whose main() lives in the first file listed.
 add_sangen_test(NoiseBlend_PROC_Test

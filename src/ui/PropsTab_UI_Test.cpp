@@ -193,6 +193,37 @@ void RunPropLayerNameUniquenessChecks() {
     Check(propLayers[0].name != propLayers[1].name, "and the later row is the one that gets suffixed");
 }
 
+// STEP96_FootprintBakeAndStalenessCheck_IO.md acceptance tests 1/2: ApplyResolvedFootprintBake is
+// the bake button's pure core (imgui-free) — a found record overwrites baseFootprintWidth/Depth/
+// footprintBakeFingerprint ONLY, a miss (nullptr) leaves the rule completely untouched.
+void RunResolveFootprintBakeChecks() {
+    Params::PropRule rule;
+    rule.spacingMinimum = 3.5f;               // must survive a bake untouched
+    rule.obstacleDistanceMinimum = 2.5f;      // must survive a bake untouched
+    Check(!ApplyResolvedFootprintBake(rule, nullptr),
+          "a miss (nullptr record) reports no bake and changes nothing");
+    Check(!rule.footprintBakeFingerprint.IsValid() && rule.baseFootprintWidth == 4.0f,
+          "the rule keeps its never-baked default after a miss");
+
+    Io::TemplateFootprintRecord record;
+    record.baseFootprintWidth = 5.5f;
+    record.baseFootprintDepth = 6.5f;
+    record.sourceFingerprint.sourcePath   = "Templates/Props/rock_01.santp";
+    record.sourceFingerprint.byteSize     = 4096ull;
+    record.sourceFingerprint.modifiedTime = 1700000000ull;
+    record.sourceFingerprint.contentHash  = 123456789ull;
+    Check(ApplyResolvedFootprintBake(rule, &record), "a found record reports a real bake");
+    Check(rule.baseFootprintWidth == 5.5f && rule.baseFootprintDepth == 6.5f
+          && rule.footprintBakeFingerprint.IsValid()
+          && rule.footprintBakeFingerprint.sourcePath == "Templates/Props/rock_01.santp"
+          && rule.footprintBakeFingerprint.byteSize == 4096ull
+          && rule.footprintBakeFingerprint.modifiedTime == 1700000000ull
+          && rule.footprintBakeFingerprint.contentHash == 123456789ull,
+          "baseFootprintWidth/Depth and every fingerprint field land on the rule");
+    Check(rule.spacingMinimum == 3.5f && rule.obstacleDistanceMinimum == 2.5f,
+          "spacingMinimum/obstacleDistanceMinimum are never touched by a bake");
+}
+
 // STEP56 (`ARCH_14_13_OpenItems.md` §14.13 item 3, Work-Order A): a newly created layer's `layerId`
 // derives as max-plus-one across the current in-memory `propLayers`, never a stored counter.
 void RunNextPropLayerIdChecks() {
@@ -215,6 +246,7 @@ int main() {
     RunPropRuleMirrorChecks();
     RunDecalRuleMirrorChecks();
     RunTemplateIdentifierChecks();
+    RunResolveFootprintBakeChecks();
     RunManualPropLayerChecks();
     RunPropLayerRemovalChecks();
     RunPropLayerReorderRenumberChecks();

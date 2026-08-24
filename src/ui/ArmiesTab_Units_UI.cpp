@@ -95,7 +95,8 @@ Params::UnitRule* SelectedUnitRule(std::vector<Params::UnitRule>& unitRules, int
 
 void DrawArmyUnitList(std::vector<Params::UnitRule>& unitRules, int armyIndex,
                       ArmyUnitListState& state, Pipeline::PreviewDriver* previewDriver,
-                      const IconAtlasManifest* iconManifest) {
+                      const IconAtlasManifest* iconManifest,
+                      const Io::TemplateIngestReport* templateIngestReport) {
     if (!DrawSectionBegin("Units", state.section)) return;
     CollectUnitRuleIndicesForArmy(unitRules, armyIndex, state.armyRuleIndices);
     ImGui::Text("%d unit rule(s) in this army.", static_cast<int>(state.armyRuleIndices.size()));
@@ -119,6 +120,10 @@ void DrawArmyUnitList(std::vector<Params::UnitRule>& unitRules, int armyIndex,
     DrawPlacementTransformSection(rule->transform, state.transform, previewDriver);
     DrawPlacementTemplatePicker(rule->transform, state.iconGridState, state.iconGridHeight,
                                 iconManifest, previewDriver);
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — NOT inside DrawPlacementTemplatePicker
+    // (PlacementRuleSections_UI.cpp): baseFootprintWidth/Depth/footprintBakeFingerprint live on
+    // UnitRule itself, not on the shared ScatterTransform that function edits.
+    DrawResolveUnitFootprintButton(*rule, state, templateIngestReport);
     DrawSectionEnd();
 }
 

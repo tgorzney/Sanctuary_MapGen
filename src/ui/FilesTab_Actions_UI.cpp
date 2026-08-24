@@ -42,7 +42,8 @@ bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFie
     // reset/thread when no caller bound one.
     if (state.unknownImportData != nullptr) *state.unknownImportData = Io::UnknownImportBag();
     const Io::MapImportResult result =
-        Io::MapImporter::LoadSanmap(state.sanmapPath, recipe, fields, options, state.unknownImportData);
+        Io::MapImporter::LoadSanmap(state.sanmapPath, recipe, fields, options, state.unknownImportData,
+                                    state.templateIngestReport);
     AppendFilesTabLog(state, result.debugLog);
     // STEP26B_MigrationReconciliationDialog_UI ruling 1: gates the "Check for Migrations..." button
     // — only a completed Open that found no version marker at all may offer the dialog.

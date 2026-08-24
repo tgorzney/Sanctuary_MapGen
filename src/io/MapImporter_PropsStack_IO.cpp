@@ -3,6 +3,7 @@
 // relocated verbatim from the deleted MapImporter_Rules_IO.cpp; only its container changed. Same
 // tier/calling contract as `areas`/`armies`/`PropGroups`/etc.: takes the top-level `document`
 // directly and is called unconditionally, BEFORE the `mapGeneratorData` presence gate.
+#include "FootprintBakeFingerprint_IO.h"
 #include "MapImporter_Recipe_IO.h"
 #include "MapImporter_ScatterTransform_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -20,6 +21,9 @@ void ReadPropRuleJson(const nlohmann::json& json, Params::PropRule& rule) {
     ReadJsonFloat(json, "SpacingMinimum", rule.spacingMinimum);
     ReadJsonFloat(json, "ObstacleDistanceMinimum", rule.obstacleDistanceMinimum);
     ReadJsonFloat(json, "NearCliffDistanceMaximum", rule.nearCliffDistanceMaximum);
+    ReadJsonFloat(json, "BaseFootprintWidth", rule.baseFootprintWidth);
+    ReadJsonFloat(json, "BaseFootprintDepth", rule.baseFootprintDepth);
+    ReadFootprintBakeFingerprintJson(json, "FootprintBakeFingerprint", rule.footprintBakeFingerprint);
     ReadJsonBoolean(json, "SymmetryUseGlobal", rule.bSymmetryUseGlobal);
     ReadJsonInteger(json, "SymmetryMask", rule.symmetryMask);
     ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,

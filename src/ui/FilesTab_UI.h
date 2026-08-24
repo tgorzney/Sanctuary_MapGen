@@ -33,7 +33,7 @@ namespace SanmapGen {
 namespace Data { class MapFields; }
 namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
-namespace Io { class SanpackReader; struct UnknownImportBag; }
+namespace Io { class SanpackReader; class TemplateIngestReport; struct UnknownImportBag; }
 namespace Ui {
 
 // See SCOPE NOTE 1. Returns true when the recipe was populated; `outLog` is appended to the panel.
@@ -98,6 +98,12 @@ struct FilesTabState {
     // unresolved (SanpackReader::HasEntry's "unopened answers false" contract) and pop the confirm
     // dialog on every export for a designer who never loaded a pack at all.
     const Io::SanpackReader* assetPack = nullptr;
+
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md §3.1 call site 1: the live, session-scoped
+    // ingestion report ("Resolve Footprint" bake source) — same nullable, caller-owned posture as
+    // `assetPack` above. With nothing bound (no install configured, or never ingested this session)
+    // OpenSanmap simply skips the post-load staleness check rather than forcing an ingest.
+    const Io::TemplateIngestReport* templateIngestReport = nullptr;
 
     // The blueprintPath confirm-dialog's pending state (Files-tab flow, FilesTab_Draw_UI.cpp only):
     // set on a dirty ExportSanmapOnly/ExportAll click, cleared on OK or Cancel. RunFilesTabAction

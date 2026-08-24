@@ -113,7 +113,8 @@ void DrawArmySettings(std::vector<Params::Army>& armies, int selectedArmyIndex, 
 } // namespace
 
 void DrawArmiesTab(Params::MapRecipe& recipe, ArmiesTabState& state,
-                   Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
+                   Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                   const Io::TemplateIngestReport* templateIngestReport) {
     ImGui::PushID("armiesTab");
     bool bRosterMutated = DrawArmiesGlobals(recipe.armies, state);
     if (DrawSectionBegin("Armies", state.armySection)) {
@@ -131,7 +132,7 @@ void DrawArmiesTab(Params::MapRecipe& recipe, ArmiesTabState& state,
         } else {
             DrawArmySettings(recipe.armies, state.selectedArmyIndex, state);
             DrawArmyUnitList(recipe.unitRules, state.selectedArmyIndex, state.units, previewDriver,
-                             iconManifest);
+                             iconManifest, templateIngestReport);
         }
         // Ruling 5: not threaded into NotifyPlacementChange/bRosterMutated — Army.groups has no reader.
         DrawPendingMirrorArmyConfirmDialog(recipe.armies, state.pendingMirrorSourceArmyIndex,

@@ -135,9 +135,12 @@ inline bool RenumberUnitRuleArmyIndicesForReorder(std::vector<Params::UnitRule>&
 }
 
 // `iconManifest` is nullable: with no resident atlas the unit picker degrades to the typed tpId.
+// `templateIngestReport` is nullable (STEP90/91's session-scoped ingestion state) — see
+// ArmiesTab_Units_UI.h's own note on DrawArmyUnitList.
 void DrawArmiesTab(Params::MapRecipe& recipe, ArmiesTabState& state,
                    Pipeline::PreviewDriver* previewDriver,
-                   const IconAtlasManifest* iconManifest = nullptr);
+                   const IconAtlasManifest* iconManifest = nullptr,
+                   const Io::TemplateIngestReport* templateIngestReport = nullptr);
 
 } // namespace Ui
 } // namespace SanmapGen

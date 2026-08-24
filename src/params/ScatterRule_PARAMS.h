@@ -4,6 +4,7 @@
 // mask gate, edge padding, symmetry and transform ranges below are the "missing capability"
 // list from the spec, exposed as first-class tweakables (Constitution §8).
 #pragma once
+#include "FootprintBakeFingerprint_PARAMS.h"
 #include "ScatterTransform_PARAMS.h"
 
 namespace SanmapGen {
@@ -28,6 +29,23 @@ struct PropRule {
     float maskWeightMinimum       = 0.0f;
     float obstacleDistanceMinimum = 0.0f;   // Jump-Flood exclusion
     float nearCliffDistanceMaximum = 0.0f;  // bNearCliffs: max distance to a steep cell
+
+    // The real, ingested ground-plane extent for transform.templateIdentifier, UNSCALED -- the
+    // per-template "base" size before ScatterTransform::scaleMinimum/scaleMaximum's per-instance
+    // scale multiplier is applied (ARCH_18_02_IngestedDataDeterminism.md §18.2 does not rule on this
+    // multiplication; a future PROC ticket that consumes this field must apply the instance's chosen
+    // scale itself, not assume this value already includes it). "base" mirrors STEP58's own
+    // baseFootprintWidth/baseFootprintDepth naming (WorldFootprintSizeTable_IO.h) for exactly the
+    // same reason STEP58 chose it. Ordinary, hand-editable PARAMS value (§18.2 rule 3) -- the bake
+    // action (PropsTab_Rules_UI.cpp) only ever fills in a STARTING value; nothing locks it afterward.
+    // Default duplicates WorldFootprintSizeTable_IO.h's kDefaultPropFootprintSize{4.0f,4.0f} as a
+    // literal, not an include -- Constitution §1 layering is IO -> {DATA, PARAMS}, never the reverse.
+    float baseFootprintWidth = 4.0f;
+    float baseFootprintDepth = 4.0f;
+    // Empty/zeroed (FootprintBakeFingerprint::IsValid() == false) means "never baked" -- an ordinary,
+    // non-error state (§18.2 rule 4). Populated only by "Resolve Footprint" (PropsTab_Rules_UI.cpp);
+    // compared, never auto-rewritten, by Io::CheckFootprintBakeStaleness.
+    FootprintBakeFingerprint footprintBakeFingerprint;
 
     bool  bSymmetryUseGlobal = true;
     int   symmetryMask       = 0;
@@ -79,6 +97,12 @@ struct UnitRule {
     int   mapEdgePadding   = 0;
     int   maskStratumIndex = -1;
     float maskWeightMinimum = 0.0f;
+
+    // See PropRule's own comment above -- identical contract, UnitRule's own default duplicates
+    // WorldFootprintSizeTable_IO.h's kDefaultUnitFootprintSize{2.0f,2.0f} as a literal.
+    float baseFootprintWidth = 2.0f;
+    float baseFootprintDepth = 2.0f;
+    FootprintBakeFingerprint footprintBakeFingerprint;
 
     bool  bSymmetryUseGlobal = true;
     int   symmetryMask       = 0;

@@ -42,6 +42,9 @@ Application::Application(ApplicationSettings applicationSettings)
     // `scenarioRuntimeResourceDirectory` is COPIED, never pointed — it never changes after launch.
     tabState.files.gameInstallRoot                    = &gameInstallRoot;
     tabState.files.scenarioRuntimeOverridePath        = &scenarioRuntimeOverridePath;
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md §3.1 call site 1 — same one-time wiring posture as
+    // the pair above: `assetBridge.templateIngestReport` is stable for the whole process lifetime.
+    tabState.files.templateIngestReport               = &assetBridge.templateIngestReport;
     tabState.files.scenarioRuntimeResourceDirectory   = settings.scenarioRuntimeResourceDirectory;
     tabState.scenarios.scenarioRuntimeOverridePath      = &scenarioRuntimeOverridePath;
     tabState.scenarios.scenarioRuntimeResourceDirectory = settings.scenarioRuntimeResourceDirectory;

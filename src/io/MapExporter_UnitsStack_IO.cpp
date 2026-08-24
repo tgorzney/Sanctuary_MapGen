@@ -2,6 +2,7 @@
 // Layer: IO. SANMAP_FORMAT_SPEC Correction 7 (ruling #1: a bare top-level array, same shape as
 // `PropGroups`/`DecalGroups`/`StratumGenerationSettings`). `BuildUnitRuleJson`'s body is relocated
 // verbatim from the deleted MapExporter_Rules_IO.cpp; only its container changed.
+#include "FootprintBakeFingerprint_IO.h"
 #include "MapExporter_Recipe_IO.h"
 #include "MapExporter_ScatterTransform_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -17,6 +18,9 @@ nlohmann::ordered_json BuildUnitRuleJson(const Params::UnitRule& rule) {
     json["MinSlope"] = rule.minSlope;  json["MaxSlope"] = rule.maxSlope;
     json["MinHeight"] = rule.minHeight; json["MaxHeight"] = rule.maxHeight;
     json["SpacingMinimum"] = rule.spacingMinimum;
+    json["BaseFootprintWidth"] = rule.baseFootprintWidth;
+    json["BaseFootprintDepth"] = rule.baseFootprintDepth;
+    json["FootprintBakeFingerprint"] = BuildFootprintBakeFingerprintJson(rule.footprintBakeFingerprint);
     json["MapEdgePadding"] = rule.mapEdgePadding;
     json["MaskStratumIndex"] = rule.maskStratumIndex;
     json["MaskWeightMinimum"] = rule.maskWeightMinimum;

@@ -44,7 +44,7 @@ void DrawBackendSettings(SystemTabState& state, Pipeline::GenerationAssembler* g
 
 } // namespace
 
-void DrawSystemTab(SystemTabState& state, Sys::DispatchPolicy* dispatchPolicy,
+bool DrawSystemTab(SystemTabState& state, Sys::DispatchPolicy* dispatchPolicy,
                    Pipeline::GenerationAssembler* generationAssembler,
                    Pipeline::PreviewDriver* previewDriver) {
     ImGui::PushID("systemTab");
@@ -68,8 +68,16 @@ void DrawSystemTab(SystemTabState& state, Sys::DispatchPolicy* dispatchPolicy,
     ImGui::Separator();
     ImGui::TextWrapped("Force a full regeneration for a change no parameter hash can see: a resize, "
                        "a recipe reload, or new stratum art.");
-    if (ImGui::Button("Force Regenerate")) RequestRegeneration(previewDriver);
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md §3.1 call site 2 — this IS the one discrete,
+    // human-clicked regeneration trigger left in the UI. The click fires RequestRegeneration()
+    // unconditionally, THEN reports whether it fired at all; the staleness check itself runs one
+    // frame later, in the caller, and never gates this line.
+    const bool bClicked = ImGui::Button("Force Regenerate");
+    if (bClicked) RequestRegeneration(previewDriver);
+    if (!state.lastRegenerateStalenessWarning.empty())
+        ImGui::TextWrapped("%s", state.lastRegenerateStalenessWarning.c_str());
     ImGui::PopID();
+    return bClicked;
 }
 
 } // namespace Ui

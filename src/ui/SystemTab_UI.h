@@ -19,6 +19,7 @@
 //     job until such a setter is ordered.
 #pragma once
 #include "../sys/Dispatch_SYS.h"
+#include <string>
 
 namespace SanmapGen {
 namespace Pipeline { class GenerationAssembler; class PreviewDriver; }
@@ -29,6 +30,14 @@ struct SystemTabState {
     Sys::ComputeBackend    globalBackend       = Sys::ComputeBackend::Automatic;
     Sys::GenerationContext generationContext   = Sys::GenerationContext::Preview;
     bool                   bDeterministic      = false;   // see SCOPE NOTE 2
+
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md §3.1 call site 2 — a plain, caller-owned status
+    // string (never a `Params::MapRecipe`/`Io::TemplateIngestReport` field: this tab's own SCOPE NOTE
+    // above still holds verbatim). Set by `Application::DrawPerformancePanel` immediately after a
+    // "Force Regenerate" click that found a stale bake; empty otherwise. Non-blocking, no modal — the
+    // house warning posture (STEP73 §0 / STEP82), surfaced here since this IS the one discrete,
+    // human-clicked regeneration trigger left in the current UI (STEP55 retired the toolbar's own).
+    std::string lastRegenerateStalenessWarning;
 };
 
 // state -> the caller's dispatch policy. Pure and headless-testable: determinism is the one
@@ -39,8 +48,13 @@ inline bool ApplySystemTabSettings(const SystemTabState& state, Sys::DispatchPol
     return bMoved;
 }
 
-// Every pointer is nullable; a tab drawn with nothing behind it still edits its own state.
-void DrawSystemTab(SystemTabState& state, Sys::DispatchPolicy* dispatchPolicy,
+// Every pointer is nullable; a tab drawn with nothing behind it still edits its own state. Returns
+// whether "Force Regenerate" was clicked THIS frame — RequestRegeneration() already fired
+// unconditionally either way (STEP96 §3.1 call site 2: the check must never gate the click); the
+// caller (Application::DrawPerformancePanel, which alone touches both `Params::MapRecipe` and
+// `Io::TemplateIngestReport`) uses the return value only to decide whether to also run the
+// non-blocking staleness check and populate `state.lastRegenerateStalenessWarning`.
+bool DrawSystemTab(SystemTabState& state, Sys::DispatchPolicy* dispatchPolicy,
                    Pipeline::GenerationAssembler* generationAssembler,
                    Pipeline::PreviewDriver* previewDriver);
 

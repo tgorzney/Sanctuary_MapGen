@@ -143,17 +143,65 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
     Check(loaded.markerRuleLayers.size() == 1 && loaded.markerRuleLayers[0].rules.size() == 1
           && loaded.markerRuleLayers[0].rules[0].count == 8
           && loaded.markerRuleLayers[0].symmetry.symmetryMask == 1, "the marker rules survive");
-    Check(loaded.propRules.size() == 1 && loaded.propRules[0].bAvoidWater
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md: the fixture now carries a SECOND prop/unit rule
+    // each (a never-baked one, acceptance test 5) alongside the original baked one — size 2, not 1.
+    Check(loaded.propRules.size() == 2 && loaded.propRules[0].bAvoidWater
           && loaded.propRules[0].bReclaimable
           && loaded.propRules[0].bSymmetryUseGlobal == false && loaded.propRules[0].symmetryMask == 2,
           "the prop rules survive, including the per-rule symmetry override");
     Check(loaded.decalRules.size() == 1 && NearlyEqual(loaded.decalRules[0].spacingMinimum, 6.0f)
           && loaded.decalRules[0].bSymmetryUseGlobal == false && loaded.decalRules[0].symmetryMask == 8,
           "the decal rules survive, including the per-rule symmetry override");
-    Check(loaded.unitRules.size() == 1 && loaded.unitRules[0].armyIndex == 2
+    Check(loaded.unitRules.size() == 2 && loaded.unitRules[0].armyIndex == 2
           && loaded.unitRules[0].count == 5 && loaded.unitRules[0].bSymmetryUseGlobal == false
           && loaded.unitRules[0].symmetryMask == 4,
           "the unit rules survive, including the per-rule symmetry override");
+}
+
+// STEP96_FootprintBakeAndStalenessCheck_IO.md acceptance tests 4/5: the baked PropRule/UnitRule's
+// baseFootprintWidth/Depth/footprintBakeFingerprint round-trip exactly (floats via NearlyEqual,
+// fingerprint fields exact), and the SECOND, never-baked rule of each kind round-trips with
+// IsValid() == false on both ends — no crash on the absent nested "FootprintBakeFingerprint" key.
+void CheckFootprintBakeFields(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
+    Check(loaded.propRules.size() == 2 && original.propRules.size() == 2,
+          "the fixture carries exactly one baked and one never-baked prop rule");
+    const Params::PropRule& bakedProp = loaded.propRules[0];
+    Check(NearlyEqual(bakedProp.baseFootprintWidth, original.propRules[0].baseFootprintWidth)
+          && NearlyEqual(bakedProp.baseFootprintDepth, original.propRules[0].baseFootprintDepth)
+          && NearlyEqual(bakedProp.baseFootprintWidth, 5.5f)
+          && NearlyEqual(bakedProp.baseFootprintDepth, 6.5f),
+          "PropRule::baseFootprintWidth/Depth survive the round trip");
+    Check(bakedProp.footprintBakeFingerprint.sourcePath == "Templates/Props/rock_01.santp"
+          && bakedProp.footprintBakeFingerprint.byteSize == 4096ull
+          && bakedProp.footprintBakeFingerprint.modifiedTime == 1700000000ull
+          && bakedProp.footprintBakeFingerprint.contentHash == 123456789ull
+          && bakedProp.footprintBakeFingerprint.IsValid(),
+          "PropRule::footprintBakeFingerprint survives byte-for-byte and reports valid");
+    Check(!loaded.propRules[1].footprintBakeFingerprint.IsValid()
+          && !original.propRules[1].footprintBakeFingerprint.IsValid()
+          && NearlyEqual(loaded.propRules[1].baseFootprintWidth, 4.0f)
+          && NearlyEqual(loaded.propRules[1].baseFootprintDepth, 4.0f),
+          "a never-baked PropRule round-trips with IsValid() == false and STEP58's own default size");
+
+    Check(loaded.unitRules.size() == 2 && original.unitRules.size() == 2,
+          "the fixture carries exactly one baked and one never-baked unit rule");
+    const Params::UnitRule& bakedUnit = loaded.unitRules[0];
+    Check(NearlyEqual(bakedUnit.baseFootprintWidth, original.unitRules[0].baseFootprintWidth)
+          && NearlyEqual(bakedUnit.baseFootprintDepth, original.unitRules[0].baseFootprintDepth)
+          && NearlyEqual(bakedUnit.baseFootprintWidth, 1.4f)
+          && NearlyEqual(bakedUnit.baseFootprintDepth, 1.6f),
+          "UnitRule::baseFootprintWidth/Depth survive the round trip");
+    Check(bakedUnit.footprintBakeFingerprint.sourcePath == "Templates/Units/uca1001.santp"
+          && bakedUnit.footprintBakeFingerprint.byteSize == 2048ull
+          && bakedUnit.footprintBakeFingerprint.modifiedTime == 1650000000ull
+          && bakedUnit.footprintBakeFingerprint.contentHash == 987654321ull
+          && bakedUnit.footprintBakeFingerprint.IsValid(),
+          "UnitRule::footprintBakeFingerprint survives byte-for-byte and reports valid");
+    Check(!loaded.unitRules[1].footprintBakeFingerprint.IsValid()
+          && !original.unitRules[1].footprintBakeFingerprint.IsValid()
+          && NearlyEqual(loaded.unitRules[1].baseFootprintWidth, 2.0f)
+          && NearlyEqual(loaded.unitRules[1].baseFootprintDepth, 2.0f),
+          "a never-baked UnitRule round-trips with IsValid() == false and STEP58's own default size");
 }
 
 // SANMAP_FORMAT_SPEC Correction 3: `SimulationGrouping`/`GeoLayers` are RELOCATED, not dual-written,
@@ -1015,7 +1063,18 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     propRule.symmetryMask = 2;
     // STEP16_SymmetryGlobalSettings_IO: the new sibling field, non-default (CheckSymmetryFields).
     propRule.radialSymmetryRepeatCount = 7;
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md acceptance test 4: a baked PropRule, non-default
+    // and distinct from the unit rule's own values below (catches a field mix-up between the two).
+    propRule.baseFootprintWidth  = 5.5f;
+    propRule.baseFootprintDepth  = 6.5f;
+    propRule.footprintBakeFingerprint.sourcePath   = "Templates/Props/rock_01.santp";
+    propRule.footprintBakeFingerprint.byteSize     = 4096ull;
+    propRule.footprintBakeFingerprint.modifiedTime = 1700000000ull;
+    propRule.footprintBakeFingerprint.contentHash  = 123456789ull;
     recipe.propRules.push_back(propRule);
+    // STEP96 acceptance test 5: a SECOND prop rule that was never baked -- must round-trip with
+    // IsValid() == false on both ends, no crash on the absent nested "FootprintBakeFingerprint" key.
+    recipe.propRules.push_back(Params::PropRule());
     Params::DecalRule decalRule;
     decalRule.spacingMinimum = 6.0f;
     decalRule.bSymmetryUseGlobal = false;
@@ -1028,7 +1087,14 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     unitRule.bSymmetryUseGlobal = false;
     unitRule.symmetryMask = 4;
     unitRule.radialSymmetryRepeatCount = 9;
+    unitRule.baseFootprintWidth  = 1.4f;
+    unitRule.baseFootprintDepth  = 1.6f;
+    unitRule.footprintBakeFingerprint.sourcePath   = "Templates/Units/uca1001.santp";
+    unitRule.footprintBakeFingerprint.byteSize     = 2048ull;
+    unitRule.footprintBakeFingerprint.modifiedTime = 1650000000ull;
+    unitRule.footprintBakeFingerprint.contentHash  = 987654321ull;
     recipe.unitRules.push_back(unitRule);
+    recipe.unitRules.push_back(Params::UnitRule());   // never baked -- see the prop rule note above
 
     // STEP13_PlacementStacks_IO: every GlobalMarkerSettings field, non-default (ARCH §11).
     Params::GlobalMarkerSettings& globalMarkerSettings = recipe.globalMarkerSettings;
@@ -1357,6 +1423,7 @@ void RunRoundTripTests() {
     CheckGeneralMapSettings(original, loaded);
     CheckGeneralMapSettingsTopLevelNotNested(documentText);
     CheckLayerStackAndRules(original, loaded);
+    CheckFootprintBakeFields(original, loaded);
     CheckHeightmapStackTopLevelNotNested(documentText);
     CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(original, loaded);
     CheckPlacementStacksTopLevelNotNested(documentText);

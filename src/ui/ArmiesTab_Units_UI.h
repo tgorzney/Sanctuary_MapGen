@@ -8,7 +8,9 @@
 // the indices is pure, so the filtering is testable with no imgui frame.
 #pragma once
 #include "PlacementRuleSections_UI.h"
+#include "../io/TemplateIngest_IO.h"
 #include "../params/ScatterRule_PARAMS.h"
+#include <string>
 #include <vector>
 
 namespace SanmapGen {
@@ -43,6 +45,10 @@ struct ArmyUnitListState {
     bool bAddUnitsPickerOpen   = false;
     ScalarSliderRange pendingUnitCountRange{ 1.0f, 512.0f, 1.0f };
     RealtimeToggle    pendingUnitCountToggle;
+
+    // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — the selected rule's own "Resolve Footprint"
+    // inline message (a bake-not-found notice; empty otherwise).
+    std::string bakeFootprintMessage;
 };
 
 // Every rule belonging to `armyIndex`, in recipe order. Pure: the filter the virtualized list
@@ -83,9 +89,33 @@ inline bool StoreUnitRuleValues(const ArmyUnitListState& state, Params::UnitRule
 Params::UnitRule* SelectedUnitRule(std::vector<Params::UnitRule>& unitRules, int armyIndex,
                                    const ArmyUnitListState& state);
 
+// STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — the "Resolve Footprint" bake action's pure core.
+// Overwrites baseFootprintWidth/baseFootprintDepth/footprintBakeFingerprint ONLY (never
+// spacingMinimum) and ONLY when `record` is non-null; returns whether it wrote anything. Pure --
+// testable with no imgui frame. Identical contract to PropsTab_Rules_UI.h's PropRule twin.
+inline bool ApplyResolvedFootprintBake(Params::UnitRule& rule, const Io::TemplateFootprintRecord* record) {
+    if (record == nullptr) return false;
+    rule.baseFootprintWidth  = record->baseFootprintWidth;
+    rule.baseFootprintDepth  = record->baseFootprintDepth;
+    rule.footprintBakeFingerprint.sourcePath   = record->sourceFingerprint.sourcePath;
+    rule.footprintBakeFingerprint.byteSize     = record->sourceFingerprint.byteSize;
+    rule.footprintBakeFingerprint.modifiedTime = record->sourceFingerprint.modifiedTime;
+    rule.footprintBakeFingerprint.contentHash  = record->sourceFingerprint.contentHash;
+    return true;
+}
+
+// Defined in ArmiesTab_Units_FootprintBake_UI.cpp (ARCH §1.5 aspect split off ArmiesTab_Units_UI.cpp)
+// — the discrete "Resolve Footprint" button DrawArmyUnitList calls immediately after the shared
+// template-id picker. `templateIngestReport` is nullable.
+void DrawResolveUnitFootprintButton(Params::UnitRule& rule, ArmyUnitListState& state,
+                                    const Io::TemplateIngestReport* templateIngestReport);
+
+// `templateIngestReport` is nullable (STEP90/91's session-scoped ingestion state) — the "Resolve
+// Footprint" button degrades to its "no ingested data" inline message with nothing bound.
 void DrawArmyUnitList(std::vector<Params::UnitRule>& unitRules, int armyIndex,
                       ArmyUnitListState& state, Pipeline::PreviewDriver* previewDriver,
-                      const IconAtlasManifest* iconManifest);
+                      const IconAtlasManifest* iconManifest,
+                      const Io::TemplateIngestReport* templateIngestReport = nullptr);
 
 } // namespace Ui
 } // namespace SanmapGen

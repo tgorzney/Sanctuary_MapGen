@@ -37,11 +37,16 @@ void Application::DrawEnvironmentGroupPanel() {
                            &assembler.Placements().markers);
             break;
         case ApplicationPanel::Armies:
-            DrawArmiesTab(recipe, tabState.armies, &previewDriver, ActiveIconManifest());
+            // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — the live, session-scoped ingestion
+            // report ("Resolve Footprint")'s data source; empty/default until ticket 91's "Ingest
+            // game templates" button has run once this session.
+            DrawArmiesTab(recipe, tabState.armies, &previewDriver, ActiveIconManifest(),
+                         &assetBridge.templateIngestReport);
             break;
         case ApplicationPanel::Props:
             DrawPropsTab(recipe, tabState.props, &previewDriver, ActiveIconManifest(),
-                         &assembler.Placements().props, &assembler.Placements().decals);
+                         &assembler.Placements().props, &assembler.Placements().decals,
+                         &assetBridge.templateIngestReport);
             break;
         case ApplicationPanel::Areas:
             DrawAreasTab(recipe, tabState.areas, &previewDriver);

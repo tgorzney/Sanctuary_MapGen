@@ -42,6 +42,8 @@ namespace Params { struct MapRecipe; }
 namespace Io {
 
 struct UnknownImportBag;
+class TemplateIngestReport;   // TemplateIngest_IO.h -- only a nullable const-ref parameter is
+                              // needed here (STEP96_FootprintBakeAndStalenessCheck_IO.md §3.1).
 
 // Validation caps (Constitution §6) — settings with sane defaults, never literals at a use site.
 struct MapImportSafetyLimits {
@@ -92,10 +94,16 @@ public:
     // baked fields. `outFields` is nullable — see SCOPE NOTE 1. `outUnknownData` is nullable too
     // (STEP24_ImportNeverRefuses_IO ruling 4, `UnknownImportBag_IO.h`) — when given, every
     // genuinely-unrecognized top-level `.sanmap` key lands there instead of being silently dropped.
+    // `currentTemplateIngestReport` is nullable and OPTIONAL (STEP96 §3.1 call site 1): when given a
+    // resident (already-populated, this-session) ingestion report, a post-load, non-blocking
+    // Io::CheckFootprintBakeStaleness pass runs and, if not AllFresh(), surfaces exactly one
+    // aggregate `result.Warn(...)`. With nullptr (the default -- no install configured, or nothing
+    // ingested this session) the check is skipped entirely, never forcing an ingest.
     static MapImportResult LoadSanmap(const std::string& pathOrFolder, Params::MapRecipe& outRecipe,
                                       Data::MapFields* outFields,
                                       const MapImportOptions& options = MapImportOptions(),
-                                      UnknownImportBag* outUnknownData = nullptr);
+                                      UnknownImportBag* outUnknownData = nullptr,
+                                      const TemplateIngestReport* currentTemplateIngestReport = nullptr);
 
     // Document text -> recipe, with no disk access at all. This is the half the round-trip
     // acceptance test drives against MapExporter::BuildSanmapJsonText. `outUnknownData` — see
