@@ -10,6 +10,7 @@
 #include "MapImporter_HeightmapDecomposition_IO.h"
 #include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
+#include "../data/StratumArt_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cstdint>
 #include <filesystem>
@@ -39,10 +40,14 @@ bool ReadWholeFile(const std::string& filePath, std::uint64_t maximumByteSize,
     return static_cast<bool>(inputStream);
 }
 
-// One uncompressed BGRA TGA into four consecutive surface-weight fields.
+// One uncompressed BGRA TGA into four consecutive surface-weight fields, AND (STEP105) the same
+// four `Data::StratumArt::importedMask` fields at the TGA's own NATIVE resolution -- that field's
+// own contract is "any resolution, the Mask stage resamples it bilinearly" (MASKING_SPEC §1.8), so
+// unlike `materialProportions` (vertexSize-clipped, the generated grid's own resolution) this write
+// is never cropped to `sampleSize`.
 bool LoadStratumMaskTga(const std::string& filePath, int firstWeightIndex, int sampleSize,
-                        Data::MapFields& outFields, const MapImportOptions& options,
-                        MapImportResult& result) {
+                        Data::MapFields& outFields, std::vector<Data::StratumArt>& outStratumArt,
+                        const MapImportOptions& options, MapImportResult& result) {
     std::vector<unsigned char> bytes;
     if (!ReadWholeFile(filePath, options.safetyLimits.maximumTextureByteSize, bytes)) return false;
     if (bytes.size() < tgaHeaderByteSize) { result.Warn(filePath + " is too short to be a TGA."); return false; }
@@ -57,22 +62,37 @@ bool LoadStratumMaskTga(const std::string& filePath, int firstWeightIndex, int s
         result.Warn(filePath + " is truncated; it was skipped.");
         return false;
     }
-    const int copySize = fileWidth < sampleSize ? fileWidth : sampleSize;
-    for (int row = 0; row < copySize; ++row) {
+    if (outStratumArt.size() < static_cast<std::size_t>(Data::MapFields::stratumCount))
+        outStratumArt.resize(static_cast<std::size_t>(Data::MapFields::stratumCount));
+    // Size each of this call's four destination fields once, before the pixel loop below (the loop
+    // only ever calls Set(), never Resize()).
+    for (int channel = 0; channel < 4; ++channel) {
+        const int weightIndex = firstWeightIndex + bgraWeightOrder[channel];
+        if (weightIndex < Data::MapFields::stratumCount)
+            outStratumArt[weightIndex].importedMask.Resize(fileWidth, fileHeight, 0.0f);
+    }
+    // Widened to the TGA's own fileWidth/fileHeight (not sampleSize) so the native-resolution write
+    // below is never cropped; the existing vertexSize-clipped materialProportions write stays gated
+    // on column/row < sampleSize exactly as before.
+    for (int row = 0; row < fileHeight; ++row) {
         // The file's first row is the image's BOTTOM row.
         const std::size_t fileRow = static_cast<std::size_t>(fileHeight - 1 - row);
-        for (int column = 0; column < copySize; ++column) {
+        for (int column = 0; column < fileWidth; ++column) {
             const std::size_t pixelStart =
                 tgaHeaderByteSize + (fileRow * fileWidth + static_cast<std::size_t>(column)) * 4u;
             for (int channel = 0; channel < 4; ++channel) {
                 const int weightIndex = firstWeightIndex + bgraWeightOrder[channel];
                 if (weightIndex >= Data::MapFields::stratumCount) continue;
+                const float value = static_cast<float>(bytes[pixelStart + channel]) * (1.0f / 255.0f);
                 // MASKING_SPEC §1.5/§1.6: IO seeds the PHYSICAL field (materialProportions) from an
                 // imported mask — a physical-field approximation, never surfaceStratumWeights (the
                 // Mask stage's own exclusive, VISIBLE-field output; ARCH §3.4 single-writer rule,
-                // STEP101 gap 1).
-                outFields.materialProportions[weightIndex].Set(
-                    column, row, static_cast<float>(bytes[pixelStart + channel]) * (1.0f / 255.0f));
+                // STEP101 gap 1). Unchanged, still vertexSize-clipped.
+                if (column < sampleSize && row < sampleSize)
+                    outFields.materialProportions[weightIndex].Set(column, row, value);
+                // STEP105: the parallel, native-resolution destination the Mask stage's
+                // ImportedMaskMode path actually consumes (Mask_Prepare_PROC.cpp/Mask_Merge_PROC.h).
+                outStratumArt[weightIndex].importedMask.Set(column, row, value);
             }
         }
     }
@@ -113,7 +133,8 @@ bool MapImporter::LoadRawHeightmapIntoField(const std::string& filePath, int ver
 bool MapImporter::LoadBakedFields(const std::string& folderPath, Params::MapRecipe& recipe,
                                   Data::MapFields& outFields, const MapImportOptions& options,
                                   MapImportResult& result,
-                                  std::vector<Data::BakedLayerImage>& outBakedLayerImages) {
+                                  std::vector<Data::BakedLayerImage>& outBakedLayerImages,
+                                  std::vector<Data::StratumArt>& outStratumArt) {
     const int vertexSize = recipe.geometry.VertexSize();
     if (vertexSize < 2) { result.Warn("The recipe's geometry is too small to size the fields."); return false; }
     outFields.Resize(vertexSize, 0.0f);
@@ -124,13 +145,47 @@ bool MapImporter::LoadBakedFields(const std::string& folderPath, Params::MapReci
     if (!bHeightmapLoaded) result.Log("No heightmap.raw beside the document; the heightfield is flat.");
     const bool bLowLoaded = LoadStratumMaskTga(
         JoinExportPath(texturesFolder, options.stratumMaskLowName), 0, vertexSize - 1, outFields,
-        options, result);
+        outStratumArt, options, result);
     const bool bHighLoaded = LoadStratumMaskTga(
         JoinExportPath(texturesFolder, options.stratumMaskHighName), 4, vertexSize - 1, outFields,
-        options, result);
-    // STEP101: only once the heightmap itself is present -- with none, DecomposeBakedHeightmapIntoLayers
+        outStratumArt, options, result);
+    // STEP105: only once the heightmap itself is present -- with none, DecomposeBakedHeightmapIntoLayers
     // would synthesize/re-derive an all-zero bake, which is strictly worse than leaving the recipe alone.
-    if (bHeightmapLoaded) DecomposeBakedHeightmapIntoLayers(recipe, outFields, outBakedLayerImages);
+    if (bHeightmapLoaded) DecomposeBakedHeightmapIntoLayers(recipe, outFields, outBakedLayerImages, result);
+
+    // STEP105 §3: default a stratum's importedMaskMode to StaticOverride ONLY when it was never
+    // explicitly configured by the imported document.
+    //
+    // DEVIATION FROM THE TICKET'S OWN TEXT (verified live, not assumed): the ticket's proposed test
+    // was "recipe.strata.size() <= stratumIndex" (MapRecipe_PARAMS.h's own "strata past the end run
+    // on their defaults"). That signal cannot fire against ANY document written by SanGen's own
+    // exporter: `BuildStratumLayersJson` (MapExporter_StratumLayers_IO.cpp) unconditionally writes
+    // all `sanmapStratumCount` (9) `stratumLayers[]` slots, defaulting an unconfigured stratum from
+    // `Params::Stratum()` rather than omitting it -- so `ReadStratumLayersJson`
+    // (MapImporter_StratumLayers_IO.cpp) always grows `recipe.strata` to 9 on import, regardless of
+    // whether a human ever touched that slot. Confirmed live: this ticket's OWN acceptance fixture
+    // (WriteSyntheticExternalMap, which exports through `Io::MapExporter::ExportAll`) already hits
+    // this — `recipe.strata.size() == 9` before this loop even runs, so the size-only check never
+    // grows/defaults anything.
+    //
+    // The signal actually available after JSON parsing is whether the resolved importedMaskMode is
+    // still sitting at its own class default (`Disabled`, `Params::Stratum`'s own field default) --
+    // so a stratum is treated as "unconfigured" when EITHER it has no slot yet (a genuinely
+    // externally-authored document with no `stratumLayers` section at all) OR its slot exists but
+    // still reads Disabled. This is what makes `CheckReimportAfterRoundTripDoesNotDuplicate` work:
+    // the first import's own StaticOverride default gets written back out explicitly on re-export,
+    // so the second import reads back something other than Disabled and this loop leaves it alone.
+    // Known imperfection (reported, not silently papered over): a document that explicitly chose
+    // Disabled on purpose, whose TGA still happens to carry leftover non-zero pixels for that
+    // channel, is indistinguishable from "never configured" and will also be bumped to
+    // StaticOverride. Fixing that needs the importer to track per-key JSON presence, out of scope
+    // here -- route to the IO Architecture Expert if it ever surfaces as a real complaint.
+    for (std::size_t stratumIndex = 0; stratumIndex < outStratumArt.size(); ++stratumIndex) {
+        if (!outStratumArt[stratumIndex].HasImportedMask()) continue;
+        if (recipe.strata.size() <= stratumIndex) recipe.strata.resize(stratumIndex + 1);
+        if (recipe.strata[stratumIndex].importedMaskMode == Params::ImportedMaskMode::Disabled)
+            recipe.strata[stratumIndex].importedMaskMode = Params::ImportedMaskMode::StaticOverride;
+    }
     return bHeightmapLoaded || bLowLoaded || bHighLoaded;
 }
 

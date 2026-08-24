@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace SanmapGen {
-namespace Data { class MapFields; struct BakedLayerImage; }
+namespace Data { class MapFields; struct BakedLayerImage; struct StratumArt; }
 namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
 namespace Ui {
@@ -20,12 +20,13 @@ struct FilesTabState;
 // popup must be given the chance to run its own frame every frame it might be open. "Apply Selected" runs
 // `RunSelectiveMigrationImport` and (on success) requests a full map update, matching
 // `DrawOpenSection`'s own Open behavior; "Close" dismisses with nothing re-read, nothing mutated.
-// `outBakedLayerImages` — see `RunFilesTabAction` (FilesTab_UI.h, STEP101), same nullable posture,
-// forwarded straight to `RunSelectiveMigrationImport`.
+// `outBakedLayerImages`/`outStratumArt` — see `RunFilesTabAction` (FilesTab_UI.h, STEP101/STEP105),
+// same nullable posture, forwarded straight to `RunSelectiveMigrationImport`.
 void DrawFilesTabMigrationReconciliationDialog(FilesTabState& state, Params::MapRecipe& recipe,
                                                Data::MapFields* fields,
                                                Pipeline::PreviewDriver* previewDriver,
-                                               std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr);
+                                               std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr,
+                                               std::vector<Data::StratumArt>* outStratumArt = nullptr);
 
 } // namespace Ui
 } // namespace SanmapGen

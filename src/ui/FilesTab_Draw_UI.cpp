@@ -14,6 +14,7 @@
 #include "TextInput_UI.h"
 #include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
+#include "../data/StratumArt_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
 #include "imgui.h"
@@ -35,14 +36,15 @@ void DrawActionButton(FilesTabAction action, FilesTabState& state, Params::MapRe
 
 void DrawOpenSection(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFields* fields,
                      Pipeline::PreviewDriver* previewDriver,
-                     std::vector<Data::BakedLayerImage>* bakedLayerImages) {
+                     std::vector<Data::BakedLayerImage>* bakedLayerImages,
+                     std::vector<Data::StratumArt>* stratumArt) {
     if (!DrawSectionBegin("Open", state.openSection)) return;
     DrawCheckbox("Load Baked Textures On Import", state.bLoadBakedFieldsOnImport);
     if (fields == nullptr)
         ImGui::TextUnformatted("No field destination bound; the recipe loads, the textures are skipped.");
     if (DrawFilesTabOpenButton(FilesTabActionLabel(FilesTabAction::OpenSanmap), state.sanmapPath)) {
         const bool bSucceeded = RunFilesTabAction(FilesTabAction::OpenSanmap, state, recipe, fields,
-                                                  false, bakedLayerImages);
+                                                  false, bakedLayerImages, stratumArt);
         if (bSucceeded && previewDriver != nullptr) previewDriver->RequestMapUpdate();
     }
     // STEP26B ruling 1: only a completed Open that found no version marker at all may offer this —
@@ -103,9 +105,10 @@ void DrawLogSection(FilesTabState& state) {
 
 void DrawFilesTab(Params::MapRecipe& recipe, FilesTabState& state, Data::MapFields* fields,
                   Pipeline::PreviewDriver* previewDriver,
-                  std::vector<Data::BakedLayerImage>* bakedLayerImages) {
+                  std::vector<Data::BakedLayerImage>* bakedLayerImages,
+                  std::vector<Data::StratumArt>* stratumArt) {
     ImGui::PushID("filesTab");
-    DrawOpenSection(state, recipe, fields, previewDriver, bakedLayerImages);
+    DrawOpenSection(state, recipe, fields, previewDriver, bakedLayerImages, stratumArt);
     DrawExportSection(state, recipe, fields, previewDriver);
     // STEP77: machine-local settings + the Export Scenario Script row/banner — a SEPARATE section,
     // never buried in Scenarios (Fix §5's own reasoning).
@@ -115,7 +118,8 @@ void DrawFilesTab(Params::MapRecipe& recipe, FilesTabState& state, Data::MapFiel
     // collapsed) Export section must still get its popup frame every frame it might be open.
     DrawPendingExportWarningDialog(state, recipe, fields);
     // Same unconditional posture (STEP26B) — the reconciliation dialog's own popup.
-    DrawFilesTabMigrationReconciliationDialog(state, recipe, fields, previewDriver, bakedLayerImages);
+    DrawFilesTabMigrationReconciliationDialog(state, recipe, fields, previewDriver, bakedLayerImages,
+                                              stratumArt);
     ImGui::PopID();
 }
 

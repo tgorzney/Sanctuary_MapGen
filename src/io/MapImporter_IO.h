@@ -38,7 +38,7 @@
 #include <vector>
 
 namespace SanmapGen {
-namespace Data { class MapFields; class FloatField; struct BakedLayerImage; }
+namespace Data { class MapFields; class FloatField; struct BakedLayerImage; struct StratumArt; }
 namespace Params { struct MapRecipe; }
 namespace Io {
 
@@ -101,17 +101,24 @@ public:
     // aggregate `result.Warn(...)`. With nullptr (the default -- no install configured, or nothing
     // ingested this session) the check is skipped entirely, never forcing an ingest.
     // `outBakedLayerImages` is nullable, same caller-owned posture as `outFields` (STEP101): when
-    // given, it receives LoadBakedFields's own per-stratum decomposition output (the pixels behind
-    // the layers DecomposeBakedHeightmapIntoLayers injects into `outRecipe.layerStack`) — normally
-    // `Pipeline::GenerationAssembler::BakedLayerImages()`, so NoiseBlendStage (STEP100) can read
-    // them straight back. With nullptr the recipe/fields still load; the decomposed pixels are
+    // given, it receives LoadBakedFields's own decomposition output (the pixel behind the single
+    // baked layer DecomposeBakedHeightmapIntoLayers injects into `outRecipe.layerStack`, STEP105) —
+    // normally `Pipeline::GenerationAssembler::BakedLayerImages()`, so NoiseBlendStage (STEP100) can
+    // read it straight back. With nullptr the recipe/fields still load; the decomposed pixels are
     // simply discarded once this call returns.
+    // `outStratumArt` is nullable too, the SAME caller-owned posture (STEP105): when given, it
+    // receives each stratum's imported mask art at the TGA's own native resolution (never
+    // vertexSize-clipped — `Data::StratumArt::importedMask`'s own "any resolution, resampled
+    // bilinearly by the Mask stage" contract), normally `Pipeline::GenerationAssembler::StratumArt()`.
+    // With nullptr the recipe/fields still load; the loaded mask art is simply discarded once this
+    // call returns (the `materialProportions` write into `outFields` is unaffected either way).
     static MapImportResult LoadSanmap(const std::string& pathOrFolder, Params::MapRecipe& outRecipe,
                                       Data::MapFields* outFields,
                                       const MapImportOptions& options = MapImportOptions(),
                                       UnknownImportBag* outUnknownData = nullptr,
                                       const TemplateIngestReport* currentTemplateIngestReport = nullptr,
-                                      std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr);
+                                      std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr,
+                                      std::vector<Data::StratumArt>* outStratumArt = nullptr);
 
     // Document text -> recipe, with no disk access at all. This is the half the round-trip
     // acceptance test drives against MapExporter::BuildSanmapJsonText. `outUnknownData` — see
@@ -122,13 +129,22 @@ public:
 
     // `<folder>/Textures/*` -> the caller's fields. The fields are RESIZED to the recipe's
     // geometry first, so a payload that disagrees with the document is clipped, never trusted.
-    // `recipe` is non-const (STEP101): once the heightmap itself loads, this injects/re-derives the
-    // per-stratum decomposed layers (MapImporter_HeightmapDecomposition_IO.h) straight into
-    // `recipe.layerStack`, with their pixels landing in `outBakedLayerImages`.
+    // `recipe` is non-const: once the heightmap itself loads, this injects/re-derives the single
+    // baked layer (MapImporter_HeightmapDecomposition_IO.h, STEP105) straight into
+    // `recipe.layerStack`, with its pixel landing in `outBakedLayerImages`. `outStratumArt` (STEP105)
+    // receives each stratum's imported mask art at native resolution; this call also grows
+    // `recipe.strata` and defaults `importedMaskMode` to `StaticOverride` for any stratum that just
+    // gained a non-empty imported mask and reads as "unconfigured" -- no slot yet, OR a slot still
+    // sitting at its own class default (Disabled). (NOT a size-only test: `Io::MapExporter` always
+    // pads `stratumLayers[9]` from `Params::Stratum()` defaults, so `recipe.strata` is already grown
+    // to 9 by the time this runs for ANY exported `.sanmap` — see MapImporter_Fields_IO.cpp's own
+    // comment for the verified trace.) An already-non-Disabled value (a real SanGen-authored
+    // round-tripped map, or this same call's own prior default) is never overwritten.
     static bool LoadBakedFields(const std::string& folderPath, Params::MapRecipe& recipe,
                                 Data::MapFields& outFields, const MapImportOptions& options,
                                 MapImportResult& result,
-                                std::vector<Data::BakedLayerImage>& outBakedLayerImages);
+                                std::vector<Data::BakedLayerImage>& outBakedLayerImages,
+                                std::vector<Data::StratumArt>& outStratumArt);
 
     // A validated 16-bit little-endian RAW heightmap into a CALLER-supplied field (STEP102) —
     // `outField` is resized to `vertexSize` x `vertexSize` first, so a payload that disagrees

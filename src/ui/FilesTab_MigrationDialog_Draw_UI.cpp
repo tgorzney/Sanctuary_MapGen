@@ -10,12 +10,14 @@ namespace Ui {
 void DrawFilesTabMigrationReconciliationDialog(FilesTabState& state, Params::MapRecipe& recipe,
                                                Data::MapFields* fields,
                                                Pipeline::PreviewDriver* previewDriver,
-                                               std::vector<Data::BakedLayerImage>* outBakedLayerImages) {
+                                               std::vector<Data::BakedLayerImage>* outBakedLayerImages,
+                                               std::vector<Data::StratumArt>* outStratumArt) {
     const MigrationReconciliationDialogChange change = DrawMigrationReconciliationDialog(
         "filesTabMigrationReconciliation", state.migrationDialogState);
     if (!change.bApplyClicked) return;   // Close: dismiss, no re-read, no mutation (ruling 3)
     const bool bSucceeded = RunSelectiveMigrationImport(
-        state, recipe, fields, SelectedMigrationNames(state.migrationDialogState), outBakedLayerImages);
+        state, recipe, fields, SelectedMigrationNames(state.migrationDialogState), outBakedLayerImages,
+        outStratumArt);
     if (bSucceeded && previewDriver != nullptr) previewDriver->RequestMapUpdate();
 }
 

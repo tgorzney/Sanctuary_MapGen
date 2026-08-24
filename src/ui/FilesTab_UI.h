@@ -30,7 +30,7 @@
 #include <vector>
 
 namespace SanmapGen {
-namespace Data { class MapFields; struct BakedLayerImage; }
+namespace Data { class MapFields; struct BakedLayerImage; struct StratumArt; }
 namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
 namespace Io { class SanpackReader; class TemplateIngestReport; struct UnknownImportBag; }
@@ -155,14 +155,18 @@ inline void AppendFilesTabLog(FilesTabState& state, const std::string& text) {
 // guarantees every path resolves before this runs); `DrawPendingExportWarningDialog`'s "Export
 // Anyway" click is the one call site that passes true. Returns whether the action reported success.
 // `outBakedLayerImages` is nullable, same caller-owned posture as `fields` (STEP101): only
-// `FilesTabAction::OpenSanmap` reads it — on success it receives the per-stratum decomposition's
-// pixels (`Io::MapImporter::LoadSanmap`'s own new parameter), normally
-// `Pipeline::GenerationAssembler::BakedLayerImages()` so NoiseBlendStage (STEP100) reads them back.
-// Every other action ignores it.
+// `FilesTabAction::OpenSanmap` reads it — on success it receives the decomposition's pixel
+// (`Io::MapImporter::LoadSanmap`'s own parameter, STEP105), normally
+// `Pipeline::GenerationAssembler::BakedLayerImages()` so NoiseBlendStage (STEP100) reads it back.
+// `outStratumArt` is nullable too, the SAME posture (STEP105): only OpenSanmap reads it — on success
+// it receives each stratum's imported mask art, normally
+// `Pipeline::GenerationAssembler::StratumArt()` so the Mask stage's `ImportedMaskMode` path reads it
+// back. Every other action ignores both.
 // FilesTab_Actions_UI.cpp — headless: no imgui frame, no window, no GL context.
 bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapRecipe& recipe,
                        Data::MapFields* fields, bool bBlueprintValidationAcknowledged = false,
-                       std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr);
+                       std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr,
+                       std::vector<Data::StratumArt>* outStratumArt = nullptr);
 
 // STEP26B: the "Check for Migrations..." button's action (ruling 1) — a fresh, read-only re-derive
 // of `state.sanmapPath` into a preview report, copied into `state.migrationDialogState` with
@@ -174,20 +178,23 @@ bool RunCheckForMigrations(FilesTabState& state);
 // read, independent of Open), applies `selectedMigrationNames` via
 // `Io::ApplySelectedSanmapMigrations`, then re-parses with `Io::MapImporter::ParseSanmapJsonText` —
 // that fresh result REPLACES `recipe`/`fields`'s baked textures/`state.unknownImportData` entirely,
-// never merged with what Open already produced. `outBakedLayerImages` — see `RunFilesTabAction`
-// above (STEP101), same nullable posture. Headless (FilesTab_MigrationImport_Actions_UI.cpp).
+// never merged with what Open already produced. `outBakedLayerImages`/`outStratumArt` — see
+// `RunFilesTabAction` above (STEP101/STEP105), same nullable posture. Headless
+// (FilesTab_MigrationImport_Actions_UI.cpp).
 bool RunSelectiveMigrationImport(FilesTabState& state, Params::MapRecipe& recipe,
                                  Data::MapFields* fields,
                                  const std::vector<std::string>& selectedMigrationNames,
-                                 std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr);
+                                 std::vector<Data::BakedLayerImage>* outBakedLayerImages = nullptr,
+                                 std::vector<Data::StratumArt>* outStratumArt = nullptr);
 
 // Draws the tab. Every pointer is nullable; the tab still edits its own state with nothing bound.
-// `bakedLayerImages` — see `RunFilesTabAction` above (STEP101): threaded to the Open button and the
-// migration-reconciliation dialog's "Apply Selected", the two draw-side actions that can load a
-// baked heightmap.
+// `bakedLayerImages`/`stratumArt` — see `RunFilesTabAction` above (STEP101/STEP105): threaded to the
+// Open button and the migration-reconciliation dialog's "Apply Selected", the two draw-side actions
+// that can load a baked heightmap / imported mask art.
 void DrawFilesTab(Params::MapRecipe& recipe, FilesTabState& state, Data::MapFields* fields,
                   Pipeline::PreviewDriver* previewDriver,
-                  std::vector<Data::BakedLayerImage>* bakedLayerImages = nullptr);
+                  std::vector<Data::BakedLayerImage>* bakedLayerImages = nullptr,
+                  std::vector<Data::StratumArt>* stratumArt = nullptr);
 
 } // namespace Ui
 } // namespace SanmapGen

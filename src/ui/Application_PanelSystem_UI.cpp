@@ -58,12 +58,13 @@ void Application::DrawSystemGroupPanel() {
         // it is handed the assembler's own `Data::MapFields` — read-only for every export action,
         // and the one destination an import's textures may land in (FilesTab_UI.h SCOPE NOTE 2).
         case ApplicationPanel::Files:
-            // STEP101: an Open/"Apply Selected" import's per-stratum decomposition writes its pixels
-            // straight into the assembler's own baked-layer cache, the same destination
-            // NoiseBlendStage (STEP100) reads from — never a caller-local copy that would need its
-            // own hand-off.
+            // STEP101/STEP105: an Open/"Apply Selected" import's decomposition writes its baked-
+            // height pixel straight into the assembler's own baked-layer cache (the same destination
+            // NoiseBlendStage/STEP100 reads from) and its imported stratum-mask art straight into the
+            // assembler's own StratumArt() (the same destination the Mask stage's ImportedMaskMode
+            // path reads from) — never a caller-local copy that would need its own hand-off.
             DrawFilesTab(recipe, tabState.files, &assembler.Fields(), &previewDriver,
-                        &assembler.BakedLayerImages());
+                        &assembler.BakedLayerImages(), &assembler.StratumArt());
             break;
         default: break;
     }

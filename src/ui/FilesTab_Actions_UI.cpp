@@ -10,6 +10,7 @@
 #include "FilesTab_ScenarioExport_Actions_UI.h"
 #include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
+#include "../data/StratumArt_DATA.h"
 #include "../io/FilesystemPrimitives_IO.h"
 #include "../io/UnknownImportBag_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -41,7 +42,8 @@ bool ResolveTexturesFolderPath(FilesTabState& state, Io::MapExportResult& result
 // `MakeDefaultMapRecipe()`) and commit (move) it onto the live objects only when the load succeeds —
 // a refused/failed Open must leave the live session untouched (Constitution §6).
 bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFields* fields,
-                   std::vector<Data::BakedLayerImage>* outBakedLayerImages) {
+                   std::vector<Data::BakedLayerImage>* outBakedLayerImages,
+                   std::vector<Data::StratumArt>* outStratumArt) {
     if (state.sanmapPath.empty()) {
         AppendFilesTabLog(state, "Open refused: no .sanmap file or map folder is set.");
         return false;
@@ -56,9 +58,10 @@ bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFie
     Params::MapRecipe scratchRecipe;                        // genuinely empty, no seeded layers
     Data::MapFields scratchFields;                          // fresh/unsized (IsSized() == false)
     std::vector<Data::BakedLayerImage> scratchBakedImages;  // fresh/empty, no stale identifiers
+    std::vector<Data::StratumArt> scratchStratumArt;        // fresh/empty (STEP105)
     const Io::MapImportResult result = Io::MapImporter::LoadSanmap(
         state.sanmapPath, scratchRecipe, fields != nullptr ? &scratchFields : nullptr, options,
-        state.unknownImportData, state.templateIngestReport, &scratchBakedImages);
+        state.unknownImportData, state.templateIngestReport, &scratchBakedImages, &scratchStratumArt);
     AppendFilesTabLog(state, result.debugLog);
     // STEP26B_MigrationReconciliationDialog_UI ruling 1: gates the "Check for Migrations..." button
     // — only a completed Open that found no version marker at all may offer the dialog.
@@ -72,6 +75,7 @@ bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFie
         recipe = std::move(scratchRecipe);
         if (fields != nullptr) *fields = std::move(scratchFields);
         if (outBakedLayerImages != nullptr) *outBakedLayerImages = std::move(scratchBakedImages);
+        if (outStratumArt != nullptr) *outStratumArt = std::move(scratchStratumArt);
     }
     return result.bSucceeded;
 }
@@ -154,13 +158,15 @@ const char* FilesTabActionLabel(FilesTabAction action) {
 
 bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapRecipe& recipe,
                        Data::MapFields* fields, bool bBlueprintValidationAcknowledged,
-                       std::vector<Data::BakedLayerImage>* outBakedLayerImages) {
+                       std::vector<Data::BakedLayerImage>* outBakedLayerImages,
+                       std::vector<Data::StratumArt>* outStratumArt) {
     if (FilesTabActionNeedsBakedFields(action) && (fields == nullptr || !fields->IsSized())) {
         AppendFilesTabLog(state, std::string(FilesTabActionLabel(action))
                           + " refused: nothing is generated yet, so there is no baked field to write.");
         return false;
     }
-    if (action == FilesTabAction::OpenSanmap) return RunOpenSanmap(state, recipe, fields, outBakedLayerImages);
+    if (action == FilesTabAction::OpenSanmap)
+        return RunOpenSanmap(state, recipe, fields, outBakedLayerImages, outStratumArt);
     if (action == FilesTabAction::ImportSupComLua) return RunImportSupComLua(state, recipe);
     if (action == FilesTabAction::ExportSanmapOnly || action == FilesTabAction::ExportAll)
         return RunRecipeExport(action, state, recipe, fields, bBlueprintValidationAcknowledged);

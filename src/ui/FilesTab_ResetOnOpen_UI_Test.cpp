@@ -111,8 +111,9 @@ void CheckBakedLayerImagesDoNotBleedAcrossOpens() {
                                 &assembler.BakedLayerImages()),
           "Open succeeds");
 
-    Check(assembler.BakedLayerImages().size() == 2,
-          "the cache holds ONLY the new file's two entries -- the sentinel is gone");
+    Check(assembler.BakedLayerImages().size() == 1,
+          "the cache holds ONLY the new file's one entry (STEP105: a single flattened baked layer) "
+          "-- the sentinel is gone");
     const Data::FloatField* stratum0Image = Data::FindBakedLayerImage(assembler.BakedLayerImages(), 0);
     Check(stratum0Image != nullptr, "layerIdentifier 0 still resolves to a stored image");
     Check(stratum0Image != nullptr && !NearlyEqual(stratum0Image->Get(0, 0), 777.0f, 1.0f),

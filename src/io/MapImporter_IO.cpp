@@ -8,6 +8,7 @@
 #include "FootprintBakeStaleness_IO.h"
 #include "TemplateIngest_IO.h"
 #include "../data/BakedLayerImage_DATA.h"
+#include "../data/StratumArt_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <filesystem>
 #include <fstream>
@@ -69,7 +70,8 @@ MapImportResult MapImporter::LoadSanmap(const std::string& pathOrFolder, Params:
                                         Data::MapFields* outFields, const MapImportOptions& options,
                                         UnknownImportBag* outUnknownData,
                                         const TemplateIngestReport* currentTemplateIngestReport,
-                                        std::vector<Data::BakedLayerImage>* outBakedLayerImages) {
+                                        std::vector<Data::BakedLayerImage>* outBakedLayerImages,
+                                        std::vector<Data::StratumArt>* outStratumArt) {
     MapImportResult result;
     result.Log("Loading " + pathOrFolder);
     if (!ResolveSanmapDocumentPath(pathOrFolder, result.resolvedDocumentPath, result.resolvedFolderPath)) {
@@ -104,8 +106,12 @@ MapImportResult MapImporter::LoadSanmap(const std::string& pathOrFolder, Params:
         std::vector<Data::BakedLayerImage> scratchBakedLayerImages;
         std::vector<Data::BakedLayerImage>& bakedLayerImages =
             outBakedLayerImages != nullptr ? *outBakedLayerImages : scratchBakedLayerImages;
+        // outStratumArt -- the SAME nullable/caller-owned posture as outBakedLayerImages (STEP105).
+        std::vector<Data::StratumArt> scratchStratumArt;
+        std::vector<Data::StratumArt>& stratumArt =
+            outStratumArt != nullptr ? *outStratumArt : scratchStratumArt;
         result.bBakedFieldsLoaded = LoadBakedFields(result.resolvedFolderPath, outRecipe, *outFields,
-                                                    options, result, bakedLayerImages);
+                                                    options, result, bakedLayerImages, stratumArt);
     }
     return result;
 }
