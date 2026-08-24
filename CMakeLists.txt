@@ -465,6 +465,14 @@ add_sangen_test(TemplateIngestCache_IO_Test src/io/TemplateIngestCache_IO_Test.c
 # needs nlohmann's headers directly too -- same reasoning as the MapExporter_IO_Test note above.
 target_link_libraries(TemplateIngestCache_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 
+# STEP89 — the one entry point composing tickets 85-88 and populating STEP58's
+# WorldFootprintSizeTable as a second producer. TemplateIngest_IO.cpp and its two ARCH §1.5 aspect
+# splits (TemplateIngest_Fold_IO.cpp, TemplateIngest_Report_IO.cpp) are already picked up by
+# SANGEN_V2_SOURCES's src/io/*.cpp glob and reach this test through SanGenV2's existing luajit link
+# (no extra CMake wiring needed, same miniz.c precedent STEP65 already established).
+add_sangen_test(TemplateIngest_IO_Test src/io/TemplateIngest_IO_Test.cpp)
+target_include_directories(TemplateIngest_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
+
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
 # each group below is ONE binary whose main() lives in the first file listed.
 add_sangen_test(NoiseBlend_PROC_Test
