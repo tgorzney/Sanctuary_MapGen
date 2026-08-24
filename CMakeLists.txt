@@ -452,6 +452,10 @@ add_sangen_test(WorldFootprintSizeTable_IO_Test src/io/WorldFootprintSizeTable_I
 add_sangen_test(TemplateSourceScan_IO_Test src/io/TemplateSourceScan_IO_Test.cpp)
 target_include_directories(TemplateSourceScan_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
+# STEP87 — classifies an already-evaluated Sys::LuaTableValue tree by its root-table dialect,
+# extracts footprint/tpId/tags, detects tpId collisions. Pure/stateless, builds fixtures directly.
+add_sangen_test(TemplateDialect_IO_Test src/io/TemplateDialect_IO_Test.cpp)
+
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
 # each group below is ONE binary whose main() lives in the first file listed.
 add_sangen_test(NoiseBlend_PROC_Test
