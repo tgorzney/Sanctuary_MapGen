@@ -473,6 +473,12 @@ target_link_libraries(TemplateIngestCache_IO_Test PRIVATE nlohmann_json::nlohman
 add_sangen_test(TemplateIngest_IO_Test src/io/TemplateIngest_IO_Test.cpp)
 target_include_directories(TemplateIngest_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
+# STEP92 — the ARCH_18_03_CatalogDataOwnership.md-mandated human-triggered bake of STEP62's
+# Params::PropRule::bReclaimable / Params::PropInstanceGroup::bReclaimable from ticket 89's
+# TemplateIngestReport::tagsByTemplateIdentifier. Pure/stateless, builds fixtures directly, no UI
+# call site (see the work-order's "Design note").
+add_sangen_test(PropReclaimableBake_IO_Test src/io/PropReclaimableBake_IO_Test.cpp)
+
 # PROC — a stage's checks may span several translation units (ARCH §1.5 ceilings);
 # each group below is ONE binary whose main() lives in the first file listed.
 add_sangen_test(NoiseBlend_PROC_Test
