@@ -1,8 +1,10 @@
 // MarkersTab_RuleLayerSettings_UI.cpp — the non-empty-layer Delete confirm, the Add/Remove buttons,
-// and the Selected Layer settings block (name/enabled/hidden/symmetry). The aspect-split sibling of
-// MarkersTab_RuleLayers_UI.cpp (ARCH §1.5), both declared by MarkersTab_RuleLayers_UI.h. Shared
-// widgets only: ConfirmDialog / TextInput / Checkbox / the shared symmetry section. No
-// ImGui::SliderFloat / DragFloat / VSliderFloat.
+// the per-layer settings block (name/enabled/hidden/symmetry), and the per-rule detail sections
+// (Gates/Quantity/Area/Focus/Placement Gate/Transform/Template Picker). The aspect-split sibling of
+// MarkersTab_RuleLayers_UI.cpp (ARCH §1.5 — this file carries the settings half of the two-tier
+// list's per-row content so neither .cpp crosses the file-size ceiling), both declared by
+// MarkersTab_RuleLayers_UI.h. Shared widgets only: ConfirmDialog / TextInput / Checkbox / the
+// shared symmetry section. No ImGui::SliderFloat / DragFloat / VSliderFloat.
 #include "MarkersTab_RuleLayers_UI.h"
 #include "MarkersTab_UI.h"
 #include "Checkbox_UI.h"
@@ -75,27 +77,46 @@ void DrawRuleLayerButtons(std::vector<Params::MarkerRuleLayer>& markerRuleLayers
     NotifyPlacementChange(bRecipeMoved, previewDriver);
 }
 
-// The one place a layer's own fields are edited — bound to SelectedMarkerRuleLayer, never a row
-// body (STEP80 §2, mirroring how DrawLayersTab draws per-layer controls BELOW the nested list
-// rather than inside a row body).
-void DrawSelectedRuleLayerSettings(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
-                                   MarkersTabState& state, Pipeline::PreviewDriver* previewDriver) {
-    Params::MarkerRuleLayer* const layer = SelectedMarkerRuleLayer(markerRuleLayers, state);
-    if (layer == nullptr) {
-        ImGui::TextUnformatted("Select a marker layer to edit it.");
-        return;
-    }
+// One rule layer's own fields — Name/Enabled/Hidden/Symmetry — bound to the caller's own row, not
+// a "selected" lookup (STEP110: called per outer row, inline, by DrawRuleLayerListBody's row body,
+// MarkersTab_RuleLayers_UI.cpp — never a trailing draw for whatever else happens to be selected).
+void DrawRuleLayerSettings(Params::MarkerRuleLayer& layer, Pipeline::PreviewDriver* previewDriver) {
     TextInputRules nameRules;
     nameRules.maximumLength = 48;
     nameRules.bAllowEmpty   = false;
     nameRules.fallbackText  = "Marker Layer";
-    NotifyPlacementChange(DrawTextInput("Layer Name", layer->name, nameRules).bCommitted, previewDriver);
+    NotifyPlacementChange(DrawTextInput("Layer Name", layer.name, nameRules).bCommitted, previewDriver);
     NotifyPlacementChange(DrawCheckbox("Enabled (off = this whole layer is not generated)",
-                                       layer->bEnabled).bCommitted, previewDriver);
+                                       layer.bEnabled).bCommitted, previewDriver);
     NotifyPlacementChange(DrawCheckbox("Hidden (still generated for clearance/fairness, not drawn)",
-                                       layer->bHidden).bCommitted, previewDriver);
-    DrawPlacementSymmetryAxes("markerLayerSymmetry", layer->symmetry.bSymmetryUseGlobal,
-                              layer->symmetry.symmetryMask, previewDriver);
+                                       layer.bHidden).bCommitted, previewDriver);
+    DrawPlacementSymmetryAxes("markerLayerSymmetry", layer.symmetry.bSymmetryUseGlobal,
+                              layer.symmetry.symmetryMask, previewDriver);
+}
+
+// One rule's detail sections — Gates/Quantity/Area/Focus/Placement Gate/Transform/Template Picker
+// — bound to the caller's own row (STEP110: called per rule row, inline, by DrawRuleLayerBody's row
+// body, MarkersTab_RuleLayers_UI.cpp; moved out of MarkersTab_UI.cpp's DrawRuleStack, which used to
+// draw this once at the bottom for whatever rule happened to be selected). The widget mirrors
+// (slope/height/count/category/priority/focusGradient) are ONE shared buffer this tab already
+// carries; reloading it from THIS rule right before drawing — the same "load right before use"
+// contract LayerEditor_Layer_UI.cpp's DrawHeightBlendSection relies on for its own shared
+// Levels/HeightMask mirrors — is what keeps two simultaneously expanded rows from bleeding into
+// each other.
+void DrawRuleSettings(Params::MarkerRule& rule, MarkersTabState& state,
+                      Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
+    if (!state.slopeToggle.IsCommitDeferred() && !state.heightToggle.IsCommitDeferred()
+        && !state.countToggle.IsCommitDeferred()) LoadMarkerRuleValues(rule, state);
+    LoadMarkerRuleEnumIndices(rule, state.ruleDetail);
+    DrawMarkerRuleGates(rule, state, previewDriver);
+    DrawMarkerRuleQuantity(rule, state, previewDriver);
+    DrawMarkerRuleArea(rule, state.ruleDetail, previewDriver);
+    DrawMarkerRuleFocus(rule, state.ruleDetail, previewDriver);
+    DrawPlacementGateSection(rule.maskStratumIndex, rule.maskWeightMinimum, rule.mapEdgePadding,
+                             state.gate, previewDriver);
+    DrawPlacementTransformSection(rule.transform, state.transform, previewDriver);
+    DrawPlacementTemplatePicker(rule.transform, state.iconGridState, state.iconGridHeight,
+                                iconManifest, previewDriver);
 }
 
 } // namespace Ui

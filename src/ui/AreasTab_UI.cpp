@@ -16,9 +16,52 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-// The area stack. MUTATES NOTHING while drawing: the signal is applied after the list has closed,
-// so the vector never moves under a live row (the v1 erase-while-iterating defect).
-DraggableListSignal DrawAreaList(const std::vector<Params::MapArea>& areas, int selectedAreaIndex) {
+// One area's own settings, drawn inline inside its own expanded row body (STEP110), never once at
+// the bottom for whatever was "selected". Every scalar is whole-cell; color has no `_PARAMS` home
+// (STEP21 ruling #4) and is resolved from the UI-only side table, keyed by name.
+bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize) {
+    const ScalarSliderRange originRange = AreaOriginSliderRange(mapSize);
+    const ScalarSliderRange extentRange = AreaExtentSliderRange(mapSize);
+    bool bCommitted = false;
+    if (IsPlayableArea(area)) {
+        ImGui::TextDisabled("PlayableArea is required by the engine: it cannot be renamed or removed.");
+    } else {
+        // Captured BEFORE the edit: if the name commits to something new, the color entry keyed on
+        // the OLD name must be retargeted, or a rename silently reverts the area's color to default
+        // next frame (STEP21 ruling #5 — a real regression from today, where color lives on the row
+        // object itself and is immune to renames).
+        const std::string nameBeforeEdit = area.name;
+        TextInputRules nameRules;
+        nameRules.maximumLength = 48;
+        nameRules.bAllowEmpty   = false;
+        nameRules.fallbackText  = "Area";
+        bCommitted = DrawTextInput("Name", area.name, nameRules).bCommitted;
+        if (bCommitted && area.name != nameBeforeEdit) {
+            for (AreaColorEntry& entry : state.areaColors)
+                if (entry.name == nameBeforeEdit) { entry.name = area.name; break; }
+        }
+    }
+    bCommitted = DrawSliderScalar("X Position", area.originX, originRange, state.originXToggle,
+                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
+    bCommitted = DrawSliderScalar("Z Position", area.originZ, originRange, state.originZToggle,
+                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
+    bCommitted = DrawSliderScalar("Width", area.width, extentRange, state.widthToggle,
+                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
+    bCommitted = DrawSliderScalar("Length", area.length, extentRange, state.lengthToggle,
+                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
+    float* const color = ResolveAreaColor(state.areaColors, area.name);
+    bCommitted = DrawColorSwatch("Color", color, state.colorOptions,
+                                 state.colorToggle).bCommitted || bCommitted;
+    if (ImGui::Button("Set to Map Size")) bCommitted = SetAreaToMapSize(area, mapSize) || bCommitted;
+    return bCommitted;
+}
+
+// The area stack. STRUCTURAL edits (reorder/delete) still MUTATE NOTHING while drawing: the signal
+// is applied by the caller after the list closes (the v1 erase-while-iterating defect). STEP110:
+// each row's own settings now draw inside that row's own body, gated on the row's own expand state
+// — never on `state.selectedAreaIndex` — so an expanded row can never show another row's settings.
+DraggableListSignal DrawAreaList(std::vector<Params::MapArea>& areas, AreasTabState& state,
+                                 int mapSize, bool& bAreasMoved) {
     return DraggableList<Params::MapArea>::Render(
         "areas", areas,
         [&](int rowIndex) {
@@ -28,8 +71,11 @@ DraggableListSignal DrawAreaList(const std::vector<Params::MapArea>& areas, int 
             row.bLocked = !IsAreaRemovable(area);      // the PlayableArea's protection, shown
             return row;
         },
-        [](int) {},                                    // header-only rows: the editor is below
-        selectedAreaIndex);
+        [&](int rowIndex) {
+            Params::MapArea& area = areas[static_cast<std::size_t>(rowIndex)];
+            bAreasMoved = DrawAreaSettings(area, state, mapSize) || bAreasMoved;
+        },
+        state.selectedAreaIndex);
 }
 
 // AFFORDANCE SCOPE: an area owns no visibility bit and no per-row lock — the lock v1 modelled is
@@ -78,46 +124,6 @@ bool DrawAreasGlobals(std::vector<Params::MapArea>& areas, AreasTabState& state)
     return bAreasMoved;
 }
 
-// The selected rectangle. Every scalar is whole-cell (the slider ranges snap to 1), because an
-// area is exported in map cells. Color has no `_PARAMS` home (STEP21 ruling #4) and is resolved
-// from the UI-only side table, keyed by name.
-bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize) {
-    const ScalarSliderRange originRange = AreaOriginSliderRange(mapSize);
-    const ScalarSliderRange extentRange = AreaExtentSliderRange(mapSize);
-    bool bCommitted = false;
-    if (IsPlayableArea(area)) {
-        ImGui::TextDisabled("PlayableArea is required by the engine: it cannot be renamed or removed.");
-    } else {
-        // Captured BEFORE the edit: if the name commits to something new, the color entry keyed on
-        // the OLD name must be retargeted, or a rename silently reverts the area's color to default
-        // next frame (STEP21 ruling #5 — a real regression from today, where color lives on the row
-        // object itself and is immune to renames).
-        const std::string nameBeforeEdit = area.name;
-        TextInputRules nameRules;
-        nameRules.maximumLength = 48;
-        nameRules.bAllowEmpty   = false;
-        nameRules.fallbackText  = "Area";
-        bCommitted = DrawTextInput("Name", area.name, nameRules).bCommitted;
-        if (bCommitted && area.name != nameBeforeEdit) {
-            for (AreaColorEntry& entry : state.areaColors)
-                if (entry.name == nameBeforeEdit) { entry.name = area.name; break; }
-        }
-    }
-    bCommitted = DrawSliderScalar("X Position", area.originX, originRange, state.originXToggle,
-                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
-    bCommitted = DrawSliderScalar("Z Position", area.originZ, originRange, state.originZToggle,
-                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
-    bCommitted = DrawSliderScalar("Width", area.width, extentRange, state.widthToggle,
-                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
-    bCommitted = DrawSliderScalar("Length", area.length, extentRange, state.lengthToggle,
-                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
-    float* const color = ResolveAreaColor(state.areaColors, area.name);
-    bCommitted = DrawColorSwatch("Color", color, state.colorOptions,
-                                 state.colorToggle).bCommitted || bCommitted;
-    if (ImGui::Button("Set to Map Size")) bCommitted = SetAreaToMapSize(area, mapSize) || bCommitted;
-    return bCommitted;
-}
-
 } // namespace
 
 void DrawAreasTab(Params::MapRecipe& recipe, AreasTabState& state,
@@ -127,11 +133,8 @@ void DrawAreasTab(Params::MapRecipe& recipe, AreasTabState& state,
     bool bAreasMoved = EnsurePlayableArea(recipe.areas, mapSize);
     bAreasMoved = DrawAreasGlobals(recipe.areas, state) || bAreasMoved;
     if (DrawSectionBegin("Area Stack", state.areaSection)) {
-        const DraggableListSignal signal = DrawAreaList(recipe.areas, state.selectedAreaIndex);
+        const DraggableListSignal signal = DrawAreaList(recipe.areas, state, mapSize, bAreasMoved);
         if (signal.bHasSignal()) bAreasMoved = ApplyAreaListSignal(recipe.areas, state, signal) || bAreasMoved;
-        Params::MapArea* const area = SelectedArea(recipe.areas, state.selectedAreaIndex);
-        if (area == nullptr) ImGui::TextUnformatted("Select an area to edit it.");
-        else bAreasMoved = DrawAreaSettings(*area, state, mapSize) || bAreasMoved;
         DrawSectionEnd();
     }
     // The export keys areas by NAME, so the duplicate repair runs on the frames a name settled —

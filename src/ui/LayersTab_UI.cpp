@@ -58,9 +58,13 @@ void DrawLayerControls(Params::Layer& layer, LayersTabState& state,
 }
 
 // One group's layer rows. Only the SELECTED group renders its list, so a drag can never carry a
-// row index from one group onto another group's list.
+// row index from one group onto another group's list. STEP110 (mirroring STEP104's fix for
+// LayerEditor_Group_UI.cpp): each row's body, whenever the row's own CollapsingHeader is open
+// (DraggableList's own per-row expand/collapse state — never gated on `state.selectedLayerIndex`),
+// draws that row's OWN noise/blend controls directly below its header, so an expanded row never
+// shows another row's settings.
 DraggableListSignal DrawGroupBody(Params::GeoLayer& group, int groupIndex,
-                                  const LayersTabState& state) {
+                                  LayersTabState& state, Pipeline::PreviewDriver* previewDriver) {
     if (groupIndex != state.selectedGeoLayerIndex) {
         ImGui::Text("%d layer(s) - select this group to edit them", static_cast<int>(group.layers.size()));
         return DraggableListSignal();
@@ -77,7 +81,13 @@ DraggableListSignal DrawGroupBody(Params::GeoLayer& group, int groupIndex,
             row.bLocked  = layer.bLocked;
             return row;
         },
-        [](int) {}, state.selectedLayerIndex);
+        [&](int rowIndex) {
+            // Own row, own layer, own settings — the same panel DrawLayersTab used to draw once at
+            // the bottom for whatever was "selected" (pre-STEP110), now drawn inline per expanded
+            // row so it can never bleed across rows.
+            DrawLayerControls(group.layers[static_cast<std::size_t>(rowIndex)], state, previewDriver);
+        },
+        state.selectedLayerIndex);
 }
 
 // The group list plus the nested layer list, and the signals both produce.
@@ -97,7 +107,7 @@ void DrawGeoLayerList(Params::LayerStack& layerStack, LayersTabState& state,
         },
         [&](int rowIndex) {
             const DraggableListSignal signal = DrawGroupBody(
-                layerStack.geoLayers[static_cast<std::size_t>(rowIndex)], rowIndex, state);
+                layerStack.geoLayers[static_cast<std::size_t>(rowIndex)], rowIndex, state, previewDriver);
             if (signal.bHasSignal()) { layerSignal = signal; layerSignalGroupIndex = rowIndex; }
         },
         state.selectedGeoLayerIndex);
@@ -138,10 +148,6 @@ void DrawLayersTab(Params::MapRecipe& recipe, LayersTabState& state,
     }
     ImGui::Separator();
     DrawGeoLayerList(layerStack, state, previewDriver);
-    ImGui::Separator();
-    Params::Layer* const layer = SelectedLayer(layerStack, state);
-    if (layer != nullptr) DrawLayerControls(*layer, state, previewDriver);
-    else ImGui::TextUnformatted("Select a layer to edit its noise and blend settings.");
     ImGui::PopID();
 }
 

@@ -15,19 +15,6 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-DraggableListSignal DrawMarkerInstanceList(const std::vector<Params::MarkerTransform>& transforms,
-                                           int selectedInstanceIndex) {
-    return DraggableList<Params::MarkerTransform>::Render(
-        "manualMarkerInstances", transforms,
-        [&](int rowIndex) {
-            DraggableListRow row;
-            row.label = MarkerInstanceRowLabel(transforms[static_cast<std::size_t>(rowIndex)]);
-            return row;
-        },
-        [](int) {},
-        selectedInstanceIndex);
-}
-
 bool ApplyMarkerInstanceListSignal(std::vector<Params::MarkerTransform>& transforms, ManualMarkersState& state,
                                    const DraggableListSignal& signal) {
     const int rowIndex = signal.sourceRowIndex;
@@ -129,20 +116,44 @@ bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params
     return bCommitted;
 }
 
+// STEP110: each row's body, whenever the row's own CollapsingHeader is open (DraggableList's own
+// per-row expand/collapse state — never gated on `state.selectedInstanceIndex`), draws that row's
+// OWN Alias/Name-or-Army/Layer/Position settings directly below its header, so an expanded row
+// never shows another row's settings. `bAnyInstanceCommitted` is set true if any expanded row's
+// fields committed this frame, feeding the caller's dirty bookkeeping and `MakeNamesUnique` repair.
+DraggableListSignal DrawMarkerInstanceList(std::vector<Params::MarkerTransform>& transforms,
+                                           const Params::MarkerInstanceGroup& group,
+                                           const std::vector<Params::Army>& armies,
+                                           const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                           ManualMarkersState& state, bool& bAnyInstanceCommitted) {
+    return DraggableList<Params::MarkerTransform>::Render(
+        "manualMarkerInstances", transforms,
+        [&](int rowIndex) {
+            DraggableListRow row;
+            row.label = MarkerInstanceRowLabel(transforms[static_cast<std::size_t>(rowIndex)]);
+            return row;
+        },
+        [&](int rowIndex) {
+            if (DrawSelectedMarkerInstance(transforms[static_cast<std::size_t>(rowIndex)], group, armies,
+                                           markerLayers, state))
+                bAnyInstanceCommitted = true;
+        },
+        state.selectedInstanceIndex);
+}
+
 } // namespace
 
 void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group, const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                ManualMarkersState& state) {
     bool bInstancesMoved = false;
-    const DraggableListSignal signal = DrawMarkerInstanceList(group.transforms, state.selectedInstanceIndex);
+    bool bAnyInstanceCommitted = false;
+    const DraggableListSignal signal =
+        DrawMarkerInstanceList(group.transforms, group, armies, markerLayers, state, bAnyInstanceCommitted);
     if (signal.bHasSignal())
         bInstancesMoved = ApplyMarkerInstanceListSignal(group.transforms, state, signal) || bInstancesMoved;
     bInstancesMoved = DrawMarkerInstanceListButtons(group.transforms, state) || bInstancesMoved;
-
-    Params::MarkerTransform* const instance = SelectedMarkerInstance(group.transforms, state.selectedInstanceIndex);
-    if (instance == nullptr) ImGui::TextUnformatted("Select a marker instance to edit it.");
-    else bInstancesMoved = DrawSelectedMarkerInstance(*instance, group, armies, markerLayers, state) || bInstancesMoved;
+    bInstancesMoved = bAnyInstanceCommitted || bInstancesMoved;
 
     // Scoped to THIS group only: the wire format's inner dictionary key only needs uniqueness
     // within its own outer group (MarkersTab_Manual_UI.h header comment).

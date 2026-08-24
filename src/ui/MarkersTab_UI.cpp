@@ -11,32 +11,16 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-// The whole procedural stack: the two-level list (MarkersTab_RuleLayers_UI.h) and the selected
-// rule's detail sections. STEP80 moved the list mechanics, the buttons, and the layer-level
-// symmetry out to that file — the ONE thing this file lost is the deleted per-rule
-// DrawPlacementSymmetryAxes call, now `layer.symmetry.*` in the Selected Layer settings block.
+// The whole procedural stack: the two-level list (MarkersTab_RuleLayers_UI.h). STEP80 moved the
+// list mechanics, the buttons and the layer-level symmetry into that file; STEP110 moved this
+// file's own remaining per-rule detail sections (Gates/Quantity/Area/Focus/Placement Gate/
+// Transform/Template Picker, `DrawRuleSettings`) into the INNER row body too, nested inside its own
+// expanded rule-layer row (MarkersTab_RuleLayerSettings_UI.cpp / MarkersTab_RuleLayers_UI.cpp) — so
+// this function is now just the Section wrapper around the two-level list.
 void DrawRuleStack(Params::MapRecipe& recipe, MarkersTabState& state,
                    Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
     if (!DrawSectionBegin("Procedural Rules", state.ruleStackSection)) return;
-    DrawMarkerRuleLayerList(recipe.markerRuleLayers, state, previewDriver);
-    ImGui::Separator();
-    Params::MarkerRule* const rule = SelectedMarkerRule(recipe.markerRuleLayers, state);
-    if (rule == nullptr) {
-        ImGui::TextUnformatted("Select a marker rule to edit it.");
-        DrawSectionEnd();
-        return;
-    }
-    if (!state.slopeToggle.IsCommitDeferred() && !state.heightToggle.IsCommitDeferred()
-        && !state.countToggle.IsCommitDeferred()) LoadMarkerRuleValues(*rule, state);
-    DrawMarkerRuleGates(*rule, state, previewDriver);
-    DrawMarkerRuleQuantity(*rule, state, previewDriver);
-    DrawMarkerRuleArea(*rule, state.ruleDetail, previewDriver);
-    DrawMarkerRuleFocus(*rule, state.ruleDetail, previewDriver);
-    DrawPlacementGateSection(rule->maskStratumIndex, rule->maskWeightMinimum, rule->mapEdgePadding,
-                             state.gate, previewDriver);
-    DrawPlacementTransformSection(rule->transform, state.transform, previewDriver);
-    DrawPlacementTemplatePicker(rule->transform, state.iconGridState, state.iconGridHeight,
-                                iconManifest, previewDriver);
+    DrawMarkerRuleLayerList(recipe.markerRuleLayers, state, previewDriver, iconManifest);
     DrawSectionEnd();
 }
 

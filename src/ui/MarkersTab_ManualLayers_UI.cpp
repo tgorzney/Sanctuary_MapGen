@@ -26,9 +26,39 @@ void DrawLayerSettings(ManualMarkerLayersState& state) {
                      state.layerIconScaleToggle, WidgetStyle(), "%.2f");
 }
 
+// The row's own name, tint, icon scale, and its own symmetry setting — STEP110: drawn inline in
+// THIS row's own expanded body, not once at the bottom for whatever happened to be "selected".
+// The tint is hidden while the block is set to one shared color: two live controls over one drawn
+// color would be a rival control (ARCH §4). Layer-level symmetry (unlike Props/Decals, which have
+// none — see ARCH_14_13_OpenItems.md §14.13 Ruling 3): manual markers are the deliberate,
+// separately-ratified exception the human required for symmetry participation, unlike manual
+// props/decals. Returns whether the name committed, so the caller can re-run the uniqueness repair.
+bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state) {
+    TextInputRules nameRules;
+    nameRules.maximumLength = 48;
+    nameRules.bAllowEmpty   = false;
+    nameRules.fallbackText  = "Marker Layer";
+    const bool bNameCommitted = DrawTextInput("Name", layer.name, nameRules).bCommitted;
+    if (!state.bUseGroupColor)
+        DrawColorSwatch("Color", layer.color, state.previewColorOptions, state.selectedLayerColorToggle);
+    DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
+                     state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
+    if (DrawSectionBegin("Layer Symmetry", state.symmetrySection)) {
+        DrawPlacementSymmetryAxes("markerLayerSymmetry", layer.symmetry.bSymmetryUseGlobal,
+                                  layer.symmetry.symmetryMask, nullptr);
+        DrawSectionEnd();
+    }
+    return bNameCommitted;
+}
+
 // The layer stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.
-DraggableListSignal DrawLayerList(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                                  int selectedLayerIndex) {
+// STEP110: each row's body, whenever the row's own CollapsingHeader is open (DraggableList's own
+// per-row expand/collapse state — never gated on `state.selectedLayerIndex`), draws that row's OWN
+// name/tint/icon-scale/symmetry settings directly below its header, so an expanded row never shows
+// another row's settings. `bAnyNameCommitted` is set true if any expanded row's name committed this
+// frame, feeding the caller's uniqueness repair.
+DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                  ManualMarkerLayersState& state, bool& bAnyNameCommitted) {
     return DraggableList<Params::MarkerInstanceLayer>::Render(
         "manualMarkerLayers", markerLayers,
         [&](int rowIndex) {
@@ -36,8 +66,11 @@ DraggableListSignal DrawLayerList(const std::vector<Params::MarkerInstanceLayer>
             row.label = ManualMarkerLayerRowLabel(markerLayers[static_cast<std::size_t>(rowIndex)]);
             return row;
         },
-        [](int) {},
-        selectedLayerIndex);
+        [&](int rowIndex) {
+            if (DrawLayerRowBody(markerLayers[static_cast<std::size_t>(rowIndex)], state))
+                bAnyNameCommitted = true;
+        },
+        state.selectedLayerIndex);
 }
 
 // A removed layer clamps every referencing `layerIndex` to 0 rather than dropping the marker
@@ -80,35 +113,6 @@ bool DrawLayerListButtons(std::vector<Params::MarkerInstanceLayer>& markerLayers
     return true;
 }
 
-// The selected layer's own name, tint, icon scale, and its own symmetry setting. The tint is
-// hidden while the block is set to one shared color: two live controls over one drawn color would
-// be a rival control (ARCH §4). Layer-level symmetry (unlike Props/Decals, which have none — see
-// ARCH_14_13_OpenItems.md §14.13 Ruling 3): manual markers are the deliberate, separately-ratified
-// exception the human required for symmetry participation, unlike manual props/decals.
-// `previewDriver` is passed as nullptr — this field has no consumer yet (SCOPE NOTE 3).
-bool DrawSelectedLayer(std::vector<Params::MarkerInstanceLayer>& markerLayers, ManualMarkerLayersState& state) {
-    Params::MarkerInstanceLayer* const layer = SelectedManualMarkerLayer(markerLayers, state.selectedLayerIndex);
-    if (layer == nullptr) {
-        ImGui::TextUnformatted("Select a marker layer to edit it.");
-        return false;
-    }
-    TextInputRules nameRules;
-    nameRules.maximumLength = 48;
-    nameRules.bAllowEmpty   = false;
-    nameRules.fallbackText  = "Marker Layer";
-    const bool bNameCommitted = DrawTextInput("Name", layer->name, nameRules).bCommitted;
-    if (!state.bUseGroupColor)
-        DrawColorSwatch("Color", layer->color, state.previewColorOptions, state.selectedLayerColorToggle);
-    DrawSliderScalar("Icon Scale", layer->iconScale, state.iconScaleRange,
-                     state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
-    if (DrawSectionBegin("Layer Symmetry", state.symmetrySection)) {
-        DrawPlacementSymmetryAxes("markerLayerSymmetry", layer->symmetry.bSymmetryUseGlobal,
-                                  layer->symmetry.symmetryMask, nullptr);
-        DrawSectionEnd();
-    }
-    return bNameCommitted;
-}
-
 } // namespace
 
 void DrawManualMarkerLayers(ManualMarkerLayersState& state, std::vector<Params::MarkerInstanceLayer>& markerLayers,
@@ -116,9 +120,10 @@ void DrawManualMarkerLayers(ManualMarkerLayersState& state, std::vector<Params::
     if (!DrawSectionBegin("Manual Marker Layers", state.section)) return;
     DrawLayerSettings(state);
     bool bLayersMoved = DrawLayerListButtons(markerLayers, state);
-    const DraggableListSignal signal = DrawLayerList(markerLayers, state.selectedLayerIndex);
+    bool bAnyNameCommitted = false;
+    const DraggableListSignal signal = DrawLayerList(markerLayers, state, bAnyNameCommitted);
     if (signal.bHasSignal()) ApplyLayerListSignal(markerLayers, markers, state, signal);
-    bLayersMoved = DrawSelectedLayer(markerLayers, state) || bLayersMoved;
+    bLayersMoved = bAnyNameCommitted || bLayersMoved;
     // The export keys layers by NAME parity with Armies/Areas/Props (cosmetic here — `MarkerGroups`
     // exports as a plain array, STEP60 §3) — the repair runs on the frames a name settled.
     if (bLayersMoved) MakeNamesUnique(markerLayers);

@@ -16,8 +16,22 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-DraggableListSignal DrawMarkerGroupList(const std::vector<Params::MarkerInstanceGroup>& markers,
-                                        int selectedGroupIndex) {
+// The selected group's own name and resource flag. `.sanmap markers` is a dictionary keyed by
+// `name`, so the uniqueness repair the caller runs afterward is not cosmetic (unlike Props/
+// Decals' layer names).
+bool DrawSelectedMarkerGroupSettings(Params::MarkerInstanceGroup& group, ManualMarkersState& state) {
+    const bool bNameCommitted     = DrawTextInput("Name", group.name, state.nameRules).bCommitted;
+    const bool bResourceCommitted = DrawCheckbox("Resource", group.bResource).bCommitted;
+    return bNameCommitted || bResourceCommitted;
+}
+
+// STEP110: each row's body, whenever the row's own CollapsingHeader is open (DraggableList's own
+// per-row expand/collapse state — never gated on `state.selectedGroupIndex`), draws that row's OWN
+// Name/Resource settings, so an expanded row never shows another row's settings. `bSettingsChanged`
+// is an out-param (not folded into the returned DraggableListSignal, which only carries the
+// STRUCTURAL kinds) so the caller still knows whether to run the name-uniqueness repair.
+DraggableListSignal DrawMarkerGroupList(std::vector<Params::MarkerInstanceGroup>& markers,
+                                        ManualMarkersState& state, bool& bSettingsChanged) {
     return DraggableList<Params::MarkerInstanceGroup>::Render(
         "manualMarkerGroups", markers,
         [&](int rowIndex) {
@@ -25,8 +39,11 @@ DraggableListSignal DrawMarkerGroupList(const std::vector<Params::MarkerInstance
             row.label = MarkerGroupRowLabel(markers[static_cast<std::size_t>(rowIndex)]);
             return row;
         },
-        [](int) {},                                    // header-only rows: the editor is below
-        selectedGroupIndex);
+        [&](int rowIndex) {
+            Params::MarkerInstanceGroup& group = markers[static_cast<std::size_t>(rowIndex)];
+            if (DrawSelectedMarkerGroupSettings(group, state)) bSettingsChanged = true;
+        },
+        state.selectedGroupIndex);
 }
 
 // A missing `Spawn` group degrades to "that army gets no commander" (soft engine behavior), so no
@@ -52,7 +69,7 @@ bool ApplyMarkerGroupListSignal(std::vector<Params::MarkerInstanceGroup>& marker
 }
 
 // "Add Marker Type": a Combo_UI seeded from the existing category vocabulary, seeding `bResource`
-// true only for "Alloys" (editable after, on the selected-group settings below).
+// true only for "Alloys" (editable after, inline on the new row's own expanded settings).
 bool DrawAddMarkerGroupControls(std::vector<Params::MarkerInstanceGroup>& markers, ManualMarkersState& state) {
     ComboOptions options;
     options.labels = markerCategoryLabels;
@@ -70,27 +87,19 @@ bool DrawAddMarkerGroupControls(std::vector<Params::MarkerInstanceGroup>& marker
     return true;
 }
 
-// The selected group's own name and resource flag. `.sanmap markers` is a dictionary keyed by
-// `name`, so the uniqueness repair below is not cosmetic (unlike Props/Decals' layer names).
-bool DrawSelectedMarkerGroupSettings(Params::MarkerInstanceGroup& group, ManualMarkersState& state) {
-    const bool bNameCommitted     = DrawTextInput("Name", group.name, state.nameRules).bCommitted;
-    const bool bResourceCommitted = DrawCheckbox("Resource", group.bResource).bCommitted;
-    return bNameCommitted || bResourceCommitted;
-}
-
 } // namespace
 
 Params::MarkerInstanceGroup* DrawMarkerGroupSection(std::vector<Params::MarkerInstanceGroup>& markers,
                                                      ManualMarkersState& state) {
     bool bGroupsMoved = DrawAddMarkerGroupControls(markers, state);
-    const DraggableListSignal signal = DrawMarkerGroupList(markers, state.selectedGroupIndex);
+    bool bSettingsChanged = false;
+    const DraggableListSignal signal = DrawMarkerGroupList(markers, state, bSettingsChanged);
     if (signal.bHasSignal()) bGroupsMoved = ApplyMarkerGroupListSignal(markers, state, signal) || bGroupsMoved;
-    Params::MarkerInstanceGroup* const group = SelectedMarkerGroup(markers, state.selectedGroupIndex);
-    if (group != nullptr) bGroupsMoved = DrawSelectedMarkerGroupSettings(*group, state) || bGroupsMoved;
+    bGroupsMoved = bSettingsChanged || bGroupsMoved;
     // `.sanmap markers` is a dictionary keyed by NAME, same posture AreasTab_UI.cpp uses for
     // `recipe.areas` — the repair runs whenever a group could have moved.
     if (bGroupsMoved) MakeNamesUnique(markers);
-    return group;
+    return SelectedMarkerGroup(markers, state.selectedGroupIndex);
 }
 
 void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,

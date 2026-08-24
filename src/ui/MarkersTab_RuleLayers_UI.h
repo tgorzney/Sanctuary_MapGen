@@ -10,8 +10,8 @@
 // One MarkerRuleLayer carries far more than fits one file under ARCH_01_05's hard 150 (the same
 // reason MarkerRule's own sections split across MarkersTab_Rules_UI.cpp / MarkersTab_Area_UI.cpp
 // behind MarkersTab_Rules_UI.h): the list mechanics live in MarkersTab_RuleLayers_UI.cpp, the
-// buttons and the Selected Layer settings block in MarkersTab_RuleLayerSettings_UI.cpp, both behind
-// this one header.
+// buttons and the per-layer settings block (STEP110: drawn inline per row, not "the selected
+// layer") in MarkersTab_RuleLayerSettings_UI.cpp, both behind this one header.
 //
 // `ApplyMarkerRuleLayerListSignal` takes plain `int&` selection indices, not `MarkersTabState`, so
 // this header never includes back into MarkersTab_UI.h (no cycle) — `MarkersTabState` is only
@@ -27,6 +27,7 @@ namespace Pipeline { class PreviewDriver; }
 namespace Ui {
 
 struct MarkersTabState;
+struct IconAtlasManifest;
 
 // Applies one frame of OUTER (layer) list traffic. Reorder/Delete are the shared structural
 // applier; ToggleVisibility is the layer's `bEnabled` generation gate (STEP80 §3), ToggleLock is
@@ -63,17 +64,22 @@ inline bool ApplyMarkerRuleLayerListSignal(std::vector<Params::MarkerRuleLayer>&
 bool ApplyMarkerRuleListSignal(Params::MarkerRuleLayer& layer, const DraggableListSignal& signal,
                                MarkersTabState& state);
 
-// The layer the "Selected Layer" settings block (name/enabled/hidden/symmetry) binds to, or null
-// when the selection points at nothing (STEP80 §2, mirroring `SelectedLayer`, LayersTab_UI.cpp:120).
+// The layer `state.selectedRuleLayerIndex` points at, or null when it points at nothing (STEP80
+// §2, mirroring `SelectedLayer`, LayersTab_UI.cpp:120). STEP110: no longer what the settings block
+// binds to (that is now every row's own layer, inline) — still what Add Rule / Remove Selected
+// Rule (DrawRuleLayerButtons) and the nested rule list (DrawRuleLayerBody) operate on.
 Params::MarkerRuleLayer* SelectedMarkerRuleLayer(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
                                                  const MarkersTabState& state);
 
 // The outer/inner DraggableLists and their appliers — every commit runs through
-// `NotifyPlacementChange` itself. Also draws the non-empty-layer Delete confirm, the Add/Remove
-// buttons, and the Selected Layer settings block (both MarkersTab_RuleLayerSettings_UI.cpp) below
-// the list.
+// `NotifyPlacementChange` itself. STEP110: each outer row draws its OWN layer settings block and
+// (selected row only, drag-safety) its own nested rule list inline, in its own row body
+// (DrawRuleLayerListBody, MarkersTab_RuleLayers_UI.cpp) — nothing is drawn a second time at the
+// bottom for whatever happens to be "selected". Also draws the non-empty-layer Delete confirm and
+// the Add/Remove buttons (MarkersTab_RuleLayerSettings_UI.cpp) below the list.
 void DrawMarkerRuleLayerList(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
-                             MarkersTabState& state, Pipeline::PreviewDriver* previewDriver);
+                             MarkersTabState& state, Pipeline::PreviewDriver* previewDriver,
+                             const IconAtlasManifest* iconManifest);
 
 // MarkersTab_RuleLayerSettings_UI.cpp — the "aspect" file this header also fronts (ARCH §1.5):
 
@@ -85,9 +91,16 @@ bool DrawPendingDeleteRuleLayerDialog(std::vector<Params::MarkerRuleLayer>& mark
 // Add Layer / Add Rule / Remove Selected Rule. Called by DrawMarkerRuleLayerList only.
 void DrawRuleLayerButtons(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
                           Pipeline::PreviewDriver* previewDriver);
-// Name / Enabled / Hidden / Symmetry for `SelectedMarkerRuleLayer`. Called by DrawMarkerRuleLayerList only.
-void DrawSelectedRuleLayerSettings(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
-                                   MarkersTabState& state, Pipeline::PreviewDriver* previewDriver);
+// Name / Enabled / Hidden / Symmetry for ONE rule layer — the caller's own row, not a "selected"
+// lookup (STEP110: called per outer row, inline, by DrawRuleLayerListBody's row body, whenever
+// THAT row's own CollapsingHeader is open — never bled from whatever else happens to be selected).
+void DrawRuleLayerSettings(Params::MarkerRuleLayer& layer, Pipeline::PreviewDriver* previewDriver);
+// Gates / Quantity / Area / Focus / Placement Gate / Transform / Template Picker for ONE rule —
+// the caller's own row (STEP110: called per rule row, inline, by DrawRuleLayerBody's own row body,
+// MarkersTab_RuleLayers_UI.cpp; moved out of MarkersTab_UI.cpp's DrawRuleStack). `iconManifest` is
+// nullable, forwarded straight to the Template Picker.
+void DrawRuleSettings(Params::MarkerRule& rule, MarkersTabState& state,
+                      Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest);
 
 } // namespace Ui
 } // namespace SanmapGen

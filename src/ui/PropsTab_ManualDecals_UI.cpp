@@ -27,9 +27,29 @@ void DrawLayerSettings(ManualDecalLayersState& state) {
                      state.layerIconScaleToggle, WidgetStyle(), "%.2f");
 }
 
-// The layer stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.
-DraggableListSignal DrawLayerList(const std::vector<Params::DecalInstanceLayer>& decalLayers,
-                                  int selectedLayerIndex) {
+// One row's own name, tint and icon scale. The tint is hidden while the block is set to one shared
+// color: two live controls over one drawn color would be a rival control (ARCH §4). Reports whether
+// the name committed, the only field the uniqueness repair cares about. STEP110: was `DrawSelectedLayer`,
+// drawn once at the bottom for the global `selectedLayerIndex`; now inline per row (STEP104's pattern).
+bool DrawLayerRowSettings(Params::DecalInstanceLayer& layer, ManualDecalLayersState& state) {
+    TextInputRules nameRules;
+    nameRules.maximumLength = 48;
+    nameRules.bAllowEmpty   = false;
+    nameRules.fallbackText  = "Decal Layer";
+    const bool bNameCommitted = DrawTextInput("Name", layer.name, nameRules).bCommitted;
+    if (!state.bUseGroupColor)
+        DrawColorSwatch("Color", layer.color, state.previewColorOptions, state.selectedLayerColorToggle);
+    DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
+                     state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
+    return bNameCommitted;
+}
+
+// The layer stack. STEP110: each row's body, whenever the row's own CollapsingHeader is open
+// (DraggableList's own per-row expand/collapse state — never gated on `state.selectedLayerIndex`),
+// draws that row's OWN settings directly, so an expanded row never shows another row's settings.
+// `bAnyNameCommitted` is set (never cleared) when any row's name commits this frame.
+DraggableListSignal DrawLayerList(std::vector<Params::DecalInstanceLayer>& decalLayers,
+                                  ManualDecalLayersState& state, bool& bAnyNameCommitted) {
     return DraggableList<Params::DecalInstanceLayer>::Render(
         "manualDecalLayers", decalLayers,
         [&](int rowIndex) {
@@ -37,8 +57,11 @@ DraggableListSignal DrawLayerList(const std::vector<Params::DecalInstanceLayer>&
             row.label = ManualDecalLayerRowLabel(decalLayers[static_cast<std::size_t>(rowIndex)]);
             return row;
         },
-        [](int) {},
-        selectedLayerIndex);
+        [&](int rowIndex) {
+            Params::DecalInstanceLayer& layer = decalLayers[static_cast<std::size_t>(rowIndex)];
+            if (DrawLayerRowSettings(layer, state)) bAnyNameCommitted = true;
+        },
+        state.selectedLayerIndex);
 }
 
 // A removed layer clamps every referencing `layerIndex` to 0 rather than dropping the decal
@@ -80,27 +103,6 @@ bool DrawLayerListButtons(std::vector<Params::DecalInstanceLayer>& decalLayers, 
     return true;
 }
 
-// The selected layer's own name, tint and icon scale. The tint is hidden while the block is set to
-// one shared color: two live controls over one drawn color would be a rival control (ARCH §4).
-// Reports whether the name committed, the only field the uniqueness repair cares about.
-bool DrawSelectedLayer(std::vector<Params::DecalInstanceLayer>& decalLayers, ManualDecalLayersState& state) {
-    Params::DecalInstanceLayer* const layer = SelectedManualDecalLayer(decalLayers, state.selectedLayerIndex);
-    if (layer == nullptr) {
-        ImGui::TextUnformatted("Select a decal layer to edit it.");
-        return false;
-    }
-    TextInputRules nameRules;
-    nameRules.maximumLength = 48;
-    nameRules.bAllowEmpty   = false;
-    nameRules.fallbackText  = "Decal Layer";
-    const bool bNameCommitted = DrawTextInput("Name", layer->name, nameRules).bCommitted;
-    if (!state.bUseGroupColor)
-        DrawColorSwatch("Color", layer->color, state.previewColorOptions, state.selectedLayerColorToggle);
-    DrawSliderScalar("Icon Scale", layer->iconScale, state.iconScaleRange,
-                     state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
-    return bNameCommitted;
-}
-
 // The resolved transforms, read-only and virtualized (SCOPE NOTE 2). Unfiltered, unrelated to
 // manual-layer membership: `Data::PlacementInstances` has no `layerIndex`-equivalent field.
 void DrawTransformList(ManualDecalLayersState& state, const Data::PlacementInstances* placedDecals) {
@@ -132,9 +134,10 @@ void DrawManualDecalLayers(ManualDecalLayersState& state, std::vector<Params::De
     if (!DrawSectionBegin("Manual Decal Layers", state.section)) return;
     DrawLayerSettings(state);
     bool bLayersMoved = DrawLayerListButtons(decalLayers, state);
-    const DraggableListSignal signal = DrawLayerList(decalLayers, state.selectedLayerIndex);
+    bool bAnyNameCommitted = false;
+    const DraggableListSignal signal = DrawLayerList(decalLayers, state, bAnyNameCommitted);
     if (signal.bHasSignal()) ApplyLayerListSignal(decalLayers, decals, state, signal);
-    bLayersMoved = DrawSelectedLayer(decalLayers, state) || bLayersMoved;
+    bLayersMoved = bAnyNameCommitted || bLayersMoved;
     DrawTransformList(state, placedDecals);
     // The export keys layers by NAME parity with Armies/Areas (cosmetic here, STEP22 ruling #6) —
     // the repair runs on the frames a name settled, not every frame.

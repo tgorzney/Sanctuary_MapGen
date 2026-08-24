@@ -29,9 +29,13 @@ void DrawScenarioTierToolbar(const char* addLabel, std::vector<ScenarioT>& scena
     ImGui::EndDisabled();
 }
 
-// Every tier's detail panel draws the SAME field labels ("Name", "Area Origin X", ...) via the
-// shared `DrawScenarioBodyFields` — each Draw*Tier is scoped under its own PushID so two sections
-// left open at once (Pattern + Count, say) never collide on imgui's id stack.
+// STEP110: each row's own settings now draw directly under that row, inside DrawScenarioPatternList/
+// DrawScenarioCountList's own `drawRowBody` — whenever ITS OWN CollapsingHeader is open, never gated
+// on `selectedTier`/`selectedIndex`. Each Draw*Tier is scoped under its own PushID so two sections
+// left open at once (Pattern + Count, say) never collide on imgui's id stack. `selectedTier`/
+// `selectedIndex` stay (Duplicate's own gate above, the DraggableList "Selected" highlight, and
+// `ApplyScenarioListSignal`'s Select handling all still need them) — only the redundant full-panel
+// draw that used to run once at the bottom for whatever they pointed at is gone.
 void DrawScenarioPatternTier(Params::Scenarios& scenarios, ScenariosTabState& state,
                              const std::vector<Params::Army>& armies) {
     ImGui::PushID("pattern");
@@ -40,18 +44,10 @@ void DrawScenarioPatternTier(Params::Scenarios& scenarios, ScenariosTabState& st
                        "regardless of position.");
     DrawScenarioTierToolbar("Add Pattern Scenario", scenarios.patternScenarios, state, ScenarioSelectedTier::Pattern);
     const int priorSelection = state.selectedTier == ScenarioSelectedTier::Pattern ? state.selectedIndex : -1;
-    const DraggableListSignal signal = DrawScenarioPatternList(scenarios.patternScenarios, priorSelection);
+    const DraggableListSignal signal = DrawScenarioPatternList(scenarios.patternScenarios, state, armies,
+                                                               scenarios.maxArmySlotCount, priorSelection);
     if (signal.bHasSignal())
         ApplyScenarioListSignal(scenarios.patternScenarios, state, ScenarioSelectedTier::Pattern, signal);
-    Params::PatternScenario* const scenario = state.selectedTier == ScenarioSelectedTier::Pattern
-        ? SelectedScenario(scenarios.patternScenarios, state.selectedIndex) : nullptr;
-    if (scenario == nullptr) ImGui::TextUnformatted("Select a pattern to edit it.");
-    else {
-        DrawSlotPatternToggleRow(scenario->slotPattern, armies, scenarios.maxArmySlotCount);
-        DrawScenarioSpawnsWarningBanner(scenario->body, armies);
-        DrawScenarioBodyFields(scenario->body, armies, state.scenarioEditModeState, &scenario->slotPattern,
-                               nullptr, scenarios.maxArmySlotCount);
-    }
     DrawSectionEnd();
     ImGui::PopID();
 }
@@ -64,18 +60,9 @@ void DrawScenarioCountTier(Params::Scenarios& scenarios, ScenariosTabState& stat
                        "to bottom; the label's leading number always agrees with position.");
     DrawScenarioTierToolbar("Add Composition Rule", scenarios.countScenarios, state, ScenarioSelectedTier::Count);
     const int priorSelection = state.selectedTier == ScenarioSelectedTier::Count ? state.selectedIndex : -1;
-    const DraggableListSignal signal = DrawScenarioCountList(scenarios, priorSelection);
+    const DraggableListSignal signal = DrawScenarioCountList(scenarios, state, armies, priorSelection);
     if (signal.bHasSignal())
         ApplyScenarioListSignal(scenarios.countScenarios, state, ScenarioSelectedTier::Count, signal);
-    Params::CountScenario* const scenario = state.selectedTier == ScenarioSelectedTier::Count
-        ? SelectedScenario(scenarios.countScenarios, state.selectedIndex) : nullptr;
-    if (scenario == nullptr) ImGui::TextUnformatted("Select a composition rule to edit it.");
-    else {
-        DrawScenarioCountConditionsEditor(scenario->conditions);
-        DrawScenarioSpawnsWarningBanner(scenario->body, armies);
-        DrawScenarioBodyFields(scenario->body, armies, state.scenarioEditModeState, nullptr,
-                               &scenario->conditions, scenarios.maxArmySlotCount);
-    }
     DrawSectionEnd();
     ImGui::PopID();
 }

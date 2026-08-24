@@ -41,12 +41,6 @@ inline void DuplicateScenario(std::vector<ScenarioT>& scenarios, int selectedInd
     state.selectedIndex = selectedIndex + 1;
 }
 
-template <typename ScenarioT>
-inline ScenarioT* SelectedScenario(std::vector<ScenarioT>& scenarios, int selectedIndex) {
-    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(scenarios.size())) return nullptr;
-    return &scenarios[static_cast<std::size_t>(selectedIndex)];
-}
-
 // Select/Reorder/Delete for one tier's vector, keeping `state.selectedIndex` valid afterward
 // (Constitution §6). Visibility/Lock carry no meaning here (no per-row bit either tier owns) and are
 // ignored, matching AreasTab_UI.cpp's own AFFORDANCE SCOPE precedent.
@@ -80,11 +74,16 @@ inline std::string ScenarioCountRowLabel(const Params::Scenarios& scenarios, int
     return label;
 }
 
-// MUTATES NOTHING while drawing (AreasTab_UI.cpp's own convention) — the signal is applied by the
-// caller after the list has closed. `labelBuffer` is reused per row, consumed by imgui before the
-// next row overwrites it (DraggableList::Render calls and consumes describeRow synchronously).
-inline DraggableListSignal DrawScenarioPatternList(const std::vector<Params::PatternScenario>& scenarios,
-                                                    int selectedIndex) {
+// MUTATES the caller's `scenarios` ONLY from inside `drawRowBody` (never from `describeRow`, which
+// stays read-only per the DraggableList contract) — STEP110: each row's OWN settings (slot-pattern
+// toggles, the spawns warning, the shared body-field editor) now draw directly under that row's own
+// header, whenever ITS OWN CollapsingHeader is open, never gated on `selectedIndex`. `selectedIndex`
+// still flows in, purely for the DraggableList "Selected" highlight (the same posture STEP104 left
+// `selectedLayerIndex` in for LayerEditor_Group_UI.cpp).
+inline DraggableListSignal DrawScenarioPatternList(std::vector<Params::PatternScenario>& scenarios,
+                                                    ScenariosTabState& state,
+                                                    const std::vector<Params::Army>& armies,
+                                                    int maxArmySlotCount, int selectedIndex) {
     std::string labelBuffer;
     return DraggableList<Params::PatternScenario>::Render(
         "patternScenarios", scenarios,
@@ -93,10 +92,19 @@ inline DraggableListSignal DrawScenarioPatternList(const std::vector<Params::Pat
             DraggableListRow row; row.label = labelBuffer.c_str();
             return row;
         },
-        [](int) {}, selectedIndex);
+        [&](int rowIndex) {
+            Params::PatternScenario& scenario = scenarios[static_cast<std::size_t>(rowIndex)];
+            DrawSlotPatternToggleRow(scenario.slotPattern, armies, maxArmySlotCount);
+            DrawScenarioSpawnsWarningBanner(scenario.body, armies);
+            DrawScenarioBodyFields(scenario.body, armies, state.scenarioEditModeState,
+                                   &scenario.slotPattern, nullptr, maxArmySlotCount);
+        },
+        selectedIndex);
 }
 
-inline DraggableListSignal DrawScenarioCountList(const Params::Scenarios& scenarios, int selectedIndex) {
+inline DraggableListSignal DrawScenarioCountList(Params::Scenarios& scenarios, ScenariosTabState& state,
+                                                  const std::vector<Params::Army>& armies,
+                                                  int selectedIndex) {
     std::string labelBuffer;
     return DraggableList<Params::CountScenario>::Render(
         "countScenarios", scenarios.countScenarios,
@@ -105,7 +113,14 @@ inline DraggableListSignal DrawScenarioCountList(const Params::Scenarios& scenar
             DraggableListRow row; row.label = labelBuffer.c_str();
             return row;
         },
-        [](int) {}, selectedIndex);
+        [&](int rowIndex) {
+            Params::CountScenario& scenario = scenarios.countScenarios[static_cast<std::size_t>(rowIndex)];
+            DrawScenarioCountConditionsEditor(scenario.conditions);
+            DrawScenarioSpawnsWarningBanner(scenario.body, armies);
+            DrawScenarioBodyFields(scenario.body, armies, state.scenarioEditModeState, nullptr,
+                                   &scenario.conditions, scenarios.maxArmySlotCount);
+        },
+        selectedIndex);
 }
 
 } // namespace Ui
