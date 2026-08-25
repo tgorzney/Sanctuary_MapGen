@@ -25,6 +25,9 @@ constexpr int simulationGroupingCount = 2;   // Separate, Unified
 void ReadLayerJson(const nlohmann::json& json, Params::Layer& layer) {
     ReadJsonText(json, "Name", layer.name);
     ReadJsonBoolean(json, "Enabled", layer.bEnabled);
+    // STEP152: additive field, defaults to false (matching Layer_PARAMS.h) for a document written
+    // before this ticket — generation-inclusion ONLY, independent of Enabled (UI visibility) above.
+    ReadJsonBoolean(json, "Disabled", layer.bDisabled);
     ReadJsonBoolean(json, "Locked", layer.bLocked);
     ReadJsonInteger(json, "StratumIndex", layer.stratumIndex);
 
@@ -86,6 +89,9 @@ void ReadLayerJson(const nlohmann::json& json, Params::Layer& layer) {
 void ReadGeoLayerJson(const nlohmann::json& json, Params::GeoLayer& geoLayer) {
     ReadJsonText(json, "Name", geoLayer.name);
     ReadJsonBoolean(json, "Enabled", geoLayer.bEnabled);
+    // STEP152: additive field, defaults to false (matching GeoLayer_PARAMS.h) for a document
+    // written before this ticket — generation-inclusion ONLY, independent of Enabled above.
+    ReadJsonBoolean(json, "Disabled", geoLayer.bDisabled);
     int enumerationValue = static_cast<int>(geoLayer.mode);
     if (ReadJsonEnumeration(json, "Mode", geoLayerModeCount, enumerationValue))
         geoLayer.mode = static_cast<Params::GeoLayerMode>(enumerationValue);

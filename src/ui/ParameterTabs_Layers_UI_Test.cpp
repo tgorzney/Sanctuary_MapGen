@@ -34,8 +34,16 @@ void RunStackSignalChecks(Params::LayerStack& layerStack, LayersTabState& state)
     Check(ApplyLayerListSignal(group, MakeSignal(DraggableListSignalKind::ToggleVisibility, 0), state.selectedLayerIndex),
           "the visibility affordance moves the recipe");
     Check(!group.layers[0].bEnabled, "the layer's bEnabled flipped");
-    Check(layerStack.GetFlatLayers().size() == 1, "and the disabled layer left the flattened stack");
+    // STEP152: bEnabled is UI-visibility only now — GetFlatLayers() gates on bDisabled instead, so
+    // a visibility toggle alone must NOT shrink the flattened (generation) stack.
+    Check(layerStack.GetFlatLayers().size() == 2,
+          "and a hidden-but-not-disabled layer still generates");
     ApplyLayerListSignal(group, MakeSignal(DraggableListSignalKind::ToggleVisibility, 0), state.selectedLayerIndex);
+
+    group.layers[0].bDisabled = true;
+    Check(layerStack.GetFlatLayers().size() == 1,
+          "bDisabled IS the generation-inclusion gate (STEP152)");
+    group.layers[0].bDisabled = false;
 
     Check(!IsGeoLayerLocked(group), "the group starts unlocked");
     Check(ApplyGeoLayerListSignal(layerStack, MakeSignal(DraggableListSignalKind::ToggleLock, 0),
@@ -50,7 +58,14 @@ void RunStackSignalChecks(Params::LayerStack& layerStack, LayersTabState& state)
     Check(ApplyGeoLayerListSignal(layerStack, MakeSignal(DraggableListSignalKind::ToggleVisibility, 0),
                                   state.selectedGeoLayerIndex)
               && !layerStack.geoLayers[0].bEnabled,
-          "a group can be disabled as a whole");
+          "a group's visibility can be toggled as a whole (bEnabled; UI-only, STEP152)");
+
+    // STEP152: the group-level generation-inclusion gate mirrors the layer-level one — bDisabled,
+    // not bEnabled, and it excludes every layer inside the group from GetFlatLayers().
+    layerStack.geoLayers[0].bDisabled = true;
+    Check(layerStack.GetFlatLayers().size() == 0,
+          "a disabled GeoLayer excludes every one of its layers from the flattened stack");
+    layerStack.geoLayers[0].bDisabled = false;
     ApplyGeoLayerListSignal(layerStack, MakeSignal(DraggableListSignalKind::ToggleVisibility, 0),
                             state.selectedGeoLayerIndex);
 }

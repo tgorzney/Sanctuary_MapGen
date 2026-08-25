@@ -14,6 +14,10 @@ namespace Params {
 struct GeoLayer {
     std::string        name;
     bool               bEnabled    = true;
+    // Generation-inclusion ONLY, mirroring Params::Layer::bDisabled — true excludes the WHOLE
+    // group (and every layer inside it) from GetFlatLayers(), independent of bEnabled (above),
+    // which stays the UI-only visibility toggle (STEP152).
+    bool               bDisabled   = false;
     GeoLayerMode       mode        = GeoLayerMode::Material;
     bool               bErodeBelow = false;
     HeightBlendMode    blendMode   = HeightBlendMode::Add;

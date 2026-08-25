@@ -15,6 +15,10 @@ struct Layer {
                                  // it, so it is deliberately absent from every parameter hash —
                                  // renaming a layer must not re-run generation (WO B2).
     bool bEnabled      = true;
+    // Generation-inclusion ONLY. True = as if the layer did not exist: excluded from
+    // Params::LayerStack::GetFlatLayers() and therefore every PROC stage. Independent of
+    // bEnabled (above), which stays UI-only (the preview visibility eye-icon) — STEP152.
+    bool bDisabled     = false;
     bool bLocked       = false;
     int  stratumIndex  = 0;      // 0..8
 

@@ -70,12 +70,18 @@ void GenerationAssembler::RegisterStages() {
 
     AddStage("NoiseBlend", full, [this] { return noiseBlendStage.ComputeParameterHash(); },
              [this] { noiseBlendStage.Run(); });
+    // STEP152: gated behind HasActiveProceduralLayer() -- once every layer is baked/disabled/
+    // recipe-less, none of these three sims has anything live to act on, so their bodies are
+    // skipped entirely (a known, ratified tradeoff: even a frozen single-layer stack no longer
+    // runs erosion/thermal/flow, LAYER_SYSTEM_SPEC's older "redundant recompute only" framing
+    // notwithstanding). ComputeParameterHash() is untouched -- the dirty-hash bookkeeping is
+    // unaffected; only the run body becomes a cheap early-return "nothing to do" when gated.
     AddStage("Erosion", full, [this] { return erosionStage.ComputeParameterHash(); },
-             [this] { erosionStage.Run(); });
+             [this] { if (recipe.layerStack.HasActiveProceduralLayer()) erosionStage.Run(); });
     AddStage("Thermal", full, [this] { return thermalStage.ComputeParameterHash(); },
-             [this] { thermalStage.Run(); });
+             [this] { if (recipe.layerStack.HasActiveProceduralLayer()) thermalStage.Run(); });
     AddStage("FlowAccumulation", full, [this] { return flowAccumulationStage.ComputeParameterHash(); },
-             [this] { flowAccumulationStage.Run(); });
+             [this] { if (recipe.layerStack.HasActiveProceduralLayer()) flowAccumulationStage.Run(); });
     AddStage("Mask", full, [this] { return maskStage.ComputeParameterHash(); },
              [this] { maskStage.Run(); });
     AddStage("Placement", full, [this] { return placementStage.ComputeParameterHash(); },

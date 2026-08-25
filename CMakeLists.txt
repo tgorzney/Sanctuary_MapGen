@@ -538,7 +538,8 @@ add_sangen_test(Generation_PIPELINE_Test          src/pipeline/Generation_PIPELI
 add_sangen_test(GenerationAssembler_PIPELINE_Test
     src/pipeline/GenerationAssembler_PIPELINE_Test.cpp
     src/pipeline/GenerationAssembler_Outputs_PIPELINE_Test.cpp
-    src/pipeline/GenerationAssembler_Dirty_PIPELINE_Test.cpp)
+    src/pipeline/GenerationAssembler_Dirty_PIPELINE_Test.cpp
+    src/pipeline/GenerationAssembler_Gating_PIPELINE_Test.cpp)
 add_sangen_test(SymmetryOrbitQuery_PIPELINE_Test  src/pipeline/SymmetryOrbitQuery_PIPELINE_Test.cpp)
 add_sangen_test(MarkerSymmetryDetection_PIPELINE_Test src/pipeline/MarkerSymmetryDetection_PIPELINE_Test.cpp)
 

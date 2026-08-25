@@ -17,6 +17,8 @@ nlohmann::ordered_json BuildLayerJson(const Params::Layer& layer) {
     nlohmann::ordered_json json;
     json["Name"]         = layer.name;
     json["Enabled"]      = layer.bEnabled;
+    // STEP152: generation-inclusion ONLY, independent of Enabled (UI visibility) above.
+    json["Disabled"]     = layer.bDisabled;
     json["Locked"]       = layer.bLocked;
     json["StratumIndex"] = layer.stratumIndex;
 
@@ -73,6 +75,8 @@ nlohmann::ordered_json BuildGeoLayerJson(const Params::GeoLayer& geoLayer) {
     nlohmann::ordered_json json;
     json["Name"]         = geoLayer.name;
     json["Enabled"]      = geoLayer.bEnabled;
+    // STEP152: generation-inclusion ONLY, independent of Enabled (UI visibility) above.
+    json["Disabled"]     = geoLayer.bDisabled;
     json["Mode"]         = static_cast<int>(geoLayer.mode);
     json["ErodeBelow"]   = geoLayer.bErodeBelow;
     json["BlendMode"]    = static_cast<int>(geoLayer.blendMode);

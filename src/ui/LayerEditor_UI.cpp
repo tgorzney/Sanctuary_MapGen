@@ -7,6 +7,7 @@
 #include "LayerEditor_BakedImage_UI.h"
 #include "LayerEditor_Draw_UI.h"
 #include "imgui.h"
+#include <cstdio>
 
 namespace SanmapGen {
 namespace Ui {
@@ -26,12 +27,20 @@ LayerEditorFrameSignals DrawGeoLayerList(Params::LayerStack& layerStack, LayerEd
                                                                : bAddGeoLayerRequestedExternally;
     if (bAddGeoLayerClicked)
         RecordLayerEditorAction(signals.action, LayerEditorActionKind::AddGeoLayer, -1);
+    // Borrowed by describeRow for the duration of this Render only (same discipline as the layer
+    // list's own rowLabel, LayerEditor_Group_UI.cpp). Wide enough for a full-length name plus the
+    // STEP152 disabled suffix; snprintf truncates rather than overruns either way.
+    char groupRowLabel[128] = { 0 };
     signals.groupSignal = DraggableList<Params::GeoLayer>::Render(
         "geoLayers", layerStack.geoLayers,
         [&](int rowIndex) {
             const Params::GeoLayer& group = layerStack.geoLayers[static_cast<std::size_t>(rowIndex)];
+            // STEP152 §7 diagnostics: makes a disabled group visually obvious on its own row.
+            std::snprintf(groupRowLabel, sizeof(groupRowLabel), "%s%s",
+                          group.name.empty() ? "GeoLayer" : group.name.c_str(),
+                          group.bDisabled ? " - DISABLED, excluded from generation" : "");
             DraggableListRow row;
-            row.label    = group.name.empty() ? "GeoLayer" : group.name.c_str();
+            row.label    = groupRowLabel;
             row.bVisible = group.bEnabled;
             row.bLocked  = IsGeoLayerLocked(group);
             return row;

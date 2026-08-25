@@ -15,16 +15,28 @@ struct LayerStack {
     std::vector<GeoLayer> geoLayers;
     SimulationGrouping    simulationGrouping = SimulationGrouping::Unified;
 
-    // Enabled layers of enabled GeoLayers, in stack order (top group first).
+    // Generation-included layers of generation-included GeoLayers, in stack order (top group
+    // first). Gated on bDisabled ONLY (STEP152) — bEnabled is UI-visibility metadata and has no
+    // say here; a hidden-but-not-disabled layer still generates.
     // The returned pointers are a transient view — valid only until the stack is modified.
     std::vector<const Layer*> GetFlatLayers() const {
         std::vector<const Layer*> flat;
         for (const GeoLayer& group : geoLayers) {
-            if (!group.bEnabled) continue;
+            if (group.bDisabled) continue;
             for (const Layer& layer : group.layers)
-                if (layer.bEnabled) flat.push_back(&layer);
+                if (!layer.bDisabled) flat.push_back(&layer);
         }
         return flat;
+    }
+
+    // True when the flattened stack has at least one layer that will actually be live-computed
+    // this run: generation-included, not frozen, and not the always-flat NoiseType::None sentinel
+    // (an unbaked recipe-less layer contributes nothing and must not count as "active"). Gates
+    // Erosion/Thermal/FlowAccumulation (GenerationAssembler_Stages_PIPELINE.cpp, STEP152).
+    bool HasActiveProceduralLayer() const {
+        for (const Layer* layer : GetFlatLayers())
+            if (!layer->bBaked && layer->noiseType != NoiseType::None) return true;
+        return false;
     }
 
     int TotalLayerCount() const {

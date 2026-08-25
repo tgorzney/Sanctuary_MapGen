@@ -18,6 +18,7 @@ void AssemblerCheck(bool bCondition, const char* label) {
 }
 void RunOutputChecks(Pipeline::GenerationAssembler& assembler, const Params::MapRecipe& recipe);
 void RunDirtyHashChecks(Pipeline::GenerationAssembler& assembler, Params::MapRecipe& recipe);
+void RunGatingChecks();
 
 namespace {
 
@@ -109,6 +110,7 @@ int main() {
     CheckSurfaceStratumWeights(assembler.Fields());
     RunOutputChecks(assembler, recipe);
     RunDirtyHashChecks(assembler, recipe);
+    RunGatingChecks();
 
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);

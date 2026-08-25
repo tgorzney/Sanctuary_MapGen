@@ -37,6 +37,10 @@ const char* const blendModeNames[] = { "Add", "Subtract", "Multiply", "Overlay",
 // The per-layer noise + blend controls, all shared widgets.
 void DrawLayerControls(Params::Layer& layer, LayersTabState& state,
                        Pipeline::PreviewDriver* previewDriver) {
+    // STEP152: generation-inclusion ONLY, independent of the row's own visibility eye-icon
+    // (Params::Layer::bEnabled) — excludes this one layer from GetFlatLayers().
+    if (ImGui::Checkbox("Disabled (excluded from generation)", &layer.bDisabled))
+        NotifyChange(true, previewDriver);
     if (!state.octaveCountToggle.IsCommitDeferred() && !state.heightBlendToggle.IsCommitDeferred())
         LoadLayerTabValues(layer, state);
     DrawEnumSetting("Noise Type", layer.noiseType, noiseTypeNames, IM_ARRAYSIZE(noiseTypeNames), previewDriver);
@@ -65,16 +69,25 @@ void DrawLayerControls(Params::Layer& layer, LayersTabState& state,
 // shows another row's settings.
 DraggableListSignal DrawGroupBody(Params::GeoLayer& group, int groupIndex,
                                   LayersTabState& state, Pipeline::PreviewDriver* previewDriver) {
+    // STEP152: drawn regardless of expand state, same as the row's other affordances — a group's
+    // generation-inclusion is not conditional on whether its layer list happens to be open.
+    if (ImGui::Checkbox("Disabled (excluded from generation)", &group.bDisabled))
+        NotifyChange(true, previewDriver);
     if (groupIndex != state.selectedGeoLayerIndex) {
         ImGui::Text("%d layer(s) - select this group to edit them", static_cast<int>(group.layers.size()));
         return DraggableListSignal();
     }
-    char rowLabel[40] = { 0 };   // borrowed by describeRow for the duration of this Render only
+    // Wide enough for "Layer %d (stratum %d)" plus the STEP152 disabled suffix; snprintf truncates
+    // rather than overruns either way. Borrowed by describeRow for the duration of this Render only.
+    char rowLabel[96] = { 0 };
     return DraggableList<Params::Layer>::Render(
         "layers", group.layers,
         [&](int rowIndex) {
             const Params::Layer& layer = group.layers[static_cast<std::size_t>(rowIndex)];
-            std::snprintf(rowLabel, sizeof(rowLabel), "Layer %d (stratum %d)", rowIndex, layer.stratumIndex);
+            // STEP152 §7 diagnostics: makes an excluded-from-generation row visually obvious.
+            std::snprintf(rowLabel, sizeof(rowLabel), "Layer %d (stratum %d)%s", rowIndex,
+                          layer.stratumIndex,
+                          layer.bDisabled ? " - DISABLED, excluded from generation" : "");
             DraggableListRow row;
             row.label    = rowLabel;
             row.bVisible = layer.bEnabled;
@@ -95,12 +108,19 @@ void DrawGeoLayerList(Params::LayerStack& layerStack, LayersTabState& state,
                       Pipeline::PreviewDriver* previewDriver) {
     DraggableListSignal layerSignal;
     int layerSignalGroupIndex = -1;
+    // Borrowed by describeRow for the duration of this Render only. Wide enough for a full-length
+    // name plus the STEP152 disabled suffix; snprintf truncates rather than overruns either way.
+    char groupRowLabel[128] = { 0 };
     const DraggableListSignal groupSignal = DraggableList<Params::GeoLayer>::Render(
         "geoLayers", layerStack.geoLayers,
         [&](int rowIndex) {
             const Params::GeoLayer& group = layerStack.geoLayers[static_cast<std::size_t>(rowIndex)];
+            // STEP152 §7 diagnostics: makes a disabled group visually obvious on its own row.
+            std::snprintf(groupRowLabel, sizeof(groupRowLabel), "%s%s",
+                          group.name.empty() ? "GeoLayer" : group.name.c_str(),
+                          group.bDisabled ? " - DISABLED, excluded from generation" : "");
             DraggableListRow row;
-            row.label    = group.name.empty() ? "GeoLayer" : group.name.c_str();
+            row.label    = groupRowLabel;
             row.bVisible = group.bEnabled;
             row.bLocked  = IsGeoLayerLocked(group);
             return row;

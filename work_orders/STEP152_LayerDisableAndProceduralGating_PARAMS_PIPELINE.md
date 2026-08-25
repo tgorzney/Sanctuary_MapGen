@@ -3,11 +3,12 @@
 **Layer:** PARAMS + PIPELINE + IO + UI. **Domain:** `src/params/Layer_PARAMS.h`,
 `GeoLayer_PARAMS.h`, `LayerStack_PARAMS.h`, `src/pipeline/GenerationAssembler_Stages_PIPELINE.cpp`,
 `src/io/MapImporter_HeightmapStack_IO.cpp`, `MapExporter_HeightmapStack_IO.cpp`,
-`src/ui/LayersTab_UI.h`/`.cpp`, `LayerEditor_UI.cpp`/`LayerEditor_Group_UI.cpp`,
-`DraggableListWidget_UI.h`.
-**Sequence:** depends on STEP150 (shares `LayerEditor_Group_UI.cpp`/`DraggableListWidget_UI.h`) and
-STEP151 (shares `LayerEditor_BakedImage_UI.cpp`'s `NoiseType::None` predicate — reuse, don't
-duplicate). Do not start until both are committed. Ratified from a design consult with the
+`src/ui/LayersTab_UI.h`/`.cpp`, `LayerEditor_UI.cpp`/`LayerEditor_Group_UI.cpp`.
+**Does NOT touch** `DraggableListWidget_UI.h` — see §6, deliberately routed around a concurrent
+peer-session ticket (STEP200) on that shared file.
+**Sequence:** depends on STEP150 and STEP151 (both shared `LayerEditor_Group_UI.cpp`/
+`LayerEditor_BakedImage_UI.cpp`'s `NoiseType::None` predicate — reuse, don't duplicate). Both are
+committed (`757ab7b`, `55e8c65`) — clear to start. Ratified from a design consult with the
 Generator Expert; this ticket encodes that consult's decisions directly.
 
 ## Root problem
@@ -101,20 +102,26 @@ following the **exact same pattern** already used for `bEnabled`'s `"Enabled"` J
 files (additive field, defaults to `false` for an older document missing the key, no `SanGenVersion`
 bump — matching every other additive-field precedent in this IO layer). Do not invent a new pattern.
 
-### 6. UI affordance for `bDisabled`
-Read how STEP150 shipped the Bake/Unbake per-row header affordance on `DraggableListWidget_UI.h`
-before writing this — it added some form of optional per-row custom action button. This ticket needs
-a SECOND independent per-row toggle-affordance (Disable, on top of Bake/Unbake and the existing
-visibility/lock/delete strip) on the same Layer/GeoLayer rows. Extend whatever STEP150 actually
-shipped to support this — either generalize to a small ordered list of optional custom
-buttons/toggles, or add one more dedicated optional slot — whichever fits the real shipped shape
-with least churn. `DraggableListWidget_UI.h` is shared by Markers/Props/Decals/Units too: leaving
-the new slot(s) unset must not change their rendering or behavior at all — verify this holds before
-finishing. Wire the Disable affordance to write `layer.bDisabled`/`group.bDisabled` through the same
+### 6. UI affordance for `bDisabled` — deliberately NOT a `DraggableListWidget_UI.h` change
+`DraggableListWidget_UI.h` is a shared widget with a second concurrent ticket (STEP200, a peer
+session) already queued against it after STEP150's change, and that peer session is currently
+blocked on its own human ratification with no known ETA — do not add a cross-session dependency to
+this ticket by touching that file. Instead, draw the Disable toggle as a plain checkbox in the row
+BODY: in `LayerEditor_Group_UI.cpp`'s row-body lambda (`DrawGroupLayerList`), add it next to/below
+the Name + Stratum Index row (`DrawLayerEditorNameRow`, STEP150) for a Layer row, and add the
+equivalent to `DrawGroupSettings` for a GeoLayer group. Use `DrawLayerEditorCheckboxRow` (already
+used for `bLocked`/`bErodeBelow` elsewhere in this file — reuse the existing helper, don't invent a
+new one) labeled "Disabled". Wire it to write `layer.bDisabled`/`group.bDisabled` through the same
 kind of action-recording path `BakeToggleRequested` uses (`LayerEditor_Action_UI.h`/
-`LayerEditor_Signals_UI.h`), and make sure `LayersTab_UI.cpp`'s own row rendering (the OTHER surface
-that draws these rows, per `LayersTab_UI.h`'s `ApplyGeoLayerListSignal`/`ApplyLayerListSignal`) gets
-the same affordance — this needs to work from both UI surfaces, not just the Layer Editor.
+`LayerEditor_Signals_UI.h`) — add a `DisableToggleRequested`-style action kind if a direct
+checkbox-commit isn't already how sibling checkboxes like `bLocked`/`bErodeBelow` apply their state
+in this file (check the real pattern those use first, match it, don't diverge). Also add the
+equivalent checkbox to `LayersTab_UI.cpp`'s own row rendering (the OTHER surface that draws these
+rows, per `LayersTab_UI.h`'s `ApplyGeoLayerListSignal`/`ApplyLayerListSignal`) so this works from
+both UI surfaces, not just the Layer Editor. This keeps the entire ticket self-contained with zero
+dependency on the peer session's `DraggableListWidget_UI.h` work — revisit moving this to a header
+affordance later, as its own small follow-up, once STEP200 has landed, if a header affordance is
+still wanted.
 
 ### 7. Minimal diagnostics
 - When `!layerStack.HasActiveProceduralLayer()`, show a short status line near the Erosion/Thermal/

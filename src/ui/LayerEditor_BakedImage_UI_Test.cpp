@@ -130,9 +130,17 @@ void RunBakeToggleChecks() {
         Data::FindBakedLayerImage(assembler.BakedLayerImages(), layer.layerIdentifier);
     CheckLayerEditor(image != nullptr, "and a Data::BakedLayerImage snapshot appears");
 
+    // STEP152: baking this one layer removes the LAST active procedural layer, so Erosion/
+    // Thermal/FlowAccumulation stop running entirely on every run from here on (the ticket's own
+    // ratified tradeoff) -- the frozen baseline this test compares against is therefore captured
+    // AFTER the bake takes effect, not `liveHeight` above (which still had thermal relaxation
+    // applied on top of it, back when the layer was active).
+    assembler.Run();
+    const float bakedHeight = assembler.Fields().heightfield.Get(1, 1);
+
     layer.frequency = 0.9f;   // a parameter edit that WOULD move a live layer's noise
     assembler.Run();
-    CheckLayerEditor(assembler.Fields().heightfield.Get(1, 1) == liveHeight,
+    CheckLayerEditor(assembler.Fields().heightfield.Get(1, 1) == bakedHeight,
                      "a parameter edit after Bake does not move the frozen height, until Unbake");
 
     LayerEditorAction unbake;

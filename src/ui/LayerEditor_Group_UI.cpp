@@ -34,6 +34,10 @@ void DrawGroupSettings(Params::GeoLayer& group, Pipeline::PreviewDriver* preview
     DrawLayerEditorEnumRow("Group Blend Mode", group.blendMode, groupBlendModeLabels,
                            IM_ARRAYSIZE(groupBlendModeLabels), previewDriver);
     DrawLayerEditorCheckboxRow("Erode Below", group.bErodeBelow, previewDriver);
+    // STEP152: generation-inclusion ONLY, independent of the row's own visibility eye-icon
+    // (Params::GeoLayer::bEnabled) — excludes the whole group, and every layer inside it, from
+    // GetFlatLayers() and therefore every PROC stage.
+    DrawLayerEditorCheckboxRow("Disabled", group.bDisabled, previewDriver);
 }
 
 // Import RAW + Duplicate + Refresh Bake (STEP151), drawn for the SELECTED row only so the one
@@ -74,18 +78,24 @@ void DrawLayerRowActions(int groupIndex, int rowIndex, const Params::Layer& laye
 void DrawGroupLayerList(Params::GeoLayer& group, int groupIndex, LayerEditorState& state,
                         LayerEditorFrameSignals& signals,
                         Pipeline::GenerationAssembler* generationAssembler,
-                        Pipeline::PreviewDriver* previewDriver) {
+                        Pipeline::PreviewDriver* previewDriver,
+                        bool bHasActiveProceduralLayer) {
     if (ImGui::SmallButton("Add Layer"))
         RecordLayerEditorAction(signals.action, LayerEditorActionKind::AddLayer, groupIndex);
     // Borrowed by describeRow for the duration of this Render only. Wide enough for a full-length
-    // name plus the stratum suffix; snprintf truncates rather than overruns either way.
-    char rowLabel[72] = { 0 };
+    // name plus the stratum suffix plus the STEP152 disabled suffix; snprintf truncates rather
+    // than overruns either way.
+    char rowLabel[112] = { 0 };
     const DraggableListSignal signal = DraggableList<Params::Layer>::Render(
         "layers", group.layers,
         [&](int rowIndex) {
             const Params::Layer& layer = group.layers[static_cast<std::size_t>(rowIndex)];
-            std::snprintf(rowLabel, sizeof(rowLabel), "%s (stratum %d)",
-                          LayerEditorRowLabel(layer), layer.stratumIndex);
+            // STEP152: makes an excluded-from-generation row visually obvious without relying on
+            // the checkbox alone being noticed (§7 diagnostics) — same suffix precedent as
+            // MarkersTab_RuleLayers_UI.cpp's own bEnabled/bHidden row label.
+            std::snprintf(rowLabel, sizeof(rowLabel), "%s (stratum %d)%s",
+                          LayerEditorRowLabel(layer), layer.stratumIndex,
+                          layer.bDisabled ? " - DISABLED, excluded from generation" : "");
             DraggableListRow row;
             row.label    = rowLabel;
             row.bVisible = layer.bEnabled;
@@ -100,6 +110,9 @@ void DrawGroupLayerList(Params::GeoLayer& group, int groupIndex, LayerEditorStat
             // STEP150: Name + Stratum Index sit ABOVE the Import RAW/Duplicate row now — a layer's
             // identity is not a procedural setting, so it stays visible even while baked.
             DrawLayerEditorNameRow(layer, state, previewDriver);
+            // STEP152: generation-inclusion ONLY, independent of the row's own visibility
+            // eye-icon (bEnabled) — excludes this one layer from GetFlatLayers().
+            DrawLayerEditorCheckboxRow("Disabled", layer.bDisabled, previewDriver);
             if (rowIndex == state.selectedLayerIndex)
                 DrawLayerRowActions(groupIndex, rowIndex, layer, state, signals);
             else ImGui::TextUnformatted("Select this layer to edit it.");
@@ -111,6 +124,12 @@ void DrawGroupLayerList(Params::GeoLayer& group, int groupIndex, LayerEditorStat
             // rolling noise and reads the cached image instead), so it is gated behind `bBaked`
             // rather than shown as if live.
             if (!layer.bBaked) {
+                // STEP152 §7 diagnostics: Erosion/Thermal/FlowAccumulation are fully skipped this
+                // run once nothing in the stack is active — say so right where their settings live,
+                // rather than leaving a silent no-op.
+                if (!bHasActiveProceduralLayer)
+                    ImGui::TextUnformatted(
+                        "No active procedural layer - Erosion/Thermal/Flow are skipped this run.");
                 DrawLayerEditorLayerSections(layer, state, previewDriver);
                 DrawLayerEditorSoilSection(layer.stratumIndex, state, generationAssembler, previewDriver);
                 DrawLayerEditorErosionSections(layer.stratumIndex, state, generationAssembler, previewDriver);
@@ -142,7 +161,11 @@ void DrawLayerEditorGroupBody(Params::LayerStack& layerStack, int groupIndex,
     }
     DrawGroupSettings(group, previewDriver);
     ImGui::Separator();
-    DrawGroupLayerList(group, groupIndex, state, signals, generationAssembler, previewDriver);
+    // STEP152 §7 diagnostics: computed once per frame from the WHOLE stack (a group's own
+    // disabled/baked state alone can't answer this — another group entirely may still be active),
+    // threaded down to wherever Erosion/Thermal/Flow settings actually draw.
+    DrawGroupLayerList(group, groupIndex, state, signals, generationAssembler, previewDriver,
+                       layerStack.HasActiveProceduralLayer());
 }
 
 } // namespace Ui

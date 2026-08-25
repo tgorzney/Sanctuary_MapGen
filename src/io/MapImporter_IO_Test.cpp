@@ -85,6 +85,11 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
               && geoLayer.mode == originalGeoLayer.mode && geoLayer.bErodeBelow
               && geoLayer.blendMode == originalGeoLayer.blendMode && geoLayer.stratumIndex == 2,
               "the geo-layer's own settings survive, all fields");
+        // STEP152: bDisabled round-trips independently of bEnabled (the fixture sets them to
+        // opposite values on purpose).
+        Check(geoLayer.bDisabled == originalGeoLayer.bDisabled && originalGeoLayer.bDisabled == true
+              && geoLayer.bDisabled != geoLayer.bEnabled,
+              "the geo-layer's generation-inclusion bDisabled survives, independent of bEnabled");
         Check(originalGeoLayer.bSymmetryUseGlobal == false
               && geoLayer.bSymmetryUseGlobal == originalGeoLayer.bSymmetryUseGlobal
               && geoLayer.symmetryMask == originalGeoLayer.symmetryMask && geoLayer.symmetryMask == 5,
@@ -97,6 +102,10 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
                   && layer.bLocked == originalLayer.bLocked
                   && layer.stratumIndex == originalLayer.stratumIndex,
                   "the layer's identity/stack-control fields survive");
+            // STEP152: same independence check as the geo-layer's own pair above.
+            Check(layer.bDisabled == originalLayer.bDisabled && originalLayer.bDisabled == true
+                  && layer.bDisabled != layer.bEnabled,
+                  "the layer's generation-inclusion bDisabled survives, independent of bEnabled");
             // STEP99_BakedImageLayer_PARAMS: bBaked=true, a non-default bakedImagePath, and a
             // non--1 layerIdentifier all round-trip exactly.
             Check(layer.bBaked == originalLayer.bBaked && originalLayer.bBaked == true
@@ -681,6 +690,8 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
                   "the in-range marker layerIndex survives exactly");
             Check(loadedMarker.symmetryGroupIdentifier == originalMarker.symmetryGroupIdentifier,
                   "the marker's symmetryGroupIdentifier survives, sibling of alias (STEP68)");
+            Check(loadedMarker.iconNameOverride == originalMarker.iconNameOverride,
+                  "the marker's iconNameOverride survives, sibling of alias/symmetryGroupIdentifier");
             Check(NearlyEqual(loadedMarker.transform.positionX, originalMarker.transform.positionX)
                   && NearlyEqual(loadedMarker.transform.positionY, originalMarker.transform.positionY),
                   "positionX/Y survive untouched by the flip");
@@ -933,6 +944,9 @@ void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     Params::GeoLayer geoLayer;
     geoLayer.name = "Ridges";
     geoLayer.bEnabled = false;
+    // STEP152: non-default AND deliberately the OPPOSITE of bEnabled above -- proves the two
+    // fields round-trip independently, not as one flag under two names (CheckLayerStackAndRules).
+    geoLayer.bDisabled = true;
     geoLayer.mode = Params::GeoLayerMode::Shaper;
     geoLayer.bErodeBelow = true;
     geoLayer.blendMode = Params::HeightBlendMode::Multiply;
@@ -947,6 +961,9 @@ void FillFixtureLayerStackAndStrata(Params::MapRecipe& recipe) {
     Params::Layer layer;
     layer.name = "Base Noise";
     layer.bEnabled = false;
+    // STEP152: non-default AND the OPPOSITE of bEnabled above, same reasoning as the geo-layer's
+    // own pair.
+    layer.bDisabled = true;
     layer.bLocked = true;
     layer.stratumIndex = 4;
     // STEP99_BakedImageLayer_PARAMS: non-default, so the round trip exercises all three new
@@ -1203,6 +1220,7 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerTransform.alias = "North Mex";
     markerTransform.layerIndex = 0;                                  // in range: no clamp warning
     markerTransform.symmetryGroupIdentifier = 3;                      // non-zero: STEP68
+    markerTransform.iconNameOverride = "CustomAlloyIcon";             // non-empty: STEP114
 
     Params::MarkerInstanceGroup group;
     group.name = "Alloys";
@@ -1995,6 +2013,27 @@ void CheckMarkerLayerIndexClampsOnImport() {
     Check(result.warningCount > 0, "the out-of-range marker layerIndex clamp is logged as a warning");
 }
 
+// STEP114: a hand-built `markers` transform JSON object with no `"iconNameOverride"` key present
+// (a legacy file saved before this ticket) leaves the struct's own default (empty = type default)
+// untouched — mirrors CheckMarkerGroupsLegacyLockAndSnapDefaults's own shape.
+void CheckMarkerIconNameOverrideLegacyDefault() {
+    nlohmann::json document;
+    nlohmann::json transformJson;   // deliberately no "iconNameOverride" key
+    nlohmann::json groupJson;
+    groupJson["resource"] = false;
+    groupJson["transforms"] = nlohmann::json::object({ { "Mex 0", transformJson } });
+    document["markers"] = nlohmann::json::object({ { "Alloys", groupJson } });
+
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    Io::ReadMarkersJson(document, recipe, result);
+
+    Check(recipe.markers.size() == 1, "one marker group survives");
+    if (recipe.markers.empty() || recipe.markers[0].transforms.empty()) return;
+    Check(recipe.markers[0].transforms[0].iconNameOverride.empty(),
+          "iconNameOverride keeps its struct default (empty) when the key is absent");
+}
+
 // STEP99_BakedImageLayer_PARAMS acceptance test: a document with none of the three keys
 // (Baked/BakedImagePath/LayerIdentifier) present leaves a freshly constructed Layer's defaults
 // (false/empty/-1) untouched — mirrors CheckStratumAppearanceIdentityFieldsMissingKeysImportWithSaneFallback's
@@ -2067,6 +2106,7 @@ int main() {
     SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyBackfill();
     SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyLockAndSnapDefaults();
     SanmapGen::MapFormatTest::CheckMarkerLayerIndexClampsOnImport();
+    SanmapGen::MapFormatTest::CheckMarkerIconNameOverrideLegacyDefault();
     SanmapGen::MapFormatTest::CheckLayerMissingBakedKeysLeaveDefaults();
     SanmapGen::MapFormatTest::CheckNextLayerIdentifier();
     SanmapGen::MapFormatTest::RunValidationTests();

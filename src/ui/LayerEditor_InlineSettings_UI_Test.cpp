@@ -215,8 +215,9 @@ void RunAddGeoLayerButtonClickThroughChecks() {
 // itself is "verified by eye against a live frame, never by test" everywhere else in this library
 // (TextInput_UI.cpp / SliderScalar_UI.cpp's own words); presence/ABSENCE of a whole row is the one
 // thing this ticket needs asserted, so it is measured by total layout height rather than by eye:
-// the group body (Name/Mode/Group Blend Mode/Erode Below, then Separator + "Add Layer") must cost
-// EXACTLY what those controls cost standalone, with nothing left over for a removed fifth row.
+// the group body (Name/Mode/Group Blend Mode/Erode Below/Disabled -- the last STEP152's own
+// generation-inclusion checkbox, then Separator + "Add Layer") must cost EXACTLY what those
+// controls cost standalone, with nothing left over for a removed (or silently added) row.
 void RunGroupStratumIndexRemovedCheck() {
     ImGui::CreateContext();
 
@@ -255,6 +256,8 @@ void RunGroupStratumIndexRemovedCheck() {
                            IM_ARRAYSIZE(groupBlendModeLabels), nullptr);
     bool bErodeBelow = false;
     DrawLayerEditorCheckboxRow("Erode Below", bErodeBelow, nullptr);
+    bool bDisabled = false;
+    DrawLayerEditorCheckboxRow("Disabled", bDisabled, nullptr);
     ImGui::Separator();
     ImGui::SmallButton("Add Layer");
     const float referenceHeight = ImGui::GetCursorPosY() - referenceStartY;
@@ -263,8 +266,8 @@ void RunGroupStratumIndexRemovedCheck() {
 
     CheckLayerEditor(std::fabs(actualHeight - referenceHeight) < 0.5f,
                      "the group body's own height now matches EXACTLY Name+Mode+GroupBlendMode+"
-                     "ErodeBelow+Separator+Add Layer -- a lingering Group Stratum Index row would "
-                     "make the real body taller than this four-control reference");
+                     "ErodeBelow+Disabled+Separator+Add Layer -- a lingering Group Stratum Index "
+                     "row would make the real body taller than this five-control reference");
 
     ImGui::DestroyContext();
 }
@@ -350,6 +353,120 @@ void RunProceduralSectionsGatedWhenBakedChecks() {
     ImGui::DestroyContext();
 }
 
+// STEP152 acceptance: the group-level "Disabled" checkbox (DrawGroupSettings) reaches
+// Params::GeoLayer::bDisabled by REFERENCE, not a copy that never lands on the recipe -- proved
+// with a real mouse press over the checkbox's own rect (found by replicating DrawGroupSettings'
+// own widget sequence with throwaway locals first, the same "reference" technique
+// RunGroupStratumIndexRemovedCheck already relies on -- a checkbox's geometry depends only on its
+// label, never its current value, so the two sequences lay out identically).
+void RunDisabledCheckboxCommitChecks() {
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+
+    io.AddMousePosEvent(-1.0f, -1.0f);
+    io.AddMouseButtonEvent(0, false);
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 300.0f));
+    ImGui::Begin("DisabledCheckboxRectWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    std::string groupName;
+    DrawTextInput("Name", groupName, LayerEditorNameRules("GeoLayer"));
+    Params::GeoLayerMode mode = Params::GeoLayerMode::Material;
+    const char* const geoLayerModeLabels[] = { "Material", "Shaper" };
+    DrawLayerEditorEnumRow("Mode", mode, geoLayerModeLabels, IM_ARRAYSIZE(geoLayerModeLabels), nullptr);
+    Params::HeightBlendMode blendMode = Params::HeightBlendMode::Add;
+    const char* const groupBlendModeLabels[] = { "Add", "Subtract", "Multiply", "Overlay",
+                                                 "Maximum", "Minimum" };
+    DrawLayerEditorEnumRow("Group Blend Mode", blendMode, groupBlendModeLabels,
+                           IM_ARRAYSIZE(groupBlendModeLabels), nullptr);
+    bool bErodeBelowReference = false;
+    DrawLayerEditorCheckboxRow("Erode Below", bErodeBelowReference, nullptr);
+    bool bDisabledReference = false;
+    DrawLayerEditorCheckboxRow("Disabled", bDisabledReference, nullptr);
+    const ImVec2 checkboxRectMin = ImGui::GetItemRectMin();
+    const ImVec2 checkboxRectMax = ImGui::GetItemRectMax();
+    ImGui::End();
+    ImGui::Render();
+
+    Params::LayerStack layerStack;
+    layerStack.geoLayers.resize(1);
+    LayerEditorState state;
+    state.selectedGeoLayerIndex = 0;
+    state.selectedLayerIndex    = -1;
+    CheckLayerEditor(!layerStack.geoLayers[0].bDisabled, "a fresh GeoLayer starts enabled for generation");
+
+    auto drawRealFrame = [&]() {
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+        ImGui::SetNextWindowSize(ImVec2(400.0f, 300.0f));
+        ImGui::Begin("DisabledCheckboxRectWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        LayerEditorFrameSignals signals;
+        DrawLayerEditorGroupBody(layerStack, 0, state, signals, nullptr, nullptr);
+        ImGui::End();
+        ImGui::Render();
+    };
+
+    const float checkboxCenterX = (checkboxRectMin.x + checkboxRectMax.x) * 0.5f;
+    const float checkboxCenterY = (checkboxRectMin.y + checkboxRectMax.y) * 0.5f;
+
+    // Settle: mouse arrives, not yet pressed.
+    io.AddMousePosEvent(checkboxCenterX, checkboxCenterY);
+    io.AddMouseButtonEvent(0, false);
+    BeginHeadlessFrame();
+    drawRealFrame();
+    CheckLayerEditor(!layerStack.geoLayers[0].bDisabled, "hovering the checkbox does not commit yet");
+
+    // Press: TickBoxWasClicked reads ImGui::IsItemClicked(), which (unlike a Button's own return
+    // value) fires on the PRESS frame, not release -- the commit lands here.
+    io.AddMouseButtonEvent(0, true);
+    BeginHeadlessFrame();
+    drawRealFrame();
+
+    CheckLayerEditor(layerStack.geoLayers[0].bDisabled,
+                     "a real mouse press over the Disabled checkbox's own rect reaches "
+                     "Params::GeoLayer::bDisabled");
+
+    ImGui::DestroyContext();
+}
+
+// STEP152 §7 diagnostics acceptance: the "no active procedural layer" status line draws exactly
+// when HasActiveProceduralLayer() is false, adding exactly one status line's worth of height and
+// nothing else -- reusing RunGroupStratumIndexRemovedCheck's own height-diff discipline (the
+// status line's text itself is "verified by eye against a live frame, never by test", same as
+// every other draw-path half in this library).
+void RunProceduralGatingDiagnosticChecks() {
+    ImGui::CreateContext();
+
+    auto heightOfSingleLayerGroup = [](bool bLayerDisabled) {
+        Params::LayerStack layerStack;
+        layerStack.geoLayers.resize(1);
+        layerStack.geoLayers[0].layers.resize(1);
+        layerStack.geoLayers[0].layers[0].bDisabled = bLayerDisabled;
+        LayerEditorState state;
+        state.selectedGeoLayerIndex = 0;
+        state.selectedLayerIndex    = 0;
+
+        BeginHeadlessFrame();
+        ImGui::Begin("ProceduralGatingDiagnosticWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        const float startY = ImGui::GetCursorPosY();
+        LayerEditorFrameSignals signals;
+        DrawLayerEditorGroupBody(layerStack, 0, state, signals, nullptr, nullptr);
+        const float height = ImGui::GetCursorPosY() - startY;
+        ImGui::End();
+        ImGui::Render();
+        return height;
+    };
+
+    const float activeHeight   = heightOfSingleLayerGroup(/*bLayerDisabled=*/false);
+    const float inactiveHeight = heightOfSingleLayerGroup(/*bLayerDisabled=*/true);
+    const float oneTextLineHeight = ImGui::GetTextLineHeightWithSpacing();
+    CheckLayerEditor(inactiveHeight > activeHeight,
+                     "an inactive stack's row draws the status line the active one does not");
+    CheckLayerEditor((inactiveHeight - activeHeight) < oneTextLineHeight * 2.0f,
+                     "and it costs exactly one status line, not a whole extra section");
+
+    ImGui::DestroyContext();
+}
+
 } // namespace
 
 void RunLayerEditorInlineSettingsChecks() {
@@ -358,4 +475,6 @@ void RunLayerEditorInlineSettingsChecks() {
     RunGroupStratumIndexRemovedCheck();
     RunImportRawPickerSyncChecks();
     RunProceduralSectionsGatedWhenBakedChecks();
+    RunDisabledCheckboxCommitChecks();
+    RunProceduralGatingDiagnosticChecks();
 }
