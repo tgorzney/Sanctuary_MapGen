@@ -98,7 +98,7 @@ void TestAllSixRealDomainRowsRenderFlatWithSeedNames() {
     HeadlessImguiSession session;
     OverlaySectionScene scene = MakeRealOverlayScene();
     Check(scene.layers.size() == 6u, "the real seed hands the popup 6 overlay-domain rows");
-    const char* const expectedNames[] = {"Alloy", "Spawns/Armies", "Units", "Props", "Reclaim", "Decals"};
+    const char* const expectedNames[] = {"Alloy", "Spawns", "Units", "Props", "Reclaim", "Decals"};
     for (std::size_t index = 0; index < scene.layers.size() && index < 6u; ++index)
         Check(scene.layers[index].name == expectedNames[index],
               "row order/name matches ConfigureDefaultOverlayLayers's own seed order");

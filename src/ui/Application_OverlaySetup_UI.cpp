@@ -23,7 +23,7 @@ void ConfigureDefaultOverlayLayers(OverlayLayerSettings& overlaySettings,
                                     const Params::MapRecipe& recipe) {
     OverlayLayer_UI alloyLayer;        alloyLayer.name        = "Alloy";
     alloyLayer.domainKind                                     = OverlayDomainKind_UI::Alloy;
-    OverlayLayer_UI spawnsArmiesLayer; spawnsArmiesLayer.name = "Spawns/Armies";
+    OverlayLayer_UI spawnsArmiesLayer; spawnsArmiesLayer.name = "Spawns";
     spawnsArmiesLayer.domainKind                               = OverlayDomainKind_UI::SpawnsArmies;
     SeedMarkerDomains(alloyLayer, spawnsArmiesLayer, recipe);
 
