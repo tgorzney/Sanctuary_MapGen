@@ -147,6 +147,140 @@ void RunBakeToggleChecks() {
                      "and resumes live generation -- the edited frequency now DOES take effect");
 }
 
+// STEP151 acceptance (1): the real-world bug the human hit -- Bake/Unbake/Bake on an import must
+// reproduce the exact original pixels bit-for-bit, never a fresh live-noise overwrite.
+void RunBakeUnbakeRebakePreservesImportedPixelsChecks() {
+    const std::string folderPath = ScratchFolderPath("SanGenLayerEditorRebakeTest");
+    Params::MapRecipe recipe = FixtureRecipe();
+    const std::string rawPath = WriteFixtureRawFile(folderPath, recipe.geometry.VertexSize());
+
+    Pipeline::GenerationAssembler assembler(recipe);
+    assembler.Thermal().Constants().iterationCount = 0;
+    assembler.Run();
+    Params::Layer& layer = recipe.layerStack.geoLayers[0].layers[0];
+
+    LayerEditorAction import;
+    import.kind          = LayerEditorActionKind::ImportRawRequested;
+    import.geoLayerIndex  = 0;
+    import.layerIndex     = 0;
+    import.importRawPath  = rawPath;
+    CheckLayerEditor(ApplyBakedImageAction(import, recipe.layerStack, assembler),
+                     "STEP151: Import RAW succeeds");
+    const int layerIdentifier = layer.layerIdentifier;
+    const Data::FloatField importedSnapshot =
+        *Data::FindBakedLayerImage(assembler.BakedLayerImages(), layerIdentifier);
+
+    LayerEditorAction toggle;
+    toggle.kind          = LayerEditorActionKind::BakeToggleRequested;
+    toggle.geoLayerIndex  = 0;
+    toggle.layerIndex     = 0;
+    CheckLayerEditor(ApplyBakedImageAction(toggle, recipe.layerStack, assembler),
+                     "STEP151: Unbake after import reports the recipe moved");
+    CheckLayerEditor(!layer.bBaked, "STEP151: the layer resumes live generation");
+    assembler.Run();   // NoiseBlend now caches PROCEDURAL noise, unrelated to the imported pixels
+
+    CheckLayerEditor(ApplyBakedImageAction(toggle, recipe.layerStack, assembler),
+                     "STEP151: re-baking after unbake reports the recipe moved");
+    CheckLayerEditor(layer.bBaked, "STEP151: the layer is baked again");
+    CheckLayerEditor(layer.layerIdentifier == layerIdentifier,
+                     "STEP151: the SAME identifier is reused -- same cache entry, not a new one");
+
+    const Data::FloatField* rebakedImage =
+        Data::FindBakedLayerImage(assembler.BakedLayerImages(), layer.layerIdentifier);
+    CheckLayerEditor(rebakedImage != nullptr, "STEP151: the rebaked entry still exists");
+    bool bIdentical = rebakedImage->Width() == importedSnapshot.Width()
+        && rebakedImage->Height() == importedSnapshot.Height();
+    for (int y = 0; bIdentical && y < importedSnapshot.Height(); ++y)
+        for (int x = 0; x < importedSnapshot.Width(); ++x)
+            if (rebakedImage->Get(x, y) != importedSnapshot.Get(x, y)) { bIdentical = false; break; }
+    CheckLayerEditor(bIdentical,
+                     "STEP151: Bake/Unbake/Bake reproduces the original imported pixels bit-for-bit "
+                     "(the old bug: the toggle unconditionally overwrote them with live noise)");
+}
+
+// STEP151 acceptance (3): Refresh Bake is the ONLY path that deliberately overwrites an existing
+// snapshot -- the simple toggle must reuse it verbatim even after a live parameter edit.
+void RunRefreshBakeChecks() {
+    Params::MapRecipe recipe = FixtureRecipe();
+    Pipeline::GenerationAssembler assembler(recipe);
+    Params::Layer& layer = recipe.layerStack.geoLayers[0].layers[0];
+    assembler.Run();
+
+    LayerEditorAction toggle;
+    toggle.kind          = LayerEditorActionKind::BakeToggleRequested;
+    toggle.geoLayerIndex  = 0;
+    toggle.layerIndex     = 0;
+    CheckLayerEditor(ApplyBakedImageAction(toggle, recipe.layerStack, assembler),
+                     "STEP151: first bake succeeds");
+    const int layerIdentifier = layer.layerIdentifier;
+    const float originalBakedHeight =
+        Data::FindBakedLayerImage(assembler.BakedLayerImages(), layerIdentifier)->Get(1, 1);
+    CheckLayerEditor(ApplyBakedImageAction(toggle, recipe.layerStack, assembler), "STEP151: unbake");
+
+    layer.frequency = 0.9f;   // moves live noise -- NOT yet reflected in the existing snapshot
+    assembler.Run();
+
+    CheckLayerEditor(ApplyBakedImageAction(toggle, recipe.layerStack, assembler),
+                     "STEP151: the simple toggle re-bakes");
+    CheckLayerEditor(Data::FindBakedLayerImage(assembler.BakedLayerImages(), layerIdentifier)->Get(1, 1)
+                    == originalBakedHeight,
+                     "STEP151: ...but never overwrites the existing snapshot on its own");
+
+    CheckLayerEditor(ApplyBakedImageAction(toggle, recipe.layerStack, assembler),
+                     "STEP151: unbake again ahead of Refresh Bake");
+    LayerEditorAction refresh;
+    refresh.kind          = LayerEditorActionKind::RefreshBakeRequested;
+    refresh.geoLayerIndex  = 0;
+    refresh.layerIndex     = 0;
+    CheckLayerEditor(ApplyBakedImageAction(refresh, recipe.layerStack, assembler),
+                     "STEP151: Refresh Bake reports the recipe moved");
+    CheckLayerEditor(!layer.bBaked, "STEP151: Refresh Bake does not itself flip bBaked");
+    CheckLayerEditor(Data::FindBakedLayerImage(assembler.BakedLayerImages(), layerIdentifier)->Get(1, 1)
+                    != originalBakedHeight,
+                     "STEP151: ...but Refresh Bake DOES overwrite it with the current live noise");
+
+    layer.bBaked = true;
+    CheckLayerEditor(!ApplyBakedImageAction(refresh, recipe.layerStack, assembler),
+                     "STEP151: Refresh Bake refuses an already-baked layer");
+    layer.bBaked = false;
+    layer.noiseType = Params::NoiseType::None;
+    CheckLayerEditor(!ApplyBakedImageAction(refresh, recipe.layerStack, assembler),
+                     "STEP151: and refuses a layer with no live recipe to refresh from");
+}
+
+// STEP151 acceptance (4): a stack edit that moves the layer's Params::Layer object in memory
+// between NoiseBlend's last Run() and the click is refused, never mis-attributed -- constructed via
+// a REAL identity-pointer mismatch (forced vector reallocation), not a guess.
+void RunIdentityMismatchRefusalChecks() {
+    Params::MapRecipe recipe = FixtureRecipe();
+    recipe.layerStack.geoLayers[0].layers.shrink_to_fit();   // capacity == size == 1, exactly
+    Pipeline::GenerationAssembler assembler(recipe);
+    assembler.Run();   // caches CachedFlatLayerPointers() into the layer's CURRENT buffer address
+
+    // Growing past the fixed capacity is GUARANTEED (the standard's capacity invariant) to move
+    // every existing element to a brand-new heap buffer -- the layer's address changes even though
+    // its C++ identity (the object a fresh index lookup resolves to) is unaffected, exactly the
+    // "reordered/edited since NoiseBlend last ran" scenario the ticket calls out.
+    recipe.layerStack.geoLayers[0].layers.push_back(Params::Layer());
+    Params::Layer& layer = recipe.layerStack.geoLayers[0].layers[0];   // resolved fresh, like a real click
+
+    LayerEditorAction bake;
+    bake.kind          = LayerEditorActionKind::BakeToggleRequested;
+    bake.geoLayerIndex  = 0;
+    bake.layerIndex     = 0;
+    CheckLayerEditor(!ApplyBakedImageAction(bake, recipe.layerStack, assembler),
+                     "STEP151: a bake click after the layer moved in memory is refused");
+    CheckLayerEditor(!layer.bBaked && layer.layerIdentifier == -1,
+                     "STEP151: ...and the layer is left completely untouched by the refusal");
+
+    LayerEditorAction refresh;
+    refresh.kind          = LayerEditorActionKind::RefreshBakeRequested;
+    refresh.geoLayerIndex  = 0;
+    refresh.layerIndex     = 0;
+    CheckLayerEditor(!ApplyBakedImageAction(refresh, recipe.layerStack, assembler),
+                     "STEP151: Refresh Bake refuses the SAME identity mismatch rather than guessing");
+}
+
 void RunNamesLayerAndKindFenceChecks() {
     Params::MapRecipe recipe = FixtureRecipe();
     Pipeline::GenerationAssembler assembler(recipe);
@@ -172,5 +306,8 @@ void RunLayerEditorBakedImageChecks() {
     RunImportRawChecks();
     RunImportRawFailureChecks();
     RunBakeToggleChecks();
+    RunBakeUnbakeRebakePreservesImportedPixelsChecks();
+    RunRefreshBakeChecks();
+    RunIdentityMismatchRefusalChecks();
     RunNamesLayerAndKindFenceChecks();
 }

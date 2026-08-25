@@ -36,13 +36,9 @@ void DrawGroupSettings(Params::GeoLayer& group, Pipeline::PreviewDriver* preview
     DrawLayerEditorCheckboxRow("Erode Below", group.bErodeBelow, previewDriver);
 }
 
-// Import RAW + Duplicate. Drawn for the SELECTED row only, so the one import-path buffer the
-// editor owns can never be shared by two live pickers at once (LayerEditor_UI.h SCOPE NOTE 2 — the
-// path has no PARAMS home to live in yet). Bake/Unbake moved OFF this row and onto the row's own
-// header affordance (STEP150 — DrawGroupLayerList's describeRow below); it is visible on every row
-// without needing to expand it, and applies through the exact same
-// `LayerEditorActionKind::BakeToggleRequested` path (RecordBakeToggleFromRowSignal,
-// LayerEditor_Signals_UI.h) this row used to record directly.
+// Import RAW + Duplicate + Refresh Bake (STEP151), drawn for the SELECTED row only so the one
+// import-path buffer the editor owns is never shared by two live pickers at once (LayerEditor_UI.h
+// SCOPE NOTE 2). Bake/Unbake itself lives on the row's own header affordance (STEP150).
 void DrawLayerRowActions(int groupIndex, int rowIndex, const Params::Layer& layer,
                          LayerEditorState& state, LayerEditorFrameSignals& signals) {
     // STEP150: sync from THIS layer's own bakedImagePath every frame it draws — the picker's
@@ -60,6 +56,14 @@ void DrawLayerRowActions(int groupIndex, int rowIndex, const Params::Layer& laye
     if (ImGui::SmallButton("Duplicate"))
         RecordLayerEditorAction(signals.action, LayerEditorActionKind::DuplicateLayer,
                                 groupIndex, rowIndex);
+    // STEP151: overwrites an EXISTING snapshot (Duplicate's sibling, not the header toggle);
+    // enabled only while unbaked with a live recipe to refresh from -- disabled otherwise.
+    const bool bCanRefreshBake = !layer.bBaked && layer.noiseType != Params::NoiseType::None;
+    ImGui::BeginDisabled(!bCanRefreshBake);
+    if (ImGui::SmallButton("Refresh Bake"))
+        RecordLayerEditorAction(signals.action, LayerEditorActionKind::RefreshBakeRequested,
+                                groupIndex, rowIndex);
+    ImGui::EndDisabled();
 }
 
 // The group's layer list. Only the SELECTED group renders one, so a drag can never carry a row

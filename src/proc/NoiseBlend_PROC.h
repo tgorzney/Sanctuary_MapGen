@@ -61,6 +61,14 @@ public:
     // STEP102's "Bake a live noise layer" UI action can snapshot a layer's CURRENT computed
     // output into a new Data::BakedLayerImage before flipping bBaked = true.
     const std::vector<Data::FloatField>& CachedRawNoiseCpu() const { return cachedRawNoiseCpu; }
+    // The SAME flattened layer pointers PrepareRun() built `cachedRawNoiseCpu` from, in the SAME
+    // call, so the two vectors are provably index-for-index in lockstep (STEP151). Lets a caller
+    // find a layer's live noise slot by POINTER IDENTITY rather than recomputing
+    // `layerStack.GetFlatLayers()` and trusting position, which silently reattaches to the wrong
+    // layer after a stack reorder between this stage's last Run() and the lookup.
+    const std::vector<const Params::Layer*>& CachedFlatLayerPointers() const {
+        return cachedFlatLayerPointers;
+    }
 
 private:
     // Flattens the enabled layers into LayerKernelConfiguration records and sizes the caches.
@@ -97,6 +105,7 @@ private:
 
     std::vector<LayerKernelConfiguration> layerConfigurations;
     std::vector<Data::FloatField>         cachedRawNoiseCpu;
+    std::vector<const Params::Layer*>     cachedFlatLayerPointers;   // lockstep with cachedRawNoiseCpu
     std::vector<std::size_t>              cachedStructuralHashesCpu;
     std::vector<std::size_t>              cachedStructuralHashesGpu;
     std::vector<float>                    gpuTransferBuffer;

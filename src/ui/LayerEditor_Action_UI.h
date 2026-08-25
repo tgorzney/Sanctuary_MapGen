@@ -15,6 +15,10 @@
 // `ApplyBakedImageAction`, the one place in this row-action family that legitimately needs IO to
 // read an imported file (STEP100/101/102). `DrawLayerEditor` (LayerEditor_UI.cpp) calls it
 // alongside `ApplyLayerEditorFrameSignals`, not instead of it.
+// STEP151: `RefreshBakeRequested` joins the same reported-only family and the same applier — it
+// never overwrites `bBaked` or the recipe fields `ApplyLayerEditorAction` owns, only the baked
+// image cache, so it belongs with the IO-needing pair above, not with the three structural kinds
+// below.
 #pragma once
 #include <string>
 #include "../params/LayerStack_PARAMS.h"
@@ -23,7 +27,8 @@ namespace SanmapGen {
 namespace Ui {
 
 enum class LayerEditorActionKind : int {
-    None = 0, AddGeoLayer, AddLayer, DuplicateLayer, ImportRawRequested, BakeToggleRequested
+    None = 0, AddGeoLayer, AddLayer, DuplicateLayer, ImportRawRequested, BakeToggleRequested,
+    RefreshBakeRequested   // STEP151: overwrites an existing snapshot -- BakeToggleRequested never does
 };
 
 // One frame produces at most ONE action (first wins), exactly like a DraggableListSignal: every

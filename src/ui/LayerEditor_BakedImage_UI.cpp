@@ -33,29 +33,71 @@ bool ApplyImportRawAction(const LayerEditorAction& action, Params::LayerStack& l
     return true;
 }
 
-// Bake toggle: freezes the CURRENT live noise output on the way in, resumes live generation
-// (from the still-present recipe) on the way back out. Bake fails, layer untouched, only when the
-// layer cannot be found in the stack's own flattened view (disabled layer/group) — there is
-// nothing live to snapshot. Unbake never fails.
+// Identity-safe live-noise lookup (STEP151 fix): finds `layer` by POINTER IDENTITY in
+// NoiseBlend's own `CachedFlatLayerPointers()`, built in the SAME `PrepareRun()` call as
+// `CachedRawNoiseCpu()` -- the two are provably index-for-index in lockstep. Deliberately NOT a
+// freshly recomputed `layerStack.GetFlatLayers()` (silently reattaches to the wrong layer after a
+// stack reorder) and deliberately NOT `layerIdentifier`-keyed (every never-baked layer shares the
+// -1 sentinel, so an identifier-keyed lookup is ambiguous exactly for a first bake). Returns
+// `CachedRawNoiseCpu().size()` -- an out-of-range index -- when `layer` is not in the cache
+// (NoiseBlend has not run against this exact stack shape yet, or it changed since); callers refuse
+// rather than guess.
+std::size_t FindLiveNoiseSlot(const Params::Layer& layer,
+                              Pipeline::GenerationAssembler& generationAssembler) {
+    const std::vector<const Params::Layer*>& cachedPointers =
+        generationAssembler.NoiseBlend().CachedFlatLayerPointers();
+    for (std::size_t index = 0; index < cachedPointers.size(); ++index)
+        if (cachedPointers[index] == &layer) return index;
+    return generationAssembler.NoiseBlend().CachedRawNoiseCpu().size();
+}
+
+// The one place that actually overwrites a Data::BakedLayerImage's pixels with live noise -- used
+// by the toggle's genuine-first-bake path and by Refresh Bake, never by anything else (STEP151).
+// False, nothing written, when the identity lookup above refuses.
+bool SnapshotLiveNoiseOverImage(Params::LayerStack& layerStack, Params::Layer& layer,
+                                Pipeline::GenerationAssembler& generationAssembler) {
+    const std::size_t slot = FindLiveNoiseSlot(layer, generationAssembler);
+    const std::vector<Data::FloatField>& liveNoise = generationAssembler.NoiseBlend().CachedRawNoiseCpu();
+    if (slot >= liveNoise.size()) return false;   // NoiseBlend has not run against this stack yet
+    if (layer.layerIdentifier < 0) layer.layerIdentifier = Params::NextLayerIdentifier(layerStack);
+    Data::BakedLayerImage& image =
+        Data::FindOrAddBakedLayerImage(generationAssembler.BakedLayerImages(), layer.layerIdentifier);
+    image.image = liveNoise[slot];   // snapshot -- a value copy, not a reference into the cache
+    return true;
+}
+
+// Bake toggle: NEVER destroys data (STEP151 -- the human hit the old unconditional-overwrite bug
+// first-hand). Off -> On reuses an existing snapshot verbatim (import, or an earlier bake) and
+// only ever snapshots live noise for a genuine first-ever bake; On -> Off is unchanged. Bake
+// fails, layer untouched, only when there is nothing live to snapshot for a genuine first bake.
 bool ApplyBakeToggleAction(Params::LayerStack& layerStack, Params::Layer& layer,
                            Pipeline::GenerationAssembler& generationAssembler) {
     if (layer.bBaked) {           // Unbake: resume live generation from the SAME still-present
         layer.bBaked = false;     // noise recipe fields (not one-way) -- bakedImagePath stays as
         return true;              // metadata; the next Run() re-rolls the layer's own noise.
     }
-    const std::vector<const Params::Layer*> flatLayers = layerStack.GetFlatLayers();
-    std::size_t flatIndex = flatLayers.size();
-    for (std::size_t index = 0; index < flatLayers.size(); ++index)
-        if (flatLayers[index] == &layer) { flatIndex = index; break; }
-    if (flatIndex >= flatLayers.size()) return false;   // a disabled layer has nothing live to bake
-    const std::vector<Data::FloatField>& liveNoise = generationAssembler.NoiseBlend().CachedRawNoiseCpu();
-    if (flatIndex >= liveNoise.size()) return false;    // NoiseBlend has not run against this stack yet
-    if (layer.layerIdentifier < 0) layer.layerIdentifier = Params::NextLayerIdentifier(layerStack);
-    Data::BakedLayerImage& image =
-        Data::FindOrAddBakedLayerImage(generationAssembler.BakedLayerImages(), layer.layerIdentifier);
-    image.image = liveNoise[flatIndex];   // snapshot -- a value copy, not a reference into the cache
-    layer.bBaked = true;                  // bakedImagePath stays empty: sourced from live noise,
-    return true;                          // not a file.
+    // A stable identifier can only already carry content if it was assigned before THIS call
+    // (FindBakedLayerImage refuses a negative key outright) -- a genuine first bake, still at -1,
+    // can never mistake this branch for its own, and this path writes nothing at all.
+    const Data::FloatField* existingImage =
+        Data::FindBakedLayerImage(generationAssembler.BakedLayerImages(), layer.layerIdentifier);
+    if (existingImage != nullptr && existingImage->Width() > 0) {
+        layer.bBaked = true;      // reuse verbatim -- Bake/Unbake/Bake never destroys the original
+        return true;
+    }
+    if (!SnapshotLiveNoiseOverImage(layerStack, layer, generationAssembler)) return false;
+    layer.bBaked = true;          // bakedImagePath stays empty: sourced from live noise, not a file.
+    return true;
+}
+
+// Refresh Bake (STEP151): the ONLY action allowed to deliberately overwrite an existing snapshot.
+// Only meaningful on an unbaked layer with a live recipe -- `NoiseType::None` has nothing to
+// refresh from (the same predicate STEP152's `HasActiveProceduralLayer()` needs; do not duplicate
+// it if that lands first). Does not itself flip `bBaked` either way.
+bool ApplyRefreshBakeAction(Params::LayerStack& layerStack, Params::Layer& layer,
+                            Pipeline::GenerationAssembler& generationAssembler) {
+    if (layer.bBaked || layer.noiseType == Params::NoiseType::None) return false;
+    return SnapshotLiveNoiseOverImage(layerStack, layer, generationAssembler);
 }
 
 } // namespace
@@ -71,6 +113,8 @@ bool ApplyBakedImageAction(const LayerEditorAction& action, Params::LayerStack& 
         return ApplyImportRawAction(action, layerStack, layer, generationAssembler);
     if (action.kind == LayerEditorActionKind::BakeToggleRequested)
         return ApplyBakeToggleAction(layerStack, layer, generationAssembler);
+    if (action.kind == LayerEditorActionKind::RefreshBakeRequested)
+        return ApplyRefreshBakeAction(layerStack, layer, generationAssembler);
     return false;
 }
 

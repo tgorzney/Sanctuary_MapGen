@@ -27,6 +27,10 @@ float ComputeFractalBounding(int octaves, float gain) {
 void NoiseBlendStage::PrepareRun() {
     const std::vector<const Params::Layer*> flatLayers = layerStack.GetFlatLayers();
     const int vertexSize = geometry.VertexSize();
+    // Persisted, not recomputed, so a caller can find a layer's `cachedRawNoiseCpu` slot by pointer
+    // identity later — built from this SAME local `flatLayers` in this SAME call, so the two stay
+    // provably in lockstep even across a stack reorder between now and that lookup (STEP151).
+    cachedFlatLayerPointers = flatLayers;
 
     layerConfigurations.clear();
     layerConfigurations.reserve(flatLayers.size());
