@@ -8,6 +8,7 @@
 #include "LayerEditor_TestSupport_UI.h"
 #include "LayerEditor_UI.h"
 #include "Section_UI.h"
+#include <cmath>
 #include <cstdio>
 #include <imgui.h>
 #include <string>
@@ -209,9 +210,152 @@ void RunAddGeoLayerButtonClickThroughChecks() {
     ImGui::DestroyContext();
 }
 
+// STEP150 acceptance: DrawGroupSettings no longer draws "Group Stratum Index" (Params::GeoLayer::
+// stratumIndex has zero PROC consumer -- only the per-Layer control drives generation). Rendering
+// itself is "verified by eye against a live frame, never by test" everywhere else in this library
+// (TextInput_UI.cpp / SliderScalar_UI.cpp's own words); presence/ABSENCE of a whole row is the one
+// thing this ticket needs asserted, so it is measured by total layout height rather than by eye:
+// the group body (Name/Mode/Group Blend Mode/Erode Below, then Separator + "Add Layer") must cost
+// EXACTLY what those controls cost standalone, with nothing left over for a removed fifth row.
+void RunGroupStratumIndexRemovedCheck() {
+    ImGui::CreateContext();
+
+    Params::LayerStack layerStack;
+    layerStack.geoLayers.resize(1);           // no layers inside -- isolates group settings +
+                                               // Separator + "Add Layer" from anything a layer row
+                                               // would itself add to the height.
+    LayerEditorState state;
+    state.selectedGeoLayerIndex = 0;
+    state.selectedLayerIndex    = -1;
+
+    BeginHeadlessFrame();
+    ImGui::Begin("GroupStratumIndexActualWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    const float actualStartY = ImGui::GetCursorPosY();
+    LayerEditorFrameSignals signals;
+    DrawLayerEditorGroupBody(layerStack, 0, state, signals, nullptr, nullptr);
+    const float actualHeight = ImGui::GetCursorPosY() - actualStartY;
+    ImGui::End();
+    ImGui::Render();
+
+    // The SAME four controls, drawn standalone, plus the same Separator + button
+    // DrawGroupLayerList always draws first — the exact height the real body would have if it drew
+    // ONLY these four settings.
+    BeginHeadlessFrame();
+    ImGui::Begin("GroupStratumIndexReferenceWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    const float referenceStartY = ImGui::GetCursorPosY();
+    std::string groupName = "GeoLayer";
+    DrawTextInput("Name", groupName, LayerEditorNameRules("GeoLayer"));
+    Params::GeoLayerMode mode = Params::GeoLayerMode::Material;
+    const char* const geoLayerModeLabels[] = { "Material", "Shaper" };
+    DrawLayerEditorEnumRow("Mode", mode, geoLayerModeLabels, IM_ARRAYSIZE(geoLayerModeLabels), nullptr);
+    Params::HeightBlendMode blendMode = Params::HeightBlendMode::Add;
+    const char* const groupBlendModeLabels[] = { "Add", "Subtract", "Multiply", "Overlay",
+                                                 "Maximum", "Minimum" };
+    DrawLayerEditorEnumRow("Group Blend Mode", blendMode, groupBlendModeLabels,
+                           IM_ARRAYSIZE(groupBlendModeLabels), nullptr);
+    bool bErodeBelow = false;
+    DrawLayerEditorCheckboxRow("Erode Below", bErodeBelow, nullptr);
+    ImGui::Separator();
+    ImGui::SmallButton("Add Layer");
+    const float referenceHeight = ImGui::GetCursorPosY() - referenceStartY;
+    ImGui::End();
+    ImGui::Render();
+
+    CheckLayerEditor(std::fabs(actualHeight - referenceHeight) < 0.5f,
+                     "the group body's own height now matches EXACTLY Name+Mode+GroupBlendMode+"
+                     "ErodeBelow+Separator+Add Layer -- a lingering Group Stratum Index row would "
+                     "make the real body taller than this four-control reference");
+
+    ImGui::DestroyContext();
+}
+
+// STEP150 acceptance: the Import RAW picker's bound path is synced from the SELECTED layer's OWN
+// bakedImagePath every frame that row draws, not left holding whatever some other row (or an
+// earlier frame) last put in the shared scratch string.
+void RunImportRawPickerSyncChecks() {
+    Params::LayerStack layerStack;
+    layerStack.geoLayers.resize(1);
+    layerStack.geoLayers[0].layers.resize(2);
+    layerStack.geoLayers[0].layers[0].bakedImagePath = "C:/SanGenTest/height0.raw";
+    layerStack.geoLayers[0].layers[1].bakedImagePath.clear();   // never imported
+
+    LayerEditorState state;
+    state.selectedGeoLayerIndex = 0;
+    state.selectedLayerIndex    = 0;
+    state.importRawPath = "C:/StaleScratch/whatever-some-other-row-picked.raw";   // poison
+
+    ImGui::CreateContext();
+    BeginHeadlessFrame();
+    ImGui::Begin("ImportRawSyncWindow1", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    LayerEditorFrameSignals signalsRowZero;
+    DrawLayerEditorGroupBody(layerStack, 0, state, signalsRowZero, nullptr, nullptr);
+    ImGui::End();
+    ImGui::Render();
+    CheckLayerEditor(state.importRawPath == layerStack.geoLayers[0].layers[0].bakedImagePath,
+                     "the picker's bound path is synced from the SELECTED row's own bakedImagePath");
+
+    state.selectedLayerIndex = 1;
+    BeginHeadlessFrame();
+    ImGui::Begin("ImportRawSyncWindow2", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    LayerEditorFrameSignals signalsRowOne;
+    DrawLayerEditorGroupBody(layerStack, 0, state, signalsRowOne, nullptr, nullptr);
+    ImGui::End();
+    ImGui::Render();
+    CheckLayerEditor(state.importRawPath.empty(),
+                     "and a layer that was never imported syncs to a genuine empty path (the "
+                     "picker's own ShortenedFilePathLabel renders that as \"(none)\")");
+
+    ImGui::DestroyContext();
+}
+
+// STEP150 acceptance: Noise/Density/HeightBlend (and, drawn the same way, Soil/Erosion) never run
+// for a baked layer. Reuses RunInlineSettingsChecks' own poison-the-mirror technique: Height
+// Blending's DrawHeightBlendSection only calls LoadLayerEditorValues (which would clear the poison)
+// when it actually draws, so the poison surviving a frame IS the proof the whole gated block was
+// skipped.
+void RunProceduralSectionsGatedWhenBakedChecks() {
+    Params::LayerStack layerStack;
+    layerStack.geoLayers.resize(1);
+    layerStack.geoLayers[0].layers.resize(1);
+    Params::Layer& layer = layerStack.geoLayers[0].layers[0];
+    layer.levelsShadows = 0.42f;      // a real, distinguishable value a live draw WOULD load
+    layer.bBaked = true;
+
+    LayerEditorState state;
+    state.selectedGeoLayerIndex = 0;
+    state.selectedLayerIndex    = 0;
+    state.levelsValues.inputShadows = -999.0f;   // poison
+
+    ImGui::CreateContext();
+    BeginHeadlessFrame();
+    ImGui::Begin("BakedGateWindow1", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    LayerEditorFrameSignals signalsBaked;
+    DrawLayerEditorGroupBody(layerStack, 0, state, signalsBaked, nullptr, nullptr);
+    ImGui::End();
+    ImGui::Render();
+    CheckLayerEditor(state.levelsValues.inputShadows == -999.0f,
+                     "a baked layer's Height Blending section (and, gated the same way, Noise/"
+                     "Density/Soil/Erosion) never draws, so the poisoned mirror survives the frame");
+
+    layer.bBaked = false;
+    BeginHeadlessFrame();
+    ImGui::Begin("BakedGateWindow2", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    LayerEditorFrameSignals signalsUnbaked;
+    DrawLayerEditorGroupBody(layerStack, 0, state, signalsUnbaked, nullptr, nullptr);
+    ImGui::End();
+    ImGui::Render();
+    CheckLayerEditor(state.levelsValues.inputShadows == 0.42f,
+                     "and the same layer, once unbaked, draws Height Blending again and reloads it");
+
+    ImGui::DestroyContext();
+}
+
 } // namespace
 
 void RunLayerEditorInlineSettingsChecks() {
     RunInlineSettingsChecks();
     RunAddGeoLayerButtonClickThroughChecks();
+    RunGroupStratumIndexRemovedCheck();
+    RunImportRawPickerSyncChecks();
+    RunProceduralSectionsGatedWhenBakedChecks();
 }

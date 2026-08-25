@@ -23,6 +23,18 @@ struct LayerEditorFrameSignals {
     LayerEditorAction   action;                   // Add / Duplicate / Import RAW / Bake
 };
 
+// Turns a layer row's header Bake/Unbake affordance click (DraggableListSignalKind::ExtraButton,
+// STEP150) into the SAME `BakeToggleRequested` action the old in-body button recorded — only WHERE
+// the click is detected moved, never the action it produces or how it is applied
+// (LayerEditor_BakedImage_UI.h's ApplyBakedImageAction, untouched). A no-op for every other signal
+// kind, so calling it on the group list's own signal (which never carries ExtraButton) is free.
+inline void RecordBakeToggleFromRowSignal(const DraggableListSignal& signal, int groupIndex,
+                                          LayerEditorFrameSignals& signals) {
+    if (signal.kind != DraggableListSignalKind::ExtraButton) return;
+    RecordLayerEditorAction(signals.action, LayerEditorActionKind::BakeToggleRequested,
+                            groupIndex, signal.sourceRowIndex);
+}
+
 // Applies a frame in the ONE safe order:
 //   1. the inner layer signal — a group delete in the same frame would move the indices it is
 //      expressed in;

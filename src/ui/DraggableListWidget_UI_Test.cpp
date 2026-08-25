@@ -99,6 +99,59 @@ void TestSyntheticDragProducesTheExpectedOrder() {
                 scene.layers[1].identifier, scene.layers[2].identifier, scene.layers[3].identifier);
 }
 
+// STEP150: the OPTIONAL per-row extra button, generically. Row 0 opts in; every other row leaves
+// `extraButtonLabel` null, same as this scene's rows always have — proving the strip and the
+// header-click arbitration are UNCHANGED for a row/consumer that never populates the field, while
+// the row that DOES gets a real, clickable fourth affordance right of `X##delete`.
+void TestOptionalExtraButtonIsGenericAndRowScoped() {
+    HeadlessImguiSession session;
+    DraggableScene scene = MakeDraggableScene();
+    scene.layers[0].extraButtonLabel = "Bake##testExtra";
+    RunSceneFrame(scene, kMouseAway, false);
+    RunSceneFrame(scene, kMouseAway, false);                   // settle layout, capture geometry
+
+    // Row 1 never set extraButtonLabel -- its own X##delete must sit at the SAME offset from the
+    // right edge the base (no-extra-button) test above found, proving row 1's strip is untouched.
+    float row1DeleteX = -1.0f;
+    for (float probeX = kSceneWindowSize.x - 110.0f; probeX < kSceneWindowSize.x - 2.0f; probeX += 2.0f) {
+        const DraggableListSignal probe = ClickAt(scene, ImVec2(probeX, RowCenterY(scene, 1)));
+        if (probe.kind == DraggableListSignalKind::Delete && probe.sourceRowIndex == 1) {
+            row1DeleteX = probeX;
+            break;
+        }
+    }
+    CheckListWidgetExpectation(row1DeleteX > 0.0f,
+                               "a row with no extra button keeps its ordinary delete affordance");
+
+    // Row 0 DID set extraButtonLabel -- sweep further right of ITS delete button to find the new
+    // fourth affordance and confirm it reports ExtraButton for row 0.
+    float row0ExtraX = -1.0f;
+    for (float probeX = kSceneWindowSize.x - 170.0f; probeX < kSceneWindowSize.x - 2.0f; probeX += 2.0f) {
+        const DraggableListSignal probe = ClickAt(scene, ImVec2(probeX, RowCenterY(scene, 0)));
+        if (probe.kind == DraggableListSignalKind::ExtraButton && probe.sourceRowIndex == 0) {
+            row0ExtraX = probeX;
+            break;
+        }
+    }
+    CheckListWidgetExpectation(row0ExtraX > 0.0f,
+                               "the opted-in row's extra button fires ExtraButton with its own row index");
+
+    // Row 0's ordinary delete affordance must still exist too -- the extra button ADDS a fourth
+    // slot, it does not replace the third.
+    bool bRow0StillHasDelete = false;
+    for (float probeX = kSceneWindowSize.x - 170.0f; probeX < kSceneWindowSize.x - 2.0f; probeX += 2.0f) {
+        const DraggableListSignal probe = ClickAt(scene, ImVec2(probeX, RowCenterY(scene, 0)));
+        if (probe.kind == DraggableListSignalKind::Delete && probe.sourceRowIndex == 0) {
+            bRow0StillHasDelete = true;
+            break;
+        }
+    }
+    CheckListWidgetExpectation(bRow0StillHasDelete,
+                               "and the opted-in row keeps its own visibility/lock/delete trio too");
+    CheckListWidgetExpectation(OrderIs(scene, 1, 2, 3, 4),
+                               "none of the probing above mutated the caller's list");
+}
+
 } // namespace
 
 namespace SanmapGen {
@@ -107,6 +160,7 @@ void RunDraggableListAcceptance() {
     TestApplySignalMovesAndDeletes();
     TestAffordanceSignalsCarryTheRightIndex();
     TestSyntheticDragProducesTheExpectedOrder();
+    TestOptionalExtraButtonIsGenericAndRowScoped();
 }
 } // namespace Ui
 } // namespace SanmapGen

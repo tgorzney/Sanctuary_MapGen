@@ -19,6 +19,10 @@ struct TestLayer {
     int         identifier;
     bool        bVisible;
     bool        bLocked;
+    // Left null by every row here except where a test opts a specific row in (STEP150's generic
+    // DraggableListRow::extraButtonLabel) — proves the shared widget stays a no-op for a consumer
+    // that never sets it, same as this scene already stood in for Props/Decals/Markers pre-STEP150.
+    const char* extraButtonLabel = nullptr;
 };
 
 struct DraggableScene {
@@ -49,9 +53,10 @@ inline DraggableListSignal RunSceneFrame(DraggableScene& scene, ImVec2 mousePosi
                 if (rowIndex < 8) scene.rowTopY[rowIndex] = rowCorner.y;
                 scene.rowLeftX = rowCorner.x;
                 DraggableListRow row;
-                row.label    = scene.layers[rowIndex].name;
-                row.bVisible = scene.layers[rowIndex].bVisible;
-                row.bLocked  = scene.layers[rowIndex].bLocked;
+                row.label            = scene.layers[rowIndex].name;
+                row.bVisible         = scene.layers[rowIndex].bVisible;
+                row.bLocked          = scene.layers[rowIndex].bLocked;
+                row.extraButtonLabel = scene.layers[rowIndex].extraButtonLabel;
                 return row;
             },
             [](int) {});                       // header-only rows keep the geometry stable

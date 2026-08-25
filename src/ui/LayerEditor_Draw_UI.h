@@ -55,7 +55,20 @@ void DrawLayerEditorEnumRow(const char* label, EnumType& value, const char* cons
     NotifyLayerEditorChange(change.bCommitted, previewDriver);
 }
 
+// The label the header's Bake/Unbake affordance shows, keyed on `bBaked` alone — pure so the flip
+// is assertable with no imgui frame (LayerEditor_Signals_UI_Test.cpp). The "##bakeToggle" id salt
+// stays fixed across both strings so a click cannot drop imgui's active id mid-press, same
+// discipline as DraggableListWidget_UI.h's own "[o]##visibility"/"[-]##visibility" icons.
+inline const char* LayerEditorBakeToggleButtonLabel(bool bBaked) {
+    return bBaked ? "Unbake##bakeToggle" : "Bake##bakeToggle";
+}
+
 // The per-layer panels, one translation unit each. `generationAssembler` may be null.
+// Name + Stratum Index: the layer's identity row (name wide, stratum compact to its right), drawn
+// ABOVE the Import RAW/Duplicate row and ALWAYS regardless of `bBaked` — a baked layer still has a
+// name and still owns a stratum slot (LayerEditor_Group_UI.cpp, STEP150).
+void DrawLayerEditorNameRow(Params::Layer& layer, LayerEditorState& state,
+                            Pipeline::PreviewDriver* previewDriver);
 void DrawLayerEditorLayerSections(Params::Layer& layer, LayerEditorState& state,
                                   Pipeline::PreviewDriver* previewDriver);
 void DrawLayerEditorSoilSection(int stratumIndex, LayerEditorState& state,

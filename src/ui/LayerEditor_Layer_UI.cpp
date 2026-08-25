@@ -80,15 +80,34 @@ void DrawHeightBlendSection(Params::Layer& layer, LayerEditorState& state,
 
 } // namespace
 
-void DrawLayerEditorLayerSections(Params::Layer& layer, LayerEditorState& state,
-                                  Pipeline::PreviewDriver* previewDriver) {
-    ImGui::PushID("layerSections");
+// The layer's identity row: Name (wide) + Stratum Index (compact, right) sharing one visual row,
+// via a two-column layout — both shared widgets (DrawTextInput, DrawLayerEditorIntegerRow) already
+// size themselves off `GetContentRegionAvail().x`, so a column IS their "compact"/"wide" knob with
+// no changes needed inside either widget (STEP150; no other same-line label+control precedent
+// existed in this library to match against — Section_UI.h's reservedRightWidth composes a single
+// trailing button, not two full controls side by side).
+void DrawLayerEditorNameRow(Params::Layer& layer, LayerEditorState& state,
+                            Pipeline::PreviewDriver* previewDriver) {
+    ImGui::PushID("layerNameRow");
+    constexpr float kStratumIndexColumnWidthPixels = 150.0f;
+    const float totalWidth = ImGui::GetContentRegionAvail().x;
+    const float nameColumnWidth = totalWidth - kStratumIndexColumnWidthPixels;
+    ImGui::Columns(2, "nameStratumColumns", false);
+    ImGui::SetColumnWidth(0, nameColumnWidth > 1.0f ? nameColumnWidth : 1.0f);
     // The name is pure metadata no stage hashes, so a commit is NOT routed to the driver: asking
     // for a regeneration a rename cannot affect would be the "cheap tweak triggers a full regen"
     // defect UI_FRAMEWORK_SPEC lists. It is the DraggableList row's label, so it is edited here
     // and read there (LayerEditor_Group_UI.cpp).
     DrawTextInput("Name", layer.name, LayerEditorNameRules("Layer"));
+    ImGui::NextColumn();
     DrawLayerEditorIntegerRow(LayerEditorScalar::StratumIndex, layer.stratumIndex, state, previewDriver);
+    ImGui::Columns(1);
+    ImGui::PopID();
+}
+
+void DrawLayerEditorLayerSections(Params::Layer& layer, LayerEditorState& state,
+                                  Pipeline::PreviewDriver* previewDriver) {
+    ImGui::PushID("layerSections");
     DrawNoiseSection(layer, state, previewDriver);
     DrawDensitySection(layer, state, previewDriver);
     DrawHeightBlendSection(layer, state, previewDriver);

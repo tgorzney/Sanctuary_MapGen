@@ -2,9 +2,11 @@
 // one frame's collected signals are applied in, and the selection fence. All pure — the editor's
 // draw path MUTATES NOTHING, so every structural edit is assertable with no window open.
 // main() lives in LayerEditor_UI_Test.cpp.
+#include "LayerEditor_Draw_UI.h"
 #include "LayerEditor_Signals_UI.h"
 #include "LayerEditor_TestSupport_UI.h"
 #include "LayerEditor_UI.h"
+#include <string>
 
 using namespace SanmapGen;
 using namespace SanmapGen::Ui;
@@ -135,6 +137,58 @@ void RunFrameSignalOrderChecks() {
                      "an empty stack selects nothing rather than index zero");
 }
 
+// STEP150: the header's Bake/Unbake affordance label and the signal->action mapping it wires
+// through are both pure, so both are assertable with no imgui frame — the drawing itself (which
+// row gets `describeRow`'s `extraButtonLabel`, and where DrawFilePathPicker/the gated sections sit)
+// is "verified by eye against a live frame, never by test", the same posture every other batch-A
+// widget's .cpp states for its own drawing half.
+void RunBakeToggleRowAffordanceChecks() {
+    CheckLayerEditor(std::string(LayerEditorBakeToggleButtonLabel(false)) == "Bake##bakeToggle",
+                     "an unbaked layer's header affordance reads Bake");
+    CheckLayerEditor(std::string(LayerEditorBakeToggleButtonLabel(true)) == "Unbake##bakeToggle",
+                     "and a baked layer's reads Unbake");
+    CheckLayerEditor(std::string(LayerEditorBakeToggleButtonLabel(false)).find("##bakeToggle")
+                     != std::string::npos
+                     && std::string(LayerEditorBakeToggleButtonLabel(true)).find("##bakeToggle")
+                     != std::string::npos,
+                     "both labels share the SAME id salt, so a click never drops imgui's active id "
+                     "mid-press when the label flips (DraggableListWidget_UI.h's own icon precedent)");
+
+    LayerEditorFrameSignals signals;
+    DraggableListSignal extraButtonSignal;
+    extraButtonSignal.kind           = DraggableListSignalKind::ExtraButton;
+    extraButtonSignal.sourceRowIndex = 2;
+    RecordBakeToggleFromRowSignal(extraButtonSignal, 5, signals);
+    CheckLayerEditor(signals.action.kind == LayerEditorActionKind::BakeToggleRequested,
+                     "the header affordance's click records the SAME BakeToggleRequested kind the "
+                     "old in-body button used");
+    CheckLayerEditor(signals.action.geoLayerIndex == 5 && signals.action.layerIndex == 2,
+                     "carrying the row's own group/layer indices");
+
+    // Every other row affordance's signal kind must never be mistaken for the bake toggle.
+    for (DraggableListSignalKind otherKind : { DraggableListSignalKind::Delete,
+                                               DraggableListSignalKind::ToggleVisibility,
+                                               DraggableListSignalKind::ToggleLock,
+                                               DraggableListSignalKind::Select,
+                                               DraggableListSignalKind::Reorder,
+                                               DraggableListSignalKind::None }) {
+        LayerEditorFrameSignals untouched;
+        DraggableListSignal otherSignal;
+        otherSignal.kind           = otherKind;
+        otherSignal.sourceRowIndex = 2;
+        RecordBakeToggleFromRowSignal(otherSignal, 5, untouched);
+        CheckLayerEditor(!untouched.action.bHasAction(),
+                         "a non-ExtraButton row signal never records a bake action");
+    }
+
+    // First-wins: an action already recorded this frame (e.g. Duplicate) is not clobbered.
+    LayerEditorFrameSignals alreadyActed;
+    RecordLayerEditorAction(alreadyActed.action, LayerEditorActionKind::DuplicateLayer, 0, 0);
+    RecordBakeToggleFromRowSignal(extraButtonSignal, 5, alreadyActed);
+    CheckLayerEditor(alreadyActed.action.kind == LayerEditorActionKind::DuplicateLayer,
+                     "the bake mapping respects the frame's own first-wins action rule");
+}
+
 void RunSelectedLayerChecks() {
     Params::LayerStack layerStack = TwoGroupStack();
     LayerEditorState state;
@@ -152,5 +206,6 @@ void RunSelectedLayerChecks() {
 void RunLayerEditorSignalChecks() {
     RunRowActionChecks();
     RunFrameSignalOrderChecks();
+    RunBakeToggleRowAffordanceChecks();
     RunSelectedLayerChecks();
 }
