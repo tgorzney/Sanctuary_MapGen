@@ -657,6 +657,11 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
         Check(NearlyEqual(loadedLayer.iconScale, originalLayer.iconScale),
               "MarkerInstanceLayer::iconScale survives");
         Check(loadedLayer.layerId == originalLayer.layerId, "MarkerInstanceLayer::layerId (7) survives");
+        Check(loadedLayer.bLocked == originalLayer.bLocked, "MarkerInstanceLayer::bLocked survives, non-default");
+        Check(loadedLayer.bGridSnapEnabled == originalLayer.bGridSnapEnabled,
+              "MarkerInstanceLayer::bGridSnapEnabled survives, non-default");
+        Check(NearlyEqual(loadedLayer.gridSnapSizeWorldUnits, originalLayer.gridSnapSizeWorldUnits),
+              "MarkerInstanceLayer::gridSnapSizeWorldUnits survives, non-default");
     }
 
     Check(loaded.markers.size() == 1, "one marker group survives");
@@ -1181,6 +1186,9 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerLayer.color[2] = 0.6f; markerLayer.color[3] = 0.8f;
     markerLayer.iconScale = 1.25f;
     markerLayer.layerId = 7;                                          // non-default, survives verbatim
+    markerLayer.bLocked = true;                                       // STEP106, non-default
+    markerLayer.bGridSnapEnabled = true;                              // STEP106, non-default
+    markerLayer.gridSnapSizeWorldUnits = 4.0f;                        // STEP106, non-default
     recipe.markerLayers.push_back(markerLayer);
 
     Params::MarkerTransform markerTransform;
@@ -1943,6 +1951,26 @@ void CheckMarkerGroupsLegacyBackfill() {
     }
 }
 
+// STEP106: a hand-built `MarkerGroups` entry with none of `"Locked"`/`"GridSnapEnabled"`/
+// `"GridSnapSizeWorldUnits"` present (a legacy file saved before this ticket) leaves the struct's
+// own defaults untouched.
+void CheckMarkerGroupsLegacyLockAndSnapDefaults() {
+    nlohmann::json document;
+    document["MarkerGroups"] = nlohmann::json::array();
+    document["MarkerGroups"].push_back(nlohmann::json::object({ { "Name", "First" } }));
+
+    Params::MapRecipe recipe;
+    Io::ReadMarkerGroupsJson(document, recipe);
+    Check(recipe.markerLayers.size() == 1, "the legacy MarkerGroups entry survives");
+    if (recipe.markerLayers.empty()) return;
+    const Params::MarkerInstanceLayer& layer = recipe.markerLayers[0];
+    Check(layer.bLocked == false, "bLocked keeps its struct default (false) when the key is absent");
+    Check(layer.bGridSnapEnabled == false,
+          "bGridSnapEnabled keeps its struct default (false) when the key is absent");
+    Check(NearlyEqual(layer.gridSnapSizeWorldUnits, 1.0f),
+          "gridSnapSizeWorldUnits keeps its struct default (1.0f) when the key is absent");
+}
+
 // STEP60_MarkerInstanceLayer_PARAMS: a hand-built `markers` entry with an out-of-range
 // `layerIndex` (5, against zero MarkerGroups entries) must clamp to 0 on import and log a
 // warning — mirrors MapImporter_PropsDecals_IO_Test.cpp's own `ClampPropLayerIndex` coverage.
@@ -2037,6 +2065,7 @@ int main() {
     SanmapGen::MapFormatTest::CheckLegacyBlobWinsOverAllFourNewFieldHomesOnDisagreement();
     SanmapGen::MapFormatTest::CheckPureOldShapedDocumentStillImportsFromLegacyBlobAlone();
     SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyBackfill();
+    SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyLockAndSnapDefaults();
     SanmapGen::MapFormatTest::CheckMarkerLayerIndexClampsOnImport();
     SanmapGen::MapFormatTest::CheckLayerMissingBakedKeysLeaveDefaults();
     SanmapGen::MapFormatTest::CheckNextLayerIdentifier();

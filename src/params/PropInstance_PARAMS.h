@@ -27,8 +27,21 @@ struct DecalInstanceGroup { std::string blueprintPath; std::vector<DecalTransfor
 // Third session (ARCH §12): the separate manual-layer metadata array, one entry per authored
 // layer, indexed by PropTransform/DecalTransform::layerIndex. Same shape for both domains. Wire
 // keys are `PropGroups`/`DecalGroups` (SANMAP_FORMAT_SPEC Correction 14), PascalCase.
-struct PropInstanceLayer  { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; int layerId = -1; };
-struct DecalInstanceLayer { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; int layerId = -1; };
+struct PropInstanceLayer  { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; int layerId = -1; bool bLocked = false; };
+struct DecalInstanceLayer { std::string name; float color[4] = {1.0f,1.0f,1.0f,1.0f}; float iconScale = 1.0f; int layerId = -1; bool bLocked = false; };
+
+// ARCH §14.15: single source of truth for resolving a PropTransform/DecalTransform's positional
+// `layerIndex` to its owning layer's stable `layerId`, bounds-checked with a -1 sentinel. Both
+// `Placement_Manual_PROC.cpp` (baked-copy resolution) and `MapCanvas_IconLayer_CullManual_UI.cpp`
+// (live cull-path resolution) call these instead of each carrying their own formula.
+inline int ResolvePropInstanceLayerId(int layerIndex, const std::vector<PropInstanceLayer>& layers) {
+    if (layerIndex < 0 || static_cast<std::size_t>(layerIndex) >= layers.size()) return -1;
+    return layers[layerIndex].layerId;
+}
+inline int ResolveDecalInstanceLayerId(int layerIndex, const std::vector<DecalInstanceLayer>& layers) {
+    if (layerIndex < 0 || static_cast<std::size_t>(layerIndex) >= layers.size()) return -1;
+    return layers[layerIndex].layerId;
+}
 
 } // namespace Params
 } // namespace SanmapGen

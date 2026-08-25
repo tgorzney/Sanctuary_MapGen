@@ -855,6 +855,7 @@
         "RadialSymmetryRepeatCount": 3,
         "SnapImperfectSymmetry": false,
         "SymmetryDetectionTolerance": 0.009999999776482582,
+        "MarkerSymmetryFixDistanceTolerance": 0.5,
         "SymSuperpositionBlend": 0.5,
         "SymmetryBlurRadius": 4.0,
         "CrossFadeWidth": 8.0,

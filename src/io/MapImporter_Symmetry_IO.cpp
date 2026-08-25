@@ -22,6 +22,8 @@ void ReadSymmetryJson(const nlohmann::json& document, Params::MapRecipe& outReci
                           Params::radialSymmetryRepeatCountMaximum, outRecipe.radialSymmetryRepeatCount);
     ReadJsonBoolean(json, "SnapImperfectSymmetry", detection.bSnapImperfectSymmetry);
     ReadJsonFloat(json, "SymmetryDetectionTolerance", detection.detectionTolerance);
+    ReadJsonFloat(json, "MarkerSymmetryFixDistanceTolerance",
+                  outRecipe.markerSymmetryFixSettings.distanceTolerance);
     ReadJsonFloat(json, "SymSuperpositionBlend", blend.superpositionBlend);
     ReadJsonFloat(json, "SymmetryBlurRadius", blend.blurRadius);
     ReadJsonFloat(json, "CrossFadeWidth", blend.crossFadeWidth);

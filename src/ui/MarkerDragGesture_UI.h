@@ -18,6 +18,7 @@
 #pragma once
 #include <vector>
 #include "MarkerOrbitCorrespondence_UI.h"
+#include "MarkersTab_ManualLayers_UI.h"
 #include "MarkersTab_Manual_UI.h"
 #include "../params/Geometry_PARAMS.h"
 #include "../params/MarkerInstance_PARAMS.h"
@@ -106,6 +107,7 @@ bool BeginMarkerDragGesture(MarkerDragGestureState& state,
 // CURRENT world position (STEP47's `PreviewComposite::PreviewPixelToWorld`). No-op if `state` is
 // not active.
 void UpdateMarkerDragGesture(MarkerDragGestureState& state, std::vector<Params::MarkerInstanceGroup>& markers,
+                             const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                              const Params::Geometry& geometry, float newWorldX, float newWorldZ);
 
 // MarkerDragGesture_Frame_UI.cpp — mouse-up: if the final orbit's cardinality still differs from

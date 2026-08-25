@@ -46,12 +46,15 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
     // STEP81: the Manual Marker Layers block, drawn BEFORE the manual roster below so a layer
     // added this frame is pickable by that roster's Layer combo on the same frame (STEP60 §3's
     // read-after-populate ordering, applied to authoring rather than import).
-    DrawManualMarkerLayers(state.manualLayers, recipe.markerLayers, recipe.markers);
+    DrawManualMarkerLayers(state.manualLayers, recipe.markerLayers, recipe.markers, recipe.geometry,
+                          recipe.globalSymmetryMask, recipe.radialSymmetryRepeatCount,
+                          recipe.markerSymmetryFixSettings);
     // STEP49: the hand-authored roster. `DrawManualMarkers` takes no map-size parameter, so the
     // caller resolves the X/Z slider bounds from `recipe.geometry.mapSize` into the state each
     // frame (MarkersTab_Manual_UI.h).
     state.manual.positionHorizontalRange = MarkerPositionHorizontalSliderRange(recipe.geometry.mapSize);
-    DrawManualMarkers(recipe.markers, recipe.armies, recipe.markerLayers, state.manual);
+    DrawManualMarkers(recipe.markers, recipe.armies, recipe.markerLayers, state.manual,
+                      state.manualLayers.selectedLayerIndex);
     DrawPlacedMarkerList(placedMarkers, state.placedList);
     ImGui::PopID();
 }

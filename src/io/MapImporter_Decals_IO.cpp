@@ -105,6 +105,7 @@ void ReadDecalGroupsJson(const nlohmann::json& document, Params::MapRecipe& outR
             }
             ReadJsonFloat(layerJson, "IconScale", layer.iconScale);
             ReadJsonInteger(layerJson, "Id", layer.layerId);
+            ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
         }
         outRecipe.decalLayers.push_back(layer);
     }

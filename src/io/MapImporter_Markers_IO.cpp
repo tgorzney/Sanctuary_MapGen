@@ -132,6 +132,9 @@ void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& out
             ReadJsonBoolean(layerJson, "SymmetryUseGlobal", layer.symmetry.bSymmetryUseGlobal);
             ReadJsonInteger(layerJson, "SymmetryMask", layer.symmetry.symmetryMask);
             ReadJsonInteger(layerJson, "RadialSymmetryRepeatCount", layer.symmetry.radialSymmetryRepeatCount);
+            ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
+            ReadJsonBoolean(layerJson, "GridSnapEnabled", layer.bGridSnapEnabled);
+            ReadJsonFloat(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeWorldUnits);
         }
         outRecipe.markerLayers.push_back(layer);
     }

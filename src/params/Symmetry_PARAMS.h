@@ -66,6 +66,17 @@ struct SymmetryDetection {
     bool bSnapImperfectSymmetry = false;
 };
 
+// The world-space distance tolerance STEP107's "Fix Symmetry" backfill command uses to decide
+// whether two MarkerTransform positions are the same mirrored point. A SEPARATE field from
+// SymmetryDetection::detectionTolerance above — that one is a normalized-height (0..1) DELTA for
+// recognizing near-symmetric terrain; this one is a world-space DISTANCE for marker positions.
+// Never conflate the two (Constitution §8 — every threshold stays a designer-reachable field).
+struct MarkerSymmetryFixSettings {
+    // World units. A marker placed by hand rarely lands more than a fraction of a unit off a
+    // true mirror position; 0.5 is a generous but not indiscriminate default.
+    float distanceTolerance = 0.5f;
+};
+
 // The six exotic-blend scalars SANMAP_FORMAT_SPEC Correction 4's `Symmetry` section carries
 // (`SymSuperpositionBlend`/`SymmetryBlurRadius`/`CrossFadeWidth`/`CylinderZScale`/
 // `TorusMajorRadius`/`TorusMinorRadius`). Zero PROC consumer today — reserved from the moment

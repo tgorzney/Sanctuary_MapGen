@@ -3,7 +3,8 @@
 ### 14.13 Open items — status as of this ratification (closed items marked)
 R2's own "Consolidated ❓ open items" list, carried forward. Items 4 and 5 were closed in the R2
 ratification session by direct expert consult; item 3 was closed on its *design* question in a
-later correction session (rulings below) — its two work-orders remain unscheduled implementation.
+later correction session (rulings below). **Its "two work-orders remain unscheduled implementation"
+framing is itself now stale — see the correction inside item 3 below; §14.15 records both as shipped.**
 Items 1-2 remain genuinely open. A coder or future ARCH pass must not treat items 1-2 as settled
 by this ruling:
 1. ⚠️ **Real footprint-size source:** placeholder-per-domain now (§14.3); who/when derives real
@@ -12,8 +13,8 @@ by this ruling:
    need the real benchmark named in §14.9, not the reasoned placeholders in this ruling.
 3. ✅ **DESIGN CLOSED — Manual sub-layer stable id + manual props/decals PROC resolution.**
    Closed by three rulings below, in a correction session following the item's original "open,
-   sharpened" framing. Two work-orders are now fully specified; **implementation itself stays
-   unscheduled — this closes the design question, not the coding task.**
+   sharpened" framing. Two work-orders are now fully specified; implementation status is corrected
+   below (this bullet originally called it unscheduled — that is no longer true).
    - **Correction to this item's own prior text.** It previously claimed manual props/decals were
      "NOT yet live-wired into `BuildSanmapJsonText`/`ParseSanmapJsonText`," citing
      `MapRecipe_PARAMS.h:103-104`. **That claim is false and is withdrawn** — confirmed live-wired
@@ -49,6 +50,7 @@ by this ruling:
      ruling. `Army_PARAMS.h`'s reorder logic (`ArmiesTab_UI.cpp`) uses the identical plain-position
      scheme as Props/Decals with no stable id; `GeoLayer_PARAMS.h::stratumIndex` is an unrelated
      fixed-slot reference, not list-position precedent. Neither is reusable prior art.
+     **Shipped — STEP56, confirmed by direct read (§14.15).**
    - **WORK-ORDER B — Manual props/decals PROC resolution + correlation column.** One work-order,
      not split — part (b2) has nothing to populate without part (b1):
      - (b1) wire `recipe.props`/`recipe.decals` into a real PROC resolution step, appending into
@@ -60,6 +62,8 @@ by this ruling:
        sentinel-defaulted `std::vector<int>`, threaded through `Append`/`Get`/`Reserve`/`Clear`):
        default `-1` for procedurally-scattered instances; populated with Work-Order A's `layerId`
        (not the renumbered `layerIndex`) for manually-authored instances.
+       **Shipped — `Placement_Manual_PROC.cpp`, wired into `Placement_PROC.cpp:50`, confirmed by
+       direct read (§14.15).**
    - **Ruling 1 — counter placement: NOT a persisted counter field on `MapRecipe`.**
      `MapRecipe_PARAMS.h`'s own header states it "is exactly what `mapGeneratorData` serializes" —
      every existing field is real recipe content; there is no session-only-scratch precedent to
@@ -102,9 +106,12 @@ by this ruling:
      `MarkerTransform` DOES participate in symmetry (via `symmetryGroupIdentifier`, §16.5), a
      deliberate, separately-ratified exception the human required for markers specifically; it does
      not reopen this ruling for Props/Decals, which stay straight copy-through.
-   - **Nothing left open on the design question.** Work-Orders A and B remain unscheduled
-     *implementation* — ordinary work-order scheduling, not a design gap, and not what this item's
-     ⚠️ previously flagged.
+   - **Nothing left open on the design question.** ~~Work-Orders A and B remain unscheduled
+     implementation~~ — **stale, corrected by §14.15**: both have since shipped (confirmed by direct
+     read, not by the sequence doc alone — see the "Shipped" notes on Work-Orders A and B above).
+     §14.15 also rules the cull-path stable-id migration this shipped state now unblocks
+     (`MapCanvas_IconLayer_CullManual_UI.cpp`'s positional match retires in favor of a stable-id
+     match).
 4. ✅ **CLOSED — Decals data source.** Confirmed (Generator Expert): procedural Decals already
    resolve into `Data::PlacementResults::decals` (`PlacementResults_DATA.h:11-15`), the identical
    `Data::PlacementInstances` SoA type with identical `ruleIndex`/`category` columns
@@ -115,9 +122,8 @@ by this ruling:
    consumer, not a DATA-shape mismatch. `PREVIEW_COMPOSITING_SPEC`'s prior "Decals never
    composited" framing is corrected accordingly. The §14.9 CSR-bucket/`SpatialGrid` scheme applies
    to procedural Decals exactly as written, no special-case needed. Applies **only** to procedural
-   decals (`recipe.decalRules`) — manual decals are the separate gap recorded in item 3 (design
-   closed by three rulings in a later session; implementation unscheduled, and — per item 3's own
-   correction — no longer lagging behind manual props in any respect).
+   decals (`recipe.decalRules`) — manual decals are the separate item 3 gap, now shipped (§14.15),
+   and — per item 3's own correction — no longer lagging behind manual props in any respect.
 5. ✅ **CLOSED — `OverlayLayer_UI::blendMode` retired; replaced by `opacity: float`.** UI Expert
    verdict: `Ui::PreviewBlendMode` (`src/ui/PreviewComposite_Settings_UI.h:26`) is a two-operand
    GPU raster-compositing enum (`Replace`/`AlphaBlend`/`Add`/`Multiply`/`Maximum`/`Minimum`) wired
@@ -134,4 +140,3 @@ by this ruling:
 R2's own open item 1 (fieldLayers/overlayLayers unification) is **not** carried forward on this
 list — §14.7 above rules it closed, and records the R2 self-inconsistency that made this call
 non-trivial.
-

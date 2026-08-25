@@ -60,14 +60,14 @@ void RunLiveMirrorFollowChecks() {
           "gesture begins on a grouped member");
     Check(static_cast<int>(state.correspondence.size()) == 1, "exactly one sibling matched at gesture-start");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 4.0f, 3.0f);
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 4.0f, 3.0f);
     Check(NearlyEqual(markers[0].transforms[0].transform.positionX, 4.0f), "dragged member follows the cursor");
     Check(NearlyEqual(markers[0].transforms[1].transform.positionX, 6.0f),
           "sibling mirrors LIVE, this frame, not deferred to release");
     Check(markers[0].transforms[1].name == "Mex1" && markers[0].transforms[1].alias == "Mex1Alias",
           "the sibling's name/alias are never touched by a live write");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 1.0f, 3.0f);
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 1.0f, 3.0f);
     Check(NearlyEqual(markers[0].transforms[1].transform.positionX, 9.0f), "and again the very next frame");
 
     EndMarkerDragGesture(state, markers, geometry);
@@ -87,18 +87,18 @@ void RunCollapseRestoreCommitChecks() {
     BeginMarkerDragGesture(state, markers, {}, geometry, Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0);
     Check(state.gestureStartOrbitCount == 2, "gesture-start orbit is the full 2-point mirror pair");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 5.0f, 3.0f);   // exactly on the mirror axis
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 5.0f, 3.0f);   // exactly on the mirror axis
     Check(state.bCardinalityShrank, "landing exactly on the axis is flagged as a shrink this frame");
     Check(IsMarkerSoftHiddenThisFrame(state, 0, 1), "the sibling soft-hides while on-axis");
     Check(NearlyEqual(markers[0].transforms[1].transform.positionX, 8.0f),
           "the soft-hidden sibling's REAL data is untouched mid-drag");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 4.0f, 3.0f);   // back off the axis
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 4.0f, 3.0f);   // back off the axis
     Check(!state.bCardinalityShrank && !IsMarkerSoftHiddenThisFrame(state, 0, 1),
           "dragging back off-axis restores the sibling live");
     Check(NearlyEqual(markers[0].transforms[1].transform.positionX, 6.0f), "restored to the correct mirror point");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 5.0f, 3.0f);   // release exactly on-axis
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 5.0f, 3.0f);   // release exactly on-axis
     EndMarkerDragGesture(state, markers, geometry);
     Check(static_cast<int>(markers[0].transforms.size()) == 1,
           "the collapse only commits (sibling actually removed) at release, on-axis");
@@ -117,7 +117,7 @@ void RunGrowthGhostMaterializeChecks() {
     BeginMarkerDragGesture(state, markers, {}, geometry, Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0);
     Check(state.gestureStartOrbitCount == 1, "on-axis, no sibling: the gesture-start orbit is one point");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 7.0f, 3.0f);   // off the axis
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 7.0f, 3.0f);   // off the axis
     Check(state.bCardinalityGrew, "moving off the axis is flagged as growth this frame");
     Check(static_cast<int>(markers[0].transforms.size()) == 1, "zero PARAMS write for the ghost point");
     Check(static_cast<int>(state.currentGhostPoints.size()) == 1, "exactly one ghost point this frame");
@@ -149,7 +149,7 @@ void RunMultiPointGrowthMaterializeChecks() {
     BeginMarkerDragGesture(state, markers, {}, geometry, mask, 3, 0, 0);
     Check(state.gestureStartOrbitCount == 1, "dead center of both axes: gesture-start orbit is one point");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 7.0f, 8.0f);   // off BOTH axes -> full 4-point orbit
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 7.0f, 8.0f);   // off BOTH axes -> full 4-point orbit
     Check(state.bCardinalityGrew, "moving fully off-axis is flagged as growth");
     Check(static_cast<int>(state.currentGhostPoints.size()) == 3, "three ghost points this frame");
 
@@ -178,11 +178,11 @@ void RunSpawnRefusalChecks() {
     BeginMarkerDragGesture(state, markers, {}, geometry, Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0);
     Check(state.bSpawnGroup, "the group is recognized as the reserved Spawn roster");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 4.0f, 3.0f);   // same-count reposition
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 4.0f, 3.0f);   // same-count reposition
     Check(!state.bSpawnCardinalityRefused, "an ordinary, same-count Spawn drag is unrestricted");
     Check(NearlyEqual(markers[0].transforms[1].transform.positionX, 6.0f), "and mirrors live like any group");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 5.0f, 3.0f);   // would collapse the orbit
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 5.0f, 3.0f);   // would collapse the orbit
     Check(state.bSpawnCardinalityRefused, "a cardinality-changing Spawn drag is refused this frame");
     Check(NearlyEqual(markers[0].transforms[0].transform.positionX, 4.0f),
           "the dragged member ITSELF freezes at the last valid position (Spawn only)");
@@ -210,7 +210,7 @@ void RunUngroupedFreeDragChecks() {
           "an ungrouped hit still begins a (free-drag) gesture");
     Check(state.correspondence.empty(), "with an empty correspondence table");
 
-    UpdateMarkerDragGesture(state, markers, geometry, 9.0f, 1.0f);
+    UpdateMarkerDragGesture(state, markers, {}, geometry, 9.0f, 1.0f);
     Check(NearlyEqual(markers[0].transforms[0].transform.positionX, 9.0f)
           && NearlyEqual(markers[0].transforms[0].transform.positionZ, 1.0f),
           "the ungrouped member follows the cursor exactly");
@@ -248,6 +248,42 @@ void RunRepositionSymmetryGroupMemberChecks() {
           "the sibling is left exactly where it was - never silently misplaced");
 }
 
+// STEP106 §4 — a locked marker layer refuses `BeginMarkerDragGesture` outright: the gesture never
+// activates for a dragged member whose own layer is locked.
+void RunLockRefusesBeginMarkerDragGestureChecks() {
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.push_back(MakeTransform("A", 2.0f, 3.0f, 0, /*layerIndex=*/0));
+    std::vector<Params::MarkerInstanceLayer> lockedLayers(1);
+    lockedLayers[0].bLocked = true;
+    const Params::Geometry geometry = MakeTestGeometry();
+
+    MarkerDragGestureState state;
+    Check(!BeginMarkerDragGesture(state, markers, lockedLayers, geometry, Params::SymmetryAxis::MirrorAcrossX,
+                                  3, 0, 0),
+          "a locked layer's marker refuses to begin a drag");
+    Check(!state.bActive, "the gesture state is left inactive");
+}
+
+// STEP106 §4 — a locked marker layer refuses `RepositionSymmetryGroupMember` outright: the moved
+// member's position is left untouched (unlike the ordinary cardinality-changing refusal, which
+// still applies the moved member's own target).
+void RunLockRefusesRepositionSymmetryGroupMemberChecks() {
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.push_back(MakeTransform("A", 2.0f, 3.0f, 3, /*layerIndex=*/0));
+    markers[0].transforms.push_back(MakeTransform("B", 8.0f, 3.0f, 3, /*layerIndex=*/0));
+    std::vector<Params::MarkerInstanceLayer> lockedLayers(1);
+    lockedLayers[0].bLocked = true;
+    const Params::Geometry geometry = MakeTestGeometry();
+
+    Check(!RepositionSymmetryGroupMember(markers, lockedLayers, geometry, Params::SymmetryAxis::MirrorAcrossX, 3,
+                                         0, 0, 1.0f, 3.0f),
+          "a locked layer's marker refuses to reposition");
+    Check(NearlyEqual(markers[0].transforms[0].transform.positionX, 2.0f),
+          "the moved member's own position is left unchanged - a lock refusal, unlike a cardinality "
+          "refusal, applies no partial write");
+    Check(NearlyEqual(markers[0].transforms[1].transform.positionX, 8.0f), "and so is its sibling's");
+}
+
 } // namespace
 
 int main() {
@@ -258,6 +294,8 @@ int main() {
     RunSpawnRefusalChecks();
     RunUngroupedFreeDragChecks();
     RunRepositionSymmetryGroupMemberChecks();
+    RunLockRefusesBeginMarkerDragGestureChecks();
+    RunLockRefusesRepositionSymmetryGroupMemberChecks();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

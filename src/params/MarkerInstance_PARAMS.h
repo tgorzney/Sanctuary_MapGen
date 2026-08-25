@@ -34,6 +34,11 @@ struct MarkerInstanceLayer {
                                          // separate, unratified-as-a-ticket work) — this ticket
                                          // only gives the field its PARAMS+IO home, same posture as
                                          // `layerIndex` before STEP49's tab existed.
+    bool  bLocked = false;                    // STEP106 §1. Blocks drag/reposition/add/remove for
+                                               // every marker on this layer.
+    bool  bGridSnapEnabled = false;            // STEP106 §2. Per-layer, not global (see §2).
+    float gridSnapSizeWorldUnits = 1.0f;       // STEP106 §2. World-unit cell size; only meaningful
+                                               // while bGridSnapEnabled is true.
 };
 
 struct MarkerTransform {

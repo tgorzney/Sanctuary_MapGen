@@ -149,7 +149,7 @@ Params::MarkerInstanceGroup* DrawMarkerGroupSection(std::vector<Params::MarkerIn
 void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
                                const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                               ManualMarkersState& state);
+                               ManualMarkersState& state, int selectedMarkerLayerIndex);
 
 // `markers` is `recipe.markers`, `armies` is `recipe.armies` (read-only here — this block only
 // picks an army for a Spawn instance's `name`, never adds/renames one). `markerLayers` is
@@ -158,7 +158,7 @@ void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
 void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
                        const std::vector<Params::Army>& armies,
                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                       ManualMarkersState& state);
+                       ManualMarkersState& state, int selectedMarkerLayerIndex);
 
 } // namespace Ui
 } // namespace SanmapGen

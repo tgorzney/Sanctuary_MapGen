@@ -7,7 +7,7 @@
 #include "DraggableListWidget_UI.h"
 #include "MarkerLayerId_UI.h"
 #include "MarkerLayerIndexRepair_UI.h"
-#include "PlacementRuleSections_UI.h"
+#include "MarkerLayerSymmetrySection_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
 
@@ -26,14 +26,16 @@ void DrawLayerSettings(ManualMarkerLayersState& state) {
                      state.layerIconScaleToggle, WidgetStyle(), "%.2f");
 }
 
-// The row's own name, tint, icon scale, and its own symmetry setting — STEP110: drawn inline in
-// THIS row's own expanded body, not once at the bottom for whatever happened to be "selected".
-// The tint is hidden while the block is set to one shared color: two live controls over one drawn
-// color would be a rival control (ARCH §4). Layer-level symmetry (unlike Props/Decals, which have
-// none — see ARCH_14_13_OpenItems.md §14.13 Ruling 3): manual markers are the deliberate,
-// separately-ratified exception the human required for symmetry participation, unlike manual
-// props/decals. Returns whether the name committed, so the caller can re-run the uniqueness repair.
-bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state) {
+// The row's own name, tint, icon scale, grid snap and symmetry setting — STEP110: drawn inline in THIS
+// row's own expanded body, not "selected"-gated. Tint hides under the block's shared-color mode
+// (ARCH §4 rival-control rule). Layer-level symmetry is the deliberate, separately-ratified exception
+// manual markers get over Props/Decals (ARCH_14_13_OpenItems.md §14.13 Ruling 3) — returns whether the
+// name committed, so the caller can re-run the uniqueness repair.
+bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
+                      const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                      std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
+                      int globalSymmetryMask, int globalRadialRepeatCount,
+                      Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state) {
     TextInputRules nameRules;
     nameRules.maximumLength = 48;
     nameRules.bAllowEmpty   = false;
@@ -43,47 +45,56 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, ManualMarkerLayersStat
         DrawColorSwatch("Color", layer.color, state.previewColorOptions, state.selectedLayerColorToggle);
     DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
                      state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
-    if (DrawSectionBegin("Layer Symmetry", state.symmetrySection)) {
-        DrawPlacementSymmetryAxes("markerLayerSymmetry", layer.symmetry.bSymmetryUseGlobal,
-                                  layer.symmetry.symmetryMask, nullptr);
-        DrawSectionEnd();
-    }
-    return bNameCommitted;
+    const bool bSnapCommitted = DrawCheckbox("Snap to Grid", layer.bGridSnapEnabled).bCommitted;
+    ImGui::BeginDisabled(!layer.bGridSnapEnabled);
+    const bool bSnapSizeCommitted = DrawSliderScalar("Grid Size", layer.gridSnapSizeWorldUnits,
+        state.gridSnapSizeRange, state.selectedLayerGridSnapToggle, WidgetStyle(), "%.2f").bCommitted;
+    ImGui::EndDisabled();
+    DrawLayerSymmetrySection(layer, layerIndex, markerLayers, markers, geometry, globalSymmetryMask,
+                             globalRadialRepeatCount, markerSymmetryFixSettings, state);
+    return bNameCommitted || bSnapCommitted || bSnapSizeCommitted;
 }
 
 // The layer stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.
-// STEP110: each row's body, whenever the row's own CollapsingHeader is open (DraggableList's own
-// per-row expand/collapse state — never gated on `state.selectedLayerIndex`), draws that row's OWN
-// name/tint/icon-scale/symmetry settings directly below its header, so an expanded row never shows
-// another row's settings. `bAnyNameCommitted` is set true if any expanded row's name committed this
-// frame, feeding the caller's uniqueness repair.
+// STEP110: each row's body, whenever the row's own CollapsingHeader is open (never gated on
+// `state.selectedLayerIndex`), draws that row's OWN settings below its header. `bAnyNameCommitted`
+// is set true if any expanded row's name committed this frame, feeding the caller's uniqueness repair.
 DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                  std::vector<Params::MarkerInstanceGroup>& markers,
+                                  const Params::Geometry& geometry, int globalSymmetryMask, int globalRadialRepeatCount,
+                                  Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                   ManualMarkerLayersState& state, bool& bAnyNameCommitted) {
     return DraggableList<Params::MarkerInstanceLayer>::Render(
         "manualMarkerLayers", markerLayers,
         [&](int rowIndex) {
             DraggableListRow row;
-            row.label = ManualMarkerLayerRowLabel(markerLayers[static_cast<std::size_t>(rowIndex)]);
+            row.label   = ManualMarkerLayerRowLabel(markerLayers[static_cast<std::size_t>(rowIndex)]);
+            row.bLocked = markerLayers[static_cast<std::size_t>(rowIndex)].bLocked;   // NEW
             return row;
         },
         [&](int rowIndex) {
-            if (DrawLayerRowBody(markerLayers[static_cast<std::size_t>(rowIndex)], state))
+            if (DrawLayerRowBody(markerLayers[static_cast<std::size_t>(rowIndex)], rowIndex, markerLayers, markers,
+                                 geometry, globalSymmetryMask, globalRadialRepeatCount, markerSymmetryFixSettings, state))
                 bAnyNameCommitted = true;
         },
         state.selectedLayerIndex);
 }
 
-// A removed layer clamps every referencing `layerIndex` to 0 rather than dropping the marker
-// instance (ClampMarkerLayerIndicesForRemovedLayer); a reordered layer renumbers them
-// (RenumberMarkerLayerIndicesForReorder, called BEFORE the layers vector itself moves — the
-// renumber needs the pre-move layer count). Reports whether `markers` moved, which feeds no
-// pipeline stage either (SCOPE NOTE 3), so the caller never notifies the preview driver with it.
+// A removed layer clamps every referencing `layerIndex` to 0 (ClampMarkerLayerIndicesForRemovedLayer);
+// a reordered layer renumbers them (RenumberMarkerLayerIndicesForReorder, called BEFORE the layers
+// vector moves). Reports whether `markers` moved, which feeds no pipeline stage (SCOPE NOTE 3).
 bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers,
                          std::vector<Params::MarkerInstanceGroup>& markers, ManualMarkerLayersState& state,
                          const DraggableListSignal& signal) {
     if (signal.kind == DraggableListSignalKind::Select) {
         state.selectedLayerIndex = signal.sourceRowIndex;
         return false;
+    }
+    if (signal.kind == DraggableListSignalKind::ToggleLock) {
+        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(markerLayers.size()))
+            markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked =
+                !markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked;
+        return false;   // cosmetic-only: no structural move, same posture as Select
     }
     const bool bDeleting            = signal.kind == DraggableListSignalKind::Delete;
     const bool bReordering          = signal.kind == DraggableListSignalKind::Reorder;
@@ -99,10 +110,9 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
     return bMarkersMoved;
 }
 
-// The Add Marker Layer button. Markers ship with `layerId` from day one (STEP60), unlike Props'
-// still-unimplemented retrofit, so the fresh row mints one via `NextMarkerLayerId` BEFORE the
-// push_back — that function scans for max(layerId) + 1, and calling it after would have the new
-// row (still carrying the `-1` sentinel) scan itself.
+// The Add Marker Layer button. Markers ship with `layerId` from day one (STEP60), unlike Props' still-
+// unimplemented retrofit, so the fresh row mints one via `NextMarkerLayerId` BEFORE the push_back —
+// that function scans for max(layerId) + 1, and calling it after would scan the new row's own `-1`.
 bool DrawLayerListButtons(std::vector<Params::MarkerInstanceLayer>& markerLayers, ManualMarkerLayersState& state) {
     if (!ImGui::Button("Add Marker Layer")) return false;
     Params::MarkerInstanceLayer layer;
@@ -116,12 +126,15 @@ bool DrawLayerListButtons(std::vector<Params::MarkerInstanceLayer>& markerLayers
 } // namespace
 
 void DrawManualMarkerLayers(ManualMarkerLayersState& state, std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                            std::vector<Params::MarkerInstanceGroup>& markers) {
+                            std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
+                            int globalSymmetryMask, int globalRadialRepeatCount,
+                            Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings) {
     if (!DrawSectionBegin("Manual Marker Layers", state.section)) return;
     DrawLayerSettings(state);
     bool bLayersMoved = DrawLayerListButtons(markerLayers, state);
     bool bAnyNameCommitted = false;
-    const DraggableListSignal signal = DrawLayerList(markerLayers, state, bAnyNameCommitted);
+    const DraggableListSignal signal = DrawLayerList(markerLayers, markers, geometry, globalSymmetryMask,
+        globalRadialRepeatCount, markerSymmetryFixSettings, state, bAnyNameCommitted);
     if (signal.bHasSignal()) ApplyLayerListSignal(markerLayers, markers, state, signal);
     bLayersMoved = bAnyNameCommitted || bLayersMoved;
     // The export keys layers by NAME parity with Armies/Areas/Props (cosmetic here — `MarkerGroups`

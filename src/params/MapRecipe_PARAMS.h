@@ -94,6 +94,10 @@ struct MapRecipe {
     // the mask (ARCH §7.1); this is a separate concept (what counts as symmetric vs. what
     // symmetry to produce), not a rival store for it.
     SymmetryDetection       symmetryDetection;
+    // The world-space marker-position distance tolerance STEP107's "Fix Symmetry" backfill command
+    // uses — a DISTINCT concept from `symmetryDetection` above (that one is a normalized-height
+    // delta for terrain; this one is a world-space distance for MarkerTransform positions).
+    MarkerSymmetryFixSettings markerSymmetryFixSettings;
     // The six exotic-blend scalars (Symmetry_PARAMS.h) — zero PROC consumer yet, same posture as
     // `symmetryDetection` above.
     SymmetryBlend           symmetryBlend;

@@ -32,24 +32,39 @@ bool ApplyMarkerInstanceListSignal(std::vector<Params::MarkerTransform>& transfo
 }
 
 // Add/Remove — `MarkersTab_UI.cpp::DrawRuleListButtons`'s pattern, applied after the list closes
-// so the vector never moves under a live row.
-bool DrawMarkerInstanceListButtons(std::vector<Params::MarkerTransform>& transforms, ManualMarkersState& state) {
+// so the vector never moves under a live row. Add targets whichever marker layer is SELECTED in
+// the Manual Marker Layers list (`selectedMarkerLayerIndex`), not hardcoded to layer 0 — falling
+// back to 0 only for an unselected/stale pick. Both buttons gate on `markerLayers`' lock state:
+// Add on the selected marker layer itself, Remove on the SELECTED INSTANCE's own layer (which may
+// differ from the selected marker layer).
+bool DrawMarkerInstanceListButtons(std::vector<Params::MarkerTransform>& transforms, ManualMarkersState& state,
+                                   const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                   int selectedMarkerLayerIndex) {
     bool bInstancesMoved = false;
+    ImGui::BeginDisabled(IsMarkerInstanceLayerLocked(markerLayers, selectedMarkerLayerIndex));
     if (ImGui::Button("Add Instance")) {
         Params::MarkerTransform transform;
         transform.name = NextMarkerInstanceName(static_cast<int>(transforms.size()));
+        transform.layerIndex = (selectedMarkerLayerIndex >= 0
+                                && selectedMarkerLayerIndex < static_cast<int>(markerLayers.size()))
+                               ? selectedMarkerLayerIndex : 0;
         transforms.push_back(transform);
         state.selectedInstanceIndex = static_cast<int>(transforms.size()) - 1;
         bInstancesMoved = true;
     }
+    ImGui::EndDisabled();
+    const Params::MarkerTransform* const selectedForRemove =
+        SelectedMarkerInstance(transforms, state.selectedInstanceIndex);
     ImGui::SameLine();
-    if (ImGui::Button("Remove Selected")
-        && SelectedMarkerInstance(transforms, state.selectedInstanceIndex) != nullptr) {
+    ImGui::BeginDisabled(selectedForRemove != nullptr
+                         && IsMarkerInstanceLayerLocked(markerLayers, selectedForRemove->layerIndex));
+    if (ImGui::Button("Remove Selected") && selectedForRemove != nullptr) {
         transforms.erase(transforms.begin() + state.selectedInstanceIndex);
         state.selectedInstanceIndex = ResolvedMarkerInstanceSelection(state.selectedInstanceIndex,
                                                                        static_cast<int>(transforms.size()));
         bInstancesMoved = true;
     }
+    ImGui::EndDisabled();
     return bInstancesMoved;
 }
 
@@ -106,13 +121,19 @@ bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params
 
     DrawMarkerInstanceLayerPicker(transform, markerLayers, state);
 
-    bCommitted = DrawSliderScalar("Position X", transform.transform.positionX, state.positionHorizontalRange,
-                                  state.positionXToggle, WidgetStyle(), "%.1f").bCommitted || bCommitted;
-    bCommitted = DrawSliderScalar("Position Y (Elevation)", transform.transform.positionY,
-                                  state.positionElevationRange, state.positionYToggle, WidgetStyle(),
-                                  "%.1f").bCommitted || bCommitted;
-    bCommitted = DrawSliderScalar("Position Z", transform.transform.positionZ, state.positionHorizontalRange,
-                                  state.positionZToggle, WidgetStyle(), "%.1f").bCommitted || bCommitted;
+    const bool bLayerLocked = IsMarkerInstanceLayerLocked(markerLayers, transform.layerIndex);
+    ImGui::BeginDisabled(bLayerLocked);
+    const WidgetChange positionXChange = DrawSliderScalar("Position X", transform.transform.positionX,
+        state.positionHorizontalRange, state.positionXToggle, WidgetStyle(), "%.1f");
+    const WidgetChange positionYChange = DrawSliderScalar("Position Y (Elevation)", transform.transform.positionY,
+        state.positionElevationRange, state.positionYToggle, WidgetStyle(), "%.1f");
+    const WidgetChange positionZChange = DrawSliderScalar("Position Z", transform.transform.positionZ,
+        state.positionHorizontalRange, state.positionZToggle, WidgetStyle(), "%.1f");
+    if (positionXChange.bCommitted || positionZChange.bCommitted)
+        QuantizeMarkerPositionToLayerGrid(markerLayers, transform.layerIndex,
+                                          transform.transform.positionX, transform.transform.positionZ);
+    ImGui::EndDisabled();
+    bCommitted = positionXChange.bCommitted || positionYChange.bCommitted || positionZChange.bCommitted || bCommitted;
     return bCommitted;
 }
 
@@ -145,14 +166,15 @@ DraggableListSignal DrawMarkerInstanceList(std::vector<Params::MarkerTransform>&
 
 void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group, const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                               ManualMarkersState& state) {
+                               ManualMarkersState& state, int selectedMarkerLayerIndex) {
     bool bInstancesMoved = false;
     bool bAnyInstanceCommitted = false;
     const DraggableListSignal signal =
         DrawMarkerInstanceList(group.transforms, group, armies, markerLayers, state, bAnyInstanceCommitted);
     if (signal.bHasSignal())
         bInstancesMoved = ApplyMarkerInstanceListSignal(group.transforms, state, signal) || bInstancesMoved;
-    bInstancesMoved = DrawMarkerInstanceListButtons(group.transforms, state) || bInstancesMoved;
+    bInstancesMoved = DrawMarkerInstanceListButtons(group.transforms, state, markerLayers,
+                                                    selectedMarkerLayerIndex) || bInstancesMoved;
     bInstancesMoved = bAnyInstanceCommitted || bInstancesMoved;
 
     // Scoped to THIS group only: the wire format's inner dictionary key only needs uniqueness

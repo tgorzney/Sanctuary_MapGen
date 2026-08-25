@@ -6,14 +6,18 @@
 // Units: ARCH_14_04_NestedUnitGroupAddressing.md §14.4 — nested UnitGroup.groups draw as part of
 // their top-level parent, never separately addressable; Application_Defaults_UI.h's
 // ResolveUnitsManualSubLayer resolves the flat OverlaySubLayerRef_UI::index back to (army, group).
-// Props/Decals: PropTransform/DecalTransform::layerIndex is read POSITIONALLY against
-// recipe.propLayers/decalLayers's array index (not PropInstanceLayer::layerId) — the two arrays'
-// exact relationship is not spelled out anywhere this ticket cites; this is a documented, flagged
-// coder choice, not a silent one, consistent with STEP51's own "indexed by ...layerIndex" phrasing.
+// Props/Decals: PropTransform/DecalTransform::layerIndex is resolved to its owning layer's stable
+// `layerId` (Params::ResolvePropInstanceLayerId/ResolveDecalInstanceLayerId, `PropInstance_PARAMS.h`)
+// and matched against the target sub-layer's own layerId, resolved the same way from
+// `subLayerArrayIndex` — the positional layerIndex-vs-subLayerArrayIndex comparison this file used
+// to make was a documented, flagged exception (ARCH_14_15_ManualCullStableIdMigration.md), now
+// retired in favor of the stable-id standard the InstanceId game-load test de-risked. Same live
+// PARAMS read timing as before (zero DAG coupling, zero staleness); only the match key changed.
 #include "MapCanvas_IconLayer_CullInternal_UI.h"
 #include "Application_Defaults_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../params/Army_PARAMS.h"
+#include "../params/PropInstance_PARAMS.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -83,13 +87,14 @@ void ResolvePropsManual(const DrawOverlayIconLayersInput& input, const OverlayLa
                         IconLayerCullDiagnostics_UI* diagnostics,
                         std::vector<OverlayVisibleInstance>& outCandidates) {
     const bool bWantReclaimable = (layer.domainKind == OverlayDomainKind_UI::Reclaim);
+    const int targetLayerId = Params::ResolvePropInstanceLayerId(subLayerArrayIndex, input.recipe->propLayers);
     for (const Params::PropInstanceGroup& group : input.recipe->props) {
         if (diagnostics != nullptr) ++diagnostics->reclaimGroupPredicateEvaluations;
         if (group.bReclaimable != bWantReclaimable) continue;   // en bloc, before any transform
         const std::string templateIdentifier = TemplateIdentifierFromBlueprintPath(group.blueprintPath);
         for (std::size_t index = 0; index < group.transforms.size(); ++index) {
             const Params::PropTransform& propTransform = group.transforms[index];
-            if (propTransform.layerIndex != subLayerArrayIndex) continue;
+            if (Params::ResolvePropInstanceLayerId(propTransform.layerIndex, input.recipe->propLayers) != targetLayerId) continue;
             ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
                                    propTransform.transform.positionX, propTransform.transform.positionZ,
                                    propTransform.transform.scaleX, PlacementCollectionKind_UI::Props,
@@ -104,11 +109,12 @@ void ResolveDecalsManual(const DrawOverlayIconLayersInput& input, const OverlayL
                          LayerWorldAabb_UI* outAabb, const ViewWorldRect_UI* viewRect,
                          IconLayerCullDiagnostics_UI* diagnostics,
                          std::vector<OverlayVisibleInstance>& outCandidates) {
+    const int targetLayerId = Params::ResolveDecalInstanceLayerId(subLayerArrayIndex, input.recipe->decalLayers);
     for (const Params::DecalInstanceGroup& group : input.recipe->decals) {
         const std::string templateIdentifier = TemplateIdentifierFromBlueprintPath(group.blueprintPath);
         for (std::size_t index = 0; index < group.transforms.size(); ++index) {
             const Params::DecalTransform& decalTransform = group.transforms[index];
-            if (decalTransform.layerIndex != subLayerArrayIndex) continue;
+            if (Params::ResolveDecalInstanceLayerId(decalTransform.layerIndex, input.recipe->decalLayers) != targetLayerId) continue;
             ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
                                    decalTransform.transform.positionX, decalTransform.transform.positionZ,
                                    decalTransform.transform.scaleX, PlacementCollectionKind_UI::Decals,

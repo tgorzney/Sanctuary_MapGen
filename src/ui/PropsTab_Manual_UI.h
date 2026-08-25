@@ -73,6 +73,16 @@ inline Params::PropInstanceLayer* SelectedManualPropLayer(std::vector<Params::Pr
     return &propLayers[static_cast<std::size_t>(selectedLayerIndex)];
 }
 
+// True when `layerIndex` names a layer with bLocked set. Out-of-range (Constitution §6) resolves
+// to false — an invalid layerIndex must never itself become a reason to refuse an edit; same
+// out-of-range-safe posture as SelectedManualPropLayer immediately above and
+// IsMarkerInstanceLayerLocked (STEP106).
+inline bool IsPropInstanceLayerLocked(const std::vector<Params::PropInstanceLayer>& propLayers,
+                                      int layerIndex) {
+    if (layerIndex < 0 || layerIndex >= static_cast<int>(propLayers.size())) return false;
+    return propLayers[static_cast<std::size_t>(layerIndex)].bLocked;
+}
+
 // The color a layer actually draws with: its own, unless the block is set to one shared tint.
 inline const float* EffectiveManualPropLayerColor(const ManualPropLayersState& state,
                                                    const Params::PropInstanceLayer& layer) {

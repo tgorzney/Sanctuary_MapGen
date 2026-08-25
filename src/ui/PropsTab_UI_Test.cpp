@@ -240,6 +240,24 @@ void RunNextPropLayerIdChecks() {
           "ids {0, 2} mint 3 - max-plus-one, not count-based");
 }
 
+// STEP108: empty vector and any index resolves to false; an out-of-range index (negative and
+// >= size()) against a non-empty vector resolves to false too. Mirrors STEP106's
+// IsMarkerInstanceLayerLocked test shape.
+void RunIsPropInstanceLayerLockedChecks() {
+    std::vector<Params::PropInstanceLayer> emptyLayers;
+    Check(!IsPropInstanceLayerLocked(emptyLayers, 0), "an empty vector resolves to false at any index");
+    Check(!IsPropInstanceLayerLocked(emptyLayers, -1), "and at a negative index too");
+
+    std::vector<Params::PropInstanceLayer> propLayers(2);
+    propLayers[1].bLocked = true;
+    Check(!IsPropInstanceLayerLocked(propLayers, 0), "index 0 (unlocked) resolves to false");
+    Check(IsPropInstanceLayerLocked(propLayers, 1), "index 1 (locked) resolves to true");
+    Check(!IsPropInstanceLayerLocked(propLayers, -1),
+          "a negative index against a non-empty vector still resolves to false");
+    Check(!IsPropInstanceLayerLocked(propLayers, 2),
+          "an index at size() resolves to false, never trusted as 'locked'");
+}
+
 } // namespace
 
 int main() {
@@ -252,6 +270,7 @@ int main() {
     RunPropLayerReorderRenumberChecks();
     RunPropLayerNameUniquenessChecks();
     RunNextPropLayerIdChecks();
+    RunIsPropInstanceLayerLockedChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

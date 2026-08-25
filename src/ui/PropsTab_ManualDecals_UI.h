@@ -65,6 +65,13 @@ inline Params::DecalInstanceLayer* SelectedManualDecalLayer(std::vector<Params::
     return &decalLayers[static_cast<std::size_t>(selectedLayerIndex)];
 }
 
+// Decal-typed mirror of IsPropInstanceLayerLocked.
+inline bool IsDecalInstanceLayerLocked(const std::vector<Params::DecalInstanceLayer>& decalLayers,
+                                       int layerIndex) {
+    if (layerIndex < 0 || layerIndex >= static_cast<int>(decalLayers.size())) return false;
+    return decalLayers[static_cast<std::size_t>(layerIndex)].bLocked;
+}
+
 // The color a layer actually draws with: its own, unless the block is set to one shared tint.
 inline const float* EffectiveManualDecalLayerColor(const ManualDecalLayersState& state,
                                                     const Params::DecalInstanceLayer& layer) {

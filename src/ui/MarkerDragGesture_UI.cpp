@@ -40,6 +40,7 @@ bool BeginMarkerDragGesture(MarkerDragGestureState& state,
     const Params::MarkerInstanceGroup& group = markers[static_cast<std::size_t>(groupIndex)];
     if (transformIndex < 0 || transformIndex >= static_cast<int>(group.transforms.size())) return false;
     const Params::MarkerTransform& dragged = group.transforms[static_cast<std::size_t>(transformIndex)];
+    if (IsMarkerInstanceLayerLocked(markerLayers, dragged.layerIndex)) return false;
 
     state.bActive               = true;
     state.groupIndex            = groupIndex;
@@ -80,6 +81,7 @@ bool RepositionSymmetryGroupMember(std::vector<Params::MarkerInstanceGroup>& mar
     if (group == nullptr) return false;
     Params::MarkerTransform* const dragged = SelectedMarkerInstance(group->transforms, movedTransformIndex);
     if (dragged == nullptr) return false;
+    if (IsMarkerInstanceLayerLocked(markerLayers, dragged->layerIndex)) return false;
 
     if (dragged->symmetryGroupIdentifier == 0) {
         dragged->transform.positionX = newWorldX; dragged->transform.positionZ = newWorldZ;

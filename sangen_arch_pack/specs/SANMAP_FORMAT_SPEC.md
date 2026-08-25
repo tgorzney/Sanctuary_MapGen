@@ -61,6 +61,10 @@ layer's import/export must target this exactly.
     Companion metadata lives in the new top-level `PropGroups`/`DecalGroups`
     sections (Correction 14) — a genuinely new SanGen-owned array, not a
     merge, so it is PascalCase per the casing law below.
+  - **Direct field injection into `props[].transforms[]`/`decals[].transforms[]`
+    is now empirically confirmed safe by a live game load (2026-08-24), not
+    just architectural precedent.** See Correction 14's "Empirical
+    confirmation" note below for the test that closed this gap.
 
 ## Shared transform
 `InstancedTransform { Vector3 position, Quaternion rotation, Vector3 scale }`.
@@ -139,6 +143,16 @@ Vector4 maskRemapMax;            // default (1,1,1,1) — {x,y,z,w}
   resolves to a real file before writing a `.sanmap`.** An unverified path is a
   map-breaking defect, not a cosmetic one. This is the single highest-value
   validation in the IO layer.
+- **Per-instance field injection tested independently of export (2026-08-24).**
+  Props export being disabled (above) meant no SanGen-*exported* `.sanmap` had
+  ever put an extra field on a prop transform in front of the real game — the
+  only evidence for that shape's safety was architectural precedent
+  (`armyColor`/`alias`/`displayName` on dictionary-value objects) plus
+  structural inference, not a directly-confirmed production case. That
+  question has now been answered directly: see Correction 14's "Empirical
+  confirmation" note below. This is orthogonal to the `blueprintPath` defect
+  above — it confirms the *transform schema* tolerates an extra key, not that
+  export produces valid `blueprintPath`s.
 - **Faction / army colors (Colors.cs):** EDA = dark green (0.078,0.329,0.196),
   Chosen = dark red (0.412,0.008,0.008), Guard = golden amber
   (0.690,0.549,0.188); plus a 32-entry `ArmyColors[]` palette + named
@@ -751,6 +765,33 @@ as `StratumGenerationSettings`/`GeneralMapSettings`.
 the same file can carry different out-of-range values. Never a hard refusal —
 this is authoring-convenience metadata, not gameplay-authoritative data, and a
 missing/foreign file simply degrades every instance to layer `0`.
+
+**Empirical confirmation (2026-08-24) — per-instance field injection on
+`props[].transforms[]` is now production-proven, not merely inferred.** Until
+this date, confidence in `layerIndex`'s direct-field-injection shape rested on
+architectural precedent (`armyColor`/`alias`/`displayName` shipping safely
+into `armies[key]`/`markers[key]` *dictionary-value* objects, Corrections
+11/18) plus structural inference — no shipped `.sanmap` had ever tested an
+*array-element* injection specifically, because SanGen's own props export has
+been disabled the whole time (see the "props export is disabled" note in
+"Conversion / import-export logic" above), so no SanGen-authored file with an
+extra prop-transform field had ever reached a real game load. That gap is now
+closed by a direct test, not an inference: the human hand-added an
+`"InstanceId"` integer field to **all 1,180 prop transforms across all 17 prop
+groups** in a real shipped map (`Pandemonium Isthmus.sanmap`, *Sanctuary:
+Shattered Sun* Demo), and the map **loaded successfully in-game**
+(human-verified, 1-player test, spawn placed correctly). This is a second,
+independently-confirmed production case for direct field injection — this
+time on an **array-element** object (`props[].transforms[]`), not just the
+dictionary-value objects Correction 11/18 already proved. `layerIndex`'s shape
+(and any future per-instance scalar following the identical pattern — e.g. a
+stable per-instance id for a cross-layer "Assembly" grouping feature) is
+**production-proven for props specifically**, not just analogized from the
+armies/markers case. Decals (`decals[].transforms[]`) share the exact same
+`PropTransform`/`DecalTransform` wrapper shape (see "Why props/decals now need
+a wrapper transform type" in `ENTITY_AUTHORING_PARAMS_SPEC`) and are covered
+by the same structural argument, though decals themselves were not separately
+live-tested.
 
 ### `MarkersStack` — Correction 15 (layer-scoped symmetry, ARCH §16) — amends Correction 7 for `MarkersStack` only
 `MarkersStack` upgrades from Correction 7's flat `Params::MarkerRule` array to a one-tier

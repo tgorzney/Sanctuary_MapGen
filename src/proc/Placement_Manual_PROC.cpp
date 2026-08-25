@@ -12,15 +12,6 @@ namespace SanmapGen {
 namespace Proc {
 namespace {
 
-int ResolveManualLayerId(int layerIndex, const std::vector<Params::PropInstanceLayer>& layers) {
-    if (layerIndex < 0 || static_cast<std::size_t>(layerIndex) >= layers.size()) return -1;
-    return layers[layerIndex].layerId;
-}
-int ResolveManualLayerId(int layerIndex, const std::vector<Params::DecalInstanceLayer>& layers) {
-    if (layerIndex < 0 || static_cast<std::size_t>(layerIndex) >= layers.size()) return -1;
-    return layers[layerIndex].layerId;
-}
-
 Data::PlacementInstance MakeManualInstance(const Params::InstancedTransform& transform) {
     Data::PlacementInstance instance;   // every other field stays at its own default (see ruling)
     instance.positionX = transform.positionX; instance.positionY = transform.positionY;
@@ -39,14 +30,14 @@ void PlacementStage::ResolveManualPropsAndDecals() {
     for (const Params::PropInstanceGroup& group : recipe.props) {
         for (const Params::PropTransform& transform : group.transforms) {
             Data::PlacementInstance instance = MakeManualInstance(transform.transform);
-            instance.manualLayerId = ResolveManualLayerId(transform.layerIndex, recipe.propLayers);
+            instance.manualLayerId = Params::ResolvePropInstanceLayerId(transform.layerIndex, recipe.propLayers);
             results.props.Append(instance);
         }
     }
     for (const Params::DecalInstanceGroup& group : recipe.decals) {
         for (const Params::DecalTransform& transform : group.transforms) {
             Data::PlacementInstance instance = MakeManualInstance(transform.transform);
-            instance.manualLayerId = ResolveManualLayerId(transform.layerIndex, recipe.decalLayers);
+            instance.manualLayerId = Params::ResolveDecalInstanceLayerId(transform.layerIndex, recipe.decalLayers);
             results.decals.Append(instance);
         }
     }

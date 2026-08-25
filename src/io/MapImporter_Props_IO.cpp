@@ -113,6 +113,7 @@ void ReadPropGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRe
             }
             ReadJsonFloat(layerJson, "IconScale", layer.iconScale);
             ReadJsonInteger(layerJson, "Id", layer.layerId);
+            ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
         }
         outRecipe.propLayers.push_back(layer);
     }

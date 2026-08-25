@@ -162,6 +162,24 @@ void RunNextDecalLayerIdChecks() {
           "ids {0, 2} mint 3 - max-plus-one, not count-based");
 }
 
+// STEP108: empty vector and any index resolves to false; an out-of-range index (negative and
+// >= size()) against a non-empty vector resolves to false too. Decal-typed mirror of
+// RunIsPropInstanceLayerLockedChecks (PropsTab_UI_Test.cpp).
+void RunIsDecalInstanceLayerLockedChecks() {
+    std::vector<Params::DecalInstanceLayer> emptyLayers;
+    Check(!IsDecalInstanceLayerLocked(emptyLayers, 0), "an empty vector resolves to false at any index");
+    Check(!IsDecalInstanceLayerLocked(emptyLayers, -1), "and at a negative index too");
+
+    std::vector<Params::DecalInstanceLayer> decalLayers(2);
+    decalLayers[1].bLocked = true;
+    Check(!IsDecalInstanceLayerLocked(decalLayers, 0), "index 0 (unlocked) resolves to false");
+    Check(IsDecalInstanceLayerLocked(decalLayers, 1), "index 1 (locked) resolves to true");
+    Check(!IsDecalInstanceLayerLocked(decalLayers, -1),
+          "a negative index against a non-empty vector still resolves to false");
+    Check(!IsDecalInstanceLayerLocked(decalLayers, 2),
+          "an index at size() resolves to false, never trusted as 'locked'");
+}
+
 } // namespace
 
 int main() {
@@ -170,6 +188,7 @@ int main() {
     RunDecalLayerReorderRenumberChecks();
     RunDecalLayerNameUniquenessChecks();
     RunNextDecalLayerIdChecks();
+    RunIsDecalInstanceLayerLockedChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

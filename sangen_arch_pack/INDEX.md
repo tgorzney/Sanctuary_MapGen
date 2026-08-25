@@ -306,3 +306,25 @@ real source before ruling:**
   `JoinExportPath(JoinExportPath(candidateRoot, "engine"), "Sanctuary_Data/Maps")` —
   `<root>/engine/Sanctuary_Data/Maps`, matching the design doc's own "correct" value, not the wrong
   one it flags. No ticket 93 needed; nothing to re-fix.
+
+**New `ARCH_14_15_ManualCullStableIdMigration.md` §14.15 (2026-08-24), human ruling + detail
+request, not yet dispatched as a work order.** Corrects `ARCH_14_13_OpenItems.md` item 3's stale
+"Work-Orders A and B remain unscheduled implementation" line — both confirmed shipped by direct
+read (STEP56; `Placement_Manual_PROC.cpp` wired into `Placement_PROC.cpp:50`). Rules the human's
+follow-on call: `MapCanvas_IconLayer_CullManual_UI.cpp`'s `ResolvePropsManual`/`ResolveDecalsManual`
+retire their positional `layerIndex`-vs-`subLayerArrayIndex` match in favor of a stable-id
+(`manualLayerId`-concept) match — but resolved **live against PARAMS**, not read from
+`Data::PlacementInstances`. A real staleness hazard was confirmed by direct read before this call
+was made: `PlacementStage::ComputeParameterHash()` (`Placement_Hash_PROC.cpp`) does not hash
+`recipe.props`/`recipe.decals`/`recipe.propLayers`/`recipe.decalLayers`, and no manual-authoring UI
+mutation site sets a PIPELINE dirty flag either — so `Data::PlacementInstances::manualLayerId` for
+manual entries only refreshes incidentally, when something else dirties Placement, not on the
+manual edit itself. Forcing a dirty-hash tie (so PROC would refresh on every manual edit) was
+considered and rejected: it would trigger a full `RunScatter()` — every procedural rule's
+`BuildRuleConfigurations`/`BuildDerivedFields`/`ScatterRule` — on every manual-prop drag frame,
+violating the Tier C/C2 "zero DAG/dirty-hash involvement" cost model `ARCH_14_08_DirtyFlagTiers.md`
+already ratified. Instead, two small inline helpers (`Params::ResolvePropInstanceLayerId`/
+`ResolveDecalInstanceLayerId`) are promoted into `PropInstance_PARAMS.h` as the single source of
+truth for the id-resolution formula, shared by `Placement_Manual_PROC.cpp`'s PROC-baked copy and
+the UI cull path's live resolution, so the two never drift. Ruled dispatchable as-is — narrow, two
+call sites, exact before/after text specified in §14.15 itself.

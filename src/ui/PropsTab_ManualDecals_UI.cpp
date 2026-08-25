@@ -54,7 +54,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::DecalInstanceLayer>& decal
         "manualDecalLayers", decalLayers,
         [&](int rowIndex) {
             DraggableListRow row;
-            row.label = ManualDecalLayerRowLabel(decalLayers[static_cast<std::size_t>(rowIndex)]);
+            row.label   = ManualDecalLayerRowLabel(decalLayers[static_cast<std::size_t>(rowIndex)]);
+            row.bLocked = decalLayers[static_cast<std::size_t>(rowIndex)].bLocked;   // NEW
             return row;
         },
         [&](int rowIndex) {
@@ -75,6 +76,12 @@ bool ApplyLayerListSignal(std::vector<Params::DecalInstanceLayer>& decalLayers,
                          const DraggableListSignal& signal) {
     if (signal.kind == DraggableListSignalKind::Select) {
         state.selectedLayerIndex = signal.sourceRowIndex;
+        return false;
+    }
+    if (signal.kind == DraggableListSignalKind::ToggleLock) {
+        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(decalLayers.size()))
+            decalLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked =
+                !decalLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked;
         return false;
     }
     const bool bDeleting            = signal.kind == DraggableListSignalKind::Delete;

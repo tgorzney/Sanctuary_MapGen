@@ -42,6 +42,7 @@ Params::MapRecipe BuildFixtureRecipe() {
     propLayer.color[2] = 0.3f; propLayer.color[3] = 0.4f;
     propLayer.iconScale = 1.5f;
     propLayer.layerId = 7;                    // non-default: exercises the "Id" wire key round-trip
+    propLayer.bLocked = true;                 // non-default: exercises the "Locked" wire key round-trip
     recipe.propLayers.push_back(propLayer);   // index 0 — the only valid propLayers index
 
     Params::PropTransform inRangeProp;
@@ -71,6 +72,7 @@ Params::MapRecipe BuildFixtureRecipe() {
     decalLayer.color[2] = 0.7f; decalLayer.color[3] = 0.8f;
     decalLayer.iconScale = 0.75f;
     decalLayer.layerId = 7;                     // non-default: exercises the "Id" wire key round-trip
+    decalLayer.bLocked = true;                  // non-default: exercises the "Locked" wire key round-trip
     recipe.decalLayers.push_back(decalLayer);   // index 0 — the only valid decalLayers index
 
     Params::DecalTransform inRangeDecal;
@@ -137,6 +139,8 @@ void RunPropsDecalsRoundTripTests() {
               "PropInstanceLayer::iconScale survives");
         Check(loadedLayer.layerId == originalLayer.layerId,
               "PropInstanceLayer::layerId survives through the 'Id' wire key");
+        Check(loadedLayer.bLocked == originalLayer.bLocked,
+              "PropInstanceLayer::bLocked survives");
     }
 
     // --- PropInstanceGroup / props -----------------------------------------------------------
@@ -192,6 +196,8 @@ void RunPropsDecalsRoundTripTests() {
               "DecalInstanceLayer::iconScale survives");
         Check(loadedLayer.layerId == originalLayer.layerId,
               "DecalInstanceLayer::layerId survives through the 'Id' wire key");
+        Check(loadedLayer.bLocked == originalLayer.bLocked,
+              "DecalInstanceLayer::bLocked survives");
     }
 
     // --- DecalInstanceGroup / decals ---------------------------------------------------------
@@ -258,11 +264,29 @@ void RunPropDecalGroupsLegacyBackfillTests() {
     }
 }
 
+// STEP108: an entry with no "Locked" key (legacy `.sanmap` files saved before this ticket) keeps the
+// struct's own default (`false`) — no clamp, no range validation needed.
+void RunPropDecalGroupsLegacyLockedDefaultTests() {
+    nlohmann::ordered_json document;
+    document["PropGroups"] = nlohmann::json::array({ nlohmann::json{ { "Name", "No Lock Key" } } });
+    document["DecalGroups"] = nlohmann::json::array({ nlohmann::json{ { "Name", "No Lock Key" } } });
+
+    Params::MapRecipe loaded;
+    Io::ReadPropGroupsJson(document, loaded);
+    Io::ReadDecalGroupsJson(document, loaded);
+
+    Check(loaded.propLayers.size() == 1 && !loaded.propLayers[0].bLocked,
+          "a PropGroups entry with no 'Locked' key defaults bLocked to false");
+    Check(loaded.decalLayers.size() == 1 && !loaded.decalLayers[0].bLocked,
+          "a DecalGroups entry with no 'Locked' key defaults bLocked to false");
+}
+
 } // namespace
 
 int main() {
     RunPropsDecalsRoundTripTests();
     RunPropDecalGroupsLegacyBackfillTests();
+    RunPropDecalGroupsLegacyLockedDefaultTests();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

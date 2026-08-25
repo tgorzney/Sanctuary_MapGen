@@ -72,6 +72,9 @@ nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["SymmetryUseGlobal"] = layer.symmetry.bSymmetryUseGlobal;
         layerJson["SymmetryMask"] = layer.symmetry.symmetryMask;
         layerJson["RadialSymmetryRepeatCount"] = layer.symmetry.radialSymmetryRepeatCount;
+        layerJson["Locked"] = layer.bLocked;
+        layerJson["GridSnapEnabled"] = layer.bGridSnapEnabled;
+        layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeWorldUnits;
         markerGroups.push_back(layerJson);
     }
     return markerGroups;

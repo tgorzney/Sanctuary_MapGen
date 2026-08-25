@@ -53,7 +53,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::PropInstanceLayer>& propLa
         "manualPropLayers", propLayers,
         [&](int rowIndex) {
             DraggableListRow row;
-            row.label = ManualPropLayerRowLabel(propLayers[static_cast<std::size_t>(rowIndex)]);
+            row.label   = ManualPropLayerRowLabel(propLayers[static_cast<std::size_t>(rowIndex)]);
+            row.bLocked = propLayers[static_cast<std::size_t>(rowIndex)].bLocked;   // NEW
             return row;
         },
         [&](int rowIndex) {
@@ -75,6 +76,12 @@ bool ApplyLayerListSignal(std::vector<Params::PropInstanceLayer>& propLayers,
     if (signal.kind == DraggableListSignalKind::Select) {
         state.selectedLayerIndex = signal.sourceRowIndex;
         return false;
+    }
+    if (signal.kind == DraggableListSignalKind::ToggleLock) {
+        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(propLayers.size()))
+            propLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked =
+                !propLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked;
+        return false;   // cosmetic-only: no structural move, same posture as Select
     }
     const bool bDeleting            = signal.kind == DraggableListSignalKind::Delete;
     const bool bReordering          = signal.kind == DraggableListSignalKind::Reorder;

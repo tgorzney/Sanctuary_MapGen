@@ -540,6 +540,7 @@ add_sangen_test(GenerationAssembler_PIPELINE_Test
     src/pipeline/GenerationAssembler_Outputs_PIPELINE_Test.cpp
     src/pipeline/GenerationAssembler_Dirty_PIPELINE_Test.cpp)
 add_sangen_test(SymmetryOrbitQuery_PIPELINE_Test  src/pipeline/SymmetryOrbitQuery_PIPELINE_Test.cpp)
+add_sangen_test(MarkerSymmetryDetection_PIPELINE_Test src/pipeline/MarkerSymmetryDetection_PIPELINE_Test.cpp)
 
 # UI — each composite acceptance test declares its own main(), so each is its own binary; the
 # M4-5 integration test is one binary spanning three translation units.
@@ -743,6 +744,9 @@ add_sangen_test(MarkerLayerId_UI_Test     src/ui/MarkerLayerId_UI_Test.cpp)
 # the layerId-never-touched regression guard, and the Combo-binding store guard — all pure, no
 # imgui frame needed (MarkerLayerIndexRepair_UI.h).
 add_sangen_test(MarkerLayerIndexRepair_UI_Test src/ui/MarkerLayerIndexRepair_UI_Test.cpp)
+# STEP106: the Manual Marker Layers block's lock gate (`IsMarkerInstanceLayerLocked`) and
+# per-layer grid-snap quantizer (`QuantizeMarkerPositionToLayerGrid`) — pure, no imgui frame needed.
+add_sangen_test(MarkersTab_ManualLayers_UI_Test src/ui/MarkersTab_ManualLayers_UI_Test.cpp)
 # STEP94: MarkerDragGesture_UI's pure gesture state machine (correspondence build/match, live
 # per-frame writes, cardinality growth/shrink, Spawn-refusal freeze, ungrouped free-drag) and
 # RepositionSymmetryGroupMember (R2 §4's roster-slider counterpart) — pure/imgui-free, no window.
@@ -751,6 +755,9 @@ add_sangen_test(MarkerDragGesture_UI_Test src/ui/MarkerDragGesture_UI_Test.cpp)
 # Picking_UI::PickMarker-mirrored first-match-wins tie rule) and the stopgap at-rest/soft-hide/
 # ghost/Spawn-refused-tint draw. One live headless imgui frame, no window/GL.
 add_sangen_test(MapCanvas_MarkerDrag_UI_Test src/ui/MapCanvas_MarkerDrag_UI_Test.cpp)
+# STEP107: Ui::FixMarkerLayerSymmetry's own PARAMS writes — skip/overwrite mode, fresh id
+# allocation, cross-layer isolation, row-scoped writes, determinism. Pure/imgui-free, no window.
+add_sangen_test(MarkerSymmetryFixCommand_UI_Test src/ui/MarkerSymmetryFixCommand_UI_Test.cpp)
 add_sangen_test(ArmiesTab_UI_Test         src/ui/ArmiesTab_UI_Test.cpp)
 add_sangen_test(PropsTab_UI_Test          src/ui/PropsTab_UI_Test.cpp)
 add_sangen_test(PropsTab_ManualDecals_UI_Test src/ui/PropsTab_ManualDecals_UI_Test.cpp)

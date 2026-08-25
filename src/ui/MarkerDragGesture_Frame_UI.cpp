@@ -9,6 +9,7 @@ namespace SanmapGen {
 namespace Ui {
 
 void UpdateMarkerDragGesture(MarkerDragGestureState& state, std::vector<Params::MarkerInstanceGroup>& markers,
+                             const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                              const Params::Geometry& geometry, float newWorldX, float newWorldZ) {
     state.bSpawnCardinalityRefused = false;
     state.bCardinalityGrew         = false;
@@ -21,8 +22,10 @@ void UpdateMarkerDragGesture(MarkerDragGestureState& state, std::vector<Params::
     if (dragged == nullptr) { state.bActive = false; return; }
 
     if (state.symmetryGroupIdentifier == 0) {           // ungrouped: free drag, zero orbit calls
-        dragged->transform.positionX = newWorldX;
-        dragged->transform.positionZ = newWorldZ;
+        float quantizedX = newWorldX, quantizedZ = newWorldZ;
+        QuantizeMarkerPositionToLayerGrid(markerLayers, dragged->layerIndex, quantizedX, quantizedZ);
+        dragged->transform.positionX = quantizedX;
+        dragged->transform.positionZ = quantizedZ;
         return;
     }
 
@@ -37,8 +40,12 @@ void UpdateMarkerDragGesture(MarkerDragGestureState& state, std::vector<Params::
         return;
     }
 
-    dragged->transform.positionX = newWorldX;             // unambiguous regardless of cardinality
-    dragged->transform.positionZ = newWorldZ;
+    {
+        float quantizedDraggedX = newWorldX, quantizedDraggedZ = newWorldZ;
+        QuantizeMarkerPositionToLayerGrid(markerLayers, dragged->layerIndex, quantizedDraggedX, quantizedDraggedZ);
+        dragged->transform.positionX = quantizedDraggedX;  // unambiguous regardless of cardinality
+        dragged->transform.positionZ = quantizedDraggedZ;
+    }
 
     std::vector<int> unclaimedSlots;
     MatchCorrespondenceToOrbit(state.correspondence, orbitPoints, orbitCount, &unclaimedSlots);
@@ -47,8 +54,11 @@ void UpdateMarkerDragGesture(MarkerDragGestureState& state, std::vector<Params::
         if (bCardinalityChanged || entry.lastMatchedOrbitSlot < 0) continue;   // frozen this frame
         Params::MarkerTransform* const sibling = SelectedMarkerInstance(group->transforms, entry.transformIndex);
         if (sibling == nullptr) continue;
-        sibling->transform.positionX = orbitPoints[entry.lastMatchedOrbitSlot].worldPositionX;
-        sibling->transform.positionZ = orbitPoints[entry.lastMatchedOrbitSlot].worldPositionZ;
+        float siblingX = orbitPoints[entry.lastMatchedOrbitSlot].worldPositionX;
+        float siblingZ = orbitPoints[entry.lastMatchedOrbitSlot].worldPositionZ;
+        QuantizeMarkerPositionToLayerGrid(markerLayers, sibling->layerIndex, siblingX, siblingZ);
+        sibling->transform.positionX = siblingX;
+        sibling->transform.positionZ = siblingZ;
         entry.referenceWorldX = sibling->transform.positionX;   // keep the match anchor fresh
         entry.referenceWorldZ = sibling->transform.positionZ;
     }

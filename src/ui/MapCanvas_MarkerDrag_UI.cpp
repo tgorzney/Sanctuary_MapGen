@@ -118,8 +118,10 @@ void MapCanvas::ContinueManualMarkerDrag(float regionLocalX, float regionLocalY)
     const PreviewPixelCoordinate previewPixel = view.ResolvePreviewPixel(regionLocalX, regionLocalY);
     const PreviewComposite::PreviewWorldPoint worldPoint = composite->PreviewPixelToWorld(
         static_cast<float>(previewPixel.pixelX), static_cast<float>(previewPixel.pixelY));
-    UpdateMarkerDragGesture(manualMarkerDragState, *manualMarkerDragMarkers, *manualMarkerDragGeometry,
-                           worldPoint.worldX, worldPoint.worldZ);
+    static const std::vector<Params::MarkerInstanceLayer> kNoLayers;
+    UpdateMarkerDragGesture(manualMarkerDragState, *manualMarkerDragMarkers,
+                           manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoLayers,
+                           *manualMarkerDragGeometry, worldPoint.worldX, worldPoint.worldZ);
 }
 
 void MapCanvas::EndManualMarkerDrag() {

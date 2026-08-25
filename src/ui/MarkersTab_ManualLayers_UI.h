@@ -22,11 +22,15 @@
 //     PROC stage (STEP60 confirmed zero `MarkerInstanceGroup` references under `src/proc/`), the
 //     same silent posture STEP49 already adopts for the manual roster.
 #pragma once
+#include <cmath>
 #include "ColorSwatch_UI.h"
+#include "MarkerSymmetryFixCommand_UI.h"
 #include "Section_UI.h"
 #include "SliderScalar_UI.h"
 #include "UniqueNameList_UI.h"
+#include "../params/Geometry_PARAMS.h"
 #include "../params/MarkerInstance_PARAMS.h"
+#include "../params/Symmetry_PARAMS.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -35,6 +39,8 @@ struct ManualMarkerLayersState {
     SectionState       section;
     ColorSwatchOptions previewColorOptions;                     // picker only, no RGBA fields
     ScalarSliderRange  iconScaleRange{ 0.1f, 10.0f, 0.0f };     // same bounds as props (§8)
+    ScalarSliderRange  gridSnapSizeRange{ 0.1f, 100.0f, 0.0f };  // Constitution §8 — a setting, not a
+                                                                  // literal at the DrawSliderScalar call
 
     bool           bUseGroupColor = false;                      // one tint for every layer
     float          groupColor[kColorSwatchChannelCount] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -47,9 +53,22 @@ struct ManualMarkerLayersState {
     // `PropInstanceLayer` cannot (`PropsTab_Manual_UI.h:55-60`).
     RealtimeToggle selectedLayerColorToggle;
     RealtimeToggle selectedLayerIconScaleToggle;
+    RealtimeToggle selectedLayerGridSnapToggle;
 
     SectionState   symmetrySection;                             // NEW vs. props — layer-level symmetry
     int            selectedLayerIndex = -1;
+
+    // STEP107 — the "Fix Symmetry" command's own controls. ONE shared instance for the whole block,
+    // not one per row: `Params::MarkerInstanceLayer` is a pure round-tripping type and cannot carry
+    // UI-only scratch state (same constraint `selectedLayerColorToggle`/`selectedLayerIconScaleToggle`
+    // already accept above). `fixSymmetryToleranceRange`/`fixSymmetryToleranceToggle` back the
+    // recipe-level `Params::MarkerSymmetryFixSettings::distanceTolerance` slider — recipe-level, not
+    // per-layer, so one shared pair is correct here (not a per-row storage gap).
+    ScalarSliderRange         fixSymmetryToleranceRange{ 0.01f, 10.0f, 0.0f };
+    RealtimeToggle            fixSymmetryToleranceToggle;
+    bool                      bFixSymmetryOverwrite   = false;
+    bool                      bHasFixSymmetryResult   = false;
+    Ui::MarkerSymmetryFixResult lastFixSymmetryResult;
 };
 
 // The layer the per-row controls edit, or null when the selection points at nothing
@@ -58,6 +77,31 @@ inline Params::MarkerInstanceLayer* SelectedManualMarkerLayer(
         std::vector<Params::MarkerInstanceLayer>& markerLayers, int selectedLayerIndex) {
     if (selectedLayerIndex < 0 || selectedLayerIndex >= static_cast<int>(markerLayers.size())) return nullptr;
     return &markerLayers[static_cast<std::size_t>(selectedLayerIndex)];
+}
+
+// True when `layerIndex` names a layer with bLocked set. Out-of-range (Constitution §6) resolves
+// to false — an invalid layerIndex must never itself become a reason to refuse an edit; that is a
+// distinct failure mode (see the existing layerIndex clamp-on-import, STEP60 §4) this gate does not
+// participate in.
+inline bool IsMarkerInstanceLayerLocked(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                        int layerIndex) {
+    if (layerIndex < 0 || layerIndex >= static_cast<int>(markerLayers.size())) return false;
+    return markerLayers[static_cast<std::size_t>(layerIndex)].bLocked;
+}
+
+// The world position `(worldX, worldZ)` quantized to `layerIndex`'s own grid setting, or
+// unchanged if that layer has grid snap off, is out of range (Constitution §6 — resolves to
+// unchanged, the same posture as IsMarkerInstanceLayerLocked's out-of-range-safe default), or its
+// own `gridSnapSizeWorldUnits` is non-positive (a non-positive cell size cannot quantize; treated
+// as snap-off rather than a divide-by-zero/no-op hazard).
+inline void QuantizeMarkerPositionToLayerGrid(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                              int layerIndex, float& worldX, float& worldZ) {
+    if (layerIndex < 0 || layerIndex >= static_cast<int>(markerLayers.size())) return;
+    const Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(layerIndex)];
+    if (!layer.bGridSnapEnabled || layer.gridSnapSizeWorldUnits <= 0.0f) return;
+    const float cellSize = layer.gridSnapSizeWorldUnits;
+    worldX = std::round(worldX / cellSize) * cellSize;
+    worldZ = std::round(worldZ / cellSize) * cellSize;
 }
 
 // The color a layer actually draws with: its own, unless the block is set to one shared tint.
@@ -78,9 +122,14 @@ inline std::string NextMarkerLayerName(int layerCount) { return NextUniqueLabel(
 // `markers` is `recipe.markers`, repaired here when a layer is deleted or reordered.
 // No `Data::PlacementInstances*` parameter — see SCOPE NOTE 1.
 // No `Pipeline::PreviewDriver*` parameter — see SCOPE NOTE 3.
+// STEP107: `geometry`/`globalSymmetryMask`/`globalRadialRepeatCount`/`markerSymmetryFixSettings` are
+// the "Fix Symmetry" command's own required inputs, unavailable to this function before that ticket.
 void DrawManualMarkerLayers(ManualMarkerLayersState& state,
                             std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                            std::vector<Params::MarkerInstanceGroup>& markers);
+                            std::vector<Params::MarkerInstanceGroup>& markers,
+                            const Params::Geometry& geometry, int globalSymmetryMask,
+                            int globalRadialRepeatCount,
+                            Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings);
 
 } // namespace Ui
 } // namespace SanmapGen

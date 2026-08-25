@@ -19,6 +19,7 @@ nlohmann::ordered_json BuildSymmetryJson(const Params::MapRecipe& recipe) {
     json["RadialSymmetryRepeatCount"] = recipe.radialSymmetryRepeatCount;
     json["SnapImperfectSymmetry"]      = detection.bSnapImperfectSymmetry;
     json["SymmetryDetectionTolerance"] = detection.detectionTolerance;
+    json["MarkerSymmetryFixDistanceTolerance"] = recipe.markerSymmetryFixSettings.distanceTolerance;
     json["SymSuperpositionBlend"] = blend.superpositionBlend;
     json["SymmetryBlurRadius"]    = blend.blurRadius;
     json["CrossFadeWidth"]        = blend.crossFadeWidth;
