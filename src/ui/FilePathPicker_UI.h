@@ -24,10 +24,13 @@ using FilePathRequestFunction = bool (*)(void* userData, const char* startingPat
 
 // Per-picker tweakables (Constitution §8).
 struct FilePathPickerOptions {
+    // STEP153: no longer read by DrawFilePathPicker's rendering — the single button's visible text
+    // is always the caller's `label` argument now. Kept on the struct so existing callers that set
+    // it still compile; a later ticket may retire the field outright.
     const char* browseButtonLabel       = "Browse...";
     const char* allowedExtensions       = nullptr;  // ';'-separated (".png;.dds"); null = any
     int         maximumLabelCharacterCount = 40;
-    bool        bClearButtonShown       = true;     // the little "x" that empties the setting
+    bool        bClearButtonShown       = true;     // STEP153: surfaced as a right-click "Clear" menu item
     FilePathRequestFunction RequestFilePath = nullptr;
     void*                   requestUserData = nullptr;
 };
@@ -69,8 +72,10 @@ inline bool StoredFilePathIsAllowed(const std::string& filePath, const FilePathP
     return filePath.empty() || HasAllowedFileExtension(filePath, options.allowedExtensions);
 }
 
-// Draws the browse button, the shortened path label and the optional clear button, and runs the
-// injected request seam when the button is pressed.
+// Draws ONE button (labelled `label`) — STEP153: the current path (or "None") and, when the fence
+// would reject the stored value, a warning, both live in the hover tooltip; clearing (when
+// `bClearButtonShown`) lives on a right-click context menu on the same button. Runs the injected
+// request seam when the button is pressed.
 FilePathPickerResult DrawFilePathPicker(const char* label, std::string& filePath,
                                         const FilePathPickerOptions& options = FilePathPickerOptions(),
                                         const WidgetStyle& style = WidgetStyle());

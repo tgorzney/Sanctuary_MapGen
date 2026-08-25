@@ -8,9 +8,6 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-// The clear button's width, derived from the current font so it stays square-ish at any scale.
-float ResolveClearButtonWidth() { return ImGui::GetFrameHeight(); }
-
 // Runs the injected seam, if any. With no seam the row only reports the request and the host —
 // which owns the platform layer — opens the dialog itself on the next frame.
 FilePathPickerResult RequestAndApplyFilePath(std::string& filePath, const FilePathPickerOptions& options) {
@@ -31,25 +28,27 @@ FilePathPickerResult DrawFilePathPicker(const char* label, std::string& filePath
                                         const FilePathPickerOptions& options, const WidgetStyle& style) {
     FilePathPickerResult result;
     ImGui::PushID(label);
-    ImGui::TextUnformatted(label);
 
-    const char* const buttonLabel = options.browseButtonLabel != nullptr ? options.browseButtonLabel : "Browse...";
-    if (ImGui::Button(buttonLabel)) result = RequestAndApplyFilePath(filePath, options);
+    // STEP153: a genuine single button — the browse button's OWN label doubles as this control's
+    // only visible element ("ANYTHING that selects a file/s or Folder/s should be the single button
+    // widget"); the current path (or the fence-rejected warning) moved to the hover tooltip below,
+    // and clearing moved to a right-click context menu on this same button.
+    if (ImGui::Button(label)) result = RequestAndApplyFilePath(filePath, options);
 
-    if (options.bClearButtonShown) {
-        ImGui::SameLine();
-        if (ImGui::Button("x", ImVec2(ResolveClearButtonWidth(), 0.0f)) && !filePath.empty())
-            result.change = ClearFilePath(filePath).change;
-    }
-
-    // The label is greyed when the stored path would not survive this picker's own fence, so a
-    // setting carried in from an older recipe is visible rather than silently trusted.
+    // Reuses the existing shortened-path helper unchanged; the "greyed" fence warning that used to
+    // live in a separate always-visible text row is folded into the same tooltip rather than lost.
     const std::string shortLabel = ShortenedFilePathLabel(filePath, options.maximumLabelCharacterCount);
     const bool bStoredPathAllowed = StoredFilePathIsAllowed(filePath, options);
-    ImGui::SameLine();
-    if (bStoredPathAllowed) ImGui::TextUnformatted(shortLabel.c_str());
-    else ImGui::TextDisabled("%s", shortLabel.c_str());
-    if (!filePath.empty() && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", filePath.c_str());
+    if (ImGui::IsItemHovered()) {
+        if (bStoredPathAllowed) ImGui::SetTooltip("%s", shortLabel.c_str());
+        else ImGui::SetTooltip("%s (not accepted by this picker)", shortLabel.c_str());
+    }
+
+    if (options.bClearButtonShown && ImGui::BeginPopupContextItem()) {
+        if (ImGui::MenuItem("Clear") && !filePath.empty())
+            result.change = ClearFilePath(filePath).change;
+        ImGui::EndPopup();
+    }
 
     (void)style;                     // the row is plain imgui items; nothing to style yet
     ImGui::PopID();
