@@ -19,9 +19,19 @@ const char* const previewLayerKindNames[] = {
 };
 // PreviewBlendMode's own enum order (PreviewComposite_Settings_UI.h) — distinct from
 // Params::HeightBlendMode's label set (LayersTab_UI.cpp's blendModeNames); do not merge the two.
+// STEP200: Subtract..HardLight are the v1 parity additions, appended after Minimum to match the
+// enum's own append-only order.
 const char* const previewBlendModeNames[] = {
-    "Replace", "AlphaBlend", "Add", "Multiply", "Maximum", "Minimum"
+    "Replace", "AlphaBlend", "Add", "Multiply", "Maximum", "Minimum",
+    "Subtract", "Divide", "Overlay", "Screen", "SoftLight", "HardLight"
 };
+static_assert(IM_ARRAYSIZE(previewBlendModeNames) == kPreviewBlendModeCount,
+             "previewBlendModeNames must name every PreviewBlendMode enumerator, in enum order");
+// STEP200 fix approach point 1 — a named fixed width for the popup's own fixed-width items (the
+// blend combo, the opacity slider), matching v1's own `SetNextItemWidth(100)` before its combo
+// (Widget_MapCanvas.cpp:69). An unconstrained item width inside the auto-fit BeginPopup window is
+// what fed the reported runaway-growth defect.
+constexpr float kFixedItemWidthPixels = 100.0f;
 
 // Terrain (composited) section — reorder + per-row blend-mode dropdown (a real GPU blend-equation
 // switch into the composite shader, §14.7 "unchanged by this ruling"). Returns true if the RECIPE-
@@ -52,12 +62,16 @@ bool DrawTerrainSection(std::vector<PreviewFieldLayer>& fieldLayers) {
         [&](int rowIndex) {
             PreviewFieldLayer& layer = fieldLayers[static_cast<std::size_t>(rowIndex)];
             int blendIndex = static_cast<int>(layer.blendMode);
-            if (ImGui::Combo("Blend Mode", &blendIndex, previewBlendModeNames,
+            // STEP200: no visible label (v1 parity, Widget_MapCanvas.cpp:68-70's "##blend") and a
+            // fixed width (point 1) — both required to stop the popup's auto-fit growth loop.
+            ImGui::SetNextItemWidth(kFixedItemWidthPixels);
+            if (ImGui::Combo("##blend", &blendIndex, previewBlendModeNames,
                              IM_ARRAYSIZE(previewBlendModeNames))) {
                 layer.blendMode = static_cast<PreviewBlendMode>(blendIndex);
                 bBlendModeChanged = true;
             }
-        });
+        },
+        -1, DraggableListRowLayout::Flat);
     return ApplyViewLayerSignal(fieldLayers, signal) || bBlendModeChanged;
 }
 
@@ -84,8 +98,11 @@ bool DrawOverlaySection(std::vector<OverlayLayer_UI>& overlayLayers) {
         },
         [&](int rowIndex) {
             OverlayLayer_UI& layer = overlayLayers[static_cast<std::size_t>(rowIndex)];
+            // STEP200 fix approach point 1 — fixed width, same defense as the blend combo above.
+            ImGui::SetNextItemWidth(kFixedItemWidthPixels);
             if (ImGui::SliderFloat("Opacity", &layer.opacity, 0.0f, 1.0f)) bOpacityChanged = true;
-        });
+        },
+        -1, DraggableListRowLayout::Flat);
     return ApplyViewLayerSignal(overlayLayers, signal) || bOpacityChanged;
 }
 

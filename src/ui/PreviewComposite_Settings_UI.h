@@ -23,7 +23,18 @@ enum class PreviewLayerKind { HeightRamp, StratumSplat, Flow, Accumulation, Wate
 
 // The preview-only Z-order blend (PREVIEW_COMPOSITING_SPEC). Distinct from the geometry
 // `Params::HeightBlendMode`, which blends terrain height, not pixels.
-enum class PreviewBlendMode { Replace, AlphaBlend, Add, Multiply, Maximum, Minimum };
+// STEP200: append-only, order matters (existing indices are load-bearing on both the CPU switch in
+// PreviewComposite_Color_UI.h and the GPU #defines PreviewComposite_GpuProgram_UI.cpp generates) —
+// Subtract..HardLight are the six modes v1 (Widget_MapCanvas.cpp) had that v2 was missing; v1's
+// "Normal" is this enum's existing AlphaBlend (cosmetic naming only, not a duplicate), and v1's
+// "None" is superseded by the View popup's dedicated visibility toggle, not ported here.
+enum class PreviewBlendMode {
+    Replace, AlphaBlend, Add, Multiply, Maximum, Minimum,
+    Subtract, Divide, Overlay, Screen, SoftLight, HardLight
+};
+// The enumerator count, named so the UI's `previewBlendModeNames[]` display table and any test can
+// static_assert against it instead of drifting silently when the enum grows.
+enum : int { kPreviewBlendModeCount = 12 };
 
 // One composited layer. Layers are applied in vector order (UI order = Z order).
 struct PreviewFieldLayer {

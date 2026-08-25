@@ -19,11 +19,34 @@ float normalizeToDomain(float value, float domainMinimum, float domainRangeRecip
     return clampUnit((value - domainMinimum) * domainRangeReciprocal);
 }
 
+// Subtract..HardLight (STEP200) mirror PreviewComposite_Color_UI.h's CombineChannel expression for
+// expression — the #defines arrive from PreviewComposite_GpuProgram_UI.cpp's BuildEnumDefinitions,
+// numerically identical to the C++ enum, so the two sides cannot drift.
 float combineChannel(float destination, float source, int blendMode) {
     if (blendMode == PREVIEW_BLEND_ADD)      return destination + source;
     if (blendMode == PREVIEW_BLEND_MULTIPLY) return destination * source;
     if (blendMode == PREVIEW_BLEND_MAXIMUM)  return destination > source ? destination : source;
     if (blendMode == PREVIEW_BLEND_MINIMUM)  return destination < source ? destination : source;
+    if (blendMode == PREVIEW_BLEND_SUBTRACT) return destination - source;
+    // Bounded to at most 1.0 (STEP200 fix) — mirrors PreviewComposite_Color_UI.h's CombineChannel
+    // exactly: an unbounded division would amplify ordinary sub-1/255 Cpu/Gpu float noise into a
+    // multi-byte divergence once it survives the opacity lerp.
+    if (blendMode == PREVIEW_BLEND_DIVIDE) {
+        if (source <= 0.0) return 1.0;
+        float divided = destination / source;
+        return divided < 1.0 ? divided : 1.0;
+    }
+    if (blendMode == PREVIEW_BLEND_OVERLAY)
+        return destination <= 0.5 ? 2.0 * destination * source
+                                   : 1.0 - 2.0 * (1.0 - destination) * (1.0 - source);
+    if (blendMode == PREVIEW_BLEND_SCREEN)
+        return 1.0 - (1.0 - destination) * (1.0 - source);
+    if (blendMode == PREVIEW_BLEND_SOFT_LIGHT)
+        return source <= 0.5 ? 2.0 * destination * source + destination * destination * (1.0 - 2.0 * source)
+                              : 2.0 * destination * (1.0 - source) + sqrt(destination) * (2.0 * source - 1.0);
+    if (blendMode == PREVIEW_BLEND_HARD_LIGHT)
+        return source <= 0.5 ? 2.0 * destination * source
+                              : 1.0 - 2.0 * (1.0 - destination) * (1.0 - source);
     return source;                                    // PREVIEW_BLEND_ALPHA / REPLACE
 }
 

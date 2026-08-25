@@ -45,7 +45,14 @@ std::string BuildEnumDefinitions() {
          + IntegerDefinition("PREVIEW_BLEND_ADD",           static_cast<int>(PreviewBlendMode::Add))
          + IntegerDefinition("PREVIEW_BLEND_MULTIPLY",      static_cast<int>(PreviewBlendMode::Multiply))
          + IntegerDefinition("PREVIEW_BLEND_MAXIMUM",       static_cast<int>(PreviewBlendMode::Maximum))
-         + IntegerDefinition("PREVIEW_BLEND_MINIMUM",       static_cast<int>(PreviewBlendMode::Minimum));
+         + IntegerDefinition("PREVIEW_BLEND_MINIMUM",       static_cast<int>(PreviewBlendMode::Minimum))
+         // STEP200 — v1 parity modes, appended after Minimum (numeric order matches the CPU enum).
+         + IntegerDefinition("PREVIEW_BLEND_SUBTRACT",      static_cast<int>(PreviewBlendMode::Subtract))
+         + IntegerDefinition("PREVIEW_BLEND_DIVIDE",        static_cast<int>(PreviewBlendMode::Divide))
+         + IntegerDefinition("PREVIEW_BLEND_OVERLAY",       static_cast<int>(PreviewBlendMode::Overlay))
+         + IntegerDefinition("PREVIEW_BLEND_SCREEN",        static_cast<int>(PreviewBlendMode::Screen))
+         + IntegerDefinition("PREVIEW_BLEND_SOFT_LIGHT",    static_cast<int>(PreviewBlendMode::SoftLight))
+         + IntegerDefinition("PREVIEW_BLEND_HARD_LIGHT",    static_cast<int>(PreviewBlendMode::HardLight));
 }
 
 std::string BuildBindingDefinitions() {

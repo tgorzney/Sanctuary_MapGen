@@ -6,6 +6,7 @@
 // Application_PanelSystem_UI.cpp). It edits no rule, derives no tier and touches no DATA field.
 #include "Application_UI.h"
 #include <algorithm>
+#include <cfloat>
 #include <imgui.h>
 
 namespace SanmapGen {
@@ -50,6 +51,11 @@ void Application::DrawCanvasWindow() {
 
     ImGui::Begin("Map Preview");
     if (ImGui::Button("View")) ImGui::OpenPopup("ViewLayersPopup");
+    // STEP200 — defense-in-depth against the auto-fit-to-content growth feedback loop (an
+    // unconstrained item width inside a BeginPopup window feeds back into that same window's next-
+    // frame width): every item the popup draws is now itself fixed-width, but a max width here means
+    // a future item added without SetNextItemWidth still cannot reintroduce runaway growth.
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(420.0f, FLT_MAX));
     if (ImGui::BeginPopup("ViewLayersPopup")) {
         DrawViewLayersPopup();
         ImGui::EndPopup();

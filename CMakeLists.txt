@@ -555,6 +555,14 @@ add_sangen_test(Picking_UI_Test                   src/ui/Picking_UI_Test.cpp)
 add_sangen_test(PreviewComposite_UI_Test          src/ui/PreviewComposite_UI_Test.cpp)
 add_sangen_test(PreviewComposite_Wysiwyg_UI_Test  src/ui/PreviewComposite_Wysiwyg_UI_Test.cpp)
 add_sangen_test(PreviewComposite_Gpu_UI_Test      src/ui/PreviewComposite_Gpu_UI_Test.cpp)
+# STEP200 — the six v1-parity PreviewBlendMode enumerators (Subtract..HardLight): Cpu CombineChannel
+# exact values, own binary per this file's own "each composite acceptance test declares its own
+# main()" convention above. The Gpu/Cpu parity across all 12 modes is inside PreviewComposite_Gpu_UI_Test
+# instead (it already owns the one real GL context these tests would otherwise have to stand up).
+add_sangen_test(PreviewComposite_BlendModes_UI_Test src/ui/PreviewComposite_BlendModes_UI_Test.cpp)
+# STEP200 — the View popup's new left-of-name visibility toggle: bEnabled=false skips exactly its
+# own composite pass and never touches the baked field it would have sampled.
+add_sangen_test(PreviewComposite_VisibilityToggle_UI_Test src/ui/PreviewComposite_VisibilityToggle_UI_Test.cpp)
 add_sangen_test(MapCanvas_UI_Test
     src/ui/MapCanvas_UI_Test.cpp
     src/ui/MapCanvas_Render_UI_Test.cpp
@@ -592,9 +600,13 @@ add_sangen_test(MapCanvas_IconLayer_Microbenchmark_UI_Test
 # is pure (no imgui frame); the cross-section payload-identifier rejection needs one live headless
 # imgui frame per pair of drag/drop frames (no GL, no window backend) — same posture
 # MapCanvas_IconLayer_UI_Test above already has.
+# STEP200 adds the Flat row-layout acceptance (popup width stability, no collapse affordance,
+# name-drag reorder, left visibility icon) as a third translation unit, same posture as the
+# cross-section file above.
 add_sangen_test(Application_ViewLayersPopup_UI_Test
     src/ui/Application_ViewLayersPopup_UI_Test.cpp
-    src/ui/Application_ViewLayersPopup_CrossSection_UI_Test.cpp)
+    src/ui/Application_ViewLayersPopup_CrossSection_UI_Test.cpp
+    src/ui/Application_ViewLayersPopup_FlatRowLayout_UI_Test.cpp)
 add_sangen_test(PreviewIntegration_UI_Test
     src/ui/PreviewIntegration_UI_Test.cpp
     src/ui/PreviewIntegration_DirtyTier_UI_Test.cpp

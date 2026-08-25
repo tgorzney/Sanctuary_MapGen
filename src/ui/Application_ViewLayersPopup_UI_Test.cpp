@@ -83,6 +83,8 @@ namespace SanmapGen {
 namespace Ui {
 // Returns its own failure count; Application_ViewLayersPopup_CrossSection_UI_Test.cpp.
 int RunViewLayersCrossSectionAcceptance();
+// Returns its own failure count; Application_ViewLayersPopup_FlatRowLayout_UI_Test.cpp (STEP200).
+int RunViewLayersFlatRowLayoutAcceptance();
 }
 }
 
@@ -92,6 +94,7 @@ int main() {
     TestLockAndSelectAreNoop();
     TestReorderDelegatesToApplyDraggableListSignal();
     failureCount += SanmapGen::Ui::RunViewLayersCrossSectionAcceptance();
+    failureCount += SanmapGen::Ui::RunViewLayersFlatRowLayoutAcceptance();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

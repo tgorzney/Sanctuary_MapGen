@@ -4,6 +4,7 @@
 // is the Cpu twin of PreviewComposite_Color_UI.glsl — one expression per operation, so the
 // preview cannot silently diverge from itself the way the legacy shader diverged from the bake.
 #pragma once
+#include <cmath>
 #include "GradientLut_UI.h"          // kLookupChannelCount: the table layout M4-2 bakes
 #include "PreviewComposite_Kernel_UI.h"
 #include "PreviewComposite_Settings_UI.h"
@@ -46,13 +47,40 @@ inline PreviewColor SampleGradientLookupTable(const float* tableBase, int entryC
     return sampled;
 }
 
-// The one channel combine, per preview blend mode.
+// The one channel combine, per preview blend mode. Subtract..HardLight (STEP200) mirror
+// PreviewComposite_Color_UI.glsl's combineChannel expression for expression — CPU/GPU parity is
+// only "same expressions, same order", never a shared implementation across the two languages.
 inline float CombineChannel(float destination, float source, PreviewBlendMode blendMode) {
     switch (blendMode) {
         case PreviewBlendMode::Add:      return destination + source;
         case PreviewBlendMode::Multiply: return destination * source;
         case PreviewBlendMode::Maximum:  return destination > source ? destination : source;
         case PreviewBlendMode::Minimum:  return destination < source ? destination : source;
+        case PreviewBlendMode::Subtract: return destination - source;
+        // Bounded to at most 1.0, not left to blow out unboundedly as `source` -> 0 (the standard
+        // compositing definition of Divide, and a real fix, not just a numerical band-aid): an
+        // UNBOUNDED division amplifies any ordinary sub-1/255 Cpu/Gpu float noise in `source`
+        // (already tolerated everywhere else) into a wildly different large magnitude on each
+        // backend, which then survives the opacity lerp as a multi-byte divergence. Clamping here
+        // means both backends saturate to the same 1.0 the instant `source` gets small, instead of
+        // disagreeing about exactly how large "very large" is.
+        case PreviewBlendMode::Divide: {
+            if (source <= 0.0f) return 1.0f;
+            const float divided = destination / source;
+            return divided < 1.0f ? divided : 1.0f;
+        }
+        case PreviewBlendMode::Overlay:
+            return destination <= 0.5f ? 2.0f * destination * source
+                                        : 1.0f - 2.0f * (1.0f - destination) * (1.0f - source);
+        case PreviewBlendMode::Screen:
+            return 1.0f - (1.0f - destination) * (1.0f - source);
+        case PreviewBlendMode::SoftLight:
+            return source <= 0.5f
+                ? 2.0f * destination * source + destination * destination * (1.0f - 2.0f * source)
+                : 2.0f * destination * (1.0f - source) + std::sqrt(destination) * (2.0f * source - 1.0f);
+        case PreviewBlendMode::HardLight:
+            return source <= 0.5f ? 2.0f * destination * source
+                                   : 1.0f - 2.0f * (1.0f - destination) * (1.0f - source);
         default:                         return source;              // AlphaBlend / Replace
     }
 }
