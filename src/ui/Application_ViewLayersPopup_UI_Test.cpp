@@ -85,6 +85,9 @@ namespace Ui {
 int RunViewLayersCrossSectionAcceptance();
 // Returns its own failure count; Application_ViewLayersPopup_FlatRowLayout_UI_Test.cpp (STEP200).
 int RunViewLayersFlatRowLayoutAcceptance();
+// Returns its own failure count; Application_ViewLayersPopup_OverlayDomainAcceptance_UI_Test.cpp
+// (STEP201) — the real 6-domain seed, not a synthetic scene.
+int RunViewLayersOverlayDomainAcceptance();
 }
 }
 
@@ -95,6 +98,7 @@ int main() {
     TestReorderDelegatesToApplyDraggableListSignal();
     failureCount += SanmapGen::Ui::RunViewLayersCrossSectionAcceptance();
     failureCount += SanmapGen::Ui::RunViewLayersFlatRowLayoutAcceptance();
+    failureCount += SanmapGen::Ui::RunViewLayersOverlayDomainAcceptance();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

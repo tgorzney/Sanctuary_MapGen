@@ -576,6 +576,8 @@ add_sangen_test(MapCanvas_UI_Test
 add_sangen_test(MapCanvas_IconLayer_UI_Test
     src/ui/MapCanvas_IconLayer_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Cull_UI_Test.cpp
+    # STEP201 — per-domain OverlayLayer_UI::bEnabled toggle acceptance over ResolveVisibleCandidates.
+    src/ui/MapCanvas_IconLayer_Cull_OverlayDomainToggle_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Budget_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Cache_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_Draw_UI_Test.cpp
@@ -603,10 +605,13 @@ add_sangen_test(MapCanvas_IconLayer_Microbenchmark_UI_Test
 # STEP200 adds the Flat row-layout acceptance (popup width stability, no collapse affordance,
 # name-drag reorder, left visibility icon) as a third translation unit, same posture as the
 # cross-section file above.
+# STEP201 adds the overlay-section acceptance over the REAL 6-domain launch-time seed (as opposed
+# to the FlatRowLayout file's synthetic 3-row scene) as a fourth translation unit, same posture.
 add_sangen_test(Application_ViewLayersPopup_UI_Test
     src/ui/Application_ViewLayersPopup_UI_Test.cpp
     src/ui/Application_ViewLayersPopup_CrossSection_UI_Test.cpp
-    src/ui/Application_ViewLayersPopup_FlatRowLayout_UI_Test.cpp)
+    src/ui/Application_ViewLayersPopup_FlatRowLayout_UI_Test.cpp
+    src/ui/Application_ViewLayersPopup_OverlayDomainAcceptance_UI_Test.cpp)
 add_sangen_test(PreviewIntegration_UI_Test
     src/ui/PreviewIntegration_UI_Test.cpp
     src/ui/PreviewIntegration_DirtyTier_UI_Test.cpp

@@ -8,6 +8,8 @@ namespace SanmapGen {
 namespace Ui {
 // Defined in the sibling test translation units.
 void RunMapCanvasIconLayerCullChecks();     // MapCanvas_IconLayer_Cull_UI_Test.cpp
+// STEP201 — per-domain visibility-toggle acceptance (MapCanvas_IconLayer_Cull_OverlayDomainToggle_UI_Test.cpp)
+void RunMapCanvasIconLayerOverlayDomainToggleChecks();
 void RunMapCanvasIconLayerBudgetChecks();   // MapCanvas_IconLayer_Budget_UI_Test.cpp
 void RunMapCanvasIconLayerCacheChecks();    // MapCanvas_IconLayer_Cache_UI_Test.cpp
 void RunMapCanvasIconLayerDrawChecks();     // MapCanvas_IconLayer_Draw_UI_Test.cpp
@@ -19,6 +21,7 @@ using namespace SanmapGen;
 
 int main() {
     Ui::RunMapCanvasIconLayerCullChecks();
+    Ui::RunMapCanvasIconLayerOverlayDomainToggleChecks();
     Ui::RunMapCanvasIconLayerBudgetChecks();
     Ui::RunMapCanvasIconLayerCacheChecks();
     Ui::RunMapCanvasIconLayerDrawChecks();
