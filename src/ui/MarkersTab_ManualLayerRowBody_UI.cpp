@@ -26,7 +26,8 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
                       int globalSymmetryMask, int globalRadialRepeatCount,
                       Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state,
-                      const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier) {
+                      const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier,
+                      const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     TextInputRules nameRules;
     nameRules.maximumLength = 48;
     nameRules.bAllowEmpty   = false;
@@ -65,8 +66,14 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
             const std::string rowLabel = instanceGroup.name + " - " + (!instanceTransform.name.empty()
                 ? instanceTransform.name : std::to_string(groupTransformIndex.second));
             const bool bRowSelected = selectedManualInstanceIdentifier == instanceTransform.instanceIdentifier;
-            if (ImGui::Selectable(rowLabel.c_str(), bRowSelected))
+            if (ImGui::Selectable(rowLabel.c_str(), bRowSelected)) {
                 selectedManualInstanceIdentifier = instanceTransform.instanceIdentifier;
+                // ARCH §19.25, item 5 — IN ADDITION TO the tab-local write above, not instead of it:
+                // drives the canvas's own real selection, so the REAL icon-sprite render path
+                // (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) reflects this click too.
+                if (selectManualMarkerInstanceCallback)
+                    selectManualMarkerInstanceCallback(instanceTransform.instanceIdentifier);
+            }
         }
     }
     return bNameCommitted || bSnapCommitted || bSnapSizeCommitted;

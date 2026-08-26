@@ -89,9 +89,11 @@ void MapCanvas::DrawOverlayIconLayerPass(float regionOriginX, float regionOrigin
     iconLayerInput.regionOriginX        = regionOriginX;
     iconLayerInput.regionOriginY        = regionOriginY;
     iconLayerInput.regionSidePixels     = regionSidePixels;
+    // ARCH §19.25 — `selectedInstanceKey` IS the canonical key now (procedural or manual, correctly
+    // tagged `bManual`); no longer reconstructed from a bare entity id, which could only ever
+    // represent the procedural case.
     if (HasSelection())
-        iconLayerInput.selectedInstanceKey = OverlayInstanceKey_UI{
-            PlacementCollectionKind_UI::Markers, static_cast<std::int32_t>(selectedEntityIdentifier), true};
+        iconLayerInput.selectedInstanceKey = selectedInstanceKey;
     DrawOverlayIconLayers(iconLayerInput, overlayLayerAabbCache, overlayIconLayerFrameCache,
                          *ImGui::GetWindowDrawList());
 }

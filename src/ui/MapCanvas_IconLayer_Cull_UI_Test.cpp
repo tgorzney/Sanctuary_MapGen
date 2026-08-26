@@ -916,6 +916,132 @@ void CheckProceduralMarkerScaleComposesEndToEnd() {
     }
 }
 
+// ARCH_19_25_SelectionRepresentationUnification.md — the index-collision regression THIS ticket
+// closes: before `bManual` existed, a manual transform's per-group index and a procedural
+// Data::PlacementInstances array position shared one untagged number space under the SAME
+// PlacementCollectionKind_UI::Markers tag and could collide, incorrectly lighting up an unrelated
+// manual marker's `bSelected`. This fixture reproduces the EXACT collision: the manual transform is
+// its group's FIRST transform (group-position 0 — the OLD, now-retired key), numerically equal to
+// the procedural instance's array position (also 0) — proving it's closed, not just adding
+// forward-looking coverage.
+void CheckIndexSpaceCollisionRegressionClosed() {
+    IconLayerTestFixture fixture;
+    fixture.recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+    fixture.recipe.globalMarkerSettings.iconNameAlloy = "Alloy";
+    // STEP122: this fixture tests selection, not scale composition — pin scaleAlloy to 1.0f so
+    // GlobalMarkerSettings' own real 0.50f default doesn't drop either candidate's thumbnailScreenSize
+    // below thumbnailLodThresholdPixels (mirrors CheckMarkerAlloysCategoryResolvesColorAlloy's own
+    // established pattern above).
+    fixture.recipe.globalMarkerSettings.scaleAlloy = 1.0f;
+
+    AppendMarkerInstance(fixture.placements, 2.0f, 2.0f, /*ruleIndex=*/0, Params::MarkerCategory::Alloys, "PMarker");
+    fixture.ruleBucketIndex.markers.Build(fixture.placements.markers.ruleIndex.data(), 1, 1);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "PMarker", 0);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "Alloy", 1, /*atlasPage=*/1);
+
+    Params::MarkerInstanceGroup alloysGroup;
+    alloysGroup.name = "Alloys";
+    Params::MarkerTransform manualTransform;
+    manualTransform.layerIndex = 0;
+    manualTransform.instanceIdentifier = 55;   // globally-unique id, deliberately NOT the colliding value
+    manualTransform.transform.positionX = 2.0f;
+    manualTransform.transform.positionZ = 2.0f;
+    manualTransform.transform.scaleX = 1.0f;
+    alloysGroup.transforms.push_back(manualTransform);   // group-position 0 — the OLD collision key
+    fixture.recipe.markers = {alloysGroup};
+
+    OverlayLayer_UI layer;
+    layer.domainKind = OverlayDomainKind_UI::Alloy;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    DrawOverlayIconLayersInput input = fixture.Input();
+    // Select the PROCEDURAL instance at array position 0.
+    input.selectedInstanceKey = OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 0, true, /*bManual=*/false};
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(input, fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 2, "both the procedural instance and the manual transform resolve as candidates");
+
+    bool bFoundSelectedProcedural = false, bFoundUnselectedManual = false;
+    for (const OverlayVisibleInstance& candidate : candidates) {
+        if (!candidate.instanceKey.bManual) {
+            check(candidate.bSelected, "selecting procedural array position 0 lights up the PROCEDURAL candidate");
+            bFoundSelectedProcedural = true;
+        } else {
+            check(!candidate.bSelected,
+                  "the manual candidate at the OLD colliding group-position 0 does NOT light up bSelected "
+                  "— the exact collision this ticket closes, proven live rather than assumed");
+            bFoundUnselectedManual = true;
+        }
+    }
+    check(bFoundSelectedProcedural && bFoundUnselectedManual, "both candidates were actually found and checked");
+
+    // The reverse direction: selecting the manual instanceIdentifier (55) selects ONLY the manual
+    // candidate, never the procedural one — proves the fix holds both ways, not just one.
+    input.selectedInstanceKey = OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 55, true, /*bManual=*/true};
+    candidates.clear();
+    ResolveVisibleCandidates(input, fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 2, "both candidates still resolve");
+    for (const OverlayVisibleInstance& candidate : candidates) {
+        if (candidate.instanceKey.bManual)
+            check(candidate.bSelected, "selecting manual instanceIdentifier 55 lights up the MANUAL candidate");
+        else
+            check(!candidate.bSelected, "the procedural candidate is untouched by a manual selection");
+    }
+}
+
+// ARCH_19_25 item 5's other half: the C2 cache's replay-frame path (MapCanvas_IconLayer_Cache_UI.cpp
+// / MapCanvas_IconLayer_Draw_UI.cpp's ReplayAndRedrawSelection) calls ResolveSelectedInstanceCandidate
+// on every cache-VALID frame — it must resolve a MANUAL selection correctly too, not misinterpret the
+// manual instanceIdentifier as a procedural Data::PlacementInstances array position (a real gap this
+// ticket's own extension closes, beyond the ApplyClick/SetSelection surface the work-order names).
+void CheckSelectedInstanceCandidateResolvesManualMarker() {
+    IconLayerTestFixture fixture;
+    fixture.recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+    fixture.recipe.globalMarkerSettings.colorAlloy[0] = 0.1f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[1] = 0.2f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[2] = 0.3f;
+    fixture.recipe.globalMarkerSettings.iconNameAlloy = "Alloy";
+    fixture.recipe.globalMarkerSettings.scaleAlloy = 1.0f;   // STEP122 — see the sibling check above
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "Alloy", 0);
+
+    Params::MarkerInstanceGroup alloysGroup;
+    alloysGroup.name = "Alloys";
+    Params::MarkerTransform manualTransform;
+    manualTransform.layerIndex = 0;
+    manualTransform.instanceIdentifier = 77;
+    manualTransform.transform.positionX = 2.0f;
+    manualTransform.transform.positionZ = 2.0f;
+    manualTransform.transform.scaleX = 1.0f;
+    alloysGroup.transforms.push_back(manualTransform);
+    fixture.recipe.markers = {alloysGroup};
+
+    OverlayLayer_UI layer;
+    layer.domainKind = OverlayDomainKind_UI::Alloy;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    DrawOverlayIconLayersInput input = fixture.Input();
+    input.selectedInstanceKey = OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 77, true, /*bManual=*/true};
+
+    std::vector<OverlayVisibleInstance> candidates;
+    const bool bResolved = ResolveSelectedInstanceCandidate(input, candidates);
+    check(bResolved && candidates.size() == 1,
+          "the C2 replay path resolves exactly the selected MANUAL candidate, not just procedural ones");
+    if (!candidates.empty()) {
+        check(candidates[0].instanceKey.bManual && candidates[0].instanceKey.instanceIndex == 77,
+              "the resolved candidate's key is the manual instanceIdentifier, not a procedural array position");
+        check(candidates[0].bSelected, "the replay-path candidate itself reports bSelected");
+        check(candidates[0].tintColorRed == 0.1f && candidates[0].tintColorGreen == 0.2f
+                  && candidates[0].tintColorBlue == 0.3f,
+              "the manual replay resolves the same Alloys tint the full cull path would");
+    }
+}
+
 } // namespace
 
 void RunMapCanvasIconLayerCullChecks() {
@@ -946,6 +1072,8 @@ void RunMapCanvasIconLayerCullChecks() {
     CheckManualMarkerScaleComposesEndToEnd();
     CheckManualMarkerScaleUnrecognizedGroupNameStaysNoOp();
     CheckProceduralMarkerScaleComposesEndToEnd();
+    CheckIndexSpaceCollisionRegressionClosed();
+    CheckSelectedInstanceCandidateResolvesManualMarker();
 }
 
 } // namespace Ui

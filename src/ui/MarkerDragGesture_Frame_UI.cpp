@@ -3,6 +3,7 @@
 // MarkerDragGesture_UI.cpp for BeginMarkerDragGesture/RepositionSymmetryGroupMember and the shared
 // header comment (ARCH §1.5 split, same posture as MarkersTab_Manual_UI.h/.cpp's own two-file split).
 #include "MarkerDragGesture_UI.h"
+#include "MarkerInstanceId_UI.h"
 #include <algorithm>
 
 namespace SanmapGen {
@@ -121,9 +122,19 @@ void EndMarkerDragGesture(MarkerDragGestureState& state, std::vector<Params::Mar
 
     // Materialize every unclaimed slot as a brand-new sibling — same group id, the dragged member's
     // own layer, STEP49's own "Add Instance" naming convention (R1's machinery, carried forward).
+    // ARCH §19.25 — the real, found gap this ticket's own audit clause commissions fixing: this was
+    // the ONE live MarkerTransform construction path that never minted `instanceIdentifier` (it was
+    // left at the struct's own `-1` default), which would have made a symmetry-materialized marker
+    // permanently unselectable/miskeyed once ResolveMarkersManual switched its selection key to this
+    // field. `nextInstanceIdentifier` is read once, then incremented locally per materialized
+    // sibling — `NextMarkerInstanceIdentifier` itself scans `markers` fresh each call, so calling it
+    // inside the loop would return the SAME id for every unclaimed slot (mirrors
+    // MapImporter_Markers_IO.cpp's own `inOutNextInstanceIdentifier++` local-counter pattern).
+    int nextInstanceIdentifier = NextMarkerInstanceIdentifier(markers);
     for (int slotIndex : unclaimedSlots) {
         Params::MarkerTransform materialized;
         materialized.name = NextMarkerInstanceName(static_cast<int>(group->transforms.size()));
+        materialized.instanceIdentifier = nextInstanceIdentifier++;
         materialized.transform.positionX = orbitPoints[slotIndex].worldPositionX;
         materialized.transform.positionZ = orbitPoints[slotIndex].worldPositionZ;
         materialized.transform.positionY = draggedFinalPositionY;   // never RE-touched elsewhere;

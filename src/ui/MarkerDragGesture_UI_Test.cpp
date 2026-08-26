@@ -111,6 +111,7 @@ void RunCollapseRestoreCommitChecks() {
 void RunGrowthGhostMaterializeChecks() {
     std::vector<Params::MarkerInstanceGroup> markers(1);
     markers[0].transforms.push_back(MakeTransform("Seed", 5.0f, 3.0f, 11, /*layerIndex=*/2));   // ON the axis
+    markers[0].transforms[0].instanceIdentifier = 5;   // ARCH §19.16/§19.25 — exercises NextMarkerInstanceIdentifier's scan below
     const Params::Geometry geometry = MakeTestGeometry();
 
     MarkerDragGestureState state;
@@ -129,6 +130,13 @@ void RunGrowthGhostMaterializeChecks() {
     Check(materialized.symmetryGroupIdentifier == 11, "the new sibling shares the group's symmetryGroupIdentifier");
     Check(materialized.layerIndex == 2, "the new sibling inherits the dragged member's layerIndex");
     Check(NearlyEqual(materialized.transform.positionX, 3.0f), "at the correct materialized position");
+    // ARCH §19.25 — the real, found gap this ticket's audit clause commissioned fixing: before the
+    // fix, a symmetry-drag-materialized sibling never minted an instanceIdentifier at all (left at
+    // the struct's own -1 default), which would have made it permanently unselectable/miskeyed once
+    // ResolveMarkersManual switched its selection key to this field.
+    Check(materialized.instanceIdentifier == 6,
+          "the materialized sibling mints a real instanceIdentifier via NextMarkerInstanceIdentifier "
+          "(seed's own id 5 -> materialized 6), never left at the -1 default");
 }
 
 // Regression check — a release that materializes MULTIPLE new siblings in one call
@@ -142,6 +150,7 @@ void RunMultiPointGrowthMaterializeChecks() {
     std::vector<Params::MarkerInstanceGroup> markers(1);
     markers[0].transforms.push_back(MakeTransform("Seed", 5.0f, 5.0f, 21, /*layerIndex=*/6));
     markers[0].transforms[0].transform.positionY = 12.5f;   // distinctive, must survive every materialize
+    markers[0].transforms[0].instanceIdentifier = 10;   // ARCH §19.16/§19.25 — exercises the local counter below
     const Params::Geometry geometry = MakeTestGeometry();
     const int mask = Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::MirrorAcrossZ;
 
@@ -155,13 +164,25 @@ void RunMultiPointGrowthMaterializeChecks() {
 
     EndMarkerDragGesture(state, markers, geometry);
     Check(static_cast<int>(markers[0].transforms.size()) == 4, "release materializes all three new siblings");
+    // ARCH §19.25 — every one of the three siblings materialized in this SINGLE call gets its own
+    // real, unique, sequential id (11, 12, 13): proves the local counter is read once and incremented
+    // per sibling, not re-scanned (which would return the SAME id for every unclaimed slot) and never
+    // left at the struct's own -1 default.
+    std::vector<int> materializedIdentifiers;
     for (std::size_t index = 1; index < markers[0].transforms.size(); ++index) {
         const Params::MarkerTransform& materialized = markers[0].transforms[index];
         Check(materialized.symmetryGroupIdentifier == 21, "each new sibling shares the group's symmetryGroupIdentifier");
         Check(materialized.layerIndex == 6, "each new sibling inherits the dragged member's layerIndex intact");
         Check(NearlyEqual(materialized.transform.positionY, 12.5f),
               "each new sibling inherits the dragged member's positionY intact, even after prior push_backs");
+        Check(materialized.instanceIdentifier >= 0,
+              "each materialized sibling mints a real, non-negative instanceIdentifier, never the -1 default");
+        materializedIdentifiers.push_back(materialized.instanceIdentifier);
     }
+    Check(materializedIdentifiers.size() == 3
+              && materializedIdentifiers[0] == 11 && materializedIdentifiers[1] == 12
+              && materializedIdentifiers[2] == 13,
+          "three siblings materialized in ONE call each get their own unique, sequential id (11, 12, 13)");
 }
 
 // Test 4 — a "Spawn"-named group refuses any cardinality-changing drag outright: the whole group

@@ -11,6 +11,7 @@
 // both fronted by this one header, same split MarkersTab_RuleLayers_UI.h/.cpp already uses.
 #pragma once
 #include <algorithm>
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -134,6 +135,9 @@ void ApplyMarkerLayerBundleTreeSignal(const TreeListSignal<MarkerGroupLeafKey_UI
 // (ARCH §19.15(a)) scopes both the tree's own filtered copy and "Add Group"'s seeded
 // `bundle.markerTypeName` — every call site is now type-scoped, there is no more "root/global" tree
 // render.
+// ARCH §19.25, item 5: `selectManualMarkerInstanceCallback` threads straight through to the tree's
+// Manual leaf body (DrawLayerRowBody, via DrawMarkerGroupLeafBody). Empty default — every existing
+// call site compiles unchanged.
 void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                std::vector<Params::MarkerRuleLayer>& ruleLayers,
                                std::vector<Params::MarkerInstanceLayer>& instanceLayers,
@@ -143,7 +147,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                MarkerLayerBundlesState& state, MarkersTabState& rootState,
                                Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
-                               const std::string& markerTypeNameFilter);
+                               const std::string& markerTypeNameFilter,
+                               const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen

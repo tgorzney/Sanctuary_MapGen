@@ -73,8 +73,18 @@ Application::~Application() { Shutdown(); }
 // legally sees both — hands each of them a closure over the other.
 void Application::WireCallbacks() {
     previewDriver.SetPreviewCompositeCallback([this] { composite.Compose(/*bNeedsTexelReadback=*/false); });
-    canvas.SetSelectionChangedCallback([this](std::uint32_t entityIdentifier) {
-        lastSelectedEntityIdentifier = entityIdentifier;
+    // ARCH §19.25, item 4 — widened to the full key: a procedural change (bManual == false) updates
+    // lastSelectedEntityIdentifier exactly as before; a manual change updates the Markers tab's own
+    // selectedManualInstanceIdentifier instead, keeping the list's highlight in sync when the CANVAS
+    // is what changed the selection (the two-way sync's other half is item 5's
+    // selectManualMarkerInstanceCallback, below).
+    canvas.SetSelectionChangedCallback([this](const OverlayInstanceKey_UI& key) {
+        if (key.bManual) {
+            tabState.markers.selectedManualInstanceIdentifier = key.bValid ? key.instanceIndex : -1;
+        } else {
+            lastSelectedEntityIdentifier = key.bValid ? static_cast<std::uint32_t>(key.instanceIndex)
+                                                       : Data::EntityIdBuffer::emptySentinel;
+        }
     });
     // STEP48: picking reads the resolved markers and PIPELINE's spatial index over them, in world
     // space, instead of the baked entity-id buffer — see MapCanvas_UI.h's header comment.
@@ -104,6 +114,13 @@ void Application::WireCallbacks() {
     // instance-list rows write (tabState.markers.selectedManualInstanceIdentifier) — one source of
     // truth, never a second copy.
     canvas.SetManualMarkerSelectionSource(&tabState.markers.selectedManualInstanceIdentifier);
+    // ARCH §19.25, item 5 — the OTHER half of the two-way sync: a Markers-tab instance-list click
+    // resolves through this closure into the canvas's own real selection (item 3's SetSelection),
+    // mirroring SetManualMarkerSelectionSource's own injection pattern exactly, just in the opposite
+    // direction (tab -> canvas instead of canvas -> tab).
+    selectManualMarkerInstanceCallback = [this](int instanceIdentifier) {
+        canvas.SelectManualMarkerByInstanceIdentifier(instanceIdentifier);
+    };
 }
 
 // The whole of the shell's generation duty. WHICH tier this is was derived by the driver from the

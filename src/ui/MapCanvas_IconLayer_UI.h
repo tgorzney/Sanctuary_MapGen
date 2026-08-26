@@ -25,10 +25,17 @@ struct OverlayInstanceKey_UI {
     PlacementCollectionKind_UI collection = PlacementCollectionKind_UI::Markers;
     std::int32_t instanceIndex = -1;
     bool bValid = false;
+    // ARCH §19.25 — true when `instanceIndex` is a manual MarkerTransform::instanceIdentifier
+    // (globally unique, minted, never reused, §19.16), false when it is a procedural
+    // Data::PlacementInstances array position. The two number spaces are UNRELATED and can collide
+    // at the same numeric value under the same `collection` tag; this flag is the fix — default
+    // false keeps every pre-existing procedural comparison byte-identical.
+    bool bManual = false;
 };
 inline bool OverlayInstanceKeysEqual(const OverlayInstanceKey_UI& a, const OverlayInstanceKey_UI& b) {
     return a.bValid == b.bValid
-        && (!a.bValid || (a.collection == b.collection && a.instanceIndex == b.instanceIndex));
+        && (!a.bValid || (a.collection == b.collection && a.instanceIndex == b.instanceIndex
+                        && a.bManual == b.bManual));
 }
 
 enum class IconLayerLodMode_UI { Thumbnail, Strategic };

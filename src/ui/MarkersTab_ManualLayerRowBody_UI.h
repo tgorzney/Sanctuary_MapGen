@@ -10,6 +10,7 @@
 // DrawLayerRowBody UNCHANGED as the tree's Manual leaf-body callback (ARCH_19_07's "good news"
 // finding) without pulling in the rest of MarkersTab_ManualLayers_UI.h's own list-mechanics surface.
 #pragma once
+#include <functional>
 #include <vector>
 #include "ManualInstanceLayerIndex_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
@@ -44,12 +45,19 @@ inline constexpr float kMarkerLayerHeaderExtraCombinedWidthPixels =
 // re-run the uniqueness repair. STEP120: lives in its own translation unit (not
 // MarkersTab_ManualLayers_UI.cpp's anonymous namespace) so MarkersTab_Bundles_UI.cpp can reuse it
 // UNCHANGED as the tree's Manual leaf-body callback (ARCH_19_07's "good news" finding).
+// ARCH §19.25, item 5 — `selectManualMarkerInstanceCallback` (Application's own shell-mediated
+// closure, empty default so every existing call site compiles unchanged) is called BY the instance-
+// list Selectable click below, IN ADDITION TO the existing `selectedManualInstanceIdentifier`
+// tab-local write, not instead of it: the tab-local write keeps the list's own highlight in sync
+// with itself, and the callback additionally drives the canvas's REAL selection (the actual fix —
+// see MapCanvas_UI.h's SelectManualMarkerByInstanceIdentifier).
 bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                       std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
                       int globalSymmetryMask, int globalRadialRepeatCount,
                       Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state,
-                      const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier);
+                      const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier,
+                      const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
 // STEP123: the row header's own compact Color Override control (checkbox + swatch), drawn on EVERY
 // row's header line via DraggableList's/TreeListWidget's header-extra slot, not gated on row-expand

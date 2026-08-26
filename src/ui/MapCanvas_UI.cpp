@@ -6,7 +6,9 @@
 // tests no placement rule — a pick walks exactly one chunk's bucket in O(1)
 // (UI_FRAMEWORK_SPEC §4), never a scan of 100k instances.
 #include "MapCanvas_UI.h"
+#include "MapCanvas_MarkerDrag_UI.h"
 #include "Picking_UI.h"
+#include "../params/MapRecipe_PARAMS.h"
 #include <cmath>
 
 namespace SanmapGen {
@@ -37,7 +39,7 @@ std::uint32_t MapCanvas::ApplyClick(float regionLocalX, float regionLocalY) {
         || pickMarkerSpatialGrid == nullptr || composite == nullptr
         || composite->PixelsPerPreviewCell() <= 0.0f) {
         SetSelection(Data::EntityIdBuffer::emptySentinel);
-        return selectedEntityIdentifier;
+        return SelectedEntityIdentifier();
     }
     const PreviewComposite::PreviewWorldPoint worldPoint =
         composite->PreviewPixelToWorld(static_cast<float>(lastPickedPixel.pixelX),
@@ -51,8 +53,37 @@ std::uint32_t MapCanvas::ApplyClick(float regionLocalX, float regionLocalY) {
     const std::int32_t pickedIndex = PickMarker(*pickMarkerSpatialGrid, *pickMarkerInstances,
                                                 worldPoint.worldX, worldPoint.worldZ,
                                                 pickRadiusWorldUnits);
-    SetSelection(static_cast<std::uint32_t>(pickedIndex));   // kNoMarkerPicked(-1) == emptySentinel
-    return selectedEntityIdentifier;
+    if (pickedIndex != kNoMarkerPicked) {
+        SetSelection(static_cast<std::uint32_t>(pickedIndex));
+        return SelectedEntityIdentifier();
+    }
+    // ARCH §19.25, item 3 — a procedural miss tries a manual hit next: the SAME linear,
+    // authoring-scale hit-test TryBeginManualMarkerDrag already uses (MapCanvas_MarkerHitTest_UI.cpp
+    // — "no grid needed" for a manual roster at authoring scale), reused rather than re-derived, so a
+    // canvas click can select a manual marker for the first time.
+    if (manualMarkerDragMarkers != nullptr) {
+        int hitGroupIndex = -1, hitTransformIndex = -1;
+        if (HitTestManualMarkers(*manualMarkerDragMarkers, *composite, view, regionLocalX, regionLocalY,
+                                 pickRadiusScreenPixels, hitGroupIndex, hitTransformIndex)) {
+            const Params::MarkerTransform& hitTransform =
+                (*manualMarkerDragMarkers)[static_cast<std::size_t>(hitGroupIndex)]
+                    .transforms[static_cast<std::size_t>(hitTransformIndex)];
+            SetSelection(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers,
+                                               hitTransform.instanceIdentifier, true, /*bManual=*/true});
+            return SelectedEntityIdentifier();
+        }
+    }
+    SetSelection(Data::EntityIdBuffer::emptySentinel);   // both pickers missed: nothing selected
+    return SelectedEntityIdentifier();
+}
+
+// ARCH §19.25, item 5 — the shell-mediated list-click-to-canvas path's landing point. A negative
+// `instanceIdentifier` (the tab's own "-1 = nothing selected" sentinel) clears the selection instead
+// of claiming a nonsensical manual key, mirroring the binding edge case §19.25 states for every
+// manual-marker key: `instanceIdentifier < 0` is never a legal selection target.
+void MapCanvas::SelectManualMarkerByInstanceIdentifier(int instanceIdentifier) {
+    SetSelection(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, instanceIdentifier,
+                                       instanceIdentifier >= 0, /*bManual=*/true});
 }
 
 void MapCanvas::ApplyDrag(float deltaRegionPixelsX, float deltaRegionPixelsY) {
@@ -67,10 +98,13 @@ void MapCanvas::ApplyScroll(float regionLocalX, float regionLocalY, float wheelS
     view.ZoomAtRegionPoint(regionLocalX, regionLocalY, zoomStepScale);
 }
 
-void MapCanvas::SetSelection(std::uint32_t entityIdentifier) {
-    if (entityIdentifier == selectedEntityIdentifier) return;
-    selectedEntityIdentifier = entityIdentifier;
-    if (selectionChangedCallback) selectionChangedCallback(entityIdentifier);
+// ARCH §19.25 — the canonical full-key setter every selection-setting path resolves through
+// (ApplyClick's procedural/manual branches above, SelectManualMarkerByInstanceIdentifier). The old
+// `std::uint32_t` overload is now the thin wrapper declared inline in MapCanvas_UI.h.
+void MapCanvas::SetSelection(const OverlayInstanceKey_UI& key) {
+    if (OverlayInstanceKeysEqual(key, selectedInstanceKey)) return;
+    selectedInstanceKey = key;
+    if (selectionChangedCallback) selectionChangedCallback(selectedInstanceKey);
 }
 
 } // namespace Ui

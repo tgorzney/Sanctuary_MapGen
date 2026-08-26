@@ -70,7 +70,8 @@ std::vector<std::string> EnumerateMarkerTypeSectionNames(
 }
 
 void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
-                            Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
+                            Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                            const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     DrawManualMarkerLayerBlockSettings(state.manualLayers);   // (a) — once, tab-wide
 
     const std::vector<std::string> typeNames = EnumerateMarkerTypeSectionNames(
@@ -84,7 +85,8 @@ void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
             DrawMarkerLayerBundleTree(recipe.markerLayerBundles, recipe.markerRuleLayers, recipe.markerLayers,
                                       recipe.markers, recipe.geometry, recipe.globalSymmetryMask,
                                       recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
-                                      state.bundles, state, previewDriver, iconManifest, typeName);
+                                      state.bundles, state, previewDriver, iconManifest, typeName,
+                                      selectManualMarkerInstanceCallback);
 
             // STEP128 §5: no enclosing "Ungrouped ..." header/collapse chrome — plain rows, directly
             // after the Bundle tree. `DrawRuleLayerListBody`/`DrawAddMarkerRuleLayerButton`/
@@ -100,7 +102,8 @@ void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
             DrawManualMarkerLayerListBody(state.manualLayers, recipe.markerLayers, recipe.markers,
                                           recipe.geometry, recipe.globalSymmetryMask,
                                           recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
-                                          typeName, state.selectedManualInstanceIdentifier);
+                                          typeName, state.selectedManualInstanceIdentifier,
+                                          selectManualMarkerInstanceCallback);
 
             DrawSectionEnd();   // outer Type-section
         }

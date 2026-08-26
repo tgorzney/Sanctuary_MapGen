@@ -64,7 +64,10 @@ public:
     // §8 — a named setting, not a literal). Matches Phase 3's icon draw radius; the two must agree
     // or a click can miss a visibly-hit icon.
     void SetMarkerPickRadiusScreenPixels(float radius) { pickRadiusScreenPixels = radius; }
-    void SetSelectionChangedCallback(std::function<void(std::uint32_t)> selectionChanged) {
+    // ARCH §19.25 — widened from `void(std::uint32_t)` to carry the full key: a manual selection's
+    // `instanceIndex` is a MarkerTransform::instanceIdentifier, not an entity id, and only the full
+    // key (with `bManual`) lets Application::WireCallbacks() tell the two cases apart.
+    void SetSelectionChangedCallback(std::function<void(const OverlayInstanceKey_UI&)> selectionChanged) {
         selectionChangedCallback = std::move(selectionChanged);
     }
 
@@ -130,20 +133,44 @@ public:
     void ApplyDrag(float deltaRegionPixelsX, float deltaRegionPixelsY);
     void ApplyScroll(float regionLocalX, float regionLocalY, float wheelSteps);
 
+    // ARCH §19.25, item 5 — the shell-mediated list-click-to-canvas path: a Markers-tab instance-list
+    // Selectable click resolves through Application's own `selectManualMarkerInstanceCallback` (bound
+    // to this method in WireCallbacks(), mirroring SetManualMarkerSelectionSource's existing
+    // injection pattern) so the SAME real icon-sprite render path a canvas click drives
+    // (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) also lights up for a list click —
+    // never a second, parallel highlight mechanism. A negative `instanceIdentifier` clears the
+    // selection (mirrors MarkersTabState::selectedManualInstanceIdentifier's own `-1` sentinel).
+    void SelectManualMarkerByInstanceIdentifier(int instanceIdentifier);   // MapCanvas_UI.cpp
+
     MapCanvasView& View() { return view; }
     const MapCanvasView& View() const { return view; }
 
     // Presentation state of a viewport: what the user last selected. `emptySentinel` = nothing.
-    std::uint32_t SelectedEntityIdentifier() const { return selectedEntityIdentifier; }
-    bool HasSelection() const {
-        return selectedEntityIdentifier != Data::EntityIdBuffer::emptySentinel;
+    // ARCH §19.25 — both stay thin reads of the widened `selectedInstanceKey` for existing
+    // procedural-only callers (Application_Draw_UI.cpp): `.instanceIndex`/`.bValid` respectively.
+    std::uint32_t SelectedEntityIdentifier() const {
+        return static_cast<std::uint32_t>(selectedInstanceKey.instanceIndex);
     }
+    bool HasSelection() const { return selectedInstanceKey.bValid; }
     const PreviewPixelCoordinate& LastPickedPixel() const { return lastPickedPixel; }
     // The toolkit identifier the image draw uses; zero when nothing has been composited yet.
     unsigned long long PresentationIdentifier() const;
 
 private:
-    void SetSelection(std::uint32_t entityIdentifier);
+    // ARCH §19.25 — the canonical full-key setter: every selection-setting path (canvas click-pick,
+    // a Markers-tab list click for a manual instance) resolves through this ONE function, never a
+    // second divergent one. Defined in MapCanvas_UI.cpp.
+    void SetSelection(const OverlayInstanceKey_UI& key);
+    // The pre-existing procedural overload, now a thin wrapper over the canonical one above — every
+    // existing procedural call site (ApplyClick's PickMarker branch) compiles unchanged.
+    // `entityIdentifier != emptySentinel` is `bValid`; `bManual` is always false here (a procedural
+    // array-position key never claims to be a manual instanceIdentifier key).
+    void SetSelection(std::uint32_t entityIdentifier) {
+        SetSelection(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers,
+                                           static_cast<std::int32_t>(entityIdentifier),
+                                           entityIdentifier != Data::EntityIdBuffer::emptySentinel,
+                                           /*bManual=*/false});
+    }
     // Translates the imgui pointer state over the region into the gestures (MapCanvas_Draw_UI.cpp).
     void ApplyPointerInput(float regionOriginX, float regionOriginY);
     // STEP53 — assembles this frame's DrawOverlayIconLayersInput from the injected sources above
@@ -169,9 +196,12 @@ private:
     const Data::SpatialGrid*        pickMarkerSpatialGrid = nullptr;
     float                           pickRadiusScreenPixels = 8.0f;   // Constitution §8; wired from
                                                                        // ApplicationSettings::markerIconRadiusPixels
-    std::function<void(std::uint32_t)>    selectionChangedCallback;
+    std::function<void(const OverlayInstanceKey_UI&)> selectionChangedCallback;
     PreviewPixelCoordinate lastPickedPixel;
-    std::uint32_t selectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;
+    // ARCH §19.25 — replaces the old bare `std::uint32_t selectedEntityIdentifier`; default-
+    // constructed (`instanceIndex = -1, bValid = false, bManual = false`) is exactly "nothing
+    // selected", the same state `emptySentinel` represented before.
+    OverlayInstanceKey_UI selectedInstanceKey;
 
     // STEP53 — overlay icon draw pass sources (read-only, injected) and its own per-canvas state.
     const OverlayLayerSettings*         overlayLayerSettings    = nullptr;

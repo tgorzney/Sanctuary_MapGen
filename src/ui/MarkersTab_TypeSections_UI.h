@@ -4,6 +4,7 @@
 // STEP124) into one collapsible Section per distinct value present — no Params::MarkerTypeSection
 // struct exists or should exist (ARCH_19_14's own binding ruling).
 #pragma once
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -60,8 +61,13 @@ struct MarkerTypeSectionsState {
 // DrawManualMarkerLayers) at their one call site (MarkersTab_UI.cpp). Also draws the handful of
 // controls that are correctly TAB-WIDE, not per-type, exactly once each — see this function's own
 // .cpp header comment for the composition reasoning.
+// ARCH §19.25, item 5: `selectManualMarkerInstanceCallback` rides the SAME chain previewDriver/
+// iconManifest already ride down, threaded to DrawMarkerLayerBundleTree and
+// DrawManualMarkerLayerListBody's own leaf/row bodies. Empty default — every existing call site
+// compiles unchanged.
 void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
-                            Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest);
+                            Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                            const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen

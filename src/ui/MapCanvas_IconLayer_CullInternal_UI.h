@@ -58,13 +58,17 @@ void WidenAabb(LayerWorldAabb_UI& aabb, float worldX, float worldZ);
 // World -> screen projection, two-mode LOD (§14.3 verbatim), pairing-lookup resolution (a miss
 // draws nothing, logged at most once per unique id/session), opacity-into-tint (§14.2). Called only
 // for an instance already known to be inside the view rect (the caller's per-instance AABB test).
+// `bManual` (ARCH §19.25) tags the emitted OverlayInstanceKey_UI — false (default) for every
+// existing procedural call site, byte-identical to before this flag existed; true only for the
+// manual-marker resolver, whose `instanceIndex` is a MarkerTransform::instanceIdentifier, not a
+// procedural array position.
 void EmitCandidateIfVisible(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
                              int layerIndex, const std::string& templateIdentifier,
                              float worldX, float worldZ, float instanceScale,
                              PlacementCollectionKind_UI collection, std::int32_t instanceIndex,
                              float tintColorRed, float tintColorGreen, float tintColorBlue,
                              int* stableOrderCounter, IconLayerCullDiagnostics_UI* diagnostics,
-                             std::vector<OverlayVisibleInstance>& outCandidates);
+                             std::vector<OverlayVisibleInstance>& outCandidates, bool bManual = false);
 
 // Category -> RGB (Alloys/Spawn resolve from GlobalMarkerSettings; Generic/Expansion/Plasma-less
 // categories stay white) — UI-owned resolution of this PARAMS enum, mirroring MarkerCategoryLabel's
@@ -110,6 +114,21 @@ void ResolveManualSubLayer(const DrawOverlayIconLayersInput& input, const Overla
                             const ViewWorldRect_UI* viewRect,
                             IconLayerCullDiagnostics_UI* diagnostics,
                             std::vector<OverlayVisibleInstance>& outCandidates);
+
+// ARCH §19.25 — declared here (not anonymous-namespace-local, unlike its Units/Props/Decals
+// siblings) so MapCanvas_IconLayer_Cull_UI.cpp's ResolveSelectedInstanceCandidate can reuse it for
+// the C2 cache's replay-frame path (§4): one manual marker sub-layer's candidates (Alloy/
+// SpawnsArmies), keyed with `bManual=true` and `transform.instanceIdentifier` (never the per-group
+// `index` its Units/Props/Decals siblings still use — the fix this ticket ratifies). When
+// `targetInstanceIdentifier` is non-null, every transform whose own instanceIdentifier does not
+// match is skipped — a scoped single-instance resolve, not a behavior change to the existing
+// (`targetInstanceIdentifier == nullptr`) full-walk callers.
+void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
+                          int layerIndex, int subLayerArrayIndex, int* stableOrderCounter,
+                          LayerWorldAabb_UI* outAabb, const ViewWorldRect_UI* viewRect,
+                          IconLayerCullDiagnostics_UI* diagnostics,
+                          std::vector<OverlayVisibleInstance>& outCandidates,
+                          const int* targetInstanceIdentifier = nullptr);
 
 } // namespace Ui
 } // namespace SanmapGen

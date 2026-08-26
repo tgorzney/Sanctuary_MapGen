@@ -26,6 +26,7 @@
 //  3. Never notifies `Pipeline::PreviewDriver`: `recipe.markers`/`recipe.markerLayers` feed no
 //     PROC stage (STEP60), same silent posture STEP49 already adopts for the manual roster.
 #pragma once
+#include <functional>
 #include <string>
 #include "ColorSwatch_UI.h"
 #include "DraggableListWidget_UI.h"
@@ -97,6 +98,9 @@ void DrawManualMarkerLayerBlockSettings(ManualMarkerLayersState& state);
 // is set true if any expanded row's name committed this frame, feeding the caller's uniqueness
 // repair. STEP125: gains `markerTypeNameFilter` (ARCH §19.15(c), composed with the existing Bundle-
 // membership suppression via IsMarkerInstanceLayerRowSuppressed).
+// ARCH §19.25, item 5: `selectManualMarkerInstanceCallback` threads straight through to
+// DrawLayerRowBody's own per-row instance-list click. Empty default — every existing call site
+// compiles unchanged.
 DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                   std::vector<Params::MarkerInstanceGroup>& markers,
                                   const Params::Geometry& geometry, int globalSymmetryMask, int globalRadialRepeatCount,
@@ -104,7 +108,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                   ManualMarkerLayersState& state, bool& bAnyNameCommitted,
                                   const ManualInstanceLayerIndex_UI& instanceIndex,
                                   int& selectedManualInstanceIdentifier,
-                                  const std::string& markerTypeNameFilter);
+                                  const std::string& markerTypeNameFilter,
+                                  const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
 // The Add Marker Layer button. STEP120: gains an optional Bundle-scoped parent so a Bundle node's
 // own "add a Layer here" (MarkersTab_Bundles_UI.cpp) can reuse it; moved out of the anonymous
@@ -131,7 +136,8 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    int globalRadialRepeatCount,
                                    Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                    const std::string& markerTypeNameFilter,
-                                   int& selectedManualInstanceIdentifier);
+                                   int& selectedManualInstanceIdentifier,
+                                   const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen

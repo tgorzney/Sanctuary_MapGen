@@ -30,6 +30,7 @@
 //     (STEP121); the gamedata root and the icon-scan request remain caller-owned UI state — see
 //     `MarkersTab_Globals_UI.h`.
 #pragma once
+#include <functional>
 #include "ConfirmDialog_UI.h"
 #include "IconGridWidget_UI.h"
 #include "LabelledDialWidget_UI.h"
@@ -156,12 +157,16 @@ Params::MarkerRule* SelectedMarkerRule(std::vector<Params::MarkerRuleLayer>& mar
 
 // `iconManifest`/`pairingLookup`/`placedMarkers` are all nullable: with no resident atlas the
 // picker degrades to the typed tpId (or, for the Global section, a disabled placeholder button),
-// and before the first generation the placed list simply says so.
+// and before the first generation the placed list simply says so. ARCH §19.25, item 5:
+// `selectManualMarkerInstanceCallback` is Application's own shell-mediated closure (empty default —
+// every existing test/call site compiles unchanged), threaded straight through to
+// DrawMarkerTypeSections, riding the SAME chain previewDriver/iconManifest already ride down.
 void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     Pipeline::PreviewDriver* previewDriver,
                     const IconAtlasManifest* iconManifest = nullptr,
                     const IconAtlasPairingLookup* pairingLookup = nullptr,
-                    const Data::PlacementInstances* placedMarkers = nullptr);
+                    const Data::PlacementInstances* placedMarkers = nullptr,
+                    const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen

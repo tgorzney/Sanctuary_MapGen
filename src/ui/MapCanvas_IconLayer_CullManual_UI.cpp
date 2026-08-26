@@ -30,7 +30,7 @@ void ConsiderManualInstance(const DrawOverlayIconLayersInput& input, const Overl
                             float tintColorRed, float tintColorGreen, float tintColorBlue,
                             int* stableOrderCounter, LayerWorldAabb_UI* outAabb,
                             const ViewWorldRect_UI* viewRect, IconLayerCullDiagnostics_UI* diagnostics,
-                            std::vector<OverlayVisibleInstance>& outCandidates) {
+                            std::vector<OverlayVisibleInstance>& outCandidates, bool bManual = false) {
     if (outAabb != nullptr) WidenAabb(*outAabb, worldX, worldZ);
     if (viewRect == nullptr) return;
     if (worldX < viewRect->lowWorldX || worldX > viewRect->highWorldX
@@ -38,7 +38,7 @@ void ConsiderManualInstance(const DrawOverlayIconLayersInput& input, const Overl
         return;
     EmitCandidateIfVisible(input, layer, layerIndex, templateIdentifier, worldX, worldZ, scale,
                            collection, instanceIndex, tintColorRed, tintColorGreen, tintColorBlue,
-                           stableOrderCounter, diagnostics, outCandidates);
+                           stableOrderCounter, diagnostics, outCandidates, bManual);
 }
 
 // "UI/Sprites/.../<tpId>.dds" -> "<tpId>", mirroring Application_Assets_UI.cpp's FileStemOfEntryName
@@ -118,14 +118,19 @@ void ResolvePropsManual(const DrawOverlayIconLayersInput& input, const OverlayLa
     }
 }
 
+} // namespace
+
 // STEP114 §4b — the manual-marker resolver Alloy/SpawnsArmies dead-end into today. Partitions by
 // the owning group's name, mirroring ResolvePropsManual's bReclaimable en-bloc gate above —
-// evaluated once per GROUP, not per transform.
+// evaluated once per GROUP, not per transform. ARCH §19.25: declared non-anonymous (see
+// MapCanvas_IconLayer_CullInternal_UI.h) so the C2 cache's replay-frame path can scope a walk to one
+// `targetInstanceIdentifier`.
 void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
                           int layerIndex, int subLayerArrayIndex, int* stableOrderCounter,
                           LayerWorldAabb_UI* outAabb, const ViewWorldRect_UI* viewRect,
                           IconLayerCullDiagnostics_UI* diagnostics,
-                          std::vector<OverlayVisibleInstance>& outCandidates) {
+                          std::vector<OverlayVisibleInstance>& outCandidates,
+                          const int* targetInstanceIdentifier) {
     const bool bWantSpawnGroups = (layer.domainKind == OverlayDomainKind_UI::SpawnsArmies);
     // STEP116: the override check is hoisted ONCE per call — subLayerArrayIndex/markerLayers are
     // invariant for the whole function.
@@ -162,18 +167,31 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
             // recipe.markerLayers position layerIndex already uses everywhere else in the marker
             // domain (IsMarkerInstanceLayerLocked, QuantizeMarkerPositionToLayerGrid).
             if (transform.layerIndex != subLayerArrayIndex) continue;
+            // ARCH §19.25 — the scoped single-instance resolve (C2 cache replay path): skip every
+            // transform except the one target, when a target is given.
+            if (targetInstanceIdentifier != nullptr && transform.instanceIdentifier != *targetInstanceIdentifier)
+                continue;
             const std::string templateIdentifier =
                 ResolveMarkerIconTemplateIdentifier(transform, group, input.recipe->globalMarkerSettings);
+            // ARCH §19.25 — the selection key is `transform.instanceIdentifier` (globally unique,
+            // minted, never reused, §19.16), NOT the per-group `index` above (still used for
+            // Units/Props/Decals, which have no working picker yet): the two number spaces are
+            // unrelated and can collide at the same value under the same `Markers` collection tag,
+            // incorrectly lighting up an unrelated manual marker's `bSelected` — the fix this ruling
+            // closes. `bManual=true` tags the key so a procedural array-position key of the same
+            // numeric value never compares equal to it.
             ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
                                    transform.transform.positionX, transform.transform.positionZ,
                                    transform.transform.scaleX * groupTypeScale * layerIconScale,   // STEP122
-                                   PlacementCollectionKind_UI::Markers,
-                                   static_cast<std::int32_t>(index),
+                                   PlacementCollectionKind_UI::Markers, transform.instanceIdentifier,
                                    groupTintRed, groupTintGreen, groupTintBlue,   // STEP116
-                                   stableOrderCounter, outAabb, viewRect, diagnostics, outCandidates);
+                                   stableOrderCounter, outAabb, viewRect, diagnostics, outCandidates,
+                                   /*bManual=*/true);
         }
     }
 }
+
+namespace {
 
 void ResolveDecalsManual(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
                          int layerIndex, int subLayerArrayIndex, int* stableOrderCounter,

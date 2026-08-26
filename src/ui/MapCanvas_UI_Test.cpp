@@ -15,6 +15,9 @@ namespace Ui {
 void RunMapCanvasRenderChecks(Sys::GpuResourceManager& manager);  // MapCanvas_Render_UI_Test.cpp
 void RunMapCanvasViewChecks();                                    // MapCanvas_View_UI_Test.cpp
 void RunMapCanvasPickingChecks();                                 // MapCanvas_Picking_UI_Test.cpp
+// ARCH §19.25 — MapCanvas_Picking_UI_Test.cpp's own manual-selection coverage (canvas click ->
+// manual marker, list click -> canvas, via SelectManualMarkerByInstanceIdentifier).
+void RunManualMarkerSelectionChecks();
 // STEP78 acceptance test 4 — MapCanvas_ScenarioEditModeOwnership_UI_Test.cpp.
 void RunMapCanvasScenarioEditModeOwnershipChecks(Sys::GpuResourceManager& manager);
 // STEP113 — MapCanvas_ActivePanelGate_UI_Test.cpp.
@@ -28,6 +31,7 @@ int main(int argumentCount, char** argumentValues) {
     const std::string shaderDirectory = argumentCount > 1 ? argumentValues[1] : ".";
     Ui::RunMapCanvasViewChecks();
     Ui::RunMapCanvasPickingChecks();
+    Ui::RunManualMarkerSelectionChecks();
 
     HWND window = nullptr; HDC deviceContext = nullptr; HGLRC glContext = nullptr;
     if (!GpuResourceTest::CreateHiddenGlContext(window, deviceContext, glContext)) {

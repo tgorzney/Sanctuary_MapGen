@@ -34,7 +34,7 @@ void Application::DrawEnvironmentGroupPanel() {
             break;
         case ApplicationPanel::Markers:
             DrawMarkersTab(recipe, tabState.markers, &previewDriver, ActiveIconManifest(), &IconPairingLookup(),
-                          &assembler.Placements().markers);
+                          &assembler.Placements().markers, selectManualMarkerInstanceCallback);
             break;
         case ApplicationPanel::Armies:
             // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — the live, session-scoped ingestion

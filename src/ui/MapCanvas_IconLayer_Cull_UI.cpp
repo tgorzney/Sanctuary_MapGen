@@ -14,6 +14,7 @@
 #include "MapCanvasView_UI.h"
 #include "PreviewComposite_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include <limits>
 
 namespace SanmapGen {
 namespace Ui {
@@ -106,12 +107,51 @@ void ResolveVisibleCandidates(const DrawOverlayIconLayersInput& input, IconLayer
     }
 }
 
+namespace {
+
+// ARCH §19.25 — the manual-marker half of ResolveSelectedInstanceCandidate: `input.selectedInstanceKey.
+// instanceIndex` is a MarkerTransform::instanceIdentifier here, NOT a Data::PlacementInstances array
+// position (the procedural branch below's own assumption), so it cannot walk `input.placements->
+// markers` — it must re-run the same manual-marker resolution ResolveMarkersManual already performs
+// for a full cull pass, scoped to the ONE selected instanceIdentifier. The viewRect passed is
+// deliberately unrestricted (not `ComputeViewWorldRect`, which this replay-frame path never
+// recomputes): the selected instance keeps rendering even if the view moved without invalidating the
+// cache, mirroring the procedural branch's own "no view-membership re-test" behavior below.
+bool ResolveSelectedManualMarkerCandidate(const DrawOverlayIconLayersInput& input,
+                                          std::vector<OverlayVisibleInstance>& outCandidates) {
+    if (input.overlayLayerSettings == nullptr || input.recipe == nullptr) return false;
+    const int targetInstanceIdentifier = input.selectedInstanceKey.instanceIndex;
+    const ViewWorldRect_UI unrestrictedRect{
+        std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(),
+        std::numeric_limits<float>::max(),    std::numeric_limits<float>::max() };
+    const std::vector<OverlayLayer_UI>& layers = input.overlayLayerSettings->overlayLayers;
+    for (std::size_t layerIndex = 0; layerIndex < layers.size(); ++layerIndex) {
+        const OverlayLayer_UI& layer = layers[layerIndex];
+        if (!layer.bEnabled || (layer.domainKind != OverlayDomainKind_UI::Alloy
+                              && layer.domainKind != OverlayDomainKind_UI::SpawnsArmies))
+            continue;
+        for (const OverlaySubLayerRef_UI& subLayerRef : layer.subLayers) {
+            if (!subLayerRef.bEnabled || subLayerRef.kind == OverlaySubLayerKind_UI::ProceduralRule) continue;
+            int stableOrderCounter = 0;
+            ResolveMarkersManual(input, layer, static_cast<int>(layerIndex), subLayerRef.index,
+                                 &stableOrderCounter, nullptr, &unrestrictedRect, nullptr, outCandidates,
+                                 &targetInstanceIdentifier);
+            if (!outCandidates.empty()) return true;
+        }
+    }
+    return false;
+}
+
+} // namespace
+
 bool ResolveSelectedInstanceCandidate(const DrawOverlayIconLayersInput& input,
                                       std::vector<OverlayVisibleInstance>& outCandidates) {
     if (!input.selectedInstanceKey.bValid || input.overlayLayerSettings == nullptr || input.placements == nullptr)
         return false;
     if (input.selectedInstanceKey.collection != PlacementCollectionKind_UI::Markers)
         return false;   // no other domain has a working picker yet (STEP48)
+    if (input.selectedInstanceKey.bManual)
+        return ResolveSelectedManualMarkerCandidate(input, outCandidates);   // ARCH §19.25
     const Data::PlacementInstances& markers = input.placements->markers;
     const std::int32_t instanceIndex = input.selectedInstanceKey.instanceIndex;
     if (instanceIndex < 0 || static_cast<std::size_t>(instanceIndex) >= markers.Count()) return false;

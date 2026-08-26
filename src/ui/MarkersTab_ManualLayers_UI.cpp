@@ -63,7 +63,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                   ManualMarkerLayersState& state, bool& bAnyNameCommitted,
                                   const ManualInstanceLayerIndex_UI& instanceIndex,
                                   int& selectedManualInstanceIdentifier,
-                                  const std::string& markerTypeNameFilter) {
+                                  const std::string& markerTypeNameFilter,
+                                  const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     return DraggableList<Params::MarkerInstanceLayer>::Render(
         "manualMarkerLayers", markerLayers,
         [&](int rowIndex) {
@@ -82,7 +83,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
             }
             if (DrawLayerRowBody(layer, rowIndex, markerLayers, markers,
                                  geometry, globalSymmetryMask, globalRadialRepeatCount, markerSymmetryFixSettings,
-                                 state, instanceIndex, selectedManualInstanceIdentifier))
+                                 state, instanceIndex, selectedManualInstanceIdentifier,
+                                 selectManualMarkerInstanceCallback))
                 bAnyNameCommitted = true;
         },
         [&](int rowIndex) {
@@ -124,13 +126,15 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    int globalRadialRepeatCount,
                                    Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                    const std::string& markerTypeNameFilter,
-                                   int& selectedManualInstanceIdentifier) {
+                                   int& selectedManualInstanceIdentifier,
+                                   const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     bool bLayersMoved = DrawLayerListButtons(markerLayers, state, -1, markerTypeNameFilter);
     bool bAnyNameCommitted = false;
     const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
     const DraggableListSignal signal = DrawLayerList(markerLayers, markers, geometry, globalSymmetryMask,
         globalRadialRepeatCount, markerSymmetryFixSettings, state, bAnyNameCommitted,
-        instanceIndex, selectedManualInstanceIdentifier, markerTypeNameFilter);
+        instanceIndex, selectedManualInstanceIdentifier, markerTypeNameFilter,
+        selectManualMarkerInstanceCallback);
     if (signal.bHasSignal()) ApplyLayerListSignal(markerLayers, markers, state, signal);
     bLayersMoved = bAnyNameCommitted || bLayersMoved;
     // The export keys layers by NAME parity with Armies/Areas/Props (cosmetic here — `MarkerGroups`

@@ -26,7 +26,8 @@ void DrawMarkerGroupLeafBody(const MarkerGroupLeafKey_UI& leaf, std::vector<Para
                              int globalSymmetryMask, int globalRadialRepeatCount,
                              Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                              MarkersTabState& rootState, Pipeline::PreviewDriver* previewDriver,
-                             const ManualInstanceLayerIndex_UI& instanceIndex) {
+                             const ManualInstanceLayerIndex_UI& instanceIndex,
+                             const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     if (leaf.kind == MarkerGroupLeafKey_UI::Kind::Procedural) {
         if (leaf.layerIndex < 0 || leaf.layerIndex >= static_cast<int>(ruleLayers.size())) return;
         DrawRuleLayerSettings(ruleLayers[static_cast<std::size_t>(leaf.layerIndex)], previewDriver);
@@ -35,7 +36,8 @@ void DrawMarkerGroupLeafBody(const MarkerGroupLeafKey_UI& leaf, std::vector<Para
         DrawLayerRowBody(instanceLayers[static_cast<std::size_t>(leaf.layerIndex)], leaf.layerIndex,
                          instanceLayers, markers, geometry, globalSymmetryMask, globalRadialRepeatCount,
                          markerSymmetryFixSettings, rootState.manualLayers,
-                         instanceIndex, rootState.selectedManualInstanceIdentifier);
+                         instanceIndex, rootState.selectedManualInstanceIdentifier,
+                         selectManualMarkerInstanceCallback);
     }
 }
 
@@ -92,7 +94,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                MarkerLayerBundlesState& state, MarkersTabState& rootState,
                                Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest*,
-                               const std::string& markerTypeNameFilter) {
+                               const std::string& markerTypeNameFilter,
+                               const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     if (ImGui::Button("Add Group")) {
         Params::MarkerLayerBundle bundle;
         bundle.identifier     = NextMarkerLayerBundleId(bundles);   // scans the REAL, unfiltered vector
@@ -132,7 +135,7 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
             [&](const MarkerGroupLeafKey_UI& leaf) {
                 DrawMarkerGroupLeafBody(leaf, ruleLayers, instanceLayers, markers, geometry, globalSymmetryMask,
                                         globalRadialRepeatCount, markerSymmetryFixSettings, rootState, previewDriver,
-                                        instanceIndex);
+                                        instanceIndex, selectManualMarkerInstanceCallback);
             },
             [](int) {},   // drawNodeHeaderExtra — no-op, Bundle nodes have no color/symmetry field of
                           // their own (ARCH §19.24's controls are per-Layer, not per-Group).

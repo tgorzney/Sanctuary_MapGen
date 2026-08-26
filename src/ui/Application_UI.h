@@ -17,6 +17,7 @@
 // ApplicationMain_UI.cpp is the thin entry point, not part of the library.
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -176,6 +177,11 @@ private:
     ApplicationAssetBridge        assetBridge;   // sanpack -> atlas -> residency -> manifest
     void*                         windowHandle = nullptr;   // GLFWwindow*, kept opaque here
     std::uint32_t lastSelectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;
+    // ARCH §19.25, item 5 — the shell-mediated list-click-to-canvas closure, bound in WireCallbacks()
+    // (mirroring SetManualMarkerSelectionSource's existing injection pattern) and threaded down
+    // through DrawMarkersTab -> DrawMarkerTypeSections -> DrawLayerRowBody's existing call chain
+    // (the same chain previewDriver/iconManifest already ride down).
+    std::function<void(int)>     selectManualMarkerInstanceCallback;
     int  frameCount           = 0;
     bool bImguiReady          = false;
 };
