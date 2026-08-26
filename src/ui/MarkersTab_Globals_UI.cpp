@@ -16,45 +16,77 @@ void DrawGamedataSource(MarkersTabGlobals& globals) {
     if (globals.bIconScanRequested) ImGui::TextUnformatted("Icon scan requested - waiting on the host.");
 }
 
-// One global scale row: select it, scale it, tint it. Selecting a row is what the shared icon
-// grid below the rows writes into, so three rows share ONE grid instead of drawing three.
-void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex) {
-    MarkerGlobalScaleRow& row = globals.scaleRows[rowIndex];
-    ImGui::PushID(rowIndex);
-    if (ImGui::Selectable(markerGlobalScaleRowLabels[rowIndex], rowIndex == globals.selectedScaleRowIndex))
-        globals.selectedScaleRowIndex = rowIndex;
-    DrawSliderScalar("Icon Scale", row.iconScale, globals.iconScaleRange, row.iconScaleToggle,
-                     WidgetStyle(), "%.2f");
-    DrawColorSwatch("Preview Color", row.previewColor, globals.previewColorOptions,
-                    row.previewColorToggle);
-    ImGui::Text("Icon id: %d", row.iconId);
-    ImGui::PopID();
+// The row's icon button + its own popup grid. Mirrors DrawColorSwatch's shape exactly
+// (ColorButton -> OpenPopup on click -> unconditional BeginPopup/EndPopup every frame), swapping
+// ColorButton/ColorPicker4 for ImageButton/DrawIconGrid.
+void DrawGlobalScaleRowIconButton(MarkerGlobalScaleRow& row, std::string& iconNameField,
+                                  const MarkersTabGlobals& globals, const IconAtlasManifest* iconManifest,
+                                  const IconAtlasPairingLookup* pairingLookup) {
+    const int currentIconId = pairingLookup != nullptr
+        ? pairingLookup->Resolve(iconNameField).thumbnailIconId : kInvalidIconId;
+    const bool bHasIcon = iconManifest != nullptr && currentIconId >= 0
+                       && currentIconId < iconManifest->EntryCount();
+    const ImVec2 buttonSize(globals.iconButtonSizePixels, globals.iconButtonSizePixels);
+
+    bool bOpenRequested = false;
+    if (bHasIcon) {
+        const IconAtlasEntry& entry = iconManifest->entries[static_cast<std::size_t>(currentIconId)];
+        const ImTextureID texture = static_cast<ImTextureID>(iconManifest->PageTextureIdentifier(entry.atlasPage));
+        bOpenRequested = ImGui::ImageButton("##icon", texture, buttonSize,
+                                            ImVec2(entry.uvMinimumX, entry.uvMinimumY),
+                                            ImVec2(entry.uvMaximumX, entry.uvMaximumY));
+    } else {
+        ImGui::BeginDisabled(iconManifest == nullptr);
+        bOpenRequested = ImGui::Button("?##icon", buttonSize);
+        ImGui::EndDisabled();
+    }
+    if (bOpenRequested) {
+        // Seed the popup's highlight with THIS row's CURRENT icon (or "none"), so it opens showing
+        // what is already picked rather than whatever another row last touched.
+        row.iconGridState.selectedIconIndex = currentIconId;
+        row.iconGridState.selectedIconId    = currentIconId;
+        ImGui::OpenPopup("##iconPicker");
+    }
+    if (ImGui::BeginPopup("##iconPicker")) {
+        if (iconManifest == nullptr)
+            ImGui::TextUnformatted("No resident icon atlas: run the host's icon scan first.");
+        else
+            DrawIconGrid("##globalMarkerIconGrid", *iconManifest, row.iconGridState, globals.iconGridHeight);
+        ImGui::EndPopup();
+    }
 }
 
-// The ONE icon grid the three rows share. A pick writes the SELECTED row's icon id.
-void DrawGlobalIconPicker(MarkersTabGlobals& globals, const IconAtlasManifest* iconManifest) {
-    MarkerGlobalScaleRow* const row = SelectedMarkerScaleRow(globals);
-    if (row == nullptr) {
-        ImGui::TextUnformatted("Select a scale row to give it an icon.");
-        return;
-    }
-    if (iconManifest == nullptr) {
-        ImGui::TextUnformatted("No resident icon atlas: run the host's icon scan first.");
-        return;
-    }
-    if (DrawIconGrid("Marker Icons", *iconManifest, globals.iconGridState, globals.iconGridHeight))
-        row->iconId = globals.iconGridState.selectedIconId;
+// One global scale row, one line, three columns: icon button, Item Scale, Preview Color — every
+// control bound directly to `Params::GlobalMarkerSettings`, no scratch intermediary.
+void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::GlobalMarkerSettings& globalMarkerSettings,
+                        const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup) {
+    const GlobalMarkerScaleRowFields fields = ResolveGlobalMarkerScaleRowFields(globalMarkerSettings, rowIndex);
+    if (fields.scale == nullptr) return;   // Constitution §6 — an out-of-range row draws nothing
+    MarkerGlobalScaleRow& row = globals.scaleRows[rowIndex];
+
+    ImGui::PushID(rowIndex);
+    ImGui::TextUnformatted(markerGlobalScaleRowLabels[rowIndex]);
+    ImGui::Columns(3, "markerGlobalScaleRowColumns", false);
+    ImGui::SetColumnWidth(0, globals.iconButtonSizePixels + ImGui::GetStyle().FramePadding.x * 2.0f);
+    DrawGlobalScaleRowIconButton(row, *fields.iconName, globals, iconManifest, pairingLookup);
+    ImGui::NextColumn();
+    DrawSliderScalar("Item Scale", *fields.scale, globals.iconScaleRange, row.iconScaleToggle,
+                     WidgetStyle(), "%.2f");
+    ImGui::NextColumn();
+    DrawColorSwatch("Preview Color", fields.color, globals.previewColorOptions, row.previewColorToggle);
+    ImGui::Columns(1);
+    ImGui::PopID();
 }
 
 } // namespace
 
-void DrawMarkersTabGlobals(MarkersTabGlobals& globals, const IconAtlasManifest* iconManifest) {
+void DrawMarkersTabGlobals(MarkersTabGlobals& globals, Params::GlobalMarkerSettings& globalMarkerSettings,
+                           const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup) {
     if (!DrawSectionBegin("Global", globals.section)) return;
     DrawGamedataSource(globals);
     ImGui::Separator();
     for (int rowIndex = 0; rowIndex < kMarkerGlobalScaleRowCount; ++rowIndex)
-        DrawGlobalScaleRow(globals, rowIndex);
-    DrawGlobalIconPicker(globals, iconManifest);
+        DrawGlobalScaleRow(globals, rowIndex, globalMarkerSettings, iconManifest, pairingLookup);
     DrawSectionEnd();
 }
 

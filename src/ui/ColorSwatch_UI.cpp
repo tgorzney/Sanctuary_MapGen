@@ -43,7 +43,7 @@ WidgetChange DrawColorSwatch(const char* label, float color[kColorSwatchChannelC
     ClampSwatchColor(color, options);
 
     ImGui::PushID(label);
-    ImGui::TextUnformatted(label);
+    if (!options.bLabelHidden) ImGui::TextUnformatted(label);
 
     const ImVec4 previewColor(color[0], color[1], color[2], options.bAlphaEnabled ? color[3] : 1.0f);
     if (ImGui::ColorButton("##swatch", previewColor, ResolveButtonFlags(options),

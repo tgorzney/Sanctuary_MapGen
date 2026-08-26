@@ -20,6 +20,7 @@ void Check(bool bCondition, const char* label) {
 }
 
 void RunMarkerRuleLayerAcceptanceChecks();   // MarkersTab_RuleLayers_UI_Test.cpp
+void RunGlobalMarkerScaleRowFieldsAcceptanceChecks();   // MarkersTab_GlobalScaleRowFields_UI_Test.cpp
 
 namespace {
 
@@ -94,15 +95,10 @@ void RunEnumMirrorChecks() {
           "and a category from a longer table falls back rather than reading off the end");
 }
 
-// The global rows and the read-only placed list are both indexed by a selection that survives a
-// regeneration, so both fences are asserted rather than assumed.
+// The read-only placed list is indexed by a selection that survives a regeneration, so the fence
+// is asserted rather than assumed.
 void RunSelectionFenceChecks() {
     MarkersTabGlobals globals;
-    Check(SelectedMarkerScaleRow(globals) == &globals.scaleRows[0], "row 0 is selectable");
-    globals.selectedScaleRowIndex = kMarkerGlobalScaleRowCount;
-    Check(SelectedMarkerScaleRow(globals) == nullptr, "one past the last row selects nothing");
-    globals.selectedScaleRowIndex = -1;
-    Check(SelectedMarkerScaleRow(globals) == nullptr, "and so does a negative index");
     Check(!globals.bIconScanRequested, "the tab opens without a pending icon scan");
 
     Check(ResolvedPlacedMarkerSelection(3, 10) == 3, "a row inside the buffer stays picked");
@@ -141,6 +137,7 @@ int main() {
     RunSelectionFenceChecks();
     RunRealtimeDefaultChecks();
     RunMarkerRuleLayerAcceptanceChecks();
+    RunGlobalMarkerScaleRowFieldsAcceptanceChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

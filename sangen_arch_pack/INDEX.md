@@ -167,6 +167,12 @@ Scenario authoring/export ratification described above) — the gap that flag na
   `ARCH_19_11_FormatSpecCorrectionBundle.md` §19.11 and `SANMAP_FORMAT_SPEC.md`'s own
   "Conversion / import-export logic" section. Whoever picks this up must also confirm the new
   `ParentBundleIdentifier` merged fields (Correction 19) don't ship with the same write-side gap.
+- **`MarkersTab_ManualLayers_UI.h` was over the §1.5 150-line hard ceiling before this session's
+  fix (2026-08-26).** STEP123 left it at 165 lines; remediated by `ARCH_19_22_ManualLayersHeaderSplit.md`
+  §19.22 (a new sibling header, `MarkersTab_ManualLayerRowBody_UI.h`, pulls
+  `DrawLayerRowBody`/`DrawManualMarkerLayerColorOverrideHeaderControl`'s declarations out to pair
+  with their already-separate `.cpp`). Ruled, not yet built — a coder work-order, dispatched ahead
+  of the Type-Sections Ticket B that would otherwise land more content on top of the violation.
 
 **Fixed since the §15.5 ratification (2026-08-21):** the naval-fleet composition gap flagged
 below the first time this note was written is closed. The live reference
@@ -389,3 +395,64 @@ documentation-only correction pass closing several already-stale field-list gaps
 canvas gesture (§19.10), and soft (UI-only) Bundle→marker-type consistency (§19.12) are all
 ratified as designed, confirmed consistent with Assembly's own parallel rulings rather than
 independently drifting variants.
+
+**`ARCH_19_MarkerLayerBundle.md` §19 extended to §19.13–§19.22 (2026-08-26) — ratifies
+`work_orders/DESIGN_MarkerTypeSectionsAndInstanceSelection_R1.md` (the UI Expert's design-round
+response to `BRIEF_MarkerTypeSectionsAndInstanceSelection_R1.md`) in full; every one of the
+design's 14 requested rulings, plus one unrelated time-sensitive file-size-ceiling item, ratified
+as proposed — none corrected.** `MarkerRuleLayer`/`MarkerInstanceLayer` gain `markerTypeName`
+(§19.13, extends §19.3's field on `MarkerLayerBundle` to both Layer types, wire key
+`"MarkerTypeName"`, additive). The new Markers-tab Type-section tier is confirmed **UI-derived** —
+dynamic enumeration over live `markerTypeName` values, no new `Params::MarkerTypeSection` struct,
+with a binding Alloy/Plasma/Spawn-first-then-alphabetical-then-"(Unassigned)" ordering rule
+(§19.14), because `markerTypeName` is already an open free-form string space and
+`GlobalMarkerSettings` is a genuinely closed, different-axis 3-field struct (confirmed by direct
+code read, not assumed). §19.15 rules three tightly-coupled Ticket B compositions at once: the
+per-type filtered-copy `TreeListWidget_UI<MarkerLayerBundle>` instantiation is confirmed safe by
+`Render`'s own read-from-copy/write-by-identifier-lookup contract; a nested child Bundle whose
+`markerTypeName` diverges from its parent's cross-section-cutoff is ruled the correct rendering
+(the UI-tier analogue of §19.6's PARAMS-tier Assembly cutoff, cited explicitly rather than left an
+unstated consequence); and `bRowSuppressed` composing two independent AND'd predicates
+(Bundle-membership, type-mismatch) is signed off as within the field's documented contract, with
+its widened reorder-across-invisible-rows blast radius explicitly recorded as an accepted,
+inherited tradeoff rather than silently absorbed. A new `MarkerTransform::instanceIdentifier`
+(§19.16, global — not per-group — uniqueness, wire key `"InstanceIdentifier"`, legacy-backfill by
+sequential encounter order across the whole nested import walk, mirroring `layerId`'s own
+already-shipped precedent exactly) gives manual markers the stable cross-frame identity the
+selection feature needs; §1.9's "Id" ban is confirmed to already cover it correctly, recorded
+there too so a future grep for every field that rule has touched finds this one. `GlobalMarkerSettings`
+gains `selectColorAlloy/Plasma/Spawn` as a strict mirror of the existing 3-field pattern, plus one
+signed-off, explicitly-justified 4th field, `selectColorDefault` (§19.17) — the existing pattern's
+white-fallback-for-unmatched-name convention is correct for "no special type color" but would make
+"selected" indistinguishable from "unselected" for any free-form group name, a real correctness
+gap the deviation closes, not an arbitrary 4th field. §19.18 records the canonical selection-tint
+priority order (refused-drag > selected > army-color > layer/type color) and rules "selected
+replaces fill" a visual language kept permanently distinct from the drag-ghost's existing
+unfilled-ring vocabulary (confirmed by direct read: the ghost uses `AddCircle`, not
+`AddCircleFilled`) — two vocabularies, never colliding. §19.19 confirms the static
+symmetric-sibling highlight computes fresh every frame via the existing
+`Pipeline::BuildWorldSymmetryOrbit` plus a small one-shot inline nearest-match — deliberately NOT
+`MarkerOrbitCorrespondence_UI.h`, a heavier cross-frame stability matcher solving a drift problem
+this one-shot feature doesn't have — reusing `markerSymmetryFixSettings.distanceTolerance` for the
+match epsilon (no new tolerance field) and wiring the canvas via a new
+`SetManualMarkerSelectionSource`, confirmed the same null-safe-injection shape as the existing
+`SetManualMarkerDragSource`/`SetActivePanelSource`, not a new module-boundary pattern. §19.20
+formally extends §19.9's manual-only-membership law one further tier to selection scope (no
+procedural-instance selection — `Data::PlacementInstances` has no stable cross-bake identity to
+hang one on). §19.21 closes, with one explicit sentence, that `MarkerRule::category` and
+`markerTypeName` are two permanently independent concepts a future ticket may not silently merge.
+
+**Unrelated, time-sensitive item from the same session — `ARCH_19_22_ManualLayersHeaderSplit.md`
+§19.22 (2026-08-26).** `src/ui/MarkersTab_ManualLayers_UI.h` was left at 165 lines by a just-completed
+coder ticket (STEP123), over `ARCH_01_05_FileSizeCeilings.md` §1.5's 150-line hard ceiling (it was
+already exactly at the ceiling before that ticket's own change). Ruled resolved now, ahead of the
+Type-Sections work's Ticket B (which would otherwise land more content on top of an
+already-noncompliant file): split along the file's own established fault line, mirroring its own
+`MarkerLayerIndexRepair_UI.h` precedent — a new sibling header,
+`src/ui/MarkersTab_ManualLayerRowBody_UI.h`, gives the already-separately-implemented
+`MarkersTab_ManualLayerRowBody_UI.cpp` the declaration header it should already have had
+(`DrawLayerRowBody`, `DrawManualMarkerLayerColorOverrideHeaderControl`, their two paired
+reserved-width constants), with every real consumer's `#include` list updated explicitly rather
+than relying on the parent header's transitive re-export. Brings the parent header to roughly 143
+lines — under the hard ceiling, with no further split needed before Ticket B is drafted. Ruled,
+not built — a coder work-order, same posture as every other file-shape ruling in this pack.

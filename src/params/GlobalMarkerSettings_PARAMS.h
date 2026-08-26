@@ -39,5 +39,17 @@ inline void ResolveMarkerGroupTypeTintColor(const std::string& groupName, const 
     outRed = color[0]; outGreen = color[1]; outBlue = color[2];
 }
 
+// STEP122: the group-name -> GlobalMarkerSettings scale-field mapping, mirroring
+// ResolveMarkerGroupTypeTintColor's exact group-name vocabulary above. Unrecognized group name
+// (Generic/Expansion/freeform) resolves to 1.0f — a multiplicative no-op, the correct "unset"
+// convention for a scale factor (ResolveMarkerGroupTypeTintColor's own white-for-unset is a
+// color-channel convention, not directly reusable here).
+inline float ResolveMarkerGroupTypeScale(const std::string& groupName, const GlobalMarkerSettings& settings) {
+    if (groupName == kSpawnMarkerGroupName || groupName == "Spawns") return settings.scaleSpawn;
+    if (groupName == "Alloy" || groupName == "Alloys")               return settings.scaleAlloy;
+    if (groupName == "Plasma" || groupName == "Plasmas")             return settings.scalePlasma;
+    return 1.0f;
+}
+
 } // namespace Params
 } // namespace SanmapGen

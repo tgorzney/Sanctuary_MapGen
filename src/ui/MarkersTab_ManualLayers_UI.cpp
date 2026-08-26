@@ -49,6 +49,11 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                  geometry, globalSymmetryMask, globalRadialRepeatCount, markerSymmetryFixSettings, state))
                 bAnyNameCommitted = true;
         },
+        [&](int rowIndex) {
+            DrawManualMarkerLayerColorOverrideHeaderControl(
+                markerLayers[static_cast<std::size_t>(rowIndex)], state, bAnyNameCommitted);
+        },
+        kMarkerLayerColorOverrideHeaderWidthPixels,
         state.selectedLayerIndex);
 }
 

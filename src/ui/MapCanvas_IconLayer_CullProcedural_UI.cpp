@@ -39,7 +39,7 @@ void ResolveProceduralSubLayer(const DrawOverlayIconLayersInput& input, const Ov
         if (worldX < viewRect->lowWorldX || worldX > viewRect->highWorldX
             || worldZ < viewRect->lowWorldZ || worldZ > viewRect->highWorldZ)
             continue;
-        const float scale = instances.scaleX[static_cast<std::size_t>(instanceIndex)];
+        float scale = instances.scaleX[static_cast<std::size_t>(instanceIndex)];   // was const
         const std::string templateIdentifier =
             TemplateIdentifierToString8(instances.templateIdentifier[static_cast<std::size_t>(instanceIndex)].characters);
         float tintRed = 1.0f, tintGreen = 1.0f, tintBlue = 1.0f;
@@ -47,6 +47,7 @@ void ResolveProceduralSubLayer(const DrawOverlayIconLayersInput& input, const Ov
             const Params::MarkerCategory category =
                 static_cast<Params::MarkerCategory>(instances.category[static_cast<std::size_t>(instanceIndex)]);
             ResolveMarkerCategoryTintColor(category, input.recipe->globalMarkerSettings, tintRed, tintGreen, tintBlue);
+            scale *= ResolveMarkerCategoryScale(category, input.recipe->globalMarkerSettings);   // STEP122
         } else if (collection == PlacementCollectionKind_UI::Units && input.recipe != nullptr) {
             // ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-C/B: Data::PlacementInstance::armyIndex
             // (Placement_Rules_PROC.cpp -> Placement_Emit_PROC.cpp) is the real, per-instance owning

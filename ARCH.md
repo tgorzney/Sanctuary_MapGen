@@ -55,7 +55,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §1.6 | [ARCH_01_06_SanmapKeyCasing.md](ARCH_01_06_SanmapKeyCasing.md) | `.sanmap` top-level key casing — game-native vs SanGen-owned (ratifies work-order SPEC-4 Correction 0) | 24 lines |
 | §1.7 | [ARCH_01_07_IoMigrationFileNaming.md](ARCH_01_07_IoMigrationFileNaming.md) | IO migration file naming — schema version steps (ratifies `IO_MIGRATION_SPEC`) | 16 lines |
 | §1.8 | [ARCH_01_08_ParamsFieldNamingByKind.md](ARCH_01_08_ParamsFieldNamingByKind.md) | PARAMS field naming for format-derived types — governed by data KIND, not by key presence | 43 lines |
-| §1.9 | [ARCH_01_09_IdAbbreviationBan.md](ARCH_01_09_IdAbbreviationBan.md) | "Id" is banned — resolved once, binding on every current and future field; retroactively confirms the shipped `layerId` defect | 54 lines |
+| §1.9 | [ARCH_01_09_IdAbbreviationBan.md](ARCH_01_09_IdAbbreviationBan.md) | "Id" is banned — resolved once, binding on every current and future field; retroactively confirms the shipped `layerId` defect | 62 lines |
 | **§2** | [ARCH_02_LayerDirectoryMap.md](ARCH_02_LayerDirectoryMap.md) | Layer → directory map (Constitution §1/§2) | 24 lines |
 | **§3** | [ARCH_03_ModuleBoundaries.md](ARCH_03_ModuleBoundaries.md) | Module boundaries & ownership (Constitution §1, resolved) — §3.5 (new) is the general MATH/PARAMS/PROC placement rule for pure `Params::`-shaped math | 126 lines |
 | **§4** | [ARCH_04_DispatchContract.md](ARCH_04_DispatchContract.md) | Dispatch contract (Constitution §4, resolved) | 81 lines |
@@ -121,7 +121,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §18.1 | [ARCH_18_01_SandboxedExecutionPrimitive.md](ARCH_18_01_SandboxedExecutionPrimitive.md) | `LuaTableEvaluate_SYS`/`LuaTableValue_SYS` — a sibling `SYS` primitive to `LuaSyntaxCheck_SYS`, sharing only the vendored LuaJIT library; the execution safety contract, binding | 59 lines |
 | §18.2 | [ARCH_18_02_IngestedDataDeterminism.md](ARCH_18_02_IngestedDataDeterminism.md) | Determinism ruling — ingested footprint data may influence generation only after being baked into `PARAMS`; never read live by `PROC` | 69 lines |
 | §18.3 | [ARCH_18_03_CatalogDataOwnership.md](ARCH_18_03_CatalogDataOwnership.md) | Q3 ruled — richer catalog data (footprint + tags, the two artifacts tickets 89/92 need) stays `IO`-owned, asset-derived, matching `AssetAtlasCache_*`; no new `DATA`-layer catalog type; `economy.harvest`/`collisionInfo`/`displayName` explicitly deferred | 33 lines |
-| **§19** | [ARCH_19_MarkerLayerBundle.md](ARCH_19_MarkerLayerBundle.md) | The Group-above-Layer container — `MarkerLayerBundle` (ARCH ruling, ratifies `work_orders/DESIGN_MarkerGroupLayerRestructure_R1.md`, firms up open items in the still-unratified `work_orders/DESIGN_Assembly_R1.md`) | index → 12 subsection files |
+| **§19** | [ARCH_19_MarkerLayerBundle.md](ARCH_19_MarkerLayerBundle.md) | The Group-above-Layer container — `MarkerLayerBundle` (ARCH ruling, ratifies `work_orders/DESIGN_MarkerGroupLayerRestructure_R1.md`, firms up open items in the still-unratified `work_orders/DESIGN_Assembly_R1.md`); extended by `work_orders/DESIGN_MarkerTypeSectionsAndInstanceSelection_R1.md` | index → 22 subsection files |
 | §19.1 | [ARCH_19_01_NamingRatified.md](ARCH_19_01_NamingRatified.md) | Final type/wire name — `MarkerLayerBundle`, not `MarkerLayerGroup`/`Cluster`/`Ensemble`/`Formation`; UI label stays "Group" | 39 lines |
 | §19.2 | [ARCH_19_02_GenericitySplit.md](ARCH_19_02_GenericitySplit.md) | Domain-touching-vs-pure-mechanics genericity split — general rule for all future Group/Bundle work (Props, Decals, NavMesh) | 33 lines |
 | §19.3 | [ARCH_19_03_FieldSpellings.md](ARCH_19_03_FieldSpellings.md) | `MarkerLayerBundle` field spellings — `identifier`/`parentBundleIdentifier`/`markerTypeName`/`assemblyIdentifier`, applying §1.9 | 44 lines |
@@ -134,6 +134,16 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §19.10 | [ARCH_19_10_TabDrivenV1Scoping.md](ARCH_19_10_TabDrivenV1Scoping.md) | v1 Move/Rotate is tab-driven only — no new canvas gesture, deferred until Assembly's own canvas work ships | 28 lines |
 | §19.11 | [ARCH_19_11_FormatSpecCorrectionBundle.md](ARCH_19_11_FormatSpecCorrectionBundle.md) | `SANMAP_FORMAT_SPEC.md` staleness correction bundle — landed directly in that file this session | 42 lines |
 | §19.12 | [ARCH_19_12_SoftTypeConsistency.md](ARCH_19_12_SoftTypeConsistency.md) | Bundle→marker-type consistency stays soft (UI-enforced only) — no import-time hard validation | 28 lines |
+| §19.13 | [ARCH_19_13_MarkerRuleLayerTypeName.md](ARCH_19_13_MarkerRuleLayerTypeName.md) | `markerTypeName` on `MarkerRuleLayer`/`MarkerInstanceLayer` — additive, wire key `"MarkerTypeName"`, extends §19.3 | 21 lines |
+| §19.14 | [ARCH_19_14_TypeSectionUiDerived.md](ARCH_19_14_TypeSectionUiDerived.md) | The Type-section tier is UI-derived — dynamic enumeration over `markerTypeName`, not a stored `Params` container; ordering rule | 26 lines |
+| §19.15 | [ARCH_19_15_TypeSectionTreeComposition.md](ARCH_19_15_TypeSectionTreeComposition.md) | Type-section × Bundle-tree composition — filtered-copy `TreeListWidget_UI` per type, the cross-Type-section nesting cutoff, `bRowSuppressed`'s two-predicate composition | 52 lines |
+| §19.16 | [ARCH_19_16_InstanceIdentifier.md](ARCH_19_16_InstanceIdentifier.md) | `MarkerTransform::instanceIdentifier` — global uniqueness, wire key `"InstanceIdentifier"`, legacy-backfill mirrors `layerId`'s precedent | 37 lines |
+| §19.17 | [ARCH_19_17_SelectColorFields.md](ARCH_19_17_SelectColorFields.md) | `GlobalMarkerSettings` select-color fields — strict 3-field mirror plus the signed-off `selectColorDefault` deviation | 36 lines |
+| §19.18 | [ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md](ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md) | Selection tint — canonical priority order; "selected replaces fill" distinct from the drag-ghost's unfilled-ring vocabulary | 29 lines |
+| §19.19 | [ARCH_19_19_StaticHighlightComputationAndWiring.md](ARCH_19_19_StaticHighlightComputationAndWiring.md) | Static selection-highlight — one-shot orbit computation (not `MarkerOrbitCorrespondence_UI.h`), tolerance reuse, canvas wiring | 57 lines |
+| §19.20 | [ARCH_19_20_ManualOnlySelectionScope.md](ARCH_19_20_ManualOnlySelectionScope.md) | Manual-only selection scope — formal law, cross-referencing §19.9 | 20 lines |
+| §19.21 | [ARCH_19_21_CategoryVsMarkerTypeNameClosed.md](ARCH_19_21_CategoryVsMarkerTypeNameClosed.md) | `MarkerRule::category` vs. `markerTypeName` — two permanently independent concepts, closed | 17 lines |
+| §19.22 | [ARCH_19_22_ManualLayersHeaderSplit.md](ARCH_19_22_ManualLayersHeaderSplit.md) | File-size ceiling remediation — `MarkersTab_ManualLayers_UI.h` split, resolved ahead of Ticket B | 67 lines |
 
 ### Oversized files — known, accepted
 

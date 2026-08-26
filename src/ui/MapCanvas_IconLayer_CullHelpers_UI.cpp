@@ -76,6 +76,19 @@ void ResolveMarkerCategoryTintColor(Params::MarkerCategory category,
     }
 }
 
+// STEP122: mirrors ResolveMarkerCategoryTintColor's exact switch shape/posture (same file).
+// Params::MarkerCategory (MarkerRule_PARAMS.h:18: Generic, Spawn, Alloys, Expansion) has NO
+// Plasma value — the same pre-existing gap ResolveMarkerCategoryTintColor already documents
+// ("Plasma has no MarkerCategory value at all") — Plasma-named procedural markers fall into the
+// default branch below, same as Generic/Expansion. Not this ticket's gap to close.
+float ResolveMarkerCategoryScale(Params::MarkerCategory category, const Params::GlobalMarkerSettings& settings) {
+    switch (category) {
+        case Params::MarkerCategory::Spawn:  return settings.scaleSpawn;
+        case Params::MarkerCategory::Alloys: return settings.scaleAlloy;
+        default:                             return 1.0f;
+    }
+}
+
 void WidenAabb(LayerWorldAabb_UI& aabb, float worldX, float worldZ) {
     if (!aabb.bValid) {
         aabb.lowWorldX = aabb.highWorldX = worldX;

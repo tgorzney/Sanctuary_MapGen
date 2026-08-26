@@ -6,6 +6,7 @@
 #pragma once
 #include "DraggableListWidget_UI.h"
 #include "ListWidget_TestFrame_UI.h"
+#include <functional>
 #include <vector>
 
 namespace SanmapGen {
@@ -41,25 +42,36 @@ inline DraggableScene MakeDraggableScene() {
 
 // One frame with the synthetic pointer wherever the caller put it. describeRow doubles as the
 // geometry probe: it runs immediately before each row header, so the cursor is that row's corner.
+// STEP123: `headerExtraWidthPixels`/`drawRowHeaderExtra` are OPTIONAL — left at their defaults
+// (0.0f / a no-op), this calls the ORIGINAL 2-callback `Render` overload, so every existing caller
+// of this function (the three pre-STEP123 tests) keeps exercising the exact code path it always
+// has. A nonzero width switches to the 3-callback overload and passes `drawRowHeaderExtra` through.
+template <typename DrawRowHeaderExtraFunction = std::function<void(int)>>
 inline DraggableListSignal RunSceneFrame(DraggableScene& scene, ImVec2 mousePosition,
-                                         bool bLeftButtonDown) {
+                                         bool bLeftButtonDown, float headerExtraWidthPixels = 0.0f,
+                                         DrawRowHeaderExtraFunction drawRowHeaderExtra = [](int) {}) {
     HeadlessMouseState mouse;
     mouse.position = mousePosition;
     mouse.bLeftButtonDown = bLeftButtonDown;
     RunHeadlessFrame(mouse, kSceneWindowSize, [&] {
-        scene.signal = DraggableList<TestLayer>::Render("LayerStack", scene.layers,
-            [&](int rowIndex) {
-                const ImVec2 rowCorner = ImGui::GetCursorScreenPos();
-                if (rowIndex < 8) scene.rowTopY[rowIndex] = rowCorner.y;
-                scene.rowLeftX = rowCorner.x;
-                DraggableListRow row;
-                row.label            = scene.layers[rowIndex].name;
-                row.bVisible         = scene.layers[rowIndex].bVisible;
-                row.bLocked          = scene.layers[rowIndex].bLocked;
-                row.extraButtonLabel = scene.layers[rowIndex].extraButtonLabel;
-                return row;
-            },
-            [](int) {});                       // header-only rows keep the geometry stable
+        const auto describeRow = [&](int rowIndex) {
+            const ImVec2 rowCorner = ImGui::GetCursorScreenPos();
+            if (rowIndex < 8) scene.rowTopY[rowIndex] = rowCorner.y;
+            scene.rowLeftX = rowCorner.x;
+            DraggableListRow row;
+            row.label            = scene.layers[rowIndex].name;
+            row.bVisible         = scene.layers[rowIndex].bVisible;
+            row.bLocked          = scene.layers[rowIndex].bLocked;
+            row.extraButtonLabel = scene.layers[rowIndex].extraButtonLabel;
+            return row;
+        };
+        const auto drawRowBody = [](int) {};   // header-only rows keep the geometry stable
+        if (headerExtraWidthPixels > 0.0f)
+            scene.signal = DraggableList<TestLayer>::Render("LayerStack", scene.layers, describeRow,
+                drawRowBody, drawRowHeaderExtra, headerExtraWidthPixels);
+        else
+            scene.signal = DraggableList<TestLayer>::Render("LayerStack", scene.layers, describeRow,
+                drawRowBody);                   // the ORIGINAL 2-callback overload, unchanged path
     });
     return scene.signal;
 }

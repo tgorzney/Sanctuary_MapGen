@@ -80,6 +80,11 @@ struct ApplicationTabState {
     // STEP114 — the manual marker instance icon-override bridge's own tracking field, sibling of
     // the two above.
     int lastManualMarkerIconId = -1;
+    // STEP121 — the Markers tab Global section's three per-category icon pickers, sibling of the
+    // three above; each bridges independently (three different GlobalMarkerSettings string fields).
+    int lastGlobalAlloyIconId  = -1;
+    int lastGlobalPlasmaIconId = -1;
+    int lastGlobalSpawnIconId  = -1;
 };
 
 } // namespace Ui

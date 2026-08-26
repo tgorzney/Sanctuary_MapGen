@@ -16,7 +16,9 @@
 // invents an atlas source. The manifest carries `iconId` only, and nothing in the tree maps an
 // icon id back to a game `tpId`, so the grid reports the SELECTION and the tpId itself is typed;
 // wiring the two together needs the manifest to carry the tpId, which is a work-order this one
-// does not own.
+// does not own. This still describes `DrawPlacementTemplatePicker`'s rule/prop template pickers
+// correctly (untouched by STEP121) — the Global section is the one exception, resolved via
+// `IconAtlasPairingLookup` (STEP121, MarkersTab_Globals_UI.h).
 //
 // FURTHER SCOPE NOTES (ARCH §8.4 — reported, not invented):
 //  1. `Params::MarkerRule` has NO `name` and NO `baseColor`, so the plan's per-rule Name TextInput
@@ -24,7 +26,9 @@
 //     Both fields need a PARAMS work-order.
 //  2. Editable MANUAL markers are drawn by `MarkersTab_Manual_UI.h`'s `DrawManualMarkers` (STEP49)
 //     — see that header, not this one, for the hand-authored roster's shape.
-//  3. The global section holds NO recipe content — see MarkersTab_Globals_UI.h.
+//  3. The global section's Scale/Color/Icon controls edit `recipe.globalMarkerSettings` directly
+//     (STEP121); the gamedata root and the icon-scan request remain caller-owned UI state — see
+//     `MarkersTab_Globals_UI.h`.
 #pragma once
 #include "ConfirmDialog_UI.h"
 #include "IconGridWidget_UI.h"
@@ -135,11 +139,13 @@ inline bool StoreMarkerRuleValues(const MarkersTabState& state, Params::MarkerRu
 Params::MarkerRule* SelectedMarkerRule(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
                                        const MarkersTabState& state);
 
-// `iconManifest` and `placedMarkers` are both nullable: with no resident atlas the picker degrades
-// to the typed tpId, and before the first generation the placed list simply says so.
+// `iconManifest`/`pairingLookup`/`placedMarkers` are all nullable: with no resident atlas the
+// picker degrades to the typed tpId (or, for the Global section, a disabled placeholder button),
+// and before the first generation the placed list simply says so.
 void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     Pipeline::PreviewDriver* previewDriver,
                     const IconAtlasManifest* iconManifest = nullptr,
+                    const IconAtlasPairingLookup* pairingLookup = nullptr,
                     const Data::PlacementInstances* placedMarkers = nullptr);
 
 } // namespace Ui

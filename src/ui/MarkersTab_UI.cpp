@@ -39,9 +39,10 @@ Params::MarkerRule* SelectedMarkerRule(std::vector<Params::MarkerRuleLayer>& mar
 
 void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                    const IconAtlasPairingLookup* pairingLookup,
                     const Data::PlacementInstances* placedMarkers) {
     ImGui::PushID("markersTab");
-    DrawMarkersTabGlobals(state.globals, iconManifest);
+    DrawMarkersTabGlobals(state.globals, recipe.globalMarkerSettings, iconManifest, pairingLookup);
     // STEP120: the Group/Bundle tree, drawn before the two "Ungrouped ..." sections it filters —
     // a bundled layer's own row is suppressed from those sections and shown in the tree instead.
     DrawMarkerLayerBundleTree(recipe.markerLayerBundles, recipe.markerRuleLayers, recipe.markerLayers,

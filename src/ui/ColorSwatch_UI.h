@@ -26,6 +26,10 @@ struct ColorSwatchOptions {
     bool  bAlphaBarShown = false;   // the picker's vertical alpha bar (the Areas tab wants it)
     float swatchWidth    = 0.0f;    // <= 0: the remaining content width, less the RT button
     float swatchHeight   = 0.0f;    // <= 0: imgui's frame height
+    bool  bLabelHidden   = false;   // NEW — STEP123: skip the TextUnformatted(label) line so the
+                                     // button + RT toggle sit on ONE line via SameLine (a header slot).
+                                     // `label` is still used to scope ImGui::PushID; only the visible
+                                     // text is skipped.
 };
 
 // Forces a legal color: every channel into 0..1, NaN to 0, and alpha to opaque while alpha

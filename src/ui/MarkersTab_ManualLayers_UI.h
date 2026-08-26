@@ -45,9 +45,11 @@ struct ManualMarkerLayersState {
     RealtimeToggle groupColorToggle{true};
     RealtimeToggle layerIconScaleToggle{true};
 
-    // ONE shared toggle set for the SELECTED row's own color/scale — `Params::MarkerInstanceLayer`
-    // is a pure round-tripping type and cannot carry a `RealtimeToggle` member, exactly as
-    // `PropInstanceLayer` cannot (`PropsTab_Manual_UI.h:55-60`).
+    // ONE shared `RealtimeToggle` instance reused across every row's own color/scale control,
+    // header or body — `Params::MarkerInstanceLayer` cannot carry a `RealtimeToggle` member (a pure
+    // round-tripping type). Pre-existing limitation (already true for multiple simultaneously
+    // expanded row bodies since STEP110); STEP123 widens how often it's exercised (the header
+    // control runs it every row, every frame), not the limitation itself.
     RealtimeToggle selectedLayerColorToggle{true};
     RealtimeToggle selectedLayerIconScaleToggle{true};
     RealtimeToggle selectedLayerGridSnapToggle{true};
@@ -65,6 +67,13 @@ struct ManualMarkerLayersState {
     bool                      bHasFixSymmetryResult   = false;
     Ui::MarkerSymmetryFixResult lastFixSymmetryResult;
 };
+
+// STEP123 — reserved width for the header's Color Override checkbox + compact swatch
+// (DrawManualMarkerLayerColorOverrideHeaderControl, MarkersTab_ManualLayerRowBody_UI.cpp), left of
+// DraggableList's own strip. Eyeballed against a live frame (Checkbox_UI.cpp/ColorSwatch_UI.cpp's
+// own "verified by eye, never by test" posture).
+inline constexpr float kMarkerLayerColorOverrideHeaderWidthPixels = 90.0f;
+inline constexpr float kMarkerLayerColorOverrideSwatchWidthPixels = 24.0f;
 
 // The layer the per-row controls edit, or null when the selection points at nothing
 // (Constitution §6 — an index is validated, never trusted).
@@ -124,6 +133,12 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
                       int globalSymmetryMask, int globalRadialRepeatCount,
                       Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state);
+
+// STEP123: the row header's own compact Color Override control (checkbox + swatch), drawn on EVERY
+// row's header line via DraggableList's new header-extra slot, not gated on row-expand state — see
+// MarkersTab_ManualLayerRowBody_UI.cpp for why the (unchanged) body copy is not removed.
+void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer& layer,
+                                                      ManualMarkerLayersState& state, bool& bAnyCommitted);
 
 // MarkersTab_ManualLayers_UI.cpp:
 

@@ -12,7 +12,19 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-constexpr float kManualMarkerDotRadiusScreenPixels = 6.0f;
+constexpr float kManualMarkerBaseDotRadiusScreenPixels = 6.0f;
+
+// STEP122: replaces the hardcoded kManualMarkerDotRadiusScreenPixels — composes Global × per-layer
+// Icon Scale into the roster dot's radius, mirroring ManualMarkerTint's exact shape/posture
+// (same anonymous namespace, same signature family, reusing the same globalMarkerSettings
+// parameter STEP116 already threads through this file).
+float ManualMarkerDotRadius(const std::vector<Params::MarkerInstanceLayer>& markerLayers, int layerIndex,
+                            const std::string& groupName, const Params::GlobalMarkerSettings& globalMarkerSettings) {
+    const float layerIconScale = (layerIndex >= 0 && layerIndex < static_cast<int>(markerLayers.size()))
+        ? markerLayers[static_cast<std::size_t>(layerIndex)].iconScale : 1.0f;
+    return kManualMarkerBaseDotRadiusScreenPixels
+         * Params::ResolveMarkerGroupTypeScale(groupName, globalMarkerSettings) * layerIconScale;
+}
 
 ImVec2 ProjectWorldToScreen(const PreviewComposite& composite, const MapCanvasView& view,
                             float worldX, float worldZ, float regionOriginX, float regionOriginY) {
@@ -113,14 +125,25 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
             } else {
                 tint = ManualMarkerTint(markerLayers, transform.layerIndex, group.name, globalMarkerSettings);
             }
-            drawList.AddCircleFilled(screenCenter, kManualMarkerDotRadiusScreenPixels, tint);
+            drawList.AddCircleFilled(screenCenter,
+                                     ManualMarkerDotRadius(markerLayers, transform.layerIndex, group.name, globalMarkerSettings),
+                                     tint);
         }
-        if (bThisGroupDragging)
+        if (bThisGroupDragging) {
+            // STEP122: the ghost points belong to the same dragged transform — its own layerIndex
+            // (not the last transform iterated above, which is out of scope here) resolves the
+            // drag-group's own dot size, consistent with the ghost being that same group's sibling
+            // orbit slots.
+            const int draggedLayerIndex = (dragState.draggedTransformIndex >= 0
+                && static_cast<std::size_t>(dragState.draggedTransformIndex) < group.transforms.size())
+                ? group.transforms[static_cast<std::size_t>(dragState.draggedTransformIndex)].layerIndex : -1;
+            const float ghostDotRadius = ManualMarkerDotRadius(markerLayers, draggedLayerIndex, group.name, globalMarkerSettings);
             for (const Pipeline::WorldSymmetryOrbitPoint& ghost : dragState.currentGhostPoints) {
                 const ImVec2 screenCenter = ProjectWorldToScreen(composite, view, ghost.worldPositionX,
                                                                  ghost.worldPositionZ, regionOriginX, regionOriginY);
-                drawList.AddCircle(screenCenter, kManualMarkerDotRadiusScreenPixels, ghostTint, 0, 2.0f);
+                drawList.AddCircle(screenCenter, ghostDotRadius, ghostTint, 0, 2.0f);
             }
+        }
     }
     if (dragState.bActive && dragState.bSpawnCardinalityRefused)
         ImGui::SetTooltip("Spawn count is fixed - drag limited.");

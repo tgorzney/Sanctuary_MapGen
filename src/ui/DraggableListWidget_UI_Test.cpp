@@ -5,6 +5,8 @@
 // The scene and pointer helpers are in DraggableList_TestScene_UI.h; main() is in
 // VirtualListWidget_UI_Test.cpp.
 #include "DraggableList_TestScene_UI.h"
+#include <cmath>
+#include <functional>
 #include <vector>
 
 using namespace SanmapGen;
@@ -152,6 +154,100 @@ void TestOptionalExtraButtonIsGenericAndRowScoped() {
                                "none of the probing above mutated the caller's list");
 }
 
+// Hover, press, release with the header-extra callback/width threaded through every frame — the
+// header-extra analogue of DraggableList_TestScene_UI.h's own ClickAt, which is fixed to the
+// zero-reservation 2-callback path.
+DraggableListSignal ClickAtWithHeaderExtra(DraggableScene& scene, ImVec2 position,
+                                           float headerExtraWidthPixels,
+                                           const std::function<void(int)>& drawRowHeaderExtra) {
+    RunSceneFrame(scene, position, false, headerExtraWidthPixels, drawRowHeaderExtra);
+    const DraggableListSignal pressSignal =
+        RunSceneFrame(scene, position, true, headerExtraWidthPixels, drawRowHeaderExtra);
+    const DraggableListSignal releaseSignal =
+        RunSceneFrame(scene, position, false, headerExtraWidthPixels, drawRowHeaderExtra);
+    return pressSignal.bHasSignal() ? pressSignal : releaseSignal;
+}
+
+bool OffsetsMatchWithinSweepStep(float a, float b) { return std::fabs(a - b) <= 2.0f; }
+
+// STEP123: the OPTIONAL per-row header-extra slot, generically (mirrors
+// TestOptionalExtraButtonIsGenericAndRowScoped's own precedent). A scene that opts into a nonzero
+// `headerExtraWidthPixels` gets a probe button drawn to the LEFT of the ordinary [o]/[U]/X strip; a
+// scene that never opts in (headerExtraWidthPixels == 0.0f, the pre-STEP123 2-callback overload)
+// must keep its strip at the exact same offset it always had — proof the additive overload changes
+// nothing for a consumer that doesn't opt in (Fix §1's "why this shape" reasoning).
+void TestOptionalHeaderExtraContentIsGenericAndRowScoped() {
+    HeadlessImguiSession session;
+    constexpr float kTestHeaderExtraWidthPixels = 60.0f;
+
+    // (c) Baseline: a scene that never opts in. The SAME sweep TestAffordanceSignalsCarryTheRightIndex
+    // already uses against the SAME window/style, so any drift here is drift in the widget itself --
+    // this reproduces that test's visibilityX/lockX/deleteX byte-for-byte.
+    DraggableScene baselineScene = MakeDraggableScene();
+    RunSceneFrame(baselineScene, kMouseAway, false);
+    RunSceneFrame(baselineScene, kMouseAway, false);
+    float baselineVisibilityX = -1.0f, baselineLockX = -1.0f, baselineDeleteX = -1.0f;
+    for (float probeX = kSceneWindowSize.x - 110.0f; probeX < kSceneWindowSize.x - 2.0f; probeX += 2.0f) {
+        const DraggableListSignal probe = ClickAt(baselineScene, ImVec2(probeX, RowCenterY(baselineScene, 0)));
+        if (probe.sourceRowIndex != 0) continue;
+        if (baselineVisibilityX < 0.0f && probe.kind == DraggableListSignalKind::ToggleVisibility) baselineVisibilityX = probeX;
+        if (baselineLockX < 0.0f && probe.kind == DraggableListSignalKind::ToggleLock) baselineLockX = probeX;
+        if (baselineDeleteX < 0.0f && probe.kind == DraggableListSignalKind::Delete) baselineDeleteX = probeX;
+    }
+    CheckListWidgetExpectation(baselineVisibilityX > 0.0f && baselineLockX > baselineVisibilityX &&
+                               baselineDeleteX > baselineLockX,
+                               "a scene that never opts in keeps the ordinary strip order (baseline)");
+
+    // The opted-in scene: a probe button drawn via the new header-extra callback, capturing its own
+    // row index in a scene-local out-param -- ExtraButton's DraggableListSignalKind is unrelated, a
+    // raw captured int is sufficient, no new signal kind needed.
+    DraggableScene headerScene = MakeDraggableScene();
+    int probeRowIndex = -1;
+    const std::function<void(int)> drawProbe = [&](int rowIndex) {
+        if (ImGui::SmallButton("##probe")) probeRowIndex = rowIndex;
+    };
+    RunSceneFrame(headerScene, kMouseAway, false, kTestHeaderExtraWidthPixels, drawProbe);
+    RunSceneFrame(headerScene, kMouseAway, false, kTestHeaderExtraWidthPixels, drawProbe);
+
+    // (a) Sweeping X in the reserved band left of the strip finds a clickable probe reporting the
+    // correct row index for row 0, and the SAME X column on row 2 reports row 2's own index.
+    float probeX0 = -1.0f;
+    for (float probeX = kSceneWindowSize.x - 220.0f; probeX < kSceneWindowSize.x - 2.0f; probeX += 2.0f) {
+        probeRowIndex = -1;
+        ClickAtWithHeaderExtra(headerScene, ImVec2(probeX, RowCenterY(headerScene, 0)),
+                               kTestHeaderExtraWidthPixels, drawProbe);
+        if (probeRowIndex == 0) { probeX0 = probeX; break; }
+    }
+    CheckListWidgetExpectation(probeX0 > 0.0f,
+                               "sweeping the reserved band finds a clickable header-extra probe for row 0");
+
+    probeRowIndex = -1;
+    ClickAtWithHeaderExtra(headerScene, ImVec2(probeX0, RowCenterY(headerScene, 2)),
+                           kTestHeaderExtraWidthPixels, drawProbe);
+    CheckListWidgetExpectation(probeRowIndex == 2,
+                               "the same X column on row 2 reports row 2's own index -- the slot is row-scoped");
+
+    // (b) The visibility/lock/delete strip's own X-offsets, found by the SAME sweep technique, are
+    // shifted left by exactly headerExtraWidthPixels versus the zero-reservation baseline.
+    float headerVisibilityX = -1.0f, headerLockX = -1.0f, headerDeleteX = -1.0f;
+    for (float probeX = kSceneWindowSize.x - 220.0f; probeX < kSceneWindowSize.x - 2.0f; probeX += 2.0f) {
+        const DraggableListSignal probe = ClickAtWithHeaderExtra(headerScene,
+            ImVec2(probeX, RowCenterY(headerScene, 0)), kTestHeaderExtraWidthPixels, drawProbe);
+        if (probe.sourceRowIndex != 0) continue;
+        if (headerVisibilityX < 0.0f && probe.kind == DraggableListSignalKind::ToggleVisibility) headerVisibilityX = probeX;
+        if (headerLockX < 0.0f && probe.kind == DraggableListSignalKind::ToggleLock) headerLockX = probeX;
+        if (headerDeleteX < 0.0f && probe.kind == DraggableListSignalKind::Delete) headerDeleteX = probeX;
+    }
+    CheckListWidgetExpectation(headerVisibilityX > 0.0f && headerLockX > headerVisibilityX &&
+                               headerDeleteX > headerLockX,
+                               "the opted-in scene keeps the same strip order, header slot or not");
+    CheckListWidgetExpectation(
+        OffsetsMatchWithinSweepStep(headerVisibilityX, baselineVisibilityX - kTestHeaderExtraWidthPixels) &&
+        OffsetsMatchWithinSweepStep(headerLockX, baselineLockX - kTestHeaderExtraWidthPixels) &&
+        OffsetsMatchWithinSweepStep(headerDeleteX, baselineDeleteX - kTestHeaderExtraWidthPixels),
+        "the strip shifts left by exactly headerExtraWidthPixels once a header slot reserves it");
+}
+
 } // namespace
 
 namespace SanmapGen {
@@ -161,6 +257,7 @@ void RunDraggableListAcceptance() {
     TestAffordanceSignalsCarryTheRightIndex();
     TestSyntheticDragProducesTheExpectedOrder();
     TestOptionalExtraButtonIsGenericAndRowScoped();
+    TestOptionalHeaderExtraContentIsGenericAndRowScoped();
 }
 } // namespace Ui
 } // namespace SanmapGen

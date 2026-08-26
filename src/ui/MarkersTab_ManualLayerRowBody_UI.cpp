@@ -49,5 +49,33 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
     return bNameCommitted || bColorOverrideCommitted || bSnapCommitted || bSnapSizeCommitted;
 }
 
+// STEP123: the row header's own compact Color Override control — checkbox + a small inline swatch,
+// drawn on EVERY row's collapsed header line via DraggableList's new header-extra slot, NOT gated on
+// the row's own expand state. Disabled (not hidden) while state.bUseGroupColor forces one shared
+// tint, so the header's own width never shifts when that block-wide toggle flips — deliberately
+// unlike the (unchanged, still-hidden-when-forced) body copy above; see the Out of Scope note in
+// STEP123_MarkerLayerColorOverrideOnHeader_UI.md for why the body copy is NOT removed: bundled
+// Manual Marker Layers reach this function ONLY through the Bundle tree's leaf-body callback
+// (TreeListWidget_UI, which has no header-extra mechanism of its own), so deleting the body copy
+// would silently strip Color Override access from every bundled layer.
+void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer& layer,
+                                                      ManualMarkerLayersState& state, bool& bAnyCommitted) {
+    ImGui::BeginDisabled(state.bUseGroupColor);
+    const bool bOverrideCommitted = DrawCheckbox("", layer.bColorOverrideEnabled).bCommitted;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Color Override");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!layer.bColorOverrideEnabled);
+    Ui::ColorSwatchOptions headerSwatchOptions = state.previewColorOptions;  // COPY: do not mutate
+                                                                              // the shared block-level
+                                                                              // options struct
+    headerSwatchOptions.bLabelHidden = true;
+    headerSwatchOptions.swatchWidth  = kMarkerLayerColorOverrideSwatchWidthPixels;
+    const bool bColorCommitted = DrawColorSwatch("ColorOverrideHeaderSwatch", layer.color,
+        headerSwatchOptions, state.selectedLayerColorToggle).bCommitted;
+    ImGui::EndDisabled();
+    ImGui::EndDisabled();
+    if (bOverrideCommitted || bColorCommitted) bAnyCommitted = true;
+}
+
 } // namespace Ui
 } // namespace SanmapGen

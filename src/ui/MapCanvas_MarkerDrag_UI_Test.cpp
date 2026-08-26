@@ -8,6 +8,7 @@
 // mostly differ by TINT alone (AddCircleFilled every time), which a vertex-count proxy cannot see.
 #include "MapCanvas_MarkerDrag_UI.h"
 #include "PreviewComposite_TestScene_UI.h"
+#include <cmath>
 #include <cstdio>
 #include <imgui.h>
 
@@ -332,6 +333,90 @@ void RunTypeDefaultColorChecks() {
     }
 }
 
+// ---- STEP122: ManualMarkerDotRadius (Global x per-layer Icon Scale composed into the roster
+// dot's radius) --------------------------------------------------------------------------------
+//
+// ManualMarkerDotRadius lives in this file's own anonymous namespace (mirroring ManualMarkerTint's
+// exact posture, Fix section 3), so — unlike ResolveMarkerIconTemplateIdentifier/
+// ResolveMarkerCategoryTintColor's sibling-file precedent of a non-anonymous, directly-testable
+// resolver — it has internal linkage and cannot be called directly from this separate translation
+// unit (this test binary links the SanGenV2 static library rather than compiling
+// MapCanvas_MarkerDrag_UI.cpp inline). So this test verifies it the same indirect way this file's
+// existing RunTypeDefaultColorChecks verifies ManualMarkerTint: through DrawManualMarkerRoster's
+// real ImDrawList output — here, the drawn circle's geometric radius rather than its vertex tint.
+// AddCircleFilled's antialiased fill appends, per path point, one "inner" vertex at (radius - half
+// the fringe width) and one "outer" fringe vertex at (radius + half the fringe width) from center;
+// averaging their distances from the known screen-space center cancels the fringe and recovers the
+// true radius.
+float DistanceFromCenter(const ImVec2& point, const ImVec2& center) {
+    const float deltaX = point.x - center.x;
+    const float deltaY = point.y - center.y;
+    return std::sqrt(deltaX * deltaX + deltaY * deltaY);
+}
+
+float DrawnCircleRadius(const ImDrawList& drawList, const ImVec2& center) {
+    const ImVec2& inner = drawList.VtxBuffer.Data[drawList.VtxBuffer.Size - 2].pos;
+    const ImVec2& outer = drawList.VtxBuffer.Data[drawList.VtxBuffer.Size - 1].pos;
+    return (DistanceFromCenter(inner, center) + DistanceFromCenter(outer, center)) * 0.5f;
+}
+
+void RunManualMarkerDotRadiusScaleChecks() {
+    DrawFixture fixture;
+    ImDrawList& drawList = *ImGui::GetWindowDrawList();
+    std::vector<Params::Army> noArmies;
+    MarkerDragGestureState inactiveDragState;
+    const RegionLocalPoint projectedCenter = ScreenPointFor(fixture, 1.0f, 1.0f);
+    const ImVec2 screenCenter(projectedCenter.regionLocalX, projectedCenter.regionLocalY);
+
+    // Out-of-range layerIndex (empty markerLayers) + unrecognized group name ("Generic"): both
+    // terms are a no-op, radius stays the base 6.0f.
+    {
+        std::vector<Params::MarkerInstanceLayer> noLayers;   // layerIndex 0 is out of range against this
+        Params::GlobalMarkerSettings globalMarkerSettings;
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = "Generic";
+        markers[0].transforms.push_back(MakeTransform("Mex 0", 1.0f, 1.0f));
+        DrawManualMarkerRoster(markers, noLayers, noArmies, globalMarkerSettings, inactiveDragState,
+                               *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+        const float radius = DrawnCircleRadius(drawList, screenCenter);
+        Check(radius > 5.0f && radius < 7.0f,
+              "out-of-range layerIndex + unrecognized group name draws the unscaled base radius (6.0f)");
+    }
+
+    // Valid layerIndex, iconScale = 2.0, unrecognized group name ("Generic"): only the layer term
+    // applies -> 6.0f * 2.0f = 12.0f.
+    {
+        std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+        markerLayers[0].iconScale = 2.0f;
+        Params::GlobalMarkerSettings globalMarkerSettings;
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = "Generic";
+        markers[0].transforms.push_back(MakeTransform("Mex 0", 1.0f, 1.0f));
+        DrawManualMarkerRoster(markers, markerLayers, noArmies, globalMarkerSettings, inactiveDragState,
+                               *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+        const float radius = DrawnCircleRadius(drawList, screenCenter);
+        Check(radius > 11.0f && radius < 13.0f,
+              "an unrecognized group name returns the base radius times only the layer term (6.0f * 2.0f = 12.0f)");
+    }
+
+    // Valid layerIndex, iconScale = 2.0, recognized group name ("Alloys"), scaleAlloy = 3.0:
+    // both terms compose -> 6.0f * 2.0f * 3.0f = 36.0f.
+    {
+        std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+        markerLayers[0].iconScale = 2.0f;
+        Params::GlobalMarkerSettings globalMarkerSettings;
+        globalMarkerSettings.scaleAlloy = 3.0f;
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = "Alloys";
+        markers[0].transforms.push_back(MakeTransform("Mex 0", 1.0f, 1.0f));
+        DrawManualMarkerRoster(markers, markerLayers, noArmies, globalMarkerSettings, inactiveDragState,
+                               *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+        const float radius = DrawnCircleRadius(drawList, screenCenter);
+        Check(radius > 34.0f && radius < 38.0f,
+              "layerIconScale(2.0) * scaleAlloy(3.0) composes into a 36.0f dot radius (base 6.0f)");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -346,6 +431,7 @@ int main() {
     RunDrawRefusedTintChecks();
     RunSpawnArmyTintChecks();
     RunTypeDefaultColorChecks();
+    RunManualMarkerDotRadiusScaleChecks();
 
     ImGui::End();
     ImGui::Render();

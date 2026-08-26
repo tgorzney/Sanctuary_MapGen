@@ -263,6 +263,10 @@ void CheckMarkerAlloysCategoryResolvesColorAlloy() {
     fixture.recipe.globalMarkerSettings.colorAlloy[0] = 0.1f;
     fixture.recipe.globalMarkerSettings.colorAlloy[1] = 0.2f;
     fixture.recipe.globalMarkerSettings.colorAlloy[2] = 0.3f;
+    // STEP122: this fixture tests tint resolution, not scale composition — pin scaleAlloy to 1.0f
+    // so GlobalMarkerSettings' own real 0.17f default doesn't drop thumbnailScreenSize below
+    // thumbnailLodThresholdPixels and flip into strategic mode (no icon seeded there).
+    fixture.recipe.globalMarkerSettings.scaleAlloy = 1.0f;
     AppendMarkerInstance(fixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Alloys, "markerA");
     fixture.ruleBucketIndex.markers.Build(fixture.placements.markers.ruleIndex.data(), 1, 1);
     SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "markerA", 0);
@@ -285,6 +289,9 @@ void CheckMarkerSpawnCategoryResolvesColorSpawn() {
     fixture.recipe.globalMarkerSettings.colorSpawn[0] = 0.4f;
     fixture.recipe.globalMarkerSettings.colorSpawn[1] = 0.5f;
     fixture.recipe.globalMarkerSettings.colorSpawn[2] = 0.6f;
+    // STEP122: this fixture tests tint resolution, not scale composition — see the identical pin
+    // in CheckMarkerAlloysCategoryResolvesColorAlloy above.
+    fixture.recipe.globalMarkerSettings.scaleSpawn = 1.0f;
     AppendMarkerInstance(fixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Spawn, "markerS");
     fixture.ruleBucketIndex.markers.Build(fixture.placements.markers.ruleIndex.data(), 1, 1);
     SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "markerS", 0);
@@ -525,6 +532,15 @@ struct ManualMarkerTestFixture {
     ManualMarkerTestFixture() {
         fixture.recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
         fixture.recipe.globalMarkerSettings.iconNameAlloy = "Alloy";   // the fixture's own default
+        // STEP122: this fixture underpins tint/override/partition tests, not scale composition —
+        // pin scaleAlloy/scaleSpawn to 1.0f so GlobalMarkerSettings' own real 0.17f default doesn't
+        // drop these fixtures' markers below thumbnailLodThresholdPixels and flip them into
+        // strategic mode (no icon seeded there, so a miss draws nothing instead of one candidate).
+        // CheckManualMarkerScaleComposesEndToEnd/CheckManualMarkerScaleUnrecognizedGroupNameStaysNoOp
+        // set their own non-default values on top of this baseline where scale is actually the
+        // thing under test.
+        fixture.recipe.globalMarkerSettings.scaleAlloy = 1.0f;
+        fixture.recipe.globalMarkerSettings.scaleSpawn = 1.0f;
         SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "Alloy", 0);
         // globalMarkerSettings.iconNameSpawn's own default ("Spawn") — seeded too, so the
         // SpawnsArmies-domain half of the group-name partition check also resolves a candidate
@@ -698,6 +714,208 @@ void CheckManualMarkerGenericGroupStaysWhite() {
               "a manual group named \"Generic\" stays white despite non-default colorAlloy/colorSpawn");
 }
 
+// STEP122 — ResolveMarkerGroupTypeScale in isolation, mirroring
+// CheckResolveMarkerIconTemplateIdentifier's own posture above.
+void CheckResolveMarkerGroupTypeScale() {
+    Params::GlobalMarkerSettings settings;
+    settings.scaleAlloy = 2.0f;
+    settings.scalePlasma = 3.0f;
+    settings.scaleSpawn = 4.0f;
+
+    check(Params::ResolveMarkerGroupTypeScale("Spawn", settings) == 4.0f, "\"Spawn\" resolves scaleSpawn");
+    check(Params::ResolveMarkerGroupTypeScale(Params::kSpawnMarkerGroupName, settings) == 4.0f,
+          "kSpawnMarkerGroupName resolves scaleSpawn");
+    check(Params::ResolveMarkerGroupTypeScale("Spawns", settings) == 4.0f, "\"Spawns\" resolves scaleSpawn");
+    check(Params::ResolveMarkerGroupTypeScale("Alloy", settings) == 2.0f, "\"Alloy\" resolves scaleAlloy");
+    check(Params::ResolveMarkerGroupTypeScale("Alloys", settings) == 2.0f, "\"Alloys\" resolves scaleAlloy");
+    check(Params::ResolveMarkerGroupTypeScale("Plasma", settings) == 3.0f, "\"Plasma\" resolves scalePlasma");
+    check(Params::ResolveMarkerGroupTypeScale("Plasmas", settings) == 3.0f, "\"Plasmas\" resolves scalePlasma");
+    check(Params::ResolveMarkerGroupTypeScale("Generic", settings) == 1.0f,
+          "\"Generic\" resolves 1.0f, the multiplicative no-op");
+    check(Params::ResolveMarkerGroupTypeScale("Expansion", settings) == 1.0f,
+          "\"Expansion\" resolves 1.0f, the multiplicative no-op");
+    check(Params::ResolveMarkerGroupTypeScale("FreeformName", settings) == 1.0f,
+          "an arbitrary freeform name resolves 1.0f, the multiplicative no-op");
+}
+
+// STEP122 — ResolveMarkersManual composes layerIconScale * groupTypeScale into the manual marker's
+// rendered screenSize, end to end through the real ResolveManualSubLayer switch. Compares against a
+// baseline (scaleAlloy pinned to 1.0f to isolate the multiplier under test) rather than a hardcoded
+// footprint constant, so this stays correct regardless of WorldFootprintSizeTable's own default.
+void CheckManualMarkerScaleComposesEndToEnd() {
+    ManualMarkerTestFixture baselineFixture;
+    baselineFixture.fixture.recipe.globalMarkerSettings.scaleAlloy = 1.0f;   // isolate the layer term
+    baselineFixture.fixture.overlaySettings.overlayLayers = {baselineFixture.alloyLayer};
+    std::vector<OverlayVisibleInstance> baselineCandidates;
+    ResolveVisibleCandidates(baselineFixture.fixture.Input(), baselineFixture.fixture.aabbCache, nullptr, baselineCandidates);
+    check(baselineCandidates.size() == 1, "the baseline (unscaled) Alloys manual group resolves exactly one candidate");
+
+    ManualMarkerTestFixture scaledFixture;
+    scaledFixture.fixture.recipe.markerLayers[0].iconScale = 2.0f;
+    scaledFixture.fixture.recipe.globalMarkerSettings.scaleAlloy = 3.0f;
+    scaledFixture.fixture.overlaySettings.overlayLayers = {scaledFixture.alloyLayer};
+    std::vector<OverlayVisibleInstance> scaledCandidates;
+    ResolveVisibleCandidates(scaledFixture.fixture.Input(), scaledFixture.fixture.aabbCache, nullptr, scaledCandidates);
+    check(scaledCandidates.size() == 1, "the scaled Alloys manual group resolves exactly one candidate");
+
+    if (!baselineCandidates.empty() && !scaledCandidates.empty()) {
+        const float expected = baselineCandidates[0].screenSize * 2.0f * 3.0f;
+        check(scaledCandidates[0].screenSize > expected * 0.99f && scaledCandidates[0].screenSize < expected * 1.01f,
+              "layerIconScale(2.0) * scaleAlloy(3.0) composes into the manual marker's rendered screenSize");
+    }
+}
+
+// STEP122 — an unrecognized manual group name is a no-op on the group-type term; only the per-layer
+// iconScale term applies.
+void CheckManualMarkerScaleUnrecognizedGroupNameStaysNoOp() {
+    IconLayerTestFixture baselineFixture;
+    baselineFixture.recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+    SeedAtlasEntry(baselineFixture.pairingLookup, baselineFixture.atlasManifest, "Generic", 0);
+    Params::MarkerInstanceGroup baselineGroup;
+    baselineGroup.name = "Generic";
+    baselineGroup.transforms.push_back(ManualMarkerTestFixture::MakeVisibleMarkerTransform());
+    baselineFixture.recipe.markers = {baselineGroup};
+    OverlayLayer_UI baselineLayer; baselineLayer.domainKind = OverlayDomainKind_UI::Alloy;
+    baselineLayer.thumbnailLodThresholdPixels = 1.0f;
+    baselineLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+    baselineFixture.overlaySettings.overlayLayers = {baselineLayer};
+    std::vector<OverlayVisibleInstance> baselineCandidates;
+    ResolveVisibleCandidates(baselineFixture.Input(), baselineFixture.aabbCache, nullptr, baselineCandidates);
+    check(baselineCandidates.size() == 1, "the unscaled Generic manual group resolves exactly one candidate");
+
+    IconLayerTestFixture scaledFixture;
+    scaledFixture.recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+    scaledFixture.recipe.markerLayers[0].iconScale = 2.0f;
+    SeedAtlasEntry(scaledFixture.pairingLookup, scaledFixture.atlasManifest, "Generic", 0);
+    Params::MarkerInstanceGroup scaledGroup;
+    scaledGroup.name = "Generic";
+    scaledGroup.transforms.push_back(ManualMarkerTestFixture::MakeVisibleMarkerTransform());
+    scaledFixture.recipe.markers = {scaledGroup};
+    OverlayLayer_UI scaledLayer; scaledLayer.domainKind = OverlayDomainKind_UI::Alloy;
+    scaledLayer.thumbnailLodThresholdPixels = 1.0f;
+    scaledLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+    scaledFixture.overlaySettings.overlayLayers = {scaledLayer};
+    std::vector<OverlayVisibleInstance> scaledCandidates;
+    ResolveVisibleCandidates(scaledFixture.Input(), scaledFixture.aabbCache, nullptr, scaledCandidates);
+    check(scaledCandidates.size() == 1, "the layer-scaled Generic manual group resolves exactly one candidate");
+
+    if (!baselineCandidates.empty() && !scaledCandidates.empty()) {
+        const float expected = baselineCandidates[0].screenSize * 2.0f;
+        check(scaledCandidates[0].screenSize > expected * 0.99f && scaledCandidates[0].screenSize < expected * 1.01f,
+              "an unrecognized group name leaves the group-type term at 1.0f — only layerIconScale(2.0) applies");
+    }
+}
+
+// STEP122 — ResolveProceduralSubLayer composes ResolveMarkerCategoryScale into the procedural
+// marker's rendered screenSize, one case per resolvable category plus the Generic/Expansion no-op.
+void CheckProceduralMarkerScaleComposesEndToEnd() {
+    // Alloys category: scaleAlloy composes.
+    {
+        IconLayerTestFixture baselineFixture;
+        baselineFixture.recipe.globalMarkerSettings.scaleAlloy = 1.0f;   // isolate the composed multiplier
+        AppendMarkerInstance(baselineFixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Alloys, "markerA");
+        baselineFixture.ruleBucketIndex.markers.Build(baselineFixture.placements.markers.ruleIndex.data(), 1, 1);
+        SeedAtlasEntry(baselineFixture.pairingLookup, baselineFixture.atlasManifest, "markerA", 0);
+        OverlayLayer_UI baselineLayer; baselineLayer.domainKind = OverlayDomainKind_UI::Alloy;
+        baselineLayer.thumbnailLodThresholdPixels = 1.0f;
+        baselineLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+        baselineFixture.overlaySettings.overlayLayers.push_back(baselineLayer);
+        std::vector<OverlayVisibleInstance> baselineCandidates;
+        ResolveVisibleCandidates(baselineFixture.Input(), baselineFixture.aabbCache, nullptr, baselineCandidates);
+        check(baselineCandidates.size() == 1, "the baseline Alloys-category procedural marker resolves exactly one candidate");
+
+        IconLayerTestFixture scaledFixture;
+        scaledFixture.recipe.globalMarkerSettings.scaleAlloy = 3.0f;
+        AppendMarkerInstance(scaledFixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Alloys, "markerA");
+        scaledFixture.ruleBucketIndex.markers.Build(scaledFixture.placements.markers.ruleIndex.data(), 1, 1);
+        SeedAtlasEntry(scaledFixture.pairingLookup, scaledFixture.atlasManifest, "markerA", 0);
+        OverlayLayer_UI scaledLayer; scaledLayer.domainKind = OverlayDomainKind_UI::Alloy;
+        scaledLayer.thumbnailLodThresholdPixels = 1.0f;
+        scaledLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+        scaledFixture.overlaySettings.overlayLayers.push_back(scaledLayer);
+        std::vector<OverlayVisibleInstance> scaledCandidates;
+        ResolveVisibleCandidates(scaledFixture.Input(), scaledFixture.aabbCache, nullptr, scaledCandidates);
+        check(scaledCandidates.size() == 1, "the scaled Alloys-category procedural marker resolves exactly one candidate");
+
+        if (!baselineCandidates.empty() && !scaledCandidates.empty()) {
+            const float expected = baselineCandidates[0].screenSize * 3.0f;
+            check(scaledCandidates[0].screenSize > expected * 0.99f && scaledCandidates[0].screenSize < expected * 1.01f,
+                  "GlobalMarkerSettings::scaleAlloy(3.0) composes into the Alloys-category procedural marker's screenSize");
+        }
+    }
+
+    // Spawn category: scaleSpawn composes.
+    {
+        IconLayerTestFixture baselineFixture;
+        baselineFixture.recipe.globalMarkerSettings.scaleSpawn = 1.0f;   // isolate the composed multiplier
+        AppendMarkerInstance(baselineFixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Spawn, "markerS");
+        baselineFixture.ruleBucketIndex.markers.Build(baselineFixture.placements.markers.ruleIndex.data(), 1, 1);
+        SeedAtlasEntry(baselineFixture.pairingLookup, baselineFixture.atlasManifest, "markerS", 0);
+        OverlayLayer_UI baselineLayer; baselineLayer.domainKind = OverlayDomainKind_UI::SpawnsArmies;
+        baselineLayer.thumbnailLodThresholdPixels = 1.0f;
+        baselineLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+        baselineFixture.overlaySettings.overlayLayers.push_back(baselineLayer);
+        std::vector<OverlayVisibleInstance> baselineCandidates;
+        ResolveVisibleCandidates(baselineFixture.Input(), baselineFixture.aabbCache, nullptr, baselineCandidates);
+        check(baselineCandidates.size() == 1, "the baseline Spawn-category procedural marker resolves exactly one candidate");
+
+        IconLayerTestFixture scaledFixture;
+        scaledFixture.recipe.globalMarkerSettings.scaleSpawn = 5.0f;
+        AppendMarkerInstance(scaledFixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Spawn, "markerS");
+        scaledFixture.ruleBucketIndex.markers.Build(scaledFixture.placements.markers.ruleIndex.data(), 1, 1);
+        SeedAtlasEntry(scaledFixture.pairingLookup, scaledFixture.atlasManifest, "markerS", 0);
+        OverlayLayer_UI scaledLayer; scaledLayer.domainKind = OverlayDomainKind_UI::SpawnsArmies;
+        scaledLayer.thumbnailLodThresholdPixels = 1.0f;
+        scaledLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+        scaledFixture.overlaySettings.overlayLayers.push_back(scaledLayer);
+        std::vector<OverlayVisibleInstance> scaledCandidates;
+        ResolveVisibleCandidates(scaledFixture.Input(), scaledFixture.aabbCache, nullptr, scaledCandidates);
+        check(scaledCandidates.size() == 1, "the scaled Spawn-category procedural marker resolves exactly one candidate");
+
+        if (!baselineCandidates.empty() && !scaledCandidates.empty()) {
+            const float expected = baselineCandidates[0].screenSize * 5.0f;
+            check(scaledCandidates[0].screenSize > expected * 0.99f && scaledCandidates[0].screenSize < expected * 1.01f,
+                  "GlobalMarkerSettings::scaleSpawn(5.0) composes into the Spawn-category procedural marker's screenSize");
+        }
+    }
+
+    // Generic category: no MarkerCategory scale field exists — screenSize stays unscaled even with
+    // non-default scaleAlloy/scaleSpawn set, mirroring CheckMarkerGenericAndExpansionStayWhite's own
+    // no-bleed-through posture for tint.
+    {
+        IconLayerTestFixture baselineFixture;
+        AppendMarkerInstance(baselineFixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Generic, "markerG");
+        baselineFixture.ruleBucketIndex.markers.Build(baselineFixture.placements.markers.ruleIndex.data(), 1, 1);
+        SeedAtlasEntry(baselineFixture.pairingLookup, baselineFixture.atlasManifest, "markerG", 0);
+        OverlayLayer_UI baselineLayer; baselineLayer.domainKind = OverlayDomainKind_UI::Alloy;
+        baselineLayer.thumbnailLodThresholdPixels = 1.0f;
+        baselineLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+        baselineFixture.overlaySettings.overlayLayers.push_back(baselineLayer);
+        std::vector<OverlayVisibleInstance> baselineCandidates;
+        ResolveVisibleCandidates(baselineFixture.Input(), baselineFixture.aabbCache, nullptr, baselineCandidates);
+        check(baselineCandidates.size() == 1, "the Generic-category procedural marker resolves exactly one candidate");
+
+        IconLayerTestFixture noOpFixture;
+        noOpFixture.recipe.globalMarkerSettings.scaleAlloy = 5.0f;   // non-default; must not leak into Generic
+        noOpFixture.recipe.globalMarkerSettings.scaleSpawn = 5.0f;
+        AppendMarkerInstance(noOpFixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Generic, "markerG");
+        noOpFixture.ruleBucketIndex.markers.Build(noOpFixture.placements.markers.ruleIndex.data(), 1, 1);
+        SeedAtlasEntry(noOpFixture.pairingLookup, noOpFixture.atlasManifest, "markerG", 0);
+        OverlayLayer_UI noOpLayer; noOpLayer.domainKind = OverlayDomainKind_UI::Alloy;
+        noOpLayer.thumbnailLodThresholdPixels = 1.0f;
+        noOpLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+        noOpFixture.overlaySettings.overlayLayers.push_back(noOpLayer);
+        std::vector<OverlayVisibleInstance> noOpCandidates;
+        ResolveVisibleCandidates(noOpFixture.Input(), noOpFixture.aabbCache, nullptr, noOpCandidates);
+        check(noOpCandidates.size() == 1, "the non-default-scale Generic-category procedural marker resolves exactly one candidate");
+
+        if (!baselineCandidates.empty() && !noOpCandidates.empty())
+            check(baselineCandidates[0].screenSize > noOpCandidates[0].screenSize * 0.99f
+                  && baselineCandidates[0].screenSize < noOpCandidates[0].screenSize * 1.01f,
+                  "Generic category's screenSize is unaffected by non-default scaleAlloy/scaleSpawn — category-scale no-op == 1.0f");
+    }
+}
+
 } // namespace
 
 void RunMapCanvasIconLayerCullChecks() {
@@ -724,6 +942,10 @@ void RunMapCanvasIconLayerCullChecks() {
     CheckManualMarkerTypeDefaultColorResolvesEndToEnd();
     CheckManualMarkerLayerOverrideWinsOverTypeDefault();
     CheckManualMarkerGenericGroupStaysWhite();
+    CheckResolveMarkerGroupTypeScale();
+    CheckManualMarkerScaleComposesEndToEnd();
+    CheckManualMarkerScaleUnrecognizedGroupNameStaysNoOp();
+    CheckProceduralMarkerScaleComposesEndToEnd();
 }
 
 } // namespace Ui

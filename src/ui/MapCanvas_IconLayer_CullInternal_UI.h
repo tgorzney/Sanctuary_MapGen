@@ -73,6 +73,11 @@ void ResolveMarkerCategoryTintColor(Params::MarkerCategory category,
                                     const Params::GlobalMarkerSettings& settings,
                                     float& outRed, float& outGreen, float& outBlue);
 
+// STEP122: category -> scale multiplier (Alloys/Spawn resolve from GlobalMarkerSettings; other
+// categories, including the pre-existing Plasma gap, stay a 1.0f no-op). Mirrors
+// ResolveMarkerCategoryTintColor's own posture, declared beside it.
+float ResolveMarkerCategoryScale(Params::MarkerCategory category, const Params::GlobalMarkerSettings& settings);
+
 // STEP114 §4a — a manual marker's icon templateIdentifier: override wins if set, else the owning
 // group's name maps to the matching GlobalMarkerSettings field, else the raw group name (v1
 // Widget_MapCanvas.cpp:341 precedent). Declared here (not anonymous) so it is directly unit-

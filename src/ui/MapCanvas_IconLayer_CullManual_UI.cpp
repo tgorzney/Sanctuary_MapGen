@@ -132,6 +132,10 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
     const bool bLayerOverrideEnabled = subLayerArrayIndex >= 0
         && static_cast<std::size_t>(subLayerArrayIndex) < input.recipe->markerLayers.size()
         && input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)].bColorOverrideEnabled;
+    // STEP122: layer.iconScale hoisted ONCE per call, same posture as bLayerOverrideEnabled above.
+    const float layerIconScale = (subLayerArrayIndex >= 0
+        && static_cast<std::size_t>(subLayerArrayIndex) < input.recipe->markerLayers.size())
+        ? input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)].iconScale : 1.0f;
     float overrideTintRed = 1.0f, overrideTintGreen = 1.0f, overrideTintBlue = 1.0f;
     if (bLayerOverrideEnabled) {
         const Params::MarkerInstanceLayer& overrideLayer =
@@ -148,6 +152,7 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
         if (!bLayerOverrideEnabled)
             Params::ResolveMarkerGroupTypeTintColor(group.name, input.recipe->globalMarkerSettings,
                                                      groupTintRed, groupTintGreen, groupTintBlue);
+        const float groupTypeScale = Params::ResolveMarkerGroupTypeScale(group.name, input.recipe->globalMarkerSettings);   // STEP122
         for (std::size_t index = 0; index < group.transforms.size(); ++index) {
             const Params::MarkerTransform& transform = group.transforms[index];
             // Positional match — MarkerTransform::layerIndex is NOT resolved through a stable
@@ -161,7 +166,8 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
                 ResolveMarkerIconTemplateIdentifier(transform, group, input.recipe->globalMarkerSettings);
             ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
                                    transform.transform.positionX, transform.transform.positionZ,
-                                   transform.transform.scaleX, PlacementCollectionKind_UI::Markers,
+                                   transform.transform.scaleX * groupTypeScale * layerIconScale,   // STEP122
+                                   PlacementCollectionKind_UI::Markers,
                                    static_cast<std::int32_t>(index),
                                    groupTintRed, groupTintGreen, groupTintBlue,   // STEP116
                                    stableOrderCounter, outAabb, viewRect, diagnostics, outCandidates);

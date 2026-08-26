@@ -92,6 +92,19 @@ void Application::ResolveIconSelections() {
         bRecipeMoved = ApplyIconSelectionToStringField(
             tabState.markers.manual.iconOverrideGridState.selectedIconId,
             tabState.lastManualMarkerIconId, manualMarkerInstance->iconNameOverride) || bRecipeMoved;
+    // STEP121 — unlike Icon Scale (still unread until STEP122), this bridge's READ side is already
+    // live: ResolveMarkerIconTemplateIdentifier (MapCanvas_IconLayer_CullManual_UI.cpp:209-213)
+    // already resolves these three fields at render time, so a pick here changes the rendered marker
+    // icon on the very next preview redraw.
+    bRecipeMoved = ApplyIconSelectionToStringField(
+        tabState.markers.globals.scaleRows[0].iconGridState.selectedIconId,
+        tabState.lastGlobalAlloyIconId, recipe.globalMarkerSettings.iconNameAlloy) || bRecipeMoved;
+    bRecipeMoved = ApplyIconSelectionToStringField(
+        tabState.markers.globals.scaleRows[1].iconGridState.selectedIconId,
+        tabState.lastGlobalPlasmaIconId, recipe.globalMarkerSettings.iconNamePlasma) || bRecipeMoved;
+    bRecipeMoved = ApplyIconSelectionToStringField(
+        tabState.markers.globals.scaleRows[2].iconGridState.selectedIconId,
+        tabState.lastGlobalSpawnIconId, recipe.globalMarkerSettings.iconNameSpawn) || bRecipeMoved;
     if (bRecipeMoved) previewDriver.NotifyParametersChanged();
 }
 

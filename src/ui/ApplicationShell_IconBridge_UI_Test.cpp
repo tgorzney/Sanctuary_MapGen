@@ -142,6 +142,57 @@ void RunManualMarkerIconOverrideBridgeChecks(Application& application) {
           "a repeated (== lastIconId) selectedIconId leaves a hand-typed value untouched");
 }
 
+// STEP121 — the Markers tab Global section's three per-category icon bridges, mirroring
+// RunManualMarkerIconOverrideBridgeChecks above exactly.
+void RunGlobalMarkerIconBridgeChecks(Application& application) {
+    const int iconId = IconIdOfTemplate(application, "ucl3001");
+    Check(iconId >= 0, "the known unit thumbnail resolved to a template identifier");
+    if (iconId < 0) return;
+
+    // Negative (default -1, no pick made yet): a no-op for all three rows.
+    application.ResolveIconSelections();
+    Check(application.Recipe().globalMarkerSettings.iconNameAlloy == "Alloy"
+          && application.Recipe().globalMarkerSettings.iconNamePlasma == "Plasma"
+          && application.Recipe().globalMarkerSettings.iconNameSpawn == "Spawn",
+          "no pick made yet leaves all three GlobalMarkerSettings icon names at their defaults");
+
+    // Fresh, resolvable pick on the Alloy row (index 0) only.
+    application.TabState().markers.globals.scaleRows[0].iconGridState.selectedIconId = iconId;
+    application.ResolveIconSelections();
+    Check(application.Recipe().globalMarkerSettings.iconNameAlloy == "ucl3001",
+          "a fresh pick on row 0 writes iconNameAlloy");
+    Check(application.Recipe().globalMarkerSettings.iconNamePlasma == "Plasma"
+          && application.Recipe().globalMarkerSettings.iconNameSpawn == "Spawn",
+          "and leaves the other two rows' fields untouched");
+    // STEP121 coder deviation from the ticket's drafted text: `GlobalMarkerSettings` is not hashed
+    // by ANY stage's own ComputeParameterHash (Placement_Hash_PROC.cpp — the only stage close
+    // enough to own it never reads it), so per PreviewDriver_PIPELINE.cpp's OWN derivation rule
+    // ("an edit no stage claims cannot alter a generated field ... the composite alone services
+    // it") this edit trips a PREVIEW-ONLY refresh, not `NeedsMapUpdate()`. Asserting
+    // `NeedsMapUpdate()` here would fail against the real dirty-hash model and, if made to pass by
+    // wiring GlobalMarkerSettings into a stage hash instead, would recreate the exact "cheap tweak
+    // triggers a full regen" defect MarkersTab_Globals_UI.h's own SCOPE NOTE 1 names — the same
+    // reason the sibling RunManualMarkerIconOverrideBridgeChecks above asserts no tier at all for
+    // its own render-only field.
+    Check(application.Driver().NeedsPreviewRender(),
+          "a real recipe edit trips a preview-only refresh (GlobalMarkerSettings owns no stage's hash)");
+
+    // Repeated: re-drawing the same selection writes nothing.
+    application.Driver().Refresh();
+    application.Recipe().globalMarkerSettings.iconNameAlloy = "HandTyped";
+    application.ResolveIconSelections();
+    Check(application.Recipe().globalMarkerSettings.iconNameAlloy == "HandTyped",
+          "a repeated (== lastGlobalAlloyIconId) selection leaves a hand-typed value untouched");
+
+    // Plasma (index 1) and Spawn (index 2) rows bridge independently, same shape.
+    application.TabState().markers.globals.scaleRows[1].iconGridState.selectedIconId = iconId;
+    application.TabState().markers.globals.scaleRows[2].iconGridState.selectedIconId = iconId;
+    application.ResolveIconSelections();
+    Check(application.Recipe().globalMarkerSettings.iconNamePlasma == "ucl3001"
+          && application.Recipe().globalMarkerSettings.iconNameSpawn == "ucl3001",
+          "the Plasma and Spawn rows each bridge to their own GlobalMarkerSettings field");
+}
+
 } // namespace
 
 void RunShellIconBridgeChecks() {
@@ -158,6 +209,7 @@ void RunShellIconBridgeChecks() {
     RunSelectionResolutionChecks(application);
     RunIconPairingLookupWiringChecks(application);
     RunManualMarkerIconOverrideBridgeChecks(application);
+    RunGlobalMarkerIconBridgeChecks(application);
 
     std::filesystem::remove(shellTestSanpackPath, errorCode);
     std::filesystem::remove_all(shellTestCacheDirectory, errorCode);

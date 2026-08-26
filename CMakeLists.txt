@@ -758,7 +758,8 @@ add_sangen_test(AtmosphereTab_UI_Test     src/ui/AtmosphereTab_UI_Test.cpp)
 # test is its own binary rather than a translation unit of one tab's: it asserts the symmetry mask
 # arithmetic and the transform mirrors ONCE, for all four tabs, so no tab owns it.
 add_sangen_test(MarkersTab_UI_Test        src/ui/MarkersTab_UI_Test.cpp
-                                          src/ui/MarkersTab_RuleLayers_UI_Test.cpp)
+                                          src/ui/MarkersTab_RuleLayers_UI_Test.cpp
+                                          src/ui/MarkersTab_GlobalScaleRowFields_UI_Test.cpp)
 add_sangen_test(MarkersTab_Manual_UI_Test src/ui/MarkersTab_Manual_UI_Test.cpp)
 # STEP60_MarkerInstanceLayer_PARAMS: `NextMarkerLayerId`'s own small binary, mirroring
 # Section_UI_Test's pure-decision shape.
@@ -770,6 +771,12 @@ add_sangen_test(MarkerLayerIndexRepair_UI_Test src/ui/MarkerLayerIndexRepair_UI_
 # STEP106: the Manual Marker Layers block's lock gate (`IsMarkerInstanceLayerLocked`) and
 # per-layer grid-snap quantizer (`QuantizeMarkerPositionToLayerGrid`) — pure, no imgui frame needed.
 add_sangen_test(MarkersTab_ManualLayers_UI_Test src/ui/MarkersTab_ManualLayers_UI_Test.cpp)
+# STEP123: DrawManualMarkerLayerColorOverrideHeaderControl's own headless-frame checks — the checkbox
+# flip/commit, going inert (not merely gray) under bUseGroupColor, and the swatch's disabled/enabled
+# click-through. One live headless imgui frame, no window/GL (mirrors MapCanvas_MarkerDrag_UI_Test's
+# posture); needs no explicit imgui link, same as that test, since SanGenV2 links imgui PUBLIC.
+add_sangen_test(MarkersTab_ManualLayerColorOverrideHeader_UI_Test
+    src/ui/MarkersTab_ManualLayerColorOverrideHeader_UI_Test.cpp)
 # STEP120: MarkersTab_Bundles_UI.h's own pure helpers (BuildMarkerLayerBundleLeafIndex,
 # NextMarkerLayerBundleId) and the Move/Rotate Apply functions' own call-boundary behavior — pure,
 # no imgui frame needed (STEP106's "defer the imgui-coupled path" posture).

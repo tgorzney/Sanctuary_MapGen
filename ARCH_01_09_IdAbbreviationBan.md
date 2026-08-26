@@ -17,6 +17,14 @@ generally, so it never needs asking a third time:**
   `assemblyIdentifier` field on `PropTransform`/`DecalTransform`/`MarkerTransform` (**not**
   `AssemblyId`, the brief's working spelling — corrected here), and the new
   `MarkerLayerBundle::identifier`/`parentBundleIdentifier`/`assemblyIdentifier` fields (§19.3).
+- **Confirmed again, a later session, same rule, same citation — `MarkerTransform::instanceIdentifier`
+  (§19.16, ratifying `DESIGN_MarkerTypeSectionsAndInstanceSelection_R1.md` Open Q2).** The design's
+  own working spelling already used the correct qualified form (never bare `identifier` — disambiguated
+  from `MarkerTransform`'s two other, non-identity int fields, `layerIndex`/`symmetryGroupIdentifier`)
+  and never proposed `instanceId`. Recorded here, not only at §19.16, so a future grep for every field
+  this rule has touched finds it in one place; no correction was needed this time — this session
+  simply re-confirms the rule held without a third re-litigation, which is the entire point of ruling
+  it generally in the first place.
 - **Retroactive defect, confirmed real and now shipped — not a "before it ships" freebie.**
   `SANMAP_FORMAT_SPEC.md` Correction 16's own text (and `DESIGN_MarkerGroupLayerRestructure_R1.md`
   §0/§7 item 12, relaying it) states `MarkerInstanceLayer::layerId` "predates [§16.5], STEP60/STEP56
