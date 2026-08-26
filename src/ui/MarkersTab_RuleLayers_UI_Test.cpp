@@ -178,35 +178,6 @@ void ClickAddRuleLayerButton(std::vector<Params::MarkerRuleLayer>& layers, Marke
     outClickedResult = RunAddRuleLayerButtonFrame(release, layers, state, markerTypeNameForNewLayer);
 }
 
-// STEP128 §4: the row's own free-text "Marker Type" field draws ONLY when the row's own
-// markerTypeName is empty — proved by height diff (RunGroupStratumIndexRemovedCheck's own technique,
-// LayerEditor_InlineSettings_UI_Test.cpp), since presence/absence of a whole row is what needs
-// asserting, not the field's own pixel content ("verified by eye against a live frame" everywhere
-// else in this library). One layer, one frame, headless — `previewDriver`/`iconManifest` stay null;
-// `state.selectedRuleLayerIndex` stays -1 (default) so the nested rule list never draws either,
-// isolating the height delta to exactly the conditional field.
-float RunRuleLayerListBodyHeight(const std::string& markerTypeName, const std::string& markerTypeNameFilter) {
-    HeadlessImguiSession session;
-    std::vector<Params::MarkerRuleLayer> layers(1);
-    layers[0].markerTypeName = markerTypeName;
-    MarkersTabState state;
-    float height = 0.0f;
-    RunHeadlessFrame(HeadlessMouseState(), ImVec2(400.0f, 400.0f), [&] {
-        const float startY = ImGui::GetCursorPosY();
-        DrawRuleLayerListBody(layers, state, nullptr, nullptr, markerTypeNameFilter);
-        height = ImGui::GetCursorPosY() - startY;
-    });
-    return height;
-}
-
-void RunRuleLayerMarkerTypeFieldConditionalCheck() {
-    const float emptyTypeHeight = RunRuleLayerListBodyHeight("", "");
-    const float namedTypeHeight = RunRuleLayerListBodyHeight("Alloy", "Alloy");
-    Check(emptyTypeHeight > namedTypeHeight,
-          "an ungrouped row with markerTypeName.empty() draws the free-text 'Marker Type' field, "
-          "costing extra height a non-empty-typed row does not");
-}
-
 void RunDrawAddMarkerRuleLayerButtonTypeSeedChecks() {
     HeadlessImguiSession session;
 
@@ -288,7 +259,6 @@ void RunMarkerRuleLayerAcceptanceChecks() {
     RunSelectedMarkerRuleFenceChecks();
     RunIsMarkerRuleLayerRowSuppressedChecks();
     RunDrawAddMarkerRuleLayerButtonTypeSeedChecks();
-    RunRuleLayerMarkerTypeFieldConditionalCheck();
     RunProceduralInstanceRuleIndexBuilderChecks();
     RunProceduralSymmetryBucketSizePredicateChecks();
     RunRuleInstanceListNullPlacedMarkersChecks();

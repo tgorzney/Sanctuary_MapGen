@@ -37,13 +37,19 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
     // per-Rule instance list (ARCH §19.27) — the SAME pointer DrawPlacedMarkerList below already reads.
     DrawMarkerTypeSections(recipe, state, previewDriver, iconManifest, selectManualMarkerInstanceCallback,
                            placedMarkers, selectProceduralMarkerInstanceCallback);
-    // STEP49: the hand-authored roster. `DrawManualMarkers` takes no map-size parameter, so the
-    // caller resolves the X/Z slider bounds from `recipe.geometry.mapSize` into the state each
-    // frame (MarkersTab_Manual_UI.h).
+    // Human's own instruction: no separate "Manual Markers"/"Placed Markers" top-level sections --
+    // Manual and Procedural are Layer TYPES within each Alloy/Plasma/Spawn Type-section, not their
+    // own tab-level zones. The read-only "Placed Markers" preview (DrawPlacedMarkerList) is fully
+    // superseded by STEP132's own per-Rule instance list inside the Type-section hierarchy above,
+    // so it is removed outright. `DrawManualMarkers` (STEP49) is NOT removed here: it is still the
+    // ONLY authoring surface for adding/deleting a manual marker, editing its position/alias/army
+    // assignment, and picking its Layer -- the new per-Layer instance list (DrawLayerRowBody) is
+    // view+select only, with no Add/Delete/position-edit affordance of its own. Removing this call
+    // would break marker authoring entirely with nothing built yet to replace it -- flagged back to
+    // the human rather than silently deleted.
     state.manual.positionHorizontalRange = MarkerPositionHorizontalSliderRange(recipe.geometry.mapSize);
     DrawManualMarkers(recipe.markers, recipe.armies, recipe.markerLayers, state.manual,
                       state.manualLayers.selectedLayerIndex, iconManifest);
-    DrawPlacedMarkerList(placedMarkers, state.placedList);
     ImGui::PopID();
 }
 

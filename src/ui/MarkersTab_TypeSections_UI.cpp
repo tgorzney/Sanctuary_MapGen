@@ -34,20 +34,12 @@ std::vector<std::string> EnumerateMarkerTypeSectionNames(
         const std::vector<Params::MarkerRuleLayer>& ruleLayers,
         const std::vector<Params::MarkerInstanceLayer>& instanceLayers) {
     std::vector<std::string> distinct;   // every non-empty markerTypeName present, union+dedup
-    bool bAnyEmptyTyped = false;         // STEP128 §4 — "" is now present-only, same test as every
-                                         // other name, just without the .empty() skip on the way in.
-    for (const Params::MarkerLayerBundle& bundle : bundles) {
+    for (const Params::MarkerLayerBundle& bundle : bundles)
         CollectDistinctNonEmptyTypeName(bundle.markerTypeName, distinct);
-        bAnyEmptyTyped = bAnyEmptyTyped || bundle.markerTypeName.empty();
-    }
-    for (const Params::MarkerRuleLayer& layer : ruleLayers) {
+    for (const Params::MarkerRuleLayer& layer : ruleLayers)
         CollectDistinctNonEmptyTypeName(layer.markerTypeName, distinct);
-        bAnyEmptyTyped = bAnyEmptyTyped || layer.markerTypeName.empty();
-    }
-    for (const Params::MarkerInstanceLayer& layer : instanceLayers) {
+    for (const Params::MarkerInstanceLayer& layer : instanceLayers)
         CollectDistinctNonEmptyTypeName(layer.markerTypeName, distinct);
-        bAnyEmptyTyped = bAnyEmptyTyped || layer.markerTypeName.empty();
-    }
 
     std::vector<std::string> ordered;
     for (const char* fixedName : { "Alloy", "Plasma", "Spawn" })   // ARCH_19_14: fixed order, present-only
@@ -58,14 +50,11 @@ std::vector<std::string> EnumerateMarkerTypeSectionNames(
         if (name != "Alloy" && name != "Plasma" && name != "Spawn") others.push_back(name);
     std::sort(others.begin(), others.end());
     for (const std::string& name : others) ordered.push_back(name);
-    if (bAnyEmptyTyped) ordered.push_back("");   // "(Unassigned)" — STEP128 §4: present-only, same as
-                                                 // every other name — appears only when at least one
-                                                 // bundle/ruleLayer/instanceLayer genuinely has
-                                                 // markerTypeName == "". Retires STEP125's own
-                                                 // always-appended bootstrap rule (see this ticket's
-                                                 // own work-order, DESIGN_MarkersUICorrectionRound2_R1.md
-                                                 // item 4, for the ratified reasoning); a brand-new
-                                                 // recipe with zero Bundles/Layers now returns {}.
+    // Human's own instruction: no "(Unassigned)" section at all, no exceptions — a bundle/layer
+    // with an empty markerTypeName (only possible today via legacy pre-STEP124 hand-edited data,
+    // since every live "Add Group"/"Add Layer" affordance now seeds a real type from its own Type
+    // section) simply does not appear in this list, and is therefore not reachable from the Markers
+    // tab's Type-section view.
     return ordered;
 }
 
@@ -82,17 +71,23 @@ void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
     for (const std::string& typeName : typeNames) {
         ImGui::PushID(typeName.c_str());   // (c) — salts every fixed-literal child ID this section owns
         MarkerTypeSectionState_UI& perType = state.typeSections.stateByTypeName[typeName];
-        const char* const label = typeName.empty() ? "(Unassigned)" : typeName.c_str();
-        if (DrawSectionBegin(label, perType.outerSection)) {
+        // typeName is never empty here (EnumerateMarkerTypeSectionNames no longer returns "" —
+        // human's own instruction: no "(Unassigned)" section at all).
+        if (DrawSectionBegin(typeName.c_str(), perType.outerSection)) {
             DrawMarkerLayerBundleTree(recipe.markerLayerBundles, recipe.markerRuleLayers, recipe.markerLayers,
                                       recipe.markers, recipe.geometry, recipe.globalSymmetryMask,
                                       recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
                                       state.bundles, state, previewDriver, iconManifest, typeName,
                                       selectManualMarkerInstanceCallback);
 
-            // STEP128 §5: no enclosing "Ungrouped ..." header/collapse chrome — plain rows, directly
-            // after the Bundle tree. `DrawRuleLayerListBody`/`DrawAddMarkerRuleLayerButton`/
-            // `DrawManualMarkerLayerListBody` themselves are UNCHANGED — only the wrapper goes away.
+            // Human's own instruction: no separate "Manual Markers"/"Procedural Markers" zones —
+            // ungrouped Procedural and Manual layers render as ONE continuous flow of rows directly
+            // after the Bundle tree, no enclosing header/collapse chrome and no divider between the
+            // two kinds. `DrawRuleLayerListBody`/`DrawAddMarkerRuleLayerButton`/
+            // `DrawManualMarkerLayerListBody` themselves are UNCHANGED — only the separating
+            // Separator() between the two kinds is gone; the one after the Bundle tree stays, since
+            // that boundary (Group tree vs. ungrouped Layers) is real structure, not a Manual/
+            // Procedural distinction.
             ImGui::Separator();
             bool bRecipeMoved = DrawRuleLayerListBody(recipe.markerRuleLayers, state, previewDriver,
                                                       iconManifest, typeName, placedMarkers,
@@ -101,7 +96,6 @@ void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
                          || bRecipeMoved;
             NotifyPlacementChange(bRecipeMoved, previewDriver);
 
-            ImGui::Separator();
             DrawManualMarkerLayerListBody(state.manualLayers, recipe.markerLayers, recipe.markers,
                                           recipe.geometry, recipe.globalSymmetryMask,
                                           recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,

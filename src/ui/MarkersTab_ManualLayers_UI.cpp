@@ -8,7 +8,6 @@
 #include "MarkerLayerIndexRepair_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
-#include "TextInput_UI.h"
 #include "imgui.h"
 
 namespace SanmapGen {
@@ -77,10 +76,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
         },
         [&](int rowIndex) {
             Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(rowIndex)];
-            if (layer.markerTypeName.empty()) {   // STEP128 §4 — mirrors MarkersTab_BundleNodeBody_UI.cpp:87
-                TextInputRules typeRules; typeRules.maximumLength = 48; typeRules.bAllowEmpty = true;
-                DrawTextInput("Marker Type", layer.markerTypeName, typeRules);
-            }
+            // Human's own instruction: no "Marker Type" input anywhere — a Layer's type comes only
+            // from the Type-section its own "Add Layer" button was clicked from, never re-editable.
             if (DrawLayerRowBody(layer, rowIndex, markerLayers, markers,
                                  geometry, globalSymmetryMask, globalRadialRepeatCount, markerSymmetryFixSettings,
                                  state, instanceIndex, selectedManualInstanceIdentifier,

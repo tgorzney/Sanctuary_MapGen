@@ -58,17 +58,14 @@ void DrawGlobalScaleRowIconButton(MarkerGlobalScaleRow& row, std::string& iconNa
     }
 }
 
-// One global scale row's own controls — icon button / type label / compact scale slider (no RT:
-// GlobalMarkerSettings never triggers anything beyond a preview repaint, so the slider commits
-// straight through) / "Icon" label + normal-color swatch (RT kept) / "Selected" label + select-
-// color swatch (RT kept) — every control bound directly to `Params::GlobalMarkerSettings`, no
-// scratch intermediary. Human's own instruction: RT stays ONLY on the two color controls, since a
-// color edit is a cheap, marker-only repaint and nothing else should be able to gate/defer it,
-// while the scale slider gets no RT button at all. All SameLine()-chained onto whatever line the
-// caller is already on (DrawMarkersTabGlobals's own loop puts all three rows on ONE shared line).
-// No AlignTextToFramePadding on any label: every item in this SameLine() run must share the row's
-// own top Y (the acceptance test's literal contract), and align-to-frame-padding would shift a
-// label's item rect down by FramePadding.y and break that.
+// One global scale row's own controls, stacked one row per type — icon button / type label /
+// compact scale slider / "Icon" label + normal-color swatch / "Selected" label + select-color
+// swatch — every control bound directly to `Params::GlobalMarkerSettings`, no scratch
+// intermediary. Human's own instruction: color edits should ALWAYS be realtime — no RT button on
+// either color swatch, and none on the scale slider either (GlobalMarkerSettings never triggers
+// anything beyond a preview repaint). No AlignTextToFramePadding on any label: every item in this
+// SameLine() run must share the row's own top Y (the acceptance test's literal contract), and
+// align-to-frame-padding would shift a label's item rect down by FramePadding.y and break that.
 void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::GlobalMarkerSettings& globalMarkerSettings,
                         const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup) {
     const GlobalMarkerScaleRowFields fields = ResolveGlobalMarkerScaleRowFields(globalMarkerSettings, rowIndex);
@@ -91,6 +88,7 @@ void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::Global
     compactSwatchOptions.bLabelHidden = true;   // the visible label is drawn here instead, so it
                                                  // can sit SameLine with the swatch on this row
     compactSwatchOptions.swatchWidth  = kMarkerGlobalScaleRowSwatchWidthPixels;
+    compactSwatchOptions.bRealtimeToggleHidden = true;   // color edits are always realtime, no choice
     ImGui::TextUnformatted("Icon");
     ImGui::SameLine();
     DrawColorSwatch("PreviewColor", fields.color, compactSwatchOptions, row.previewColorToggle);
@@ -106,12 +104,9 @@ void DrawMarkersTabGlobals(MarkersTabGlobals& globals, Params::GlobalMarkerSetti
     if (!DrawSectionBegin("Global", globals.section)) return;
     DrawGamedataSource(globals);
     ImGui::Separator();
-    // Human's own instruction: all three type rows share ONE line, with spacing between each
-    // type's own control cluster — not one line per type.
-    for (int rowIndex = 0; rowIndex < kMarkerGlobalScaleRowCount; ++rowIndex) {
-        if (rowIndex > 0) ImGui::SameLine(0.0f, kMarkerGlobalScaleRowGroupSpacingPixels);
+    // Stacked: one type per line (human's own reversal of the earlier all-on-one-line attempt).
+    for (int rowIndex = 0; rowIndex < kMarkerGlobalScaleRowCount; ++rowIndex)
         DrawGlobalScaleRow(globals, rowIndex, globalMarkerSettings, iconManifest, pairingLookup);
-    }
     DrawSectionEnd();
 }
 

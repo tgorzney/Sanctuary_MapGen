@@ -125,6 +125,7 @@ void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer
                                                                               // options struct
     headerSwatchOptions.bLabelHidden = true;
     headerSwatchOptions.swatchWidth  = kMarkerLayerColorOverrideSwatchWidthPixels;
+    headerSwatchOptions.bRealtimeToggleHidden = true;   // color edits are always realtime, no choice
     const bool bColorCommitted = DrawColorSwatch("ColorOverrideHeaderSwatch", layer.color,
         headerSwatchOptions, state.selectedLayerColorToggle).bCommitted;
     ImGui::EndDisabled();

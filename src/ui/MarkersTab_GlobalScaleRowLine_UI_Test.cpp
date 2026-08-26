@@ -1,9 +1,9 @@
 // MarkersTab_GlobalScaleRowLine_UI_Test.cpp — acceptance for DrawGlobalScaleRow's single-line
 // composition (icon button / type label / compact scale slider, no RT / "Icon" label + normal-
-// color swatch / "Selected" label + select-color swatch) and for DrawMarkersTabGlobals's own
-// outer loop putting all three type rows on ONE shared line with spacing between each row's own
-// cluster. Mirrors MarkersTab_ManualLayerColorOverrideHeader_UI_Test.cpp's own headless-frame
-// harness (HeadlessImguiSession/RunHeadlessFrame — no window, no GL).
+// color swatch, no RT / "Selected" label + select-color swatch, no RT) and for
+// DrawMarkersTabGlobals's own outer loop stacking the three type rows one per line. Mirrors
+// MarkersTab_ManualLayerColorOverrideHeader_UI_Test.cpp's own headless-frame harness
+// (HeadlessImguiSession/RunHeadlessFrame — no window, no GL).
 //
 // DrawGlobalScaleRow draws all seven items inside ONE opaque call, so there is no way to read an
 // INTERMEDIATE control's own item rect from outside it. This test instead replays DrawGlobalScaleRow's
@@ -34,7 +34,7 @@ bool IsNear(float value, float expected, float tolerance = 0.5f) {
     return difference < tolerance && difference > -tolerance;
 }
 
-const ImVec2 kWindowSize = ImVec2(1400.0f, 100.0f);
+const ImVec2 kWindowSize = ImVec2(1400.0f, 200.0f);
 
 struct RowRects {
     ImVec2 iconMin, iconMax;
@@ -75,6 +75,7 @@ RowRects DrawRowWithProbes(MarkerGlobalScaleRow& row, Params::GlobalMarkerSettin
     ColorSwatchOptions compactSwatchOptions = globals.previewColorOptions;
     compactSwatchOptions.bLabelHidden = true;
     compactSwatchOptions.swatchWidth  = kMarkerGlobalScaleRowSwatchWidthPixels;
+    compactSwatchOptions.bRealtimeToggleHidden = true;
 
     rects.iconLabelMin = ImGui::GetCursorScreenPos();
     ImGui::TextUnformatted("Icon");
@@ -126,19 +127,18 @@ void RunGlobalScaleRowSingleLineChecks() {
     Check(rects.selectedLabelMax.x <= rects.swatch2Min.x,
           "the \"Selected\" label ends before the select-color swatch starts");
 
-    // The compact slider carries NO RT button now (human's own instruction: RT stays only on the
-    // two color swatches) — its measured width is track+field only, no realtimeButtonWidth term.
+    // Human's own instruction: color edits are ALWAYS realtime -- no RT button anywhere in this
+    // row, not on the slider and not on either color swatch. Every measured width is therefore
+    // just its own fixed content, no realtimeButtonWidth term anywhere.
     const float itemSpacing         = ImGui::GetStyle().ItemSpacing.x;
-    const float realtimeButtonWidth = WidgetStyle().realtimeButtonWidth;
     const float expectedSliderWidth = kMarkerGlobalScaleRowTrackWidthPixels + itemSpacing
                                      + kMarkerGlobalScaleRowFieldWidthPixels;
     Check(IsNear(rects.sliderMax.x - rects.sliderMin.x, expectedSliderWidth),
           "the compact slider's measured width matches track+field only, no RT button");
 
-    // Both color swatches keep their RT button.
-    const float expectedSwatchWidth = kMarkerGlobalScaleRowSwatchWidthPixels + itemSpacing + realtimeButtonWidth;
+    const float expectedSwatchWidth = kMarkerGlobalScaleRowSwatchWidthPixels;
     Check(IsNear(rects.swatch1Max.x - rects.swatch1Min.x, expectedSwatchWidth),
-          "the normal-color swatch's measured width matches its fixed swatch width + its own RT button");
+          "the normal-color swatch's measured width matches its fixed swatch width only, no RT button");
     Check(IsNear(rects.swatch2Max.x - rects.swatch2Min.x, expectedSwatchWidth),
           "and the select-color swatch matches the same fixed footprint");
 
@@ -153,48 +153,36 @@ void RunGlobalScaleRowSingleLineChecks() {
           "the real DrawGlobalScaleRow's own final item matches the probe replay's final control");
 }
 
-// Human's own instruction: all three type rows (Alloy/Plasma/Spawn) share ONE line, with spacing
-// between each row's own control cluster — not one line per type. Replays
-// DrawMarkersTabGlobals's own loop body (SameLine with kMarkerGlobalScaleRowGroupSpacingPixels
-// between rows) without the Section wrap, to keep this test focused on the loop's own layout.
-void RunGlobalRowsShareOneLineChecks() {
+// Human's own instruction (reversal of an earlier attempt to put all three on one line): the three
+// type rows are STACKED, one per line -- DrawMarkersTabGlobals's own loop draws no SameLine
+// between rows, so each row naturally starts a fresh ImGui line below the previous one.
+void RunGlobalRowsStackedChecks() {
     HeadlessImguiSession session;
     Params::GlobalMarkerSettings settings;
     MarkersTabGlobals globals;
 
-    ImVec2 row0Min, row0Max, row1Min, row1Max, row2Min, row2Max;
+    ImVec2 row0Min, row1Min, row2Min;
     RunHeadlessFrame(HeadlessMouseState(), kWindowSize, [&] {
         for (int rowIndex = 0; rowIndex < kMarkerGlobalScaleRowCount; ++rowIndex) {
-            if (rowIndex > 0) ImGui::SameLine(0.0f, kMarkerGlobalScaleRowGroupSpacingPixels);
             const ImVec2 rowMin = ImGui::GetCursorScreenPos();
             DrawGlobalScaleRow(globals, rowIndex, settings, nullptr, nullptr);
-            const ImVec2 rowMax = ImGui::GetItemRectMax();
-            if (rowIndex == 0) { row0Min = rowMin; row0Max = rowMax; }
-            else if (rowIndex == 1) { row1Min = rowMin; row1Max = rowMax; }
-            else { row2Min = rowMin; row2Max = rowMax; }
+            if (rowIndex == 0) row0Min = rowMin;
+            else if (rowIndex == 1) row1Min = rowMin;
+            else row2Min = rowMin;
         }
     });
 
-    Check(row0Min.y == row1Min.y && row1Min.y == row2Min.y,
-          "all three type rows share the same Y -- one shared line, not one line each");
-    Check(row0Max.x <= row1Min.x && row1Max.x <= row2Min.x,
-          "each row's own cluster starts after the previous row's own cluster ends, left to right");
-
-    // ImGui::SameLine(offset, spacing_w)'s spacing_w REPLACES the default ItemSpacing.x when >= 0
-    // (it does not add to it) -- the gap between clusters is exactly the configured constant.
-    const float gap01 = row1Min.x - row0Max.x;
-    const float gap12 = row2Min.x - row1Max.x;
-    Check(IsNear(gap01, kMarkerGlobalScaleRowGroupSpacingPixels, 1.0f),
-          "the gap between row 0 and row 1 is the configured group spacing");
-    Check(IsNear(gap12, kMarkerGlobalScaleRowGroupSpacingPixels, 1.0f),
-          "and the same gap sits between row 1 and row 2");
+    Check(row0Min.x == row1Min.x && row1Min.x == row2Min.x,
+          "all three type rows start at the same left edge -- stacked, not chained onto one line");
+    Check(row0Min.y < row1Min.y && row1Min.y < row2Min.y,
+          "each row sits strictly below the previous one -- one type per line");
 }
 
 } // namespace
 
 int main() {
     RunGlobalScaleRowSingleLineChecks();
-    RunGlobalRowsShareOneLineChecks();
+    RunGlobalRowsStackedChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

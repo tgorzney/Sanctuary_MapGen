@@ -2,7 +2,6 @@
 // appliers). Delete confirm / buttons / both tiers' settings live in MarkersTab_RuleLayerSettings_UI.cpp.
 #include "MarkersTab_RuleLayers_UI.h"
 #include "MarkersTab_UI.h"
-#include "TextInput_UI.h"
 #include "imgui.h"
 #include <cstdio>
 
@@ -108,10 +107,8 @@ bool DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
         },
         [&](int rowIndex) {
             Params::MarkerRuleLayer& layer = markerRuleLayers[static_cast<std::size_t>(rowIndex)];
-            if (layer.markerTypeName.empty()) {   // STEP128 §4 — mirrors MarkersTab_BundleNodeBody_UI.cpp:87
-                TextInputRules typeRules; typeRules.maximumLength = 48; typeRules.bAllowEmpty = true;
-                DrawTextInput("Marker Type", layer.markerTypeName, typeRules);
-            }
+            // Human's own instruction: no "Marker Type" input anywhere — a Layer's type comes only
+            // from the Type-section its own "Add Layer" button was clicked from, never re-editable.
             DrawRuleLayerSettings(layer, previewDriver);
             ImGui::Separator();
             ProceduralInstanceListContext_UI layerInstanceListContext = baseInstanceListContext;

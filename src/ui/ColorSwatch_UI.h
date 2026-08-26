@@ -30,6 +30,10 @@ struct ColorSwatchOptions {
                                      // button + RT toggle sit on ONE line via SameLine (a header slot).
                                      // `label` is still used to scope ImGui::PushID; only the visible
                                      // text is skipped.
+    // A caller whose field never triggers anything beyond a cheap preview repaint can set this to
+    // drop the RT button entirely — `realtimeToggle` still governs the underlying commit timing
+    // unchanged, the caller simply never draws the control that would let a user flip it off.
+    bool  bRealtimeToggleHidden = false;
 };
 
 // Forces a legal color: every channel into 0..1, NaN to 0, and alpha to opaque while alpha

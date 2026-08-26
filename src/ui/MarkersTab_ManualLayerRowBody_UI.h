@@ -24,8 +24,11 @@ namespace Ui {
 // STEP123 — reserved width for the header's Color Override checkbox + compact swatch
 // (DrawManualMarkerLayerColorOverrideHeaderControl, below), left of DraggableList's own strip.
 // Eyeballed against a live frame (Checkbox_UI.cpp/ColorSwatch_UI.cpp's own "verified by eye, never
-// by test" posture).
-inline constexpr float kMarkerLayerColorOverrideHeaderWidthPixels = 90.0f;
+// by test" posture). Shrunk from 90 (checkbox + swatch + RT button) once the swatch's own RT
+// button was removed (color edits are always realtime now, human's own instruction) — the control
+// is narrower by roughly one RT button's own width (WidgetStyle().realtimeButtonWidth, 30px) plus
+// its SameLine gap.
+inline constexpr float kMarkerLayerColorOverrideHeaderWidthPixels = 55.0f;
 inline constexpr float kMarkerLayerColorOverrideSwatchWidthPixels = 24.0f;
 
 // STEP130 (ARCH §19.24) — reserved width for the header's Symmetry-toggle checkbox

@@ -82,10 +82,9 @@ void DrawMarkerLayerBundleNodeBody(int bundleIdentifier, std::vector<Params::Mar
     TextInputRules nameRules;
     nameRules.maximumLength = 48; nameRules.bAllowEmpty = false; nameRules.fallbackText = "Group";
     DrawTextInput("Name", bundle.name, nameRules);
-    TextInputRules typeRules;
-    typeRules.maximumLength = 48; typeRules.bAllowEmpty = true;
-    DrawTextInput("Marker Type", bundle.markerTypeName, typeRules);   // free text — soft-validated
-                                                                       // only (§19.12), no combo built
+    // Human's own instruction: no "Marker Type" input anywhere — the Section a Group lives in IS
+    // its Marker Type. `bundle.markerTypeName` is still set, once, at creation ("Add Group" seeds
+    // it from the Type-section it was added from, MarkersTab_Bundles_UI.cpp) and never re-editable.
 
     if (DrawAddMarkerRuleLayerButton(ruleLayers, rootState, bundleIdentifier))
         NotifyPlacementChange(true, previewDriver);

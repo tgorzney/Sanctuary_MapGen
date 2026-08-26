@@ -49,8 +49,10 @@ WidgetChange DrawColorSwatch(const char* label, float color[kColorSwatchChannelC
     if (ImGui::ColorButton("##swatch", previewColor, ResolveButtonFlags(options),
                            ResolveSwatchSize(options, style)))
         ImGui::OpenPopup("##picker");
-    ImGui::SameLine();
-    DrawRealtimeToggleButton("realtime", realtimeToggle, style);
+    if (!options.bRealtimeToggleHidden) {
+        ImGui::SameLine();
+        DrawRealtimeToggleButton("realtime", realtimeToggle, style);
+    }
 
     ColorSwatchInput input;
     if (ImGui::BeginPopup("##picker")) {
