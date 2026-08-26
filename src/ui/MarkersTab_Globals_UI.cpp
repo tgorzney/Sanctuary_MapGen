@@ -58,16 +58,19 @@ void DrawGlobalScaleRowIconButton(MarkerGlobalScaleRow& row, std::string& iconNa
     }
 }
 
-// One global scale row's own controls, stacked one row per type — icon button / type label /
-// compact scale slider / "Icon" label + normal-color swatch / "Selected" label + select-color
-// swatch — every control bound directly to `Params::GlobalMarkerSettings`, no scratch
-// intermediary. Human's own instruction: color edits should ALWAYS be realtime — no RT button on
-// either color swatch, and none on the scale slider either (GlobalMarkerSettings never triggers
-// anything beyond a preview repaint). No AlignTextToFramePadding on any label: every item in this
-// SameLine() run must share the row's own top Y (the acceptance test's literal contract), and
-// align-to-frame-padding would shift a label's item rect down by FramePadding.y and break that.
-void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::GlobalMarkerSettings& globalMarkerSettings,
-                        const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup) {
+// STEP136 (was DrawGlobalScaleRow, STEP134) — one Type-section header's own marker-settings row:
+// icon button / icon-color swatch (unlabeled) / "Selected" label + select-color swatch / compact
+// scale slider (unlabeled) — every control bound directly to `Params::GlobalMarkerSettings`, no
+// scratch intermediary. No type-name label here: the Type-section's own header text already shows
+// it (MarkersTab_UI.cpp). Human's own instruction: color edits should ALWAYS be realtime — no RT
+// button on either color swatch, and none on the scale slider either (GlobalMarkerSettings never
+// triggers anything beyond a preview repaint). No AlignTextToFramePadding on any label: every item
+// in this SameLine() run must share the row's own top Y (the acceptance test's literal contract),
+// and align-to-frame-padding would shift a label's item rect down by FramePadding.y and break that.
+void DrawTypeSectionMarkerSettingsRow(MarkersTabGlobals& globals, int rowIndex,
+                                      Params::GlobalMarkerSettings& globalMarkerSettings,
+                                      const IconAtlasManifest* iconManifest,
+                                      const IconAtlasPairingLookup* pairingLookup) {
     const GlobalMarkerScaleRowFields fields = ResolveGlobalMarkerScaleRowFields(globalMarkerSettings, rowIndex);
     if (fields.scale == nullptr) return;   // Constitution §6 — an out-of-range row draws nothing
     MarkerGlobalScaleRow& row = globals.scaleRows[rowIndex];
@@ -75,38 +78,31 @@ void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::Global
     ImGui::PushID(rowIndex);
     DrawGlobalScaleRowIconButton(row, *fields.iconName, globals, iconManifest, pairingLookup);
     ImGui::SameLine();
-    ImGui::TextUnformatted(markerGlobalScaleRowLabels[rowIndex]);
+
+    ColorSwatchOptions compactSwatchOptions = globals.previewColorOptions;   // COPY: do not mutate
+                                                                              // the shared section-
+                                                                              // level options struct
+    compactSwatchOptions.bLabelHidden = true;
+    compactSwatchOptions.swatchWidth  = kMarkerGlobalScaleRowSwatchWidthPixels;
+    compactSwatchOptions.bRealtimeToggleHidden = true;   // color edits are always realtime, no choice
+    DrawColorSwatch("PreviewColor", fields.color, compactSwatchOptions, row.previewColorToggle);
     ImGui::SameLine();
+
+    ImGui::TextUnformatted("Selected");
+    ImGui::SameLine();
+    DrawColorSwatch("SelectColor", fields.selectColor, compactSwatchOptions, row.selectColorToggle);
+    ImGui::SameLine();
+
     DrawSliderScalarCompact("Icon Scale (Global)", *fields.scale, globals.iconScaleRange,
                             row.iconScaleToggle, kMarkerGlobalScaleRowTrackWidthPixels,
                             kMarkerGlobalScaleRowFieldWidthPixels, WidgetStyle(), "%.2f",
                             /*bShowRealtimeToggle=*/false);
-    ImGui::SameLine();
-    ColorSwatchOptions compactSwatchOptions = globals.previewColorOptions;   // COPY: do not mutate
-                                                                              // the shared section-
-                                                                              // level options struct
-    compactSwatchOptions.bLabelHidden = true;   // the visible label is drawn here instead, so it
-                                                 // can sit SameLine with the swatch on this row
-    compactSwatchOptions.swatchWidth  = kMarkerGlobalScaleRowSwatchWidthPixels;
-    compactSwatchOptions.bRealtimeToggleHidden = true;   // color edits are always realtime, no choice
-    ImGui::TextUnformatted("Icon");
-    ImGui::SameLine();
-    DrawColorSwatch("PreviewColor", fields.color, compactSwatchOptions, row.previewColorToggle);
-    ImGui::SameLine();
-    ImGui::TextUnformatted("Selected");
-    ImGui::SameLine();
-    DrawColorSwatch("SelectColor", fields.selectColor, compactSwatchOptions, row.selectColorToggle);
     ImGui::PopID();
 }
 
-void DrawMarkersTabGlobals(MarkersTabGlobals& globals, Params::GlobalMarkerSettings& globalMarkerSettings,
-                           const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup) {
+void DrawMarkersTabGlobals(MarkersTabGlobals& globals) {
     if (!DrawSectionBegin("Global", globals.section)) return;
     DrawGamedataSource(globals);
-    ImGui::Separator();
-    // Stacked: one type per line (human's own reversal of the earlier all-on-one-line attempt).
-    for (int rowIndex = 0; rowIndex < kMarkerGlobalScaleRowCount; ++rowIndex)
-        DrawGlobalScaleRow(globals, rowIndex, globalMarkerSettings, iconManifest, pairingLookup);
     DrawSectionEnd();
 }
 

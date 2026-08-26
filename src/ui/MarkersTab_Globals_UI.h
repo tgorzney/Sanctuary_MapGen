@@ -1,5 +1,7 @@
-// MarkersTab_Globals_UI.h — the Markers tab's global section: the gamedata root, the icon scan
-// request, and the three global marker scale rows (Alloy / Plasma / Spawn).
+// MarkersTab_Globals_UI.h — the Markers tab's global section (the gamedata root and the icon scan
+// request) plus the per-Type marker-settings row (icon / icon color / select color / global scale)
+// STEP136 relocates onto each Type-section's own header (MarkersTab_UI.cpp) — still binds directly
+// to `Params::GlobalMarkerSettings`, only WHERE it draws moved out of this section.
 // Layer: UI. Accuracy class: Visual. TAB_REBUILD_PLAN "§ Markers · Global".
 //
 // SCOPE NOTES (ARCH §8.4 — a coder never invents a missing type; reported, not invented):
@@ -26,6 +28,7 @@
 #include "IconGridWidget_UI.h"
 #include "Section_UI.h"
 #include "SliderScalar_UI.h"
+#include "imgui.h"
 #include "../params/GlobalMarkerSettings_PARAMS.h"
 
 namespace SanmapGen {
@@ -113,24 +116,45 @@ inline GlobalMarkerScaleRowFields ResolveGlobalMarkerScaleRowFields(
 }
 
 // The row's icon button + its own popup grid — declared here (not file-local/anonymous), like
-// DrawGlobalScaleRow below, so the headless-frame acceptance test can drive DrawGlobalScaleRow's
-// own five constituent calls one at a time and capture each control's own item rect (there is no
-// other way to see an INTERMEDIATE item rect from inside one opaque DrawGlobalScaleRow call).
+// DrawTypeSectionMarkerSettingsRow below, so the headless-frame acceptance test can drive
+// DrawTypeSectionMarkerSettingsRow's own four constituent calls one at a time and capture each
+// control's own item rect (there is no other way to see an INTERMEDIATE item rect from inside one
+// opaque DrawTypeSectionMarkerSettingsRow call).
 void DrawGlobalScaleRowIconButton(MarkerGlobalScaleRow& row, std::string& iconNameField,
                                   const MarkersTabGlobals& globals, const IconAtlasManifest* iconManifest,
                                   const IconAtlasPairingLookup* pairingLookup);
 
-// STEP134: one Global row, drawn as a genuine single ImGui::SameLine()-chained line — declared
-// here (not file-local/anonymous) so the headless-frame acceptance test can drive it directly,
-// mirroring DrawManualMarkerLayerColorOverrideHeaderControl's own test-callable posture
-// (MarkersTab_ManualLayerRowBody_UI.h).
-void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::GlobalMarkerSettings& globalMarkerSettings,
-                        const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup);
+// STEP136 (was DrawGlobalScaleRow, STEP134): one Type-section header's own marker-settings row,
+// drawn as a genuine single ImGui::SameLine()-chained line — declared here (not file-local/
+// anonymous) so the headless-frame acceptance test can drive it directly, mirroring
+// DrawManualMarkerLayerColorOverrideHeaderControl's own test-callable posture
+// (MarkersTab_ManualLayerRowBody_UI.h). Human's own explicit order: icon thumbnail (unlabeled) ->
+// icon-color swatch (unlabeled) -> "Selected" label + select-color swatch -> Size slider (unlabeled
+// — DrawSliderScalarCompact's own `label` param is tooltip/ID-only, never rendered). No type-name
+// label: the Type-section's own header text already shows it (MarkersTab_UI.cpp).
+void DrawTypeSectionMarkerSettingsRow(MarkersTabGlobals& globals, int rowIndex,
+                                      Params::GlobalMarkerSettings& globalMarkerSettings,
+                                      const IconAtlasManifest* iconManifest,
+                                      const IconAtlasPairingLookup* pairingLookup);
 
-// Draws the global section. `iconManifest`/`pairingLookup` are both nullable: with no resident
-// atlas the icon column shows a disabled placeholder button instead of a thumbnail.
-void DrawMarkersTabGlobals(MarkersTabGlobals& globals, Params::GlobalMarkerSettings& globalMarkerSettings,
-                           const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup);
+// This row's own total rendered width (icon button + icon-color swatch + "Selected" label +
+// select-color swatch + Size slider, the exact DrawTypeSectionMarkerSettingsRow sequence above), so
+// MarkersTab_UI.cpp can fold it into a Type-section header's own reserved-right-zone math without
+// the two ever drifting apart (mirrors that file's own TypeSectionHeaderButtonClusterWidth
+// companion-function pattern).
+inline float TypeSectionMarkerSettingsRowWidth(const MarkersTabGlobals& globals) {
+    const float itemSpacing = ImGui::GetStyle().ItemSpacing.x;
+    return globals.iconButtonSizePixels + itemSpacing
+         + kMarkerGlobalScaleRowSwatchWidthPixels + itemSpacing
+         + ImGui::CalcTextSize("Selected").x + itemSpacing
+         + kMarkerGlobalScaleRowSwatchWidthPixels + itemSpacing
+         + kMarkerGlobalScaleRowTrackWidthPixels + kMarkerGlobalScaleRowFieldWidthPixels;
+}
+
+// Draws the global section: the gamedata root and the icon scan request only (STEP136 — the three
+// per-Type rows this used to stack live on the Type-section headers now, see
+// DrawTypeSectionMarkerSettingsRow above).
+void DrawMarkersTabGlobals(MarkersTabGlobals& globals);
 
 } // namespace Ui
 } // namespace SanmapGen

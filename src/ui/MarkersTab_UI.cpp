@@ -7,6 +7,7 @@
 #include "MarkerLayerId_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "PlacementRuleSections_UI.h"
+#include "../params/Geometry_PARAMS.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
 #include "imgui.h"
@@ -26,23 +27,27 @@ float SmallButtonWidth(const char* label) {
     return ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
 }
 
-// STEP135 — the header's own button cluster, human's own explicit left-to-right order: "Add
-// Instance", "Add Group", "Add Layer", then the pre-existing Hide/Unhide (STEP133). One combined
-// width function so the reserved zone (below) and the actual draw (DrawRightAlignedTypeSectionHeader-
-// Buttons) can never drift apart.
+// STEP135/STEP137 — the header's own button cluster, human's own explicit left-to-right order: "+
+// Instance", "+ Group", "+ Layer", then the pre-existing Hide/Unhide (STEP133) — "+" replaces the
+// earlier "Add " prefix verbatim (human's own instruction). One combined width function so the
+// reserved zone (below) and the actual draw (DrawRightAlignedTypeSectionHeaderButtons) can never
+// drift apart.
 float TypeSectionHeaderButtonClusterWidth(bool bHidden) {
-    return SmallButtonWidth("Add Instance") + kHeaderButtonSpacingPixels
-         + SmallButtonWidth("Add Group")    + kHeaderButtonSpacingPixels
-         + SmallButtonWidth("Add Layer")    + kHeaderButtonSpacingPixels
+    return SmallButtonWidth("+ Instance") + kHeaderButtonSpacingPixels
+         + SmallButtonWidth("+ Group")    + kHeaderButtonSpacingPixels
+         + SmallButtonWidth("+ Layer")    + kHeaderButtonSpacingPixels
          + SmallButtonWidth(bHidden ? "Unhide" : "Hide");
 }
 
-// The reserved-right-width `SectionOptions` for one Type-section header: the whole button cluster's
-// own measured width plus the fixed leading spacing above, mirroring HeightmapTab_UI.cpp's
-// GeoLayerSectionOptions exactly (STEP133), now sized for four buttons instead of one.
-SectionOptions HeaderButtonsSectionOptions(bool bHidden) {
+// STEP136 — the FULL reserved-right-width `SectionOptions` for one Type-section header: the
+// relocated per-Type marker-settings row (MarkersTab_Globals_UI.h's own
+// TypeSectionMarkerSettingsRowWidth) immediately followed by the button cluster above, human's own
+// explicit "to the left of the buttons" ordering, plus the fixed leading spacing, mirroring
+// HeightmapTab_UI.cpp's GeoLayerSectionOptions exactly (STEP133).
+SectionOptions HeaderButtonsSectionOptions(const MarkersTabGlobals& globals, bool bHidden) {
     SectionOptions options;
-    options.reservedRightWidth = TypeSectionHeaderButtonClusterWidth(bHidden) + kHeaderButtonSpacingPixels;
+    options.reservedRightWidth = TypeSectionMarkerSettingsRowWidth(globals) + kHeaderButtonSpacingPixels
+                                + TypeSectionHeaderButtonClusterWidth(bHidden) + kHeaderButtonSpacingPixels;
     return options;
 }
 
@@ -57,28 +62,35 @@ struct TypeSectionHeaderButtons_UI {
     bool bHideToggleClicked         = false;
 };
 
-// Right-aligns the four-button cluster within the header's own reserved right zone: its right edge
-// lands at the same X every frame regardless of which Hide/Unhide label is current, rather than
-// sitting flush-left of the reserved zone the way SameLine() alone would leave it (HeightmapTab_UI.cpp's
-// single-label "Add GeoLayer" precedent never needed this). Must be called immediately after
-// ImGui::SameLine(), with the reserved zone the ONLY content still ahead of the cursor on this line —
-// GetContentRegionAvail().x is exactly that zone's remaining width, and DrawSectionBegin sized
-// `barWidth` so this cluster's own right edge always lands at the header's own full right edge,
-// independent of which Hide/Unhide label reserved the zone this frame (STEP133's own
-// DrawRightAlignedHideToggleButton, widened one tier to the whole cluster).
-TypeSectionHeaderButtons_UI DrawRightAlignedTypeSectionHeaderButtons(bool bHidden) {
+// Right-aligns the marker-settings row + the four-button cluster within the header's own reserved
+// right zone: the combined content's right edge lands at the same X every frame regardless of which
+// Hide/Unhide label is current, rather than sitting flush-left of the reserved zone the way
+// SameLine() alone would leave it (HeightmapTab_UI.cpp's single-label "Add GeoLayer" precedent never
+// needed this). Must be called immediately after ImGui::SameLine(), with the reserved zone the ONLY
+// content still ahead of the cursor on this line — GetContentRegionAvail().x is exactly that zone's
+// remaining width, and DrawSectionBegin sized `barWidth` so this content's own right edge always
+// lands at the header's own full right edge, independent of which Hide/Unhide label reserved the
+// zone this frame (STEP133's own DrawRightAlignedHideToggleButton, widened one tier to the whole
+// cluster, then STEP136 widened again to include the relocated marker-settings row).
+TypeSectionHeaderButtons_UI DrawRightAlignedTypeSectionHeaderButtons(
+        MarkersTabGlobals& globals, int rowIndex, Params::GlobalMarkerSettings& globalMarkerSettings,
+        const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup, bool bHidden) {
     TypeSectionHeaderButtons_UI result;
     const char* const hideLabel = bHidden ? "Unhide" : "Hide";
-    const float totalWidth = TypeSectionHeaderButtonClusterWidth(bHidden);
+    const float totalWidth = TypeSectionMarkerSettingsRowWidth(globals) + kHeaderButtonSpacingPixels
+                            + TypeSectionHeaderButtonClusterWidth(bHidden);
     const float availableWidth = ImGui::GetContentRegionAvail().x;
     if (availableWidth > totalWidth)
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + availableWidth - totalWidth);
 
-    result.bAddInstanceClicked = ImGui::SmallButton("Add Instance");
+    DrawTypeSectionMarkerSettingsRow(globals, rowIndex, globalMarkerSettings, iconManifest, pairingLookup);
     ImGui::SameLine(0.0f, kHeaderButtonSpacingPixels);
-    result.bAddGroupClicked = ImGui::SmallButton("Add Group");
+
+    result.bAddInstanceClicked = ImGui::SmallButton("+ Instance");
     ImGui::SameLine(0.0f, kHeaderButtonSpacingPixels);
-    if (ImGui::SmallButton("Add Layer")) ImGui::OpenPopup("addLayerTypePopup");
+    result.bAddGroupClicked = ImGui::SmallButton("+ Group");
+    ImGui::SameLine(0.0f, kHeaderButtonSpacingPixels);
+    if (ImGui::SmallButton("+ Layer")) ImGui::OpenPopup("addLayerTypePopup");
     if (ImGui::BeginPopup("addLayerTypePopup")) {
         if (ImGui::MenuItem("Manual"))     result.bAddManualLayerClicked     = true;
         if (ImGui::MenuItem("Procedural")) result.bAddProceduralLayerClicked = true;
@@ -104,6 +116,28 @@ Params::MarkerInstanceGroup& FindOrCreateMarkerInstanceGroupByName(
     return markers.back();
 }
 
+// STEP137 — a new manual instance's default X/Z: the map's own center (human's own instruction —
+// the struct's own (0,0,0) default sits at the map's CORNER under SanGen's corner-origin world-space
+// convention, confirmed by Placement_Fields_PROC.cpp's own `mapCenter = (vertexSize - 1) * 0.5` and
+// MarkerSymmetryDetection_PIPELINE.cpp's own `worldSize = mapSize * worldUnitsPerCell` extent).
+float MapCenterWorldUnits(const Params::Geometry& geometry) {
+    return static_cast<float>(geometry.mapSize) * geometry.worldUnitsPerCell * 0.5f;
+}
+
+// STEP137 — the selected Manual Layer's own plain vector position (`MarkerTransform::layerIndex`'s
+// established convention, MarkerLayerIndexRepair_UI.h), when a Layer typed to THIS Type-section is
+// currently selected; else the SAME "no specific layer" fallback every other layer-losing path
+// already uses (`ClampMarkerLayerIndicesForRemovedLayer`'s own clamp-to-0 — layerIndex has no
+// "unassigned" sentinel to invent here, only the existing ratified convention to reuse). Guards on
+// `markerTypeName` so a Layer selected under a DIFFERENT Type-section's "+ Layer"/tree click never
+// silently receives another Type's instance.
+int ResolveAddInstanceLayerIndex(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                 int selectedLayerIndex, const std::string& typeName) {
+    if (selectedLayerIndex < 0 || selectedLayerIndex >= static_cast<int>(markerLayers.size())) return 0;
+    if (markerLayers[static_cast<std::size_t>(selectedLayerIndex)].markerTypeName != typeName) return 0;
+    return selectedLayerIndex;
+}
+
 } // namespace
 
 // The rule the detail controls edit: a two-index walk, both bounds-checked, null on either miss
@@ -126,23 +160,28 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
     (void)placedMarkers;
     (void)selectManualMarkerInstanceCallback; (void)selectProceduralMarkerInstanceCallback;
     ImGui::PushID("markersTab");
-    DrawMarkersTabGlobals(state.globals, recipe.globalMarkerSettings, iconManifest, pairingLookup);
+    DrawMarkersTabGlobals(state.globals);
     // Human's own explicit instruction: strip the tab down to Global plus three EMPTY collapsible
     // sections (Alloy/Plasma/Spawn), nothing else, as a clean baseline to verify before anything
     // else is rebuilt on top. No Bundle tree, no Rule stack, no Manual Markers, no Placed Markers —
-    // STEP133/STEP135 add the header's own Hide/Unhide and Add Instance/Group/Layer affordances
-    // directly, still with no body content rendered underneath.
-    for (const char* typeName : { "Alloy", "Plasma", "Spawn" }) {
+    // STEP133/STEP135/STEP136 add the header's own Hide/Unhide, "+ Instance"/"+ Group"/"+ Layer",
+    // and the relocated per-Type marker-settings row directly, still with no body content rendered
+    // underneath.
+    for (int rowIndex = 0; rowIndex < kMarkerGlobalScaleRowCount; ++rowIndex) {
+        const char* const typeName = markerGlobalScaleRowLabels[rowIndex];
         ImGui::PushID(typeName);
         // STEP133 — a right-aligned Hide/Unhide button, per Type-section header, toggling that
         // Type's markers off the map preview entirely (both manual and procedural). STEP135 widens
-        // the same reserved-right-zone mechanism to the "Add Instance"/"Add Group"/"Add Layer"
-        // buttons the human asked for, in that order, immediately to the LEFT of Hide/Unhide.
+        // the same reserved-right-zone mechanism to the "+ Instance"/"+ Group"/"+ Layer" buttons the
+        // human asked for, in that order, immediately to the LEFT of Hide/Unhide. STEP136 widens it
+        // again, one tier further left, for the relocated per-Type marker-settings row (icon / icon
+        // color / select color / global scale), formerly the Global section's own stacked rows.
         const bool bHidden = state.markerTypeVisibility.IsHidden(typeName);
         if (DrawSectionBegin(typeName, state.typeSections.stateByTypeName[typeName].outerSection,
-                             HeaderButtonsSectionOptions(bHidden))) {
+                             HeaderButtonsSectionOptions(state.globals, bHidden))) {
             ImGui::SameLine();
-            const TypeSectionHeaderButtons_UI buttons = DrawRightAlignedTypeSectionHeaderButtons(bHidden);
+            const TypeSectionHeaderButtons_UI buttons = DrawRightAlignedTypeSectionHeaderButtons(
+                state.globals, rowIndex, recipe.globalMarkerSettings, iconManifest, pairingLookup, bHidden);
 
             if (buttons.bAddInstanceClicked) {
                 Params::MarkerInstanceGroup& group =
@@ -150,6 +189,11 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                 Params::MarkerTransform transform;
                 transform.name = NextMarkerInstanceName(static_cast<int>(group.transforms.size()));
                 transform.instanceIdentifier = NextMarkerInstanceIdentifier(recipe.markers);
+                const float mapCenter = MapCenterWorldUnits(recipe.geometry);
+                transform.transform.positionX = mapCenter;
+                transform.transform.positionZ = mapCenter;
+                transform.layerIndex = ResolveAddInstanceLayerIndex(
+                    recipe.markerLayers, state.manualLayers.selectedLayerIndex, typeName);
                 group.transforms.push_back(transform);
                 state.selectedManualInstanceIdentifier = transform.instanceIdentifier;
             }
