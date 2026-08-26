@@ -75,16 +75,26 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
             return row;
         },
         [&](int rowIndex) {
-            if (DrawLayerRowBody(markerLayers[static_cast<std::size_t>(rowIndex)], rowIndex, markerLayers, markers,
+            Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(rowIndex)];
+            if (layer.markerTypeName.empty()) {   // STEP128 §4 — mirrors MarkersTab_BundleNodeBody_UI.cpp:87
+                TextInputRules typeRules; typeRules.maximumLength = 48; typeRules.bAllowEmpty = true;
+                DrawTextInput("Marker Type", layer.markerTypeName, typeRules);
+            }
+            if (DrawLayerRowBody(layer, rowIndex, markerLayers, markers,
                                  geometry, globalSymmetryMask, globalRadialRepeatCount, markerSymmetryFixSettings,
                                  state, instanceIndex, selectedManualInstanceIdentifier))
                 bAnyNameCommitted = true;
         },
         [&](int rowIndex) {
+            // STEP130 (ARCH §19.24): [Symmetry toggle][Color Override], in that order, sharing ONE
+            // combined header-extra width.
+            DrawMarkerLayerSymmetryToggleHeaderControl(
+                markerLayers[static_cast<std::size_t>(rowIndex)], bAnyNameCommitted);
+            ImGui::SameLine();
             DrawManualMarkerLayerColorOverrideHeaderControl(
                 markerLayers[static_cast<std::size_t>(rowIndex)], state, bAnyNameCommitted);
         },
-        kMarkerLayerColorOverrideHeaderWidthPixels,
+        kMarkerLayerHeaderExtraCombinedWidthPixels,
         state.selectedLayerIndex);
 }
 

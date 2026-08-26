@@ -284,6 +284,39 @@ void RunLockRefusesRepositionSymmetryGroupMemberChecks() {
     Check(NearlyEqual(markers[0].transforms[1].transform.positionX, 8.0f), "and so is its sibling's");
 }
 
+// STEP130 (ARCH §19.24) — ResolveEffectiveMarkerSymmetry's own consumer gate: bSymmetryEnabled ==
+// false forces the effective mask/count to (None, 0) regardless of `symmetry`'s own configured
+// values; re-enabling (true) resolves the ORIGINAL configuration unchanged (not reset/cleared) —
+// the specific non-destructive claim the ARCH ruling makes, verified directly rather than assumed.
+void RunResolveEffectiveMarkerSymmetryGateChecks() {
+    std::vector<Params::MarkerInstanceLayer> layers(1);
+    layers[0].bSymmetryEnabled = true;
+    layers[0].symmetry.bSymmetryUseGlobal      = false;
+    layers[0].symmetry.symmetryMask            = Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::Radial;
+    layers[0].symmetry.radialSymmetryRepeatCount = 5;
+
+    int mask = -1, radialRepeatCount = -1;
+    ResolveEffectiveMarkerSymmetry(layers, 0, Params::SymmetryAxis::MirrorAcrossZ, 3, mask, radialRepeatCount);
+    Check(mask == (Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::Radial) && radialRepeatCount == 5,
+          "bSymmetryEnabled == true resolves the layer's own configured mask/count, unaffected by this field");
+
+    layers[0].bSymmetryEnabled = false;   // gate closes
+    ResolveEffectiveMarkerSymmetry(layers, 0, Params::SymmetryAxis::MirrorAcrossZ, 3, mask, radialRepeatCount);
+    Check(mask == Params::SymmetryAxis::None && radialRepeatCount == 0,
+          "bSymmetryEnabled == false forces the EFFECTIVE mask to SymmetryAxis::None (count 0), "
+          "regardless of the layer's own configured symmetry.symmetryMask");
+    Check(layers[0].symmetry.symmetryMask == (Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::Radial)
+          && layers[0].symmetry.radialSymmetryRepeatCount == 5
+          && !layers[0].symmetry.bSymmetryUseGlobal,
+          "the gate never mutates layer.symmetry's own fields while closed");
+
+    layers[0].bSymmetryEnabled = true;   // re-enable
+    ResolveEffectiveMarkerSymmetry(layers, 0, Params::SymmetryAxis::MirrorAcrossZ, 3, mask, radialRepeatCount);
+    Check(mask == (Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::Radial) && radialRepeatCount == 5,
+          "re-enabling restores the ORIGINAL symmetry configuration unchanged, not reset/cleared "
+          "(ARCH §19.24's specific non-destructive claim)");
+}
+
 } // namespace
 
 int main() {
@@ -296,6 +329,7 @@ int main() {
     RunRepositionSymmetryGroupMemberChecks();
     RunLockRefusesBeginMarkerDragGestureChecks();
     RunLockRefusesRepositionSymmetryGroupMemberChecks();
+    RunResolveEffectiveMarkerSymmetryGateChecks();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

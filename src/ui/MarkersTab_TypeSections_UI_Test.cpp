@@ -1,7 +1,8 @@
-// MarkersTab_TypeSections_UI_Test.cpp — STEP125 acceptance for EnumerateMarkerTypeSectionNames
-// (ARCH §19.14): the Unassigned-always-present bootstrap rule, the Alloy/Plasma/Spawn-first fixed
-// order (present-only), alphabetical-others, cross-collection union+dedup, and the all-legacy-data
-// degrade case. Pure logic only — no imgui frame, no window, no GL context.
+// MarkersTab_TypeSections_UI_Test.cpp — STEP125/STEP128 acceptance for EnumerateMarkerTypeSectionNames
+// (ARCH §19.14): the Alloy/Plasma/Spawn-first fixed order (present-only), alphabetical-others,
+// cross-collection union+dedup, the all-legacy-data degrade case, and (STEP128 §4) the Unassigned
+// bucket's own present-only rule — a genuinely empty recipe now returns {}, not {""}. Pure logic
+// only — no imgui frame, no window, no GL context.
 #include "MarkersTab_TypeSections_UI.h"
 #include <cstdio>
 
@@ -22,15 +23,16 @@ bool NamesEqual(const std::vector<std::string>& actual, const std::vector<std::s
     return actual == expected;
 }
 
-// Empty bundles/ruleLayers/instanceLayers -> exactly {""} — the Unassigned-always-present bootstrap
-// rule (§1): a brand-new recipe with zero Bundles/Layers must still have somewhere to click "Add
-// Group"/"Add Layer" for the very first one.
+// STEP128 §4: empty bundles/ruleLayers/instanceLayers -> exactly {} — the Unassigned bucket is now
+// present-only, the SAME test every other name gets; with zero entries of any kind, nothing is
+// "genuinely empty-typed" either, so "" does not appear (retires STEP125's own always-appended rule).
 void RunEmptyDataBootstrapCheck() {
     const std::vector<Params::MarkerLayerBundle> bundles;
     const std::vector<Params::MarkerRuleLayer> ruleLayers;
     const std::vector<Params::MarkerInstanceLayer> instanceLayers;
     const std::vector<std::string> result = EnumerateMarkerTypeSectionNames(bundles, ruleLayers, instanceLayers);
-    Check(NamesEqual(result, { "" }), "empty everything returns exactly {\"\"} (the Unassigned bucket, always present)");
+    Check(NamesEqual(result, {}), "empty everything (zero bundles/layers at all) returns exactly {} — no "
+                                  "Unassigned bucket invented when nothing is genuinely empty-typed");
 }
 
 // Bundles typed {"Spawn", "Alloy", "Expansion"}, a rule layer typed "Generic", an instance layer
@@ -53,7 +55,8 @@ void RunFixedOrderAlphabeticalUnassignedCheck() {
 }
 
 // The same "Alloy" value present on both a Bundle AND a rule layer produces exactly ONE "Alloy"
-// entry — the union is deduped, not per-collection.
+// entry — the union is deduped, not per-collection. STEP128 §4: neither entry is empty-typed, so the
+// Unassigned bucket correctly does NOT appear either.
 void RunCrossCollectionDedupCheck() {
     std::vector<Params::MarkerLayerBundle> bundles(1);
     bundles[0].markerTypeName = "Alloy";
@@ -62,7 +65,27 @@ void RunCrossCollectionDedupCheck() {
     const std::vector<Params::MarkerInstanceLayer> instanceLayers;
 
     const std::vector<std::string> result = EnumerateMarkerTypeSectionNames(bundles, ruleLayers, instanceLayers);
-    Check(NamesEqual(result, { "Alloy", "" }), "the same type on two collections produces exactly one entry");
+    Check(NamesEqual(result, { "Alloy" }),
+          "the same type on two collections produces exactly one entry, and no Unassigned bucket "
+          "(nothing is genuinely empty-typed)");
+}
+
+// STEP128 §4: a plain data-level assertion, no imgui frame needed — typing a real name into a
+// previously-empty row's own markerTypeName (the free-text field's own mutation target) moves it out
+// of the Unassigned bucket and into that name's own section, next call.
+void RunTypingIntoEmptyRowMovesSectionCheck() {
+    std::vector<Params::MarkerLayerBundle> bundles;
+    std::vector<Params::MarkerRuleLayer> ruleLayers(1);   // starts genuinely empty-typed
+    const std::vector<Params::MarkerInstanceLayer> instanceLayers;
+
+    const std::vector<std::string> before = EnumerateMarkerTypeSectionNames(bundles, ruleLayers, instanceLayers);
+    Check(NamesEqual(before, { "" }), "before typing, the row sits in the Unassigned bucket alone");
+
+    ruleLayers[0].markerTypeName = "Generic";   // the free-text field's own DrawTextInput mutation target
+    const std::vector<std::string> after = EnumerateMarkerTypeSectionNames(bundles, ruleLayers, instanceLayers);
+    Check(NamesEqual(after, { "Generic" }),
+          "typing a real name moves the row's own Type section next enumeration — Unassigned no "
+          "longer appears, \"Generic\" now does");
 }
 
 // bundles/ruleLayers/instanceLayers each non-empty but EVERY entry has markerTypeName == "" ->
@@ -84,6 +107,7 @@ int main() {
     RunFixedOrderAlphabeticalUnassignedCheck();
     RunCrossCollectionDedupCheck();
     RunAllLegacyDataDegradesCheck();
+    RunTypingIntoEmptyRowMovesSectionCheck();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

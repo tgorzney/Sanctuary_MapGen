@@ -38,9 +38,23 @@ inline const char* const markerGlobalScaleRowLabels[kMarkerGlobalScaleRowCount] 
     "Alloy", "Plasma", "Spawn"
 };
 
+// STEP134 — the compact row's own fixed geometry. Named constants, not struct fields: a fixed
+// layout footprint (like kMarkerLayerColorOverrideSwatchWidthPixels,
+// MarkersTab_ManualLayerRowBody_UI.h), not a user-tunable recipe value, so Constitution §8's
+// "settings, not literals" does not reach it. The design doc's own flagged width-budget risk
+// (DESIGN_MarkersUICorrectionRound2_R1.md item 1+14) is why the track and icon are the two
+// SHRUNK-FIRST values here rather than the plan's rough 90px/48px estimate.
+inline constexpr float kMarkerGlobalScaleRowTrackWidthPixels  = 60.0f;
+inline constexpr float kMarkerGlobalScaleRowFieldWidthPixels  = 42.0f;
+inline constexpr float kMarkerGlobalScaleRowSwatchWidthPixels = 20.0f;
+
 struct MarkerGlobalScaleRow {
     RealtimeToggle iconScaleToggle{true};
     RealtimeToggle previewColorToggle{true};
+    // NEW — STEP134: the select-color swatch's own toggle, independent of the two above (the
+    // struct's existing two-separate-toggles convention — each field keeps its own
+    // RT-tweakability, never merged).
+    RealtimeToggle selectColorToggle{true};
     // NEW — STEP121: this row's OWN popup/highlight state, so each row's picker remembers its own
     // scroll position and highlighted cell independently. Replaces the single shared
     // MarkersTabGlobals::iconGridState + selectedScaleRowIndex "click a row to make it the active
@@ -54,7 +68,10 @@ struct MarkersTabGlobals {
     SectionState      section;
     ScalarSliderRange iconScaleRange{ 0.1f, 10.0f, 0.0f };
     MarkerGlobalScaleRow scaleRows[kMarkerGlobalScaleRowCount];
-    float iconButtonSizePixels = 48.0f;    // NEW — Constitution §8, the row's icon-button footprint
+    // STEP134: shrunk 48->32 — the FIRST of the ticket's own "shrink icon button and track width
+    // first" width-budget remedies, now that the row carries 5 controls on one line instead of 3
+    // across three ImGui::Columns.
+    float iconButtonSizePixels = 32.0f;    // NEW — Constitution §8, the row's icon-button footprint
 
     std::string           gamedataDirectory;      // SCOPE NOTE 1
     FilePathPickerOptions gamedataOptions;        // a directory: no extension fence
@@ -68,9 +85,13 @@ struct MarkersTabGlobals {
 // mirroring the posture MarkersTab_ManualLayerRowBody_UI.cpp already uses for `layer.iconScale`
 // (bind straight to the PARAMS field, no scratch intermediary).
 struct GlobalMarkerScaleRowFields {
-    float*       scale    = nullptr;
-    float*       color    = nullptr;   // 4 floats: colorAlloy/colorPlasma/colorSpawn
-    std::string* iconName = nullptr;   // iconNameAlloy/iconNamePlasma/iconNameSpawn
+    float*       scale       = nullptr;
+    float*       color       = nullptr;   // 4 floats: colorAlloy/colorPlasma/colorSpawn
+    std::string* iconName    = nullptr;   // iconNameAlloy/iconNamePlasma/iconNameSpawn
+    // NEW — STEP134 (ARCH §19.17's select-tint field, item 14): 4 floats:
+    // selectColorAlloy/Plasma/Spawn. selectColorDefault is never resolved to by this per-type row —
+    // it is the resolver's own unmatched-name fallback (GlobalMarkerSettings_PARAMS.h), not a 4th row.
+    float*       selectColor = nullptr;
 };
 
 // rowIndex -> the GlobalMarkerSettings fields that row edits (Alloy=0/Plasma=1/Spawn=2, the same
@@ -81,12 +102,30 @@ struct GlobalMarkerScaleRowFields {
 inline GlobalMarkerScaleRowFields ResolveGlobalMarkerScaleRowFields(
     Params::GlobalMarkerSettings& settings, int rowIndex) {
     switch (rowIndex) {
-        case 0: return { &settings.scaleAlloy,  settings.colorAlloy,  &settings.iconNameAlloy };
-        case 1: return { &settings.scalePlasma, settings.colorPlasma, &settings.iconNamePlasma };
-        case 2: return { &settings.scaleSpawn,  settings.colorSpawn,  &settings.iconNameSpawn };
+        case 0: return { &settings.scaleAlloy,  settings.colorAlloy,  &settings.iconNameAlloy,
+                         settings.selectColorAlloy };
+        case 1: return { &settings.scalePlasma, settings.colorPlasma, &settings.iconNamePlasma,
+                         settings.selectColorPlasma };
+        case 2: return { &settings.scaleSpawn,  settings.colorSpawn,  &settings.iconNameSpawn,
+                         settings.selectColorSpawn };
         default: return {};
     }
 }
+
+// The row's icon button + its own popup grid — declared here (not file-local/anonymous), like
+// DrawGlobalScaleRow below, so the headless-frame acceptance test can drive DrawGlobalScaleRow's
+// own five constituent calls one at a time and capture each control's own item rect (there is no
+// other way to see an INTERMEDIATE item rect from inside one opaque DrawGlobalScaleRow call).
+void DrawGlobalScaleRowIconButton(MarkerGlobalScaleRow& row, std::string& iconNameField,
+                                  const MarkersTabGlobals& globals, const IconAtlasManifest* iconManifest,
+                                  const IconAtlasPairingLookup* pairingLookup);
+
+// STEP134: one Global row, drawn as a genuine single ImGui::SameLine()-chained line — declared
+// here (not file-local/anonymous) so the headless-frame acceptance test can drive it directly,
+// mirroring DrawManualMarkerLayerColorOverrideHeaderControl's own test-callable posture
+// (MarkersTab_ManualLayerRowBody_UI.h).
+void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::GlobalMarkerSettings& globalMarkerSettings,
+                        const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup);
 
 // Draws the global section. `iconManifest`/`pairingLookup` are both nullable: with no resident
 // atlas the icon column shows a disabled placeholder button instead of a thumbnail.

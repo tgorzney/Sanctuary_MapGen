@@ -24,21 +24,22 @@ struct IconAtlasManifest;
 // order: Alloy, Plasma, Spawn first (each only if actually present — this stays a DYNAMIC
 // enumeration, not three hardcoded tabs), then every other distinct non-empty value, alphabetical,
 // then "" last. "" is the internal key for the "(Unassigned)" bucket (a Bundle/Layer whose own
-// markerTypeName == "") — see DrawMarkerTypeSections's own header comment for why "" is ALWAYS
-// appended (a STEP125 bootstrap ruling, not literally spelled out by ARCH_19_14's own text).
+// markerTypeName == ""). STEP128 §4: "" is present-only, the SAME test every other name gets — it
+// appears only when at least one Bundle/RuleLayer/InstanceLayer genuinely has markerTypeName == "";
+// an entirely empty recipe (zero Bundles/Layers of any kind) returns {}. Retires STEP125's own
+// always-appended bootstrap rule.
 std::vector<std::string> EnumerateMarkerTypeSectionNames(
     const std::vector<Params::MarkerLayerBundle>& bundles,
     const std::vector<Params::MarkerRuleLayer>& ruleLayers,
     const std::vector<Params::MarkerInstanceLayer>& instanceLayers);
 
-// One Type-section's own three independent collapse toggles: the section itself, plus its two
-// nested "Ungrouped ..." sub-sections (Item 3: "nested one level deeper", not retired). Grouped in
-// one struct so ONE map lookup (below) reaches all three, mirroring how MarkersTabState already
-// groups several SectionStates together per block.
+// One Type-section's own single collapse toggle. STEP128 §5: the two nested "Ungrouped ..."
+// sub-sections are RETIRED — those rows now render flat (plain rows, no enclosing collapsible
+// header) directly after the Bundle tree, so there is nothing left for a nested SectionState to
+// gate. Still its own struct (not a bare SectionState) so a later per-Type-section addition has
+// somewhere to land without another map-lookup indirection.
 struct MarkerTypeSectionState_UI {
     SectionState outerSection;
-    SectionState ungroupedProceduralSection;
-    SectionState ungroupedManualSection;
 };
 
 // Caller-owned (Section_UI.h's rule; MarkersTabState's "one instance each" posture), keyed by the

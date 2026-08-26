@@ -16,6 +16,8 @@ void DrawGamedataSource(MarkersTabGlobals& globals) {
     if (globals.bIconScanRequested) ImGui::TextUnformatted("Icon scan requested - waiting on the host.");
 }
 
+} // namespace
+
 // The row's icon button + its own popup grid. Mirrors DrawColorSwatch's shape exactly
 // (ColorButton -> OpenPopup on click -> unconditional BeginPopup/EndPopup every frame), swapping
 // ColorButton/ColorPicker4 for ImageButton/DrawIconGrid.
@@ -56,8 +58,15 @@ void DrawGlobalScaleRowIconButton(MarkerGlobalScaleRow& row, std::string& iconNa
     }
 }
 
-// One global scale row, one line, three columns: icon button, Icon Scale (Global), Preview Color —
-// every control bound directly to `Params::GlobalMarkerSettings`, no scratch intermediary.
+// STEP134: one global scale row, one genuine ImGui line, five SameLine()-chained controls — icon
+// button / label / compact scale slider / normal-color swatch / select-color swatch — every
+// control bound directly to `Params::GlobalMarkerSettings`, no scratch intermediary. Replaces the
+// ImGui::Columns 3-column/3-line shape (MarkersTab_Globals_UI.cpp history): DrawSliderScalar's own
+// label+track+value 3-line shape was the tallest column, so the row could never be one line no
+// matter how the columns were arranged (see MarkersTab_Globals_UI.h's DrawSliderScalarCompact
+// note). No AlignTextToFramePadding on the label: every item in this SameLine() run must share
+// the row's own top Y (the acceptance test's literal contract), and align-to-frame-padding would
+// shift the label's item rect down by FramePadding.y and break that.
 void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::GlobalMarkerSettings& globalMarkerSettings,
                         const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup) {
     const GlobalMarkerScaleRowFields fields = ResolveGlobalMarkerScaleRowFields(globalMarkerSettings, rowIndex);
@@ -65,20 +74,24 @@ void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::Global
     MarkerGlobalScaleRow& row = globals.scaleRows[rowIndex];
 
     ImGui::PushID(rowIndex);
-    ImGui::TextUnformatted(markerGlobalScaleRowLabels[rowIndex]);
-    ImGui::Columns(3, "markerGlobalScaleRowColumns", false);
-    ImGui::SetColumnWidth(0, globals.iconButtonSizePixels + ImGui::GetStyle().FramePadding.x * 2.0f);
     DrawGlobalScaleRowIconButton(row, *fields.iconName, globals, iconManifest, pairingLookup);
-    ImGui::NextColumn();
-    DrawSliderScalar("Icon Scale (Global)", *fields.scale, globals.iconScaleRange, row.iconScaleToggle,
-                     WidgetStyle(), "%.2f");
-    ImGui::NextColumn();
-    DrawColorSwatch("Preview Color", fields.color, globals.previewColorOptions, row.previewColorToggle);
-    ImGui::Columns(1);
+    ImGui::SameLine();
+    ImGui::TextUnformatted(markerGlobalScaleRowLabels[rowIndex]);
+    ImGui::SameLine();
+    DrawSliderScalarCompact(markerGlobalScaleRowLabels[rowIndex], *fields.scale, globals.iconScaleRange,
+                            row.iconScaleToggle, kMarkerGlobalScaleRowTrackWidthPixels,
+                            kMarkerGlobalScaleRowFieldWidthPixels, WidgetStyle(), "%.2f");
+    ImGui::SameLine();
+    ColorSwatchOptions compactSwatchOptions = globals.previewColorOptions;   // COPY: do not mutate
+                                                                              // the shared section-
+                                                                              // level options struct
+    compactSwatchOptions.bLabelHidden = true;
+    compactSwatchOptions.swatchWidth  = kMarkerGlobalScaleRowSwatchWidthPixels;
+    DrawColorSwatch("PreviewColor", fields.color, compactSwatchOptions, row.previewColorToggle);
+    ImGui::SameLine();
+    DrawColorSwatch("SelectColor", fields.selectColor, compactSwatchOptions, row.selectColorToggle);
     ImGui::PopID();
 }
-
-} // namespace
 
 void DrawMarkersTabGlobals(MarkersTabGlobals& globals, Params::GlobalMarkerSettings& globalMarkerSettings,
                            const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup) {

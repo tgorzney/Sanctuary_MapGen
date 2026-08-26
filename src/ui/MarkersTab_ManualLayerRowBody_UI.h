@@ -27,6 +27,15 @@ namespace Ui {
 inline constexpr float kMarkerLayerColorOverrideHeaderWidthPixels = 90.0f;
 inline constexpr float kMarkerLayerColorOverrideSwatchWidthPixels = 24.0f;
 
+// STEP130 (ARCH §19.24) — reserved width for the header's Symmetry-toggle checkbox
+// (DrawMarkerLayerSymmetryToggleHeaderControl, below), placed LEFT of the Color Override control,
+// so the header's own reservation is the sum of both. Eyeballed the same way as the constant above:
+// a plain, no-label checkbox is narrower than the Color Override pair (no swatch), plus its own
+// `ImGui::SameLine()` gap before Color Override starts.
+inline constexpr float kMarkerLayerSymmetryToggleWidthPixels = 30.0f;
+inline constexpr float kMarkerLayerHeaderExtraCombinedWidthPixels =
+    kMarkerLayerSymmetryToggleWidthPixels + kMarkerLayerColorOverrideHeaderWidthPixels;
+
 // The row's own name, tint, icon scale, grid snap, symmetry setting, and (STEP126, Open Q7) its own
 // per-Layer instance list — STEP110: drawn inline in THIS row's own expanded body, not "selected"-
 // gated. Tint hides under the block's shared-color mode (ARCH §4 rival-control rule). Layer-level
@@ -43,10 +52,18 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier);
 
 // STEP123: the row header's own compact Color Override control (checkbox + swatch), drawn on EVERY
-// row's header line via DraggableList's header-extra slot, not gated on row-expand state — see
-// MarkersTab_ManualLayerRowBody_UI.cpp for why the (unchanged) body copy above is not removed.
+// row's header line via DraggableList's/TreeListWidget's header-extra slot, not gated on row-expand
+// state. STEP130: this is now the ONLY place Color Override draws — the body copy formerly here for
+// bundled layers (which had no other way to reach the control) is deleted, since the Bundle tree's
+// own `drawLeafHeaderExtra` slot (ARCH §19.23) now reaches this same function for bundled rows too.
 void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer& layer,
                                                       ManualMarkerLayersState& state, bool& bAnyCommitted);
+
+// STEP130 (ARCH §19.24): the row header's own Symmetry-toggle control — a plain checkbox bound to
+// `layer.bSymmetryEnabled`, no swatch. Mirrors DrawManualMarkerLayerColorOverrideHeaderControl's
+// shape exactly (empty label, hover tooltip). Drawn LEFT of the Color Override control at every
+// call site (`[Symmetry toggle][Color Override]`).
+void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted);
 
 } // namespace Ui
 } // namespace SanmapGen

@@ -30,12 +30,37 @@ public:
     // drawNodeBody(nodeIdentifier): the node's own inline content when its row is expanded.
     // drawExpandedLeafBody(leafKey): the additive piece ARCH_19_07 requires — a no-op lambda for a
     // read-only-leaf consumer (Assembly's later ticket).
+    // STEP129 (ARCH §19.23): the original 7-callback shape every existing call site binds. A thin
+    // delegator onto the 9-callback overload below with no-op header-extra callbacks and a 0.0f
+    // reserved width — every current call site recompiles unchanged; arity alone disambiguates
+    // which overload a 7-callback caller resolves to (the exact STEP123 DraggableList precedent).
     template <typename IdOfFn, typename ParentIdOfFn, typename NameOfFn, typename DrawNodeBodyFn,
              typename DescribeLeavesFn, typename LeafLabelFn, typename DrawExpandedLeafBodyFn>
     static TreeListSignal<LeafKeyT> Render(const char* treeIdentifier, const std::vector<T>& nodes,
         IdOfFn idOf, ParentIdOfFn parentIdOf, NameOfFn nameOf, DrawNodeBodyFn drawNodeBody,
         DescribeLeavesFn describeLeaves, LeafLabelFn leafLabel, DrawExpandedLeafBodyFn drawExpandedLeafBody,
         TreeListState& state, int selectedNodeIdentifier = -1) {
+        return Render(treeIdentifier, nodes, idOf, parentIdOf, nameOf, drawNodeBody, describeLeaves,
+                     leafLabel, drawExpandedLeafBody, [](int) {}, [](const LeafKeyT&) {}, 0.0f, state,
+                     selectedNodeIdentifier);
+    }
+
+    // STEP129 (ARCH §19.23): the OPTIONAL per-row header-extra slot — TWO callbacks, not one,
+    // because a tree row has two distinct row kinds with two distinct identity types (Node's own
+    // `int nodeIdentifier` vs. Leaf's own `const LeafKeyT&`), a deliberate, permanent divergence
+    // from DraggableList<T>::Render's single-callback shape (ARCH_19_23 — ratified as designed, not
+    // an inconsistency to unify). `headerExtraWidthPixels` is a FIXED width the CALLER supplies and
+    // is reserved UNCONDITIONALLY on every row so the control sits at one constant right-aligned
+    // offset regardless of any individual row's own state.
+    // headerExtraWidthPixels == 0.0f (the overload above) draws nothing and reserves nothing.
+    template <typename IdOfFn, typename ParentIdOfFn, typename NameOfFn, typename DrawNodeBodyFn,
+             typename DescribeLeavesFn, typename LeafLabelFn, typename DrawExpandedLeafBodyFn,
+             typename DrawNodeHeaderExtraFn, typename DrawLeafHeaderExtraFn>
+    static TreeListSignal<LeafKeyT> Render(const char* treeIdentifier, const std::vector<T>& nodes,
+        IdOfFn idOf, ParentIdOfFn parentIdOf, NameOfFn nameOf, DrawNodeBodyFn drawNodeBody,
+        DescribeLeavesFn describeLeaves, LeafLabelFn leafLabel, DrawExpandedLeafBodyFn drawExpandedLeafBody,
+        DrawNodeHeaderExtraFn drawNodeHeaderExtra, DrawLeafHeaderExtraFn drawLeafHeaderExtra,
+        float headerExtraWidthPixels, TreeListState& state, int selectedNodeIdentifier = -1) {
         TreeListSignal<LeafKeyT> signal;
         if (treeIdentifier == nullptr) return signal;
         const char* const payloadIdentifier =
@@ -58,7 +83,8 @@ public:
         TreeListDetail::DrawRootDropZoneRow<LeafKeyT>(payloadIdentifier, signal);
         for (int rootIndex : rootIndices)
             TreeListDetail::RenderNode(payloadIdentifier, nodes, rootIndex, childrenOf, idOf, parentIdOf, nameOf,
-                                       drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody, state,
+                                       drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody,
+                                       drawNodeHeaderExtra, drawLeafHeaderExtra, headerExtraWidthPixels, state,
                                        selectedNodeIdentifier, signal);
 
         ImGui::PopID();

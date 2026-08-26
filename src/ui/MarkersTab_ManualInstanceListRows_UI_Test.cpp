@@ -12,6 +12,7 @@
 #include "ListWidget_TestFrame_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
+#include <cmath>
 #include <cstdio>
 
 using namespace SanmapGen;
@@ -142,11 +143,48 @@ void RunNoInstancesRendersNoneChecks() {
     Check(selectedManualInstanceIdentifier == -1, "clicking where a row would have been does nothing — no row exists");
 }
 
+// STEP130: DrawLayerRowBody's own body no longer draws a Color-Override checkbox/swatch block for
+// EITHER a bundled or an ungrouped layer -- the block used to gate on `!state.bUseGroupColor`
+// (STEP123's own comment for why it survived: bundled layers had no other way to reach the
+// control). Proof: the row's own rendered HEIGHT is now IDENTICAL regardless of
+// state.bUseGroupColor, since nothing left in the body reacts to that flag -- mirrors
+// MarkersTab_ManualLayers_UI_Test.cpp's own RunManualLayerMarkerTypeFieldConditionalCheck
+// height-diff technique.
+float RunRowBodyHeight(bool bUseGroupColor) {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+    std::vector<Params::MarkerInstanceGroup> markers;
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    ManualMarkerLayersState state;
+    state.bUseGroupColor = bUseGroupColor;
+    int selectedManualInstanceIdentifier = -1;
+    const Params::Geometry geometry;
+    Params::MarkerSymmetryFixSettings symmetryFixSettings;
+    float height = 0.0f;
+    RunHeadlessFrame(HeadlessMouseState(), kWindowSize, [&] {
+        const float startY = ImGui::GetCursorPosY();
+        DrawLayerRowBody(markerLayers[0], 0, markerLayers, markers, geometry, Params::SymmetryAxis::None, 3,
+                         symmetryFixSettings, state, instanceIndex, selectedManualInstanceIdentifier);
+        height = ImGui::GetCursorPosY() - startY;
+    });
+    return height;
+}
+
+void RunColorOverrideBodyCopyRemovedCheck() {
+    const float heightWithGroupColorOff = RunRowBodyHeight(false);
+    const float heightWithGroupColorOn  = RunRowBodyHeight(true);
+    Check(std::fabs(heightWithGroupColorOff - heightWithGroupColorOn) < 0.01f,
+          "DrawLayerRowBody's own rendered height is identical regardless of state.bUseGroupColor -- "
+          "proof the body's own Color-Override checkbox/swatch block (formerly gated on "
+          "!state.bUseGroupColor) no longer exists, for either a bundled or an ungrouped layer");
+}
+
 } // namespace
 
 int main() {
     RunInstanceRowClickChecks();
     RunNoInstancesRendersNoneChecks();
+    RunColorOverrideBodyCopyRemovedCheck();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

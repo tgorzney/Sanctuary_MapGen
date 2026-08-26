@@ -7,10 +7,10 @@
 namespace SanmapGen {
 namespace Ui {
 
-ScalarSliderTrackGeometry ReserveScalarSliderTrack(const WidgetStyle& style) {
+ScalarSliderTrackGeometry ReserveScalarSliderTrack(const WidgetStyle& style, float requestedWidthPixels) {
     ScalarSliderTrackGeometry geometry;
     geometry.origin      = ImGui::GetCursorScreenPos();
-    geometry.width       = ImGui::GetContentRegionAvail().x;
+    geometry.width       = requestedWidthPixels > 0.0f ? requestedWidthPixels : ImGui::GetContentRegionAvail().x;
     geometry.height      = ResolveWidgetTrackHeight(style);
     geometry.handleWidth = style.handleWidth > 1.0f ? style.handleWidth : 1.0f;
     geometry.usableWidth = geometry.width - geometry.handleWidth;

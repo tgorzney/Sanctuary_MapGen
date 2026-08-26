@@ -52,6 +52,22 @@ const char* MarkerGroupLeafLabel(const MarkerGroupLeafKey_UI& leaf,
 
 } // namespace
 
+// STEP130 (ARCH §19.24, item 7(b)): the Bundle tree's `drawLeafHeaderExtra` body — the FIRST real
+// consumer of STEP129's slot. Rule (Procedural) leaves have no color/symmetry field, so the guard
+// returns before resolving into `instanceLayers`; a Manual leaf draws [Symmetry toggle][Color
+// Override], same order/shape as the flat/ungrouped DraggableList rows. Declared in the header so
+// MarkersTab_Bundles_UI_Test.cpp can drive it directly without a full tree frame.
+void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
+                                    std::vector<Params::MarkerInstanceLayer>& instanceLayers,
+                                    ManualMarkerLayersState& manualLayersState, bool& bAnyCommitted) {
+    if (leaf.kind != MarkerGroupLeafKey_UI::Kind::Manual) return;
+    if (leaf.layerIndex < 0 || leaf.layerIndex >= static_cast<int>(instanceLayers.size())) return;
+    Params::MarkerInstanceLayer& layer = instanceLayers[static_cast<std::size_t>(leaf.layerIndex)];
+    DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
+    ImGui::SameLine();
+    DrawManualMarkerLayerColorOverrideHeaderControl(layer, manualLayersState, bAnyCommitted);
+}
+
 MarkerLayerBundleLeafIndex_UI BuildMarkerLayerBundleLeafIndex(
         const std::vector<Params::MarkerRuleLayer>& ruleLayers,
         const std::vector<Params::MarkerInstanceLayer>& instanceLayers) {
@@ -93,6 +109,9 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
     // are looked up by that Bundle's own (globally unique) identifier regardless of which
     // Type-section is currently rendering, so this index needs no filtering of its own.
     const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    bool bHeaderExtraCommitted = false;   // STEP130: discarded — no downstream consumer today, same
+                                          // posture as DrawLayerList's own bAnyNameCommitted before a
+                                          // future name-uniqueness-style repair needs it here too.
 
     const TreeListSignal<MarkerGroupLeafKey_UI> signal =
         TreeListWidget_UI<Params::MarkerLayerBundle, MarkerGroupLeafKey_UI>::Render(
@@ -115,6 +134,12 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                         globalRadialRepeatCount, markerSymmetryFixSettings, rootState, previewDriver,
                                         instanceIndex);
             },
+            [](int) {},   // drawNodeHeaderExtra — no-op, Bundle nodes have no color/symmetry field of
+                          // their own (ARCH §19.24's controls are per-Layer, not per-Group).
+            [&](const MarkerGroupLeafKey_UI& leaf) {
+                DrawMarkerGroupLeafHeaderExtra(leaf, instanceLayers, rootState.manualLayers, bHeaderExtraCommitted);
+            },
+            kMarkerLayerHeaderExtraCombinedWidthPixels,
             state.treeState, state.selectedBundleIdentifier);
 
     ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, state);

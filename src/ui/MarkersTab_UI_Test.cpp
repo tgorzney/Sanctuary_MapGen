@@ -124,8 +124,9 @@ void RunRealtimeDefaultChecks() {
           && state.ruleDetail.focusContrastToggle.IsRealtimeEnabled(),
           "MarkerRuleDetailState's six toggles default to realtime ON (STEP118)");
     Check(state.globals.scaleRows[0].iconScaleToggle.IsRealtimeEnabled()
-          && state.globals.scaleRows[0].previewColorToggle.IsRealtimeEnabled(),
-          "MarkerGlobalScaleRow's two toggles default to realtime ON (STEP118)");
+          && state.globals.scaleRows[0].previewColorToggle.IsRealtimeEnabled()
+          && state.globals.scaleRows[0].selectColorToggle.IsRealtimeEnabled(),
+          "MarkerGlobalScaleRow's three toggles default to realtime ON (STEP118, +selectColorToggle STEP134)");
 }
 
 } // namespace

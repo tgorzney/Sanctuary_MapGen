@@ -3,13 +3,13 @@
 // DraggableList_TestScene_UI.h's own shape.
 //
 // The scene is the CALLER's state: TreeListWidget_UI never writes it (but for TreeListState::
-// expandedNodeIdentifiers, its one precedented exception) — every assertion about the caller's own
-// data is an assertion about what the test applied from a signal, never a mutation the widget itself
-// made.
+// expandedNodeIdentifiers, its one precedented exception) — every assertion is about what the test
+// applied from a signal, never a mutation the widget itself made.
 #pragma once
 #include "ListWidget_TestFrame_UI.h"
 #include "TreeListWidget_UI.h"
 #include <cstdio>
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
@@ -38,10 +38,8 @@ struct TreeScene {
     std::unordered_map<int, ImVec2> nodeRowTopLeft;
     std::unordered_map<int, ImVec2> leafRowTopLeft;
     // The PRECISE item rect (min/max) of a node's own header row — captured one call later than
-    // nodeRowTopLeft (at the START of the NEXT sibling's own nameOf call, when the previous node's
-    // header is still the last-submitted imgui item): nodeRowTopLeft's own gap between consecutive
-    // cursor starts also includes ItemSpacing, which is NOT part of the row's own hit-testable rect
-    // DetectTreeRowDragAndDrop bands against — using the gap for drop-zone-band math undershoots.
+    // nodeRowTopLeft (at the START of the NEXT sibling's nameOf call, the previous header still
+    // being the last-submitted imgui item); nodeRowTopLeft's own gap also includes ItemSpacing.
     std::unordered_map<int, ImVec2> nodeRowRectMin;
     std::unordered_map<int, ImVec2> nodeRowRectMax;
     int   previousNodeIdentifierThisFrame = -1;
@@ -68,7 +66,18 @@ inline const char* TreeSceneLeafLabel(int leaf) {
     return leaf == 100 ? "Leaf100" : "Leaf101";
 }
 
-inline TreeListSignal<int> RunTreeSceneFrame(TreeScene& scene, ImVec2 mousePosition, bool bLeftButtonDown) {
+// STEP129: `headerExtraWidthPixels`/`drawNodeHeaderExtra`/`drawLeafHeaderExtra` are OPTIONAL — left
+// at their defaults (0.0f / no-ops), this calls the ORIGINAL 7-callback `Render` overload, so every
+// pre-STEP129 caller keeps its exact code path. A nonzero width switches to the 9-callback overload.
+// `bForceNineCallbackOverload`: escape hatch so a regression test can force the NEW 9-callback
+// overload at headerExtraWidthPixels == 0.0f, to diff its geometry against the delegator's own.
+template <typename DrawNodeHeaderExtraFunction = std::function<void(int)>,
+         typename DrawLeafHeaderExtraFunction = std::function<void(const int&)>>
+inline TreeListSignal<int> RunTreeSceneFrame(TreeScene& scene, ImVec2 mousePosition, bool bLeftButtonDown,
+    float headerExtraWidthPixels = 0.0f,
+    DrawNodeHeaderExtraFunction drawNodeHeaderExtra = [](int) {},
+    DrawLeafHeaderExtraFunction drawLeafHeaderExtra = [](const int&) {},
+    bool bForceNineCallbackOverload = false) {
     HeadlessMouseState mouse;
     mouse.position = mousePosition;
     mouse.bLeftButtonDown = bLeftButtonDown;
@@ -78,37 +87,41 @@ inline TreeListSignal<int> RunTreeSceneFrame(TreeScene& scene, ImVec2 mousePosit
     scene.previousNodeIdentifierThisFrame = -1;
     RunHeadlessFrame(mouse, kTreeSceneWindowSize, [&] {
         scene.rootDropZoneTopY = ImGui::GetCursorScreenPos().y;
-        scene.signal = TreeListWidget_UI<TestNode, int>::Render(
-            "TestTree", scene.nodes,
-            [](const TestNode& node) { return node.identifier; },
-            [](const TestNode& node) { return node.parentIdentifier; },
-            [&](const TestNode& node) {
-                // The previous node's header (if any) is still the last-submitted imgui item — its
-                // own precise rect is only available NOW, one nameOf call later (see nodeRowRectMin/
-                // Max's own comment above).
-                if (scene.previousNodeIdentifierThisFrame != -1) {
-                    scene.nodeRowRectMin[scene.previousNodeIdentifierThisFrame] = ImGui::GetItemRectMin();
-                    scene.nodeRowRectMax[scene.previousNodeIdentifierThisFrame] = ImGui::GetItemRectMax();
-                }
-                scene.previousNodeIdentifierThisFrame = node.identifier;
-                const ImVec2 rowCorner = ImGui::GetCursorScreenPos();
-                scene.nodeRowTopLeft[node.identifier] = rowCorner;
-                scene.rowLeftX = rowCorner.x;
-                return node.name;
-            },
-            [&](int nodeIdentifier) { scene.nodeBodyCallsThisFrame.push_back(nodeIdentifier); },
-            [&](int nodeIdentifier) -> const std::vector<int>& {
-                static const std::vector<int> kEmpty;
-                const auto it = scene.leavesByNode.find(nodeIdentifier);
-                return it != scene.leavesByNode.end() ? it->second : kEmpty;
-            },
-            [&](const int& leaf) -> const char* {
-                scene.leafRowTopLeft[leaf] = ImGui::GetCursorScreenPos();
-                scene.leafRowDrawsThisFrame.push_back(leaf);
-                return TreeSceneLeafLabel(leaf);
-            },
-            [&](const int& leaf) { scene.leafBodyCallsThisFrame.push_back(leaf); },
-            scene.treeState, scene.selectedNodeIdentifier);
+        const auto idOf = [](const TestNode& node) { return node.identifier; };
+        const auto parentIdOf = [](const TestNode& node) { return node.parentIdentifier; };
+        const auto nameOf = [&](const TestNode& node) {
+            // The previous node's header rect is only available NOW, one nameOf call later (see
+            // nodeRowRectMin/Max's own comment above).
+            if (scene.previousNodeIdentifierThisFrame != -1) {
+                scene.nodeRowRectMin[scene.previousNodeIdentifierThisFrame] = ImGui::GetItemRectMin();
+                scene.nodeRowRectMax[scene.previousNodeIdentifierThisFrame] = ImGui::GetItemRectMax();
+            }
+            scene.previousNodeIdentifierThisFrame = node.identifier;
+            const ImVec2 rowCorner = ImGui::GetCursorScreenPos();
+            scene.nodeRowTopLeft[node.identifier] = rowCorner;
+            scene.rowLeftX = rowCorner.x;
+            return node.name;
+        };
+        const auto drawNodeBody = [&](int nodeIdentifier) { scene.nodeBodyCallsThisFrame.push_back(nodeIdentifier); };
+        const auto describeLeaves = [&](int nodeIdentifier) -> const std::vector<int>& {
+            static const std::vector<int> kEmpty;
+            const auto it = scene.leavesByNode.find(nodeIdentifier);
+            return it != scene.leavesByNode.end() ? it->second : kEmpty;
+        };
+        const auto leafLabel = [&](const int& leaf) -> const char* {
+            scene.leafRowTopLeft[leaf] = ImGui::GetCursorScreenPos();
+            scene.leafRowDrawsThisFrame.push_back(leaf);
+            return TreeSceneLeafLabel(leaf);
+        };
+        const auto drawExpandedLeafBody = [&](const int& leaf) { scene.leafBodyCallsThisFrame.push_back(leaf); };
+        if (headerExtraWidthPixels > 0.0f || bForceNineCallbackOverload)
+            scene.signal = TreeListWidget_UI<TestNode, int>::Render("TestTree", scene.nodes, idOf, parentIdOf,
+                nameOf, drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody, drawNodeHeaderExtra,
+                drawLeafHeaderExtra, headerExtraWidthPixels, scene.treeState, scene.selectedNodeIdentifier);
+        else
+            scene.signal = TreeListWidget_UI<TestNode, int>::Render("TestTree", scene.nodes, idOf, parentIdOf,
+                nameOf, drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody,
+                scene.treeState, scene.selectedNodeIdentifier);   // the ORIGINAL 7-callback overload, unchanged path
     });
     return scene.signal;
 }

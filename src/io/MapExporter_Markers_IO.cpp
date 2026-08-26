@@ -80,6 +80,7 @@ nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["GridSnapEnabled"] = layer.bGridSnapEnabled;
         layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeWorldUnits;
         layerJson["ColorOverrideEnabled"] = layer.bColorOverrideEnabled;
+        layerJson["SymmetryEnabled"] = layer.bSymmetryEnabled;
         layerJson["ParentBundleIdentifier"] = layer.parentBundleIdentifier;
         layerJson["MarkerTypeName"] = layer.markerTypeName;
         markerGroups.push_back(layerJson);

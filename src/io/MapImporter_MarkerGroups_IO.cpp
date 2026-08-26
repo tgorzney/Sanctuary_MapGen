@@ -41,6 +41,7 @@ void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& out
             ReadJsonBoolean(layerJson, "GridSnapEnabled", layer.bGridSnapEnabled);
             ReadJsonFloat(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeWorldUnits);
             ReadJsonBoolean(layerJson, "ColorOverrideEnabled", layer.bColorOverrideEnabled);
+            ReadJsonBoolean(layerJson, "SymmetryEnabled", layer.bSymmetryEnabled);
             ReadJsonInteger(layerJson, "ParentBundleIdentifier", layer.parentBundleIdentifier);
             ReadJsonText(layerJson, "MarkerTypeName", layer.markerTypeName);   // NEW, STEP124/ARCH §19.13
         }

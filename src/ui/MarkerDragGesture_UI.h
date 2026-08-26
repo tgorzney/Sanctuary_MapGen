@@ -64,7 +64,10 @@ struct MarkerDragGestureState {
 // The raw, already-valid mask/count for `layerIndex` — `layer.symmetry.bSymmetryUseGlobal` selects
 // between the layer's own fields and the two global ones, per STEP68's own two-line ternary
 // (`SymmetryOrbitQuery_PIPELINE.h`'s wrapper deliberately does not resolve this itself). An
-// out-of-range `layerIndex` (Constitution §6) falls back to the global pair.
+// out-of-range `layerIndex` (Constitution §6) falls back to the global pair. ARCH §19.24: a
+// `bSymmetryEnabled == false` layer forces the EFFECTIVE mask to `Params::SymmetryAxis::None`
+// (radial repeat count 0) WITHOUT touching `layer.symmetry`'s own configured fields — the gate
+// applies only here, at read time.
 inline void ResolveEffectiveMarkerSymmetry(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                            int layerIndex, int globalSymmetryMask,
                                            int globalRadialRepeatCount, int& outMask,
@@ -73,6 +76,9 @@ inline void ResolveEffectiveMarkerSymmetry(const std::vector<Params::MarkerInsta
         outMask = globalSymmetryMask; outRadialRepeatCount = globalRadialRepeatCount; return;
     }
     const Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(layerIndex)];
+    if (!layer.bSymmetryEnabled) {
+        outMask = Params::SymmetryAxis::None; outRadialRepeatCount = 0; return;
+    }
     outMask = layer.symmetry.bSymmetryUseGlobal ? globalSymmetryMask : layer.symmetry.symmetryMask;
     outRadialRepeatCount = layer.symmetry.bSymmetryUseGlobal ? globalRadialRepeatCount
                                                               : layer.symmetry.radialSymmetryRepeatCount;

@@ -32,13 +32,10 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
     nameRules.bAllowEmpty   = false;
     nameRules.fallbackText  = "Marker Layer";
     const bool bNameCommitted = DrawTextInput("Name", layer.name, nameRules).bCommitted;
-    bool bColorOverrideCommitted = false;
-    if (!state.bUseGroupColor) {
-        bColorOverrideCommitted = DrawCheckbox("Color Override", layer.bColorOverrideEnabled).bCommitted;
-        ImGui::BeginDisabled(!layer.bColorOverrideEnabled);
-        DrawColorSwatch("Color", layer.color, state.previewColorOptions, state.selectedLayerColorToggle);
-        ImGui::EndDisabled();
-    }
+    // STEP130: Color Override no longer has a body copy — it is reachable from the row header on
+    // every row (ungrouped via DraggableList's header-extra slot, bundled via the Bundle tree's
+    // `drawLeafHeaderExtra` slot), so a second, body-drawn control is redundant (see
+    // DrawManualMarkerLayerColorOverrideHeaderControl below).
     DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
                      state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
     const bool bSnapCommitted = DrawCheckbox("Snap to Grid", layer.bGridSnapEnabled).bCommitted;
@@ -72,18 +69,17 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                 selectedManualInstanceIdentifier = instanceTransform.instanceIdentifier;
         }
     }
-    return bNameCommitted || bColorOverrideCommitted || bSnapCommitted || bSnapSizeCommitted;
+    return bNameCommitted || bSnapCommitted || bSnapSizeCommitted;
 }
 
 // STEP123: the row header's own compact Color Override control — checkbox + a small inline swatch,
-// drawn on EVERY row's collapsed header line via DraggableList's new header-extra slot, NOT gated on
-// the row's own expand state. Disabled (not hidden) while state.bUseGroupColor forces one shared
-// tint, so the header's own width never shifts when that block-wide toggle flips — deliberately
-// unlike the (unchanged, still-hidden-when-forced) body copy above; see the Out of Scope note in
-// STEP123_MarkerLayerColorOverrideOnHeader_UI.md for why the body copy is NOT removed: bundled
-// Manual Marker Layers reach this function ONLY through the Bundle tree's leaf-body callback
-// (TreeListWidget_UI, which has no header-extra mechanism of its own), so deleting the body copy
-// would silently strip Color Override access from every bundled layer.
+// drawn on EVERY row's collapsed header line via DraggableList's/TreeListWidget's header-extra slot,
+// NOT gated on the row's own expand state. Disabled (not hidden) while state.bUseGroupColor forces
+// one shared tint, so the header's own width never shifts when that block-wide toggle flips.
+// STEP130: this is now the ONLY place Color Override draws for EITHER an ungrouped row (the
+// STEP123 DraggableList slot) or a bundled row (the Bundle tree's `drawLeafHeaderExtra` slot,
+// ARCH §19.23) — the body copy this comment used to explain away is deleted, since both paths now
+// reach this function.
 void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer& layer,
                                                       ManualMarkerLayersState& state, bool& bAnyCommitted) {
     ImGui::BeginDisabled(state.bUseGroupColor);
@@ -101,6 +97,17 @@ void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer
     ImGui::EndDisabled();
     ImGui::EndDisabled();
     if (bOverrideCommitted || bColorCommitted) bAnyCommitted = true;
+}
+
+// STEP130 (ARCH §19.24): the row header's own Symmetry-toggle control — a plain checkbox bound to
+// `layer.bSymmetryEnabled`, no swatch, mirroring the Color Override checkbox's own empty-label +
+// hover-tooltip shape exactly. Placed LEFT of Color Override at every call site. Never touches
+// `layer.symmetry`'s own fields — toggling only flips the gate `ResolveEffectiveMarkerSymmetry`
+// reads (MarkerDragGesture_UI.h), so re-enabling restores the prior configuration unchanged.
+void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted) {
+    const bool bSymmetryCommitted = DrawCheckbox("", layer.bSymmetryEnabled).bCommitted;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Symmetry");
+    if (bSymmetryCommitted) bAnyCommitted = true;
 }
 
 } // namespace Ui

@@ -177,6 +177,39 @@ void ClickAddManualLayerButton(std::vector<Params::MarkerInstanceLayer>& layers,
     outClickedResult = RunAddManualLayerButtonFrame(release, layers, state, markerTypeNameForNewLayer);
 }
 
+// STEP128 §4: the row's own free-text "Marker Type" field draws ONLY when the row's own
+// markerTypeName is empty — mirrors MarkersTab_RuleLayers_UI_Test.cpp's own height-diff check one
+// tier over (RunGroupStratumIndexRemovedCheck's technique, LayerEditor_InlineSettings_UI_Test.cpp).
+// One layer, one frame, headless, zero `markers` (no instance-list rows to add height of their own).
+float RunLayerListHeight(const std::string& markerTypeName, const std::string& markerTypeNameFilter) {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerInstanceLayer> layers(1);
+    layers[0].markerTypeName = markerTypeName;
+    std::vector<Params::MarkerInstanceGroup> markers;
+    Params::Geometry geometry;
+    Params::MarkerSymmetryFixSettings symmetryFixSettings;
+    ManualMarkerLayersState state;
+    bool bAnyNameCommitted = false;
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    int selectedManualInstanceIdentifier = -1;
+    float height = 0.0f;
+    RunHeadlessFrame(HeadlessMouseState(), ImVec2(400.0f, 400.0f), [&] {
+        const float startY = ImGui::GetCursorPosY();
+        DrawLayerList(layers, markers, geometry, 0, 1, symmetryFixSettings, state, bAnyNameCommitted,
+                     instanceIndex, selectedManualInstanceIdentifier, markerTypeNameFilter);
+        height = ImGui::GetCursorPosY() - startY;
+    });
+    return height;
+}
+
+void RunManualLayerMarkerTypeFieldConditionalCheck() {
+    const float emptyTypeHeight = RunLayerListHeight("", "");
+    const float namedTypeHeight = RunLayerListHeight("Spawn", "Spawn");
+    Check(emptyTypeHeight > namedTypeHeight,
+          "an ungrouped row with markerTypeName.empty() draws the free-text 'Marker Type' field, "
+          "costing extra height a non-empty-typed row does not");
+}
+
 void RunDrawLayerListButtonsTypeSeedChecks() {
     HeadlessImguiSession session;
 
@@ -217,6 +250,7 @@ int main() {
     RunBuildManualInstanceLayerIndexChecks();
     RunIsMarkerInstanceLayerRowSuppressedChecks();
     RunDrawLayerListButtonsTypeSeedChecks();
+    RunManualLayerMarkerTypeFieldConditionalCheck();
     RunRealtimeDefaultChecks();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }

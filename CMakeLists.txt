@@ -780,6 +780,12 @@ add_sangen_test(MarkersTab_ManualLayers_UI_Test src/ui/MarkersTab_ManualLayers_U
 # posture); needs no explicit imgui link, same as that test, since SanGenV2 links imgui PUBLIC.
 add_sangen_test(MarkersTab_ManualLayerColorOverrideHeader_UI_Test
     src/ui/MarkersTab_ManualLayerColorOverrideHeader_UI_Test.cpp)
+# STEP134: DrawGlobalScaleRow's new genuine single-line composition (icon / label / compact scale
+# slider / normal-color swatch / select-color swatch) — every control shares one Y, left-to-right,
+# no overlap, fixed widths honored. Same headless-frame posture as
+# MarkersTab_ManualLayerColorOverrideHeader_UI_Test above.
+add_sangen_test(MarkersTab_GlobalScaleRowLine_UI_Test
+    src/ui/MarkersTab_GlobalScaleRowLine_UI_Test.cpp)
 # STEP126: DrawLayerRowBody's new per-Layer instance list (Open Q7) — row click selects the right
 # instanceIdentifier, a second click updates (not toggles/adds), and a layer with zero matching
 # instances renders "(none)" with no interactive row. One live headless imgui frame, no window/GL

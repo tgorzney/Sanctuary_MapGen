@@ -5,6 +5,8 @@
 // DraggableListWidget_UI_Test.cpp already established. The fixture and pointer helpers are in
 // TreeListWidget_TestScene_UI.h; main() is in VirtualListWidget_UI_Test.cpp.
 #include "TreeListWidget_TestScene_UI.h"
+#include <cmath>
+#include <vector>
 
 using namespace SanmapGen;
 using namespace SanmapGen::Ui;
@@ -194,6 +196,137 @@ void TestNodeDraggedOntoItselfEmitsNoSignal() {
     CheckListWidgetExpectation(!signal.bHasSignal(), "a node dragged onto itself produces no signal");
 }
 
+// STEP129 (ARCH §19.23) — TreeListWidget_UI<T,LeafKeyT>::Render header-extra slot.
+
+// Regression proof the 7-callback overload is now a true no-op delegator: driving the SAME tree
+// through the ORIGINAL 7-callback call form (delegatorScene) and, separately, through the NEW
+// 9-callback overload called EXPLICITLY with no-op header-extra callbacks and headerExtraWidthPixels
+// == 0.0f (explicitScene, forced via RunTreeSceneFrame's bForceNineCallbackOverload), must produce
+// byte-identical row geometry -- proof the delegation changes nothing for every existing call site.
+void TestZeroWidthDelegatorIsByteIdenticalToExplicitNineCallbackOverload() {
+    HeadlessImguiSession session;
+    TreeScene delegatorScene = MakeTreeScene();
+    delegatorScene.treeState.expandedNodeIdentifiers[10] = true;
+    RunTreeSceneFrame(delegatorScene, kTreeMouseAway, false);
+    RunTreeSceneFrame(delegatorScene, kTreeMouseAway, false);
+
+    TreeScene explicitScene = MakeTreeScene();
+    explicitScene.treeState.expandedNodeIdentifiers[10] = true;
+    RunTreeSceneFrame(explicitScene, kTreeMouseAway, false, 0.0f, [](int) {}, [](const int&) {}, true);
+    RunTreeSceneFrame(explicitScene, kTreeMouseAway, false, 0.0f, [](int) {}, [](const int&) {}, true);
+
+    CheckListWidgetExpectation(
+        delegatorScene.nodeRowRectMin[10].x == explicitScene.nodeRowRectMin[10].x &&
+        delegatorScene.nodeRowRectMin[10].y == explicitScene.nodeRowRectMin[10].y &&
+        delegatorScene.nodeRowRectMax[10].x == explicitScene.nodeRowRectMax[10].x &&
+        delegatorScene.nodeRowRectMax[10].y == explicitScene.nodeRowRectMax[10].y,
+        "root node row's own item rect is byte-identical between the 7-callback delegator and the "
+        "explicit 9-callback no-op overload at headerExtraWidthPixels == 0.0f");
+    CheckListWidgetExpectation(
+        delegatorScene.nodeRowTopLeft[30].x == explicitScene.nodeRowTopLeft[30].x &&
+        delegatorScene.nodeRowTopLeft[30].y == explicitScene.nodeRowTopLeft[30].y,
+        "the second root's own row corner is byte-identical between the two call paths");
+    CheckListWidgetExpectation(
+        delegatorScene.leafRowTopLeft[100].x == explicitScene.leafRowTopLeft[100].x &&
+        delegatorScene.leafRowTopLeft[100].y == explicitScene.leafRowTopLeft[100].y &&
+        delegatorScene.leafRowTopLeft[101].x == explicitScene.leafRowTopLeft[101].x &&
+        delegatorScene.leafRowTopLeft[101].y == explicitScene.leafRowTopLeft[101].y,
+        "both leaf rows' own corners are byte-identical between the two call paths");
+}
+
+// A standalone, minimal frame runner (mirrors DraggableListWidget_UI_Test.cpp's own
+// RunRowGeometryFrame precedent) -- one root node with one leaf, so both row kinds' own header-extra
+// slot can be probed in the same frame. `bForceNineCallbackOverload` lets a test drive the NEW
+// overload even at headerExtraWidthPixels == 0.0f with a REAL (non-trivial) callback, to prove the
+// WIDTH gate -- not merely an empty lambda -- is what controls whether anything draws.
+struct TreeHeaderExtraGeometryFrame {
+    float  nodeRowAvailWidthPixels = 0.0f;
+    float  leafRowAvailWidthPixels = 0.0f;
+    float  windowLeftEdgeX         = 0.0f;
+    bool   bNodeHeaderExtraDrawn   = false;
+    ImVec2 nodeHeaderExtraMin, nodeHeaderExtraMax;
+    bool   bLeafHeaderExtraDrawn   = false;
+    ImVec2 leafHeaderExtraMin, leafHeaderExtraMax;
+};
+
+TreeHeaderExtraGeometryFrame RunTreeHeaderExtraGeometryFrame(float headerExtraWidthPixels,
+                                                              bool bForceNineCallbackOverload = false) {
+    TreeHeaderExtraGeometryFrame result;
+    std::vector<TestNode> nodes = { {10, -1, "Root1"} };
+    const std::vector<int> leaves = { 100 };
+    TreeListState state;
+    state.expandedNodeIdentifiers[10] = true;
+    for (int settleFrame = 0; settleFrame < 2; ++settleFrame) {
+        RunHeadlessFrame(HeadlessMouseState(), kTreeSceneWindowSize, [&] {
+            const auto idOf = [](const TestNode& node) { return node.identifier; };
+            const auto parentIdOf = [](const TestNode& node) { return node.parentIdentifier; };
+            const auto nameOf = [&](const TestNode& node) {
+                result.windowLeftEdgeX = ImGui::GetWindowPos().x - ImGui::GetScrollX();
+                result.nodeRowAvailWidthPixels = ImGui::GetContentRegionAvail().x;
+                return node.name;
+            };
+            const auto drawNodeBody = [](int) {};
+            const auto describeLeaves = [&](int) -> const std::vector<int>& { return leaves; };
+            const auto leafLabel = [&](const int&) -> const char* {
+                result.leafRowAvailWidthPixels = ImGui::GetContentRegionAvail().x;
+                return "Leaf100";
+            };
+            const auto drawExpandedLeafBody = [](const int&) {};
+            const auto drawNodeHeaderExtra = [&](int) {
+                ImGui::InvisibleButton("##nodeProbe", ImVec2(20.0f, 16.0f));
+                result.bNodeHeaderExtraDrawn = true;
+                result.nodeHeaderExtraMin = ImGui::GetItemRectMin();
+                result.nodeHeaderExtraMax = ImGui::GetItemRectMax();
+            };
+            const auto drawLeafHeaderExtra = [&](const int&) {
+                ImGui::InvisibleButton("##leafProbe", ImVec2(20.0f, 16.0f));
+                result.bLeafHeaderExtraDrawn = true;
+                result.leafHeaderExtraMin = ImGui::GetItemRectMin();
+                result.leafHeaderExtraMax = ImGui::GetItemRectMax();
+            };
+            if (headerExtraWidthPixels > 0.0f || bForceNineCallbackOverload)
+                TreeListWidget_UI<TestNode, int>::Render("GeometryTree", nodes, idOf, parentIdOf, nameOf,
+                    drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody, drawNodeHeaderExtra,
+                    drawLeafHeaderExtra, headerExtraWidthPixels, state);
+            else
+                TreeListWidget_UI<TestNode, int>::Render("GeometryTree", nodes, idOf, parentIdOf, nameOf,
+                    drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody, state);
+        });
+    }
+    return result;
+}
+
+// headerExtraWidthPixels > 0.0f: the header-extra control draws for BOTH row kinds, each landing at
+// its own row's right-aligned X (`ImGui::SameLine(rowAvailWidthPixels - headerExtraWidthPixels)`,
+// per ARCH_19_23's contract) -- the node row unindented, the leaf row one indent level in, so their
+// own rowAvailWidthPixels legitimately differ while both land at the SAME predicted formula.
+void TestHeaderExtraDrawsAtExpectedRightAlignedXForNodeAndLeafRows() {
+    HeadlessImguiSession session;
+    constexpr float kTestHeaderExtraWidthPixels = 24.0f;
+    constexpr float kEpsilonPixels = 2.0f;
+    const TreeHeaderExtraGeometryFrame frame = RunTreeHeaderExtraGeometryFrame(kTestHeaderExtraWidthPixels);
+    CheckListWidgetExpectation(frame.bNodeHeaderExtraDrawn && frame.bLeafHeaderExtraDrawn,
+                               "the 9-callback overload draws both the node's and the leaf's own header-extra control");
+    const float predictedNodeX = frame.windowLeftEdgeX + frame.nodeRowAvailWidthPixels - kTestHeaderExtraWidthPixels;
+    const float predictedLeafX = frame.windowLeftEdgeX + frame.leafRowAvailWidthPixels - kTestHeaderExtraWidthPixels;
+    CheckListWidgetExpectation(std::fabs(frame.nodeHeaderExtraMin.x - predictedNodeX) < kEpsilonPixels,
+                               "the node row's header-extra control lands at the predicted right-aligned X");
+    CheckListWidgetExpectation(std::fabs(frame.leafHeaderExtraMin.x - predictedLeafX) < kEpsilonPixels,
+                               "the leaf row's header-extra control lands at the predicted right-aligned X");
+}
+
+// headerExtraWidthPixels == 0.0f, driven through the 9-callback overload itself (not the delegator)
+// with a REAL (non-trivial, InvisibleButton-drawing) callback: nothing draws for either row kind --
+// proof the WIDTH GATE inside RenderNode/RenderLeaf, not just an empty lambda, controls drawing.
+void TestHeaderExtraNeverDrawsWhenWidthIsZeroEvenWithNonTrivialCallback() {
+    HeadlessImguiSession session;
+    const TreeHeaderExtraGeometryFrame frame =
+        RunTreeHeaderExtraGeometryFrame(0.0f, /*bForceNineCallbackOverload=*/true);
+    CheckListWidgetExpectation(!frame.bNodeHeaderExtraDrawn && !frame.bLeafHeaderExtraDrawn,
+                               "headerExtraWidthPixels == 0.0f draws nothing at all for either row kind, "
+                               "even with a non-trivial callback wired through the 9-callback overload directly");
+}
+
 } // namespace
 
 namespace SanmapGen {
@@ -206,6 +339,9 @@ void RunTreeListAcceptance() {
     TestDragNodeOntoAnotherNodesThreeBands();
     TestDragNodeOntoRootDropZoneEmitsRootTarget();
     TestNodeDraggedOntoItselfEmitsNoSignal();
+    TestZeroWidthDelegatorIsByteIdenticalToExplicitNineCallbackOverload();
+    TestHeaderExtraDrawsAtExpectedRightAlignedXForNodeAndLeafRows();
+    TestHeaderExtraNeverDrawsWhenWidthIsZeroEvenWithNonTrivialCallback();
 }
 } // namespace Ui
 } // namespace SanmapGen

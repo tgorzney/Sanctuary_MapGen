@@ -695,6 +695,8 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
               "MarkerInstanceLayer::gridSnapSizeWorldUnits survives, non-default");
         Check(loadedLayer.bColorOverrideEnabled == originalLayer.bColorOverrideEnabled,
               "MarkerInstanceLayer::bColorOverrideEnabled survives, non-default");
+        Check(loadedLayer.bSymmetryEnabled == originalLayer.bSymmetryEnabled && !loadedLayer.bSymmetryEnabled,
+              "MarkerInstanceLayer::bSymmetryEnabled survives, non-default (STEP130, ARCH §19.24)");
         Check(loadedLayer.parentBundleIdentifier == originalLayer.parentBundleIdentifier,
               "MarkerInstanceLayer::parentBundleIdentifier survives, non-default (STEP119)");
         Check(loadedLayer.markerTypeName == originalLayer.markerTypeName,
@@ -1262,6 +1264,7 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerLayer.bGridSnapEnabled = true;                              // STEP106, non-default
     markerLayer.gridSnapSizeWorldUnits = 4.0f;                        // STEP106, non-default
     markerLayer.bColorOverrideEnabled = true;                         // STEP116, non-default
+    markerLayer.bSymmetryEnabled = false;                             // STEP130, non-default (ARCH §19.24)
     markerLayer.parentBundleIdentifier = 42;                          // STEP119, non-default
     markerLayer.markerTypeName = "Spawn";                             // STEP124, non-default
     recipe.markerLayers.push_back(markerLayer);
@@ -2106,6 +2109,9 @@ void CheckMarkerGroupsLegacyLockAndSnapDefaults() {
           "gridSnapSizeWorldUnits keeps its struct default (1.0f) when the key is absent");
     Check(layer.bColorOverrideEnabled == false,
           "bColorOverrideEnabled keeps its struct default (false) when the key is absent");
+    Check(layer.bSymmetryEnabled == true,
+          "bSymmetryEnabled keeps its struct default (true) when the key is absent (STEP130, ARCH "
+          "§19.24) — every pre-existing/legacy layer's configured symmetry mask stays live");
 }
 
 // STEP60_MarkerInstanceLayer_PARAMS: a hand-built `markers` entry with an out-of-range

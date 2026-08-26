@@ -2,7 +2,13 @@
 // helpers: BuildMarkerLayerBundleLeafIndex, NextMarkerLayerBundleId, and the Move/Rotate Apply
 // functions' own call-boundary behavior. Pure logic only — no imgui frame needed, mirroring
 // STEP106's own "defer the imgui-coupled path, test the definitely-pure pieces" posture.
+// STEP130 (ARCH §19.24, item 7(b)) adds one headless-frame section at the bottom for
+// DrawMarkerGroupLeafHeaderExtra — the Bundle tree's own `drawLeafHeaderExtra` body — mirroring
+// MarkersTab_ManualLayerColorOverrideHeader_UI_Test.cpp's own HeadlessImguiSession/RunHeadlessFrame
+// harness, since that one function is genuinely imgui-coupled.
 #include "MarkersTab_Bundles_UI.h"
+#include "ListWidget_TestFrame_UI.h"
+#include "MarkersTab_ManualLayers_UI.h"
 #include <cmath>
 #include <cstdio>
 
@@ -226,6 +232,71 @@ void TestCrossTypeSectionNestedBundleCutoff() {
          "already-proven root rule consumes");
 }
 
+// STEP130 (ARCH §19.24, item 7(b)) — a Manual leaf's own header-extra draws BOTH controls
+// ([Symmetry toggle][Color Override]); clicking the Symmetry checkbox (the first, leftmost control)
+// flips the real Params::MarkerInstanceLayer's own bSymmetryEnabled and reports the commit.
+void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
+    ManualMarkerLayersState state;
+    const MarkerGroupLeafKey_UI manualLeaf{ MarkerGroupLeafKey_UI::Kind::Manual, 0 };
+
+    const ImVec2 windowSize(300.0f, 100.0f);
+    ImVec2 origin; float boxSize = 0.0f;
+    bool bSettleCommitted = false;
+    RunHeadlessFrame(HeadlessMouseState(), windowSize, [&] {
+        origin  = ImGui::GetCursorScreenPos();
+        boxSize = ResolveWidgetTrackHeight(WidgetStyle());
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bSettleCommitted);
+    });
+    const ImVec2 checkboxCenter(origin.x + boxSize * 0.5f, origin.y + boxSize * 0.5f);
+
+    HeadlessMouseState hover;   hover.position = checkboxCenter;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    auto runFrame = [&](HeadlessMouseState mouse) {
+        bool bCommitted = false;
+        RunHeadlessFrame(mouse, windowSize, [&] {
+            DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bCommitted);
+        });
+        return bCommitted;
+    };
+    runFrame(hover);
+    const bool bPressCommitted = runFrame(press);
+    runFrame(release);
+
+    Check(!instanceLayers[0].bSymmetryEnabled,
+         "a Manual leaf's header-extra draws the Symmetry checkbox first -- clicking it flips the "
+         "real MarkerInstanceLayer's own bSymmetryEnabled");
+    Check(bPressCommitted, "and reports a commit on the press frame");
+}
+
+// A Rule (Procedural) leaf's header-extra draws NOTHING (the `kind != Manual` guard returns before
+// any widget call) -- the cursor is exactly unmoved, no commit fires, and `instanceLayers` (present,
+// same index by coincidence) is never touched.
+void TestProceduralLeafHeaderExtraDrawsNothing() {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
+    ManualMarkerLayersState state;
+    const MarkerGroupLeafKey_UI proceduralLeaf{ MarkerGroupLeafKey_UI::Kind::Procedural, 0 };
+
+    bool bAnyCommitted = false;
+    ImVec2 cursorBefore, cursorAfter;
+    RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 100.0f), [&] {
+        cursorBefore = ImGui::GetCursorScreenPos();
+        DrawMarkerGroupLeafHeaderExtra(proceduralLeaf, instanceLayers, state, bAnyCommitted);
+        cursorAfter = ImGui::GetCursorScreenPos();
+    });
+
+    Check(cursorBefore.x == cursorAfter.x && cursorBefore.y == cursorAfter.y,
+         "a Procedural leaf's header-extra draws nothing at all -- the cursor is exactly unmoved "
+         "(the kind != Manual guard, not merely an empty-looking control)");
+    Check(!bAnyCommitted, "and reports no commit");
+    Check(instanceLayers[0].bSymmetryEnabled && !instanceLayers[0].bColorOverrideEnabled,
+         "instanceLayers[0] -- present at the same index by coincidence -- is left at its struct "
+         "defaults, never resolved into for a Procedural leaf");
+}
+
 } // namespace
 
 int main() {
@@ -237,6 +308,8 @@ int main() {
     TestBuildFilteredMarkerLayerBundlesByType();
     TestApplyMarkerLayerBundleTreeSignalFilteredCopyWriteSafety();
     TestCrossTypeSectionNestedBundleCutoff();
+    TestManualLeafHeaderExtraDrawsAndFlipsSymmetry();
+    TestProceduralLeafHeaderExtraDrawsNothing();
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

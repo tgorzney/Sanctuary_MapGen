@@ -34,9 +34,20 @@ std::vector<std::string> EnumerateMarkerTypeSectionNames(
         const std::vector<Params::MarkerRuleLayer>& ruleLayers,
         const std::vector<Params::MarkerInstanceLayer>& instanceLayers) {
     std::vector<std::string> distinct;   // every non-empty markerTypeName present, union+dedup
-    for (const Params::MarkerLayerBundle& bundle : bundles) CollectDistinctNonEmptyTypeName(bundle.markerTypeName, distinct);
-    for (const Params::MarkerRuleLayer& layer : ruleLayers) CollectDistinctNonEmptyTypeName(layer.markerTypeName, distinct);
-    for (const Params::MarkerInstanceLayer& layer : instanceLayers) CollectDistinctNonEmptyTypeName(layer.markerTypeName, distinct);
+    bool bAnyEmptyTyped = false;         // STEP128 §4 — "" is now present-only, same test as every
+                                         // other name, just without the .empty() skip on the way in.
+    for (const Params::MarkerLayerBundle& bundle : bundles) {
+        CollectDistinctNonEmptyTypeName(bundle.markerTypeName, distinct);
+        bAnyEmptyTyped = bAnyEmptyTyped || bundle.markerTypeName.empty();
+    }
+    for (const Params::MarkerRuleLayer& layer : ruleLayers) {
+        CollectDistinctNonEmptyTypeName(layer.markerTypeName, distinct);
+        bAnyEmptyTyped = bAnyEmptyTyped || layer.markerTypeName.empty();
+    }
+    for (const Params::MarkerInstanceLayer& layer : instanceLayers) {
+        CollectDistinctNonEmptyTypeName(layer.markerTypeName, distinct);
+        bAnyEmptyTyped = bAnyEmptyTyped || layer.markerTypeName.empty();
+    }
 
     std::vector<std::string> ordered;
     for (const char* fixedName : { "Alloy", "Plasma", "Spawn" })   // ARCH_19_14: fixed order, present-only
@@ -47,13 +58,14 @@ std::vector<std::string> EnumerateMarkerTypeSectionNames(
         if (name != "Alloy" && name != "Plasma" && name != "Spawn") others.push_back(name);
     std::sort(others.begin(), others.end());
     for (const std::string& name : others) ordered.push_back(name);
-    ordered.push_back("");   // "(Unassigned)" — ALWAYS appended, not gated on presence (STEP125's own
-                              // bootstrap ruling, see .h comment): a brand-new recipe with zero
-                              // Bundles/Layers must still have SOMEWHERE to click "Add Group"/
-                              // "Add Layer" for the very first one; every other section already
-                              // requires the type to exist in data first (no chicken-and-egg problem
-                              // for a NAMED type — its first Bundle/Layer is minted from an ALREADY-
-                              // open Unassigned section, then typed into via the free-text field).
+    if (bAnyEmptyTyped) ordered.push_back("");   // "(Unassigned)" — STEP128 §4: present-only, same as
+                                                 // every other name — appears only when at least one
+                                                 // bundle/ruleLayer/instanceLayer genuinely has
+                                                 // markerTypeName == "". Retires STEP125's own
+                                                 // always-appended bootstrap rule (see this ticket's
+                                                 // own work-order, DESIGN_MarkersUICorrectionRound2_R1.md
+                                                 // item 4, for the ratified reasoning); a brand-new
+                                                 // recipe with zero Bundles/Layers now returns {}.
     return ordered;
 }
 
@@ -74,21 +86,22 @@ void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
                                       recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
                                       state.bundles, state, previewDriver, iconManifest, typeName);
 
-            if (DrawSectionBegin("Ungrouped Procedural Rules", perType.ungroupedProceduralSection)) {
-                bool bRecipeMoved = DrawRuleLayerListBody(recipe.markerRuleLayers, state, previewDriver,
-                                                          iconManifest, typeName);
-                bRecipeMoved = DrawAddMarkerRuleLayerButton(recipe.markerRuleLayers, state, -1, typeName)
-                             || bRecipeMoved;
-                NotifyPlacementChange(bRecipeMoved, previewDriver);
-                DrawSectionEnd();
-            }
-            if (DrawSectionBegin("Ungrouped Manual Marker Layers", perType.ungroupedManualSection)) {
-                DrawManualMarkerLayerListBody(state.manualLayers, recipe.markerLayers, recipe.markers,
-                                              recipe.geometry, recipe.globalSymmetryMask,
-                                              recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
-                                              typeName, state.selectedManualInstanceIdentifier);
-                DrawSectionEnd();
-            }
+            // STEP128 §5: no enclosing "Ungrouped ..." header/collapse chrome — plain rows, directly
+            // after the Bundle tree. `DrawRuleLayerListBody`/`DrawAddMarkerRuleLayerButton`/
+            // `DrawManualMarkerLayerListBody` themselves are UNCHANGED — only the wrapper goes away.
+            ImGui::Separator();
+            bool bRecipeMoved = DrawRuleLayerListBody(recipe.markerRuleLayers, state, previewDriver,
+                                                      iconManifest, typeName);
+            bRecipeMoved = DrawAddMarkerRuleLayerButton(recipe.markerRuleLayers, state, -1, typeName)
+                         || bRecipeMoved;
+            NotifyPlacementChange(bRecipeMoved, previewDriver);
+
+            ImGui::Separator();
+            DrawManualMarkerLayerListBody(state.manualLayers, recipe.markerLayers, recipe.markers,
+                                          recipe.geometry, recipe.globalSymmetryMask,
+                                          recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
+                                          typeName, state.selectedManualInstanceIdentifier);
+
             DrawSectionEnd();   // outer Type-section
         }
         ImGui::PopID();

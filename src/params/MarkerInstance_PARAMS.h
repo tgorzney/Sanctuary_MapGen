@@ -34,6 +34,11 @@ struct MarkerInstanceLayer {
                                          // separate, unratified-as-a-ticket work) — this ticket
                                          // only gives the field its PARAMS+IO home, same posture as
                                          // `layerIndex` before STEP49's tab existed.
+    bool  bSymmetryEnabled = true;      // ARCH §19.24. true (default, every pre-existing/legacy
+                                         // layer): `symmetry`'s configured mask is live. false: every
+                                         // reader must resolve the EFFECTIVE mask to
+                                         // SymmetryAxis::None WITHOUT clearing `symmetry`'s own axis
+                                         // configuration — re-enabling recovers it unchanged.
     bool  bLocked = false;                    // STEP106 §1. Blocks drag/reposition/add/remove for
                                                // every marker on this layer.
     bool  bGridSnapEnabled = false;            // STEP106 §2. Per-layer, not global (see §2).

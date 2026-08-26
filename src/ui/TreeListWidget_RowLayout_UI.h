@@ -33,9 +33,17 @@ inline void DrawRootDropZoneRow(const char* payloadIdentifier, TreeListSignal<Le
     }
 }
 
-template <typename LeafLabelFn, typename DrawExpandedLeafBodyFn, typename LeafKeyT>
+// STEP129: `headerExtraWidthPixels`/`drawLeafHeaderExtra` are the OPTIONAL header-extra slot — a
+// fixed-width caller-drawn control drawn INLINE on the leaf row's own line, right-aligned against
+// the row's own edge, after click/drag-drop detection and before the (bExpanded) body.
+// `headerExtraWidthPixels == 0.0f` (the 7-callback delegator's default) draws nothing and reserves
+// nothing — byte-identical to the pre-STEP129 layout. See ARCH_19_23 for why this is a SEPARATE
+// leaf-keyed callback rather than sharing the node's own drawNodeHeaderExtra.
+template <typename LeafLabelFn, typename DrawExpandedLeafBodyFn, typename DrawLeafHeaderExtraFn,
+         typename LeafKeyT>
 inline void RenderLeaf(const char* payloadIdentifier, const LeafKeyT& leaf, LeafLabelFn leafLabel,
-    DrawExpandedLeafBodyFn drawExpandedLeafBody, TreeListState& state, TreeListSignal<LeafKeyT>& signal) {
+    DrawExpandedLeafBodyFn drawExpandedLeafBody, DrawLeafHeaderExtraFn drawLeafHeaderExtra,
+    float headerExtraWidthPixels, TreeListState& state, TreeListSignal<LeafKeyT>& signal) {
     // A leaf has no stable int identifier of its own to key expand-state by (unlike a node) — this
     // v1 keys off imgui's own per-label id scope instead (bExpanded local, not persisted in
     // TreeListState), acceptable since a leaf's inline body is cheap to redraw/recollapse; label
@@ -50,18 +58,24 @@ inline void RenderLeaf(const char* payloadIdentifier, const LeafKeyT& leaf, Leaf
     TreeDragPayload<LeafKeyT> payload;
     payload.sourceKind = TreeNodeSourceKind::Leaf; payload.leaf = leaf;
     DetectTreeRowDragAndDrop(payloadIdentifier, payload, -1, false, signal);
+    if (headerExtraWidthPixels > 0.0f) {
+        const float rowAvailWidthPixels = ImGui::GetContentRegionAvail().x;
+        ImGui::SameLine(rowAvailWidthPixels - headerExtraWidthPixels);
+        drawLeafHeaderExtra(leaf);
+    }
     if (bExpanded) { ImGui::Indent(); drawExpandedLeafBody(leaf); ImGui::Unindent(); }
     ImGui::PopID();
 }
 
 template <typename T, typename LeafKeyT, typename IdOfFn, typename ParentIdOfFn, typename NameOfFn,
          typename DrawNodeBodyFn, typename DescribeLeavesFn, typename LeafLabelFn,
-         typename DrawExpandedLeafBodyFn>
+         typename DrawExpandedLeafBodyFn, typename DrawNodeHeaderExtraFn, typename DrawLeafHeaderExtraFn>
 inline void RenderNode(const char* payloadIdentifier, const std::vector<T>& nodes, int nodeIndex,
     const std::unordered_map<int, std::vector<int>>& childrenOf, IdOfFn idOf, ParentIdOfFn parentIdOf,
     NameOfFn nameOf, DrawNodeBodyFn drawNodeBody, DescribeLeavesFn describeLeaves, LeafLabelFn leafLabel,
-    DrawExpandedLeafBodyFn drawExpandedLeafBody, TreeListState& state, int selectedNodeIdentifier,
-    TreeListSignal<LeafKeyT>& signal) {
+    DrawExpandedLeafBodyFn drawExpandedLeafBody, DrawNodeHeaderExtraFn drawNodeHeaderExtra,
+    DrawLeafHeaderExtraFn drawLeafHeaderExtra, float headerExtraWidthPixels, TreeListState& state,
+    int selectedNodeIdentifier, TreeListSignal<LeafKeyT>& signal) {
     const T& node = nodes[static_cast<std::size_t>(nodeIndex)];
     const int nodeIdentifier = idOf(node);
     ImGui::PushID(nodeIdentifier);
@@ -78,6 +92,13 @@ inline void RenderNode(const char* payloadIdentifier, const std::vector<T>& node
     TreeDragPayload<LeafKeyT> payload;
     payload.sourceKind = TreeNodeSourceKind::Node; payload.nodeIdentifier = nodeIdentifier;
     DetectTreeRowDragAndDrop(payloadIdentifier, payload, nodeIdentifier, true, signal);
+    // STEP129: the OPTIONAL header-extra slot — see RenderLeaf's own comment above for the contract;
+    // headerExtraWidthPixels == 0.0f draws nothing and reserves nothing.
+    if (headerExtraWidthPixels > 0.0f) {
+        const float rowAvailWidthPixels = ImGui::GetContentRegionAvail().x;
+        ImGui::SameLine(rowAvailWidthPixels - headerExtraWidthPixels);
+        drawNodeHeaderExtra(nodeIdentifier);
+    }
     if (bExpanded) {
         ImGui::Indent();
         drawNodeBody(nodeIdentifier);
@@ -85,10 +106,11 @@ inline void RenderNode(const char* payloadIdentifier, const std::vector<T>& node
         if (childIt != childrenOf.end())
             for (int childIndex : childIt->second)
                 RenderNode<T, LeafKeyT>(payloadIdentifier, nodes, childIndex, childrenOf, idOf, parentIdOf, nameOf,
-                          drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody, state,
-                          selectedNodeIdentifier, signal);
+                          drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody, drawNodeHeaderExtra,
+                          drawLeafHeaderExtra, headerExtraWidthPixels, state, selectedNodeIdentifier, signal);
         for (const LeafKeyT& leaf : describeLeaves(nodeIdentifier))
-            RenderLeaf(payloadIdentifier, leaf, leafLabel, drawExpandedLeafBody, state, signal);
+            RenderLeaf(payloadIdentifier, leaf, leafLabel, drawExpandedLeafBody, drawLeafHeaderExtra,
+                      headerExtraWidthPixels, state, signal);
         ImGui::Unindent();
     }
     ImGui::PopID();

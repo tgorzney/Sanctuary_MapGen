@@ -119,5 +119,18 @@ WidgetChange DrawSliderScalarInteger(const char* label, int& value, const Scalar
                                      RealtimeToggle& realtimeToggle, const WidgetStyle& style = WidgetStyle(),
                                      const char* valueFormat = "%d");
 
+// STEP134 — the single-line variant a caller composing its OWN row (SameLine-chaining a slider
+// beside other controls) reaches for instead: no label line, no value line — the track and the
+// numeric field are both drawn at the caller's fixed pixel widths, on ONE line, and `label` is
+// used only to scope the ImGui ID and as a hover tooltip (mirrors the already-shipped
+// IsItemHovered()/SetTooltip pattern at MarkersTab_ManualLayerRowBody_UI.cpp:90-91). Composition:
+// PushID(label) -> fixed-width track -> SameLine -> fixed-width DragFloat -> SameLine -> the RT
+// button -> paint the track. DrawSliderScalar/DrawSliderScalarInteger above are UNTOUCHED by this
+// addition — every other caller in the codebase still gets the 3-line shape.
+WidgetChange DrawSliderScalarCompact(const char* label, float& value, const ScalarSliderRange& range,
+                                     RealtimeToggle& realtimeToggle, float trackWidthPixels,
+                                     float fieldWidthPixels, const WidgetStyle& style = WidgetStyle(),
+                                     const char* valueFormat = "%.2f");
+
 } // namespace Ui
 } // namespace SanmapGen

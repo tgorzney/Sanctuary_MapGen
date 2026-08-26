@@ -3,6 +3,12 @@
 // driven by a synthetic pointer sequence in value space, and the integer twin landing on whole
 // numbers. No imgui frame, no window, no GL (SliderScalar_UI.h is pure); the rectangles are a
 // by-eye check against a live frame.
+// STEP134 additions (DrawSliderScalarCompact + the ReserveScalarSliderTrack(style, 0.0f) regression
+// proof) DO need a live headless imgui frame — ListWidget_TestFrame_UI.h's HeadlessImguiSession/
+// RunHeadlessFrame harness, same posture MarkersTab_ManualLayerColorOverrideHeader_UI_Test.cpp
+// uses; needs no explicit imgui link since SanGenV2 links imgui PUBLIC.
+#include "ListWidget_TestFrame_UI.h"
+#include "SliderScalar_Track_UI.h"
 #include "SliderScalar_UI.h"
 #include <cstdio>
 
@@ -138,11 +144,163 @@ static void TestTheIntegerTwinLandsOnWholeNumbers() {
     Check(released.bCommitted && octaveCount == 5, "and the one commit arrives on release");
 }
 
+// STEP134 regression proof: ReserveScalarSliderTrack(style, 0.0f) must be byte-identical to
+// ReserveScalarSliderTrack(style) — the exact call every existing DrawSliderScalar/
+// DrawSliderScalarInteger caller makes. Not trusted from default-parameter reasoning alone: both
+// forms are actually called, at the same cursor position, in the same live frame.
+static void TestReserveScalarSliderTrackZeroWidthMatchesTheDefaultRegression() {
+    Ui::HeadlessImguiSession session;
+    const ImVec2 windowSize(240.0f, 80.0f);
+    const Ui::WidgetStyle style;
+    ImVec2 origin;
+    float contentRegionAvailableWidth = 0.0f;
+    Ui::ScalarSliderTrackGeometry defaultArgGeometry;
+    Ui::ScalarSliderTrackGeometry explicitZeroGeometry;
+
+    Ui::RunHeadlessFrame(Ui::HeadlessMouseState(), windowSize, [&] {
+        origin = ImGui::GetCursorScreenPos();
+        contentRegionAvailableWidth = ImGui::GetContentRegionAvail().x;
+
+        ImGui::PushID("defaultArgCall");
+        ImGui::SetCursorScreenPos(origin);
+        defaultArgGeometry = Ui::ReserveScalarSliderTrack(style);   // no second argument: exactly
+                                                                    // what SliderScalar_UI.cpp/
+                                                                    // SliderScalar_Integer_UI.cpp call
+        ImGui::PopID();
+
+        ImGui::PushID("explicitZeroCall");
+        ImGui::SetCursorScreenPos(origin);
+        explicitZeroGeometry = Ui::ReserveScalarSliderTrack(style, 0.0f);
+        ImGui::PopID();
+    });
+
+    Check(defaultArgGeometry.origin.x == explicitZeroGeometry.origin.x
+          && defaultArgGeometry.origin.y == explicitZeroGeometry.origin.y
+          && defaultArgGeometry.width       == explicitZeroGeometry.width
+          && defaultArgGeometry.height      == explicitZeroGeometry.height
+          && defaultArgGeometry.handleWidth == explicitZeroGeometry.handleWidth
+          && defaultArgGeometry.usableWidth == explicitZeroGeometry.usableWidth,
+          "ReserveScalarSliderTrack(style, 0.0f) is byte-identical to ReserveScalarSliderTrack(style)");
+    Check(IsNear(defaultArgGeometry.width, contentRegionAvailableWidth),
+          "and both still claim the full content-region width -- the pre-change function's own "
+          "unconditional 'rest of the line' contract every existing caller depends on");
+}
+
+// STEP134: DrawSliderScalarCompact — the fixed track/field widths are actually honored (measured
+// item rects, not just "it compiles"), a click-drag on the track moves the value and commits
+// through the SAME StepScalarSliderInteraction every other slider uses, and the compact row's own
+// RT button toggles independently, same as the 3-line slider's.
+static void TestDrawSliderScalarCompactHonorsWidthsAndInteraction() {
+    Ui::HeadlessImguiSession session;   // one context for all three sub-checks below: ImGui::GetStyle()
+                                        // needs a current context even before the first frame.
+    const ImVec2 windowSize(400.0f, 100.0f);
+    const float trackWidthPixels = 60.0f;
+    const float fieldWidthPixels = 42.0f;
+    const Ui::ScalarSliderRange range = MakeRange(0.0f, 1.0f, 0.0f);
+    const float itemSpacing         = ImGui::GetStyle().ItemSpacing.x;
+    const float realtimeButtonWidth = Ui::WidgetStyle().realtimeButtonWidth;
+
+    // --- widths honored, one line ------------------------------------------------------------
+    {
+        float value = 0.25f;
+        Ui::RealtimeToggle realtimeToggle;
+        ImVec2 rowOrigin, rtItemMin, rtItemMax;
+        Ui::RunHeadlessFrame(Ui::HeadlessMouseState(), windowSize, [&] {
+            rowOrigin = ImGui::GetCursorScreenPos();
+            Ui::DrawSliderScalarCompact("Compact", value, range, realtimeToggle,
+                                        trackWidthPixels, fieldWidthPixels);
+            rtItemMin = ImGui::GetItemRectMin();
+            rtItemMax = ImGui::GetItemRectMax();
+        });
+
+        const float expectedRtLeft = rowOrigin.x + trackWidthPixels + itemSpacing
+                                    + fieldWidthPixels + itemSpacing;
+        Check(IsNear(rtItemMin.x, expectedRtLeft),
+              "the RT button lands exactly after track+field at their fixed pixel widths "
+              "(trackWidthPixels/fieldWidthPixels honored, not the 'rest of the line' default)");
+        Check(IsNear(rtItemMax.x - rtItemMin.x, realtimeButtonWidth),
+              "and is the library's normal RT-button width");
+        Check(rtItemMin.y == rowOrigin.y, "the whole compact row -- track, field and RT -- sits on ONE line");
+    }
+
+    // --- value commit via a click-drag on the track ------------------------------------------
+    {
+        float value = 0.0f;
+        Ui::RealtimeToggle realtimeToggle(true);   // RT on: commits the same frame the value moves
+        ImVec2 rowOrigin;
+        Ui::RunHeadlessFrame(Ui::HeadlessMouseState(), windowSize, [&] {
+            rowOrigin = ImGui::GetCursorScreenPos();
+            Ui::DrawSliderScalarCompact("Compact", value, range, realtimeToggle,
+                                        trackWidthPixels, fieldWidthPixels);
+        });
+
+        const float trackHeight = Ui::ResolveWidgetTrackHeight(Ui::WidgetStyle());
+        const ImVec2 clickPoint(rowOrigin.x + trackWidthPixels * 0.75f, rowOrigin.y + trackHeight * 0.5f);
+        Ui::HeadlessMouseState hover;   hover.position = clickPoint;
+        Ui::HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+        Ui::HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+
+        Ui::WidgetChange pressChange;
+        Ui::RunHeadlessFrame(hover, windowSize, [&] {
+            Ui::DrawSliderScalarCompact("Compact", value, range, realtimeToggle,
+                                        trackWidthPixels, fieldWidthPixels);
+        });
+        Ui::RunHeadlessFrame(press, windowSize, [&] {
+            pressChange = Ui::DrawSliderScalarCompact("Compact", value, range, realtimeToggle,
+                                                      trackWidthPixels, fieldWidthPixels);
+        });
+        Ui::RunHeadlessFrame(release, windowSize, [&] {
+            Ui::DrawSliderScalarCompact("Compact", value, range, realtimeToggle,
+                                        trackWidthPixels, fieldWidthPixels);
+        });
+
+        Check(value > 0.5f, "a click on the right 3/4 of the track moves the value up there");
+        Check(pressChange.bValueChanged && pressChange.bCommitted,
+              "and reports both the live change and (RT on) the immediate commit, on the press frame");
+    }
+
+    // --- the compact row's own RT button toggles, independent of the track drag --------------
+    {
+        float value = 0.4f;
+        Ui::RealtimeToggle realtimeToggle;   // starts OFF
+        ImVec2 rtItemMin, rtItemMax;
+        Ui::RunHeadlessFrame(Ui::HeadlessMouseState(), windowSize, [&] {
+            Ui::DrawSliderScalarCompact("Compact", value, range, realtimeToggle,
+                                        trackWidthPixels, fieldWidthPixels);
+            rtItemMin = ImGui::GetItemRectMin();
+            rtItemMax = ImGui::GetItemRectMax();
+        });
+
+        const ImVec2 rtCenter((rtItemMin.x + rtItemMax.x) * 0.5f, (rtItemMin.y + rtItemMax.y) * 0.5f);
+        Ui::HeadlessMouseState hover;   hover.position = rtCenter;
+        Ui::HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+        Ui::HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+
+        Ui::RunHeadlessFrame(hover, windowSize, [&] {
+            Ui::DrawSliderScalarCompact("Compact", value, range, realtimeToggle,
+                                        trackWidthPixels, fieldWidthPixels);
+        });
+        Ui::RunHeadlessFrame(press, windowSize, [&] {
+            Ui::DrawSliderScalarCompact("Compact", value, range, realtimeToggle,
+                                        trackWidthPixels, fieldWidthPixels);
+        });
+        Ui::RunHeadlessFrame(release, windowSize, [&] {
+            Ui::DrawSliderScalarCompact("Compact", value, range, realtimeToggle,
+                                        trackWidthPixels, fieldWidthPixels);
+        });
+
+        Check(realtimeToggle.IsRealtimeEnabled(),
+              "clicking the compact slider's own RT button flips it, same as the 3-line slider's");
+    }
+}
+
 int main() {
     TestClampingAndSnappingHoldTheContract();
     TestTheDrawnOffsetAgreesWithTheValue();
     TestDragDefersItsCommitUntilRelease();
     TestTheIntegerTwinLandsOnWholeNumbers();
+    TestReserveScalarSliderTrackZeroWidthMatchesTheDefaultRegression();
+    TestDrawSliderScalarCompactHonorsWidthsAndInteraction();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

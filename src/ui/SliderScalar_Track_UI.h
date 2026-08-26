@@ -19,8 +19,12 @@ struct ScalarSliderTrackGeometry {
 
 // Reserves the track row and hit-tests it with ONE InvisibleButton spanning the whole track, so
 // clicking anywhere on it seizes the handle and jumps it under the cursor. The caller reads
-// ImGui::IsItemActive() straight after.
-ScalarSliderTrackGeometry ReserveScalarSliderTrack(const WidgetStyle& style);
+// ImGui::IsItemActive() straight after. `requestedWidthPixels` mirrors
+// ColorSwatchOptions::swatchWidth's exact <=0/>0 convention (ColorSwatch_UI.h): <=0 (the default)
+// keeps today's "claim the rest of the line" behavior every existing DrawSliderScalar/
+// DrawSliderScalarInteger caller depends on; >0 is a caller-fixed width, for
+// DrawSliderScalarCompact's single-line composition (STEP134).
+ScalarSliderTrackGeometry ReserveScalarSliderTrack(const WidgetStyle& style, float requestedWidthPixels = 0.0f);
 
 // The track value under a screen-space cursor x, measured against the handle CENTER so grabbing
 // the handle does not shift it by half its width.

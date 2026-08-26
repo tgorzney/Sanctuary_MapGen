@@ -31,6 +31,7 @@ namespace Ui {
 
 struct MarkersTabState;
 struct IconAtlasManifest;
+struct ManualMarkerLayersState;   // MarkersTab_ManualLayers_UI.h — forward-declared, reference-only.
 
 // A tree LEAF's opaque address: either a MarkerRuleLayer or a MarkerInstanceLayer, by index into its
 // own array. Per-consumer, not shared with Assembly's own future AssemblyMemberKey_UI (ARCH_19_07).
@@ -99,6 +100,12 @@ void DrawMarkerLayerBundleNodeBody(int bundleIdentifier, std::vector<Params::Mar
                                    std::vector<Params::MarkerInstanceGroup>& markers,
                                    MarkerLayerBundlesState& state, MarkersTabState& rootState,
                                    Pipeline::PreviewDriver* previewDriver);
+
+// STEP130 (ARCH §19.24, item 7(b)): the Bundle tree's own `drawLeafHeaderExtra` body (see
+// MarkersTab_Bundles_UI.cpp). Declared here so MarkersTab_Bundles_UI_Test.cpp can drive it directly.
+void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
+                                    std::vector<Params::MarkerInstanceLayer>& instanceLayers,
+                                    ManualMarkerLayersState& manualLayersState, bool& bAnyCommitted);
 
 // MarkersTab_Bundles_UI.cpp — the tree mechanics:
 
