@@ -33,6 +33,12 @@ GlobalMarkerSettings MakeNonDefaultSettings() {
 } // namespace
 
 int main() {
+    // STEP127 item 3 — scaleAlloy/Plasma/Spawn's default initializer, was 0.17f, now 0.50f.
+    const GlobalMarkerSettings defaultSettings;
+    Check(defaultSettings.scaleAlloy == 0.50f && defaultSettings.scalePlasma == 0.50f
+          && defaultSettings.scaleSpawn == 0.50f,
+          "GlobalMarkerSettings::scaleAlloy/Plasma/Spawn default to 0.50f (STEP127, was 0.17f)");
+
     const GlobalMarkerSettings settings = MakeNonDefaultSettings();
     float red = -1.0f, green = -1.0f, blue = -1.0f;
 

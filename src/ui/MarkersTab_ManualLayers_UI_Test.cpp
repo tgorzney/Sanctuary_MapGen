@@ -196,16 +196,17 @@ void RunDrawLayerListButtonsTypeSeedChecks() {
           "the parameter omitted (default, empty) leaves markerTypeName empty — unchanged existing behavior");
 }
 
-// STEP118: RT enabled by default for ManualMarkerLayersState's six toggles — RealtimeToggle's
-// own class default stays off (RtToggleWidget_UI_Test.cpp).
+// STEP118: RT enabled by default for ManualMarkerLayersState's toggles — RealtimeToggle's
+// own class default stays off (RtToggleWidget_UI_Test.cpp). STEP127: layerIconScaleToggle deleted
+// (dead field, item 2) — five toggles remain, not six.
 void RunRealtimeDefaultChecks() {
     ManualMarkerLayersState state;
-    Check(state.groupColorToggle.IsRealtimeEnabled() && state.layerIconScaleToggle.IsRealtimeEnabled()
+    Check(state.groupColorToggle.IsRealtimeEnabled()
           && state.selectedLayerColorToggle.IsRealtimeEnabled()
           && state.selectedLayerIconScaleToggle.IsRealtimeEnabled()
           && state.selectedLayerGridSnapToggle.IsRealtimeEnabled()
           && state.fixSymmetryToleranceToggle.IsRealtimeEnabled(),
-          "ManualMarkerLayersState's six toggles default to realtime ON (STEP118)");
+          "ManualMarkerLayersState's five toggles default to realtime ON (STEP118)");
 }
 
 } // namespace

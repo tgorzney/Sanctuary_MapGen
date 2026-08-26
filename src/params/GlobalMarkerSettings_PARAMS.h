@@ -18,9 +18,9 @@ struct GlobalMarkerSettings {
     float colorAlloy[4]  = {0.8f, 0.8f, 0.2f, 1.0f};
     float colorPlasma[4] = {0.2f, 0.8f, 0.8f, 1.0f};
     float colorSpawn[4]  = {0.8f, 0.2f, 0.2f, 1.0f};
-    float scaleAlloy  = 0.17f;
-    float scalePlasma = 0.17f;
-    float scaleSpawn  = 0.17f;
+    float scaleAlloy  = 0.50f;   // STEP127 item 3 — was 0.17f
+    float scalePlasma = 0.50f;   // STEP127 item 3 — was 0.17f
+    float scaleSpawn  = 0.50f;   // STEP127 item 3 — was 0.17f
 
     // ARCH §19.17 — selection-highlight tint. selectColorAlloy/Plasma/Spawn strictly mirror
     // colorAlloy/Plasma/Spawn's shape/placement; selectColorDefault is the one signed-off 4th-field

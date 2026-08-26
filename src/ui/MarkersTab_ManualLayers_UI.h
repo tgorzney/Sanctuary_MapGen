@@ -49,9 +49,7 @@ struct ManualMarkerLayersState {
 
     bool           bUseGroupColor = false;                      // one tint for every layer
     float          groupColor[kColorSwatchChannelCount] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    float          layerIconScale = 1.0f;
     RealtimeToggle groupColorToggle{true};
-    RealtimeToggle layerIconScaleToggle{true};
 
     // ONE shared `RealtimeToggle` instance reused across every row's own color/scale control,
     // header or body — `Params::MarkerInstanceLayer` cannot carry a `RealtimeToggle` member (a pure

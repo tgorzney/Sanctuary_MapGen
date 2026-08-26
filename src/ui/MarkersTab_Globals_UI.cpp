@@ -56,8 +56,8 @@ void DrawGlobalScaleRowIconButton(MarkerGlobalScaleRow& row, std::string& iconNa
     }
 }
 
-// One global scale row, one line, three columns: icon button, Item Scale, Preview Color — every
-// control bound directly to `Params::GlobalMarkerSettings`, no scratch intermediary.
+// One global scale row, one line, three columns: icon button, Icon Scale (Global), Preview Color —
+// every control bound directly to `Params::GlobalMarkerSettings`, no scratch intermediary.
 void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::GlobalMarkerSettings& globalMarkerSettings,
                         const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup) {
     const GlobalMarkerScaleRowFields fields = ResolveGlobalMarkerScaleRowFields(globalMarkerSettings, rowIndex);
@@ -70,7 +70,7 @@ void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::Global
     ImGui::SetColumnWidth(0, globals.iconButtonSizePixels + ImGui::GetStyle().FramePadding.x * 2.0f);
     DrawGlobalScaleRowIconButton(row, *fields.iconName, globals, iconManifest, pairingLookup);
     ImGui::NextColumn();
-    DrawSliderScalar("Item Scale", *fields.scale, globals.iconScaleRange, row.iconScaleToggle,
+    DrawSliderScalar("Icon Scale (Global)", *fields.scale, globals.iconScaleRange, row.iconScaleToggle,
                      WidgetStyle(), "%.2f");
     ImGui::NextColumn();
     DrawColorSwatch("Preview Color", fields.color, globals.previewColorOptions, row.previewColorToggle);

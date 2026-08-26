@@ -37,8 +37,8 @@ struct DomainToggleFixture {
         AppendMarkerInstance(fixture.placements, 2.0f, 2.0f, 1, Params::MarkerCategory::Spawn, "spawnMk");
         fixture.ruleBucketIndex.markers.Build(fixture.placements.markers.ruleIndex.data(), 2, 2);
         // STEP122: this fixture tests domain-toggle isolation, not scale composition — pin
-        // scaleAlloy/scaleSpawn to 1.0f so GlobalMarkerSettings' own real 0.17f default (STEP122's
-        // flagged, deliberate product value) doesn't drop these markers' thumbnailScreenSize below
+        // scaleAlloy/scaleSpawn to 1.0f so GlobalMarkerSettings' own real 0.50f default (STEP127,
+        // was 0.17f) doesn't drop these markers' thumbnailScreenSize below
         // thumbnailLodThresholdPixels(1.0f) and flip them into strategic mode (no icon seeded there,
         // so a miss draws nothing — unrelated to the toggle behavior under test).
         fixture.recipe.globalMarkerSettings.scaleAlloy = 1.0f;

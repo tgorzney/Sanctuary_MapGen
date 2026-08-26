@@ -1,6 +1,6 @@
 [← ARCH index](ARCH.md) · Part of the ratified v2 architecture; the Constitution and this file's preamble in `ARCH.md` bind alongside it. **Only the ARCH Expert writes this file.**
 
-## 19. The Group-above-Layer container — ratified `MarkerLayerBundle` (ratifies `work_orders/DESIGN_MarkerGroupLayerRestructure_R1.md`, firms up `work_orders/DESIGN_Assembly_R1.md` where this design forces a call the unratified Assembly design didn't anticipate); extended by `work_orders/DESIGN_MarkerTypeSectionsAndInstanceSelection_R1.md` (§19.13–§19.22)
+## 19. The Group-above-Layer container — ratified `MarkerLayerBundle` (ratifies `work_orders/DESIGN_MarkerGroupLayerRestructure_R1.md`, firms up `work_orders/DESIGN_Assembly_R1.md` where this design forces a call the unratified Assembly design didn't anticipate); extended by `work_orders/DESIGN_MarkerTypeSectionsAndInstanceSelection_R1.md` (§19.13–§19.22) and `work_orders/DESIGN_MarkersUICorrectionRound2_R1.md` (§19.23–§19.27)
 
 Responds to `work_orders/BRIEF_MarkerGroupLayerRestructure_R1.md` +
 `work_orders/DESIGN_MarkerGroupLayerRestructure_R1.md` §7's 13-item ratification list. Assembly
@@ -20,6 +20,14 @@ dynamic, UI-derived Type-section tier over `markerTypeName`; the per-type filter
 new `MarkerTransform::instanceIdentifier` and manual-instance selection highlight (priority order,
 visual language, sibling-orbit computation, canvas wiring); the `GlobalMarkerSettings` select-color
 fields; and a `§1.5` file-size-ceiling remediation this extension required ahead of its own Ticket B.
+
+**§19.23–§19.27** ratify `work_orders/DESIGN_MarkersUICorrectionRound2_R1.md` — the human's
+post-STEP121-126 correction round. `TreeListWidget_UI<T,LeafKeyT>::Render` gains a two-callback
+header-extra contract (§19.23); `MarkerInstanceLayer` gains `bSymmetryEnabled` (§19.24); canvas
+click-pick and Markers-tab list-selection are unified onto one `OverlayInstanceKey_UI`
+representation, correcting §19.20's "manual-only" framing (§19.25); the manual instance list gets
+symmetry-cluster grouping (§19.26); and procedural marker instances get their own listing/selection
+mechanism, overriding §19.20's earlier scope-out (§19.27).
 
 ### Subsections of §19
 
@@ -44,12 +52,18 @@ fields; and a `§1.5` file-size-ceiling remediation this extension required ahea
 | §19.17 | [ARCH_19_17_SelectColorFields.md](ARCH_19_17_SelectColorFields.md) | `GlobalMarkerSettings` select-color fields — strict 3-field mirror plus the signed-off `selectColorDefault` deviation |
 | §19.18 | [ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md](ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md) | Selection tint — canonical priority order; "selected replaces fill" distinct from the drag-ghost's unfilled-ring vocabulary |
 | §19.19 | [ARCH_19_19_StaticHighlightComputationAndWiring.md](ARCH_19_19_StaticHighlightComputationAndWiring.md) | Static selection-highlight — one-shot orbit computation (not `MarkerOrbitCorrespondence_UI.h`), tolerance reuse, canvas wiring |
-| §19.20 | [ARCH_19_20_ManualOnlySelectionScope.md](ARCH_19_20_ManualOnlySelectionScope.md) | Manual-only selection scope — formal law, cross-referencing §19.9 |
+| §19.20 | [ARCH_19_20_ManualOnlySelectionScope.md](ARCH_19_20_ManualOnlySelectionScope.md) | Manual-only selection scope — formal law, cross-referencing §19.9. **Narrowed by §19.25/§19.27** (Round 2 correction): `instanceIdentifier`-keyed selection stays manual-only; overall canvas/list selection no longer is |
 | §19.21 | [ARCH_19_21_CategoryVsMarkerTypeNameClosed.md](ARCH_19_21_CategoryVsMarkerTypeNameClosed.md) | `MarkerRule::category` vs. `markerTypeName` — two permanently independent concepts, closed |
 | §19.22 | [ARCH_19_22_ManualLayersHeaderSplit.md](ARCH_19_22_ManualLayersHeaderSplit.md) | File-size ceiling remediation, FINAL combined plan (2026-08-26 revision) — `MarkersTab_ManualLayers_UI.h` splits along BOTH the RowBody fault line and Ticket B's own required Helpers fault line, additively; supersedes this section's earlier single-split text once Ticket B's actual draft (`STEP125`) proved it added new declarations of its own |
+| §19.23 | [ARCH_19_23_TreeListHeaderExtraContract.md](ARCH_19_23_TreeListHeaderExtraContract.md) | `TreeListWidget_UI<T,LeafKeyT>::Render` gains a header-extra contract — TWO callbacks (Node vs. Leaf), a deliberate divergence from `DraggableList`'s single-callback shape |
+| §19.24 | [ARCH_19_24_SymmetryEnabledField.md](ARCH_19_24_SymmetryEnabledField.md) | `Params::MarkerInstanceLayer::bSymmetryEnabled` — new field, mirrors `bColorOverrideEnabled`'s shape, wire key `"SymmetryEnabled"` |
+| §19.25 | [ARCH_19_25_SelectionRepresentationUnification.md](ARCH_19_25_SelectionRepresentationUnification.md) | Canvas/list selection unification — `OverlayInstanceKey_UI::bManual`, `MapCanvas`'s widened selection surface, the shell-mediated tab↔canvas callback; corrects and narrows §19.20 |
+| §19.26 | [ARCH_19_26_ManualInstanceSymmetryGrouping.md](ARCH_19_26_ManualInstanceSymmetryGrouping.md) | Manual-instance symmetry-cluster grouping in the instance list — UI composition only, no PARAMS change |
+| §19.27 | [ARCH_19_27_ProceduralInstanceSelectionMechanism.md](ARCH_19_27_ProceduralInstanceSelectionMechanism.md) | Procedural marker-instance listing/selection — per-frame `ruleIndex` positional index, convergence with §19.25, bucket-size symmetry-grouping rule; narrows §19.20 |
 
 Related law: `sangen_arch_pack/CONSTITUTION.md`; `ARCH_03_ModuleBoundaries.md` §3.5 (the general
 MATH/PARAMS/PROC placement rule this section's math rulings apply, not re-derive);
 `ARCH_01_09_IdAbbreviationBan.md` (the "Id" ban this section's field spellings apply);
-`ARCH_16_MarkerLayerSymmetry.md` (the `MarkerRuleLayer`/`MarkerInstanceLayer` shapes this section
-adds back-reference fields to, without reopening their existing fields).
+`ARCH_14_08_DirtyFlagTiers.md` §14.8 (dirty-flag tiers, applied by §19.27's zero-DAG-participation
+rule); `ARCH_16_MarkerLayerSymmetry.md` (the `MarkerRuleLayer`/`MarkerInstanceLayer` shapes this
+section adds back-reference fields to, without reopening their existing fields).

@@ -533,8 +533,8 @@ struct ManualMarkerTestFixture {
         fixture.recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
         fixture.recipe.globalMarkerSettings.iconNameAlloy = "Alloy";   // the fixture's own default
         // STEP122: this fixture underpins tint/override/partition tests, not scale composition —
-        // pin scaleAlloy/scaleSpawn to 1.0f so GlobalMarkerSettings' own real 0.17f default doesn't
-        // drop these fixtures' markers below thumbnailLodThresholdPixels and flip them into
+        // pin scaleAlloy/scaleSpawn to 1.0f so GlobalMarkerSettings' own real 0.50f default (STEP127)
+        // doesn't drop these fixtures' markers below thumbnailLodThresholdPixels and flip them into
         // strategic mode (no icon seeded there, so a miss draws nothing instead of one candidate).
         // CheckManualMarkerScaleComposesEndToEnd/CheckManualMarkerScaleUnrecognizedGroupNameStaysNoOp
         // set their own non-default values on top of this baseline where scale is actually the

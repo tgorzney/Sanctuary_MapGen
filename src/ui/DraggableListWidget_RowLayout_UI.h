@@ -41,8 +41,12 @@ void RenderCollapsibleRow(const char* payloadIdentifier, const DraggableListRow&
             - extraButtonWidthPixels - headerExtraWidthPixels);
         drawRowHeaderExtra(rowIndex);
     }
-    DrawRowAffordances(row, rowIndex, signal, extraButtonWidthPixels,
-                       rowAvailWidthPixels - headerExtraWidthPixels, false);
+    // STEP127 items 8/9 — the FULL rowAvailWidthPixels, not a headerExtraWidthPixels-reduced one:
+    // the strip must right-align against the row's true edge, independent of whether a header-extra
+    // control is present. Reducing the width here re-derived the SAME start offset as the
+    // header-extra control just above (offsetA == offsetB), so the strip drew ON TOP of it instead
+    // of to its right, and also fell headerExtraWidthPixels short of the row's true right margin.
+    DrawRowAffordances(row, rowIndex, signal, extraButtonWidthPixels, rowAvailWidthPixels, false);
     if (bExpanded) { ImGui::Indent(); drawRowBody(rowIndex); ImGui::Unindent(); }
 }
 
@@ -70,8 +74,9 @@ void RenderFlatRow(const char* payloadIdentifier, const DraggableListRow& row, i
             - extraButtonWidthPixels - headerExtraWidthPixels);
         drawRowHeaderExtra(rowIndex);
     }
-    DrawRowAffordances(row, rowIndex, signal, extraButtonWidthPixels,
-                       rowAvailWidthPixels - headerExtraWidthPixels, true);
+    // STEP127 items 8/9 — see RenderCollapsibleRow's own comment above: the FULL rowAvailWidthPixels,
+    // not headerExtraWidthPixels-reduced, so the strip right-aligns against the row's true edge.
+    DrawRowAffordances(row, rowIndex, signal, extraButtonWidthPixels, rowAvailWidthPixels, true);
 }
 
 } // namespace RowLayoutDetail

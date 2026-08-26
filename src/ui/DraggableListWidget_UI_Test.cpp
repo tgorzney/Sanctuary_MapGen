@@ -227,10 +227,27 @@ void TestOptionalHeaderExtraContentIsGenericAndRowScoped() {
     CheckListWidgetExpectation(probeRowIndex == 2,
                                "the same X column on row 2 reports row 2's own index -- the slot is row-scoped");
 
-    // (b) The visibility/lock/delete strip's own X-offsets, found by the SAME sweep technique, are
-    // shifted left by exactly headerExtraWidthPixels versus the zero-reservation baseline.
+    // (b) STEP127 items 8/9 fix: the visibility/lock/delete strip's own X-offsets, found by the SAME
+    // sweep technique, now land at the SAME row-relative position as the zero-reservation baseline --
+    // the strip right-aligns against the row's TRUE right edge regardless of headerExtraWidthPixels,
+    // with the header-extra control occupying its own reserved band strictly to the strip's LEFT.
+    // (Before the fix this strip shifted left by exactly headerExtraWidthPixels, landing it ON TOP of
+    // the header-extra control's own band instead of beside it -- that was items 8/9's bug.)
+    //
+    // STEP127 investigation: this CLICK-sweep technique has a pre-existing, unrelated ~8px hover-
+    // resolution slop specific to the FIRST strip widget (the visibility icon) when something else was
+    // drawn on the same line before it -- ImGuiTreeNodeFlags_AllowOverlap defers hover priority near a
+    // widget's own left edge, and an extra preceding widget on the row measurably narrows that dead
+    // zone. Proven NOT a real positional shift: ImGui::GetContentRegionAvail().x at row 0 is BIT-
+    // IDENTICAL between this scene and the baseline scene above (both feed the SAME rowAvailWidthPixels
+    // into the SAME DrawRowAffordances SameLine() offset, so the strip's real screen X cannot differ),
+    // and TestHeaderExtraAffordanceStripGeometryDoesNotOverlapOrGap below reads the widgets' own real
+    // ImGui item rects (not a click sweep) to confirm the exact, unshifted position directly. lockX/
+    // deleteX (each one widget further from the header, unaffected by this edge case) already match
+    // the baseline EXACTLY with no slop at all, which is itself confirmation this is a boundary
+    // artifact of probing right next to the header, not a widened/shifted strip.
     float headerVisibilityX = -1.0f, headerLockX = -1.0f, headerDeleteX = -1.0f;
-    for (float probeX = kSceneWindowSize.x - 220.0f; probeX < kSceneWindowSize.x - 2.0f; probeX += 2.0f) {
+    for (float probeX = kSceneWindowSize.x - 110.0f; probeX < kSceneWindowSize.x - 2.0f; probeX += 2.0f) {
         const DraggableListSignal probe = ClickAtWithHeaderExtra(headerScene,
             ImVec2(probeX, RowCenterY(headerScene, 0)), kTestHeaderExtraWidthPixels, drawProbe);
         if (probe.sourceRowIndex != 0) continue;
@@ -241,11 +258,110 @@ void TestOptionalHeaderExtraContentIsGenericAndRowScoped() {
     CheckListWidgetExpectation(headerVisibilityX > 0.0f && headerLockX > headerVisibilityX &&
                                headerDeleteX > headerLockX,
                                "the opted-in scene keeps the same strip order, header slot or not");
+    constexpr float kAllowOverlapBoundarySlopPixels = 10.0f;   // covers the ~8px hover-resolution
+        // artifact documented above; still far smaller than kTestHeaderExtraWidthPixels (60px), the
+        // shift the pre-fix bug actually produced, so this cannot mask a regression back to it.
     CheckListWidgetExpectation(
-        OffsetsMatchWithinSweepStep(headerVisibilityX, baselineVisibilityX - kTestHeaderExtraWidthPixels) &&
-        OffsetsMatchWithinSweepStep(headerLockX, baselineLockX - kTestHeaderExtraWidthPixels) &&
-        OffsetsMatchWithinSweepStep(headerDeleteX, baselineDeleteX - kTestHeaderExtraWidthPixels),
-        "the strip shifts left by exactly headerExtraWidthPixels once a header slot reserves it");
+        std::fabs(headerVisibilityX - baselineVisibilityX) < kAllowOverlapBoundarySlopPixels &&
+        OffsetsMatchWithinSweepStep(headerLockX, baselineLockX) &&
+        OffsetsMatchWithinSweepStep(headerDeleteX, baselineDeleteX),
+        "STEP127: the strip stays at the row's true right edge, unshifted, once headerExtraWidthPixels "
+        "reserves its own band strictly to the left of it");
+}
+
+// STEP127 items 8/9 — synthetic-frame geometry regression, mirroring MarkersTab_ManualLayerColor
+// OverrideHeader_UI_Test.cpp's own HeadlessImguiSession/RunHeadlessFrame harness (real ImGui item
+// rects) rather than this file's own sweep-probe DraggableList_TestScene_UI.h harness — proves
+// (a) the header-extra control's own item rect and the affordance strip's own first item no longer
+// overlap on X, and (b) the strip's own rightmost item lands within a small epsilon of the row's
+// TRUE right edge, not headerExtraWidthPixels short of it. Both the 2-callback (headerExtraWidthPixels
+// == 0) and 3-callback paths run: the 2-callback run is the regression check for the 19+ existing
+// DraggableList<T>::Render call sites that never opt into a header-extra control at all.
+struct RowGeometryFrame {
+    float  rowAvailWidthPixels = 0.0f;
+    float  contentRegionMaxX   = 0.0f;   // the row's own TRUE right edge (GetContentRegionAvail's own
+                                          // definition: rowOrigin.x + rowAvailWidthPixels, exact)
+    float  windowLeftEdgeX     = 0.0f;   // window->Pos.x - ScrollX -- the SAME reference
+                                          // ImGui::SameLine(offset_from_start_x) resolves against
+                                          // (imgui.cpp's own SameLine, verified against source)
+    bool   bHeaderExtraDrawn   = false;
+    ImVec2 headerExtraMin, headerExtraMax;
+    ImVec2 stripRightmostMin, stripRightmostMax;
+};
+
+// One row is enough for geometry; two settle frames match this file's own established convention
+// (imgui's first frame is a layout-settling frame, see VirtualListWidget_UI_Test.cpp's own comment).
+RowGeometryFrame RunRowGeometryFrame(float headerExtraWidthPixels) {
+    RowGeometryFrame result;
+    std::vector<TestLayer> layers = {{"Alpha", 1, true, false}};
+    for (int settleFrame = 0; settleFrame < 2; ++settleFrame) {
+        RunHeadlessFrame(HeadlessMouseState(), kSceneWindowSize, [&] {
+            const auto describeRow = [&](int rowIndex) {
+                const ImVec2 rowOrigin = ImGui::GetCursorScreenPos();
+                result.rowAvailWidthPixels = ImGui::GetContentRegionAvail().x;
+                result.contentRegionMaxX   = rowOrigin.x + result.rowAvailWidthPixels;
+                result.windowLeftEdgeX     = ImGui::GetWindowPos().x - ImGui::GetScrollX();
+                DraggableListRow row;
+                row.label    = layers[rowIndex].name;
+                row.bVisible = layers[rowIndex].bVisible;
+                row.bLocked  = layers[rowIndex].bLocked;
+                return row;
+            };
+            // Collapsible layout, DefaultOpen: the strip finishes drawing immediately before this
+            // callback runs, so the LAST item submitted is the strip's own rightmost affordance
+            // (X##delete -- this row never sets extraButtonLabel, so there is no fourth item).
+            const auto drawRowBody = [&](int) {
+                result.stripRightmostMin = ImGui::GetItemRectMin();
+                result.stripRightmostMax = ImGui::GetItemRectMax();
+            };
+            const auto drawRowHeaderExtra = [&](int) {
+                ImGui::SmallButton("##geometryProbe");
+                result.bHeaderExtraDrawn = true;
+                result.headerExtraMin = ImGui::GetItemRectMin();
+                result.headerExtraMax = ImGui::GetItemRectMax();
+            };
+            if (headerExtraWidthPixels > 0.0f)
+                DraggableList<TestLayer>::Render("GeometryRow", layers, describeRow, drawRowBody,
+                                                 drawRowHeaderExtra, headerExtraWidthPixels);
+            else
+                DraggableList<TestLayer>::Render("GeometryRow", layers, describeRow, drawRowBody);
+        });
+    }
+    return result;
+}
+
+void TestHeaderExtraAffordanceStripGeometryDoesNotOverlapOrGap() {
+    HeadlessImguiSession session;
+    constexpr float kTestHeaderExtraWidthPixels = 60.0f;
+    // Covers WindowPadding.x plus SmallButton width-calibration slop against the named
+    // kAffordanceStripWidthPixels budget; far smaller than the 60px gap items 8/9's bug produced,
+    // so it cannot mask a regression back to the old behavior.
+    constexpr float kEpsilonPixels = 15.0f;
+
+    // 3-callback path: a header-extra control IS reserved.
+    const RowGeometryFrame withHeaderExtra = RunRowGeometryFrame(kTestHeaderExtraWidthPixels);
+    CheckListWidgetExpectation(withHeaderExtra.bHeaderExtraDrawn,
+                               "the 3-callback path actually drew the header-extra control");
+    const float predictedStripStartX = withHeaderExtra.windowLeftEdgeX
+        + (withHeaderExtra.rowAvailWidthPixels - static_cast<float>(kAffordanceStripWidthPixels));
+    CheckListWidgetExpectation(withHeaderExtra.headerExtraMax.x <= predictedStripStartX + 1.0f,
+                               "(a) the header-extra control's own item rect ends at or before the "
+                               "affordance strip's own first item starts -- no more overlap (items 8/9)");
+    CheckListWidgetExpectation(
+        std::fabs(withHeaderExtra.contentRegionMaxX - withHeaderExtra.stripRightmostMax.x) < kEpsilonPixels,
+        "(b) the affordance strip's own rightmost item ends within a small epsilon of the row's TRUE "
+        "right edge, not headerExtraWidthPixels (60px) short of it (items 8/9)");
+
+    // 2-callback path: headerExtraWidthPixels == 0.0f -- the regression check every existing
+    // DraggableList<T>::Render call site (19+ sites, none of which opt into a header-extra control)
+    // actually exercises.
+    const RowGeometryFrame withoutHeaderExtra = RunRowGeometryFrame(0.0f);
+    CheckListWidgetExpectation(!withoutHeaderExtra.bHeaderExtraDrawn,
+                               "the 2-callback path never invokes the header-extra callback at all");
+    CheckListWidgetExpectation(
+        std::fabs(withoutHeaderExtra.contentRegionMaxX - withoutHeaderExtra.stripRightmostMax.x) < kEpsilonPixels,
+        "(b) regression: the strip's rightmost item still ends at the row's true right edge for the "
+        "existing no-header-extra callers, unaffected by the fix");
 }
 
 } // namespace
@@ -258,6 +374,7 @@ void RunDraggableListAcceptance() {
     TestSyntheticDragProducesTheExpectedOrder();
     TestOptionalExtraButtonIsGenericAndRowScoped();
     TestOptionalHeaderExtraContentIsGenericAndRowScoped();
+    TestHeaderExtraAffordanceStripGeometryDoesNotOverlapOrGap();
 }
 } // namespace Ui
 } // namespace SanmapGen

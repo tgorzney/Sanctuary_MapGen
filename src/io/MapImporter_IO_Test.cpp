@@ -2228,6 +2228,27 @@ void CheckMergedMarkerTypeNameLegacyDefault() {
               "MarkerRuleLayer::markerTypeName defaults to empty when the key is absent");
 }
 
+// STEP127 item 3 — the legacy-import-default-jump question the ticket flags: on a document with NO
+// "GlobalMarkerSettings" key at all (confirmed real for a non-SanGen-authored .sanmap; every
+// SanGen-authored file, v1 or v2, always carries the 9 legacy fields that GlobalMarkerSettings_
+// Migrate_V2 relocates into this object before this reader ever runs — see that migration's own
+// header), ReadGlobalMarkerSettingsJson early-returns and leaves recipe.globalMarkerSettings at its
+// struct default. Before STEP127 that default was 0.17f; after, 0.50f — so a legacy/foreign map's
+// markers DO jump in rendered size on this change. Not a regression this ticket can silently
+// dismiss (mirrors CheckMergedParentBundleIdentifierLegacyDefault's exact shape).
+void CheckGlobalMarkerSettingsLegacyDefault() {
+    nlohmann::json document;   // deliberately no "GlobalMarkerSettings" key at all
+    Params::MapRecipe recipe;
+    Io::ReadGlobalMarkerSettingsJson(document, recipe);
+
+    Check(NearlyEqual(recipe.globalMarkerSettings.scaleAlloy, 0.50f)
+          && NearlyEqual(recipe.globalMarkerSettings.scalePlasma, 0.50f)
+          && NearlyEqual(recipe.globalMarkerSettings.scaleSpawn, 0.50f),
+          "GlobalMarkerSettings::scaleAlloy/Plasma/Spawn keep the struct default (0.50f, STEP127) "
+          "when the GlobalMarkerSettings key is absent entirely — confirms the legacy-import-"
+          "default-jump risk STEP127 flags rather than silently assuming it away");
+}
+
 // STEP124 / ARCH §19.16: instanceIdentifier's legacy-backfill counter is threaded across the WHOLE
 // nested `markers` walk, never reset per group — a group with an explicit InstanceIdentifier key
 // still consumes (advances) the counter before being overwritten.
@@ -2531,6 +2552,7 @@ int main() {
     SanmapGen::MapFormatTest::CheckMarkerLayerBundlesLegacyDefault();
     SanmapGen::MapFormatTest::CheckMergedParentBundleIdentifierLegacyDefault();
     SanmapGen::MapFormatTest::CheckMergedMarkerTypeNameLegacyDefault();
+    SanmapGen::MapFormatTest::CheckGlobalMarkerSettingsLegacyDefault();
     SanmapGen::MapFormatTest::CheckMarkerInstanceIdentifierLegacyBackfillAcrossGroups();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairOnImport();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairIsNoOpOnValidChain();

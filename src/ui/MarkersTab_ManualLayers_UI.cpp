@@ -54,8 +54,6 @@ void DrawManualMarkerLayerBlockSettings(ManualMarkerLayersState& state) {
     if (state.bUseGroupColor)
         DrawColorSwatch("Group Color", state.groupColor, state.previewColorOptions,
                         state.groupColorToggle);
-    DrawSliderScalar("Layer Icon Scale", state.layerIconScale, state.iconScaleRange,
-                     state.layerIconScaleToggle, WidgetStyle(), "%.2f");
 }
 
 DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& markerLayers,

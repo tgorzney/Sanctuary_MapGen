@@ -447,8 +447,10 @@ match epsilon (no new tolerance field) and wiring the canvas via a new
 `SetManualMarkerDragSource`/`SetActivePanelSource`, not a new module-boundary pattern. §19.20
 formally extends §19.9's manual-only-membership law one further tier to selection scope (no
 procedural-instance selection — `Data::PlacementInstances` has no stable cross-bake identity to
-hang one on). §19.21 closes, with one explicit sentence, that `MarkerRule::category` and
-`markerTypeName` are two permanently independent concepts a future ticket may not silently merge.
+hang one on) — **this specific "no procedural selection" premise is itself corrected the very
+next session; see the 2026-08-26 correction-round paragraph below.** §19.21 closes, with one
+explicit sentence, that `MarkerRule::category` and `markerTypeName` are two permanently
+independent concepts a future ticket may not silently merge.
 
 **Unrelated, time-sensitive item from the same session — `ARCH_19_22_ManualLayersHeaderSplit.md`
 §19.22 (2026-08-26; revised, same day, into its FINAL combined shape once Ticket B's own actual
@@ -478,3 +480,53 @@ list is updated explicitly for both new headers, mechanically, at every call sit
 either header's transitive re-export. Ruled, not yet built — a coder work-order (implemented as
 part of, or immediately ahead of, Ticket B's own diff — the two splits and Ticket B's new
 declarations land together).
+
+**`ARCH_19_MarkerLayerBundle.md` §19 extended to §19.23–§19.27 (2026-08-26, "Markers UI Correction
+Round 2") — ratifies `work_orders/DESIGN_MarkersUICorrectionRound2_R1.md` (the UI Expert's response
+to `work_orders/BRIEF_MarkersUICorrectionRound2_R1.md`, the human's post-STEP121-126 correction
+list) for its five ARCH-flagged items, all ratified as designed after independent re-verification
+against the live code (not taken on the design doc's word alone).** §19.23 signs off
+`TreeListWidget_UI<T,LeafKeyT>::Render`'s new header-extra contract with TWO callbacks
+(`drawNodeHeaderExtra(int)`/`drawLeafHeaderExtra(const LeafKeyT&)`), a deliberate divergence from
+`DraggableList<T>::Render`'s single-callback shape — confirmed correct because the tree has two
+row kinds with two distinct identity types, unlike `DraggableList`'s one; the additive overload and
+thin-delegator preservation of the existing 7-callback signature were confirmed by direct read of
+`TreeListWidget_UI.h`. §19.24 signs off `Params::MarkerInstanceLayer::bSymmetryEnabled` (default
+`true`, wire key `"SymmetryEnabled"` — confirmed by direct read of the sibling `bLocked`/
+`bGridSnapEnabled`/`bColorOverrideEnabled` IO code, all `b<Name>`→`"<Name>"`), gating the effective
+symmetry mask to `None` without destructively clearing the configured axes, mirroring
+`bColorOverrideEnabled`'s exact shape in the same struct. §19.25 is the round's most invasive
+ruling: `OverlayInstanceKey_UI` gains `bool bManual = false` (fixing a real, independently
+re-confirmed live bug — procedural `Data::PlacementInstances` array positions and manual per-group
+transform indices shared one untagged number space and could collide under
+`PlacementCollectionKind_UI::Markers`); `ResolveMarkersManual` switches its selection key from a
+per-group index to `MarkerTransform::instanceIdentifier` (§19.16); `MapCanvas::selectedEntityIdentifier`
+widens to be backed by the full `OverlayInstanceKey_UI`, with `SetSelection` gaining a canonical
+full-key overload every selection-setting path (canvas pick, manual list-click, §19.27's procedural
+list-click) now shares; `ApplyClick` gains a manual-marker linear hit-test fallback;
+`selectionChangedCallback` widens to carry the full key; and a new shell-mediated
+`MapCanvas::SelectManualMarkerByInstanceIdentifier(int)` + `Application`-bound callback lets a
+Markers-tab list click drive the same selection state a canvas click drives — confirmed the same
+null-safe-injection shell-mediation pattern §19.19's `SetManualMarkerSelectionSource` already uses,
+not a new module-boundary class. **§19.25 formally corrects §19.20**, whose "manual-only" framing
+and "OverlayInstanceKey_UI... untouched, unshared, unreferenced" claim no longer hold — see §19.20's
+own file for the full correction note; §19.20's one binding sentence that still stands
+(`instanceIdentifier` is never repurposed for procedural identity) is honored by both §19.25 and
+§19.27. §19.26 records the manual-instance symmetry-cluster grouping UI shape (partition by
+`MarkerTransform::symmetryGroupIdentifier`, `0` = ungrouped/flat-after, non-zero = collapsible
+cluster, first) — no PARAMS change, recorded per the design's own request. §19.27, overriding
+§19.20's prior scope-out at the human's direct instruction ("This was wrong and is now overridden:
+build it"), gives procedural marker instances their own listing/selection mechanism: a session-only
+per-frame `ruleIndex`→array-position index over `Data::PlacementInstances` (mirroring
+`ManualInstanceLayerIndex_UI`'s shape, zero dirty-hash/DAG participation per §14.8's Tier C/C2 cost
+model, no new `DATA` field), whose selection key converges onto §19.25's SAME `OverlayInstanceKey_UI`
+representation (`bManual=false`) — confirmed as one shared mechanism, not built twice — plus a
+symmetry-grouping rule for procedural instances that DELIBERATELY differs from §19.26's manual `== 0`
+convention: `Data::PlacementInstance::symmetryIdentifier` is never `0` (confirmed by direct read,
+`nextSymmetryIdentifier` starts at `1`, `Placement_PROC.cpp:44`/`Placement_Accept_PROC.cpp:43`), so
+the correct predicate is bucket size `> 1`, not id value. Two lower-risk, UI-composition-only items
+from the same design doc — the "(Unassigned)" Type-section becoming present-only (with a conditional
+free-text Marker Type field on empty ungrouped rows, mirroring the Bundle's own existing field) and
+flattening the "Ungrouped Procedural Rules"/"Ungrouped Manual Marker Layers" sub-sections into plain
+rows — were reviewed and raise no ARCH objection; no new subsection was written for either, per the
+design doc's own assessment that neither introduces a new field or cross-cutting contract.

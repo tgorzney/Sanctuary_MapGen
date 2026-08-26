@@ -747,9 +747,9 @@
             "b": 0.20000000298023224,
             "a": 1.0
         },
-        "MarkerScaleAlloy": 0.17000000178813934,
-        "MarkerScalePlasma": 0.17000000178813934,
-        "MarkerScaleSpawn": 0.17000000178813934,
+        "MarkerScaleAlloy": 0.5,
+        "MarkerScalePlasma": 0.5,
+        "MarkerScaleSpawn": 0.5,
         "MarkerSelectColorAlloy": {
             "r": 1.0,
             "g": 1.0,
