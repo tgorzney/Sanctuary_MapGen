@@ -18,6 +18,8 @@ void RunMapCanvasPickingChecks();                                 // MapCanvas_P
 // ARCH §19.25 — MapCanvas_Picking_UI_Test.cpp's own manual-selection coverage (canvas click ->
 // manual marker, list click -> canvas, via SelectManualMarkerByInstanceIdentifier).
 void RunManualMarkerSelectionChecks();
+// STEP132 (ARCH §19.27) — the procedural sibling, MapCanvas_Picking_UI_Test.cpp.
+void RunProceduralMarkerListSelectionChecks();
 // STEP78 acceptance test 4 — MapCanvas_ScenarioEditModeOwnership_UI_Test.cpp.
 void RunMapCanvasScenarioEditModeOwnershipChecks(Sys::GpuResourceManager& manager);
 // STEP113 — MapCanvas_ActivePanelGate_UI_Test.cpp.
@@ -32,6 +34,7 @@ int main(int argumentCount, char** argumentValues) {
     Ui::RunMapCanvasViewChecks();
     Ui::RunMapCanvasPickingChecks();
     Ui::RunManualMarkerSelectionChecks();
+    Ui::RunProceduralMarkerListSelectionChecks();
 
     HWND window = nullptr; HDC deviceContext = nullptr; HGLRC glContext = nullptr;
     if (!GpuResourceTest::CreateHiddenGlContext(window, deviceContext, glContext)) {

@@ -142,6 +142,14 @@ public:
     // selection (mirrors MarkersTabState::selectedManualInstanceIdentifier's own `-1` sentinel).
     void SelectManualMarkerByInstanceIdentifier(int instanceIdentifier);   // MapCanvas_UI.cpp
 
+    // STEP132 (ARCH §19.27) — the procedural sibling of SelectManualMarkerByInstanceIdentifier above:
+    // a Markers-tab PROCEDURAL instance-list click resolves through the SAME canonical SetSelection,
+    // `bManual=false` and `arrayPosition` (a raw Data::PlacementInstances SoA index) as the key — the
+    // exact representation §19.25 already establishes for canvas click-pick, because it IS the same
+    // array. A negative `arrayPosition` clears the selection, mirroring the manual sibling's own
+    // sentinel handling. Built once, not a second divergent selection path (§19.27's own instruction).
+    void SelectProceduralMarkerInstanceByArrayPosition(int arrayPosition);   // MapCanvas_UI.cpp
+
     MapCanvasView& View() { return view; }
     const MapCanvasView& View() const { return view; }
 

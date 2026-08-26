@@ -6,12 +6,40 @@
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "Checkbox_UI.h"
 #include "MarkerLayerSymmetrySection_UI.h"
+#include "SymmetryClusterInstanceList_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
 #include <string>
+#include <utility>
 
 namespace SanmapGen {
 namespace Ui {
+namespace {
+
+// One instance row's own body — unchanged from STEP126, just extracted so both the flat-list branch
+// and the (STEP132) symmetry-cluster branch draw it identically, never a second near-duplicate copy.
+void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
+                           const std::pair<int, int>& groupTransformIndex,
+                           int& selectedManualInstanceIdentifier,
+                           const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+    const Params::MarkerInstanceGroup& instanceGroup =
+        markers[static_cast<std::size_t>(groupTransformIndex.first)];
+    const Params::MarkerTransform& instanceTransform =
+        instanceGroup.transforms[static_cast<std::size_t>(groupTransformIndex.second)];
+    const std::string rowLabel = instanceGroup.name + " - " + (!instanceTransform.name.empty()
+        ? instanceTransform.name : std::to_string(groupTransformIndex.second));
+    const bool bRowSelected = selectedManualInstanceIdentifier == instanceTransform.instanceIdentifier;
+    if (ImGui::Selectable(rowLabel.c_str(), bRowSelected)) {
+        selectedManualInstanceIdentifier = instanceTransform.instanceIdentifier;
+        // ARCH §19.25, item 5 — IN ADDITION TO the tab-local write above, not instead of it:
+        // drives the canvas's own real selection, so the REAL icon-sprite render path
+        // (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) reflects this click too.
+        if (selectManualMarkerInstanceCallback)
+            selectManualMarkerInstanceCallback(instanceTransform.instanceIdentifier);
+    }
+}
+
+} // namespace
 
 // The row's own name, tint, icon scale, grid snap and symmetry setting — STEP110: drawn inline in THIS
 // row's own expanded body, not "selected"-gated. Tint hides under the block's shared-color mode
@@ -52,29 +80,27 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
     // homogeneous backing vector for a reorder/delete signal to apply against — see the design doc's
     // own reasoning for rejecting DraggableList<Params::MarkerTransform> here). No delete/reorder
     // affordance: deletion/repositioning stays owned by the roster editor (MarkersTab_Manual_UI.h).
+    // STEP132 (ARCH §19.26) — partitioned by `symmetryGroupIdentifier`: non-zero buckets render first
+    // as their own collapsible "Symmetry Group N (k)" node, `== 0` (never-dragged/-repaired) instances
+    // list flat after, via the shared cluster-list helper (SymmetryClusterInstanceList_UI.h) Part B's
+    // procedural instance list also calls, parameterized on the OPPOSITE (bucket-size) predicate.
     ImGui::Separator();
     ImGui::TextUnformatted("Instances");
     const auto instanceIt = instanceIndex.instancesByLayerIndex.find(layerIndex);
     if (instanceIt == instanceIndex.instancesByLayerIndex.end() || instanceIt->second.empty()) {
         ImGui::TextDisabled("(none)");
     } else {
-        for (const std::pair<int, int>& groupTransformIndex : instanceIt->second) {
-            const Params::MarkerInstanceGroup& instanceGroup =
-                markers[static_cast<std::size_t>(groupTransformIndex.first)];
-            const Params::MarkerTransform& instanceTransform =
-                instanceGroup.transforms[static_cast<std::size_t>(groupTransformIndex.second)];
-            const std::string rowLabel = instanceGroup.name + " - " + (!instanceTransform.name.empty()
-                ? instanceTransform.name : std::to_string(groupTransformIndex.second));
-            const bool bRowSelected = selectedManualInstanceIdentifier == instanceTransform.instanceIdentifier;
-            if (ImGui::Selectable(rowLabel.c_str(), bRowSelected)) {
-                selectedManualInstanceIdentifier = instanceTransform.instanceIdentifier;
-                // ARCH §19.25, item 5 — IN ADDITION TO the tab-local write above, not instead of it:
-                // drives the canvas's own real selection, so the REAL icon-sprite render path
-                // (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) reflects this click too.
-                if (selectManualMarkerInstanceCallback)
-                    selectManualMarkerInstanceCallback(instanceTransform.instanceIdentifier);
-            }
-        }
+        DrawSymmetryClusterInstanceList<std::pair<int, int>>(instanceIt->second,
+            [&](const std::pair<int, int>& groupTransformIndex) {
+                return markers[static_cast<std::size_t>(groupTransformIndex.first)]
+                    .transforms[static_cast<std::size_t>(groupTransformIndex.second)]
+                    .symmetryGroupIdentifier;
+            },
+            [](int groupIdentifier, int /*bucketSize*/) { return groupIdentifier != 0; },
+            [&](const std::pair<int, int>& groupTransformIndex) {
+                DrawManualInstanceRow(markers, groupTransformIndex, selectedManualInstanceIdentifier,
+                                      selectManualMarkerInstanceCallback);
+            });
     }
     return bNameCommitted || bSnapCommitted || bSnapSizeCommitted;
 }

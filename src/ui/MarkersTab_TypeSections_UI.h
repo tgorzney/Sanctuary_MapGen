@@ -14,6 +14,7 @@
 #include "../params/MarkerRule_PARAMS.h"
 
 namespace SanmapGen {
+namespace Data { class PlacementInstances; }
 namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
 namespace Ui {
@@ -64,10 +65,13 @@ struct MarkerTypeSectionsState {
 // ARCH §19.25, item 5: `selectManualMarkerInstanceCallback` rides the SAME chain previewDriver/
 // iconManifest already ride down, threaded to DrawMarkerLayerBundleTree and
 // DrawManualMarkerLayerListBody's own leaf/row bodies. Empty default — every existing call site
-// compiles unchanged.
+// compiles unchanged. STEP132 (ARCH §19.27): `placedMarkers`/`selectProceduralMarkerInstanceCallback`
+// ride the same chain one leg further, into DrawRuleLayerListBody's own per-Rule instance list.
 void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
                             Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
-                            const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
+                            const std::function<void(int)>& selectManualMarkerInstanceCallback = {},
+                            const Data::PlacementInstances* placedMarkers = nullptr,
+                            const std::function<void(int)>& selectProceduralMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen

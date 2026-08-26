@@ -182,6 +182,11 @@ private:
     // through DrawMarkersTab -> DrawMarkerTypeSections -> DrawLayerRowBody's existing call chain
     // (the same chain previewDriver/iconManifest already ride down).
     std::function<void(int)>     selectManualMarkerInstanceCallback;
+    // STEP132 (ARCH §19.27) — the procedural sibling: bound in WireCallbacks() to
+    // MapCanvas::SelectProceduralMarkerInstanceByArrayPosition, threaded down through
+    // DrawMarkersTab -> DrawMarkerTypeSections -> DrawRuleLayerListBody's own call chain (the SAME
+    // chain selectManualMarkerInstanceCallback above already rides).
+    std::function<void(int)>     selectProceduralMarkerInstanceCallback;
     int  frameCount           = 0;
     bool bImguiReady          = false;
 };

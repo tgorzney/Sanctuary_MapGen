@@ -86,6 +86,13 @@ void MapCanvas::SelectManualMarkerByInstanceIdentifier(int instanceIdentifier) {
                                        instanceIdentifier >= 0, /*bManual=*/true});
 }
 
+// STEP132 (ARCH §19.27) — the procedural sibling: routes through the SAME canonical SetSelection
+// above, `bManual=false` (a procedural array position is never a manual instanceIdentifier).
+void MapCanvas::SelectProceduralMarkerInstanceByArrayPosition(int arrayPosition) {
+    SetSelection(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, arrayPosition,
+                                       arrayPosition >= 0, /*bManual=*/false});
+}
+
 void MapCanvas::ApplyDrag(float deltaRegionPixelsX, float deltaRegionPixelsY) {
     view.PanByRegionPixels(deltaRegionPixelsX, deltaRegionPixelsY);
 }

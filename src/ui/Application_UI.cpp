@@ -121,6 +121,12 @@ void Application::WireCallbacks() {
     selectManualMarkerInstanceCallback = [this](int instanceIdentifier) {
         canvas.SelectManualMarkerByInstanceIdentifier(instanceIdentifier);
     };
+    // STEP132 (ARCH §19.27) — the procedural sibling, same shell-mediated pattern, opposite direction
+    // of nothing new: the Rule row's own instance-list click resolves through this into the canvas's
+    // own real selection, exactly like the manual closure above.
+    selectProceduralMarkerInstanceCallback = [this](int arrayPosition) {
+        canvas.SelectProceduralMarkerInstanceByArrayPosition(arrayPosition);
+    };
 }
 
 // The whole of the shell's generation duty. WHICH tier this is was derived by the driver from the

@@ -71,7 +71,9 @@ std::vector<std::string> EnumerateMarkerTypeSectionNames(
 
 void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
                             Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
-                            const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+                            const std::function<void(int)>& selectManualMarkerInstanceCallback,
+                            const Data::PlacementInstances* placedMarkers,
+                            const std::function<void(int)>& selectProceduralMarkerInstanceCallback) {
     DrawManualMarkerLayerBlockSettings(state.manualLayers);   // (a) — once, tab-wide
 
     const std::vector<std::string> typeNames = EnumerateMarkerTypeSectionNames(
@@ -93,7 +95,8 @@ void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
             // `DrawManualMarkerLayerListBody` themselves are UNCHANGED — only the wrapper goes away.
             ImGui::Separator();
             bool bRecipeMoved = DrawRuleLayerListBody(recipe.markerRuleLayers, state, previewDriver,
-                                                      iconManifest, typeName);
+                                                      iconManifest, typeName, placedMarkers,
+                                                      selectProceduralMarkerInstanceCallback);
             bRecipeMoved = DrawAddMarkerRuleLayerButton(recipe.markerRuleLayers, state, -1, typeName)
                          || bRecipeMoved;
             NotifyPlacementChange(bRecipeMoved, previewDriver);

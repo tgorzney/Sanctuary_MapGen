@@ -25,14 +25,18 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                     const IconAtlasPairingLookup* pairingLookup,
                     const Data::PlacementInstances* placedMarkers,
-                    const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+                    const std::function<void(int)>& selectManualMarkerInstanceCallback,
+                    const std::function<void(int)>& selectProceduralMarkerInstanceCallback) {
     ImGui::PushID("markersTab");
     DrawMarkersTabGlobals(state.globals, recipe.globalMarkerSettings, iconManifest, pairingLookup);
     // STEP125: replaces the old flat DrawMarkerLayerBundleTree/DrawRuleStack/DrawManualMarkerLayers
     // trio with the dynamic Type-section outer loop (ARCH §19.14/§19.15) — one collapsible Section
     // per distinct markerTypeName, each containing its own type-filtered Bundle tree and the two
-    // type-filtered "Ungrouped ..." lists (MarkersTab_TypeSections_UI.h).
-    DrawMarkerTypeSections(recipe, state, previewDriver, iconManifest, selectManualMarkerInstanceCallback);
+    // type-filtered "Ungrouped ..." lists (MarkersTab_TypeSections_UI.h). STEP132: also threads
+    // `placedMarkers`/`selectProceduralMarkerInstanceCallback` down to the Rule layer list's own
+    // per-Rule instance list (ARCH §19.27) — the SAME pointer DrawPlacedMarkerList below already reads.
+    DrawMarkerTypeSections(recipe, state, previewDriver, iconManifest, selectManualMarkerInstanceCallback,
+                           placedMarkers, selectProceduralMarkerInstanceCallback);
     // STEP49: the hand-authored roster. `DrawManualMarkers` takes no map-size parameter, so the
     // caller resolves the X/Z slider bounds from `recipe.geometry.mapSize` into the state each
     // frame (MarkersTab_Manual_UI.h).

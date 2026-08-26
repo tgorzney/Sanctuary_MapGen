@@ -157,5 +157,36 @@ void RunManualMarkerSelectionChecks() {
     check(!canvas.HasSelection(), "a negative instanceIdentifier clears the selection, never claims it");
 }
 
+// STEP132 (ARCH §19.27) — the procedural sibling of RunManualMarkerSelectionChecks' item-5 half: a
+// Markers-tab PROCEDURAL instance-list click's own landing point
+// (SelectProceduralMarkerInstanceByArrayPosition) routes through the SAME canonical SetSelection,
+// `bManual=false` and the array position as the key — never a second, divergent selection path.
+void RunProceduralMarkerListSelectionChecks() {
+    MapCanvas canvas;
+    OverlayInstanceKey_UI lastReportedKey;
+    int selectionChangeCount = 0;
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key) {
+        lastReportedKey = key; ++selectionChangeCount;
+    });
+
+    canvas.SelectProceduralMarkerInstanceByArrayPosition(7);
+    check(canvas.HasSelection() && canvas.SelectedEntityIdentifier() == 7u,
+          "SelectProceduralMarkerInstanceByArrayPosition drives the canvas's own real selection");
+    check(selectionChangeCount == 1 && !lastReportedKey.bManual && lastReportedKey.instanceIndex == 7
+              && lastReportedKey.collection == PlacementCollectionKind_UI::Markers,
+          "the reported key is {Markers, 7, true, bManual=false} — a PROCEDURAL selection (array "
+          "position), correctly tagged the OPPOSITE of the manual sibling's bManual=true");
+
+    selectionChangeCount = 0;
+    canvas.SelectProceduralMarkerInstanceByArrayPosition(7);
+    check(selectionChangeCount == 0,
+          "re-selecting the SAME array position is a no-op — SetSelection's own equal-key short-circuit");
+
+    // A negative array position is never a legal selection target, mirroring the manual sibling's
+    // own "-1 = nothing selected" sentinel handling.
+    canvas.SelectProceduralMarkerInstanceByArrayPosition(-1);
+    check(!canvas.HasSelection(), "a negative array position clears the selection, never claims it");
+}
+
 } // namespace Ui
 } // namespace SanmapGen

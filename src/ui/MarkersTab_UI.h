@@ -161,12 +161,15 @@ Params::MarkerRule* SelectedMarkerRule(std::vector<Params::MarkerRuleLayer>& mar
 // `selectManualMarkerInstanceCallback` is Application's own shell-mediated closure (empty default —
 // every existing test/call site compiles unchanged), threaded straight through to
 // DrawMarkerTypeSections, riding the SAME chain previewDriver/iconManifest already ride down.
+// STEP132 (ARCH §19.27): `selectProceduralMarkerInstanceCallback` is that closure's procedural
+// sibling, riding the exact same chain one parameter further along.
 void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     Pipeline::PreviewDriver* previewDriver,
                     const IconAtlasManifest* iconManifest = nullptr,
                     const IconAtlasPairingLookup* pairingLookup = nullptr,
                     const Data::PlacementInstances* placedMarkers = nullptr,
-                    const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
+                    const std::function<void(int)>& selectManualMarkerInstanceCallback = {},
+                    const std::function<void(int)>& selectProceduralMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen

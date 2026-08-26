@@ -10,11 +10,13 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-// One layer's rule rows, each row's own DrawRuleSettings inline (STEP110, one tier down from
-// STEP104). Only the SELECTED layer renders a list — no cross-layer drag (STEP80 §1).
+// One layer's rule rows, each row's own DrawRuleSettings inline (STEP110). Only the SELECTED layer
+// renders a list — no cross-layer drag (STEP80 §1). STEP132: a row's own flat ruleIndex is
+// `layerInstanceListContext.flatRuleIndex` (this layer's own base) + rowIndex.
 DraggableListSignal DrawRuleLayerBody(Params::MarkerRuleLayer& layer, int layerIndex,
                                       MarkersTabState& state, Pipeline::PreviewDriver* previewDriver,
-                                      const IconAtlasManifest* iconManifest) {
+                                      const IconAtlasManifest* iconManifest,
+                                      const ProceduralInstanceListContext_UI& layerInstanceListContext) {
     if (layerIndex != state.selectedRuleLayerIndex) {
         ImGui::Text("%d rule(s) - select this layer to edit them", static_cast<int>(layer.rules.size()));
         return DraggableListSignal();
@@ -34,13 +36,15 @@ DraggableListSignal DrawRuleLayerBody(Params::MarkerRuleLayer& layer, int layerI
         },
         // Own row, own settings — no bleed (STEP110; was a bottom-of-stack draw in DrawRuleStack).
         [&](int rowIndex) {
+            ProceduralInstanceListContext_UI rowInstanceListContext = layerInstanceListContext;
+            rowInstanceListContext.flatRuleIndex += rowIndex;
             DrawRuleSettings(layer.rules[static_cast<std::size_t>(rowIndex)], state, previewDriver,
-                             iconManifest);
+                             iconManifest, rowInstanceListContext);
         }, state.selectedRuleIndex);
 }
 
-// Applies the frame's traffic from both lists: the inner signal FIRST — a same-frame layer Delete
-// would move the indices it is expressed in (LayersTab_UI.cpp) — then the outer, delete-confirm-gated.
+// Applies the frame's traffic from both lists: the inner signal FIRST (a same-frame layer Delete
+// would move the indices it is expressed in), then the outer, delete-confirm-gated.
 bool ApplyRuleLayerFrameSignals(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
                                 const DraggableListSignal& ruleSignal, int ruleSignalLayerIndex,
                                 const DraggableListSignal& layerSignal) {
@@ -67,15 +71,22 @@ bool ApplyRuleLayerFrameSignals(std::vector<Params::MarkerRuleLayer>& markerRule
 
 } // namespace
 
-// The outer list plus the nested rule list. STEP110 Fix part 1: each row draws its OWN
-// DrawRuleLayerSettings inline whenever ITS OWN header is open — never gated on
-// `state.selectedRuleLayerIndex` (the nested rule list still is, drag-safety: DrawRuleLayerBody).
-// STEP125: promoted out of the anonymous namespace, gains `markerTypeNameFilter` (ARCH §19.15(c)),
-// and returns whether the LIST signals alone moved the recipe — the non-empty-layer Delete confirm
-// and the trailing NotifyPlacementChange move to the tab-wide DrawMarkerTypeSections (§5(b)).
+// The outer list plus the nested rule list. STEP110: each row draws its OWN DrawRuleLayerSettings
+// inline whenever ITS OWN header is open — never gated on `state.selectedRuleLayerIndex` (the nested
+// rule list still is, drag-safety: DrawRuleLayerBody). Returns whether the LIST signals alone moved
+// the recipe — the Delete confirm/NotifyPlacementChange live in DrawMarkerTypeSections instead.
 bool DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
                            Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
-                           const std::string& markerTypeNameFilter) {
+                           const std::string& markerTypeNameFilter,
+                           const Data::PlacementInstances* placedMarkers,
+                           const std::function<void(int)>& selectProceduralMarkerInstanceCallback) {
+    // STEP132 — built ONCE per call, mirrors ManualInstanceLayerIndex_UI's own build-once posture.
+    const ProceduralInstanceRuleIndex_UI ruleIndexLookup(placedMarkers != nullptr
+        ? BuildProceduralInstanceRuleIndex(*placedMarkers) : ProceduralInstanceRuleIndex_UI());
+    ProceduralInstanceListContext_UI baseInstanceListContext;
+    baseInstanceListContext.placedMarkers   = placedMarkers;
+    baseInstanceListContext.ruleIndexLookup = &ruleIndexLookup;
+    baseInstanceListContext.selectProceduralMarkerInstanceCallback = selectProceduralMarkerInstanceCallback;
     DraggableListSignal ruleSignal;
     int ruleSignalLayerIndex = -1;
     char rowLabel[128] = { 0 };
@@ -103,8 +114,11 @@ bool DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
             }
             DrawRuleLayerSettings(layer, previewDriver);
             ImGui::Separator();
+            ProceduralInstanceListContext_UI layerInstanceListContext = baseInstanceListContext;
+            layerInstanceListContext.flatRuleIndex = FlatMarkerRuleIndexBase(markerRuleLayers, rowIndex);
             const DraggableListSignal signal =
-                DrawRuleLayerBody(layer, rowIndex, state, previewDriver, iconManifest);
+                DrawRuleLayerBody(layer, rowIndex, state, previewDriver, iconManifest,
+                                 layerInstanceListContext);
             if (signal.bHasSignal()) { ruleSignal = signal; ruleSignalLayerIndex = rowIndex; }
         },
         state.selectedRuleLayerIndex);
@@ -113,37 +127,9 @@ bool DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
     // no DrawPendingDeleteRuleLayerDialog / NotifyPlacementChange here anymore — §5
 }
 
-Params::MarkerRuleLayer* SelectedMarkerRuleLayer(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
-                                                 const MarkersTabState& state) {
-    if (state.selectedRuleLayerIndex < 0
-        || state.selectedRuleLayerIndex >= static_cast<int>(markerRuleLayers.size())) return nullptr;
-    return &markerRuleLayers[static_cast<std::size_t>(state.selectedRuleLayerIndex)];
-}
-
-// The existing per-rule ApplyRuleListSignal body, rehomed against `layer.rules`.
-bool ApplyMarkerRuleListSignal(Params::MarkerRuleLayer& layer, const DraggableListSignal& signal,
-                               MarkersTabState& state) {
-    std::vector<Params::MarkerRule>& rules = layer.rules;
-    const int rowIndex = signal.sourceRowIndex;
-    const bool bRowValid = rowIndex >= 0 && rowIndex < static_cast<int>(rules.size());
-    if (signal.kind == DraggableListSignalKind::Select && bRowValid) {
-        state.selectedRuleIndex = rowIndex;
-        LoadMarkerRuleValues(rules[static_cast<std::size_t>(rowIndex)], state);
-        LoadMarkerRuleEnumIndices(rules[static_cast<std::size_t>(rowIndex)], state.ruleDetail);
-        return false;
-    }
-    if (signal.kind == DraggableListSignalKind::ToggleVisibility && bRowValid) {
-        rules[static_cast<std::size_t>(rowIndex)].bEnabled =
-            !rules[static_cast<std::size_t>(rowIndex)].bEnabled;
-        return true;
-    }
-    if (signal.kind == DraggableListSignalKind::ToggleLock && bRowValid) {
-        rules[static_cast<std::size_t>(rowIndex)].bHidden =
-            !rules[static_cast<std::size_t>(rowIndex)].bHidden;
-        return true;
-    }
-    return ApplyDraggableListSignal(rules, signal);
-}
+// SelectedMarkerRuleLayer / ApplyMarkerRuleListSignal: STEP132 relocated both to the sibling
+// MarkersTab_RuleLayerInstances_UI.cpp — a pure size-ceiling remediation (ARCH §1.5), not a
+// thematic move; see that file's own header comment.
 
 } // namespace Ui
 } // namespace SanmapGen

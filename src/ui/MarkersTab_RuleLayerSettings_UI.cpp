@@ -124,7 +124,8 @@ void DrawRuleLayerSettings(Params::MarkerRuleLayer& layer, Pipeline::PreviewDriv
 // Levels/HeightMask mirrors — is what keeps two simultaneously expanded rows from bleeding into
 // each other.
 void DrawRuleSettings(Params::MarkerRule& rule, MarkersTabState& state,
-                      Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
+                      Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                      const ProceduralInstanceListContext_UI& instanceListContext) {
     if (!state.slopeToggle.IsCommitDeferred() && !state.heightToggle.IsCommitDeferred()
         && !state.countToggle.IsCommitDeferred()) LoadMarkerRuleValues(rule, state);
     LoadMarkerRuleEnumIndices(rule, state.ruleDetail);
@@ -137,6 +138,7 @@ void DrawRuleSettings(Params::MarkerRule& rule, MarkersTabState& state,
     DrawPlacementTransformSection(rule.transform, state.transform, previewDriver);
     DrawPlacementTemplatePicker(rule.transform, state.iconGridState, state.iconGridHeight,
                                 iconManifest, previewDriver);
+    DrawRuleInstanceList(instanceListContext);   // STEP132 (ARCH §19.27)
 }
 
 } // namespace Ui

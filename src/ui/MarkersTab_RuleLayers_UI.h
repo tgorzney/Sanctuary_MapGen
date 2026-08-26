@@ -11,16 +11,20 @@
 // reason MarkerRule's own sections split across MarkersTab_Rules_UI.cpp / MarkersTab_Area_UI.cpp
 // behind MarkersTab_Rules_UI.h): the list mechanics live in MarkersTab_RuleLayers_UI.cpp, the
 // buttons and the per-layer settings block (STEP110: drawn inline per row, not "the selected
-// layer") in MarkersTab_RuleLayerSettings_UI.cpp, both behind this one header.
+// layer") in MarkersTab_RuleLayerSettings_UI.cpp, and (STEP132, a pure size-ceiling remediation)
+// the Rule row's own instance list plus two relocated appliers in
+// MarkersTab_RuleLayerInstances_UI.cpp — all three behind this one header.
 //
 // `ApplyMarkerRuleLayerListSignal` takes plain `int&` selection indices, not `MarkersTabState`, so
 // this header never includes back into MarkersTab_UI.h (no cycle) — `MarkersTabState` is only
 // FORWARD-DECLARED here. Every other declaration below DOES need the full state (mirror loads, the
-// two selection indices), so each is defined in one of the two .cpp files, which include the full
+// two selection indices), so each is defined in one of the three .cpp files, which include the full
 // header — the same split MarkersTab_Rules_UI.h/.cpp already uses for `MarkersTabState`.
 #pragma once
+#include <functional>
 #include <string>
 #include "DraggableListWidget_UI.h"
+#include "ProceduralInstanceRuleIndex_UI.h"
 #include "../params/MarkerRule_PARAMS.h"
 
 namespace SanmapGen {
@@ -69,18 +73,6 @@ inline bool IsMarkerRuleLayerRowSuppressed(const Params::MarkerRuleLayer& layer,
 
 // MarkersTab_RuleLayers_UI.cpp:
 
-// The same for one layer's rule list — the existing per-rule `ApplyRuleListSignal` body, rehomed
-// against `layer.rules`.
-bool ApplyMarkerRuleListSignal(Params::MarkerRuleLayer& layer, const DraggableListSignal& signal,
-                               MarkersTabState& state);
-
-// The layer `state.selectedRuleLayerIndex` points at, or null when it points at nothing (STEP80
-// §2, mirroring `SelectedLayer`, LayersTab_UI.cpp:120). STEP110: no longer what the settings block
-// binds to (that is now every row's own layer, inline) — still what Add Rule / Remove Selected
-// Rule (DrawMarkerRuleButtons) and the nested rule list (DrawRuleLayerBody) operate on.
-Params::MarkerRuleLayer* SelectedMarkerRuleLayer(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
-                                                 const MarkersTabState& state);
-
 // The outer/inner DraggableLists and their appliers — every commit runs through
 // `NotifyPlacementChange` itself. STEP110: each outer row draws its OWN layer settings block and
 // (selected row only, drag-safety) its own nested rule list inline, in its own row body — nothing is
@@ -90,9 +82,14 @@ Params::MarkerRuleLayer* SelectedMarkerRuleLayer(std::vector<Params::MarkerRuleL
 // NotifyPlacementChange moved OUT to the tab-wide DrawMarkerRuleButtons/DrawMarkerTypeSections
 // (this ticket's own composition call, §5(b): both operate on tab-wide selection scalars, not
 // type-scoped ones, so drawing them once per Type-section would desync N redundant copies).
+// STEP132 (ARCH §19.27): `placedMarkers`/`selectProceduralMarkerInstanceCallback` ride the SAME
+// chain previewDriver/iconManifest already ride, into each rule row's own new instance list
+// (DrawRuleSettings). Both nullable/empty by default — every existing call site compiles unchanged.
 bool DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
                            Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
-                           const std::string& markerTypeNameFilter);
+                           const std::string& markerTypeNameFilter,
+                           const Data::PlacementInstances* placedMarkers = nullptr,
+                           const std::function<void(int)>& selectProceduralMarkerInstanceCallback = {});
 
 // MarkersTab_RuleLayerSettings_UI.cpp — the "aspect" file this header also fronts (ARCH §1.5):
 
@@ -122,9 +119,27 @@ void DrawRuleLayerSettings(Params::MarkerRuleLayer& layer, Pipeline::PreviewDriv
 // Gates / Quantity / Area / Focus / Placement Gate / Transform / Template Picker for ONE rule —
 // the caller's own row (STEP110: called per rule row, inline, by DrawRuleLayerBody's own row body,
 // MarkersTab_RuleLayers_UI.cpp; moved out of MarkersTab_UI.cpp's DrawRuleStack). `iconManifest` is
-// nullable, forwarded straight to the Template Picker.
+// nullable, forwarded straight to the Template Picker. STEP132 (ARCH §19.27): `instanceListContext`
+// bundles this rule's own instance-list inputs (ProceduralInstanceRuleIndex_UI.h) — drawn at the
+// bottom via DrawRuleInstanceList, below.
 void DrawRuleSettings(Params::MarkerRule& rule, MarkersTabState& state,
-                      Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest);
+                      Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                      const ProceduralInstanceListContext_UI& instanceListContext = {});
+
+// MarkersTab_RuleLayerInstances_UI.cpp — a THIRD aspect-split sibling (ARCH §1.5): neither
+// MarkersTab_RuleLayers_UI.cpp nor MarkersTab_RuleLayerSettings_UI.cpp had headroom left under the
+// 150-line hard ceiling once STEP132's own plumbing landed. Carries DrawRuleInstanceList (the Rule
+// row's own new instance list, called once at the bottom of DrawRuleSettings) PLUS
+// ApplyMarkerRuleListSignal/SelectedMarkerRuleLayer, relocated here from MarkersTab_RuleLayers_UI.cpp
+// for the SAME size-ceiling reason, not a thematic one.
+void DrawRuleInstanceList(const ProceduralInstanceListContext_UI& instanceListContext);
+bool ApplyMarkerRuleListSignal(Params::MarkerRuleLayer& layer, const DraggableListSignal& signal,
+                               MarkersTabState& state);
+// The layer `state.selectedRuleLayerIndex` points at, or null when it points at nothing (STEP80 §2,
+// mirroring `SelectedLayer`, LayersTab_UI.cpp:120) — what Add Rule / Remove Selected Rule
+// (DrawMarkerRuleButtons) and the nested rule list (DrawRuleLayerBody) operate on.
+Params::MarkerRuleLayer* SelectedMarkerRuleLayer(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
+                                                 const MarkersTabState& state);
 
 } // namespace Ui
 } // namespace SanmapGen

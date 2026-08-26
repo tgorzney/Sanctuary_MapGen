@@ -12,8 +12,10 @@
 #include "ListWidget_TestFrame_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
+#include "SymmetryClusterInstanceList_UI.h"
 #include <cmath>
 #include <cstdio>
+#include <utility>
 
 using namespace SanmapGen;
 using namespace SanmapGen::Ui;
@@ -179,12 +181,98 @@ void RunColorOverrideBodyCopyRemovedCheck() {
           "!state.bUseGroupColor) no longer exists, for either a bundled or an ungrouped layer");
 }
 
+// STEP132 (ARCH §19.26) — the ticket's own literal fixture: 5 instances, 2 in symmetry group 3, 2 in
+// symmetry group 7, 1 ungrouped (== 0). Drives the SAME shared helper DrawLayerRowBody now calls
+// (SymmetryClusterInstanceList_UI.h), over the REAL (groupIndex, transformIndex) item shape and the
+// REAL `symmetryGroupIdentifier` predicate, proving cluster members visit BEFORE any flat row, each
+// cluster's own members stay in their original relative order, and the flat tail preserves its own
+// original order too — the bucket-count/order acceptance this ticket's Verify section asks for.
+void RunManualSymmetryClusterOrderChecks() {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].name = "Resources";
+    auto makeTransform = [](int identifier, int symmetryGroupIdentifier) {
+        Params::MarkerTransform transform;
+        transform.layerIndex             = 0;
+        transform.instanceIdentifier     = identifier;
+        transform.symmetryGroupIdentifier = symmetryGroupIdentifier;
+        return transform;
+    };
+    markers[0].transforms.push_back(makeTransform(1, 3));
+    markers[0].transforms.push_back(makeTransform(2, 3));
+    markers[0].transforms.push_back(makeTransform(3, 7));
+    markers[0].transforms.push_back(makeTransform(4, 7));
+    markers[0].transforms.push_back(makeTransform(5, 0));
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    const std::vector<std::pair<int, int>>& pairs = instanceIndex.instancesByLayerIndex.at(0);
+    Check(pairs.size() == 5u, "all 5 instances map to layerIndex 0");
+
+    std::vector<int> visitOrder;
+    RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 400.0f), [&] {
+        DrawSymmetryClusterInstanceList<std::pair<int, int>>(pairs,
+            [&](const std::pair<int, int>& groupTransformIndex) {
+                return markers[static_cast<std::size_t>(groupTransformIndex.first)]
+                    .transforms[static_cast<std::size_t>(groupTransformIndex.second)].symmetryGroupIdentifier;
+            },
+            [](int groupIdentifier, int /*bucketSize*/) { return groupIdentifier != 0; },
+            [&](const std::pair<int, int>& groupTransformIndex) {
+                visitOrder.push_back(markers[static_cast<std::size_t>(groupTransformIndex.first)]
+                    .transforms[static_cast<std::size_t>(groupTransformIndex.second)].instanceIdentifier);
+            });
+    });
+    Check(visitOrder.size() == 5u, "every one of the 5 instances is visited exactly once");
+    Check(visitOrder[0] == 1 && visitOrder[1] == 2, "symmetry group 3's 2 members render FIRST, as their own cluster, in order");
+    Check(visitOrder[2] == 3 && visitOrder[3] == 4, "symmetry group 7's 2 members render NEXT, as their own cluster, in order");
+    Check(visitOrder[4] == 5, "the ungrouped (== 0) instance renders LAST, as exactly 1 flat row");
+}
+
+// STEP132 (ARCH §19.26) — the SAME two rows RunInstanceRowClickChecks exercises, now both tagged
+// into ONE non-zero symmetry group (a real cluster): per-row click-to-select stays byte-identical —
+// the cluster's own collapsible header is an extra item ABOVE the two rows, nothing else changes.
+void RunSymmetryGroupedInstanceRowClickChecks() {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].name = "Resources";
+    Params::MarkerTransform first;  first.name = "A"; first.layerIndex = 0; first.instanceIdentifier = 300;
+    first.symmetryGroupIdentifier  = 9;
+    Params::MarkerTransform second; second.name = "B"; second.layerIndex = 0; second.instanceIdentifier = 301;
+    second.symmetryGroupIdentifier = 9;
+    markers[0].transforms.push_back(first);
+    markers[0].transforms.push_back(second);
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+
+    ManualMarkerLayersState state;
+    int selectedManualInstanceIdentifier = -1;
+
+    const FrameResult settle = RunRowBodyFrame(HeadlessMouseState(), markerLayers[0], markerLayers, markers,
+                                               instanceIndex, state, selectedManualInstanceIdentifier);
+    Check(settle.lastItemId != 0, "the last-drawn item, inside the open cluster, is a real, interactive row");
+    const float rowHeight  = settle.lastItemMax.y - settle.lastItemMin.y;
+    const float rowSpacing = ImGui::GetStyle().ItemSpacing.y;
+    const ImVec2 secondRowCenter((settle.lastItemMin.x + settle.lastItemMax.x) * 0.5f,
+                                 (settle.lastItemMin.y + settle.lastItemMax.y) * 0.5f);
+    const ImVec2 firstRowCenter(secondRowCenter.x, secondRowCenter.y - (rowHeight + rowSpacing));
+
+    ClickAt(firstRowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state,
+           selectedManualInstanceIdentifier);
+    Check(selectedManualInstanceIdentifier == 300,
+          "clicking the first row inside an open cluster still selects its own instanceIdentifier (300)");
+
+    ClickAt(secondRowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state,
+           selectedManualInstanceIdentifier);
+    Check(selectedManualInstanceIdentifier == 301,
+          "clicking the second row inside the SAME cluster still updates to its own id (301), not additive");
+}
+
 } // namespace
 
 int main() {
     RunInstanceRowClickChecks();
     RunNoInstancesRendersNoneChecks();
     RunColorOverrideBodyCopyRemovedCheck();
+    RunManualSymmetryClusterOrderChecks();
+    RunSymmetryGroupedInstanceRowClickChecks();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

@@ -4,6 +4,8 @@
 // `Check`/`failureCount` (ARCH §1.5 — one binary, split translation units).
 #include "MarkersTab_UI.h"
 #include "ListWidget_TestFrame_UI.h"
+#include "SymmetryClusterInstanceList_UI.h"
+#include "../data/PlacementInstances_DATA.h"
 
 using namespace SanmapGen;
 using namespace SanmapGen::Ui;
@@ -224,6 +226,59 @@ void RunDrawAddMarkerRuleLayerButtonTypeSeedChecks() {
           "the parameter omitted (default, empty) leaves markerTypeName empty — unchanged existing behavior");
 }
 
+// STEP132 (ARCH §19.27) — the builder: markers tagged ruleIndex 0/0/1 map to exactly the right array
+// positions per rule.
+void RunProceduralInstanceRuleIndexBuilderChecks() {
+    Data::PlacementInstances markers;
+    Data::PlacementInstance first;  first.ruleIndex = 0;
+    Data::PlacementInstance second; second.ruleIndex = 0;
+    Data::PlacementInstance third;  third.ruleIndex = 1;
+    markers.Append(first); markers.Append(second); markers.Append(third);
+
+    const ProceduralInstanceRuleIndex_UI index = BuildProceduralInstanceRuleIndex(markers);
+    Check(index.instancesByRuleIndex.at(0).size() == 2u
+              && index.instancesByRuleIndex.at(0)[0] == 0 && index.instancesByRuleIndex.at(0)[1] == 1,
+          "ruleIndex 0 maps to array positions {0, 1}, in order");
+    Check(index.instancesByRuleIndex.at(1).size() == 1u && index.instancesByRuleIndex.at(1)[0] == 2,
+          "ruleIndex 1 maps to array position {2}");
+    Check(index.instancesByRuleIndex.find(2) == index.instancesByRuleIndex.end(),
+          "a ruleIndex with no instances has no entry at all in the index");
+}
+
+// STEP132 (ARCH §19.27) — the OPPOSITE membership predicate from §19.26's manual `== 0`: bucket
+// SIZE, not id value. `symmetryIdentifier` values {5,5,9,12} — bucket 5 has 2 members, 9 and 12 have
+// 1 each — so exactly 1 cluster (id 5, count 2) renders first, then 2 flat rows, id 0 never appears
+// (ARCH §19.27's own confirmed minting semantics).
+void RunProceduralSymmetryBucketSizePredicateChecks() {
+    HeadlessImguiSession session;
+    const std::vector<int> symmetryIdentifiers = { 5, 5, 9, 12 };   // item == its own index
+    std::vector<int> visitOrder;
+    RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 300.0f), [&] {
+        const std::vector<int> items = { 0, 1, 2, 3 };
+        DrawSymmetryClusterInstanceList<int>(items,
+            [&](const int& item) { return symmetryIdentifiers[static_cast<std::size_t>(item)]; },
+            [](int /*groupIdentifier*/, int bucketSize) { return bucketSize > 1; },
+            [&](const int& item) { visitOrder.push_back(item); });
+    });
+    Check(visitOrder.size() == 4u, "every one of the 4 instances is visited exactly once");
+    Check(visitOrder[0] == 0 && visitOrder[1] == 1,
+          "symmetry id 5's 2 members render FIRST, as the ONE real cluster (bucket size, not id value)");
+    Check(visitOrder[2] == 2 && visitOrder[3] == 3,
+          "the two SIZE-1 buckets (id 9, id 12) render flat, in order, regardless of their non-zero id");
+}
+
+// STEP132 (ARCH §19.27) — before the first generation (placedMarkers == nullptr), the Rule row's
+// instance list renders the "generate first" placeholder: inert, not a crash, not an interactive row.
+void RunRuleInstanceListNullPlacedMarkersChecks() {
+    HeadlessImguiSession session;
+    ImGuiID lastItemId = 0;
+    RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 200.0f), [&] {
+        DrawRuleInstanceList(ProceduralInstanceListContext_UI());
+        lastItemId = ImGui::GetItemID();
+    });
+    Check(lastItemId == 0, "the null-placedMarkers placeholder is inert text, never an interactive row");
+}
+
 } // namespace
 
 void RunMarkerRuleLayerAcceptanceChecks() {
@@ -234,4 +289,7 @@ void RunMarkerRuleLayerAcceptanceChecks() {
     RunIsMarkerRuleLayerRowSuppressedChecks();
     RunDrawAddMarkerRuleLayerButtonTypeSeedChecks();
     RunRuleLayerMarkerTypeFieldConditionalCheck();
+    RunProceduralInstanceRuleIndexBuilderChecks();
+    RunProceduralSymmetryBucketSizePredicateChecks();
+    RunRuleInstanceListNullPlacedMarkersChecks();
 }
