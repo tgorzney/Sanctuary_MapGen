@@ -27,29 +27,20 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     const Data::PlacementInstances* placedMarkers,
                     const std::function<void(int)>& selectManualMarkerInstanceCallback,
                     const std::function<void(int)>& selectProceduralMarkerInstanceCallback) {
+    (void)previewDriver; (void)placedMarkers;
+    (void)selectManualMarkerInstanceCallback; (void)selectProceduralMarkerInstanceCallback;
     ImGui::PushID("markersTab");
     DrawMarkersTabGlobals(state.globals, recipe.globalMarkerSettings, iconManifest, pairingLookup);
-    // STEP125: replaces the old flat DrawMarkerLayerBundleTree/DrawRuleStack/DrawManualMarkerLayers
-    // trio with the dynamic Type-section outer loop (ARCH §19.14/§19.15) — one collapsible Section
-    // per distinct markerTypeName, each containing its own type-filtered Bundle tree and the two
-    // type-filtered "Ungrouped ..." lists (MarkersTab_TypeSections_UI.h). STEP132: also threads
-    // `placedMarkers`/`selectProceduralMarkerInstanceCallback` down to the Rule layer list's own
-    // per-Rule instance list (ARCH §19.27) — the SAME pointer DrawPlacedMarkerList below already reads.
-    DrawMarkerTypeSections(recipe, state, previewDriver, iconManifest, selectManualMarkerInstanceCallback,
-                           placedMarkers, selectProceduralMarkerInstanceCallback);
-    // Human's own instruction: no separate "Manual Markers"/"Placed Markers" top-level sections --
-    // Manual and Procedural are Layer TYPES within each Alloy/Plasma/Spawn Type-section, not their
-    // own tab-level zones. The read-only "Placed Markers" preview (DrawPlacedMarkerList) is fully
-    // superseded by STEP132's own per-Rule instance list inside the Type-section hierarchy above,
-    // so it is removed outright. `DrawManualMarkers` (STEP49) is NOT removed here: it is still the
-    // ONLY authoring surface for adding/deleting a manual marker, editing its position/alias/army
-    // assignment, and picking its Layer -- the new per-Layer instance list (DrawLayerRowBody) is
-    // view+select only, with no Add/Delete/position-edit affordance of its own. Removing this call
-    // would break marker authoring entirely with nothing built yet to replace it -- flagged back to
-    // the human rather than silently deleted.
-    state.manual.positionHorizontalRange = MarkerPositionHorizontalSliderRange(recipe.geometry.mapSize);
-    DrawManualMarkers(recipe.markers, recipe.armies, recipe.markerLayers, state.manual,
-                      state.manualLayers.selectedLayerIndex, iconManifest);
+    // Human's own explicit instruction: strip the tab down to Global plus three EMPTY collapsible
+    // sections (Alloy/Plasma/Spawn), nothing else, as a clean baseline to verify before anything
+    // else is rebuilt on top. No Bundle tree, no Rule stack/Add Rule/Remove Rule, no Manual Markers,
+    // no Placed Markers.
+    for (const char* typeName : { "Alloy", "Plasma", "Spawn" }) {
+        ImGui::PushID(typeName);
+        if (DrawSectionBegin(typeName, state.typeSections.stateByTypeName[typeName].outerSection))
+            DrawSectionEnd();
+        ImGui::PopID();
+    }
     ImGui::PopID();
 }
 
