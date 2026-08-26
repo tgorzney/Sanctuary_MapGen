@@ -6,7 +6,9 @@
 #include "MarkerInstanceId_UI.h"
 #include "MarkerLayerId_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
+#include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "PlacementRuleSections_UI.h"
+#include "SymmetryClusterInstanceList_UI.h"
 #include "../params/Geometry_PARAMS.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
@@ -138,6 +140,57 @@ int ResolveAddInstanceLayerIndex(const std::vector<Params::MarkerInstanceLayer>&
     return selectedLayerIndex;
 }
 
+// STEP138 — a new Layer's own `parentBundleIdentifier`: the currently-selected Group (Bundle), when
+// one typed to THIS Type-section is selected (human's own instruction — "+ Layer" should add under
+// the selected Group); else root ("the base section"), the existing -1 convention every Bundle/
+// Layer already carries. Guards on `markerTypeName` for the same cross-Type-section-selection
+// reason `ResolveAddInstanceLayerIndex` above does.
+int ResolveAddLayerParentBundleIdentifier(const std::vector<Params::MarkerLayerBundle>& bundles,
+                                          int selectedBundleIdentifier, const std::string& typeName) {
+    if (selectedBundleIdentifier < 0) return -1;
+    for (const Params::MarkerLayerBundle& bundle : bundles)
+        if (bundle.identifier == selectedBundleIdentifier)
+            return bundle.markerTypeName == typeName ? selectedBundleIdentifier : -1;
+    return -1;
+}
+
+// STEP138 — this Type's own instances whose `layerIndex` does not resolve to any Layer OF THIS
+// TYPE (no manual Layer exists yet for it, or the index is a legacy/cross-type stale reference),
+// rendered at the base of the section, after every Group and Layer, still indented under the
+// collapsible Type-section. `MarkerTransform::layerIndex` has no real "unassigned" sentinel
+// (MarkerLayerIndexRepair_UI.h's own clamp-to-0 convention) — this IS the one "no Layer" case the
+// current data model can actually represent; an instance "in a Group but no Layer" (human's other
+// stated case) needs a real PARAMS+IO field this ticket does not add (out of scope, flagged not
+// guessed).
+void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>& markers,
+                                       const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                       const std::string& typeName, int& selectedManualInstanceIdentifier,
+                                       const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+    std::vector<std::pair<int, int>> baseInstances;
+    for (int groupIndex = 0; groupIndex < static_cast<int>(markers.size()); ++groupIndex) {
+        Params::MarkerInstanceGroup& group = markers[static_cast<std::size_t>(groupIndex)];
+        if (group.name != typeName) continue;
+        for (int transformIndex = 0; transformIndex < static_cast<int>(group.transforms.size()); ++transformIndex) {
+            const int layerIndex = group.transforms[static_cast<std::size_t>(transformIndex)].layerIndex;
+            const bool bHasOwnTypeLayer = layerIndex >= 0 && layerIndex < static_cast<int>(markerLayers.size())
+                && markerLayers[static_cast<std::size_t>(layerIndex)].markerTypeName == typeName;
+            if (!bHasOwnTypeLayer) baseInstances.push_back({groupIndex, transformIndex});
+        }
+    }
+    ImGui::TextUnformatted("Instances");
+    if (baseInstances.empty()) { ImGui::TextDisabled("(none)"); return; }
+    DrawSymmetryClusterInstanceList<std::pair<int, int>>(baseInstances,
+        [&](const std::pair<int, int>& groupTransformIndex) {
+            return markers[static_cast<std::size_t>(groupTransformIndex.first)]
+                .transforms[static_cast<std::size_t>(groupTransformIndex.second)].symmetryGroupIdentifier;
+        },
+        [](int groupIdentifier, int /*bucketSize*/) { return groupIdentifier != 0; },
+        [&](const std::pair<int, int>& groupTransformIndex) {
+            DrawManualInstanceRow(markers, groupTransformIndex, selectedManualInstanceIdentifier,
+                                  selectManualMarkerInstanceCallback);
+        });
+}
+
 } // namespace
 
 // The rule the detail controls edit: a two-index walk, both bounds-checked, null on either miss
@@ -157,16 +210,12 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     const Data::PlacementInstances* placedMarkers,
                     const std::function<void(int)>& selectManualMarkerInstanceCallback,
                     const std::function<void(int)>& selectProceduralMarkerInstanceCallback) {
-    (void)placedMarkers;
-    (void)selectManualMarkerInstanceCallback; (void)selectProceduralMarkerInstanceCallback;
     ImGui::PushID("markersTab");
     DrawMarkersTabGlobals(state.globals);
-    // Human's own explicit instruction: strip the tab down to Global plus three EMPTY collapsible
-    // sections (Alloy/Plasma/Spawn), nothing else, as a clean baseline to verify before anything
-    // else is rebuilt on top. No Bundle tree, no Rule stack, no Manual Markers, no Placed Markers —
-    // STEP133/STEP135/STEP136 add the header's own Hide/Unhide, "+ Instance"/"+ Group"/"+ Layer",
-    // and the relocated per-Type marker-settings row directly, still with no body content rendered
-    // underneath.
+    // Global plus three collapsible Type-sections (Alloy/Plasma/Spawn) — no free-floating Rule stack,
+    // no old "Manual Markers"/"Placed Markers" editors. STEP133/STEP135/STEP136 add the header's own
+    // Hide/Unhide, "+ Instance"/"+ Group"/"+ Layer", and the relocated per-Type marker-settings row.
+    // STEP138 adds the body: the Group(Bundle)/Layer/Instance hierarchy those buttons populate.
     for (int rowIndex = 0; rowIndex < kMarkerGlobalScaleRowCount; ++rowIndex) {
         const char* const typeName = markerGlobalScaleRowLabels[rowIndex];
         ImGui::PushID(typeName);
@@ -206,23 +255,50 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
             }
             if (buttons.bAddManualLayerClicked) {
                 Params::MarkerInstanceLayer layer;
-                layer.name                   = NextMarkerLayerName(static_cast<int>(recipe.markerLayers.size()));
-                layer.layerId                = NextMarkerLayerId(recipe.markerLayers);
-                layer.parentBundleIdentifier = -1;
-                layer.markerTypeName         = typeName;
+                layer.name     = NextMarkerLayerName(static_cast<int>(recipe.markerLayers.size()));
+                layer.layerId  = NextMarkerLayerId(recipe.markerLayers);
+                layer.parentBundleIdentifier = ResolveAddLayerParentBundleIdentifier(
+                    recipe.markerLayerBundles, state.bundles.selectedBundleIdentifier, typeName);
+                layer.markerTypeName = typeName;
                 recipe.markerLayers.push_back(layer);
                 state.manualLayers.selectedLayerIndex = static_cast<int>(recipe.markerLayers.size()) - 1;
             }
             bool bRecipeMoved = false;
             if (buttons.bAddProceduralLayerClicked) {
                 Params::MarkerRuleLayer layer;
-                layer.parentBundleIdentifier = -1;
-                layer.markerTypeName         = typeName;
+                layer.parentBundleIdentifier = ResolveAddLayerParentBundleIdentifier(
+                    recipe.markerLayerBundles, state.bundles.selectedBundleIdentifier, typeName);
+                layer.markerTypeName = typeName;
                 recipe.markerRuleLayers.push_back(layer);
                 state.selectedRuleLayerIndex = static_cast<int>(recipe.markerRuleLayers.size()) - 1;
                 state.selectedRuleIndex      = 0;
                 bRecipeMoved = true;
             }
+
+            // STEP138 — the actual Group -> Layer -> Instance hierarchy the header's own buttons now
+            // populate: the Bundle (Group) tree first (each Group's own Layers and their Instances
+            // draw nested/indented inside it, DrawMarkerLayerBundleTree/DrawLayerRowBody), then this
+            // Type's own UNGROUPED Layers (root `parentBundleIdentifier == -1`), then the base-section
+            // Instance list — the "no Layer at all" case (see DrawBaseSectionManualInstanceList above).
+            DrawMarkerLayerBundleTree(recipe.markerLayerBundles, recipe.markerRuleLayers, recipe.markerLayers,
+                                      recipe.markers, recipe.geometry, recipe.globalSymmetryMask,
+                                      recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
+                                      state.bundles, state, previewDriver, iconManifest, typeName,
+                                      selectManualMarkerInstanceCallback);
+            ImGui::Separator();
+            bRecipeMoved = DrawRuleLayerListBody(recipe.markerRuleLayers, state, previewDriver, iconManifest,
+                                                 typeName, placedMarkers, selectProceduralMarkerInstanceCallback)
+                         || bRecipeMoved;
+            DrawManualMarkerLayerListBody(state.manualLayers, recipe.markerLayers, recipe.markers,
+                                          recipe.geometry, recipe.globalSymmetryMask,
+                                          recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
+                                          typeName, state.selectedManualInstanceIdentifier,
+                                          selectManualMarkerInstanceCallback);
+            ImGui::Separator();
+            DrawBaseSectionManualInstanceList(recipe.markers, recipe.markerLayers, typeName,
+                                              state.selectedManualInstanceIdentifier,
+                                              selectManualMarkerInstanceCallback);
+
             NotifyPlacementChange(bRecipeMoved, previewDriver);
 
             if (buttons.bHideToggleClicked)

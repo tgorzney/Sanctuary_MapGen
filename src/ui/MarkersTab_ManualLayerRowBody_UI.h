@@ -11,6 +11,7 @@
 // finding) without pulling in the rest of MarkersTab_ManualLayers_UI.h's own list-mechanics surface.
 #pragma once
 #include <functional>
+#include <utility>
 #include <vector>
 #include "ManualInstanceLayerIndex_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
@@ -20,6 +21,16 @@
 
 namespace SanmapGen {
 namespace Ui {
+
+// One instance row's own body (Selectable + click -> select, both the tab-local write and the
+// canvas-selection callback). Declared here (not file-local/anonymous) so MarkersTab_UI.cpp's
+// base-section instance list (STEP138 — the one "in a Group/Section with no Layer" case the current
+// data model can represent, since layerIndex has no true unassigned sentinel) draws an IDENTICAL
+// row rather than a near-duplicate copy.
+void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
+                           const std::pair<int, int>& groupTransformIndex,
+                           int& selectedManualInstanceIdentifier,
+                           const std::function<void(int)>& selectManualMarkerInstanceCallback);
 
 // STEP123 — reserved width for the header's Color Override checkbox + compact swatch
 // (DrawManualMarkerLayerColorOverrideHeaderControl, below), left of DraggableList's own strip.

@@ -14,10 +14,13 @@
 
 namespace SanmapGen {
 namespace Ui {
-namespace {
 
 // One instance row's own body — unchanged from STEP126, just extracted so both the flat-list branch
 // and the (STEP132) symmetry-cluster branch draw it identically, never a second near-duplicate copy.
+// STEP138: promoted out of this file's own anonymous namespace (declared in
+// MarkersTab_ManualLayerRowBody_UI.h) so MarkersTab_UI.cpp's base-section instance list — the one
+// "no Layer" case the current data model can represent, human's own instruction — can draw an
+// identical row rather than a near-duplicate copy.
 void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
                            const std::pair<int, int>& groupTransformIndex,
                            int& selectedManualInstanceIdentifier,
@@ -38,8 +41,6 @@ void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
             selectManualMarkerInstanceCallback(instanceTransform.instanceIdentifier);
     }
 }
-
-} // namespace
 
 // The row's own name, tint, icon scale, grid snap and symmetry setting — STEP110: drawn inline in THIS
 // row's own expanded body, not "selected"-gated. Tint hides under the block's shared-color mode
