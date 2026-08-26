@@ -47,6 +47,7 @@ ResolvedLod_UI ResolveLodModeAndIcon(const DrawOverlayIconLayersInput& input, co
 void AppendCandidate(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer, int layerIndex,
                      const ResolvedLod_UI& lod, const IconAtlasEntry& atlasEntry, float worldX, float worldZ,
                      PlacementCollectionKind_UI collection, std::int32_t instanceIndex,
+                     float tintColorRed, float tintColorGreen, float tintColorBlue,
                      int* stableOrderCounter, std::vector<OverlayVisibleInstance>& outCandidates) {
     const PreviewComposite::PreviewPixelPoint previewPixel = input.composite->WorldToPreviewPixel(worldX, worldZ);
     const RegionLocalPoint regionLocal =
@@ -60,6 +61,7 @@ void AppendCandidate(const DrawOverlayIconLayersInput& input, const OverlayLayer
     instance.atlasPage = atlasEntry.atlasPage;
     instance.textureIdentifier = input.atlasManifest->PageTextureIdentifier(atlasEntry.atlasPage);
     instance.tintAlpha = layer.opacity;   // §14.2 — opacity folded into tint, never a second blend path
+    instance.tintColorRed = tintColorRed; instance.tintColorGreen = tintColorGreen; instance.tintColorBlue = tintColorBlue;
     instance.layerIndex = layerIndex;
     instance.stableOrder = stableOrderCounter != nullptr ? (*stableOrderCounter)++ : 0;
     instance.instanceKey = OverlayInstanceKey_UI{collection, instanceIndex, true};
@@ -74,6 +76,7 @@ void EmitCandidateIfVisible(const DrawOverlayIconLayersInput& input, const Overl
                             int layerIndex, const std::string& templateIdentifier,
                             float worldX, float worldZ, float instanceScale,
                             PlacementCollectionKind_UI collection, std::int32_t instanceIndex,
+                            float tintColorRed, float tintColorGreen, float tintColorBlue,
                             int* stableOrderCounter, IconLayerCullDiagnostics_UI* diagnostics,
                             std::vector<OverlayVisibleInstance>& outCandidates) {
     if (input.pairingLookup == nullptr || input.atlasManifest == nullptr || input.footprintSizeTable == nullptr
@@ -87,7 +90,8 @@ void EmitCandidateIfVisible(const DrawOverlayIconLayersInput& input, const Overl
         return;
     }
     AppendCandidate(input, layer, layerIndex, lod, input.atlasManifest->entries[static_cast<std::size_t>(lod.iconId)],
-                    worldX, worldZ, collection, instanceIndex, stableOrderCounter, outCandidates);
+                    worldX, worldZ, collection, instanceIndex, tintColorRed, tintColorGreen, tintColorBlue,
+                    stableOrderCounter, outCandidates);
 }
 
 } // namespace Ui

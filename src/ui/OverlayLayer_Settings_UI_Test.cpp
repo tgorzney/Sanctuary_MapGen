@@ -34,20 +34,23 @@ void RunDefaultSeedingChecks() {
     OverlayLayerSettings overlaySettings;
     ConfigureDefaultOverlayLayers(overlaySettings, recipe);
 
-    Check(overlaySettings.overlayLayers.size() == 6, "six domains are always seeded");
-    const OverlayDomainKind_UI expectedOrder[6] = {
-        OverlayDomainKind_UI::Alloy, OverlayDomainKind_UI::SpawnsArmies, OverlayDomainKind_UI::Units,
+    // ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-A: Units seeds one row PER ARMY, not one shared
+    // row — the default recipe has zero armies, so it contributes zero Units rows here (five total,
+    // not six).
+    Check(overlaySettings.overlayLayers.size() == 5,
+          "five rows: Alloy, SpawnsArmies, zero Units rows (no armies), Props, Reclaim, Decals");
+    const OverlayDomainKind_UI expectedOrder[5] = {
+        OverlayDomainKind_UI::Alloy, OverlayDomainKind_UI::SpawnsArmies,
         OverlayDomainKind_UI::Props, OverlayDomainKind_UI::Reclaim, OverlayDomainKind_UI::Decals};
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 5; ++i)
         Check(overlaySettings.overlayLayers[static_cast<std::size_t>(i)].domainKind == expectedOrder[i],
-              "domain order/kind matches Alloy, SpawnsArmies, Units, Props, Reclaim, Decals");
+              "domain order/kind matches Alloy, SpawnsArmies, Props, Reclaim, Decals (no armies -> no Units rows)");
 
     const OverlayLayer_UI& alloyLayer        = overlaySettings.overlayLayers[0];
     const OverlayLayer_UI& spawnsArmiesLayer = overlaySettings.overlayLayers[1];
-    const OverlayLayer_UI& unitsLayer        = overlaySettings.overlayLayers[2];
-    const OverlayLayer_UI& propsLayer        = overlaySettings.overlayLayers[3];
-    const OverlayLayer_UI& reclaimLayer      = overlaySettings.overlayLayers[4];
-    const OverlayLayer_UI& decalsLayer       = overlaySettings.overlayLayers[5];
+    const OverlayLayer_UI& propsLayer        = overlaySettings.overlayLayers[2];
+    const OverlayLayer_UI& reclaimLayer      = overlaySettings.overlayLayers[3];
+    const OverlayLayer_UI& decalsLayer       = overlaySettings.overlayLayers[4];
 
     Check(spawnsArmiesLayer.subLayers.size() == 1
           && spawnsArmiesLayer.subLayers[0].kind == OverlaySubLayerKind_UI::ProceduralRule
@@ -60,9 +63,66 @@ void RunDefaultSeedingChecks() {
           && propsLayer.subLayers[0].index == 0,
           "the default recipe's one propRule seeds Props with {ProceduralRule, 0}, zero Manual");
 
-    Check(unitsLayer.subLayers.empty(), "no armies/unitRules in the default recipe");
     Check(reclaimLayer.subLayers.empty(), "Reclaim always stays empty — no data/rule yet");
     Check(decalsLayer.subLayers.empty(), "no decalRules/decalLayers in the default recipe");
+}
+
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-A/D: N armies -> N Units-domain rows, named via
+// ArmyRowLabel (displayName falls back to name falls back to "Army"), in roster order, seeded with
+// the D-palette default color the moment Add Army/import backfill would give them (proven
+// separately below/in ArmiesTab_UI_Test.cpp and MapImporter_Armies_IO_Test.cpp — this checks only
+// the row-seeding shape).
+void RunPerArmyUnitsRowSeedingChecks() {
+    Params::MapRecipe recipe;
+    Params::Army namedArmy;   namedArmy.displayName = "Alpha Strike";
+    Params::Army fallbackArmy; fallbackArmy.name = "ARMY_02";   // empty displayName -> falls back to name
+    Params::Army blankArmy;                                     // both empty -> falls back to "Army"
+    recipe.armies = {namedArmy, fallbackArmy, blankArmy};
+
+    OverlayLayerSettings overlaySettings;
+    ConfigureDefaultOverlayLayers(overlaySettings, recipe);
+
+    // Alloy(0), SpawnsArmies(1), Units x3 (2,3,4), Props(5), Reclaim(6), Decals(7).
+    Check(overlaySettings.overlayLayers.size() == 8,
+          "3 armies -> exactly 3 Units-domain rows, 8 rows total");
+    for (std::size_t index = 2; index <= 4; ++index)
+        Check(overlaySettings.overlayLayers[index].domainKind == OverlayDomainKind_UI::Units,
+              "rows 2..4 are all Units-domain, one per army, in roster order");
+    Check(overlaySettings.overlayLayers[2].name == "Alpha Strike", "row 0's name is ArmyRowLabel's displayName branch");
+    Check(overlaySettings.overlayLayers[3].name == "ARMY_02", "row 1's name is ArmyRowLabel's name fallback");
+    Check(overlaySettings.overlayLayers[4].name == "Army", "row 2's name is ArmyRowLabel's final \"Army\" fallback");
+    Check(overlaySettings.overlayLayers[5].domainKind == OverlayDomainKind_UI::Props, "Props still follows the Units rows");
+    Check(overlaySettings.overlayLayers[6].domainKind == OverlayDomainKind_UI::Reclaim, "Reclaim follows Props");
+    Check(overlaySettings.overlayLayers[7].domainKind == OverlayDomainKind_UI::Decals, "Decals follows Reclaim");
+}
+
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-B: a procedural UnitRule with an out-of-range
+// armyIndex is dropped silently — attached to no row, never crashing.
+void RunProceduralUnitOutOfRangeArmyIndexChecks() {
+    Params::MapRecipe recipe;
+    recipe.armies.assign(2, Params::Army());
+    Params::UnitRule inRangeRule;  inRangeRule.armyIndex  = 1;
+    Params::UnitRule negativeRule; negativeRule.armyIndex = -1;
+    Params::UnitRule tooHighRule;  tooHighRule.armyIndex  = 2;   // == recipe.armies.size(), out of range
+    recipe.unitRules = {inRangeRule, negativeRule, tooHighRule};
+
+    OverlayLayerSettings overlaySettings;
+    ConfigureDefaultOverlayLayers(overlaySettings, recipe);
+
+    // Alloy(0), SpawnsArmies(1), Units army0(2), Units army1(3), Props(4), Reclaim(5), Decals(6).
+    Check(overlaySettings.overlayLayers.size() == 7, "2 armies -> 2 Units rows, 7 rows total");
+    const OverlayLayer_UI& armyZeroUnits = overlaySettings.overlayLayers[2];
+    const OverlayLayer_UI& armyOneUnits  = overlaySettings.overlayLayers[3];
+    Check(armyZeroUnits.subLayers.empty(), "army0 gets no procedural ref: the only in-range rule targets army1");
+    Check(armyOneUnits.subLayers.size() == 1
+          && armyOneUnits.subLayers[0].kind == OverlaySubLayerKind_UI::ProceduralRule
+          && armyOneUnits.subLayers[0].index == 0,
+          "army1 gets exactly {ProceduralRule, 0} — the in-range rule, by its recipe.unitRules position");
+    for (const OverlayLayer_UI& layer : overlaySettings.overlayLayers) {
+        for (const OverlaySubLayerRef_UI& ref : layer.subLayers)
+            Check(!(ref.kind == OverlaySubLayerKind_UI::ProceduralRule && (ref.index == 1 || ref.index == 2)),
+                  "the negative- and too-high-armyIndex rules (recipe.unitRules[1],[2]) attach to no row");
+    }
 }
 
 void RunCategorySplitChecks() {
@@ -111,8 +171,9 @@ void RunManualProceduralOrderingChecks() {
 
     OverlayLayerSettings overlaySettings;
     ConfigureDefaultOverlayLayers(overlaySettings, recipe);
-    const OverlayLayer_UI& propsLayer  = overlaySettings.overlayLayers[3];
-    const OverlayLayer_UI& decalsLayer = overlaySettings.overlayLayers[5];
+    // No armies in this fixture -> zero Units rows: Alloy(0), SpawnsArmies(1), Props(2), Reclaim(3), Decals(4).
+    const OverlayLayer_UI& propsLayer  = overlaySettings.overlayLayers[2];
+    const OverlayLayer_UI& decalsLayer = overlaySettings.overlayLayers[4];
 
     auto checkManualThenProcedural = [](const OverlayLayer_UI& layerToCheck, const char* label) {
         Check(layerToCheck.subLayers.size() == 5, label);
@@ -143,8 +204,9 @@ void RunPropReclaimPartitionChecks() {
 
     OverlayLayerSettings overlaySettings;
     ConfigureDefaultOverlayLayers(overlaySettings, recipe);
-    const OverlayLayer_UI& propsLayer   = overlaySettings.overlayLayers[3];
-    const OverlayLayer_UI& reclaimLayer = overlaySettings.overlayLayers[4];
+    // No armies in this fixture -> zero Units rows: Alloy(0), SpawnsArmies(1), Props(2), Reclaim(3), Decals(4).
+    const OverlayLayer_UI& propsLayer   = overlaySettings.overlayLayers[2];
+    const OverlayLayer_UI& reclaimLayer = overlaySettings.overlayLayers[3];
 
     // The indices ARE the assertion: a per-domain renumbering bug would produce {0,1} here instead
     // of the real recipe.propRules positions {0,2}/{1,3}.
@@ -176,24 +238,24 @@ void RunPropReclaimPartitionChecks() {
     for (Params::PropRule& rule : allReclaimable.propRules) rule.bReclaimable = true;
     OverlayLayerSettings allReclaimableSettings;
     ConfigureDefaultOverlayLayers(allReclaimableSettings, allReclaimable);
-    Check(allReclaimableSettings.overlayLayers[3].subLayers.empty(),
+    Check(allReclaimableSettings.overlayLayers[2].subLayers.empty(),
           "all-reclaimable: Props gets zero procedural refs");
-    Check(allReclaimableSettings.overlayLayers[4].subLayers.size() == 4,
+    Check(allReclaimableSettings.overlayLayers[3].subLayers.size() == 4,
           "all-reclaimable: Reclaim gets all four procedural refs");
-    Check(allReclaimableSettings.overlayLayers.size() == 6,
-          "all-reclaimable: both Props and Reclaim rows still exist for the View toolbar");
+    Check(allReclaimableSettings.overlayLayers.size() == 5,
+          "all-reclaimable: no armies -> zero Units rows; Props and Reclaim rows still exist for the View toolbar");
 
     // Edge: all four non-reclaimable.
     Params::MapRecipe noneReclaimable;
     noneReclaimable.propRules.assign(4, Params::PropRule());
     OverlayLayerSettings noneReclaimableSettings;
     ConfigureDefaultOverlayLayers(noneReclaimableSettings, noneReclaimable);
-    Check(noneReclaimableSettings.overlayLayers[3].subLayers.size() == 4,
+    Check(noneReclaimableSettings.overlayLayers[2].subLayers.size() == 4,
           "none-reclaimable: Props gets all four procedural refs");
-    Check(noneReclaimableSettings.overlayLayers[4].subLayers.empty(),
+    Check(noneReclaimableSettings.overlayLayers[3].subLayers.empty(),
           "none-reclaimable: Reclaim gets zero procedural refs");
-    Check(noneReclaimableSettings.overlayLayers.size() == 6,
-          "none-reclaimable: both Props and Reclaim rows still exist for the View toolbar");
+    Check(noneReclaimableSettings.overlayLayers.size() == 5,
+          "none-reclaimable: no armies -> zero Units rows; Props and Reclaim rows still exist for the View toolbar");
 
     // Manual refs go to BOTH domains, Manual-before-Procedural order preserved in both.
     Params::MapRecipe manualRecipe;
@@ -207,17 +269,18 @@ void RunPropReclaimPartitionChecks() {
             Check(layerToCheck.subLayers[static_cast<std::size_t>(i)].index == i, label);
         }
     };
-    checkThreeManualRefs(manualSettings.overlayLayers[3], "Props carries [{Manual,0},{Manual,1},{Manual,2}]");
-    checkThreeManualRefs(manualSettings.overlayLayers[4], "Reclaim carries [{Manual,0},{Manual,1},{Manual,2}]");
+    checkThreeManualRefs(manualSettings.overlayLayers[2], "Props carries [{Manual,0},{Manual,1},{Manual,2}]");
+    checkThreeManualRefs(manualSettings.overlayLayers[3], "Reclaim carries [{Manual,0},{Manual,1},{Manual,2}]");
 
-    // Unchanged domains: Alloy/SpawnsArmies/Units/Decals are byte-identical to STEP51's own seeding
-    // (none of these fixtures touch markerRuleLayers/armies/unitRules/decalRules/decalLayers).
+    // Unchanged domains: Alloy/SpawnsArmies/Decals are byte-identical to STEP51's own seeding (none
+    // of these fixtures touch markerRuleLayers/unitRules/decalRules/decalLayers); Units stays at
+    // zero ROWS (not merely empty sub-layers) since none of these fixtures populate recipe.armies.
     for (const OverlayLayerSettings* settings : {&overlaySettings, &allReclaimableSettings,
                                                   &noneReclaimableSettings, &manualSettings}) {
         Check(settings->overlayLayers[0].subLayers.empty(), "Alloy stays empty across every fixture above");
         Check(settings->overlayLayers[1].subLayers.empty(), "SpawnsArmies stays empty across every fixture above");
-        Check(settings->overlayLayers[2].subLayers.empty(), "Units stays empty across every fixture above");
-        Check(settings->overlayLayers[5].subLayers.empty(), "Decals stays empty across every fixture above");
+        Check(settings->overlayLayers.size() == 5, "no armies in these fixtures: zero Units rows, 5 total rows");
+        Check(settings->overlayLayers[4].subLayers.empty(), "Decals stays empty across every fixture above");
     }
 }
 
@@ -344,14 +407,19 @@ void RunMarkerManualPartitionChecks() {
               "Manual-before-Procedural: SpawnsArmies is [{Manual,0},{ProceduralRule,0}] in that order");
     }
 
-    // 6. Unchanged-domain guard: Units/Props/Reclaim/Decals stay empty across every fixture above
-    // (none populate armies/propRules/propLayers/decalRules/decalLayers).
-    Check(orderingSettings.overlayLayers[2].subLayers.empty(), "unchanged-domain guard: Units stays empty");
-    Check(orderingSettings.overlayLayers[3].subLayers.empty(), "unchanged-domain guard: Props stays empty");
-    Check(orderingSettings.overlayLayers[4].subLayers.empty(), "unchanged-domain guard: Reclaim stays empty");
-    Check(orderingSettings.overlayLayers[5].subLayers.empty(), "unchanged-domain guard: Decals stays empty");
+    // 6. Unchanged-domain guard: Props/Reclaim/Decals stay empty across every fixture above (none
+    // populate propRules/propLayers/decalRules/decalLayers); Units stays at zero ROWS (no armies
+    // populated), so Alloy(0), SpawnsArmies(1), Props(2), Reclaim(3), Decals(4).
+    Check(orderingSettings.overlayLayers.size() == 5, "no armies in this fixture: zero Units rows, 5 total rows");
+    Check(orderingSettings.overlayLayers[2].subLayers.empty(), "unchanged-domain guard: Props stays empty");
+    Check(orderingSettings.overlayLayers[3].subLayers.empty(), "unchanged-domain guard: Reclaim stays empty");
+    Check(orderingSettings.overlayLayers[4].subLayers.empty(), "unchanged-domain guard: Decals stays empty");
 }
 
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-A: ResolveUnitsManualSubLayer's global flat-index
+// formula over recipe.armies[*].groups is completely UNCHANGED — this re-proves the exact same
+// (flatIndex -> army, group) table STEP79 already established, only now each flat ref lands in the
+// ROW belonging to that same resolved army, instead of one shared row.
 void RunResolveUnitsManualSubLayerChecks() {
     Params::MapRecipe recipe;
     Params::Army armyZero; armyZero.groups.assign(2, Params::UnitGroup());
@@ -361,8 +429,20 @@ void RunResolveUnitsManualSubLayerChecks() {
 
     OverlayLayerSettings overlaySettings;
     ConfigureDefaultOverlayLayers(overlaySettings, recipe);
-    const OverlayLayer_UI& unitsLayer = overlaySettings.overlayLayers[2];
-    Check(unitsLayer.subLayers.size() == 5, "SeedUnitsManualSubLayers emits one ref per group, army1 contributes none");
+    // Alloy(0), SpawnsArmies(1), Units army0(2), Units army1(3), Units army2(4), Props(5), Reclaim(6), Decals(7).
+    Check(overlaySettings.overlayLayers.size() == 8, "3 armies -> 3 Units rows, 8 rows total");
+    const OverlayLayer_UI& unitsRowArmyZero = overlaySettings.overlayLayers[2];
+    const OverlayLayer_UI& unitsRowArmyOne  = overlaySettings.overlayLayers[3];
+    const OverlayLayer_UI& unitsRowArmyTwo  = overlaySettings.overlayLayers[4];
+
+    Check(unitsRowArmyZero.subLayers.size() == 2
+          && unitsRowArmyZero.subLayers[0].index == 0 && unitsRowArmyZero.subLayers[1].index == 1,
+          "army0's own row carries its two groups, at the global flat indices 0 and 1");
+    Check(unitsRowArmyOne.subLayers.empty(), "army1 (zero groups) contributes no sub-layer refs to its own row");
+    Check(unitsRowArmyTwo.subLayers.size() == 3
+          && unitsRowArmyTwo.subLayers[0].index == 2 && unitsRowArmyTwo.subLayers[1].index == 3
+          && unitsRowArmyTwo.subLayers[2].index == 4,
+          "army2's own row carries its three groups, continuing the global flat index at 2, 3, 4");
 
     struct Expectation { int flatIndex; int expectedArmy; int expectedGroup; };
     const Expectation expectations[5] = {
@@ -371,10 +451,7 @@ void RunResolveUnitsManualSubLayerChecks() {
         int resolvedArmy = -1, resolvedGroup = -1;
         const bool bResolved = ResolveUnitsManualSubLayer(recipe, expectation.flatIndex, resolvedArmy, resolvedGroup);
         Check(bResolved && resolvedArmy == expectation.expectedArmy && resolvedGroup == expectation.expectedGroup,
-              "flat index resolves to the expected (army, group) pair");
-        Check(static_cast<int>(unitsLayer.subLayers[static_cast<std::size_t>(expectation.flatIndex)].index)
-              == expectation.flatIndex,
-              "the seeded ref's own flat index agrees with the resolution's input");
+              "flat index resolves to the expected (army, group) pair — the resolution formula itself is unchanged");
     }
 
     int outArmy = -1, outGroup = -1;
@@ -422,6 +499,8 @@ void RunReadWriteCorrectnessChecks() {
 int main() {
     RunStructDefaultChecks();
     RunDefaultSeedingChecks();
+    RunPerArmyUnitsRowSeedingChecks();
+    RunProceduralUnitOutOfRangeArmyIndexChecks();
     RunCategorySplitChecks();
     RunManualProceduralOrderingChecks();
     RunPropReclaimPartitionChecks();

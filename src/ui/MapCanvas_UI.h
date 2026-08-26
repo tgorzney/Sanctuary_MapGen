@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <functional>
 #include <vector>
+#include "Application_Panels_UI.h"
 #include "MapCanvasView_UI.h"
 #include "MapCanvas_IconLayer_Ops_UI.h"
 #include "MapCanvas_ScenarioEditMode_Ops_UI.h"
@@ -89,6 +90,12 @@ public:
     // STEP78 — while IsActive(), ApplyPointerInput (MapCanvas_Draw_UI.cpp) takes EXCLUSIVE
     // interaction ownership: drag/click route to Scenario Edit Mode, not the normal pan/pick path.
     void SetScenarioEditModeState(ScenarioEditModeState* state) { scenarioEditModeState = state; }
+
+    // STEP113 — the active-panel gate: a manual-marker drag may only BEGIN while the Markers panel
+    // is the shell's active tab. Mirrors SetScenarioEditModeState exactly (same class of injected,
+    // caller-owned, read-every-frame pointer; see this header's own comment on why a second copy of
+    // this state is never made).
+    void SetActivePanelSource(const ApplicationPanel* panel) { activePanelSource = panel; }
 
     // STEP94 — the manual-marker drag-and-follow source: `markers` is the ONLY mutable pointer
     // here (a drag writes straight into `recipe.markers`, Constitution §1 — UI sets PARAMS, never
@@ -171,6 +178,9 @@ private:
 
     // STEP78 — Scenario Edit Mode's own state (Application-owned, injected).
     ScenarioEditModeState* scenarioEditModeState = nullptr;
+
+    // STEP113 — mirrors scenarioEditModeState exactly: injected, caller-owned, read every frame.
+    const ApplicationPanel* activePanelSource = nullptr;
 
     // STEP94 — the manual-marker drag-and-follow source (injected, see SetManualMarkerDragSource)
     // and this canvas's own live gesture state.

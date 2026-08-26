@@ -174,7 +174,19 @@ void RunInvalidUtf8() {
 }
 
 void RunRoundTripStability() {
-    const Params::MapRecipe originalRecipe = BuildFixtureRecipe();
+    Params::MapRecipe originalRecipe = BuildFixtureRecipe();
+    // STEP115_MarkerPropDecalLayerReconciliationOnImport_IO: BuildFixtureRecipe's one
+    // PropInstanceGroup deliberately has no matching PropInstanceLayer (propLayers stays empty) —
+    // that shape is needed by the OTHER tests in this file (the byte-exact fixture match against the
+    // checked-in golden file, determinism). But it is also exactly the "real map, no PropGroups
+    // section" shape Io::ReconcilePropLayers now synthesizes a layer for on import, so re-parsing
+    // firstText below would gain a PropGroups entry it didn't start with — a real, correct behavior
+    // change, but one unrelated to what this test actually checks (JSON formatting stability). Give
+    // this LOCAL copy a matching layer so the round trip stays a pure formatting-stability check.
+    Params::PropInstanceLayer propLayer;
+    propLayer.name = "rock01";
+    originalRecipe.propLayers.push_back(propLayer);
+
     const std::string firstText = Io::MapExporter::BuildSanmapJsonText(originalRecipe);
 
     Params::MapRecipe reimportedRecipe;

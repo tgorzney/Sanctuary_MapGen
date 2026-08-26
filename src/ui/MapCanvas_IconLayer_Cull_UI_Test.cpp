@@ -255,6 +255,449 @@ void CheckReclaimDeterminismGuardrailAndBudgetNonInflation() {
           "both-layers-enabled candidate count equals Props-only plus Reclaim-only — no instance counted twice");
 }
 
+// STEP111 — procedural marker tint resolution (Data::PlacementInstances::category ->
+// Params::MarkerCategory -> GlobalMarkerSettings). "Alloy" domainKind here is purely the layer's
+// screen routing (§14.6) — the tint itself is keyed off the DATA-baked category, not domainKind.
+void CheckMarkerAlloysCategoryResolvesColorAlloy() {
+    IconLayerTestFixture fixture;
+    fixture.recipe.globalMarkerSettings.colorAlloy[0] = 0.1f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[1] = 0.2f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[2] = 0.3f;
+    AppendMarkerInstance(fixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Alloys, "markerA");
+    fixture.ruleBucketIndex.markers.Build(fixture.placements.markers.ruleIndex.data(), 1, 1);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "markerA", 0);
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::Alloy;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.Input(), fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 1, "one Alloys-category marker resolves as a candidate");
+    if (!candidates.empty())
+        check(candidates[0].tintColorRed == 0.1f && candidates[0].tintColorGreen == 0.2f
+              && candidates[0].tintColorBlue == 0.3f,
+              "Alloys category tint resolves from GlobalMarkerSettings::colorAlloy");
+}
+
+void CheckMarkerSpawnCategoryResolvesColorSpawn() {
+    IconLayerTestFixture fixture;
+    fixture.recipe.globalMarkerSettings.colorSpawn[0] = 0.4f;
+    fixture.recipe.globalMarkerSettings.colorSpawn[1] = 0.5f;
+    fixture.recipe.globalMarkerSettings.colorSpawn[2] = 0.6f;
+    AppendMarkerInstance(fixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Spawn, "markerS");
+    fixture.ruleBucketIndex.markers.Build(fixture.placements.markers.ruleIndex.data(), 1, 1);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "markerS", 0);
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::SpawnsArmies;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.Input(), fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 1, "one Spawn-category marker resolves as a candidate");
+    if (!candidates.empty())
+        check(candidates[0].tintColorRed == 0.4f && candidates[0].tintColorGreen == 0.5f
+              && candidates[0].tintColorBlue == 0.6f,
+              "Spawn category tint resolves from GlobalMarkerSettings::colorSpawn");
+}
+
+// Generic/Expansion have no reserved color today — stay white even with non-default
+// colorAlloy/colorSpawn set, proving no accidental bleed-through from the other two categories.
+void CheckMarkerGenericAndExpansionStayWhite() {
+    IconLayerTestFixture fixture;
+    fixture.recipe.globalMarkerSettings.colorAlloy[0] = 0.1f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[1] = 0.2f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[2] = 0.3f;
+    fixture.recipe.globalMarkerSettings.colorSpawn[0] = 0.4f;
+    fixture.recipe.globalMarkerSettings.colorSpawn[1] = 0.5f;
+    fixture.recipe.globalMarkerSettings.colorSpawn[2] = 0.6f;
+    AppendMarkerInstance(fixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Generic, "markerG");
+    AppendMarkerInstance(fixture.placements, 2.0f, 2.0f, 1, Params::MarkerCategory::Expansion, "markerE");
+    const int ruleIndexColumn[2] = {0, 1};
+    fixture.ruleBucketIndex.markers.Build(ruleIndexColumn, 2, 2);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "markerG", 0);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "markerE", 1);
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::Alloy;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 1, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.Input(), fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 2, "both Generic and Expansion markers resolve as candidates");
+    for (const OverlayVisibleInstance& candidate : candidates)
+        check(candidate.tintColorRed == 1.0f && candidate.tintColorGreen == 1.0f && candidate.tintColorBlue == 1.0f,
+              "Generic/Expansion markers stay white despite non-default colorAlloy/colorSpawn");
+}
+
+// Manual Props/Decals — the layer's own authored color threads through, mirroring the Manual
+// reclaim-partition fixtures above.
+void CheckManualPropLayerColorThreadsThrough() {
+    IconLayerTestFixture fixture;
+    Params::PropInstanceLayer propLayer;
+    propLayer.color[0] = 0.4f; propLayer.color[1] = 0.5f; propLayer.color[2] = 0.6f;
+    fixture.recipe.propLayers.push_back(propLayer);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "propGroup", 0);
+
+    Params::PropInstanceGroup group;
+    group.blueprintPath = "propGroup";
+    group.transforms.push_back(ReclaimManualFixture::MakeVisibleTransform());   // layerIndex = 0
+    fixture.recipe.props.push_back(group);
+
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::Props;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.Input(), fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 1, "one manual Prop candidate resolves");
+    if (!candidates.empty())
+        check(candidates[0].tintColorRed == 0.4f && candidates[0].tintColorGreen == 0.5f
+              && candidates[0].tintColorBlue == 0.6f,
+              "the manual Prop layer's own color threads through to the candidate's tint");
+}
+
+void CheckManualDecalLayerColorThreadsThrough() {
+    IconLayerTestFixture fixture;
+    Params::DecalInstanceLayer decalLayer;
+    decalLayer.color[0] = 0.7f; decalLayer.color[1] = 0.8f; decalLayer.color[2] = 0.9f;
+    fixture.recipe.decalLayers.push_back(decalLayer);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "decalGroup", 0);
+
+    Params::DecalInstanceGroup group;
+    group.blueprintPath = "decalGroup";
+    Params::DecalTransform decalTransform;
+    decalTransform.layerIndex = 0;
+    decalTransform.transform.positionX = 2.0f; decalTransform.transform.positionZ = 2.0f;
+    decalTransform.transform.scaleX = 1.0f;
+    group.transforms.push_back(decalTransform);
+    fixture.recipe.decals.push_back(group);
+
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::Decals;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.Input(), fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 1, "one manual Decal candidate resolves");
+    if (!candidates.empty())
+        check(candidates[0].tintColorRed == 0.7f && candidates[0].tintColorGreen == 0.8f
+              && candidates[0].tintColorBlue == 0.9f,
+              "the manual Decal layer's own color threads through to the candidate's tint");
+}
+
+// Procedural Props (no color/layer-association PARAMS field) and manual Units (no color PARAMS
+// field reaches this pipeline at all) stay white regardless of any GlobalMarkerSettings/
+// PropInstanceLayer::color values set on the fixture — proves no accidental cross-talk from the
+// Markers-only category resolution.
+void CheckProceduralPropsAndManualUnitsStayWhite() {
+    IconLayerTestFixture fixture;
+    fixture.recipe.globalMarkerSettings.colorAlloy[0] = 0.9f;
+    fixture.recipe.propLayers.push_back(Params::PropInstanceLayer());
+    fixture.recipe.propLayers[0].color[0] = 0.9f;
+    fixture.recipe.propLayers[0].color[1] = 0.1f;
+    fixture.recipe.propLayers[0].color[2] = 0.1f;
+
+    AppendPropInstance(fixture.placements, 2.0f, 2.0f, 0, "propA");
+    fixture.ruleBucketIndex.props.Build(fixture.placements.props.ruleIndex.data(), 1, 1);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "propA", 0);
+    OverlayLayer_UI proceduralPropsLayer; proceduralPropsLayer.domainKind = OverlayDomainKind_UI::Props;
+    proceduralPropsLayer.thumbnailLodThresholdPixels = 1.0f;
+    proceduralPropsLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+
+    Params::Army army; army.name = "ARMY_01";
+    Params::UnitGroup group;
+    Params::UnitTransform unit;
+    unit.positionX = 2.0f; unit.positionZ = 2.0f; unit.scaleX = 1.0f;
+    const char* unitTemplateIdentifier = "unitA";
+    for (int index = 0; unitTemplateIdentifier[index] != '\0' && index < 7; ++index)
+        unit.templateIdentifier[index] = unitTemplateIdentifier[index];
+    group.units.push_back(unit);
+    army.groups.push_back(group);
+    fixture.recipe.armies.push_back(army);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "unitA", 1);
+    OverlayLayer_UI unitsLayer; unitsLayer.domainKind = OverlayDomainKind_UI::Units;
+    unitsLayer.thumbnailLodThresholdPixels = 1.0f;
+    unitsLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+
+    fixture.overlaySettings.overlayLayers = {proceduralPropsLayer, unitsLayer};
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.Input(), fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 2, "one procedural Prop candidate plus one manual Unit candidate resolve");
+    for (const OverlayVisibleInstance& candidate : candidates)
+        check(candidate.tintColorRed == 1.0f && candidate.tintColorGreen == 1.0f && candidate.tintColorBlue == 1.0f,
+              "procedural Props and manual Units stay white — no color PARAMS field reaches either");
+}
+
+// The C2 cache's selected-instance replay path (§4's "run steps 1-3 fresh for only the selected
+// instance") resolves the same category tint as the normal full-walk path — closes the "flashes
+// white on a cache-valid frame" risk called out in the ticket's Fix §7.
+void CheckSelectedInstanceCandidateResolvesMarkerColor() {
+    IconLayerTestFixture fixture;
+    fixture.recipe.globalMarkerSettings.colorAlloy[0] = 0.1f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[1] = 0.2f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[2] = 0.3f;
+    AppendMarkerInstance(fixture.placements, 2.0f, 2.0f, 0, Params::MarkerCategory::Alloys, "markerA");
+    fixture.ruleBucketIndex.markers.Build(fixture.placements.markers.ruleIndex.data(), 1, 1);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "markerA", 0);
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::Alloy;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    DrawOverlayIconLayersInput input = fixture.Input();
+    input.selectedInstanceKey = OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 0, true};
+
+    std::vector<OverlayVisibleInstance> candidates;
+    const bool bResolved = ResolveSelectedInstanceCandidate(input, candidates);
+    check(bResolved && candidates.size() == 1, "the C2 replay path resolves exactly one selected candidate");
+    if (!candidates.empty())
+        check(candidates[0].tintColorRed == 0.1f && candidates[0].tintColorGreen == 0.2f
+              && candidates[0].tintColorBlue == 0.3f,
+              "ResolveSelectedInstanceCandidate resolves the same Alloys tint as the full cull path");
+}
+
+// Params::ResolvePropInstanceLayerColor/ResolveDecalInstanceLayerColor's own out-of-range-safe
+// contract, called directly (mirrors IsMarkerInstanceLayerLocked's convention, STEP106 §3).
+void CheckLayerColorOutOfRangeDefaultsWhite() {
+    std::vector<Params::PropInstanceLayer> emptyPropLayers;
+    float propRed = 0.0f, propGreen = 0.0f, propBlue = 0.0f;
+    Params::ResolvePropInstanceLayerColor(0, emptyPropLayers, propRed, propGreen, propBlue);
+    check(propRed == 1.0f && propGreen == 1.0f && propBlue == 1.0f,
+          "an out-of-range Prop layer index defaults to white");
+
+    std::vector<Params::DecalInstanceLayer> emptyDecalLayers;
+    float decalRed = 0.0f, decalGreen = 0.0f, decalBlue = 0.0f;
+    Params::ResolveDecalInstanceLayerColor(3, emptyDecalLayers, decalRed, decalGreen, decalBlue);
+    check(decalRed == 1.0f && decalGreen == 1.0f && decalBlue == 1.0f,
+          "an out-of-range Decal layer index defaults to white");
+}
+
+// STEP114: ResolveMarkerIconTemplateIdentifier's own resolution order, isolated from the full cull
+// walk — override wins regardless of group.name; empty override falls through to the group-name
+// mapping; an unrecognized name falls back to itself, verbatim.
+void CheckResolveMarkerIconTemplateIdentifier() {
+    Params::GlobalMarkerSettings settings;
+    settings.iconNameAlloy  = "AlloyIcon";
+    settings.iconNamePlasma = "PlasmaIcon";
+    settings.iconNameSpawn  = "SpawnIcon";
+
+    Params::MarkerTransform overriddenTransform;
+    overriddenTransform.iconNameOverride = "OverrideIcon";
+    Params::MarkerInstanceGroup spawnGroup; spawnGroup.name = Params::kSpawnMarkerGroupName;
+    check(ResolveMarkerIconTemplateIdentifier(overriddenTransform, spawnGroup, settings) == "OverrideIcon",
+          "a non-empty transform.iconNameOverride always wins regardless of group.name");
+
+    Params::MarkerTransform plainTransform;   // no override
+    check(ResolveMarkerIconTemplateIdentifier(plainTransform, spawnGroup, settings) == "SpawnIcon",
+          "an empty override with group.name == the reserved Spawn name resolves to iconNameSpawn");
+
+    Params::MarkerInstanceGroup alloysGroup; alloysGroup.name = "Alloys";
+    check(ResolveMarkerIconTemplateIdentifier(plainTransform, alloysGroup, settings) == "AlloyIcon",
+          "group.name == \"Alloys\" resolves to iconNameAlloy");
+
+    Params::MarkerInstanceGroup plasmaGroup; plasmaGroup.name = "Plasma";
+    check(ResolveMarkerIconTemplateIdentifier(plainTransform, plasmaGroup, settings) == "PlasmaIcon",
+          "group.name == \"Plasma\" resolves to iconNamePlasma");
+
+    Params::MarkerInstanceGroup expansionGroup; expansionGroup.name = "Expansion";
+    check(ResolveMarkerIconTemplateIdentifier(plainTransform, expansionGroup, settings) == "Expansion",
+          "an unrecognized group.name (e.g. \"Expansion\") resolves to group.name itself, verbatim");
+
+    Params::MarkerInstanceGroup genericGroup; genericGroup.name = "Generic";
+    check(ResolveMarkerIconTemplateIdentifier(plainTransform, genericGroup, settings) == "Generic",
+          "an unrecognized group.name (e.g. \"Generic\") resolves to group.name itself, verbatim");
+}
+
+// STEP114: ResolveMarkersManual end to end, through the real ResolveManualSubLayer switch —
+// mirrors ReclaimManualFixture's exact shape, built over fixture.recipe.markers/markerLayers/
+// globalMarkerSettings instead of recipe.props/propLayers.
+struct ManualMarkerTestFixture {
+    IconLayerTestFixture fixture;
+    OverlayLayer_UI alloyLayer;
+    OverlayLayer_UI spawnsArmiesLayer;
+
+    ManualMarkerTestFixture() {
+        fixture.recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+        fixture.recipe.globalMarkerSettings.iconNameAlloy = "Alloy";   // the fixture's own default
+        SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "Alloy", 0);
+        // globalMarkerSettings.iconNameSpawn's own default ("Spawn") — seeded too, so the
+        // SpawnsArmies-domain half of the group-name partition check also resolves a candidate
+        // rather than logging a pairing miss.
+        SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "Spawn", 2);
+
+        Params::MarkerInstanceGroup alloysGroup;
+        alloysGroup.name = "Alloys";
+        alloysGroup.transforms.push_back(MakeVisibleMarkerTransform());
+        Params::MarkerInstanceGroup spawnGroup;
+        spawnGroup.name = Params::kSpawnMarkerGroupName;
+        spawnGroup.transforms.push_back(MakeVisibleMarkerTransform());
+        fixture.recipe.markers = {alloysGroup, spawnGroup};
+
+        alloyLayer.domainKind = OverlayDomainKind_UI::Alloy;
+        alloyLayer.thumbnailLodThresholdPixels = 1.0f;
+        alloyLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+        spawnsArmiesLayer.domainKind = OverlayDomainKind_UI::SpawnsArmies;
+        spawnsArmiesLayer.thumbnailLodThresholdPixels = 1.0f;
+        spawnsArmiesLayer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+    }
+
+    static Params::MarkerTransform MakeVisibleMarkerTransform() {
+        Params::MarkerTransform transform;
+        transform.layerIndex = 0;
+        transform.transform.positionX = 2.0f;   // in-view (fixture header comment)
+        transform.transform.positionZ = 2.0f;
+        transform.transform.scaleX = 1.0f;
+        return transform;
+    }
+};
+
+// Group-name partition: the Alloy domain walks only the Alloys group, the SpawnsArmies domain
+// walks only the Spawn group, under the SAME {Manual, 0} sub-layer ref.
+void CheckManualMarkerGroupNamePartition() {
+    ManualMarkerTestFixture alloyFixture;
+    alloyFixture.fixture.overlaySettings.overlayLayers = {alloyFixture.alloyLayer};
+    std::vector<OverlayVisibleInstance> alloyCandidates;
+    ResolveVisibleCandidates(alloyFixture.fixture.Input(), alloyFixture.fixture.aabbCache, nullptr, alloyCandidates);
+    check(alloyCandidates.size() == 1, "resolving an Alloy-domain layer with {Manual, 0} yields exactly 1 candidate");
+
+    ManualMarkerTestFixture spawnFixture;   // separate fixture — a fresh AABB cache, not a toggle
+    spawnFixture.fixture.overlaySettings.overlayLayers = {spawnFixture.spawnsArmiesLayer};
+    std::vector<OverlayVisibleInstance> spawnCandidates;
+    ResolveVisibleCandidates(spawnFixture.fixture.Input(), spawnFixture.fixture.aabbCache, nullptr, spawnCandidates);
+    check(spawnCandidates.size() == 1,
+          "resolving a SpawnsArmies-domain layer with the same {Manual, 0} yields exactly 1 candidate");
+}
+
+// Override-wins-over-type-default, proven end to end: a transform with a non-empty
+// iconNameOverride resolves to the OVERRIDE entry's atlas placement, not the type-default entry's.
+void CheckManualMarkerIconOverrideWinsEndToEnd() {
+    ManualMarkerTestFixture overrideFixture;
+    overrideFixture.fixture.recipe.markers[0].transforms[0].iconNameOverride = "OverrideEntry";
+    SeedAtlasEntry(overrideFixture.fixture.pairingLookup, overrideFixture.fixture.atlasManifest,
+                   "OverrideEntry", 1, /*atlasPage=*/1);
+    overrideFixture.fixture.overlaySettings.overlayLayers = {overrideFixture.alloyLayer};
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(overrideFixture.fixture.Input(), overrideFixture.fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 1, "the overridden Alloys-group transform still resolves as one candidate");
+    if (!candidates.empty())
+        check(candidates[0].atlasPage == 1,
+              "the emitted candidate's atlasPage matches the OVERRIDE entry, not the type-default \"Alloy\" entry");
+}
+
+// The positional layerIndex != subLayerArrayIndex filter: a transform on layerIndex 1 against a
+// {Manual, 0} sub-layer ref yields zero candidates.
+void CheckManualMarkerLayerIndexFilter() {
+    ManualMarkerTestFixture fixture;
+    fixture.fixture.recipe.markers[0].transforms[0].layerIndex = 1;
+    fixture.fixture.overlaySettings.overlayLayers = {fixture.alloyLayer};
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.fixture.Input(), fixture.fixture.aabbCache, nullptr, candidates);
+    check(candidates.empty(),
+          "a transform on layerIndex 1 against a {Manual, 0} sub-layer ref yields zero candidates");
+}
+
+// STEP116: ResolveMarkersManual's type-default color resolution, end to end through the real
+// ResolveManualSubLayer switch — mirrors ManualMarkerTestFixture's own shape. Leaves
+// markerLayers[0].bColorOverrideEnabled at its default `false`.
+void CheckManualMarkerTypeDefaultColorResolvesEndToEnd() {
+    // Alloy domain resolves colorAlloy.
+    {
+        ManualMarkerTestFixture fixture;
+        fixture.fixture.recipe.globalMarkerSettings.colorAlloy[0] = 0.1f;
+        fixture.fixture.recipe.globalMarkerSettings.colorAlloy[1] = 0.2f;
+        fixture.fixture.recipe.globalMarkerSettings.colorAlloy[2] = 0.3f;
+        fixture.fixture.overlaySettings.overlayLayers = {fixture.alloyLayer};
+
+        std::vector<OverlayVisibleInstance> candidates;
+        ResolveVisibleCandidates(fixture.fixture.Input(), fixture.fixture.aabbCache, nullptr, candidates);
+        check(candidates.size() == 1, "the Alloys manual group resolves exactly one candidate");
+        if (!candidates.empty())
+            check(candidates[0].tintColorRed == 0.1f && candidates[0].tintColorGreen == 0.2f
+                  && candidates[0].tintColorBlue == 0.3f,
+                  "the icon-overlay path's Alloy-domain candidate resolves the group's type-default colorAlloy");
+    }
+
+    // SpawnsArmies domain resolves colorSpawn.
+    {
+        ManualMarkerTestFixture fixture;
+        fixture.fixture.recipe.globalMarkerSettings.colorSpawn[0] = 0.4f;
+        fixture.fixture.recipe.globalMarkerSettings.colorSpawn[1] = 0.5f;
+        fixture.fixture.recipe.globalMarkerSettings.colorSpawn[2] = 0.6f;
+        fixture.fixture.overlaySettings.overlayLayers = {fixture.spawnsArmiesLayer};
+
+        std::vector<OverlayVisibleInstance> candidates;
+        ResolveVisibleCandidates(fixture.fixture.Input(), fixture.fixture.aabbCache, nullptr, candidates);
+        check(candidates.size() == 1, "the Spawn manual group resolves exactly one candidate");
+        if (!candidates.empty())
+            check(candidates[0].tintColorRed == 0.4f && candidates[0].tintColorGreen == 0.5f
+                  && candidates[0].tintColorBlue == 0.6f,
+                  "the icon-overlay path's SpawnsArmies-domain candidate resolves the group's type-default colorSpawn");
+    }
+}
+
+// STEP116: an explicit layer color override wins over the group's type-default color — proven end
+// to end, with a non-default colorAlloy also set to prove no bleed.
+void CheckManualMarkerLayerOverrideWinsOverTypeDefault() {
+    ManualMarkerTestFixture fixture;
+    fixture.fixture.recipe.markerLayers[0].bColorOverrideEnabled = true;
+    fixture.fixture.recipe.markerLayers[0].color[0] = 0.7f;
+    fixture.fixture.recipe.markerLayers[0].color[1] = 0.8f;
+    fixture.fixture.recipe.markerLayers[0].color[2] = 0.9f;
+    fixture.fixture.recipe.globalMarkerSettings.colorAlloy[0] = 0.1f;
+    fixture.fixture.recipe.globalMarkerSettings.colorAlloy[1] = 0.2f;
+    fixture.fixture.recipe.globalMarkerSettings.colorAlloy[2] = 0.3f;
+    fixture.fixture.overlaySettings.overlayLayers = {fixture.alloyLayer};
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.fixture.Input(), fixture.fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 1, "the Alloys manual group resolves exactly one candidate");
+    if (!candidates.empty())
+        check(candidates[0].tintColorRed == 0.7f && candidates[0].tintColorGreen == 0.8f
+              && candidates[0].tintColorBlue == 0.9f,
+              "the layer's explicit color override wins over the group's type-default colorAlloy");
+}
+
+// STEP116: a MANUAL group named "Generic" stays white despite non-default colorAlloy/colorSpawn —
+// mirrors CheckMarkerGenericAndExpansionStayWhite's own shape, but for the manual (not procedural)
+// marker path.
+void CheckManualMarkerGenericGroupStaysWhite() {
+    IconLayerTestFixture fixture;
+    fixture.recipe.markerLayers.assign(1, Params::MarkerInstanceLayer());
+    fixture.recipe.globalMarkerSettings.colorAlloy[0] = 0.1f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[1] = 0.2f;
+    fixture.recipe.globalMarkerSettings.colorAlloy[2] = 0.3f;
+    fixture.recipe.globalMarkerSettings.colorSpawn[0] = 0.4f;
+    fixture.recipe.globalMarkerSettings.colorSpawn[1] = 0.5f;
+    fixture.recipe.globalMarkerSettings.colorSpawn[2] = 0.6f;
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "Generic", 0);
+
+    Params::MarkerInstanceGroup genericGroup;
+    genericGroup.name = "Generic";
+    genericGroup.transforms.push_back(ManualMarkerTestFixture::MakeVisibleMarkerTransform());
+    fixture.recipe.markers = {genericGroup};
+
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::Alloy;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, 0, true});
+
+    fixture.overlaySettings.overlayLayers = {layer};
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.Input(), fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 1, "the manual Generic group resolves exactly one candidate");
+    if (!candidates.empty())
+        check(candidates[0].tintColorRed == 1.0f && candidates[0].tintColorGreen == 1.0f
+              && candidates[0].tintColorBlue == 1.0f,
+              "a manual group named \"Generic\" stays white despite non-default colorAlloy/colorSpawn");
+}
+
 } // namespace
 
 void RunMapCanvasIconLayerCullChecks() {
@@ -266,6 +709,21 @@ void RunMapCanvasIconLayerCullChecks() {
     CheckManualReclaimPredicateIsGroupLevel();
     CheckManualReclaimEmptyContributionNeverCrashes();
     CheckReclaimDeterminismGuardrailAndBudgetNonInflation();
+    CheckMarkerAlloysCategoryResolvesColorAlloy();
+    CheckMarkerSpawnCategoryResolvesColorSpawn();
+    CheckMarkerGenericAndExpansionStayWhite();
+    CheckManualPropLayerColorThreadsThrough();
+    CheckManualDecalLayerColorThreadsThrough();
+    CheckProceduralPropsAndManualUnitsStayWhite();
+    CheckSelectedInstanceCandidateResolvesMarkerColor();
+    CheckLayerColorOutOfRangeDefaultsWhite();
+    CheckResolveMarkerIconTemplateIdentifier();
+    CheckManualMarkerGroupNamePartition();
+    CheckManualMarkerIconOverrideWinsEndToEnd();
+    CheckManualMarkerLayerIndexFilter();
+    CheckManualMarkerTypeDefaultColorResolvesEndToEnd();
+    CheckManualMarkerLayerOverrideWinsOverTypeDefault();
+    CheckManualMarkerGenericGroupStaysWhite();
 }
 
 } // namespace Ui

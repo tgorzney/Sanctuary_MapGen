@@ -42,13 +42,17 @@ layer's import/export must target this exactly.
     Correction 18 below** — the human-authored label lives in the new
     `displayName` field, not the key.
 - `markers`: Dictionary<string, MarkerType{ resource:bool, transforms:
-  Dict<string,MarkerTransform{ ..., alias, layerIndex, symmetryGroupIdentifier }> }>
+  Dict<string,MarkerTransform{ ..., alias, layerIndex, symmetryGroupIdentifier,
+  iconNameOverride }> }>
   - **`alias` is a SanGen-added field (Correction 11)** — same lowerCamelCase
     rule as `armyColor` above.
-  - **`layerIndex`/`symmetryGroupIdentifier` are SanGen-added fields (schema v3,
-    Correction 15/16 below)** — same lowerCamelCase merge rule, applied to a
-    dictionary-value object. Companion metadata lives in the new top-level
-    `MarkerGroups` section (Correction 16).
+  - **`layerIndex`/`symmetryGroupIdentifier`/`iconNameOverride` are SanGen-added
+    fields (schema v3, Correction 15/16 below)** — same lowerCamelCase merge
+    rule, applied to a dictionary-value object. Companion metadata lives in the
+    new top-level `MarkerGroups` section (Correction 16); `MarkerLayerBundles`
+    (Correction 19) is a further, separate top-level array — it does NOT merge
+    a field onto `MarkerTransform` itself, only onto `MarkerRuleLayer`/
+    `MarkerInstanceLayer` (see Correction 19).
 - `chains`: Dictionary<string, MarkerChain.Marker[]{ type, name }>
 - `decals`: DecalType[]{ blueprintPath, transforms: DecalTransform[]{ ...,
   layerIndex } }
@@ -153,6 +157,20 @@ Vector4 maskRemapMax;            // default (1,1,1,1) — {x,y,z,w}
   confirmation" note below. This is orthogonal to the `blueprintPath` defect
   above — it confirms the *transform schema* tolerates an extra key, not that
   export produces valid `blueprintPath`s.
+- **⚠️ Standing recorded defect, confirmed still live — the manual marker
+  exporter never writes `layerIndex` back out.** `BuildMarkerTransformJson`
+  (`src/io/MapExporter_Markers_IO.cpp:17-39`) has no `json["layerIndex"] = ...`
+  line at all — confirmed by direct read, unlike `PropTransform`/
+  `DecalTransform`, both of which do (`MapExporter_Props_IO.cpp:35`,
+  `MapExporter_Decals_IO.cpp:32`). Every exported marker's layer membership
+  currently round-trips as "always absent → clamps to 0" on reimport (the
+  importer, `MapImporter_Markers_IO.cpp:69`, reads it correctly — this is a
+  write-side-only gap). Flagged by `DESIGN_MarkerGroupLayerRestructure_R1.md`
+  §0/§7 item 12 as a real, separate bug; not fixed by this correction pass
+  (ARCH does not write code) — routed as its own small coder work-order.
+  Whoever picks it up must also confirm the sibling `parentBundleIdentifier`
+  field the new `MarkerLayerBundles` feature adds to `MarkersStack`/
+  `MarkerGroups` entries (Correction 19) does not ship with the same omission.
 - **Faction / army colors (Colors.cs):** EDA = dark green (0.078,0.329,0.196),
   Chosen = dark red (0.412,0.008,0.008), Guard = golden amber
   (0.690,0.549,0.188); plus a 32-entry `ArmyColors[]` palette + named
@@ -463,6 +481,10 @@ hand-placed instance *layers* (a manual authoring concept). The two "Group"/
 "Layer" words are reused across genuinely different concepts in this format —
 `ENTITY_AUTHORING_PARAMS_SPEC`'s naming for the manual concept was chosen
 specifically (`PropGroups`, not `PropLayers`) to avoid colliding the two.
+**A THIRD, container-above-Layer concept exists as of Correction 19 below
+(`MarkerLayerBundles`) — deliberately named "Bundle," not "Group," specifically
+to avoid becoming a fourth collision with the two already documented here**
+(ARCH §19.1).
 
 **`MarkersStack` is no longer flat like the other three Stacks — see
 Correction 15 below.** `PropsStack`/`DecalsStack`/`UnitsStack` remain exactly
@@ -808,6 +830,8 @@ MarkersStack → [ N × {
     SymmetryUseGlobal          (bool)    // Params::SymmetrySetting::bSymmetryUseGlobal
     SymmetryMask               (int)     // Params::SymmetrySetting::symmetryMask
     RadialSymmetryRepeatCount  (int)     // Params::SymmetrySetting::radialSymmetryRepeatCount
+    ParentBundleIdentifier     (int)     // NEW, Correction 19 (ARCH §19.4) — Params::MarkerRuleLayer::
+                                          // parentBundleIdentifier, -1/absent = root (ungrouped)
     Rules                      ([...])   // Params::MarkerRuleLayer::rules — NEW nested array, ruled below
 } ]
 ```
@@ -845,65 +869,92 @@ New top-level SanGen-owned key (ARCH §1.6: single-token PascalCase, no spaces),
 `std::vector<Params::MarkerInstanceLayer>` — array order is the layer's identity, same convention as
 `PropGroups`/`DecalGroups` (Correction 14).
 
+**Field list corrected (2026-08-25) — the shape below was stale relative to the live exporter/importer
+before this pass.** `MapExporter_Markers_IO.cpp:77-80`/`MapImporter_Markers_IO.cpp:138-141` have
+shipped `Locked`/`GridSnapEnabled`/`GridSnapSizeWorldUnits`/`ColorOverrideEnabled` (STEP106/STEP116)
+since before this correction last documented this array's shape — confirmed genuinely missing from
+this section's text by direct grep, not merely uncommitted-and-pending. Added below, no shape change
+to the actual wire format (documentation-only fix):
+
 ```
 MarkerGroups: [ N × {
     Name                       (string)   // Params::MarkerInstanceLayer::name
     Color                      ({r,g,b,a})// Params::MarkerInstanceLayer::color[4]
     IconScale                  (float)    // Params::MarkerInstanceLayer::iconScale
     Id                         (int)      // Params::MarkerInstanceLayer::layerId — stable id,
-                                           // legacy-backfill by array index on import when absent
+                                           // legacy-backfill by array index on import when absent.
+                                           // See the naming note below — this key is a confirmed,
+                                           // now-ruled-on naming defect (ARCH §1.9), not fixed by
+                                           // this documentation-only pass.
     SymmetryUseGlobal          (bool)     // Params::MarkerInstanceLayer::symmetry.bSymmetryUseGlobal
     SymmetryMask               (int)      // Params::MarkerInstanceLayer::symmetry.symmetryMask
     RadialSymmetryRepeatCount  (int)      // Params::MarkerInstanceLayer::symmetry.radialSymmetryRepeatCount
+    Locked                     (bool)     // Params::MarkerInstanceLayer::bLocked (STEP106)
+    GridSnapEnabled            (bool)     // Params::MarkerInstanceLayer::bGridSnapEnabled (STEP106)
+    GridSnapSizeWorldUnits     (float)    // Params::MarkerInstanceLayer::gridSnapSizeWorldUnits (STEP106)
+    ColorOverrideEnabled       (bool)     // Params::MarkerInstanceLayer::bColorOverrideEnabled (STEP116)
+    ParentBundleIdentifier     (int)      // NEW, Correction 19 (ARCH §19.4) — Params::MarkerInstanceLayer::
+                                           // parentBundleIdentifier, -1/absent = root (ungrouped)
 } ]
 ```
 
 Confirms the shape parallels `PropGroups`/`DecalGroups`' `Name`/`Color`/`IconScale` exactly (Correction
-14), PLUS two things Props/Decals' manual layers don't carry: the stable `Id` key (already specified
-for markers specifically, `MarkerInstanceLayer::layerId`/STEP60 §3 `BuildMarkerGroupsJson`, since
-markers introduce `layerId` from day one rather than retrofitting it as Props/Decals did via STEP56)
-and the new `SymmetrySetting` triplet (ARCH §16.1), flattened to sibling keys using the exact same
-spelling already ruled for `MarkersStack` above — the two new "Layer" types (`MarkerRuleLayer`/
-`MarkerInstanceLayer`) both carry a `SymmetrySetting`, and both get the identical three wire keys, so
-a reader/importer can share one flattening helper across both new arrays if convenient (not mandated,
-just enabled by the consistent spelling).
+14), PLUS several things Props/Decals' manual layers don't (yet) carry: the stable `Id` key (already
+specified for markers specifically, `MarkerInstanceLayer::layerId`/STEP60 §3 `BuildMarkerGroupsJson`,
+since markers introduce `layerId` from day one rather than retrofitting it as Props/Decals did via
+STEP56), the `SymmetrySetting` triplet (ARCH §16.1), and the per-layer `Locked`/grid-snap/color-override
+fields (STEP106/STEP116) — flattened to sibling keys using the exact same spelling already ruled for
+`MarkersStack` above, so a reader/importer can share one flattening helper across both new arrays if
+convenient (not mandated, just enabled by the consistent spelling).
 
 **Import validation** for the symmetry triplet: no range to validate (unlike `layerIndex`) —
 `SymmetryMask`/`RadialSymmetryRepeatCount` are free integers, tolerated the same way `Symmetry`
 (Correction 4)'s existing per-rule fields are — no new validation rule introduced here.
 
-**Naming note flagged, not re-ruled here:** `MarkerInstanceLayer::layerId` (STEP60 §1) is spelled with
-the same "Id" abbreviation ARCH §16.5 just ruled OUT for the sibling new field
-`symmetryGroupIdentifier` on `MarkerTransform`, on the grounds that "Id" is not on §1.1's permitted
-abbreviation list and the codebase carries zero precedent for it under `src/params/`. `layerId`
-predates that ruling (STEP56/STEP60, drafted before ARCH §16) and shares the exact same defect by the
-same reasoning — flagged for ARCH/the IO Architecture Expert's attention as a probable follow-up
-naming correction (`layerId` → `layerIdentifier`, wire key `"Id"` → `"Identifier"`, matching
-`PropInstanceLayer`/`DecalInstanceLayer::layerId` too, since all three share the same STEP56 pattern),
-not silently fixed by this correction, and not blocking — STEP60/STEP56 are still undispatched
-work-orders, so no shipped code needs migrating if ARCH acts before either lands.
+**Naming note — RULED, not merely flagged (ARCH §1.9, supersedes this paragraph's prior text).**
+`MarkerInstanceLayer::layerId` is spelled with the "Id" abbreviation ARCH §16.5 ruled out for the
+sibling field `symmetryGroupIdentifier`. The prior text of this note assumed "STEP60/STEP56 are still
+undispatched work-orders, so no shipped code needs migrating if ARCH acts before either lands" — **that
+assumption is now confirmed false**: direct read of `src/params/PropInstance_PARAMS.h` and
+`src/params/MarkerInstance_PARAMS.h` (2026-08-25) confirms STEP56/STEP60/STEP111/STEP116 have all
+shipped, `layerId` is live on all three of `PropInstanceLayer`/`DecalInstanceLayer`/
+`MarkerInstanceLayer`, and the wire key `"Id"` is live in both the exporter and importer above. This is
+therefore a real, standing, already-shipped naming-law violation — ARCH §1.9 rules the exact fix
+(`layerId` → `layerIdentifier`, wire `"Id"` → `"Identifier"` with a legacy-`"Id"`-fallback import path)
+and routes the migration mechanics to the IO Architecture Expert as a standing recorded defect, not
+blocking on any ticket. **The new `MarkerLayerBundles` array (Correction 19) does not repeat this
+defect** — its own stable-id field is spelled `Identifier` from day one.
 
-### `markers[type].transforms[name]` — two new merged fields (extends Correction 11's `alias`/ARCH §12's `layerIndex` precedent)
-Both new, both **direct field injection** (ARCH §16.5) into the existing format-native
-`MarkerTransform` object, both **lowerCamelCase**, merged the same way `alias` (Correction 11) and
+### `markers[type].transforms[name]` — three new merged fields (extends Correction 11's `alias`/ARCH §12's `layerIndex` precedent)
+All new, all **direct field injection** (ARCH §16.5/§1.8) into the existing format-native
+`MarkerTransform` object, all **lowerCamelCase**, merged the same way `alias` (Correction 11) and
 `armyColor` are — this is a format-native dictionary-value object, not a new SanGen-owned array, so
 ARCH §1.6's camelCase merge rule applies, not the PascalCase rule governing the new top-level
-`MarkerGroups`/`MarkersStack` sections above:
+`MarkerGroups`/`MarkersStack`/`MarkerLayerBundles` sections:
 
 - **`layerIndex`** (`int`, default `0`) — indexes `recipe.markerLayers` (`MarkerGroups` above).
   Spelled **identically** to the already-live `PropTransform`/`DecalTransform::layerIndex` wire key
   (`ENTITY_AUTHORING_PARAMS_SPEC`, ARCH §12) — same name, same casing, same default, same
   direct-injection placement; no marker-specific divergence. Import validation: out-of-range against
   `MarkerGroups.size()` is a loud, logged clamp to `0` (Constitution §6), identical rule to
-  Props/Decals.
+  Props/Decals. **⚠️ Confirmed still-live export gap, see "Conversion / import-export logic" above:
+  the exporter never actually writes this key today** (`BuildMarkerTransformJson`) — the importer reads
+  it correctly; this is a write-side-only bug, not a format-shape defect, and is not fixed by this
+  documentation pass.
 - **`symmetryGroupIdentifier`** (`int`, default `0`, `0` = ungrouped) — NEW. Spelled in full per ARCH
   §16.5's naming amendment (no abbreviation); the wire key matches the C++ field name verbatim,
   lowerCamelCase, same merge rule as `layerIndex` above. No range to validate on import — `0` is
   always legal (ungrouped), any positive value is accepted as-is; no clamp logic is needed.
+- **`iconNameOverride`** (`string`, default empty) — NEW (STEP114), previously undocumented in this
+  section, confirmed genuinely absent from the field list by direct grep. Empty = use the owning
+  `MarkerInstanceGroup`'s type-default icon; any non-empty value is an atlas-manifest NAME key
+  (`ASSET_LOADING_SPEC`), never a numeric atlas index. No range to validate on import — any string is
+  legal, same tolerance as `alias`.
 
-Both fields are genuinely novel scalars with no format-native competing home, so both use direct field
-injection rather than a side table — the same §1.8/§12 rule already governing `armyColor`/`alias`/
-`layerIndex`, applied consistently (ARCH §16.5's own framing, restated here as format truth).
+All three fields are genuinely novel scalars with no format-native competing home, so all three use
+direct field injection rather than a side table — the same §1.8/§12 rule already governing
+`armyColor`/`alias`/`layerIndex`, applied consistently (ARCH §16.5's own framing, restated here as
+format truth).
 
 ### STEP49 export-time-warning ticket scope — ruled (ARCH §16.8/§16.10 routing)
 **Ruling: yes — the future export-time "warn on missing Spawn content" ticket (STEP49's own
@@ -991,6 +1042,50 @@ an empty string — ordinary Constitution §6 "absent key" tolerance, matching C
 `.sanmap` whose `armies[key]` was itself a human-authored string like `"Army_0"`, not yet `ARMY_XX`)
 is IO/BRIDGE mechanism, not format truth, and is `STEP76`'s own §4 to specify — flagged `⚠️ ASSUMPTION`
 in that ticket, not re-litigated here.
+
+### `MarkerLayerBundles` — Correction 19 (the Group-above-Layer container, ARCH §19)
+New top-level SanGen-owned key (ARCH §1.6: single-token PascalCase, no spaces), sibling of
+`MarkerGroups`/`MarkersStack`/`markers`. Serializes `std::vector<Params::MarkerLayerBundle>`
+(`ARCH_19_03_FieldSpellings.md`) — array order is NOT this array's identity (unlike `PropGroups`/
+`DecalGroups`/`MarkerGroups`); membership and nesting are addressed by `Identifier`, because a Bundle
+forest can be reordered/reparented independently of array position (the same reason `Assemblies`,
+`DESIGN_Assembly_R1.md` §5, needs a stable id rather than positional identity).
+
+```
+MarkerLayerBundles: [ N × {
+    Identifier                 (int)      // Params::MarkerLayerBundle::identifier — stable, survives
+                                           // reorder/delete. Spelled in full per ARCH §1.9 — this new
+                                           // array does NOT repeat MarkerGroups' pre-§1.9 "Id" defect.
+    Name                       (string)
+    ParentBundleIdentifier     (int)      // -1/absent = root; enables Bundle-in-Bundle nesting
+    MarkerTypeName             (string)   // single-type scope, e.g. "Alloy" — free-form, same string
+                                           // space as markers[type]'s own dictionary key, NOT MarkerCategory
+    AssemblyIdentifier         (int)      // -1/absent = ungrouped; inert until the separate,
+                                           // still-unbuilt Assembly feature exists (ARCH §19.5)
+} ]
+```
+
+**Per-Layer back-reference, additive, direct field injection (ARCH §1.8), lowerCamelCase, merged into
+the existing `MarkersStack`/`MarkerGroups` array-of-objects entries** (see those two sections above for
+the exact position each `parentBundleIdentifier` key lands at):
+```
+MarkersStack[i].ParentBundleIdentifier    // Params::MarkerRuleLayer::parentBundleIdentifier
+MarkerGroups[i].ParentBundleIdentifier    // Params::MarkerInstanceLayer::parentBundleIdentifier
+```
+Both `-1`/absent = root (not inside any Bundle) — no range to validate on import, an out-of-range or
+dangling `ParentBundleIdentifier` degrades to root (loud, logged), the same soft-degrade posture ARCH
+§19.12 rules for this whole feature.
+
+**Additive, no `SanGenVersion` bump** — same precedent class as every prior top-level-array addition
+this file records (Corrections 12/14/16/18): an unrecognized-key-tolerant importer simply never finds
+`MarkerLayerBundles` in an older file, and the two merged `ParentBundleIdentifier` keys are absent-key
+tolerant on any pre-Bundle export. Not self-ratified — IO Architecture Expert territory for final
+migration-mechanics sign-off, per the same split already used at §16.4/ARCH §19.4.
+
+**Scope note:** this correction covers Markers only. `PropGroups`/`DecalGroups` gain no
+`ParentBundleIdentifier` field by this correction — the analogous `PropLayerBundles`/
+`DecalLayerBundles` arrays are a separate, later, independently-ticketed addition (ARCH §19.2), not
+implied or reserved by this entry.
 
 ### Verified deletions (pure duplicates — delete outright)
 Confirmed line-for-line against a real map — no replacement needed, each

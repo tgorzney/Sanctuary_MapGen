@@ -24,6 +24,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "IconGridWidget_UI.h"       // IconGridState — STEP114's icon-override picker
 #include "MarkersTab_Rules_UI.h"     // markerCategoryLabels / kMarkerCategoryCount — reused, not duplicated
 #include "Section_UI.h"
 #include "SliderScalar_UI.h"
@@ -57,15 +58,20 @@ struct ManualMarkersState {
     // (128) with headroom, not a literal at the slider call site.
     ScalarSliderRange positionElevationRange{ -64.0f, 512.0f, 0.0f };
 
-    RealtimeToggle positionXToggle;
-    RealtimeToggle positionYToggle;
-    RealtimeToggle positionZToggle;
+    RealtimeToggle positionXToggle{true};
+    RealtimeToggle positionYToggle{true};
+    RealtimeToggle positionZToggle{true};
 
     // STEP81 part (b): the selected instance's Layer picker label buffer. `ComboOptions::labels`
     // is a borrowed `const char* const*` (Combo_UI.h) and `recipe.markerLayers` is a vector of
     // structs, so the labels must be materialized. Rebuilt per frame with clear() + push_back();
     // clear() keeps the capacity, so this is amortized zero-allocation after the first frames.
     std::vector<const char*> layerPickerLabels;
+
+    // STEP114: the selected instance's icon-override picker — one shared grid below the target
+    // selector, mirroring MarkersTabGlobals::iconGridState/iconGridHeight's own posture.
+    IconGridState iconOverrideGridState;
+    float         iconOverrideGridHeight = 160.0f;
 };
 
 // ---- pure helpers (headless-testable, no imgui) -----------------------------------------------
@@ -85,6 +91,15 @@ inline Params::MarkerTransform* SelectedMarkerInstance(std::vector<Params::Marke
                                                         int selectedInstanceIndex) {
     if (selectedInstanceIndex < 0 || selectedInstanceIndex >= static_cast<int>(transforms.size())) return nullptr;
     return &transforms[static_cast<std::size_t>(selectedInstanceIndex)];
+}
+
+// STEP114: the two-level walk (group, then instance within it) `ResolveIconSelections`'s new
+// manual-marker bridge needs — mirrors `SelectedMarkerRule`'s layer-then-rule composition exactly.
+inline Params::MarkerTransform* SelectedManualMarkerInstance(
+        std::vector<Params::MarkerInstanceGroup>& markers, ManualMarkersState& state) {
+    Params::MarkerInstanceGroup* const group = SelectedMarkerGroup(markers, state.selectedGroupIndex);
+    if (group == nullptr) return nullptr;
+    return SelectedMarkerInstance(group->transforms, state.selectedInstanceIndex);
 }
 
 // Same shape as `ResolvedMarkerGroupSelection`, scoped one level down (a group's own `transforms`).
@@ -146,19 +161,24 @@ Params::MarkerInstanceGroup* DrawMarkerGroupSection(std::vector<Params::MarkerIn
 // Remove, and the selected instance's Alias/Name/Layer/Position editor. `markerLayers` is
 // `recipe.markerLayers` (read-only here — STEP81 part (b) only picks a layer for the selected
 // instance's `layerIndex`, never adds/reorders one; that is MarkersTab_ManualLayers_UI.h's job).
+// `iconManifest` (STEP114) is nullable: with no resident atlas the icon-override picker degrades
+// to text only, same posture DrawMarkersTabGlobals already has.
 void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
                                const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                               ManualMarkersState& state, int selectedMarkerLayerIndex);
+                               ManualMarkersState& state, int selectedMarkerLayerIndex,
+                               const IconAtlasManifest* iconManifest);
 
 // `markers` is `recipe.markers`, `armies` is `recipe.armies` (read-only here — this block only
 // picks an army for a Spawn instance's `name`, never adds/renames one). `markerLayers` is
-// `recipe.markerLayers` (STEP81 part (b) — read-only, see DrawMarkerInstanceSection above). Never
+// `recipe.markerLayers` (STEP81 part (b) — read-only, see DrawMarkerInstanceSection above).
+// `iconManifest` (STEP114) threads down to the selected instance's icon-override picker. Never
 // touches `Pipeline::PreviewDriver` (SCOPE NOTE 3 above).
 void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
                        const std::vector<Params::Army>& armies,
                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                       ManualMarkersState& state, int selectedMarkerLayerIndex);
+                       ManualMarkersState& state, int selectedMarkerLayerIndex,
+                       const IconAtlasManifest* iconManifest);
 
 } // namespace Ui
 } // namespace SanmapGen

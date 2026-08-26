@@ -27,6 +27,7 @@ void ConsiderManualInstance(const DrawOverlayIconLayersInput& input, const Overl
                             int layerIndex, const std::string& templateIdentifier,
                             float worldX, float worldZ, float scale,
                             PlacementCollectionKind_UI collection, std::int32_t instanceIndex,
+                            float tintColorRed, float tintColorGreen, float tintColorBlue,
                             int* stableOrderCounter, LayerWorldAabb_UI* outAabb,
                             const ViewWorldRect_UI* viewRect, IconLayerCullDiagnostics_UI* diagnostics,
                             std::vector<OverlayVisibleInstance>& outCandidates) {
@@ -36,7 +37,8 @@ void ConsiderManualInstance(const DrawOverlayIconLayersInput& input, const Overl
         || worldZ < viewRect->lowWorldZ || worldZ > viewRect->highWorldZ)
         return;
     EmitCandidateIfVisible(input, layer, layerIndex, templateIdentifier, worldX, worldZ, scale,
-                           collection, instanceIndex, stableOrderCounter, diagnostics, outCandidates);
+                           collection, instanceIndex, tintColorRed, tintColorGreen, tintColorBlue,
+                           stableOrderCounter, diagnostics, outCandidates);
 }
 
 // "UI/Sprites/.../<tpId>.dds" -> "<tpId>", mirroring Application_Assets_UI.cpp's FileStemOfEntryName
@@ -50,9 +52,14 @@ std::string TemplateIdentifierFromBlueprintPath(const std::string& blueprintPath
     return blueprintPath.substr(stemBegin, stemEnd - stemBegin);
 }
 
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-C: tint reads Params::Army::armyColor directly — the
+// owning army's real color, resolved once by the caller and threaded down, not
+// OverlaySessionAppearance::unitsAppearance.color (retired for this purpose).
 void CollectUnitGroupInstances(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
-                               int layerIndex, const Params::UnitGroup& group, int* stableOrderCounter,
-                               LayerWorldAabb_UI* outAabb, const ViewWorldRect_UI* viewRect,
+                               int layerIndex, const Params::UnitGroup& group,
+                               float tintColorRed, float tintColorGreen, float tintColorBlue,
+                               int* stableOrderCounter, LayerWorldAabb_UI* outAabb,
+                               const ViewWorldRect_UI* viewRect,
                                IconLayerCullDiagnostics_UI* diagnostics,
                                std::vector<OverlayVisibleInstance>& outCandidates) {
     for (std::size_t unitIndex = 0; unitIndex < group.units.size(); ++unitIndex) {
@@ -60,10 +67,12 @@ void CollectUnitGroupInstances(const DrawOverlayIconLayersInput& input, const Ov
         ConsiderManualInstance(input, layer, layerIndex, TemplateIdentifierToString8(unit.templateIdentifier),
                                unit.positionX, unit.positionZ, unit.scaleX,
                                PlacementCollectionKind_UI::Units, static_cast<std::int32_t>(unitIndex),
+                               tintColorRed, tintColorGreen, tintColorBlue,
                                stableOrderCounter, outAabb, viewRect, diagnostics, outCandidates);
     }
     for (const Params::UnitGroup& childGroup : group.groups)
-        CollectUnitGroupInstances(input, layer, layerIndex, childGroup, stableOrderCounter, outAabb,
+        CollectUnitGroupInstances(input, layer, layerIndex, childGroup,
+                                  tintColorRed, tintColorGreen, tintColorBlue, stableOrderCounter, outAabb,
                                   viewRect, diagnostics, outCandidates);
 }
 
@@ -76,6 +85,7 @@ void ResolveUnitsManual(const DrawOverlayIconLayersInput& input, const OverlayLa
     if (!ResolveUnitsManualSubLayer(*input.recipe, subLayerArrayIndex, armyIndex, groupIndex)) return;
     const Params::Army& army = input.recipe->armies[static_cast<std::size_t>(armyIndex)];
     CollectUnitGroupInstances(input, layer, layerIndex, army.groups[static_cast<std::size_t>(groupIndex)],
+                              army.armyColor[0], army.armyColor[1], army.armyColor[2],
                               stableOrderCounter, outAabb, viewRect, diagnostics, outCandidates);
 }
 
@@ -88,6 +98,9 @@ void ResolvePropsManual(const DrawOverlayIconLayersInput& input, const OverlayLa
                         std::vector<OverlayVisibleInstance>& outCandidates) {
     const bool bWantReclaimable = (layer.domainKind == OverlayDomainKind_UI::Reclaim);
     const int targetLayerId = Params::ResolvePropInstanceLayerId(subLayerArrayIndex, input.recipe->propLayers);
+    float layerTintRed = 1.0f, layerTintGreen = 1.0f, layerTintBlue = 1.0f;
+    Params::ResolvePropInstanceLayerColor(subLayerArrayIndex, input.recipe->propLayers,
+                                          layerTintRed, layerTintGreen, layerTintBlue);
     for (const Params::PropInstanceGroup& group : input.recipe->props) {
         if (diagnostics != nullptr) ++diagnostics->reclaimGroupPredicateEvaluations;
         if (group.bReclaimable != bWantReclaimable) continue;   // en bloc, before any transform
@@ -98,8 +111,60 @@ void ResolvePropsManual(const DrawOverlayIconLayersInput& input, const OverlayLa
             ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
                                    propTransform.transform.positionX, propTransform.transform.positionZ,
                                    propTransform.transform.scaleX, PlacementCollectionKind_UI::Props,
-                                   static_cast<std::int32_t>(index), stableOrderCounter, outAabb, viewRect,
+                                   static_cast<std::int32_t>(index), layerTintRed, layerTintGreen, layerTintBlue,
+                                   stableOrderCounter, outAabb, viewRect,
                                    diagnostics, outCandidates);
+        }
+    }
+}
+
+// STEP114 §4b — the manual-marker resolver Alloy/SpawnsArmies dead-end into today. Partitions by
+// the owning group's name, mirroring ResolvePropsManual's bReclaimable en-bloc gate above —
+// evaluated once per GROUP, not per transform.
+void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
+                          int layerIndex, int subLayerArrayIndex, int* stableOrderCounter,
+                          LayerWorldAabb_UI* outAabb, const ViewWorldRect_UI* viewRect,
+                          IconLayerCullDiagnostics_UI* diagnostics,
+                          std::vector<OverlayVisibleInstance>& outCandidates) {
+    const bool bWantSpawnGroups = (layer.domainKind == OverlayDomainKind_UI::SpawnsArmies);
+    // STEP116: the override check is hoisted ONCE per call — subLayerArrayIndex/markerLayers are
+    // invariant for the whole function.
+    const bool bLayerOverrideEnabled = subLayerArrayIndex >= 0
+        && static_cast<std::size_t>(subLayerArrayIndex) < input.recipe->markerLayers.size()
+        && input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)].bColorOverrideEnabled;
+    float overrideTintRed = 1.0f, overrideTintGreen = 1.0f, overrideTintBlue = 1.0f;
+    if (bLayerOverrideEnabled) {
+        const Params::MarkerInstanceLayer& overrideLayer =
+            input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)];
+        overrideTintRed = overrideLayer.color[0]; overrideTintGreen = overrideLayer.color[1];
+        overrideTintBlue = overrideLayer.color[2];
+    }
+    for (const Params::MarkerInstanceGroup& group : input.recipe->markers) {
+        const bool bIsSpawnGroup = group.name == Params::kSpawnMarkerGroupName;
+        if (bIsSpawnGroup != bWantSpawnGroups) continue;
+        // Type-default resolves once per GROUP (mirrors ResolvePropsManual's bReclaimable en-bloc
+        // gate above) — group.name is invariant within the inner transform loop too.
+        float groupTintRed = overrideTintRed, groupTintGreen = overrideTintGreen, groupTintBlue = overrideTintBlue;
+        if (!bLayerOverrideEnabled)
+            Params::ResolveMarkerGroupTypeTintColor(group.name, input.recipe->globalMarkerSettings,
+                                                     groupTintRed, groupTintGreen, groupTintBlue);
+        for (std::size_t index = 0; index < group.transforms.size(); ++index) {
+            const Params::MarkerTransform& transform = group.transforms[index];
+            // Positional match — MarkerTransform::layerIndex is NOT resolved through a stable
+            // layerId indirection the way Props/Decals now are (this file's own header comment,
+            // lines 9-15); markers never got that migration, and SeedMarkerDomains
+            // (Application_OverlaySetup_Seed_UI.cpp) seeds subLayerArrayIndex as the SAME plain
+            // recipe.markerLayers position layerIndex already uses everywhere else in the marker
+            // domain (IsMarkerInstanceLayerLocked, QuantizeMarkerPositionToLayerGrid).
+            if (transform.layerIndex != subLayerArrayIndex) continue;
+            const std::string templateIdentifier =
+                ResolveMarkerIconTemplateIdentifier(transform, group, input.recipe->globalMarkerSettings);
+            ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
+                                   transform.transform.positionX, transform.transform.positionZ,
+                                   transform.transform.scaleX, PlacementCollectionKind_UI::Markers,
+                                   static_cast<std::int32_t>(index),
+                                   groupTintRed, groupTintGreen, groupTintBlue,   // STEP116
+                                   stableOrderCounter, outAabb, viewRect, diagnostics, outCandidates);
         }
     }
 }
@@ -110,6 +175,9 @@ void ResolveDecalsManual(const DrawOverlayIconLayersInput& input, const OverlayL
                          IconLayerCullDiagnostics_UI* diagnostics,
                          std::vector<OverlayVisibleInstance>& outCandidates) {
     const int targetLayerId = Params::ResolveDecalInstanceLayerId(subLayerArrayIndex, input.recipe->decalLayers);
+    float layerTintRed = 1.0f, layerTintGreen = 1.0f, layerTintBlue = 1.0f;
+    Params::ResolveDecalInstanceLayerColor(subLayerArrayIndex, input.recipe->decalLayers,
+                                           layerTintRed, layerTintGreen, layerTintBlue);
     for (const Params::DecalInstanceGroup& group : input.recipe->decals) {
         const std::string templateIdentifier = TemplateIdentifierFromBlueprintPath(group.blueprintPath);
         for (std::size_t index = 0; index < group.transforms.size(); ++index) {
@@ -118,13 +186,33 @@ void ResolveDecalsManual(const DrawOverlayIconLayersInput& input, const OverlayL
             ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
                                    decalTransform.transform.positionX, decalTransform.transform.positionZ,
                                    decalTransform.transform.scaleX, PlacementCollectionKind_UI::Decals,
-                                   static_cast<std::int32_t>(index), stableOrderCounter, outAabb, viewRect,
+                                   static_cast<std::int32_t>(index), layerTintRed, layerTintGreen, layerTintBlue,
+                                   stableOrderCounter, outAabb, viewRect,
                                    diagnostics, outCandidates);
         }
     }
 }
 
 } // namespace
+
+// STEP114 §4a — type-default resolution, mirroring v1's exact order (Widget_MapCanvas.cpp:341-370):
+// override wins if set, else map the owning group's name to the matching GlobalMarkerSettings
+// field, else fall back to the raw group name (a miss on that just logs-once-and-draws-nothing,
+// the same posture every other unresolved templateIdentifier already gets in this file). Declared
+// non-anonymous (MapCanvas_IconLayer_CullInternal_UI.h), mirroring ResolveMarkerCategoryTintColor's
+// own posture, so it is directly unit-testable.
+std::string ResolveMarkerIconTemplateIdentifier(const Params::MarkerTransform& transform,
+                                                const Params::MarkerInstanceGroup& group,
+                                                const Params::GlobalMarkerSettings& globalMarkerSettings) {
+    if (!transform.iconNameOverride.empty()) return transform.iconNameOverride;
+    if (group.name == Params::kSpawnMarkerGroupName || group.name == "Spawns")
+        return globalMarkerSettings.iconNameSpawn;
+    if (group.name == "Alloy" || group.name == "Alloys")
+        return globalMarkerSettings.iconNameAlloy;
+    if (group.name == "Plasma" || group.name == "Plasmas")
+        return globalMarkerSettings.iconNamePlasma;
+    return group.name;   // v1 Widget_MapCanvas.cpp:341 precedent — raw type name as last resort
+}
 
 void ResolveManualSubLayer(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
                            int layerIndex, int subLayerArrayIndex, int* stableOrderCounter,
@@ -147,7 +235,12 @@ void ResolveManualSubLayer(const DrawOverlayIconLayersInput& input, const Overla
             ResolveDecalsManual(input, layer, layerIndex, subLayerArrayIndex, stableOrderCounter, outAabb,
                                 viewRect, diagnostics, outCandidates);
             return;
-        default: return;   // Alloy/SpawnsArmies carry no Manual sub-layers this sequence
+        case OverlayDomainKind_UI::Alloy:
+        case OverlayDomainKind_UI::SpawnsArmies:   // STEP114 — the manual roster's own icon render consumer
+            ResolveMarkersManual(input, layer, layerIndex, subLayerArrayIndex, stableOrderCounter, outAabb,
+                                 viewRect, diagnostics, outCandidates);
+            return;
+        default: return;
     }
 }
 

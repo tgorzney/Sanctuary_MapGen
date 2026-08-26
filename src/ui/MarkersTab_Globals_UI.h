@@ -38,8 +38,8 @@ struct MarkerGlobalScaleRow {
     float          iconScale = 1.0f;
     float          previewColor[kColorSwatchChannelCount] = { 1.0f, 1.0f, 1.0f, 1.0f };
     int            iconId = -1;          // the atlas id the picker last emitted for this row
-    RealtimeToggle iconScaleToggle;
-    RealtimeToggle previewColorToggle;
+    RealtimeToggle iconScaleToggle{true};
+    RealtimeToggle previewColorToggle{true};
 };
 
 struct MarkersTabGlobals {

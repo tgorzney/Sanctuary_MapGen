@@ -111,6 +111,27 @@ void RunSelectionFenceChecks() {
     Check(ResolvedPlacedMarkerSelection(0, 0) == -1, "and an empty buffer picks nothing");
 }
 
+// STEP118: RT enabled by default for the Markers-domain toggles, scoped to these five structs
+// only — RealtimeToggle's own class default stays off (RtToggleWidget_UI_Test.cpp).
+void RunRealtimeDefaultChecks() {
+    MarkersTabState state;
+    Check(state.slopeToggle.IsRealtimeEnabled() && state.heightToggle.IsRealtimeEnabled()
+          && state.densityToggle.IsRealtimeEnabled() && state.countToggle.IsRealtimeEnabled()
+          && state.clearanceSpacingToggle.IsRealtimeEnabled()
+          && state.obstacleDistanceToggle.IsRealtimeEnabled(),
+          "MarkersTabState's six rule-stack toggles default to realtime ON (STEP118)");
+    Check(state.ruleDetail.areaRadiusMinimumToggle.IsRealtimeEnabled()
+          && state.ruleDetail.areaRadiusMaximumToggle.IsRealtimeEnabled()
+          && state.ruleDetail.areaHeightRangeToggle.IsRealtimeEnabled()
+          && state.ruleDetail.focusRadiusToggle.IsRealtimeEnabled()
+          && state.ruleDetail.focusStrengthToggle.IsRealtimeEnabled()
+          && state.ruleDetail.focusContrastToggle.IsRealtimeEnabled(),
+          "MarkerRuleDetailState's six toggles default to realtime ON (STEP118)");
+    Check(state.globals.scaleRows[0].iconScaleToggle.IsRealtimeEnabled()
+          && state.globals.scaleRows[0].previewColorToggle.IsRealtimeEnabled(),
+          "MarkerGlobalScaleRow's two toggles default to realtime ON (STEP118)");
+}
+
 } // namespace
 
 int main() {
@@ -118,6 +139,7 @@ int main() {
     RunPlanLimitChecks();
     RunEnumMirrorChecks();
     RunSelectionFenceChecks();
+    RunRealtimeDefaultChecks();
     RunMarkerRuleLayerAcceptanceChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

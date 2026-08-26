@@ -84,13 +84,17 @@ void ReadUnitGroupJson(const nlohmann::json& json, Params::UnitGroup& group, int
                         });
 }
 
-void ReadArmyColorJson(const nlohmann::json& armyJson, float armyColor[4]) {
-    if (!armyJson.contains("armyColor") || !armyJson["armyColor"].is_object()) return;
+// Reports whether "armyColor" was present at all (ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-D's
+// key-presence discriminator, never a value comparison against white) — same bool-reporting pattern
+// ReadJsonFloat already uses elsewhere in this file.
+bool ReadArmyColorJson(const nlohmann::json& armyJson, float armyColor[4]) {
+    if (!armyJson.contains("armyColor") || !armyJson["armyColor"].is_object()) return false;
     const nlohmann::json& color = armyJson["armyColor"];
     ReadJsonFloat(color, "r", armyColor[0]);
     ReadJsonFloat(color, "g", armyColor[1]);
     ReadJsonFloat(color, "b", armyColor[2]);
     ReadJsonFloat(color, "a", armyColor[3]);
+    return true;
 }
 
 void ReadArmyJson(const nlohmann::json& armyJson, Params::Army& army, int mapSize) {
@@ -103,12 +107,28 @@ void ReadArmyJson(const nlohmann::json& armyJson, Params::Army& army, int mapSiz
                         [mapSize](const nlohmann::json& groupJson, Params::UnitGroup& group) {
                             ReadUnitGroupJson(groupJson, group, mapSize);
                         });
-    ReadArmyColorJson(armyJson, army.armyColor);
+    ReadArmyColorJson(armyJson, army.armyColor);   // an absent key is backfilled by the second pass below
     ReadJsonText(armyJson, "alias", army.alias);
     // STEP76 §2/§8: `displayName` merges into the format-native `armies[<ARMY_XX>]` object, a
     // sibling of `alias`. `name` itself (the outer dict key) is re-minted unconditionally right
     // after this by NormalizeArmyIdentities — never trusted as authoritative from the document.
     ReadJsonText(armyJson, "displayName", army.displayName);
+}
+
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-D: a SECOND pass over the same `armies` JSON object
+// (not a counter threaded through ReadNameKeyedObject's per-item lambda above, which skips
+// ReadOneItem for a malformed non-object entry and would desync from `armies`' real vector index).
+// Same iteration order/source as the first pass, so position i here IS armies[i]'s roster position.
+void BackfillMissingArmyColors(const nlohmann::json& armiesJson, std::vector<Params::Army>& armies) {
+    std::size_t rosterPosition = 0;
+    for (const auto& [name, armyJson] : armiesJson.items()) {
+        if (rosterPosition >= armies.size()) break;
+        const bool bHasColorKey = armyJson.is_object() && armyJson.contains("armyColor")
+                                 && armyJson["armyColor"].is_object();
+        if (!bHasColorKey)
+            Params::SeedDefaultArmyColor(armies[rosterPosition].armyColor, static_cast<int>(rosterPosition));
+        ++rosterPosition;
+    }
 }
 
 } // namespace
@@ -122,6 +142,7 @@ void ReadArmiesJson(const nlohmann::json& document, Params::MapRecipe& outRecipe
                         [mapSize](const nlohmann::json& armyJson, Params::Army& army) {
                             ReadArmyJson(armyJson, army, mapSize);
                         });
+    BackfillMissingArmyColors(document["armies"], outRecipe.armies);
 }
 
 } // namespace Io

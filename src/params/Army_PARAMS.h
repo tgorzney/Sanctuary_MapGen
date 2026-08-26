@@ -4,6 +4,7 @@
 // the `.sanmap` `armies` dictionary is the entire purpose, no PROC stage computes or reinterprets
 // these fields. Verbatim from ENTITY_AUTHORING_PARAMS_SPEC.md's "The types" section.
 #pragma once
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -65,6 +66,30 @@ struct Army {
     float       armyColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };  // SanGen-added, Correction 11
     std::string alias;                                       // SanGen-added, Correction 11
 };
+
+// v1's rotating default palette, ported (ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-D). One
+// definition shared by Add Army (ArmiesTab_UI.cpp) and the import backfill
+// (MapImporter_Armies_IO.cpp) — rotation-by-index consumption, roster position mod 8. Verbatim
+// from the ARCH ruling's own code block; do not retype by hand.
+inline constexpr float kDefaultArmyColors[8][4] = {
+    { 1.0f, 0.0f, 0.0f, 1.0f },   // 0 Red
+    { 1.0f, 0.4f, 0.7f, 1.0f },   // 1 Pink
+    { 1.0f, 0.5f, 0.0f, 1.0f },   // 2 Orange
+    { 0.5f, 0.0f, 0.5f, 1.0f },   // 3 Purple
+    { 0.0f, 0.0f, 1.0f, 1.0f },   // 4 Blue
+    { 0.0f, 0.5f, 0.5f, 1.0f },   // 5 Teal
+    { 0.0f, 0.5f, 0.0f, 1.0f },   // 6 Green
+    { 0.2f, 0.8f, 0.2f, 1.0f },   // 7 LimeGreen
+};
+
+// The one shared mint: `rosterPosition % 8` into kDefaultArmyColors above. Both call sites §14.16-D
+// names — Add Army (ArmiesTab_UI.cpp, UI) and the import backfill (MapImporter_Armies_IO.cpp, IO) —
+// already legally depend on PARAMS, so this lives here rather than being copy-pasted twice.
+inline void SeedDefaultArmyColor(float armyColor[4], int rosterPosition) {
+    const std::size_t paletteIndex = static_cast<std::size_t>(rosterPosition) % 8u;
+    for (int channel = 0; channel < 4; ++channel)
+        armyColor[channel] = kDefaultArmyColors[paletteIndex][channel];
+}
 
 } // namespace Params
 } // namespace SanmapGen

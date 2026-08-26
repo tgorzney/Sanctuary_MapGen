@@ -123,12 +123,17 @@ bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params
 
     const bool bLayerLocked = IsMarkerInstanceLayerLocked(markerLayers, transform.layerIndex);
     ImGui::BeginDisabled(bLayerLocked);
-    const WidgetChange positionXChange = DrawSliderScalar("Position X", transform.transform.positionX,
+    ImGui::TextUnformatted("Position");
+    ImGui::Columns(3, "markerPositionColumns", false);
+    const WidgetChange positionXChange = DrawSliderScalar("X", transform.transform.positionX,
         state.positionHorizontalRange, state.positionXToggle, WidgetStyle(), "%.1f");
-    const WidgetChange positionYChange = DrawSliderScalar("Position Y (Elevation)", transform.transform.positionY,
+    ImGui::NextColumn();
+    const WidgetChange positionYChange = DrawSliderScalar("Y", transform.transform.positionY,
         state.positionElevationRange, state.positionYToggle, WidgetStyle(), "%.1f");
-    const WidgetChange positionZChange = DrawSliderScalar("Position Z", transform.transform.positionZ,
+    ImGui::NextColumn();
+    const WidgetChange positionZChange = DrawSliderScalar("Z", transform.transform.positionZ,
         state.positionHorizontalRange, state.positionZToggle, WidgetStyle(), "%.1f");
+    ImGui::Columns(1);
     if (positionXChange.bCommitted || positionZChange.bCommitted)
         QuantizeMarkerPositionToLayerGrid(markerLayers, transform.layerIndex,
                                           transform.transform.positionX, transform.transform.positionZ);
@@ -162,11 +167,35 @@ DraggableListSignal DrawMarkerInstanceList(std::vector<Params::MarkerTransform>&
         state.selectedInstanceIndex);
 }
 
+// STEP114: the selected instance's icon-override picker — drawn once, after the rows, gated on
+// the current target (`state.selectedGroupIndex`/`selectedInstanceIndex`, the SAME target-
+// selection the Remove button above already uses), mirroring DrawGlobalIconPicker's "one shared
+// grid below the rows" layout. Never writes `selected->iconNameOverride` directly from the grid's
+// volatile int — the shell resolves `state.iconOverrideGridState.selectedIconId` into the string
+// field (Application_AssetPanel_UI.cpp's ResolveIconSelections); this tab never touches the atlas.
+void DrawMarkerInstanceIconOverridePicker(std::vector<Params::MarkerTransform>& transforms,
+                                          ManualMarkersState& state,
+                                          const IconAtlasManifest* iconManifest) {
+    Params::MarkerTransform* const selected =
+        SelectedMarkerInstance(transforms, state.selectedInstanceIndex);
+    if (selected == nullptr) return;
+    ImGui::Text("Icon Override: %s", selected->iconNameOverride.empty()
+                                     ? "(type default)" : selected->iconNameOverride.c_str());
+    if (!selected->iconNameOverride.empty() && ImGui::Button("Clear Icon Override"))
+        selected->iconNameOverride.clear();
+    if (iconManifest == nullptr) {
+        ImGui::TextUnformatted("No resident icon atlas: run the host's icon scan first.");
+        return;
+    }
+    DrawIconGrid("Marker Instance Icon", *iconManifest, state.iconOverrideGridState, state.iconOverrideGridHeight);
+}
+
 } // namespace
 
 void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group, const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                               ManualMarkersState& state, int selectedMarkerLayerIndex) {
+                               ManualMarkersState& state, int selectedMarkerLayerIndex,
+                               const IconAtlasManifest* iconManifest) {
     bool bInstancesMoved = false;
     bool bAnyInstanceCommitted = false;
     const DraggableListSignal signal =
@@ -175,6 +204,7 @@ void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group, const std::ve
         bInstancesMoved = ApplyMarkerInstanceListSignal(group.transforms, state, signal) || bInstancesMoved;
     bInstancesMoved = DrawMarkerInstanceListButtons(group.transforms, state, markerLayers,
                                                     selectedMarkerLayerIndex) || bInstancesMoved;
+    DrawMarkerInstanceIconOverridePicker(group.transforms, state, iconManifest);
     bInstancesMoved = bAnyInstanceCommitted || bInstancesMoved;
 
     // Scoped to THIS group only: the wire format's inner dictionary key only needs uniqueness

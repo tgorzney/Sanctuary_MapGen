@@ -44,12 +44,12 @@ struct MarkerRuleDetailState {
     ScalarSliderRange focusStrengthRange{ 0.0f, 5.0f, 0.0f };
     ScalarSliderRange focusContrastRange{ 0.1f, 5.0f, 0.0f };
 
-    RealtimeToggle areaRadiusMinimumToggle;
-    RealtimeToggle areaRadiusMaximumToggle;
-    RealtimeToggle areaHeightRangeToggle;
-    RealtimeToggle focusRadiusToggle;
-    RealtimeToggle focusStrengthToggle;
-    RealtimeToggle focusContrastToggle;
+    RealtimeToggle areaRadiusMinimumToggle{true};
+    RealtimeToggle areaRadiusMaximumToggle{true};
+    RealtimeToggle areaHeightRangeToggle{true};
+    RealtimeToggle focusRadiusToggle{true};
+    RealtimeToggle focusStrengthToggle{true};
+    RealtimeToggle focusContrastToggle{true};
 
     int categoryIndex      = 0;   // mirrors of the three enum fields, for Combo_UI
     int priorityIndex      = 0;

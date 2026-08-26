@@ -86,7 +86,11 @@ struct DecalRule {
 // (PLACEMENT_SCATTER_SPEC "Unit spawning") with the same seeded scatter every other rule uses.
 struct UnitRule {
     bool  bEnabled  = true;
-    int   armyIndex = 0;        // Chosen = 0, Guard = 1, EDA = 2
+    // A real, actively-maintained POSITIONAL index into recipe.armies (ArmiesTab_UI.h's own header
+    // note; renumbered on army delete/reorder by DropUnitRulesForRemovedArmy/
+    // RenumberUnitRuleArmyIndicesForReorder) — NOT a Faction value. Stale "Chosen=0, Guard=1, EDA=2"
+    // comment corrected by ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-B.
+    int   armyIndex = 0;
     int   count     = 0;
     float minSlope  = 0.0f;
     float maxSlope  = 89.9f;

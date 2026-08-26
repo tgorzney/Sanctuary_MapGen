@@ -671,6 +671,8 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
               "MarkerInstanceLayer::bGridSnapEnabled survives, non-default");
         Check(NearlyEqual(loadedLayer.gridSnapSizeWorldUnits, originalLayer.gridSnapSizeWorldUnits),
               "MarkerInstanceLayer::gridSnapSizeWorldUnits survives, non-default");
+        Check(loadedLayer.bColorOverrideEnabled == originalLayer.bColorOverrideEnabled,
+              "MarkerInstanceLayer::bColorOverrideEnabled survives, non-default");
     }
 
     Check(loaded.markers.size() == 1, "one marker group survives");
@@ -1206,6 +1208,7 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerLayer.bLocked = true;                                       // STEP106, non-default
     markerLayer.bGridSnapEnabled = true;                              // STEP106, non-default
     markerLayer.gridSnapSizeWorldUnits = 4.0f;                        // STEP106, non-default
+    markerLayer.bColorOverrideEnabled = true;                         // STEP116, non-default
     recipe.markerLayers.push_back(markerLayer);
 
     Params::MarkerTransform markerTransform;
@@ -1507,6 +1510,53 @@ void CheckUnrecognizedSkyboxIntensityModeFallsBackSafely() {
           "an unrecognized skyboxIntensityMode string falls back to Exposure");
     Check(result.warningCount > 0,
           "the unrecognized skyboxIntensityMode fallback is logged as a warning, not silent");
+}
+
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-D acceptance: a hand-authored/partial .sanmap army
+// with no "armyColor" key at all backfills from Params::kDefaultArmyColors by roster position, while
+// an army that explicitly authored white stays white — a KEY-PRESENCE discriminator, never a value
+// comparison against white (which would silently clobber a genuinely-authored white army). Roster
+// position is the parse-order position in the (alphabetically-iterated, "ARMY_01" < "ARMY_02" <
+// "ARMY_03") armies dictionary — the same order NormalizeArmyIdentities already relies on being
+// stable (MapImporter_ArmyIdentityNormalize_IO.cpp). A pure-reader check, mirroring
+// CheckUnrecognizedSkyboxIntensityModeFallsBackSafely's own style above.
+void CheckArmyColorBackfillUsesKeyPresenceNotValueComparison() {
+    nlohmann::json document;
+    document["armies"] = nlohmann::json::object();
+    document["armies"]["ARMY_01"] = nlohmann::json::object();   // no "armyColor" key at all
+
+    nlohmann::json armyExplicitWhite;
+    armyExplicitWhite["armyColor"]["r"] = 1.0f;
+    armyExplicitWhite["armyColor"]["g"] = 1.0f;
+    armyExplicitWhite["armyColor"]["b"] = 1.0f;
+    armyExplicitWhite["armyColor"]["a"] = 1.0f;
+    document["armies"]["ARMY_02"] = armyExplicitWhite;
+
+    document["armies"]["ARMY_03"] = nlohmann::json::object();   // no "armyColor" key at all
+
+    Params::MapRecipe loaded;
+    loaded.geometry.mapSize = 256;
+    Io::ReadArmiesJson(document, loaded);
+
+    Check(loaded.armies.size() == 3, "all three armies parse");
+    if (loaded.armies.size() != 3) return;
+
+    Check(NearlyEqual(loaded.armies[0].armyColor[0], Params::kDefaultArmyColors[0][0])
+          && NearlyEqual(loaded.armies[0].armyColor[1], Params::kDefaultArmyColors[0][1])
+          && NearlyEqual(loaded.armies[0].armyColor[2], Params::kDefaultArmyColors[0][2])
+          && NearlyEqual(loaded.armies[0].armyColor[3], Params::kDefaultArmyColors[0][3]),
+          "ARMY_01 (roster position 0, no armyColor key): backfilled from kDefaultArmyColors[0]");
+
+    Check(NearlyEqual(loaded.armies[1].armyColor[0], 1.0f) && NearlyEqual(loaded.armies[1].armyColor[1], 1.0f)
+          && NearlyEqual(loaded.armies[1].armyColor[2], 1.0f) && NearlyEqual(loaded.armies[1].armyColor[3], 1.0f),
+          "ARMY_02 (armyColor key explicitly present, white): stays white, never overwritten by the backfill");
+
+    Check(NearlyEqual(loaded.armies[2].armyColor[0], Params::kDefaultArmyColors[2][0])
+          && NearlyEqual(loaded.armies[2].armyColor[1], Params::kDefaultArmyColors[2][1])
+          && NearlyEqual(loaded.armies[2].armyColor[2], Params::kDefaultArmyColors[2][2])
+          && NearlyEqual(loaded.armies[2].armyColor[3], Params::kDefaultArmyColors[2][3]),
+          "ARMY_03 (roster position 2, no armyColor key): backfilled from kDefaultArmyColors[2], "
+          "not position 1 — the skipped explicit-white army does not shift the rotation");
 }
 
 // SANMAP_FORMAT_SPEC Correction 13's cardinality invariant: `stratumLayers[9]` is fixed by the
@@ -1987,6 +2037,8 @@ void CheckMarkerGroupsLegacyLockAndSnapDefaults() {
           "bGridSnapEnabled keeps its struct default (false) when the key is absent");
     Check(NearlyEqual(layer.gridSnapSizeWorldUnits, 1.0f),
           "gridSnapSizeWorldUnits keeps its struct default (1.0f) when the key is absent");
+    Check(layer.bColorOverrideEnabled == false,
+          "bColorOverrideEnabled keeps its struct default (false) when the key is absent");
 }
 
 // STEP60_MarkerInstanceLayer_PARAMS: a hand-built `markers` entry with an out-of-range
@@ -2032,6 +2084,126 @@ void CheckMarkerIconNameOverrideLegacyDefault() {
     if (recipe.markers.empty() || recipe.markers[0].transforms.empty()) return;
     Check(recipe.markers[0].transforms[0].iconNameOverride.empty(),
           "iconNameOverride keeps its struct default (empty) when the key is absent");
+}
+
+// STEP115: a real, non-SanGen-authored `.sanmap` never carries `MarkerGroups` — build a raw document
+// with a `"markers"` object containing two type-groups and explicitly NO `"MarkerGroups"` key.
+// ReadMarkerGroupsJson is a confirmed no-op (it never fabricates the key); ReconcileMarkerLayers then
+// synthesizes one layer per marker group and repoints every transform's layerIndex at it.
+void CheckMarkerLayerSynthesisOnEmptyMarkerGroups() {
+    nlohmann::json document;   // deliberately no "MarkerGroups" key
+    nlohmann::json spawnTransformJson;
+    nlohmann::json spawnGroupJson;
+    spawnGroupJson["transforms"] = nlohmann::json::object({ { "Spawn 0", spawnTransformJson } });
+
+    nlohmann::json alloyTransformOneJson;
+    nlohmann::json alloyTransformTwoJson;
+    nlohmann::json alloyGroupJson;
+    alloyGroupJson["transforms"] = nlohmann::json::object({
+        { "Mex 0", alloyTransformOneJson }, { "Mex 1", alloyTransformTwoJson } });
+
+    document["markers"] = nlohmann::json::object({
+        { "Spawn", spawnGroupJson }, { "Alloys", alloyGroupJson } });
+
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    Io::ReadMarkerGroupsJson(document, recipe);
+    Check(recipe.markerLayers.empty(), "ReadMarkerGroupsJson does not fabricate MarkerGroups");
+    Io::ReadMarkersJson(document, recipe, result);
+    Io::ReconcileMarkerLayers(recipe, result);
+
+    Check(recipe.markerLayers.size() == 2, "one synthesized layer per marker type group");
+    if (recipe.markerLayers.size() != 2 || recipe.markers.size() != 2) return;
+    // ReadNameKeyedObject (MapImporter_Markers_IO.cpp) walks the JSON object's own key-iteration
+    // order — nlohmann::json (non-ordered) is alphabetical by default, so "Alloys" precedes "Spawn".
+    Check(recipe.markerLayers[0].name == "Alloys" && recipe.markerLayers[1].name == "Spawn",
+          "synthesized layer names match the real marker-group key-iteration order");
+    Check(recipe.markerLayers[0].layerId == 0 && recipe.markerLayers[1].layerId == 1,
+          "synthesized layerId is sequential");
+    for (const Params::MarkerInstanceGroup& group : recipe.markers) {
+        const int expectedLayerIndex = group.name == "Alloys" ? 0 : 1;
+        for (const Params::MarkerTransform& transform : group.transforms)
+            Check(transform.layerIndex == expectedLayerIndex,
+                  "every transform in a synthesized-layer group points at its real layer");
+    }
+    const Params::MarkerInstanceLayer defaultLayer;
+    const Params::MarkerInstanceLayer& synthesizedLayer = recipe.markerLayers[0];
+    Check(NearlyEqual(synthesizedLayer.color[0], defaultLayer.color[0])
+          && NearlyEqual(synthesizedLayer.color[1], defaultLayer.color[1])
+          && NearlyEqual(synthesizedLayer.color[2], defaultLayer.color[2])
+          && NearlyEqual(synthesizedLayer.color[3], defaultLayer.color[3])
+          && NearlyEqual(synthesizedLayer.iconScale, defaultLayer.iconScale)
+          && synthesizedLayer.bLocked == defaultLayer.bLocked
+          && synthesizedLayer.bGridSnapEnabled == defaultLayer.bGridSnapEnabled
+          && NearlyEqual(synthesizedLayer.gridSnapSizeWorldUnits, defaultLayer.gridSnapSizeWorldUnits),
+          "a synthesized layer is struct-default in every field but name/layerId (white-as-unset)");
+    Check(result.warningCount == 1,
+          "exactly one aggregate warning fires for the whole synthesis, not one per layer");
+}
+
+// STEP115: a document WITH `MarkerGroups` present must be left provably untouched — no double
+// synthesis. Reuses FillFixtureMarkersAndChains's existing fixture (already populates one
+// MarkerInstanceLayer and one marker group).
+void CheckMarkerLayerSynthesisIsNoOpWhenMarkerGroupsPresent() {
+    Params::MapRecipe fixture;
+    FillFixtureMarkersAndChains(fixture);
+    nlohmann::ordered_json document;
+    document["MarkerGroups"] = Io::BuildMarkerGroupsJson(fixture);
+    document["markers"] = Io::BuildMarkersJson(fixture);
+
+    Params::MapRecipe loaded;
+    Io::MapImportResult result;
+    Io::ReadMarkerGroupsJson(document, loaded);
+    Io::ReadMarkersJson(document, loaded, result);
+    Check(loaded.markerLayers.size() == 1, "the one real MarkerGroups entry survives");
+    const int warningCountBeforeReconcile = result.warningCount;
+
+    Io::ReconcileMarkerLayers(loaded, result);
+
+    Check(loaded.markerLayers.size() == 1, "ReconcileMarkerLayers is a no-op when MarkerGroups was present");
+    if (!loaded.markerLayers.empty()) {
+        const Params::MarkerInstanceLayer& layer = loaded.markerLayers[0];
+        Check(layer.layerId == fixture.markerLayers[0].layerId
+              && layer.name == fixture.markerLayers[0].name
+              && NearlyEqual(layer.color[0], fixture.markerLayers[0].color[0])
+              && layer.bLocked == fixture.markerLayers[0].bLocked
+              && layer.bGridSnapEnabled == fixture.markerLayers[0].bGridSnapEnabled
+              && NearlyEqual(layer.gridSnapSizeWorldUnits, fixture.markerLayers[0].gridSnapSizeWorldUnits),
+              "the real MarkerGroups entry is byte-identical to before the Reconcile call");
+    }
+    Check(result.warningCount == warningCountBeforeReconcile,
+          "no new warning fires when MarkerGroups was already present");
+}
+
+// STEP115: partial coverage (layers present but not covering every group) is explicitly deferred —
+// this test pins that behavior so it isn't silently changed by a future edit. The guard is
+// `markerLayers.empty()`, not "every group covered".
+void CheckMarkerLayerSynthesisPartialCoverageIsNoOp() {
+    Params::MapRecipe loaded;
+    Params::MarkerInstanceLayer onlyLayer;
+    onlyLayer.name = "Spawn";
+    onlyLayer.layerId = 0;
+    loaded.markerLayers.push_back(onlyLayer);   // exactly ONE entry
+
+    Params::MarkerTransform spawnTransform;   // points at the real layer 0
+    spawnTransform.layerIndex = 0;
+    Params::MarkerInstanceGroup spawnGroup;
+    spawnGroup.name = "Spawn";
+    spawnGroup.transforms.push_back(spawnTransform);
+    loaded.markers.push_back(spawnGroup);
+
+    Params::MarkerTransform alloyTransform;   // left at its default layerIndex = 0 too — no
+    Params::MarkerInstanceGroup alloyGroup;   // synthesis has run for this group
+    alloyGroup.name = "Alloys";
+    alloyGroup.transforms.push_back(alloyTransform);
+    loaded.markers.push_back(alloyGroup);   // TWO groups total, only one covered by markerLayers
+
+    Io::MapImportResult result;
+    Io::ReconcileMarkerLayers(loaded, result);
+
+    Check(loaded.markerLayers.size() == 1,
+          "partial coverage is untouched — the guard is markerLayers.empty(), not full coverage");
+    Check(result.warningCount == 0, "no warning fires for the deferred partial-coverage case");
 }
 
 // STEP99_BakedImageLayer_PARAMS acceptance test: a document with none of the three keys
@@ -2088,6 +2260,7 @@ int main() {
     SanmapGen::MapFormatTest::RunRoundTripTests();
     SanmapGen::MapFormatTest::CheckKnownTopLevelSanmapKeysCoverage();
     SanmapGen::MapFormatTest::CheckUnrecognizedSkyboxIntensityModeFallsBackSafely();
+    SanmapGen::MapFormatTest::CheckArmyColorBackfillUsesKeyPresenceNotValueComparison();
     SanmapGen::MapFormatTest::CheckStratumLayersCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::CheckStratumGenerationSettingsCardinalityMismatchWarns();
     SanmapGen::MapFormatTest::CheckAccumulationReaderToleratesUnrecognizedKeys();
@@ -2107,6 +2280,9 @@ int main() {
     SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyLockAndSnapDefaults();
     SanmapGen::MapFormatTest::CheckMarkerLayerIndexClampsOnImport();
     SanmapGen::MapFormatTest::CheckMarkerIconNameOverrideLegacyDefault();
+    SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisOnEmptyMarkerGroups();
+    SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisIsNoOpWhenMarkerGroupsPresent();
+    SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisPartialCoverageIsNoOp();
     SanmapGen::MapFormatTest::CheckLayerMissingBakedKeysLeaveDefaults();
     SanmapGen::MapFormatTest::CheckNextLayerIdentifier();
     SanmapGen::MapFormatTest::RunValidationTests();

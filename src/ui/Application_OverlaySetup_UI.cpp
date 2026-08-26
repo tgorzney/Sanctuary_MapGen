@@ -4,6 +4,7 @@
 // (`Application_Defaults_UI.h`). No live resync as the recipe grows mid-session — out of scope here
 // (STEP51).
 #include "Application_Defaults_UI.h"
+#include "ArmiesTab_UI.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -15,10 +16,17 @@ void PushProceduralRefs(std::vector<OverlaySubLayerRef_UI>& subLayers, int ruleC
 void PushManualRefs(std::vector<OverlaySubLayerRef_UI>& subLayers, int recordCount);
 void SeedMarkerDomains(OverlayLayer_UI& alloyLayer, OverlayLayer_UI& spawnsArmiesLayer,
                        const Params::MapRecipe& recipe);
-void SeedUnitsManualSubLayers(OverlayLayer_UI& unitsLayer, const Params::MapRecipe& recipe);
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-A/B: `unitsLayers` is one row per `recipe.armies[i]`,
+// army-index-aligned by construction (see the loop below) — no name-matching needed to find "the
+// row whose army matches".
+void SeedUnitsManualSubLayers(std::vector<OverlayLayer_UI>& unitsLayers, const Params::MapRecipe& recipe);
+void SeedUnitsProceduralSubLayers(std::vector<OverlayLayer_UI>& unitsLayers, const Params::MapRecipe& recipe);
 void SeedPropReclaimDomains(OverlayLayer_UI& propsLayer, OverlayLayer_UI& reclaimLayer,
                             const Params::MapRecipe& recipe);
 
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-A: N `OverlayLayer_UI{domainKind=Units}` rows, one
+// per `recipe.armies[i]` in roster order, named via ArmyRowLabel — not one shared row. Every other
+// domain's seeding is unchanged.
 void ConfigureDefaultOverlayLayers(OverlayLayerSettings& overlaySettings,
                                     const Params::MapRecipe& recipe) {
     OverlayLayer_UI alloyLayer;        alloyLayer.name        = "Alloy";
@@ -27,10 +35,16 @@ void ConfigureDefaultOverlayLayers(OverlayLayerSettings& overlaySettings,
     spawnsArmiesLayer.domainKind                               = OverlayDomainKind_UI::SpawnsArmies;
     SeedMarkerDomains(alloyLayer, spawnsArmiesLayer, recipe);
 
-    OverlayLayer_UI unitsLayer; unitsLayer.name = "Units";
-    unitsLayer.domainKind = OverlayDomainKind_UI::Units;
-    SeedUnitsManualSubLayers(unitsLayer, recipe);
-    PushProceduralRefs(unitsLayer.subLayers, static_cast<int>(recipe.unitRules.size()));
+    std::vector<OverlayLayer_UI> unitsLayers;
+    unitsLayers.reserve(recipe.armies.size());
+    for (const Params::Army& army : recipe.armies) {
+        OverlayLayer_UI unitsLayer;
+        unitsLayer.name       = ArmyRowLabel(army);
+        unitsLayer.domainKind = OverlayDomainKind_UI::Units;
+        unitsLayers.push_back(unitsLayer);
+    }
+    SeedUnitsManualSubLayers(unitsLayers, recipe);
+    SeedUnitsProceduralSubLayers(unitsLayers, recipe);
 
     OverlayLayer_UI propsLayer;   propsLayer.name   = "Props";
     propsLayer.domainKind   = OverlayDomainKind_UI::Props;
@@ -43,8 +57,13 @@ void ConfigureDefaultOverlayLayers(OverlayLayerSettings& overlaySettings,
     PushManualRefs(decalsLayer.subLayers, static_cast<int>(recipe.decalLayers.size()));
     PushProceduralRefs(decalsLayer.subLayers, static_cast<int>(recipe.decalRules.size()));
 
-    overlaySettings.overlayLayers = {alloyLayer, spawnsArmiesLayer, unitsLayer,
-                                      propsLayer, reclaimLayer, decalsLayer};
+    overlaySettings.overlayLayers.clear();
+    overlaySettings.overlayLayers.push_back(alloyLayer);
+    overlaySettings.overlayLayers.push_back(spawnsArmiesLayer);
+    for (const OverlayLayer_UI& unitsLayer : unitsLayers) overlaySettings.overlayLayers.push_back(unitsLayer);
+    overlaySettings.overlayLayers.push_back(propsLayer);
+    overlaySettings.overlayLayers.push_back(reclaimLayer);
+    overlaySettings.overlayLayers.push_back(decalsLayer);
 }
 
 bool ResolveUnitsManualSubLayer(const Params::MapRecipe& recipe, int flatSubLayerIndex,

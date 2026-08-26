@@ -45,15 +45,15 @@ struct ManualMarkerLayersState {
     bool           bUseGroupColor = false;                      // one tint for every layer
     float          groupColor[kColorSwatchChannelCount] = { 1.0f, 1.0f, 1.0f, 1.0f };
     float          layerIconScale = 1.0f;
-    RealtimeToggle groupColorToggle;
-    RealtimeToggle layerIconScaleToggle;
+    RealtimeToggle groupColorToggle{true};
+    RealtimeToggle layerIconScaleToggle{true};
 
     // ONE shared toggle set for the SELECTED row's own color/scale — `Params::MarkerInstanceLayer`
     // is a pure round-tripping type and cannot carry a `RealtimeToggle` member, exactly as
     // `PropInstanceLayer` cannot (`PropsTab_Manual_UI.h:55-60`).
-    RealtimeToggle selectedLayerColorToggle;
-    RealtimeToggle selectedLayerIconScaleToggle;
-    RealtimeToggle selectedLayerGridSnapToggle;
+    RealtimeToggle selectedLayerColorToggle{true};
+    RealtimeToggle selectedLayerIconScaleToggle{true};
+    RealtimeToggle selectedLayerGridSnapToggle{true};
 
     SectionState   symmetrySection;                             // NEW vs. props — layer-level symmetry
     int            selectedLayerIndex = -1;
@@ -65,7 +65,7 @@ struct ManualMarkerLayersState {
     // recipe-level `Params::MarkerSymmetryFixSettings::distanceTolerance` slider — recipe-level, not
     // per-layer, so one shared pair is correct here (not a per-row storage gap).
     ScalarSliderRange         fixSymmetryToleranceRange{ 0.01f, 10.0f, 0.0f };
-    RealtimeToggle            fixSymmetryToleranceToggle;
+    RealtimeToggle            fixSymmetryToleranceToggle{true};
     bool                      bFixSymmetryOverwrite   = false;
     bool                      bHasFixSymmetryResult   = false;
     Ui::MarkerSymmetryFixResult lastFixSymmetryResult;

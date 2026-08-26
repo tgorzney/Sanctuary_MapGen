@@ -28,7 +28,7 @@ section number, so a citation resolves by arithmetic:
 A section long enough to need it is itself split one-file-per-subsection; its
 `ARCH_NN_<Topic>.md` file then holds only the ruling's framing plus a table of its
 subsection files. Short sections stay whole. **Target: no ARCH file over ~100 lines** —
-the four that exceed it are single indivisible rulings, flagged in the table below.
+the files that exceed it are single indivisible rulings, flagged in the table below.
 
 Section numbers are permanent and never renumbered, so every `§N` / `§N.M` citation
 across the specs, work-orders, and agent charters keeps resolving forever.
@@ -37,7 +37,7 @@ across the specs, work-orders, and agent charters keeps resolving forever.
 ARCH. This is the same on-demand discipline `sangen_arch_pack/INDEX.md` applies to specs.
 
 A new ratification appends a **new file** (the next unused top-level number, e.g.
-`ARCH_19_*.md`, split into `ARCH_19_NN_*.md` if it runs long) plus its rows below.
+`ARCH_20_*.md`, split into `ARCH_20_NN_*.md` if it runs long) plus its rows below.
 Existing files are amended in place. **Only the ARCH Expert writes any of them.**
 
 ---
@@ -46,7 +46,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 
 | § | File | Ruling | Size |
 |---|------|--------|------|
-| **§1** | [ARCH_01_NamingLaw.md](ARCH_01_NamingLaw.md) | Naming law (Constitution §2, resolved) | index → 8 subsection files |
+| **§1** | [ARCH_01_NamingLaw.md](ARCH_01_NamingLaw.md) | Naming law (Constitution §2, resolved) | index → 9 subsection files |
 | §1.1 | [ARCH_01_01_LiteralNames.md](ARCH_01_01_LiteralNames.md) | Literal, fully-spelled names — no abbreviations | 20 lines |
 | §1.2 | [ARCH_01_02_LayerTagSuffix.md](ARCH_01_02_LayerTagSuffix.md) | Layer tag is a SUFFIX (TGUE convention) | 19 lines |
 | §1.3 | [ARCH_01_03_MathNaming.md](ARCH_01_03_MathNaming.md) | Math naming — domain + optimization variant | 11 lines |
@@ -55,8 +55,9 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §1.6 | [ARCH_01_06_SanmapKeyCasing.md](ARCH_01_06_SanmapKeyCasing.md) | `.sanmap` top-level key casing — game-native vs SanGen-owned (ratifies work-order SPEC-4 Correction 0) | 24 lines |
 | §1.7 | [ARCH_01_07_IoMigrationFileNaming.md](ARCH_01_07_IoMigrationFileNaming.md) | IO migration file naming — schema version steps (ratifies `IO_MIGRATION_SPEC`) | 16 lines |
 | §1.8 | [ARCH_01_08_ParamsFieldNamingByKind.md](ARCH_01_08_ParamsFieldNamingByKind.md) | PARAMS field naming for format-derived types — governed by data KIND, not by key presence | 43 lines |
+| §1.9 | [ARCH_01_09_IdAbbreviationBan.md](ARCH_01_09_IdAbbreviationBan.md) | "Id" is banned — resolved once, binding on every current and future field; retroactively confirms the shipped `layerId` defect | 54 lines |
 | **§2** | [ARCH_02_LayerDirectoryMap.md](ARCH_02_LayerDirectoryMap.md) | Layer → directory map (Constitution §1/§2) | 24 lines |
-| **§3** | [ARCH_03_ModuleBoundaries.md](ARCH_03_ModuleBoundaries.md) | Module boundaries & ownership (Constitution §1, resolved) | 78 lines |
+| **§3** | [ARCH_03_ModuleBoundaries.md](ARCH_03_ModuleBoundaries.md) | Module boundaries & ownership (Constitution §1, resolved) — §3.5 (new) is the general MATH/PARAMS/PROC placement rule for pure `Params::`-shaped math | 126 lines |
 | **§4** | [ARCH_04_DispatchContract.md](ARCH_04_DispatchContract.md) | Dispatch contract (Constitution §4, resolved) | 81 lines |
 | **§5** | [ARCH_05_GodObjectDismemberment.md](ARCH_05_GodObjectDismemberment.md) | God-object dismemberment (hit-list #1–2) | 41 lines |
 | **§6** | [ARCH_06_RebuildOrder.md](ARCH_06_RebuildOrder.md) | v2 rebuild order (dependency-ordered milestones) | 37 lines |
@@ -76,7 +77,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | **§11** | [ARCH_11_GlobalMarkerSettings.md](ARCH_11_GlobalMarkerSettings.md) | `Params::GlobalMarkerSettings` (ARCH ruling, completes `SANMAP_FORMAT_SPEC` Correction 7) | 40 lines |
 | **§12** | [ARCH_12_ManualPropDecalLayers.md](ARCH_12_ManualPropDecalLayers.md) | Manual-layer authoring for props/decals — `layerIndex` + `PropGroups`/`DecalGroups` (ARCH ruling, revises `ENTITY_AUTHORING_PARAMS_SPEC`) | 59 lines |
 | **§13** | [ARCH_13_RadialSymmetry.md](ARCH_13_RadialSymmetry.md) | Radial N-fold symmetry — `SymmetryAxis::Radial` + `radialSymmetryRepeatCount` (ARCH ruling, amends `Symmetry_PARAMS.h`, `SANMAP_FORMAT_SPEC` Correction 4) | 70 lines |
-| **§14** | [ARCH_14_PreviewOverlayLayering.md](ARCH_14_PreviewOverlayLayering.md) | Preview overlay layering — six-domain screen-space compositor (ARCH ruling, ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`) | index → 14 subsection files |
+| **§14** | [ARCH_14_PreviewOverlayLayering.md](ARCH_14_PreviewOverlayLayering.md) | Preview overlay layering — six-domain screen-space compositor (ARCH ruling, ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`) | index → 16 subsection files |
 | §14.1 | [ARCH_14_01_ModuleBoundaryDataVsParams.md](ARCH_14_01_ModuleBoundaryDataVsParams.md) | Module boundary and the DATA-vs-PARAMS split | 16 lines |
 | §14.2 | [ARCH_14_02_DataModel.md](ARCH_14_02_DataModel.md) | Data model (binding shape) | 43 lines |
 | §14.3 | [ARCH_14_03_IconRenderingLod.md](ARCH_14_03_IconRenderingLod.md) | Icon rendering — two-mode LOD, not constant-screen-size-only | 32 lines |
@@ -91,6 +92,8 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §14.12 | [ARCH_14_12_Naming.md](ARCH_14_12_Naming.md) | Naming | 6 lines |
 | §14.13 | [ARCH_14_13_OpenItems.md](ARCH_14_13_OpenItems.md) | Open items — status as of this ratification (closed items marked) | 137 lines |
 | §14.14 | [ARCH_14_14_AlloySpawnsArmiesManualRouting.md](ARCH_14_14_AlloySpawnsArmiesManualRouting.md) | Alloy/SpawnsArmies Manual sub-layer routing — no discriminator field on `MarkerInstanceLayer`; routed per-transform by the reserved `"Spawn"` group name (responds to `STEP97_AlloySpawnsArmiesManualSubLayers_UI.md`) | 51 lines |
+| §14.15 | [ARCH_14_15_ManualCullStableIdMigration.md](ARCH_14_15_ManualCullStableIdMigration.md) | Manual props/decals cull-path stable-id migration — corrects §14.13 item 3's stale "unscheduled" line (both work-orders shipped); rules `MapCanvas_IconLayer_CullManual_UI.cpp` migrates its match key from positional `layerIndex` to stable `manualLayerId`, resolved live against PARAMS (not read from `Data::PlacementInstances`, a confirmed staleness hazard) | 106 lines |
+| §14.16 | [ARCH_14_16_PerArmyUnitsOverlayRows.md](ARCH_14_16_PerArmyUnitsOverlayRows.md) | Per-army Units overlay rows — dynamic row-per-army (not a fixed enum), real `UnitRule::armyIndex` plumbing for procedural units (corrects a relayed "Faction-only" premise), per-army tint reads `Army::armyColor` directly, plus the v1 default-color-palette port this ruling needs to not be inert | 114 lines |
 | **§15** | [ARCH_15_MapScenarioSystem.md](ARCH_15_MapScenarioSystem.md) | The SanGen Map Scenario system — formalized as first-class law (ratifies `MAP_SCENARIO_SPEC.md`) | index → 10 subsection files |
 | §15.1 | [ARCH_15_01_LayerClassification.md](ARCH_15_01_LayerClassification.md) | Layer classification | 13 lines |
 | §15.2 | [ARCH_15_02_IoScopeRuling.md](ARCH_15_02_IoScopeRuling.md) | IO scope ruling — corrects an earlier assumption, does not reverse it | 39 lines |
@@ -107,7 +110,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §16.2 | [ARCH_16_02_MarkerRuleLayersKeepsName.md](ARCH_16_02_MarkerRuleLayersKeepsName.md) | `markerRuleLayers` keeps its full name; does not shorten to `markerLayers` like `propLayers` did | 11 lines |
 | §16.3 | [ARCH_16_03_ModuleBoundaryChain.md](ARCH_16_03_ModuleBoundaryChain.md) | Module boundary — solved via the existing legal `UI → PIPELINE → PROC` chain; no MATH relocation, no new UI→PROC exception | 68 lines |
 | §16.4 | [ARCH_16_04_SanmapCorrection7Amendment.md](ARCH_16_04_SanmapCorrection7Amendment.md) | `SANMAP_FORMAT_SPEC` Correction 7 amendment — scoped-down one-tier shape accepted; exact key spelling deferred to the Format Expert | 28 lines |
-| §16.5 | [ARCH_16_05_MarkerTransformFields.md](ARCH_16_05_MarkerTransformFields.md) | `MarkerTransform` — `symmetryGroupIdentifier` (not `symmetryGroupId`) + already-ratified `layerIndex` | 39 lines |
+| §16.5 | [ARCH_16_05_MarkerTransformFields.md](ARCH_16_05_MarkerTransformFields.md) | `MarkerTransform` — `symmetryGroupIdentifier` (not `symmetryGroupId`) + already-ratified `layerIndex`; superseded as the canonical "Id" ban citation by §1.9, not deleted | 39 lines |
 | §16.6 | [ARCH_16_06_MigrationRouting.md](ARCH_16_06_MigrationRouting.md) | Migration — a real breaking schema change; routed to the IO Architecture Expert, not ruled on here | 20 lines |
 | §16.7 | [ARCH_16_07_NamingConfirmed.md](ARCH_16_07_NamingConfirmed.md) | Naming confirmed — `MarkerRuleLayer` / `MarkerInstanceLayer` | 14 lines |
 | §16.8 | [ARCH_16_08_SpawnArmyShrink.md](ARCH_16_08_SpawnArmyShrink.md) | Spawn/Army shrink — confirmed: no new PARAMS type or field needed; corrected wording — match key is `MarkerTransform::name` only, never `alias` | 24 lines |
@@ -118,19 +121,38 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §18.1 | [ARCH_18_01_SandboxedExecutionPrimitive.md](ARCH_18_01_SandboxedExecutionPrimitive.md) | `LuaTableEvaluate_SYS`/`LuaTableValue_SYS` — a sibling `SYS` primitive to `LuaSyntaxCheck_SYS`, sharing only the vendored LuaJIT library; the execution safety contract, binding | 59 lines |
 | §18.2 | [ARCH_18_02_IngestedDataDeterminism.md](ARCH_18_02_IngestedDataDeterminism.md) | Determinism ruling — ingested footprint data may influence generation only after being baked into `PARAMS`; never read live by `PROC` | 69 lines |
 | §18.3 | [ARCH_18_03_CatalogDataOwnership.md](ARCH_18_03_CatalogDataOwnership.md) | Q3 ruled — richer catalog data (footprint + tags, the two artifacts tickets 89/92 need) stays `IO`-owned, asset-derived, matching `AssetAtlasCache_*`; no new `DATA`-layer catalog type; `economy.harvest`/`collisionInfo`/`displayName` explicitly deferred | 33 lines |
+| **§19** | [ARCH_19_MarkerLayerBundle.md](ARCH_19_MarkerLayerBundle.md) | The Group-above-Layer container — `MarkerLayerBundle` (ARCH ruling, ratifies `work_orders/DESIGN_MarkerGroupLayerRestructure_R1.md`, firms up open items in the still-unratified `work_orders/DESIGN_Assembly_R1.md`) | index → 12 subsection files |
+| §19.1 | [ARCH_19_01_NamingRatified.md](ARCH_19_01_NamingRatified.md) | Final type/wire name — `MarkerLayerBundle`, not `MarkerLayerGroup`/`Cluster`/`Ensemble`/`Formation`; UI label stays "Group" | 39 lines |
+| §19.2 | [ARCH_19_02_GenericitySplit.md](ARCH_19_02_GenericitySplit.md) | Domain-touching-vs-pure-mechanics genericity split — general rule for all future Group/Bundle work (Props, Decals, NavMesh) | 33 lines |
+| §19.3 | [ARCH_19_03_FieldSpellings.md](ARCH_19_03_FieldSpellings.md) | `MarkerLayerBundle` field spellings — `identifier`/`parentBundleIdentifier`/`markerTypeName`/`assemblyIdentifier`, applying §1.9 | 44 lines |
+| §19.4 | [ARCH_19_04_WireShape.md](ARCH_19_04_WireShape.md) | New top-level wire key/shape — `MarkerLayerBundles`, PascalCase, additive, no `SanGenVersion` bump | 39 lines |
+| §19.5 | [ARCH_19_05_AssemblyReferencesBundle.md](ARCH_19_05_AssemblyReferencesBundle.md) | Assembly-references-Bundle — scalar `assemblyIdentifier` on the Bundle, not a `{domain, groupIdentifier}` forward-reference list on Assembly | 41 lines |
+| §19.6 | [ARCH_19_06_NestedBundleAssemblyCutoff.md](ARCH_19_06_NestedBundleAssemblyCutoff.md) | Nested child Bundle with its own different `assemblyIdentifier` stops the recursive walk there — new rule | 27 lines |
+| §19.7 | [ARCH_19_07_TreeListWidgetOwnership.md](ARCH_19_07_TreeListWidgetOwnership.md) | `TreeListWidget_UI<T>` — one shared, domain-agnostic widget; Markers' own Ticket B builds it first | 34 lines |
+| §19.8 | [ARCH_19_08_SharedMathConfirmed.md](ARCH_19_08_SharedMathConfirmed.md) | Bundle's rigid-transform math and cycle-detection placement — applies §3.5; one shared MATH function with Assembly, not two copies | 37 lines |
+| §19.9 | [ARCH_19_09_ManualOnlyMembership.md](ARCH_19_09_ManualOnlyMembership.md) | Manual-layer-only membership confirmed consistent with Assembly's own §0 ruling, not a drifting variant | 26 lines |
+| §19.10 | [ARCH_19_10_TabDrivenV1Scoping.md](ARCH_19_10_TabDrivenV1Scoping.md) | v1 Move/Rotate is tab-driven only — no new canvas gesture, deferred until Assembly's own canvas work ships | 28 lines |
+| §19.11 | [ARCH_19_11_FormatSpecCorrectionBundle.md](ARCH_19_11_FormatSpecCorrectionBundle.md) | `SANMAP_FORMAT_SPEC.md` staleness correction bundle — landed directly in that file this session | 42 lines |
+| §19.12 | [ARCH_19_12_SoftTypeConsistency.md](ARCH_19_12_SoftTypeConsistency.md) | Bundle→marker-type consistency stays soft (UI-enforced only) — no import-time hard validation | 28 lines |
 
 ### Oversized files — known, accepted
 
-Four subsection files exceed the ~100-line target. Each is a single indivisible ruling
-with no internal subsection structure to split on; splitting them further would break the
-`§N.M` ↔ file rule for no gain.
+Files exceeding the ~100-line target are listed below. Six are single indivisible
+rulings with no internal subsection structure to split on; splitting them further
+would break the `§N.M` ↔ file rule for no gain. The seventh, `ARCH_03_ModuleBoundaries.md`,
+is §3 itself — a section this pack has never split into per-subsection files (unlike
+§1/§7/§14/§15/§16/§18) — accepting one additional general rule (§3.5) appended in place
+rather than forking that established non-split pattern for a single new subsection.
 
 | File | Lines | Why it stays whole |
 |------|-------|--------------------|
+| `ARCH_03_ModuleBoundaries.md` | 126 | §3.5 (the general MATH/PARAMS/PROC placement rule) appended to the section's existing non-split file rather than forking a new subsection-file pattern this section has never used |
 | `ARCH_07_02_MaterialProportionVsSurfaceWeight.md` | 162 | One ratified ruling on the two-field distinction |
 | `ARCH_14_13_OpenItems.md` | 137 | A flat numbered list of open items from the §14 ratification |
 | `ARCH_15_10_SlotPatternConstructionMoves.md` | 119 | One ruling: slot-pattern construction moves into the runtime |
 | `ARCH_15_05_ParamsScenariosType.md` | 118 | One ruling: the full `Params::Scenarios` shape |
+| `ARCH_14_16_PerArmyUnitsOverlayRows.md` | 114 | One ruling: per-army row seeding + procedural-unit routing + tint source + default-palette prerequisite, deliberately kept together as one shippable unit |
+| `ARCH_14_15_ManualCullStableIdMigration.md` | 106 | One ruling: the cull-path stable-id migration |
 
 ---
 

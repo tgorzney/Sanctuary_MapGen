@@ -73,11 +73,14 @@ void ParseEntityDomainsJson(const nlohmann::json& document, Params::MapRecipe& o
     ReadArmiesJson(document, outRecipe);
     ReadMarkerGroupsJson(document, outRecipe);
     ReadMarkersJson(document, outRecipe, result);
+    ReconcileMarkerLayers(outRecipe, result);              // STEP115
     ReadChainsJson(document, outRecipe);
     ReadPropGroupsJson(document, outRecipe);
     ReadPropsJson(document, outRecipe, result);
+    ReconcilePropLayers(outRecipe, result);                // STEP115
     ReadDecalGroupsJson(document, outRecipe);
     ReadDecalsJson(document, outRecipe, result);
+    ReconcileDecalLayers(outRecipe, result);                // STEP115
     ReadStratumLayersJson(document, outRecipe, result);
     ReadStratumGenerationSettingsJson(document, outRecipe, result);
     // STEP69_ParamsScenariosRoundTrip_IO: lobby-resolved spawn/alloy scenario data, same tier,

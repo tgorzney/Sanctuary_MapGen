@@ -6,6 +6,7 @@
 // IO_PARITY_REPORT.md Decision #5 flagged.
 #pragma once
 #include <string>
+#include "MarkerInstance_PARAMS.h"   // NEW — kSpawnMarkerGroupName
 
 namespace SanmapGen {
 namespace Params {
@@ -21,6 +22,22 @@ struct GlobalMarkerSettings {
     float scalePlasma = 0.17f;
     float scaleSpawn  = 0.17f;
 };
+
+// STEP116: the group-name -> GlobalMarkerSettings-field mapping a manual marker resolves a
+// TYPE-default color through, once "no explicit per-layer override" is established by the caller
+// (MarkerInstanceLayer::bColorOverrideEnabled). Mirrors ResolveMarkerIconTemplateIdentifier's own
+// vocabulary (MapCanvas_IconLayer_CullManual_UI.cpp, STEP114) — Spawn/Spawns, Alloy/Alloys,
+// Plasma/Plasmas. Any other group name (Generic/Expansion/freeform) resolves to opaque white — the
+// established "unset" convention (STEP115 ruling #5), not a strong color opinion.
+inline void ResolveMarkerGroupTypeTintColor(const std::string& groupName, const GlobalMarkerSettings& settings,
+                                            float& outRed, float& outGreen, float& outBlue) {
+    const float* color = nullptr;
+    if (groupName == kSpawnMarkerGroupName || groupName == "Spawns") color = settings.colorSpawn;
+    else if (groupName == "Alloy" || groupName == "Alloys")          color = settings.colorAlloy;
+    else if (groupName == "Plasma" || groupName == "Plasmas")        color = settings.colorPlasma;
+    if (color == nullptr) { outRed = outGreen = outBlue = 1.0f; return; }
+    outRed = color[0]; outGreen = color[1]; outBlue = color[2];
+}
 
 } // namespace Params
 } // namespace SanmapGen

@@ -56,6 +56,19 @@ bool Application::ApplyIconSelection(int selectedIconId, int& lastIconId,
     return !identifier.empty() && StoreTemplateIdentifier(identifier, templateIdentifier);
 }
 
+// STEP114 — the untruncated sibling of ApplyIconSelection above: same "only a NEW pick writes"
+// guard, but stores the full resolved identifier into a plain std::string field instead of the
+// fixed-8-char tpId buffer (this field, MarkerTransform::iconNameOverride, is not that convention).
+bool Application::ApplyIconSelectionToStringField(int selectedIconId, int& lastIconId,
+                                                   std::string& target) {
+    if (selectedIconId < 0 || selectedIconId == lastIconId) return false;
+    lastIconId = selectedIconId;
+    const std::string identifier = TemplateIdentifierOfIcon(selectedIconId);
+    if (identifier.empty() || identifier == target) return false;
+    target = identifier;
+    return true;
+}
+
 // The bridge in use: the grid emits an icon id, the shell resolves it to the template identifier
 // and stores it on the rule the tab has selected. The tabs stay unaware that an atlas exists
 // beyond the read-only manifest they are handed.
@@ -71,6 +84,14 @@ void Application::ResolveIconSelections() {
         bRecipeMoved = ApplyIconSelection(tabState.props.iconGridState.selectedIconId,
                                           tabState.lastPropIconId,
                                           propRule->transform.templateIdentifier) || bRecipeMoved;
+    // STEP114 — the third bridge: the selected manual marker instance's icon-override string, the
+    // untruncated field ApplyIconSelectionToStringField targets.
+    Params::MarkerTransform* const manualMarkerInstance =
+        SelectedManualMarkerInstance(recipe.markers, tabState.markers.manual);
+    if (manualMarkerInstance != nullptr)
+        bRecipeMoved = ApplyIconSelectionToStringField(
+            tabState.markers.manual.iconOverrideGridState.selectedIconId,
+            tabState.lastManualMarkerIconId, manualMarkerInstance->iconNameOverride) || bRecipeMoved;
     if (bRecipeMoved) previewDriver.NotifyParametersChanged();
 }
 

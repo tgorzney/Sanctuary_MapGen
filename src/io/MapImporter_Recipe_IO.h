@@ -61,6 +61,12 @@ void ReadArmiesJson(const nlohmann::json& document, Params::MapRecipe& outRecipe
 // `outRecipe.markerLayers.size()`, which `ReadMarkerGroupsJson` populates.
 void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
+// MapImporter_MarkerLayerReconcile_IO.cpp — synthesizes one MarkerInstanceLayer per marker GROUP
+// entry when `outRecipe.markerLayers` is empty AND at least one marker group exists (STEP115). A
+// real, non-SanGen-authored `.sanmap` never carries `MarkerGroups`; this is what makes the Manual
+// Marker Layers tab have something to show for such a file. No-op when markerLayers is non-empty
+// (partial coverage is explicitly out of scope — see the .cpp's own header comment).
+void ReconcileMarkerLayers(Params::MapRecipe& outRecipe, MapImportResult& result);
 void ReadChainsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 
 // MapImporter_Props_IO.cpp / MapImporter_Decals_IO.cpp — `props`/`decals`/`PropGroups`/
@@ -69,8 +75,14 @@ void ReadChainsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe
 // `ReadDecalsJson` — see each .cpp's own header comment for the `layerIndex` clamp reason.
 void ReadPropGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadPropsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
+// STEP115 — same synthesis posture as ReconcileMarkerLayers above, mirrored per domain (own .cpp,
+// see MapImporter_Props_IO.cpp's own header comment on the new function).
+void ReconcilePropLayers(Params::MapRecipe& outRecipe, MapImportResult& result);
 void ReadDecalGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadDecalsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
+// STEP115 — same synthesis posture as ReconcileMarkerLayers above, mirrored per domain (own .cpp,
+// see MapImporter_Decals_IO.cpp's own header comment on the new function).
+void ReconcileDecalLayers(Params::MapRecipe& outRecipe, MapImportResult& result);
 
 // MapImporter_Atmosphere_IO.cpp — ~49 top-level `.sanmap` keys -> `recipe.atmosphere`
 // (ATMOSPHERE_PARAMS_SPEC; MapImporter_IO.h SCOPE NOTE 3). `result` logs the one fail-safe

@@ -76,3 +76,51 @@ Two rules that make the dirty-hash DAG sound. Both are binding on every PROC sta
      owns the heightfield and the material proportions) — because the sim is the field's
      single writer and PIPELINE re-runs a sim from its upstream snapshot, never from the
      sim's own previous output. The exception must be declared in the stage's spec.
+
+### 3.5 Pure, stateless PARAMS-shaped math — the general MATH-vs-PARAMS-vs-PROC placement rule
+Raised three times as a per-feature question before being settled here generally
+(`BuildSymmetryOrbit`, `DESIGN_MarkerLayerSymmetry_R1.md` §4 item 3 → §16.3; the rigid
+rotate-around-centroid math, `DESIGN_Assembly_R1.md` §4/§6; cycle-detection + rigid-transform
+math again, `DESIGN_MarkerGroupLayerRestructure_R1.md` §7 item 8). **Ruled once, mechanically
+checkable, not a per-feature judgment call:**
+
+> **The dividing line is not "is this pure/stateless math" — MATH and this class are equally
+> pure and stateless. The dividing line is whether the function's signature carries a
+> `Params::`-typed parameter or return value.**
+> - **Zero `Params::` types in the signature** (plain scalars, `float`/`int` in and out, or a
+>   caller-owned plain struct with no PARAMS dependency) → **`MATH`**. Reusable, ignorant of any
+>   recipe shape. Example: a generic `RotatePointAroundPivot(float x, float z, float pivotX,
+>   float pivotZ, float angleRadians, float& outX, float& outZ)` — usable by symmetry-orbit
+>   math, Assembly's rotate, and a future Group/Bundle's rotate identically, with zero
+>   knowledge any of those PARAMS types exist. §16.3 already found the matching real-code
+>   case: `Placement_SymmetryOrbit_PROC.h`'s orbit primitives reference **zero** `Params::`
+>   symbols and are a legitimate future `Symmetry_MATH.h` relocation for exactly this reason.
+> - **Any `Params::` type in the signature** (a `std::vector<Params::Assembly>&`, a
+>   `Params::MarkerRuleLayer&`, etc.) → **`PARAMS`**, as a free function co-located in the same
+>   file family as the struct(s) it walks. **Never `MATH`** — §3.1's dependency table gives
+>   MATH exactly the same "(nothing)" dependency budget PARAMS itself has; a function that
+>   closes over a PARAMS shape moving into MATH makes MATH depend on PARAMS, a Constitution
+>   violation, not a technicality (§16.3's own reasoning, now generalized rather than
+>   restated per feature). **Never a new `PROC` file either** — nothing about walking
+>   `parentIdentifier`/`groupIdentifier` chains or resolving a recursive membership set needs
+>   PROC's kernel-pairing, DAG-node, or dispatch machinery, and routing it through PROC would
+>   force `UI` through the "never touch PROC directly" wall (§3.1) for zero benefit. This is
+>   the already-shipped, already-correct precedent — `Params::ResolvePropInstanceLayerId`/
+>   `ResolveDecalInstanceLayerId` (`PropInstance_PARAMS.h:37-44`) — generalized into standing
+>   law instead of re-derived per feature. Governs `WouldReparentCreateCycle`,
+>   `CollectAssemblyRecursiveMembership`, `ResolveAssemblyRootAncestor` (Assembly, §7 below)
+>   and `WouldReparentMarkerLayerBundleCreateCycle`,
+>   `CollectMarkerLayerBundleRecursiveLayerIndices`,
+>   `CollectMarkerLayerBundleRecursiveManualMembers` (Group/Bundle, §19.8).
+> - **Orchestration that reads live `Params::MapRecipe` state, applies the MATH-layer math per
+>   member, and writes the result back** (e.g. an "Apply Move"/"Apply Rotation" button handler
+>   that resolves a selection, calls the MATH rotate function once per member, and mutates
+>   `recipe.markers[...].transform` in place) **is `UI`**, not `PARAMS` and not `PROC` — it is a
+>   stateful, button-triggered edit across live recipe state, exactly the class of action
+>   Constitution §1/§3.2 already assigns to UI ("UI... sets params, trips dirty flags"). It is
+>   not a PROC stage (no DAG node, not re-run by the dirty-hash conductor, not declared
+>   input/output) and not a pure PARAMS resolver (it mutates, a resolver never does).
+
+This closes the class of question, not just the three instances that raised it — a future
+design proposing a new pure function that touches a PARAMS type does not need to ask again;
+it applies this rule and cites §3.5.

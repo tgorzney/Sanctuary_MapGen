@@ -71,6 +71,10 @@ bool DrawArmiesGlobals(std::vector<Params::Army>& armies, ArmiesTabState& state)
     if (ImGui::Button("Add Army")) {
         Params::Army army;
         army.displayName = NextArmyDisplayName(static_cast<int>(armies.size()));
+        // ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-D: a real default color, not the field's own
+        // plain-white default — roster position is armies.size() (0-based, unambiguous single call
+        // site) BEFORE the push_back below.
+        Params::SeedDefaultArmyColor(army.armyColor, static_cast<int>(armies.size()));
         armies.push_back(army);
         state.selectedArmyIndex = static_cast<int>(armies.size()) - 1;
         bArmiesMoved = true;

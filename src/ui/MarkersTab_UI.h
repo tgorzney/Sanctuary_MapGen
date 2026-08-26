@@ -59,12 +59,12 @@ struct MarkersTabState {
     DialRange clearanceSpacingRange{ 0.0f, 500.0f, 0.0f, 600.0f };
     DialRange obstacleDistanceRange{ 0.0f, 128.0f, 0.0f, 600.0f };
 
-    RealtimeToggle slopeToggle;
-    RealtimeToggle heightToggle;
-    RealtimeToggle densityToggle;
-    RealtimeToggle countToggle;
-    RealtimeToggle clearanceSpacingToggle;
-    RealtimeToggle obstacleDistanceToggle;
+    RealtimeToggle slopeToggle{true};
+    RealtimeToggle heightToggle{true};
+    RealtimeToggle densityToggle{true};
+    RealtimeToggle countToggle{true};
+    RealtimeToggle clearanceSpacingToggle{true};
+    RealtimeToggle obstacleDistanceToggle{true};
 
     IconGridState iconGridState;
     // STEP80: the two-level selection — which MarkerRuleLayer, then which MarkerRule inside it.

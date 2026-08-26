@@ -63,12 +63,34 @@ void SeedMarkerDomains(OverlayLayer_UI& alloyLayer, OverlayLayer_UI& spawnsArmie
     }
 }
 
-void SeedUnitsManualSubLayers(OverlayLayer_UI& unitsLayer, const Params::MapRecipe& recipe) {
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-A: ResolveUnitsManualSubLayer's existing global
+// flat-index formula over recipe.armies[*].groups is completely UNCHANGED (§14.4 composes as "flat
+// within one army's row" now, not "flat within one shared row") — only the seeding target changes:
+// each army's own groups push into unitsLayers[armyIndex], the row that army itself owns
+// (army-index-aligned by construction, ConfigureDefaultOverlayLayers), mirroring
+// SeedMarkerDomains'/SeedPropReclaimDomains' "push into whichever row owns it" pattern.
+void SeedUnitsManualSubLayers(std::vector<OverlayLayer_UI>& unitsLayers, const Params::MapRecipe& recipe) {
     int flatIndex = 0;
-    for (const Params::Army& army : recipe.armies)
+    for (std::size_t armyIndex = 0; armyIndex < recipe.armies.size(); ++armyIndex) {
+        const Params::Army& army = recipe.armies[armyIndex];
         for (std::size_t group = 0; group < army.groups.size(); ++group)
-            unitsLayer.subLayers.push_back(
+            unitsLayers[armyIndex].subLayers.push_back(
                 OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::Manual, flatIndex++, true});
+    }
+}
+
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-B: procedurally-scattered units route into the SAME
+// per-army rows as manual units, as ProceduralRule sub-layers — no separate "Units (Procedural)"
+// bucket. An out-of-range armyIndex (corrupt/hand-edited data — never produced by the shipped UI)
+// drops the ref silently, the same defensive floor ResolveUnitsManualSubLayer already applies to
+// Manual refs; never throws or asserts.
+void SeedUnitsProceduralSubLayers(std::vector<OverlayLayer_UI>& unitsLayers, const Params::MapRecipe& recipe) {
+    for (std::size_t ruleIndex = 0; ruleIndex < recipe.unitRules.size(); ++ruleIndex) {
+        const int armyIndex = recipe.unitRules[ruleIndex].armyIndex;
+        if (armyIndex < 0 || static_cast<std::size_t>(armyIndex) >= unitsLayers.size()) continue;
+        unitsLayers[static_cast<std::size_t>(armyIndex)].subLayers.push_back(
+            OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, static_cast<int>(ruleIndex), true});
+    }
 }
 
 // Props/Reclaim mutually-exclusively partition `recipe.propRules` by `bReclaimable` — the same

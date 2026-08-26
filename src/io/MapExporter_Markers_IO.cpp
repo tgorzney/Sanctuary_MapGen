@@ -33,6 +33,8 @@ nlohmann::ordered_json BuildMarkerTransformJson(const Params::MarkerTransform& m
     json["alias"]    = markerTransform.alias;
     // Correction 16 (STEP68): 0 = ungrouped, sibling of alias, same unconditional-write posture.
     json["symmetryGroupIdentifier"] = markerTransform.symmetryGroupIdentifier;
+    // STEP114: empty = use the type default (§4a), same unconditional-write posture as alias.
+    json["iconNameOverride"] = markerTransform.iconNameOverride;
     return json;
 }
 
@@ -75,6 +77,7 @@ nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["Locked"] = layer.bLocked;
         layerJson["GridSnapEnabled"] = layer.bGridSnapEnabled;
         layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeWorldUnits;
+        layerJson["ColorOverrideEnabled"] = layer.bColorOverrideEnabled;
         markerGroups.push_back(layerJson);
     }
     return markerGroups;

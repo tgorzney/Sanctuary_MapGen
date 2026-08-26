@@ -43,5 +43,23 @@ inline int ResolveDecalInstanceLayerId(int layerIndex, const std::vector<DecalIn
     return layers[layerIndex].layerId;
 }
 
+// STEP111: the same out-of-range-safe posture as the Id resolvers above, resolving the layer's
+// authored `color` instead of its stable `layerId` — a single source of truth both PROC and UI
+// could call, out-of-range defaulting to white (no strong color opinion).
+inline void ResolvePropInstanceLayerColor(int layerIndex, const std::vector<PropInstanceLayer>& layers,
+                                          float& outRed, float& outGreen, float& outBlue) {
+    if (layerIndex < 0 || static_cast<std::size_t>(layerIndex) >= layers.size()) { outRed = outGreen = outBlue = 1.0f; return; }
+    outRed = layers[static_cast<std::size_t>(layerIndex)].color[0];
+    outGreen = layers[static_cast<std::size_t>(layerIndex)].color[1];
+    outBlue = layers[static_cast<std::size_t>(layerIndex)].color[2];
+}
+inline void ResolveDecalInstanceLayerColor(int layerIndex, const std::vector<DecalInstanceLayer>& layers,
+                                           float& outRed, float& outGreen, float& outBlue) {
+    if (layerIndex < 0 || static_cast<std::size_t>(layerIndex) >= layers.size()) { outRed = outGreen = outBlue = 1.0f; return; }
+    outRed = layers[static_cast<std::size_t>(layerIndex)].color[0];
+    outGreen = layers[static_cast<std::size_t>(layerIndex)].color[1];
+    outBlue = layers[static_cast<std::size_t>(layerIndex)].color[2];
+}
+
 } // namespace Params
 } // namespace SanmapGen

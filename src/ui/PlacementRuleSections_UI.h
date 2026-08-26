@@ -28,7 +28,7 @@ namespace Ui {
 // tracked gap (STEP95 "Explicit out-of-scope"), not an oversight of this table.
 enum : int { kPlacementSymmetryAxisCount = 5 };
 inline const char* const placementSymmetryAxisLabels[kPlacementSymmetryAxisCount] = {
-    "Mirror X", "Mirror Z", "Half Turn", "Quarter Turns", "Radial"
+    "Mirror X", "Mirror Z", "180\xC2\xB0 Rotation", "Quarter Turns", "Radial"
 };
 
 inline int PlacementSymmetryAxisBit(int axisIndex) {

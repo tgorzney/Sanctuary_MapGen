@@ -12,6 +12,7 @@
 #include "JsonPrimitives_IO.h"
 #include "MapImporter_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include "../sys/PathStem_SYS.h"
 
 namespace SanmapGen {
 namespace Io {
@@ -117,6 +118,30 @@ void ReadPropGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRe
         }
         outRecipe.propLayers.push_back(layer);
     }
+}
+
+// STEP115: mirrors ReconcileMarkerLayers (MapImporter_MarkerLayerReconcile_IO.cpp) — same problem
+// (`PropGroups` is SanGen-invented, never present on a real file), own domain file per the
+// per-domain-file-split law (this file stays under the ARCH §1.5 ceiling once the stem helper is
+// promoted to Sys::FileStemFromPath, per ARCH signoff correction #1). One PropInstanceLayer
+// synthesized per `outRecipe.props` GROUP entry — `props` is a plain ORDERED ARRAY (this file's own
+// header comment, line 7), so two entries sharing the same blueprintPath legitimately get two
+// separate layers, never collapsed by name.
+void ReconcilePropLayers(Params::MapRecipe& outRecipe, MapImportResult& result) {
+    if (!outRecipe.propLayers.empty() || outRecipe.props.empty()) return;
+    for (Params::PropInstanceGroup& group : outRecipe.props) {
+        Params::PropInstanceLayer layer;
+        layer.name = Sys::FileStemFromPath(group.blueprintPath);
+        const int newLayerIndex = static_cast<int>(outRecipe.propLayers.size());
+        layer.layerId = newLayerIndex;
+        outRecipe.propLayers.push_back(layer);
+        for (Params::PropTransform& transform : group.transforms)
+            transform.layerIndex = newLayerIndex;
+    }
+    result.Warn("No PropGroups section present; synthesized "
+               + std::to_string(outRecipe.propLayers.size())
+               + " prop layer(s) from the existing prop blueprint group(s) so the Manual Prop Layers"
+                 " tooling has something to show.");
 }
 
 } // namespace Io

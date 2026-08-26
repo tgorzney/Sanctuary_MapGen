@@ -70,6 +70,9 @@ void ReadMarkerTransformJson(const nlohmann::json& json, Params::MarkerTransform
     // Correction 16 (STEP68): no range to validate — 0 is always legal, any positive value
     // accepted as-is (unlike layerIndex/radialSymmetryRepeatCount, which clamp on import).
     ReadJsonInteger(json, "symmetryGroupIdentifier", markerTransform.symmetryGroupIdentifier);
+    // STEP114: absent key (legacy files) keeps the struct default (empty = type default) — no
+    // validation needed, any string is legal (same posture as alias).
+    ReadJsonText(json, "iconNameOverride", markerTransform.iconNameOverride);
 }
 
 // ARCH §12 / Constitution §6: an out-of-range layerIndex is a loud, logged clamp to 0, applied PER
@@ -135,6 +138,7 @@ void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& out
             ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
             ReadJsonBoolean(layerJson, "GridSnapEnabled", layer.bGridSnapEnabled);
             ReadJsonFloat(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeWorldUnits);
+            ReadJsonBoolean(layerJson, "ColorOverrideEnabled", layer.bColorOverrideEnabled);
         }
         outRecipe.markerLayers.push_back(layer);
     }

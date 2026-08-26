@@ -42,6 +42,7 @@ struct OverlayVisibleInstance {
     int   atlasPage         = 0;
     std::uint64_t textureIdentifier = 0;
     float tintAlpha = 1.0f;           // layer.opacity, folded in once here (§14.2)
+    float tintColorRed = 1.0f, tintColorGreen = 1.0f, tintColorBlue = 1.0f;   // NEW — STEP111
     int   layerIndex = 0;             // vector order = Z order = decimation priority (§14.7/§14.9)
     int   stableOrder = 0;            // monotonic append order this frame — decimation tie-break
     OverlayInstanceKey_UI instanceKey;

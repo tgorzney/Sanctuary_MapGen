@@ -91,6 +91,10 @@ void Application::WireCallbacks() {
     canvas.SetWorldFootprintSizeTable(&WorldFootprintSizeTable());
     // STEP78 — Scenario Edit Mode's own state; see MapCanvas_UI.h's SetScenarioEditModeState.
     canvas.SetScenarioEditModeState(&scenarioEditMode);
+    // STEP113 — the active-panel gate; see MapCanvas_UI.h's SetActivePanelSource. Points at the
+    // shell's own live tabState.activePanel — one source of truth, never a second copy (same
+    // posture as every other canvas.Set*Source call in this function).
+    canvas.SetActivePanelSource(&tabState.activePanel);
     // STEP94 — the manual-marker drag-and-follow source; see MapCanvas_UI.h's
     // SetManualMarkerDragSource. `markers`/`markerLayers` are the SAME vectors the Markers tab
     // edits (recipe.markers/recipe.markerLayers) — one source of truth, never a second copy.

@@ -76,7 +76,8 @@ void FlushIconLayerBucket(ImDrawList& drawList, const AtlasPageBucket& bucket) {
         for (int i = 0; i < chunk.quadCount; ++i) {
             const OverlayVisibleInstance& instance = bucket.quads[chunk.quadStart + i];
             const float half = instance.screenSize * 0.5f;
-            const ImU32 tint = ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, instance.tintAlpha));
+            const ImU32 tint = ImGui::ColorConvertFloat4ToU32(
+                ImVec4(instance.tintColorRed, instance.tintColorGreen, instance.tintColorBlue, instance.tintAlpha));
             const ImDrawIdx base = static_cast<ImDrawIdx>(drawList._VtxCurrentIdx);
             drawList.PrimWriteIdx(base);     drawList.PrimWriteIdx(base + 1); drawList.PrimWriteIdx(base + 2);
             drawList.PrimWriteIdx(base);     drawList.PrimWriteIdx(base + 2); drawList.PrimWriteIdx(base + 3);

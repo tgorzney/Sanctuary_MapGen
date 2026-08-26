@@ -109,8 +109,13 @@ void RunHitTestChecks() {
 
 // ---- DrawManualMarkerRoster --------------------------------------------------------------------
 
+// AddCircleFilled's anti-aliased fill (on by default) appends, for each path point, a solid
+// "inner" vertex immediately followed by a transparent "outer" fringe vertex (same RGB, alpha
+// forced to 0 for the smooth edge fade — see ImDrawList::AddConvexPolyFilled). The buffer's very
+// last vertex is therefore always that alpha-zeroed fringe vertex, not the shape's actual fill
+// tint; the second-to-last vertex is the solid one right before it. Index [-2], not [-1].
 ImU32 LastVertexColor(const ImDrawList& drawList) {
-    return drawList.VtxBuffer.Data[drawList.VtxBuffer.Size - 1].col;
+    return drawList.VtxBuffer.Data[drawList.VtxBuffer.Size - 2].col;
 }
 
 void RunDrawAtRestAndSoftHideChecks() {
@@ -119,11 +124,13 @@ void RunDrawAtRestAndSoftHideChecks() {
     markers[0].transforms.push_back(MakeTransform("Visible", 1.0f, 1.0f));
     markers[0].transforms.push_back(MakeTransform("Hidden", 2.0f, 2.0f));
     std::vector<Params::MarkerInstanceLayer> noLayers;
+    std::vector<Params::Army> noArmies;
+    Params::GlobalMarkerSettings globalMarkerSettings;
 
     MarkerDragGestureState dragState;   // inactive — nothing is soft-hidden or refused
     ImDrawList& drawList = *ImGui::GetWindowDrawList();
     int beforeVertexCount = drawList.VtxBuffer.Size;
-    DrawManualMarkerRoster(markers, noLayers, dragState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+    DrawManualMarkerRoster(markers, noLayers, noArmies, globalMarkerSettings, dragState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
     Check(drawList.VtxBuffer.Size > beforeVertexCount, "at-rest markers draw at least one primitive each");
 
     // Now make transform 1 the gesture's soft-hidden sibling: its dot must be skipped entirely.
@@ -135,12 +142,12 @@ void RunDrawAtRestAndSoftHideChecks() {
     dragState.correspondence.push_back(hiddenEntry);
 
     beforeVertexCount = drawList.VtxBuffer.Size;
-    DrawManualMarkerRoster(markers, noLayers, dragState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+    DrawManualMarkerRoster(markers, noLayers, noArmies, globalMarkerSettings, dragState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
     const int withOneHiddenDelta = drawList.VtxBuffer.Size - beforeVertexCount;
 
     dragState.bActive = false;   // draw again with the gesture inactive: both dots draw
     beforeVertexCount = drawList.VtxBuffer.Size;
-    DrawManualMarkerRoster(markers, noLayers, dragState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+    DrawManualMarkerRoster(markers, noLayers, noArmies, globalMarkerSettings, dragState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
     const int withNoneHiddenDelta = drawList.VtxBuffer.Size - beforeVertexCount;
 
     Check(withOneHiddenDelta < withNoneHiddenDelta,
@@ -152,19 +159,177 @@ void RunDrawRefusedTintChecks() {
     std::vector<Params::MarkerInstanceGroup> markers(1);
     markers[0].transforms.push_back(MakeTransform("Player", 1.0f, 1.0f));
     std::vector<Params::MarkerInstanceLayer> noLayers;
+    std::vector<Params::Army> noArmies;
+    Params::GlobalMarkerSettings globalMarkerSettings;
     ImDrawList& drawList = *ImGui::GetWindowDrawList();
 
     MarkerDragGestureState ordinaryState;
     ordinaryState.bActive = true; ordinaryState.groupIndex = 0; ordinaryState.bSpawnCardinalityRefused = false;
-    DrawManualMarkerRoster(markers, noLayers, ordinaryState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+    DrawManualMarkerRoster(markers, noLayers, noArmies, globalMarkerSettings, ordinaryState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
     const ImU32 ordinaryColor = LastVertexColor(drawList);
 
     MarkerDragGestureState refusedState;
     refusedState.bActive = true; refusedState.groupIndex = 0; refusedState.bSpawnCardinalityRefused = true;
-    DrawManualMarkerRoster(markers, noLayers, refusedState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+    DrawManualMarkerRoster(markers, noLayers, noArmies, globalMarkerSettings, refusedState, *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
     const ImU32 refusedColor = LastVertexColor(drawList);
 
     Check(ordinaryColor != refusedColor, "a Spawn-refused frame tints the dot differently from an ordinary drag");
+}
+
+// ---- STEP112: Spawn-group manual markers tint by real army color ------------------------------
+
+void RunSpawnArmyTintChecks() {
+    DrawFixture fixture;
+    std::vector<Params::MarkerInstanceLayer> noLayers;
+    Params::GlobalMarkerSettings globalMarkerSettings;
+    ImDrawList& drawList = *ImGui::GetWindowDrawList();
+    MarkerDragGestureState inactiveDragState;   // inactive — no refused-tint priority in play
+
+    // A Spawn-group transform whose name matches an army renders that army's real color.
+    {
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = Params::kSpawnMarkerGroupName;
+        markers[0].transforms.push_back(MakeTransform("ARMY_01", 1.0f, 1.0f));
+        std::vector<Params::Army> armies(1);
+        armies[0].name = "ARMY_01";
+        armies[0].armyColor[0] = 0.0f; armies[0].armyColor[1] = 1.0f;
+        armies[0].armyColor[2] = 0.0f; armies[0].armyColor[3] = 1.0f;
+        DrawManualMarkerRoster(markers, noLayers, armies, globalMarkerSettings, inactiveDragState, *fixture.composite,
+                               fixture.view, 0.0f, 0.0f, drawList);
+        Check(LastVertexColor(drawList)
+                  == ImGui::ColorConvertFloat4ToU32(ImVec4(0.0f, 1.0f, 0.0f, 1.0f)),
+              "a Spawn transform whose name matches an army renders that army's real color");
+    }
+
+    // An orphaned Spawn slot (no matching army) falls back to the existing layer-color behavior.
+    {
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = Params::kSpawnMarkerGroupName;
+        markers[0].transforms.push_back(MakeTransform("ARMY_99", 1.0f, 1.0f));
+        std::vector<Params::Army> armies(1);
+        armies[0].name = "ARMY_01";
+        DrawManualMarkerRoster(markers, noLayers, armies, globalMarkerSettings, inactiveDragState, *fixture.composite,
+                               fixture.view, 0.0f, 0.0f, drawList);
+        Check(LastVertexColor(drawList) == IM_COL32(220, 220, 220, 255),
+              "an orphaned Spawn slot with no matching army falls back to the neutral layer color");
+    }
+
+    // A non-Spawn group with a name-colliding transform is unaffected — gated on group identity.
+    {
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = "Alloys";
+        markers[0].transforms.push_back(MakeTransform("ARMY_01", 1.0f, 1.0f));
+        std::vector<Params::Army> armies(1);
+        armies[0].name = "ARMY_01";
+        armies[0].armyColor[0] = 0.0f; armies[0].armyColor[1] = 1.0f;
+        armies[0].armyColor[2] = 0.0f; armies[0].armyColor[3] = 1.0f;
+        DrawManualMarkerRoster(markers, noLayers, armies, globalMarkerSettings, inactiveDragState, *fixture.composite,
+                               fixture.view, 0.0f, 0.0f, drawList);
+        Check(LastVertexColor(drawList) == IM_COL32(220, 220, 220, 255),
+              "a non-Spawn group whose transform name collides with an army name is unaffected");
+    }
+
+    // The Spawn-cardinality-refused red tint still wins over army color.
+    {
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = Params::kSpawnMarkerGroupName;
+        markers[0].transforms.push_back(MakeTransform("ARMY_01", 1.0f, 1.0f));
+        std::vector<Params::Army> armies(1);
+        armies[0].name = "ARMY_01";
+        armies[0].armyColor[0] = 0.0f; armies[0].armyColor[1] = 1.0f;
+        armies[0].armyColor[2] = 0.0f; armies[0].armyColor[3] = 1.0f;
+        MarkerDragGestureState refusedState;
+        refusedState.bActive = true; refusedState.groupIndex = 0; refusedState.bSpawnCardinalityRefused = true;
+        DrawManualMarkerRoster(markers, noLayers, armies, globalMarkerSettings, refusedState, *fixture.composite,
+                               fixture.view, 0.0f, 0.0f, drawList);
+        Check(LastVertexColor(drawList) == IM_COL32(220, 60, 40, 255),
+              "the Spawn-cardinality-refused red tint still wins over army color");
+    }
+}
+
+// ---- STEP116: dot renderer, layer override / type-default / unrecognized-group resolution ------
+
+void RunTypeDefaultColorChecks() {
+    DrawFixture fixture;
+    ImDrawList& drawList = *ImGui::GetWindowDrawList();
+    std::vector<Params::Army> noArmies;
+    MarkerDragGestureState inactiveDragState;
+
+    // Override wins over type default: bColorOverrideEnabled = true, color deliberately different
+    // from what the "Alloys" group name would otherwise resolve.
+    {
+        std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+        markerLayers[0].bColorOverrideEnabled = true;
+        markerLayers[0].color[0] = 0.1f; markerLayers[0].color[1] = 0.2f;
+        markerLayers[0].color[2] = 0.3f; markerLayers[0].color[3] = 1.0f;
+        Params::GlobalMarkerSettings globalMarkerSettings;
+        globalMarkerSettings.colorAlloy[0] = 0.4f; globalMarkerSettings.colorAlloy[1] = 0.5f;
+        globalMarkerSettings.colorAlloy[2] = 0.6f; globalMarkerSettings.colorAlloy[3] = 1.0f;
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = "Alloys";
+        markers[0].transforms.push_back(MakeTransform("Mex 0", 1.0f, 1.0f));
+        DrawManualMarkerRoster(markers, markerLayers, noArmies, globalMarkerSettings, inactiveDragState,
+                               *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+        Check(LastVertexColor(drawList)
+                  == ImGui::ColorConvertFloat4ToU32(ImVec4(0.1f, 0.2f, 0.3f, 1.0f)),
+              "an explicit layer color override wins over the group's type-default color");
+    }
+
+    // Type default when override is disabled: resolves colorAlloy (RGB) with alpha from layer.color[3].
+    {
+        std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+        markerLayers[0].bColorOverrideEnabled = false;
+        Params::GlobalMarkerSettings globalMarkerSettings;
+        globalMarkerSettings.colorAlloy[0] = 0.4f; globalMarkerSettings.colorAlloy[1] = 0.5f;
+        globalMarkerSettings.colorAlloy[2] = 0.6f; globalMarkerSettings.colorAlloy[3] = 1.0f;
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = "Alloys";
+        markers[0].transforms.push_back(MakeTransform("Mex 0", 1.0f, 1.0f));
+        DrawManualMarkerRoster(markers, markerLayers, noArmies, globalMarkerSettings, inactiveDragState,
+                               *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+        Check(LastVertexColor(drawList)
+                  == ImGui::ColorConvertFloat4ToU32(ImVec4(0.4f, 0.5f, 0.6f, markerLayers[0].color[3])),
+              "with the override disabled, the group's type-default color (colorAlloy) resolves, alpha from layer.color[3]");
+    }
+
+    // Unrecognized group name resolves opaque white, proving no bleed-through from non-default
+    // colorAlloy/colorSpawn.
+    {
+        std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+        markerLayers[0].bColorOverrideEnabled = false;
+        Params::GlobalMarkerSettings globalMarkerSettings;
+        globalMarkerSettings.colorAlloy[0] = 0.4f; globalMarkerSettings.colorAlloy[1] = 0.5f;
+        globalMarkerSettings.colorAlloy[2] = 0.6f;
+        globalMarkerSettings.colorSpawn[0] = 0.7f; globalMarkerSettings.colorSpawn[1] = 0.8f;
+        globalMarkerSettings.colorSpawn[2] = 0.9f;
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = "Generic";
+        markers[0].transforms.push_back(MakeTransform("Mex 0", 1.0f, 1.0f));
+        DrawManualMarkerRoster(markers, markerLayers, noArmies, globalMarkerSettings, inactiveDragState,
+                               *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+        Check(LastVertexColor(drawList) == IM_COL32(255, 255, 255, 255),
+              "an unrecognized group name resolves opaque white, no bleed-through");
+    }
+
+    // Orphaned Spawn slot with a real in-range layer (override disabled) now resolves colorSpawn,
+    // not the old flat gray — the WYSIWYG improvement STEP116 delivers for orphaned slots.
+    {
+        std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+        markerLayers[0].bColorOverrideEnabled = false;
+        Params::GlobalMarkerSettings globalMarkerSettings;
+        globalMarkerSettings.colorSpawn[0] = 0.7f; globalMarkerSettings.colorSpawn[1] = 0.8f;
+        globalMarkerSettings.colorSpawn[2] = 0.9f; globalMarkerSettings.colorSpawn[3] = 1.0f;
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].name = Params::kSpawnMarkerGroupName;
+        markers[0].transforms.push_back(MakeTransform("ARMY_ORPHAN", 1.0f, 1.0f));
+        std::vector<Params::Army> armies(1);
+        armies[0].name = "ARMY_NOT_ORPHAN";   // no match for "ARMY_ORPHAN"
+        DrawManualMarkerRoster(markers, markerLayers, armies, globalMarkerSettings, inactiveDragState,
+                               *fixture.composite, fixture.view, 0.0f, 0.0f, drawList);
+        Check(LastVertexColor(drawList)
+                  == ImGui::ColorConvertFloat4ToU32(ImVec4(0.7f, 0.8f, 0.9f, markerLayers[0].color[3])),
+              "an orphaned Spawn slot with a real in-range layer resolves colorSpawn, not flat gray");
+    }
 }
 
 } // namespace
@@ -179,6 +344,8 @@ int main() {
     RunHitTestChecks();
     RunDrawAtRestAndSoftHideChecks();
     RunDrawRefusedTintChecks();
+    RunSpawnArmyTintChecks();
+    RunTypeDefaultColorChecks();
 
     ImGui::End();
     ImGui::Render();

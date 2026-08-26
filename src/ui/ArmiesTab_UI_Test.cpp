@@ -272,6 +272,36 @@ void RunArmyDisplayNameDefaultsChecks() {
           "a colliding displayName is legal and left exactly as authored — no repair runs");
 }
 
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-D: "Add Army" seeds a fresh row with
+// kDefaultArmyColors[armies.size() % 8], not the field's own plain-white default — mirrors
+// DrawArmiesGlobals' own click-handling shape exactly (Params::Army mint, roster position =
+// armies.size() BEFORE push_back), the same posture RunArmyDisplayNameDefaultsChecks proves for
+// NextArmyDisplayName just above.
+void RunDefaultArmyColorChecks() {
+    std::vector<Params::Army> armies;
+    for (int expectedPaletteIndex = 0; expectedPaletteIndex < 10; ++expectedPaletteIndex) {
+        Params::Army army;
+        Params::SeedDefaultArmyColor(army.armyColor, static_cast<int>(armies.size()));
+        armies.push_back(army);
+    }
+    for (std::size_t index = 0; index < armies.size(); ++index) {
+        const std::size_t paletteIndex = index % 8u;
+        for (int channel = 0; channel < 4; ++channel)
+            Check(NearlyEqual(armies[index].armyColor[channel], Params::kDefaultArmyColors[paletteIndex][channel]),
+                  "each newly-minted army's color is kDefaultArmyColors[rosterPosition % 8], channel-exact");
+    }
+    // Never plain white (the field's own bare default) for any of the ten minted armies above.
+    for (const Params::Army& army : armies)
+        Check(!(NearlyEqual(army.armyColor[0], 1.0f) && NearlyEqual(army.armyColor[1], 1.0f)
+                && NearlyEqual(army.armyColor[2], 1.0f)),
+              "Add Army never leaves the field's own plain-white default");
+    // The rotation wraps: army index 8 (paletteIndex 0, Red) must equal army index 0's own color.
+    Check(NearlyEqual(armies[8].armyColor[0], armies[0].armyColor[0])
+          && NearlyEqual(armies[8].armyColor[1], armies[0].armyColor[1])
+          && NearlyEqual(armies[8].armyColor[2], armies[0].armyColor[2]),
+          "the 8-color palette rotates: roster position 8 repeats roster position 0's color");
+}
+
 // STEP75 acceptance: MirrorArmyGroupsOntoNextArmy on a synthetic tree with a nested child group
 // (not just top-level units) — position mirrors as `newX = 2*centerX - X` in world units (matching
 // BuildWorldSymmetryOrbit's own convention), rotation composes against a hand-computed expected
@@ -364,6 +394,7 @@ int main() {
     RunResolveUnitFootprintBakeChecks();
     RunArmySelectionChecks();
     RunArmyDisplayNameDefaultsChecks();
+    RunDefaultArmyColorChecks();
     RunMirrorArmyGroupsChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

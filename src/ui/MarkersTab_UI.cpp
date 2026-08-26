@@ -54,7 +54,7 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
     // frame (MarkersTab_Manual_UI.h).
     state.manual.positionHorizontalRange = MarkerPositionHorizontalSliderRange(recipe.geometry.mapSize);
     DrawManualMarkers(recipe.markers, recipe.armies, recipe.markerLayers, state.manual,
-                      state.manualLayers.selectedLayerIndex);
+                      state.manualLayers.selectedLayerIndex, iconManifest);
     DrawPlacedMarkerList(placedMarkers, state.placedList);
     ImGui::PopID();
 }

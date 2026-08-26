@@ -11,6 +11,8 @@
 // per-instance world-rect test here, uniformly. This avoids special-casing markers onto a
 // rule-agnostic grid it would then have to re-filter by rule membership anyway.
 #include "MapCanvas_IconLayer_CullInternal_UI.h"
+#include "../params/Army_PARAMS.h"
+#include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -40,8 +42,25 @@ void ResolveProceduralSubLayer(const DrawOverlayIconLayersInput& input, const Ov
         const float scale = instances.scaleX[static_cast<std::size_t>(instanceIndex)];
         const std::string templateIdentifier =
             TemplateIdentifierToString8(instances.templateIdentifier[static_cast<std::size_t>(instanceIndex)].characters);
+        float tintRed = 1.0f, tintGreen = 1.0f, tintBlue = 1.0f;
+        if (collection == PlacementCollectionKind_UI::Markers && input.recipe != nullptr) {
+            const Params::MarkerCategory category =
+                static_cast<Params::MarkerCategory>(instances.category[static_cast<std::size_t>(instanceIndex)]);
+            ResolveMarkerCategoryTintColor(category, input.recipe->globalMarkerSettings, tintRed, tintGreen, tintBlue);
+        } else if (collection == PlacementCollectionKind_UI::Units && input.recipe != nullptr) {
+            // ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-C/B: Data::PlacementInstance::armyIndex
+            // (Placement_Rules_PROC.cpp -> Placement_Emit_PROC.cpp) is the real, per-instance owning
+            // army — resolve its color directly, same defensive bounds floor as everywhere else this
+            // ticket touches armyIndex (corrupt/out-of-range data draws white rather than crashing).
+            const int unitArmyIndex = instances.armyIndex[static_cast<std::size_t>(instanceIndex)];
+            if (unitArmyIndex >= 0 && static_cast<std::size_t>(unitArmyIndex) < input.recipe->armies.size()) {
+                const Params::Army& army = input.recipe->armies[static_cast<std::size_t>(unitArmyIndex)];
+                tintRed = army.armyColor[0]; tintGreen = army.armyColor[1]; tintBlue = army.armyColor[2];
+            }
+        }
         EmitCandidateIfVisible(input, layer, layerIndex, templateIdentifier, worldX, worldZ, scale,
-                               collection, instanceIndex, stableOrderCounter, diagnostics, outCandidates);
+                               collection, instanceIndex, tintRed, tintGreen, tintBlue,
+                               stableOrderCounter, diagnostics, outCandidates);
     }
 }
 

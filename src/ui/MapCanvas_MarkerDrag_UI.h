@@ -11,6 +11,8 @@
 #include "MarkerDragGesture_UI.h"
 #include "MapCanvasView_UI.h"
 #include "../params/MarkerInstance_PARAMS.h"
+#include "../params/Army_PARAMS.h"
+#include "../params/GlobalMarkerSettings_PARAMS.h"
 
 struct ImDrawList;
 
@@ -33,13 +35,16 @@ bool HitTestManualMarkers(const std::vector<Params::MarkerInstanceGroup>& marker
                           int& outGroupIndex, int& outTransformIndex);
 
 // The deliberately-minimal at-rest + ghost/refused-tint draw (Gap 6) — plain `AddCircleFilled`
-// dots, one per `MarkerTransform`, tinted by its layer's color (or a neutral default). A gesture's
-// own soft-hidden siblings are skipped (not erased, just not drawn); its unclaimed orbit slots draw
-// as a distinct hollow ghost ring; a Spawn-refused gesture's whole group tints red and a short
-// status tooltip is drawn. Superseded outright by a future real overlay/icon ticket — not
-// `OverlayLayer_UI`/View-toolbar participation of any kind (ARCH_14_PreviewOverlayLayering.md §14).
+// dots, one per `MarkerTransform`, tinted by its layer's color override, its group's type-default
+// color, or a neutral default. A gesture's own soft-hidden siblings are skipped (not erased, just
+// not drawn); its unclaimed orbit slots draw as a distinct hollow ghost ring; a Spawn-refused
+// gesture's whole group tints red and a short status tooltip is drawn. Superseded outright by a
+// future real overlay/icon ticket — not `OverlayLayer_UI`/View-toolbar participation of any kind
+// (ARCH_14_PreviewOverlayLayering.md §14).
 void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& markers,
                             const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                            const std::vector<Params::Army>& armies,
+                            const Params::GlobalMarkerSettings& globalMarkerSettings,
                             const MarkerDragGestureState& dragState, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionOriginX, float regionOriginY,
                             ImDrawList& drawList);

@@ -13,6 +13,7 @@
 #include "MapCanvas_IconLayer_CullInternal_UI.h"
 #include "MapCanvasView_UI.h"
 #include "PreviewComposite_UI.h"
+#include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -127,11 +128,17 @@ bool ResolveSelectedInstanceCandidate(const DrawOverlayIconLayersInput& input,
                 continue;
             const std::size_t index = static_cast<std::size_t>(instanceIndex);
             const std::string templateIdentifier = TemplateIdentifierToString8(markers.templateIdentifier[index].characters);
+            float tintRed = 1.0f, tintGreen = 1.0f, tintBlue = 1.0f;
+            if (input.recipe != nullptr) {
+                const Params::MarkerCategory category =
+                    static_cast<Params::MarkerCategory>(markers.category[index]);
+                ResolveMarkerCategoryTintColor(category, input.recipe->globalMarkerSettings, tintRed, tintGreen, tintBlue);
+            }
             int stableOrderCounter = 0;
             EmitCandidateIfVisible(input, layer, static_cast<int>(layerIndex), templateIdentifier,
                                    markers.positionX[index], markers.positionZ[index], markers.scaleX[index],
-                                   PlacementCollectionKind_UI::Markers, instanceIndex, &stableOrderCounter,
-                                   nullptr, outCandidates);
+                                   PlacementCollectionKind_UI::Markers, instanceIndex, tintRed, tintGreen, tintBlue,
+                                   &stableOrderCounter, nullptr, outCandidates);
             return !outCandidates.empty();
         }
     }

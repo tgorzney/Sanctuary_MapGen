@@ -42,6 +42,11 @@ void RunLegacyRoundTripChecks() {
     document["markers"]["Spawn"]["transforms"]["Army_0"] = nlohmann::json::object();
     document["markers"]["Spawn"]["transforms"]["Army_1"] = nlohmann::json::object();
     document["markers"]["Spawn"]["transforms"]["Army_2"] = nlohmann::json::object();
+    // STEP115_MarkerPropDecalLayerReconciliationOnImport_IO: a MarkerGroups entry for "Spawn" keeps
+    // Io::ReconcileMarkerLayers a no-op here — this test is exercising army-identity normalization's
+    // own warning count, not marker-layer synthesis (a genuinely absent MarkerGroups section, which
+    // this document deliberately does not have, is that ticket's own separate acceptance coverage).
+    document["MarkerGroups"] = nlohmann::json::array({ nlohmann::json{ { "Name", "Spawn" } } });
 
     Params::MapRecipe recipe;
     Io::MapImportResult result;
@@ -100,6 +105,9 @@ void RunAlreadyCleanNoOpChecks() {
     document["armies"]["ARMY_02"] = nlohmann::json::object();
     document["markers"]["Spawn"]["transforms"]["ARMY_01"] = nlohmann::json::object();
     document["markers"]["Spawn"]["transforms"]["ARMY_02"] = nlohmann::json::object();
+    // STEP115_MarkerPropDecalLayerReconciliationOnImport_IO — see RunLegacyRoundTripChecks's own
+    // comment above; keeps Io::ReconcileMarkerLayers a no-op so this stays a pure army-identity check.
+    document["MarkerGroups"] = nlohmann::json::array({ nlohmann::json{ { "Name", "Spawn" } } });
 
     Params::MapRecipe recipe;
     Io::MapImportResult result;

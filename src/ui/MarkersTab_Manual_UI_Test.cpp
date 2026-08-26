@@ -149,6 +149,44 @@ void RunFreshInstanceNameChecks() {
     Check(NextMarkerInstanceName(2) == "Marker_2", "the seed counts the roster it is joining");
 }
 
+// STEP114: SelectedManualMarkerInstance's two-level walk — mirrors SelectedMarkerRule's own
+// two-index test shape (MarkersTab_RuleLayers_UI_Test.cpp).
+void RunSelectedManualMarkerInstanceChecks() {
+    std::vector<Params::MarkerInstanceGroup> markers;
+    ManualMarkersState state;
+    state.selectedGroupIndex = 0;
+    state.selectedInstanceIndex = 0;
+    Check(SelectedManualMarkerInstance(markers, state) == nullptr, "an empty markers vector resolves to null");
+
+    Params::MarkerInstanceGroup group = MakeGroup("Alloys");
+    group.transforms.push_back(MakeInstance("Mex 0"));
+    group.transforms.push_back(MakeInstance("Mex 1"));
+    markers.push_back(group);
+    state.selectedGroupIndex = 0;
+    state.selectedInstanceIndex = 1;
+    Check(SelectedManualMarkerInstance(markers, state) == &markers[0].transforms[1],
+          "a valid group/instance pair resolves to the exact transform's address");
+
+    state.selectedGroupIndex = 5;
+    state.selectedInstanceIndex = 0;
+    Check(SelectedManualMarkerInstance(markers, state) == nullptr,
+          "an out-of-range selectedGroupIndex resolves to null without touching selectedInstanceIndex's own bounds");
+
+    state.selectedGroupIndex = 0;
+    state.selectedInstanceIndex = 9;
+    Check(SelectedManualMarkerInstance(markers, state) == nullptr,
+          "a valid selectedGroupIndex with an out-of-range selectedInstanceIndex resolves to null");
+}
+
+// STEP118: RT enabled by default for ManualMarkersState's three position toggles —
+// RealtimeToggle's own class default stays off (RtToggleWidget_UI_Test.cpp).
+void RunRealtimeDefaultChecks() {
+    ManualMarkersState state;
+    Check(state.positionXToggle.IsRealtimeEnabled() && state.positionYToggle.IsRealtimeEnabled()
+          && state.positionZToggle.IsRealtimeEnabled(),
+          "ManualMarkersState's three position toggles default to realtime ON (STEP118)");
+}
+
 } // namespace
 
 int main() {
@@ -161,6 +199,8 @@ int main() {
     RunGroupNameUniquenessChecks();
     RunPositionRangeChecks();
     RunFreshInstanceNameChecks();
+    RunSelectedManualMarkerInstanceChecks();
+    RunRealtimeDefaultChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

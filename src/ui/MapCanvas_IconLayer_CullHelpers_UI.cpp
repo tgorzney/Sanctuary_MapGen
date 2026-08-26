@@ -58,6 +58,24 @@ bool WorldRectsIntersect(const LayerWorldAabb_UI& aabb, const ViewWorldRect_UI& 
         && aabb.lowWorldZ <= viewRect.highWorldZ && aabb.highWorldZ >= viewRect.lowWorldZ;
 }
 
+void ResolveMarkerCategoryTintColor(Params::MarkerCategory category,
+                                    const Params::GlobalMarkerSettings& settings,
+                                    float& outRed, float& outGreen, float& outBlue) {
+    switch (category) {
+        case Params::MarkerCategory::Spawn:
+            outRed = settings.colorSpawn[0]; outGreen = settings.colorSpawn[1]; outBlue = settings.colorSpawn[2];
+            return;
+        case Params::MarkerCategory::Alloys:
+            outRed = settings.colorAlloy[0]; outGreen = settings.colorAlloy[1]; outBlue = settings.colorAlloy[2];
+            return;
+        // Generic/Expansion: no reserved color today. Plasma has no MarkerCategory value at all
+        // (see this ticket's ⚠️ section) — deliberately falls here too, not a bug.
+        default:
+            outRed = outGreen = outBlue = 1.0f;
+            return;
+    }
+}
+
 void WidenAabb(LayerWorldAabb_UI& aabb, float worldX, float worldZ) {
     if (!aabb.bValid) {
         aabb.lowWorldX = aabb.highWorldX = worldX;

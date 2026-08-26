@@ -105,7 +105,8 @@ Params::MarkerInstanceGroup* DrawMarkerGroupSection(std::vector<Params::MarkerIn
 void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
                        const std::vector<Params::Army>& armies,
                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                       ManualMarkersState& state, int selectedMarkerLayerIndex) {
+                       ManualMarkersState& state, int selectedMarkerLayerIndex,
+                       const IconAtlasManifest* iconManifest) {
     if (!DrawSectionBegin("Manual Markers", state.section)) return;
     ImGui::TextWrapped("The hand-authored marker roster: commander spawns, resources and any other "
                        "fixed-position marker exported beside the procedural rules above.");
@@ -114,7 +115,7 @@ void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
         ImGui::TextUnformatted("Select a marker type to edit its roster.");
     } else {
         ImGui::Separator();
-        DrawMarkerInstanceSection(*group, armies, markerLayers, state, selectedMarkerLayerIndex);
+        DrawMarkerInstanceSection(*group, armies, markerLayers, state, selectedMarkerLayerIndex, iconManifest);
     }
     DrawSectionEnd();
 }

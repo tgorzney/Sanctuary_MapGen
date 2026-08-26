@@ -79,11 +79,24 @@ void RunQuantizeMarkerPositionToLayerGridChecks() {
           "and so does an index at size()");
 }
 
+// STEP118: RT enabled by default for ManualMarkerLayersState's six toggles — RealtimeToggle's
+// own class default stays off (RtToggleWidget_UI_Test.cpp).
+void RunRealtimeDefaultChecks() {
+    ManualMarkerLayersState state;
+    Check(state.groupColorToggle.IsRealtimeEnabled() && state.layerIconScaleToggle.IsRealtimeEnabled()
+          && state.selectedLayerColorToggle.IsRealtimeEnabled()
+          && state.selectedLayerIconScaleToggle.IsRealtimeEnabled()
+          && state.selectedLayerGridSnapToggle.IsRealtimeEnabled()
+          && state.fixSymmetryToleranceToggle.IsRealtimeEnabled(),
+          "ManualMarkerLayersState's six toggles default to realtime ON (STEP118)");
+}
+
 } // namespace
 
 int main() {
     RunIsMarkerInstanceLayerLockedChecks();
     RunQuantizeMarkerPositionToLayerGridChecks();
+    RunRealtimeDefaultChecks();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

@@ -21,7 +21,7 @@ spec(s) a question needs — never the whole pack.
 | gamedata layout — folder map (units/props/stratum/icons), sprite pairs, sizes | `specs/GAMEDATA_LAYOUT_SPEC.md` |
 | noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
 | the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights` | `specs/MASKING_SPEC.md` |
-| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
+| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
 | pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
@@ -152,6 +152,21 @@ Scenario authoring/export ratification described above) — the gap that flag na
   256MB wasted PCIe transfer + blocking wait at the 8192² cap, every recompose. Narrow, already
   diagnosed, independent of the ARCH §14 overlay redesign; should land before it. See
   `PREVIEW_COMPOSITING_SPEC.md` / `ARCH_14_10_GpuColorReadbackBug.md` §14.10.
+- **`layerId` → `layerIdentifier` rename (ARCH §1.9, 2026-08-25).** `PropInstanceLayer::layerId`,
+  `DecalInstanceLayer::layerId`, `MarkerInstanceLayer::layerId` (all shipped, confirmed live —
+  STEP56/STEP60/STEP111/STEP116), `Resolve{Prop,Decal}InstanceLayerId`, and the wire key `"Id"` on
+  `PropGroups`/`DecalGroups`/`MarkerGroups` all carry the "Id" abbreviation ARCH §1.9 now formally
+  bans. Target spelling, migration posture (legacy-`"Id"`-fallback import, no forced version bump
+  decided here), and full call-site list: `ARCH_01_09_IdAbbreviationBan.md` §1.9. Not blocking any
+  currently-open ticket; new code must not repeat this spelling.
+- **`BuildMarkerTransformJson` never writes `layerIndex` (confirmed still live, 2026-08-25).**
+  `src/io/MapExporter_Markers_IO.cpp:17-39` has no `json["layerIndex"] = ...` line — every exported
+  marker's manual-layer membership round-trips as "always absent → clamps to 0" on reimport, unlike
+  Props/Decals, which both write it. Flagged originally by
+  `work_orders/BRIEF_MarkerGroupLayerRestructure_R1.md`; recorded here as a standing defect per
+  `ARCH_19_11_FormatSpecCorrectionBundle.md` §19.11 and `SANMAP_FORMAT_SPEC.md`'s own
+  "Conversion / import-export logic" section. Whoever picks this up must also confirm the new
+  `ParentBundleIdentifier` merged fields (Correction 19) don't ship with the same write-side gap.
 
 **Fixed since the §15.5 ratification (2026-08-21):** the naval-fleet composition gap flagged
 below the first time this note was written is closed. The live reference
@@ -202,7 +217,9 @@ without re-ruling, that `MarkerInstanceLayer::layerId` (STEP60/STEP56, both stil
 carries the same "Id" abbreviation defect ARCH §16.5 rejected for `symmetryGroupIdentifier` —
 recorded in `SANMAP_FORMAT_SPEC` Correction 16 as a probable follow-up naming correction
 (`layerId` → `layerIdentifier`) for ARCH/the IO Architecture Expert to act on before STEP56/
-STEP60 ship, not acted on by this pass.
+STEP60 ship, not acted on by this pass. **Superseded by ARCH §1.9 (2026-08-25): both fields have
+since shipped, so this is a real standing defect, not a pre-ship freebie — see the "Standing
+recorded defects" list above.**
 
 **Fixed since ARCH §15.7's ownership split (2026-08-21):** the Format Expert's follow-up
 `SANMAP_FORMAT_SPEC` Correction defining the `Scenarios` `.sanmap` section has landed —
@@ -215,7 +232,12 @@ literal exists for either field, and this section's own established PascalCase c
 by default over a UI-authoring-compactness argument that doesn't bind wire-format spelling in
 the first place). No `SanGenVersion` bump — purely additive, same precedent as Corrections 12
 and 14. The IO Architecture Expert's `MapExporter_Scenarios_IO`/`MapImporter_Scenarios_IO` file
-pair (§15.7) remains open, not touched by this pass.
+pair (§15.7) remains open, not touched by this pass. **Note (2026-08-25): this "Correction 17"
+heading does not currently exist as its own numbered section inside `SANMAP_FORMAT_SPEC.md`
+itself** — confirmed by grep during the §19 ratification pass; several other files/work-orders
+cite it by number, but the spec file's own text jumps from Correction 16 to the STEP49 note to
+Correction 18. Flagged here, not investigated or fixed — out of scope for the session that found
+it.
 
 **Consolidation pass (2026-08-21) — seven ratings plus one backfill, all cross-checked against
 real source before ruling:**
@@ -328,3 +350,42 @@ already ratified. Instead, two small inline helpers (`Params::ResolvePropInstanc
 truth for the id-resolution formula, shared by `Placement_Manual_PROC.cpp`'s PROC-baked copy and
 the UI cull path's live resolution, so the two never drift. Ruled dispatchable as-is — narrow, two
 call sites, exact before/after text specified in §14.15 itself.
+
+**New `ARCH_19_MarkerLayerBundle.md` §19 (2026-08-25) — ratifies `work_orders/DESIGN_MarkerGroupLayerRestructure_R1.md`,
+firms up open items in the still-unratified `work_orders/DESIGN_Assembly_R1.md`.** The new
+Group-above-Layer container is named **`MarkerLayerBundle`** ("Bundle," not "Group" — "Group"
+already names three unrelated existing concepts in this format, and a fourth silent meaning was
+judged a real AI-legibility hazard, not a style preference; the UI display label stays "Group,"
+a cosmetic string only, §19.1). The domain-touching-logic-vs-pure-mechanics genericity split
+(repeated per-domain struct+functions for anything touching real PARAMS fields; one shared
+template/callback-parameterized mechanism for pure container/graph mechanics) is promoted from
+this ticket's own reasoning to standing law for all future Props/Decals/NavMesh Group work
+(§19.2). The Assembly-references-Bundle question is resolved as a scalar `assemblyIdentifier` on
+the Bundle (mirroring how leaf transforms already carry it), NOT a `{domain, groupIdentifier}`
+forward-reference list on Assembly — keeping Assembly's own already-ratified "no members list"
+rule intact one tier up (§19.5), with a new sub-rule (not in either prior document) that a nested
+child Bundle carrying its own different `assemblyIdentifier` stops the recursive walk there
+(§19.6). `TreeListWidget_UI<T>` is ruled a single shared, domain-agnostic UI-framework primitive,
+built by the Markers Group ticket first (the human's own explicit "get Markers working first"
+priority) with Assembly's leaf-body-callback extension included from day one, not bolted on later
+(§19.7). **New general rule, closing a question raised three times per-feature before this
+session**: `ARCH_03_ModuleBoundaries.md` gains **§3.5**, ruling that a pure function's home is
+decided by whether its signature carries a `Params::` type (yes → `PARAMS`, co-located free
+function, never `MATH`, never a new `PROC` file; no → `MATH`, fully generic) — settling
+`BuildSymmetryOrbit` (§16.3), Assembly's rigid-rotate math, and this ticket's cycle-detection and
+rotate math all under one citable rule instead of three separate design-doc judgment calls. This
+confirms Bundle's rotate math and Assembly's rotate math are the exact same `MATH`-layer function,
+not two copies (§19.8). The "Id" abbreviation question, raised in both this design and
+`DESIGN_Assembly_R1.md` §7, is resolved once for both: **new `ARCH_01_09_IdAbbreviationBan.md`
+§1.9**, which also retroactively confirms `PropInstanceLayer`/`DecalInstanceLayer`/
+`MarkerInstanceLayer::layerId` are real, already-shipped naming-law violations (not the
+pre-ship freebie `SANMAP_FORMAT_SPEC.md` Correction 16 previously assumed) — recorded as a new
+standing defect above, routed to the IO Architecture Expert for migration mechanics, not
+blocking. `SANMAP_FORMAT_SPEC.md` gains **Correction 19** (`MarkerLayerBundles`, the new
+`ParentBundleIdentifier` merged fields on `MarkersStack`/`MarkerGroups` entries) and a
+documentation-only correction pass closing several already-stale field-list gaps in Corrections
+7/16 and the `markers[type].transforms[name]` section (full list: `ARCH_19_11_FormatSpecCorrectionBundle.md`
+§19.11). Manual-layer-only Bundle membership (§19.9), v1 tab-driven-only Move/Rotate with no new
+canvas gesture (§19.10), and soft (UI-only) Bundle→marker-type consistency (§19.12) are all
+ratified as designed, confirmed consistent with Assembly's own parallel rulings rather than
+independently drifting variants.

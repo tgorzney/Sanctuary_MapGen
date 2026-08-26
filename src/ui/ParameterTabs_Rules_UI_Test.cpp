@@ -21,14 +21,14 @@ void RunMarkersTabChecks(Params::MapRecipe& recipe) {
     WidgetChange change = StepRangeSliderInteraction(state.slopeToggle, state.slopeValues,
                                                      state.slopeBounds,
                                                      GrabRangeHandle(RangeSliderHandle::Maximum, 30.0f));
-    Check(change.bValueChanged && !change.bCommitted,
-          "RT off: the gate moves live and defers the commit");
+    Check(change.bValueChanged && change.bCommitted,
+          "RT on: the gate commits immediately");
     Check(StoreMarkerRuleValues(state, *rule), "the store reports the rule moved");
     Check(rule->maxSlope == 30.0f, "the slope gate reached the recipe");
     Check(rule->minSlope == state.slopeValues.minimumValue, "the partner handle is unchanged");
     change = StepRangeSliderInteraction(state.slopeToggle, state.slopeValues, state.slopeBounds,
                                         ReleaseRangeHandle());
-    Check(change.bCommitted, "the commit lands on release");
+    Check(!change.bCommitted, "no additional commit is owed on release");
 
     // The height gate, and the integer count through its float mirror.
     StepRangeSliderInteraction(state.heightToggle, state.heightValues, state.heightBounds,

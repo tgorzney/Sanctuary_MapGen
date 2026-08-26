@@ -74,6 +74,33 @@ inline void AppendPropInstance(Data::PlacementResults& placements, float worldX,
     placements.props.Append(instance);
 }
 
+inline void AppendMarkerInstance(Data::PlacementResults& placements, float worldX, float worldZ,
+                                 int ruleIndex, Params::MarkerCategory category,
+                                 const char* templateIdentifier, float scale = 1.0f) {
+    Data::PlacementInstance instance;
+    instance.positionX = worldX; instance.positionZ = worldZ;
+    instance.scaleX = instance.scaleY = instance.scaleZ = scale;
+    instance.ruleIndex = ruleIndex;
+    instance.category = static_cast<int>(category);
+    instance.templateIdentifier = Data::MakeTemplateIdentifier(templateIdentifier);
+    placements.markers.Append(instance);
+}
+
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-B: armyIndex is a real, per-instance field
+// (Data::PlacementInstance::armyIndex, "units only; -1 for markers/props/decals") — a procedural
+// units fixture must set it explicitly, unlike AppendPropInstance/AppendMarkerInstance's domains.
+inline void AppendUnitInstance(Data::PlacementResults& placements, float worldX, float worldZ,
+                               int ruleIndex, int armyIndex, const char* templateIdentifier,
+                               float scale = 1.0f) {
+    Data::PlacementInstance instance;
+    instance.positionX = worldX; instance.positionZ = worldZ;
+    instance.scaleX = instance.scaleY = instance.scaleZ = scale;
+    instance.ruleIndex = ruleIndex;
+    instance.armyIndex = armyIndex;
+    instance.templateIdentifier = Data::MakeTemplateIdentifier(templateIdentifier);
+    placements.units.Append(instance);
+}
+
 inline void SeedAtlasEntry(IconAtlasPairingLookup& pairingLookup, IconAtlasManifest& manifest,
                           const std::string& templateIdentifier, int iconId, int atlasPage = 0) {
     pairingLookup.SetThumbnailIconId(templateIdentifier, iconId);

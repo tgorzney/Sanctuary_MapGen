@@ -21,11 +21,30 @@ ImVec2 ProjectWorldToScreen(const PreviewComposite& composite, const MapCanvasVi
     return ImVec2(regionOriginX + regionLocal.regionLocalX, regionOriginY + regionLocal.regionLocalY);
 }
 
-ImU32 ManualMarkerTint(const std::vector<Params::MarkerInstanceLayer>& markerLayers, int layerIndex) {
+ImU32 ManualMarkerTint(const std::vector<Params::MarkerInstanceLayer>& markerLayers, int layerIndex,
+                       const std::string& groupName, const Params::GlobalMarkerSettings& globalMarkerSettings) {
     if (layerIndex < 0 || layerIndex >= static_cast<int>(markerLayers.size()))
         return IM_COL32(220, 220, 220, 255);
-    const float* color = markerLayers[static_cast<std::size_t>(layerIndex)].color;
-    return ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], color[3]));
+    const Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(layerIndex)];
+    if (layer.bColorOverrideEnabled)
+        return ImGui::ColorConvertFloat4ToU32(ImVec4(layer.color[0], layer.color[1], layer.color[2], layer.color[3]));
+    float typeRed = 1.0f, typeGreen = 1.0f, typeBlue = 1.0f;
+    Params::ResolveMarkerGroupTypeTintColor(groupName, globalMarkerSettings, typeRed, typeGreen, typeBlue);
+    return ImGui::ColorConvertFloat4ToU32(ImVec4(typeRed, typeGreen, typeBlue, layer.color[3]));
+}
+
+// Resolves a Spawn-group transform's render tint to its matching army's real color — the ratified
+// match rule, ARCH_16_08_SpawnArmyShrink.md §16.8: Army::name == MarkerTransform::name,
+// byte-for-byte, NEVER MarkerTransform::alias. An orphaned Spawn slot (no army carries this name —
+// already "a legal, unremarkable state," ARCH_16_08) falls back to `fallback`, the caller's own
+// already-resolved layer-color tint — never a crash, never a hardcoded literal color.
+ImU32 ManualSpawnArmyTint(const std::vector<Params::Army>& armies, const std::string& transformName,
+                          ImU32 fallback) {
+    for (const Params::Army& army : armies)
+        if (army.name == transformName)
+            return ImGui::ColorConvertFloat4ToU32(ImVec4(army.armyColor[0], army.armyColor[1],
+                                                          army.armyColor[2], army.armyColor[3]));
+    return fallback;
 }
 
 } // namespace
@@ -66,6 +85,8 @@ bool HitTestManualMarkers(const std::vector<Params::MarkerInstanceGroup>& marker
 
 void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& markers,
                             const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                            const std::vector<Params::Army>& armies,
+                            const Params::GlobalMarkerSettings& globalMarkerSettings,
                             const MarkerDragGestureState& dragState, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionOriginX, float regionOriginY,
                             ImDrawList& drawList) {
@@ -83,8 +104,15 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
             const Params::MarkerTransform& transform = group.transforms[transformIndex];
             const ImVec2 screenCenter = ProjectWorldToScreen(composite, view, transform.transform.positionX,
                                                              transform.transform.positionZ, regionOriginX, regionOriginY);
-            const ImU32 tint = (bThisGroupDragging && dragState.bSpawnCardinalityRefused)
-                              ? refusedTint : ManualMarkerTint(markerLayers, transform.layerIndex);
+            ImU32 tint;
+            if (bThisGroupDragging && dragState.bSpawnCardinalityRefused) {
+                tint = refusedTint;
+            } else if (IsSpawnMarkerGroup(group)) {
+                tint = ManualSpawnArmyTint(armies, transform.name,
+                                           ManualMarkerTint(markerLayers, transform.layerIndex, group.name, globalMarkerSettings));
+            } else {
+                tint = ManualMarkerTint(markerLayers, transform.layerIndex, group.name, globalMarkerSettings);
+            }
             drawList.AddCircleFilled(screenCenter, kManualMarkerDotRadiusScreenPixels, tint);
         }
         if (bThisGroupDragging)
@@ -101,6 +129,14 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
 bool MapCanvas::TryBeginManualMarkerDrag(float regionLocalX, float regionLocalY) {
     if (manualMarkerDragMarkers == nullptr || manualMarkerDragGeometry == nullptr
         || manualMarkerDragRecipe == nullptr || composite == nullptr) return false;
+    // STEP113 — a drag may only BEGIN while the Markers panel is active. Guard-clause negated-OR
+    // form, matching this function's OWN existing null-check style immediately above (not
+    // DrawScenarioEditModeOverlayPass's positive "!= nullptr && ->IsActive()" gate-and-proceed
+    // form) — both are the same null-safety posture, applied as the shape each call site already
+    // uses. Null (no shell has wired a panel source, e.g. a test harness) refuses, never defaults
+    // to permitting a drag — same null-safe-refuses posture as the existing scenarioEditModeState
+    // pointer (MapCanvas_UI.h:173), not a new convention.
+    if (activePanelSource == nullptr || *activePanelSource != ApplicationPanel::Markers) return false;
     int hitGroupIndex = -1, hitTransformIndex = -1;
     if (!HitTestManualMarkers(*manualMarkerDragMarkers, *composite, view, regionLocalX, regionLocalY,
                               pickRadiusScreenPixels, hitGroupIndex, hitTransformIndex))
@@ -135,7 +171,11 @@ void MapCanvas::EndManualMarkerDrag() {
 void MapCanvas::DrawManualMarkerDragPass(float regionOriginX, float regionOriginY) {
     if (composite == nullptr || manualMarkerDragMarkers == nullptr) return;
     static const std::vector<Params::MarkerInstanceLayer> kNoLayers;
+    static const std::vector<Params::Army> kNoArmies;
+    static const Params::GlobalMarkerSettings kDefaultGlobalMarkerSettings;
     DrawManualMarkerRoster(*manualMarkerDragMarkers, manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoLayers,
+                          manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->armies : kNoArmies,
+                          manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->globalMarkerSettings : kDefaultGlobalMarkerSettings,
                           manualMarkerDragState, *composite, view, regionOriginX, regionOriginY,
                           *ImGui::GetWindowDrawList());
 }

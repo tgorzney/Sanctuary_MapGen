@@ -23,9 +23,10 @@ void ConfigureDefaultStages(Pipeline::GenerationAssembler& assembler);   // Appl
 void ConfigureDefaultPreview(PreviewCompositeSettings& previewSettings, int previewResolution,
                              float worldUnitsPerCell);            // Application_PreviewSetup_UI.cpp
 
-// The six-domain overlay stack's launch default (ARCH_14_02_DataModel.md §14.2) — one `OverlayLayer_UI`
-// per domain, sub-layers seeded per the §14.2 mapping table. One-shot; no live resync as the recipe
-// grows mid-session (Application_OverlaySetup_UI.cpp).
+// The overlay stack's launch default (ARCH_14_02_DataModel.md §14.2) — one `OverlayLayer_UI` per
+// domain, EXCEPT Units, which seeds one row per `recipe.armies[i]` in roster order
+// (ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-A). Sub-layers seeded per the §14.2 mapping table.
+// One-shot; no live resync as the recipe grows mid-session (Application_OverlaySetup_UI.cpp).
 void ConfigureDefaultOverlayLayers(OverlayLayerSettings& overlaySettings,
                                     const Params::MapRecipe& recipe);   // Application_OverlaySetup_UI.cpp
 // The one flattening Units' Manual sub-layers need (§14.4): resolves a flat

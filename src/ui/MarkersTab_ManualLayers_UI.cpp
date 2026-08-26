@@ -41,8 +41,13 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
     nameRules.bAllowEmpty   = false;
     nameRules.fallbackText  = "Marker Layer";
     const bool bNameCommitted = DrawTextInput("Name", layer.name, nameRules).bCommitted;
-    if (!state.bUseGroupColor)
+    bool bColorOverrideCommitted = false;
+    if (!state.bUseGroupColor) {
+        bColorOverrideCommitted = DrawCheckbox("Color Override", layer.bColorOverrideEnabled).bCommitted;
+        ImGui::BeginDisabled(!layer.bColorOverrideEnabled);
         DrawColorSwatch("Color", layer.color, state.previewColorOptions, state.selectedLayerColorToggle);
+        ImGui::EndDisabled();
+    }
     DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
                      state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
     const bool bSnapCommitted = DrawCheckbox("Snap to Grid", layer.bGridSnapEnabled).bCommitted;
@@ -52,7 +57,7 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
     ImGui::EndDisabled();
     DrawLayerSymmetrySection(layer, layerIndex, markerLayers, markers, geometry, globalSymmetryMask,
                              globalRadialRepeatCount, markerSymmetryFixSettings, state);
-    return bNameCommitted || bSnapCommitted || bSnapSizeCommitted;
+    return bNameCommitted || bColorOverrideCommitted || bSnapCommitted || bSnapSizeCommitted;
 }
 
 // The layer stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.

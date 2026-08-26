@@ -17,3 +17,4 @@
 | §1.6 | [ARCH_01_06_SanmapKeyCasing.md](ARCH_01_06_SanmapKeyCasing.md) | `.sanmap` top-level key casing — game-native vs SanGen-owned (ratifies work-order SPEC-4 Correction 0) |
 | §1.7 | [ARCH_01_07_IoMigrationFileNaming.md](ARCH_01_07_IoMigrationFileNaming.md) | IO migration file naming — schema version steps (ratifies `IO_MIGRATION_SPEC`) |
 | §1.8 | [ARCH_01_08_ParamsFieldNamingByKind.md](ARCH_01_08_ParamsFieldNamingByKind.md) | PARAMS field naming for format-derived types — governed by data KIND, not by key presence |
+| §1.9 | [ARCH_01_09_IdAbbreviationBan.md](ARCH_01_09_IdAbbreviationBan.md) | "Id" is banned — resolved once, binding on every current and future field (supersedes §16.5 as the canonical citation) |

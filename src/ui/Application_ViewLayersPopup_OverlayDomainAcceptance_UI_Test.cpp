@@ -12,6 +12,7 @@
 // Application_ViewLayersPopup_UI_Test.cpp.
 #include "Application_Defaults_UI.h"
 #include "Application_ViewLayersPopup_UI.h"
+#include "ArmiesTab_UI.h"
 #include "ListWidget_TestFrame_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cfloat>
@@ -73,11 +74,19 @@ DraggableListSignal ClickAtOverlaySection(OverlaySectionScene& scene, ImVec2 pos
 }
 
 // The exact launch-time seed Application::Application() hands DrawOverlaySection every session
-// (Application_UI.cpp -> ConfigureDefaultOverlayLayers). A default-constructed recipe is enough —
-// the 6 rows/names come from the domain list itself, not from any populated recipe array.
-OverlaySectionScene MakeRealOverlayScene() {
-    OverlayLayerSettings settings;
+// (Application_UI.cpp -> ConfigureDefaultOverlayLayers), over a REAL two-army roster —
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-A: Units seeds one row per `recipe.armies[i]`, named
+// via ArmyRowLabel, so a 0-army recipe would silently hide that behavior from this acceptance file.
+Params::MapRecipe MakeTwoArmyRecipe() {
     Params::MapRecipe recipe;
+    Params::Army armyWithDisplayName; armyWithDisplayName.displayName = "Northern Fleet";
+    Params::Army armyWithoutDisplayName; armyWithoutDisplayName.name = "ARMY_02";
+    recipe.armies = {armyWithDisplayName, armyWithoutDisplayName};
+    return recipe;
+}
+
+OverlaySectionScene MakeRealOverlayScene(const Params::MapRecipe& recipe) {
+    OverlayLayerSettings settings;
     ConfigureDefaultOverlayLayers(settings, recipe);
     OverlaySectionScene scene;
     scene.layers = settings.overlayLayers;
@@ -94,14 +103,18 @@ void Check(bool bCondition, const char* label) {
 // STEP201 fix approach item 1 / STEP200 fix approach points 2-3, re-proven over the real seed: every
 // real domain row draws its body unconditionally (Flat, never collapsed), and a click at a row's own
 // left margin (a Collapsible row's disclosure-arrow hit-box) never changes how many bodies draw.
+// ARCH_14_16_PerArmyUnitsOverlayRows.md §14.16-A: over a real two-army roster, "Units" becomes two
+// rows named via ArmyRowLabel (one displayName, one name-fallback) instead of one shared "Units" row.
 void TestAllSixRealDomainRowsRenderFlatWithSeedNames() {
     HeadlessImguiSession session;
-    OverlaySectionScene scene = MakeRealOverlayScene();
-    Check(scene.layers.size() == 6u, "the real seed hands the popup 6 overlay-domain rows");
-    const char* const expectedNames[] = {"Alloy", "Spawns", "Units", "Props", "Reclaim", "Decals"};
-    for (std::size_t index = 0; index < scene.layers.size() && index < 6u; ++index)
+    const Params::MapRecipe recipe = MakeTwoArmyRecipe();
+    OverlaySectionScene scene = MakeRealOverlayScene(recipe);
+    Check(scene.layers.size() == 7u,
+          "2 armies -> 2 Units rows: 7 overlay-domain rows (Alloy, Spawns, 2xUnits, Props, Reclaim, Decals)");
+    const char* const expectedNames[] = {"Alloy", "Spawns", "Northern Fleet", "ARMY_02", "Props", "Reclaim", "Decals"};
+    for (std::size_t index = 0; index < scene.layers.size() && index < 7u; ++index)
         Check(scene.layers[index].name == expectedNames[index],
-              "row order/name matches ConfigureDefaultOverlayLayers's own seed order");
+              "row order/name matches ConfigureDefaultOverlayLayers's own seed order, Units rows named via ArmyRowLabel");
 
     RunOverlaySectionFrame(scene, kMouseAway, false);
     RunOverlaySectionFrame(scene, kMouseAway, false);   // settle
@@ -124,7 +137,8 @@ void TestAllSixRealDomainRowsRenderFlatWithSeedNames() {
 // (this file never constructs either of those, by design: nothing here CAN move them).
 void TestEachDomainRowTogglesOnlyItsOwnVisibility() {
     HeadlessImguiSession session;
-    OverlaySectionScene scene = MakeRealOverlayScene();
+    const Params::MapRecipe recipe = MakeTwoArmyRecipe();
+    OverlaySectionScene scene = MakeRealOverlayScene(recipe);
     RunOverlaySectionFrame(scene, kMouseAway, false);
     RunOverlaySectionFrame(scene, kMouseAway, false);
 

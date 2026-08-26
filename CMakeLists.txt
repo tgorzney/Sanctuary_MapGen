@@ -414,6 +414,7 @@ add_sangen_test(SpatialGrid_DATA_Test           src/data/SpatialGrid_DATA_Test.c
 
 # PARAMS
 add_sangen_test(Geometry_PARAMS_Test            src/params/Geometry_PARAMS_Test.cpp)
+add_sangen_test(GlobalMarkerSettings_PARAMS_Test src/params/GlobalMarkerSettings_PARAMS_Test.cpp)
 add_sangen_test(GradientRamp_PARAMS_Test        src/params/GradientRamp_PARAMS_Test.cpp)
 add_sangen_test(LayerStack_PARAMS_Test          src/params/LayerStack_PARAMS_Test.cpp)
 add_sangen_test(MapRecipe_PARAMS_Test           src/params/MapRecipe_PARAMS_Test.cpp)
@@ -568,7 +569,8 @@ add_sangen_test(MapCanvas_UI_Test
     src/ui/MapCanvas_Render_UI_Test.cpp
     src/ui/MapCanvas_View_UI_Test.cpp
     src/ui/MapCanvas_Picking_UI_Test.cpp
-    src/ui/MapCanvas_ScenarioEditModeOwnership_UI_Test.cpp)
+    src/ui/MapCanvas_ScenarioEditModeOwnership_UI_Test.cpp
+    src/ui/MapCanvas_ActivePanelGate_UI_Test.cpp)
 # STEP53 — the screen-space overlay icon draw pass. Culling/LOD, budget/decimation, and the C2
 # cache's invalidation decision are headless (no imgui frame, no GL); bucketing + the bulk vertex
 # write need one live headless imgui frame (no GL, no window backend) — mirrors MapCanvas_UI_Test's

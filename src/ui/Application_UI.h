@@ -148,6 +148,10 @@ private:
     bool ServiceTemplateIngestRequest();      // Application_AssetPanel_UI.cpp
     bool ApplyIconSelection(int selectedIconId, int& lastIconId,
                             char (&templateIdentifier)[8]);   // Application_AssetPanel_UI.cpp
+    // STEP114 — the untruncated bridge: writes a resolved template identifier into a plain
+    // std::string field (NOT the fixed-8-char tpId convention ApplyIconSelection above targets).
+    bool ApplyIconSelectionToStringField(int selectedIconId, int& lastIconId,
+                                         std::string& target);   // Application_AssetPanel_UI.cpp
     const IconAtlasManifest* ActiveIconManifest() const;   // null until an atlas is resident
     void LoadAppSettingsAtStartup();         // Application_AppSettings_UI.cpp
 

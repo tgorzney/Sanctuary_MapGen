@@ -93,6 +93,55 @@ void RunSelectionResolutionChecks(Application& application) {
           "re-drawing the same selection writes nothing and trips no flag");
 }
 
+// STEP114 — Application::ApplyIconSelectionToStringField, driven through the same public
+// ResolveIconSelections()/manual-marker-bridge shape RunSelectionResolutionChecks above already
+// exercises for MarkerRule (the function itself is private, same posture as ApplyIconSelection).
+// Covers: a fresh, resolvable id writes the string; a repeated id is a no-op; a negative
+// (default -1) id is a no-op; an unresolvable id is a no-op — mirroring ApplyIconSelection's own
+// no-op-on-miss test case.
+void RunManualMarkerIconOverrideBridgeChecks(Application& application) {
+    const int iconId = IconIdOfTemplate(application, "ucl3001");
+    Check(iconId >= 0, "the known unit thumbnail resolved to a template identifier");
+    if (iconId < 0) return;
+
+    Params::MarkerInstanceGroup group;
+    group.name = "Alloys";
+    Params::MarkerTransform transform;
+    group.transforms.push_back(transform);
+    application.Recipe().markers.push_back(group);
+    application.TabState().markers.manual.selectedGroupIndex = 0;
+    application.TabState().markers.manual.selectedInstanceIndex = 0;
+
+    Params::MarkerTransform* const manualMarkerInstance =
+        SelectedManualMarkerInstance(application.Recipe().markers, application.TabState().markers.manual);
+    Check(manualMarkerInstance != nullptr, "the seeded manual marker instance is reachable");
+    if (manualMarkerInstance == nullptr) return;
+
+    // Negative (default -1, no pick made yet): a no-op, the field stays empty.
+    application.ResolveIconSelections();
+    Check(manualMarkerInstance->iconNameOverride.empty(),
+          "a negative selectedIconId (the default, no pick made) writes nothing");
+
+    // Unresolvable: an id past the manifest's own entry count resolves to no template identifier.
+    application.TabState().markers.manual.iconOverrideGridState.selectedIconId =
+        application.IconManifest().EntryCount() + 1000;
+    application.ResolveIconSelections();
+    Check(manualMarkerInstance->iconNameOverride.empty(),
+          "an unresolvable icon id writes nothing and leaves the field untouched");
+
+    // Fresh, resolvable: writes the string once.
+    application.TabState().markers.manual.iconOverrideGridState.selectedIconId = iconId;
+    application.ResolveIconSelections();
+    Check(manualMarkerInstance->iconNameOverride == "ucl3001",
+          "a fresh, resolvable selectedIconId writes the resolved template identifier");
+
+    // Repeated: re-drawing the same selection writes nothing (bRecipeMoved-style no-op).
+    manualMarkerInstance->iconNameOverride = "HandTyped";   // prove the repeat truly no-ops
+    application.ResolveIconSelections();
+    Check(manualMarkerInstance->iconNameOverride == "HandTyped",
+          "a repeated (== lastIconId) selectedIconId leaves a hand-typed value untouched");
+}
+
 } // namespace
 
 void RunShellIconBridgeChecks() {
@@ -108,6 +157,7 @@ void RunShellIconBridgeChecks() {
     RunManifestShapeChecks(application);
     RunSelectionResolutionChecks(application);
     RunIconPairingLookupWiringChecks(application);
+    RunManualMarkerIconOverrideBridgeChecks(application);
 
     std::filesystem::remove(shellTestSanpackPath, errorCode);
     std::filesystem::remove_all(shellTestCacheDirectory, errorCode);

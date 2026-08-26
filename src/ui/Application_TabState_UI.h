@@ -77,6 +77,9 @@ struct ApplicationTabState {
     // back to a template identifier (the atlas-id bridge, Application_Assets_UI.cpp). -1 = none.
     int lastMarkerIconId = -1;
     int lastPropIconId   = -1;
+    // STEP114 — the manual marker instance icon-override bridge's own tracking field, sibling of
+    // the two above.
+    int lastManualMarkerIconId = -1;
 };
 
 } // namespace Ui

@@ -39,6 +39,14 @@ struct MarkerInstanceLayer {
     bool  bGridSnapEnabled = false;            // STEP106 §2. Per-layer, not global (see §2).
     float gridSnapSizeWorldUnits = 1.0f;       // STEP106 §2. World-unit cell size; only meaningful
                                                // while bGridSnapEnabled is true.
+    bool  bColorOverrideEnabled = false;       // STEP116. false (struct default — every pre-existing
+                                               // and every STEP115-synthesized layer): `color` is
+                                               // ignored, every marker on this layer resolves its
+                                               // owning group's TYPE-default color instead
+                                               // (GlobalMarkerSettings::colorAlloy/colorPlasma/
+                                               // colorSpawn), white for an unrecognized group name.
+                                               // true: `color` is used verbatim, including a
+                                               // deliberately-chosen white.
 };
 
 struct MarkerTransform {
@@ -50,6 +58,13 @@ struct MarkerTransform {
     // positive value groups this instance with every other MarkerTransform sharing the same value —
     // the field the future drag-and-follow UI (ARCH_16_MarkerLayerSymmetry.md) writes into.
     int symmetryGroupIdentifier = 0;
+    std::string iconNameOverride;      // STEP114. Atlas-manifest NAME key, same shape as
+                                        // GlobalMarkerSettings::iconName* (NOT the fixed-8-char tpId
+                                        // convention MarkerRule::transform.templateIdentifier uses).
+                                        // Empty = use the type default resolved from the owning
+                                        // MarkerInstanceGroup::name. NEVER an atlas int index —
+                                        // IconGridState::selectedIconId is a volatile per-session scan
+                                        // order, never stable across a rescan or a save/load.
 };
 
 struct MarkerInstanceGroup {

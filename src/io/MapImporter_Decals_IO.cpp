@@ -7,6 +7,7 @@
 #include "JsonPrimitives_IO.h"
 #include "MapImporter_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include "../sys/PathStem_SYS.h"
 
 namespace SanmapGen {
 namespace Io {
@@ -109,6 +110,28 @@ void ReadDecalGroupsJson(const nlohmann::json& document, Params::MapRecipe& outR
         }
         outRecipe.decalLayers.push_back(layer);
     }
+}
+
+// STEP115: mirrors ReconcilePropLayers (MapImporter_Props_IO.cpp)/ReconcileMarkerLayers
+// (MapImporter_MarkerLayerReconcile_IO.cpp) — same problem (`DecalGroups` is SanGen-invented, never
+// present on a real file). One DecalInstanceLayer synthesized per `outRecipe.decals` GROUP entry —
+// `decals` is a plain ORDERED ARRAY, so two entries sharing the same blueprintPath legitimately get
+// two separate layers, never collapsed by name.
+void ReconcileDecalLayers(Params::MapRecipe& outRecipe, MapImportResult& result) {
+    if (!outRecipe.decalLayers.empty() || outRecipe.decals.empty()) return;
+    for (Params::DecalInstanceGroup& group : outRecipe.decals) {
+        Params::DecalInstanceLayer layer;
+        layer.name = Sys::FileStemFromPath(group.blueprintPath);
+        const int newLayerIndex = static_cast<int>(outRecipe.decalLayers.size());
+        layer.layerId = newLayerIndex;
+        outRecipe.decalLayers.push_back(layer);
+        for (Params::DecalTransform& transform : group.transforms)
+            transform.layerIndex = newLayerIndex;
+    }
+    result.Warn("No DecalGroups section present; synthesized "
+               + std::to_string(outRecipe.decalLayers.size())
+               + " decal layer(s) from the existing decal blueprint group(s) so the Manual Decal"
+                 " Layers tooling has something to show.");
 }
 
 } // namespace Io

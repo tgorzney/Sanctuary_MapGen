@@ -13,6 +13,7 @@
 #include "MapImporter_Recipe_IO.h"
 #include "MapImporter_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include "../sys/PathStem_SYS.h"
 #include <cmath>
 #include <cstdio>
 #include <nlohmann/json.hpp>
@@ -281,12 +282,113 @@ void RunPropDecalGroupsLegacyLockedDefaultTests() {
           "a DecalGroups entry with no 'Locked' key defaults bLocked to false");
 }
 
+// STEP115: two PropInstanceGroup entries sharing the SAME blueprintPath must synthesize TWO
+// separate layers (NOT deduplicated by blueprintPath — pins the "one layer per GROUP entry, never
+// collapsed by name" ruling). Repeats the identical shape for DecalInstanceGroup/ReconcileDecalLayers.
+void RunPropDecalLayerSynthesisOnEmptyGroupsTests() {
+    Params::MapRecipe recipe;   // deliberately no propLayers/decalLayers
+
+    Params::PropInstanceGroup propGroupOne;
+    propGroupOne.blueprintPath = "Props/Rock/Rock01.santp";
+    propGroupOne.transforms.push_back(Params::PropTransform{});
+    recipe.props.push_back(propGroupOne);
+
+    Params::PropInstanceGroup propGroupTwo;
+    propGroupTwo.blueprintPath = "Props/Rock/Rock01.santp";   // same blueprintPath as group one
+    propGroupTwo.transforms.push_back(Params::PropTransform{});
+    propGroupTwo.transforms.push_back(Params::PropTransform{});
+    recipe.props.push_back(propGroupTwo);
+
+    Io::MapImportResult result;
+    Io::ReconcilePropLayers(recipe, result);
+
+    Check(recipe.propLayers.size() == 2,
+          "two PropInstanceGroup entries sharing one blueprintPath synthesize two separate layers");
+    if (recipe.propLayers.size() == 2) {
+        Check(recipe.propLayers[0].name == "Rock01" && recipe.propLayers[1].name == "Rock01",
+              "both synthesized prop layers are named from the shared blueprintPath's stem");
+        Check(recipe.propLayers[0].layerId == 0 && recipe.propLayers[1].layerId == 1,
+              "synthesized prop layerId is sequential");
+    }
+    if (recipe.props.size() == 2) {
+        Check(recipe.props[0].transforms.size() == 1 && recipe.props[0].transforms[0].layerIndex == 0,
+              "the first prop group's transform points at layer 0");
+        Check(recipe.props[1].transforms.size() == 2
+              && recipe.props[1].transforms[0].layerIndex == 1
+              && recipe.props[1].transforms[1].layerIndex == 1,
+              "the second prop group's transforms point at layer 1");
+    }
+    Check(result.warningCount == 1, "one aggregate warning fires for the whole prop synthesis");
+
+    Params::MapRecipe decalRecipe;   // identical shape, DecalInstanceGroup/ReconcileDecalLayers
+    Params::DecalInstanceGroup decalGroupOne;
+    decalGroupOne.blueprintPath = "Decals/Blood/Blood01.santp";
+    decalGroupOne.transforms.push_back(Params::DecalTransform{});
+    decalRecipe.decals.push_back(decalGroupOne);
+
+    Params::DecalInstanceGroup decalGroupTwo;
+    decalGroupTwo.blueprintPath = "Decals/Blood/Blood01.santp";
+    decalGroupTwo.transforms.push_back(Params::DecalTransform{});
+    decalGroupTwo.transforms.push_back(Params::DecalTransform{});
+    decalRecipe.decals.push_back(decalGroupTwo);
+
+    Io::MapImportResult decalResult;
+    Io::ReconcileDecalLayers(decalRecipe, decalResult);
+
+    Check(decalRecipe.decalLayers.size() == 2,
+          "two DecalInstanceGroup entries sharing one blueprintPath synthesize two separate layers");
+    if (decalRecipe.decalLayers.size() == 2) {
+        Check(decalRecipe.decalLayers[0].name == "Blood01" && decalRecipe.decalLayers[1].name == "Blood01",
+              "both synthesized decal layers are named from the shared blueprintPath's stem");
+        Check(decalRecipe.decalLayers[0].layerId == 0 && decalRecipe.decalLayers[1].layerId == 1,
+              "synthesized decal layerId is sequential");
+    }
+    if (decalRecipe.decals.size() == 2) {
+        Check(decalRecipe.decals[0].transforms.size() == 1
+              && decalRecipe.decals[0].transforms[0].layerIndex == 0,
+              "the first decal group's transform points at layer 0");
+        Check(decalRecipe.decals[1].transforms.size() == 2
+              && decalRecipe.decals[1].transforms[0].layerIndex == 1
+              && decalRecipe.decals[1].transforms[1].layerIndex == 1,
+              "the second decal group's transforms point at layer 1");
+    }
+    Check(decalResult.warningCount == 1, "one aggregate warning fires for the whole decal synthesis");
+
+    // Sys::FileStemFromPath edge cases — a path with no directory separator, and a path with no
+    // extension — neither has a dedicated test for the existing UI-layer twin algorithm (repo-wide
+    // grep), worth covering once, here.
+    Check(Sys::FileStemFromPath("Rock01.santp") == "Rock01",
+          "FileStemFromPath with no directory separator still strips the extension");
+    Check(Sys::FileStemFromPath("Props/Rock/Rock01") == "Rock01",
+          "FileStemFromPath with no extension still strips the directory");
+}
+
+// STEP115: reuses BuildFixtureRecipe's existing fixture (already populates one PropInstanceLayer and
+// one DecalInstanceLayer) — ReconcilePropLayers/ReconcileDecalLayers must leave both at size 1.
+void RunPropDecalLayerSynthesisIsNoOpWhenGroupsPresentTest() {
+    Params::MapRecipe recipe = BuildFixtureRecipe();
+    const int propLayerCountBefore = static_cast<int>(recipe.propLayers.size());
+    const int decalLayerCountBefore = static_cast<int>(recipe.decalLayers.size());
+
+    Io::MapImportResult result;
+    Io::ReconcilePropLayers(recipe, result);
+    Io::ReconcileDecalLayers(recipe, result);
+
+    Check(static_cast<int>(recipe.propLayers.size()) == propLayerCountBefore && propLayerCountBefore == 1,
+          "ReconcilePropLayers is a no-op when propLayers was already populated");
+    Check(static_cast<int>(recipe.decalLayers.size()) == decalLayerCountBefore && decalLayerCountBefore == 1,
+          "ReconcileDecalLayers is a no-op when decalLayers was already populated");
+    Check(result.warningCount == 0, "no synthesis warning fires when both *Groups were already present");
+}
+
 } // namespace
 
 int main() {
     RunPropsDecalsRoundTripTests();
     RunPropDecalGroupsLegacyBackfillTests();
     RunPropDecalGroupsLegacyLockedDefaultTests();
+    RunPropDecalLayerSynthesisOnEmptyGroupsTests();
+    RunPropDecalLayerSynthesisIsNoOpWhenGroupsPresentTest();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

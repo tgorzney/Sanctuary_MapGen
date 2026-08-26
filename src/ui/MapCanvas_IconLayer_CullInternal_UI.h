@@ -9,6 +9,9 @@
 #include "../data/PlacementInstances_DATA.h"
 #include "../data/PlacementResults_DATA.h"
 #include "../data/RuleBucketIndexSet_DATA.h"
+#include "../params/MarkerRule_PARAMS.h"
+#include "../params/GlobalMarkerSettings_PARAMS.h"
+#include "../params/MarkerInstance_PARAMS.h"   // STEP114 — MarkerTransform/MarkerInstanceGroup
 
 namespace SanmapGen {
 namespace Ui {
@@ -59,8 +62,24 @@ void EmitCandidateIfVisible(const DrawOverlayIconLayersInput& input, const Overl
                              int layerIndex, const std::string& templateIdentifier,
                              float worldX, float worldZ, float instanceScale,
                              PlacementCollectionKind_UI collection, std::int32_t instanceIndex,
+                             float tintColorRed, float tintColorGreen, float tintColorBlue,
                              int* stableOrderCounter, IconLayerCullDiagnostics_UI* diagnostics,
                              std::vector<OverlayVisibleInstance>& outCandidates);
+
+// Category -> RGB (Alloys/Spawn resolve from GlobalMarkerSettings; Generic/Expansion/Plasma-less
+// categories stay white) — UI-owned resolution of this PARAMS enum, mirroring MarkerCategoryLabel's
+// own precedent (MarkersTab_Rules_UI.h). STEP111.
+void ResolveMarkerCategoryTintColor(Params::MarkerCategory category,
+                                    const Params::GlobalMarkerSettings& settings,
+                                    float& outRed, float& outGreen, float& outBlue);
+
+// STEP114 §4a — a manual marker's icon templateIdentifier: override wins if set, else the owning
+// group's name maps to the matching GlobalMarkerSettings field, else the raw group name (v1
+// Widget_MapCanvas.cpp:341 precedent). Declared here (not anonymous) so it is directly unit-
+// testable, mirroring ResolveMarkerCategoryTintColor's own posture above.
+std::string ResolveMarkerIconTemplateIdentifier(const Params::MarkerTransform& transform,
+                                                const Params::MarkerInstanceGroup& group,
+                                                const Params::GlobalMarkerSettings& globalMarkerSettings);
 
 // `viewRect == nullptr` is the AABB-cache-build pass: only *outAabb gets widened, per instance,
 // no pairing lookup / projection / emission (cheap; this is the "membership changed" rebuild, not
@@ -78,8 +97,8 @@ void ResolveProceduralSubLayer(const DrawOverlayIconLayersInput& input, const Ov
                                 IconLayerCullDiagnostics_UI* diagnostics,
                                 std::vector<OverlayVisibleInstance>& outCandidates);
 
-// §1 item 4 — one hand-authored sub-layer (Props/Reclaim/Decals/Units; Alloy/SpawnsArmies carry
-// none this sequence — SEQUENCE_PreviewOverlayLayering.md Phase 5) (MapCanvas_IconLayer_CullManual_UI.cpp).
+// §1 item 4 — one hand-authored sub-layer (Props/Reclaim/Decals/Units, plus Alloy/SpawnsArmies as
+// of STEP114's manual-marker icon resolver) (MapCanvas_IconLayer_CullManual_UI.cpp).
 void ResolveManualSubLayer(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
                             int layerIndex, int subLayerArrayIndex,
                             int* stableOrderCounter, LayerWorldAabb_UI* outAabb,
