@@ -96,15 +96,11 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest*,
                                const std::string& markerTypeNameFilter,
                                const std::function<void(int)>& selectManualMarkerInstanceCallback) {
-    if (ImGui::Button("Add Group")) {
-        Params::MarkerLayerBundle bundle;
-        bundle.identifier     = NextMarkerLayerBundleId(bundles);   // scans the REAL, unfiltered vector
-        bundle.name           = "Group";
-        bundle.markerTypeName = markerTypeNameFilter;                // ARCH §19.15(a)
-        bundles.push_back(bundle);
-        state.selectedBundleIdentifier = bundle.identifier;
-    }
-
+    // STEP138/human's own correction: no "Add Group" button here — the Type-section header's own
+    // "+ Group" (MarkersTab_UI.cpp) already owns this job; a second one here duplicated it and the
+    // two, both minting via NextMarkerLayerBundleId against the same vector, produced confusing
+    // double-adds. `markerTypeNameFilter` stays a parameter (still scopes the tree below) even though
+    // it no longer seeds a button here.
     const std::vector<Params::MarkerLayerBundle> filteredBundles =
         BuildFilteredMarkerLayerBundlesByType(bundles, markerTypeNameFilter);
     const MarkerLayerBundleLeafIndex_UI leafIndex = BuildMarkerLayerBundleLeafIndex(ruleLayers, instanceLayers);

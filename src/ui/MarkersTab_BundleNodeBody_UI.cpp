@@ -79,18 +79,20 @@ void DrawMarkerLayerBundleNodeBody(int bundleIdentifier, std::vector<Params::Mar
     if (bundleIt == bundles.end()) return;   // Constitution §6 — an id is validated, never trusted
     Params::MarkerLayerBundle& bundle = *bundleIt;
 
+    (void)previewDriver;   // STEP138 — no longer used here (see below); kept as a parameter so this
+                            // signature does not ripple, same posture other dormant-notify params use.
     TextInputRules nameRules;
     nameRules.maximumLength = 48; nameRules.bAllowEmpty = false; nameRules.fallbackText = "Group";
     DrawTextInput("Name", bundle.name, nameRules);
     // Human's own instruction: no "Marker Type" input anywhere — the Section a Group lives in IS
-    // its Marker Type. `bundle.markerTypeName` is still set, once, at creation ("Add Group" seeds
-    // it from the Type-section it was added from, MarkersTab_Bundles_UI.cpp) and never re-editable.
+    // its Marker Type. `bundle.markerTypeName` is still set, once, at creation ("+ Group" seeds it
+    // from the Type-section it was added from, MarkersTab_UI.cpp) and never re-editable.
 
-    if (DrawAddMarkerRuleLayerButton(ruleLayers, rootState, bundleIdentifier))
-        NotifyPlacementChange(true, previewDriver);
-    ImGui::SameLine();
-    DrawLayerListButtons(instanceLayers, rootState.manualLayers, bundleIdentifier);   // no PreviewDriver
-                                                                                      // notify — SCOPE NOTE 3
+    // STEP138/human's own correction: no per-node "Add Layer"/"Add Manual Layer Here" here either —
+    // fully redundant with the Type-section header's own "+ Layer" (which already targets THIS
+    // Group once its node is selected, MarkersTab_UI.cpp's ResolveAddLayerParentBundleIdentifier),
+    // and a second affordance produced the same confusing double-add STEP138's own "Add Group"
+    // duplicate did.
 
     ImGui::Separator();
     ImGui::TextUnformatted("Move");

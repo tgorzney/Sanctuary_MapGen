@@ -125,7 +125,10 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    const std::string& markerTypeNameFilter,
                                    int& selectedManualInstanceIdentifier,
                                    const std::function<void(int)>& selectManualMarkerInstanceCallback) {
-    bool bLayersMoved = DrawLayerListButtons(markerLayers, state, -1, markerTypeNameFilter);
+    // STEP138/human's own correction: no "Add Marker Layer" button here — fully redundant with the
+    // Type-section header's own "+ Layer" (MarkersTab_UI.cpp), and drawing both produced the same
+    // confusing double-add the header's "+ Group" duplicate did.
+    bool bLayersMoved = false;
     bool bAnyNameCommitted = false;
     const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
     const DraggableListSignal signal = DrawLayerList(markerLayers, markers, geometry, globalSymmetryMask,
