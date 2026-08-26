@@ -5,9 +5,9 @@
 // applied from Step 2 (promote only if a THIRD domain later needs the identical shape; `chains`
 // does not, since it is an object-of-arrays, not an object-of-objects).
 //
-// `MarkerGroups` -> `recipe.markerLayers` (STEP60_MarkerInstanceLayer_PARAMS), a plain array walk,
-// same shape as `ReadPropGroupsJson` (`MapImporter_Props_IO.cpp`). `ReadMarkerGroupsJson` MUST run
-// before `ReadMarkersJson`: the `layerIndex` range-clamp validates against
+// `MarkerGroups` -> `recipe.markerLayers` (STEP60_MarkerInstanceLayer_PARAMS) moved to
+// MapImporter_MarkerGroups_IO.cpp (STEP124, file-size remediation). `ReadMarkerGroupsJson` MUST
+// still run before `ReadMarkersJson`: the `layerIndex` range-clamp validates against
 // `outRecipe.markerLayers.size()`, which `ReadMarkerGroupsJson` populates.
 #include "JsonPrimitives_IO.h"
 #include "MapImporter_IO.h"
@@ -38,7 +38,7 @@ void ReadNameKeyedObject(const nlohmann::json& parent, const char* key, std::vec
 // InstancedTransform, it does not flatten it). `positionZ` inverts the export-side flip (finding 4):
 // `positionZ = mapSize - jsonZ - 1`.
 void ReadMarkerTransformJson(const nlohmann::json& json, Params::MarkerTransform& markerTransform,
-                             int mapSize) {
+                             int mapSize, int& inOutNextInstanceIdentifier) {
     Params::InstancedTransform& transform = markerTransform.transform;
     if (json.contains("position") && json["position"].is_object()) {
         const nlohmann::json& position = json["position"];
@@ -73,6 +73,14 @@ void ReadMarkerTransformJson(const nlohmann::json& json, Params::MarkerTransform
     // STEP114: absent key (legacy files) keeps the struct default (empty = type default) — no
     // validation needed, any string is legal (same posture as alias).
     ReadJsonText(json, "iconNameOverride", markerTransform.iconNameOverride);
+    // ARCH §19.16 — legacy-backfill mirrors layerId's own precedent (now MapImporter_
+    // MarkerGroups_IO.cpp): the counter's CURRENT value is always assigned first (so an absent key
+    // backfills to this transform's position in the encounter order), then overwritten if the file
+    // actually carries the key. The counter always advances, whether or not this transform's
+    // backfilled default was kept — same "assign eagerly, allow overwrite" shape as layerId, not a
+    // conditional increment.
+    markerTransform.instanceIdentifier = inOutNextInstanceIdentifier++;
+    ReadJsonInteger(json, "InstanceIdentifier", markerTransform.instanceIdentifier);
 }
 
 // ARCH §12 / Constitution §6: an out-of-range layerIndex is a loud, logged clamp to 0, applied PER
@@ -97,53 +105,19 @@ void ClampMarkerLayerIndex(Params::MarkerTransform& markerTransform, std::size_t
 }
 
 void ReadMarkerInstanceGroupJson(const nlohmann::json& json, Params::MarkerInstanceGroup& group,
-                                 int mapSize, std::size_t markerLayerCount, MapImportResult& result) {
+                                 int mapSize, std::size_t markerLayerCount, MapImportResult& result,
+                                 int& inOutNextInstanceIdentifier) {
     ReadJsonBoolean(json, "resource", group.bResource);
     ReadNameKeyedObject(json, "transforms", group.transforms,
-                        [mapSize, markerLayerCount, &result](const nlohmann::json& transformJson,
-                                                             Params::MarkerTransform& markerTransform) {
-                            ReadMarkerTransformJson(transformJson, markerTransform, mapSize);
+                        [mapSize, markerLayerCount, &result, &inOutNextInstanceIdentifier]
+                        (const nlohmann::json& transformJson, Params::MarkerTransform& markerTransform) {
+                            ReadMarkerTransformJson(transformJson, markerTransform, mapSize,
+                                                    inOutNextInstanceIdentifier);
                             ClampMarkerLayerIndex(markerTransform, markerLayerCount, result);
                         });
 }
 
 } // namespace
-
-// `MarkerGroups` — a plain array walk, same shape as `ReadPropGroupsJson`'s `{r,g,b,a}` read
-// (STEP60_MarkerInstanceLayer_PARAMS). `layerId` legacy-backfills by array index — a file with no
-// `"Id"` key on an entry lands it on the vector position it was read at, the same convention
-// `ReadPropGroupsJson`'s own STEP56-era `Id` retrofit will use once that ticket lands.
-void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
-    if (!document.contains("MarkerGroups") || !document["MarkerGroups"].is_array()) return;
-    outRecipe.markerLayers.clear();
-    for (const nlohmann::json& layerJson : document["MarkerGroups"]) {
-        Params::MarkerInstanceLayer layer;
-        layer.layerId = static_cast<int>(outRecipe.markerLayers.size());   // legacy-backfill default
-        if (layerJson.is_object()) {
-            ReadJsonText(layerJson, "Name", layer.name);
-            if (layerJson.contains("Color") && layerJson["Color"].is_object()) {
-                const nlohmann::json& color = layerJson["Color"];
-                ReadJsonFloat(color, "r", layer.color[0]);
-                ReadJsonFloat(color, "g", layer.color[1]);
-                ReadJsonFloat(color, "b", layer.color[2]);
-                ReadJsonFloat(color, "a", layer.color[3]);
-            }
-            ReadJsonFloat(layerJson, "IconScale", layer.iconScale);
-            ReadJsonInteger(layerJson, "Id", layer.layerId);
-            // Correction 16. No range to validate (free integers, same tolerance as the per-rule/
-            // MarkersStack tiers) — absent keys keep SymmetrySetting's own defaults.
-            ReadJsonBoolean(layerJson, "SymmetryUseGlobal", layer.symmetry.bSymmetryUseGlobal);
-            ReadJsonInteger(layerJson, "SymmetryMask", layer.symmetry.symmetryMask);
-            ReadJsonInteger(layerJson, "RadialSymmetryRepeatCount", layer.symmetry.radialSymmetryRepeatCount);
-            ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
-            ReadJsonBoolean(layerJson, "GridSnapEnabled", layer.bGridSnapEnabled);
-            ReadJsonFloat(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeWorldUnits);
-            ReadJsonBoolean(layerJson, "ColorOverrideEnabled", layer.bColorOverrideEnabled);
-            ReadJsonInteger(layerJson, "ParentBundleIdentifier", layer.parentBundleIdentifier);
-        }
-        outRecipe.markerLayers.push_back(layer);
-    }
-}
 
 void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result) {
     if (!document.contains("markers") || !document["markers"].is_object()) return;
@@ -151,10 +125,13 @@ void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecip
                                                        // before this is called — see the "Critical
                                                        // wiring correction" note in MapImporter_IO.cpp.
     const std::size_t markerLayerCount = outRecipe.markerLayers.size();
+    // ARCH §19.16 — threaded across the ENTIRE nested walk below, never reset per group.
+    int nextInstanceIdentifier = 0;
     ReadNameKeyedObject(document, "markers", outRecipe.markers,
-                        [mapSize, markerLayerCount, &result](const nlohmann::json& groupJson,
-                                                             Params::MarkerInstanceGroup& group) {
-                            ReadMarkerInstanceGroupJson(groupJson, group, mapSize, markerLayerCount, result);
+                        [mapSize, markerLayerCount, &result, &nextInstanceIdentifier]
+                        (const nlohmann::json& groupJson, Params::MarkerInstanceGroup& group) {
+                            ReadMarkerInstanceGroupJson(groupJson, group, mapSize, markerLayerCount,
+                                                        result, nextInstanceIdentifier);
                         });
 }
 

@@ -56,9 +56,11 @@ void ReadArmiesJson(const nlohmann::json& document, Params::MapRecipe& outRecipe
 
 // MapImporter_Markers_IO.cpp / MapImporter_Chains_IO.cpp — `markers`/`chains` -> `recipe.markers`/
 // `recipe.chains` (STEP3_MarkersChains_IO; MapImporter_IO.h SCOPE NOTE 3). `MarkerGroups` ->
-// `recipe.markerLayers` (STEP60_MarkerInstanceLayer_PARAMS) — `ReadMarkerGroupsJson` MUST run
-// before `ReadMarkersJson`: the `layerIndex` range-clamp validates against
-// `outRecipe.markerLayers.size()`, which `ReadMarkerGroupsJson` populates.
+// `recipe.markerLayers` (STEP60_MarkerInstanceLayer_PARAMS), DEFINED in
+// MapImporter_MarkerGroups_IO.cpp (STEP124, split out of MapImporter_Markers_IO.cpp for file-size
+// remediation) — `ReadMarkerGroupsJson` MUST run before `ReadMarkersJson`: the `layerIndex`
+// range-clamp validates against `outRecipe.markerLayers.size()`, which `ReadMarkerGroupsJson`
+// populates.
 void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
 // MapImporter_MarkerLayerReconcile_IO.cpp — synthesizes one MarkerInstanceLayer per marker GROUP

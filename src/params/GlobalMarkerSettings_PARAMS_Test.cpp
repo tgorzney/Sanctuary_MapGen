@@ -23,6 +23,10 @@ GlobalMarkerSettings MakeNonDefaultSettings() {
     settings.colorSpawn[0] = 0.8f; settings.colorSpawn[1] = 0.2f; settings.colorSpawn[2] = 0.2f;
     settings.colorAlloy[0] = 0.8f; settings.colorAlloy[1] = 0.8f; settings.colorAlloy[2] = 0.2f;
     settings.colorPlasma[0] = 0.2f; settings.colorPlasma[1] = 0.8f; settings.colorPlasma[2] = 0.8f;
+    settings.selectColorSpawn[0] = 1.0f; settings.selectColorSpawn[1] = 0.4f; settings.selectColorSpawn[2] = 0.4f;
+    settings.selectColorAlloy[0] = 1.0f; settings.selectColorAlloy[1] = 1.0f; settings.selectColorAlloy[2] = 0.4f;
+    settings.selectColorPlasma[0] = 0.4f; settings.selectColorPlasma[1] = 1.0f; settings.selectColorPlasma[2] = 1.0f;
+    settings.selectColorDefault[0] = 1.0f; settings.selectColorDefault[1] = 0.6f; settings.selectColorDefault[2] = 0.0f;
     return settings;
 }
 
@@ -64,6 +68,29 @@ int main() {
     Check(red == 1.0f && green == 1.0f && blue == 1.0f, "\"Expansion\" resolves white");
     ResolveMarkerGroupTypeTintColor("SomeFreeformGroupName", settings, red, green, blue);
     Check(red == 1.0f && green == 1.0f && blue == 1.0f, "an arbitrary freeform name resolves white");
+
+    // ARCH §19.17: ResolveMarkerGroupSelectTintColor mirrors the same name-matching vocabulary, but
+    // an unmatched name resolves selectColorDefault, NOT white.
+    ResolveMarkerGroupSelectTintColor(kSpawnMarkerGroupName, settings, red, green, blue);
+    Check(red == settings.selectColorSpawn[0] && green == settings.selectColorSpawn[1]
+          && blue == settings.selectColorSpawn[2], "\"Spawn\" resolves selectColorSpawn");
+    ResolveMarkerGroupSelectTintColor("Alloys", settings, red, green, blue);
+    Check(red == settings.selectColorAlloy[0] && green == settings.selectColorAlloy[1]
+          && blue == settings.selectColorAlloy[2], "\"Alloys\" (plural) resolves selectColorAlloy");
+    ResolveMarkerGroupSelectTintColor("Plasma", settings, red, green, blue);
+    Check(red == settings.selectColorPlasma[0] && green == settings.selectColorPlasma[1]
+          && blue == settings.selectColorPlasma[2], "\"Plasma\" resolves selectColorPlasma");
+    // The deviation this ticket exists to prove: unmatched names resolve selectColorDefault, NOT
+    // white — unlike ResolveMarkerGroupTypeTintColor's own fallback, exercised just above in this
+    // same file for the identical group names.
+    ResolveMarkerGroupSelectTintColor("Generic", settings, red, green, blue);
+    Check(red == settings.selectColorDefault[0] && green == settings.selectColorDefault[1]
+          && blue == settings.selectColorDefault[2],
+          "\"Generic\" resolves selectColorDefault, NOT white (ARCH §19.17's signed-off deviation)");
+    ResolveMarkerGroupSelectTintColor("SomeFreeformGroupName", settings, red, green, blue);
+    Check(red == settings.selectColorDefault[0] && green == settings.selectColorDefault[1]
+          && blue == settings.selectColorDefault[2],
+          "an arbitrary freeform name also resolves selectColorDefault");
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

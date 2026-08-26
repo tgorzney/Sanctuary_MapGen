@@ -21,6 +21,14 @@ struct GlobalMarkerSettings {
     float scaleAlloy  = 0.17f;
     float scalePlasma = 0.17f;
     float scaleSpawn  = 0.17f;
+
+    // ARCH §19.17 — selection-highlight tint. selectColorAlloy/Plasma/Spawn strictly mirror
+    // colorAlloy/Plasma/Spawn's shape/placement; selectColorDefault is the one signed-off 4th-field
+    // deviation from that mirror (see ResolveMarkerGroupSelectTintColor below for why).
+    float selectColorAlloy[4]   = {1.0f, 1.0f, 0.0f, 1.0f};
+    float selectColorPlasma[4]  = {1.0f, 1.0f, 0.0f, 1.0f};
+    float selectColorSpawn[4]   = {1.0f, 1.0f, 0.0f, 1.0f};
+    float selectColorDefault[4] = {1.0f, 1.0f, 0.0f, 1.0f};
 };
 
 // STEP116: the group-name -> GlobalMarkerSettings-field mapping a manual marker resolves a
@@ -49,6 +57,22 @@ inline float ResolveMarkerGroupTypeScale(const std::string& groupName, const Glo
     if (groupName == "Alloy" || groupName == "Alloys")               return settings.scaleAlloy;
     if (groupName == "Plasma" || groupName == "Plasmas")             return settings.scalePlasma;
     return 1.0f;
+}
+
+// ARCH §19.17: the select-tint counterpart to ResolveMarkerGroupTypeTintColor, same name-matching
+// vocabulary (Spawn/Spawns, Alloy/Alloys, Plasma/Plasmas) — but an unmatched group name resolves to
+// settings.selectColorDefault, NOT hardcoded white: a select tint that fell back to white would
+// make "selected" indistinguishable from "unselected" for any Generic/Expansion/freeform group,
+// since that same unmatched name's normal (unselected) fill already resolves to white via
+// ResolveMarkerGroupTypeTintColor's own fallback absent a per-layer color override — a real
+// correctness gap, not a cosmetic one (ARCH §19.17's signed-off deviation from the 3-field mirror).
+inline void ResolveMarkerGroupSelectTintColor(const std::string& groupName, const GlobalMarkerSettings& settings,
+                                              float& outRed, float& outGreen, float& outBlue) {
+    const float* color = settings.selectColorDefault;
+    if (groupName == kSpawnMarkerGroupName || groupName == "Spawns") color = settings.selectColorSpawn;
+    else if (groupName == "Alloy" || groupName == "Alloys")          color = settings.selectColorAlloy;
+    else if (groupName == "Plasma" || groupName == "Plasmas")        color = settings.selectColorPlasma;
+    outRed = color[0]; outGreen = color[1]; outBlue = color[2];
 }
 
 } // namespace Params

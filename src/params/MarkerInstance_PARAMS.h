@@ -48,6 +48,9 @@ struct MarkerInstanceLayer {
                                                // true: `color` is used verbatim, including a
                                                // deliberately-chosen white.
     int parentBundleIdentifier = -1;   // ARCH §19.3/§19.4 — -1 = root (ungrouped). Additive.
+    std::string markerTypeName;   // ARCH §19.13 — free-form, same string space as
+                                   // MarkerLayerBundle::markerTypeName (STEP119), NOT MarkerCategory
+                                   // (ARCH §19.21). Additive.
 };
 
 struct MarkerTransform {
@@ -66,6 +69,12 @@ struct MarkerTransform {
                                         // MarkerInstanceGroup::name. NEVER an atlas int index —
                                         // IconGridState::selectedIconId is a volatile per-session scan
                                         // order, never stable across a rescan or a save/load.
+    // ARCH §19.16. Stable, GLOBALLY unique across every MarkerInstanceGroup's transforms (not
+    // per-group) — never reused, -1 = unassigned. A THIRD bare int alongside layerIndex/
+    // symmetryGroupIdentifier, spelled in full per §1.9 to stay unambiguous among the three. Exists
+    // solely for stable UI-selection addressing (Ticket C) — carries no round-tripping/export-key
+    // role of its own; MakeNamesUnique's existing name-based identity is untouched.
+    int instanceIdentifier = -1;
 };
 
 struct MarkerInstanceGroup {

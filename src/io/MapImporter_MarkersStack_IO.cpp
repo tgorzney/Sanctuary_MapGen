@@ -62,6 +62,7 @@ void ReadMarkerRuleLayerJson(const nlohmann::json& json, Params::MarkerRuleLayer
                           Params::radialSymmetryRepeatCountMaximum,
                           layer.symmetry.radialSymmetryRepeatCount);
     ReadJsonInteger(json, "ParentBundleIdentifier", layer.parentBundleIdentifier);
+    ReadJsonText(json, "MarkerTypeName", layer.markerTypeName);
     ReadRuleArray(json, "Rules", layer.rules, ReadMarkerRuleJson);
 }
 
@@ -97,6 +98,10 @@ void ReadGlobalMarkerSettingsJson(const nlohmann::json& document, Params::MapRec
     ReadJsonFloat(json, "MarkerScaleAlloy", settings.scaleAlloy);
     ReadJsonFloat(json, "MarkerScalePlasma", settings.scalePlasma);
     ReadJsonFloat(json, "MarkerScaleSpawn", settings.scaleSpawn);
+    ReadJsonColorRgba(json, "MarkerSelectColorAlloy", settings.selectColorAlloy);
+    ReadJsonColorRgba(json, "MarkerSelectColorPlasma", settings.selectColorPlasma);
+    ReadJsonColorRgba(json, "MarkerSelectColorSpawn", settings.selectColorSpawn);
+    ReadJsonColorRgba(json, "MarkerSelectColorDefault", settings.selectColorDefault);
 }
 
 } // namespace Io

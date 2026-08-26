@@ -352,6 +352,23 @@ void CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(const Params::MapRecipe& or
           && NearlyEqual(loadedSettings.scalePlasma, originalSettings.scalePlasma)
           && NearlyEqual(loadedSettings.scaleSpawn, originalSettings.scaleSpawn),
           "GlobalMarkerSettings's three scales survive");
+    Check(NearlyEqual(loadedSettings.selectColorAlloy[0], originalSettings.selectColorAlloy[0])
+          && NearlyEqual(loadedSettings.selectColorAlloy[1], originalSettings.selectColorAlloy[1])
+          && NearlyEqual(loadedSettings.selectColorAlloy[2], originalSettings.selectColorAlloy[2])
+          && NearlyEqual(loadedSettings.selectColorAlloy[3], originalSettings.selectColorAlloy[3])
+          && NearlyEqual(loadedSettings.selectColorPlasma[0], originalSettings.selectColorPlasma[0])
+          && NearlyEqual(loadedSettings.selectColorPlasma[1], originalSettings.selectColorPlasma[1])
+          && NearlyEqual(loadedSettings.selectColorPlasma[2], originalSettings.selectColorPlasma[2])
+          && NearlyEqual(loadedSettings.selectColorPlasma[3], originalSettings.selectColorPlasma[3])
+          && NearlyEqual(loadedSettings.selectColorSpawn[0], originalSettings.selectColorSpawn[0])
+          && NearlyEqual(loadedSettings.selectColorSpawn[1], originalSettings.selectColorSpawn[1])
+          && NearlyEqual(loadedSettings.selectColorSpawn[2], originalSettings.selectColorSpawn[2])
+          && NearlyEqual(loadedSettings.selectColorSpawn[3], originalSettings.selectColorSpawn[3])
+          && NearlyEqual(loadedSettings.selectColorDefault[0], originalSettings.selectColorDefault[0])
+          && NearlyEqual(loadedSettings.selectColorDefault[1], originalSettings.selectColorDefault[1])
+          && NearlyEqual(loadedSettings.selectColorDefault[2], originalSettings.selectColorDefault[2])
+          && NearlyEqual(loadedSettings.selectColorDefault[3], originalSettings.selectColorDefault[3]),
+          "GlobalMarkerSettings's four selectColor* fields survive, all four components each");
 }
 
 // STEP66_MarkerRuleLayer_PARAMS acceptance test: a recipe with 2 `MarkerRuleLayer`s (different
@@ -371,6 +388,7 @@ void CheckMarkerRuleLayerTwoLevelRoundTrip() {
     layerOne.symmetry.symmetryMask = Params::SymmetryAxis::MirrorAcrossX;
     layerOne.symmetry.radialSymmetryRepeatCount = 4;
     layerOne.parentBundleIdentifier = 5;                          // STEP119, non-default
+    layerOne.markerTypeName = "Alloy";                            // STEP124, non-default
     Params::MarkerRule ruleOneA; ruleOneA.count = 3; ruleOneA.hydroMultiplier = 1.4f;
     Params::MarkerRule ruleOneB; ruleOneB.count = 5; ruleOneB.mexDensity = 0.25f;
     layerOne.rules.push_back(ruleOneA);
@@ -434,9 +452,10 @@ void CheckMarkerRuleLayerTwoLevelRoundTrip() {
               && loadedLayer.symmetry.radialSymmetryRepeatCount
                      == originalLayer.symmetry.radialSymmetryRepeatCount
               && loadedLayer.parentBundleIdentifier == originalLayer.parentBundleIdentifier
+              && loadedLayer.markerTypeName == originalLayer.markerTypeName
               && loadedLayer.rules.size() == originalLayer.rules.size(),
-              "the layer's own fields (Name/Enabled/Hidden/symmetry/parentBundleIdentifier) and "
-              "rule count survive");
+              "the layer's own fields (Name/Enabled/Hidden/symmetry/parentBundleIdentifier/"
+              "markerTypeName) and rule count survive");
         for (std::size_t ruleIndex = 0; ruleIndex < originalLayer.rules.size(); ++ruleIndex) {
             const Params::MarkerRule& originalRule = originalLayer.rules[ruleIndex];
             const Params::MarkerRule& loadedRule   = loadedLayer.rules[ruleIndex];
@@ -678,6 +697,8 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
               "MarkerInstanceLayer::bColorOverrideEnabled survives, non-default");
         Check(loadedLayer.parentBundleIdentifier == originalLayer.parentBundleIdentifier,
               "MarkerInstanceLayer::parentBundleIdentifier survives, non-default (STEP119)");
+        Check(loadedLayer.markerTypeName == originalLayer.markerTypeName,
+              "MarkerInstanceLayer::markerTypeName survives, non-default (STEP124)");
     }
 
     Check(loaded.markerLayerBundles.size() == 1, "one MarkerLayerBundle survives (STEP119)");
@@ -714,6 +735,9 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
                   "the marker's symmetryGroupIdentifier survives, sibling of alias (STEP68)");
             Check(loadedMarker.iconNameOverride == originalMarker.iconNameOverride,
                   "the marker's iconNameOverride survives, sibling of alias/symmetryGroupIdentifier");
+            Check(loadedMarker.instanceIdentifier == originalMarker.instanceIdentifier,
+                  "the marker's explicit instanceIdentifier (999) survives the OVERWRITE half of "
+                  "the backfill-then-overwrite logic (STEP124)");
             Check(NearlyEqual(loadedMarker.transform.positionX, originalMarker.transform.positionX)
                   && NearlyEqual(loadedMarker.transform.positionY, originalMarker.transform.positionY),
                   "positionX/Y survive untouched by the flip");
@@ -1168,6 +1192,15 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     globalMarkerSettings.scaleAlloy  = 0.25f;
     globalMarkerSettings.scalePlasma = 0.3f;
     globalMarkerSettings.scaleSpawn  = 0.2f;
+    // STEP124: the four selectColor* fields, non-default, each component distinct (ARCH §19.17).
+    globalMarkerSettings.selectColorAlloy[0] = 0.91f; globalMarkerSettings.selectColorAlloy[1] = 0.92f;
+    globalMarkerSettings.selectColorAlloy[2] = 0.93f; globalMarkerSettings.selectColorAlloy[3] = 0.94f;
+    globalMarkerSettings.selectColorPlasma[0] = 0.81f; globalMarkerSettings.selectColorPlasma[1] = 0.82f;
+    globalMarkerSettings.selectColorPlasma[2] = 0.83f; globalMarkerSettings.selectColorPlasma[3] = 0.84f;
+    globalMarkerSettings.selectColorSpawn[0] = 0.71f; globalMarkerSettings.selectColorSpawn[1] = 0.72f;
+    globalMarkerSettings.selectColorSpawn[2] = 0.73f; globalMarkerSettings.selectColorSpawn[3] = 0.74f;
+    globalMarkerSettings.selectColorDefault[0] = 0.41f; globalMarkerSettings.selectColorDefault[1] = 0.42f;
+    globalMarkerSettings.selectColorDefault[2] = 0.43f; globalMarkerSettings.selectColorDefault[3] = 0.44f;
 }
 
 void FillFixtureArmiesAndAreas(Params::MapRecipe& recipe) {
@@ -1230,6 +1263,7 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerLayer.gridSnapSizeWorldUnits = 4.0f;                        // STEP106, non-default
     markerLayer.bColorOverrideEnabled = true;                         // STEP116, non-default
     markerLayer.parentBundleIdentifier = 42;                          // STEP119, non-default
+    markerLayer.markerTypeName = "Spawn";                             // STEP124, non-default
     recipe.markerLayers.push_back(markerLayer);
 
     // STEP119: one MarkerLayerBundle, non-default on every field, non-cyclic (parentBundleIdentifier
@@ -1256,6 +1290,7 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerTransform.layerIndex = 0;                                  // in range: no clamp warning
     markerTransform.symmetryGroupIdentifier = 3;                      // non-zero: STEP68
     markerTransform.iconNameOverride = "CustomAlloyIcon";             // non-empty: STEP114
+    markerTransform.instanceIdentifier = 999;                         // non-default, explicit: STEP124
 
     Params::MarkerInstanceGroup group;
     group.name = "Alloys";
@@ -2168,6 +2203,86 @@ void CheckMergedParentBundleIdentifierLegacyDefault() {
               "MarkerRuleLayer::parentBundleIdentifier defaults to -1 when the key is absent");
 }
 
+// STEP124: the two merged `MarkerTypeName` fields default to empty (std::string's own default) when
+// absent on a legacy `MarkerGroups`/`MarkersStack` entry, mirroring
+// CheckMergedParentBundleIdentifierLegacyDefault's exact two-part shape.
+void CheckMergedMarkerTypeNameLegacyDefault() {
+    nlohmann::json markerGroupsDocument;
+    markerGroupsDocument["MarkerGroups"] = nlohmann::json::array();
+    markerGroupsDocument["MarkerGroups"].push_back(nlohmann::json::object({ { "Name", "First" } }));
+    Params::MapRecipe markerGroupsRecipe;
+    Io::ReadMarkerGroupsJson(markerGroupsDocument, markerGroupsRecipe);
+    Check(markerGroupsRecipe.markerLayers.size() == 1, "the legacy MarkerGroups entry survives");
+    if (!markerGroupsRecipe.markerLayers.empty())
+        Check(markerGroupsRecipe.markerLayers[0].markerTypeName.empty(),
+              "MarkerInstanceLayer::markerTypeName defaults to empty when the key is absent");
+
+    nlohmann::json markersStackDocument;
+    markersStackDocument["MarkersStack"] = nlohmann::json::array();
+    markersStackDocument["MarkersStack"].push_back(nlohmann::json::object({ { "Name", "First" } }));
+    Params::MapRecipe markersStackRecipe;
+    Io::ReadMarkersStackJson(markersStackDocument, markersStackRecipe);
+    Check(markersStackRecipe.markerRuleLayers.size() == 1, "the legacy MarkersStack entry survives");
+    if (!markersStackRecipe.markerRuleLayers.empty())
+        Check(markersStackRecipe.markerRuleLayers[0].markerTypeName.empty(),
+              "MarkerRuleLayer::markerTypeName defaults to empty when the key is absent");
+}
+
+// STEP124 / ARCH §19.16: instanceIdentifier's legacy-backfill counter is threaded across the WHOLE
+// nested `markers` walk, never reset per group — a group with an explicit InstanceIdentifier key
+// still consumes (advances) the counter before being overwritten.
+void CheckMarkerInstanceIdentifierLegacyBackfillAcrossGroups() {
+    // Group "Alloys" (alphabetically first — see §5's load-bearing note on nlohmann::json's
+    // sorted, non-insertion-order object iteration) has two transforms: "AAA" (no
+    // InstanceIdentifier key) and "BBB" (an explicit, out-of-band value, 500).
+    // NOTE (deviation from the work-order's literal text): a default-constructed `nlohmann::json`
+    // is JSON NULL, not an empty OBJECT — `ReadNameKeyedObject`'s existing, correct
+    // `if (valueJson.is_object())` gate (a non-object entry yields a default-constructed item and
+    // never invokes the per-item reader at all) would then skip AAA/CCC entirely, so the backfill
+    // line inside ReadMarkerTransformJson would never run for them, leaving both at the struct
+    // default (-1) instead of exercising the backfill. Using `nlohmann::json::object()` makes each
+    // entry a genuine (empty) object — present, with no "InstanceIdentifier" key — matching the
+    // ticket's own stated intent ("no InstanceIdentifier key") rather than its literal code.
+    nlohmann::json transformAAA = nlohmann::json::object();   // no "InstanceIdentifier" key
+    nlohmann::json transformBBB; transformBBB["InstanceIdentifier"] = 500;
+    nlohmann::json groupAlloys;
+    groupAlloys["resource"] = true;
+    groupAlloys["transforms"] = nlohmann::json::object({ { "AAA", transformAAA }, { "BBB", transformBBB } });
+
+    // Group "Spawn" (alphabetically second) has one transform, also no InstanceIdentifier key —
+    // proves the counter is NOT reset per group (ARCH §19.16's core requirement).
+    nlohmann::json transformCCC = nlohmann::json::object();   // no "InstanceIdentifier" key
+    nlohmann::json groupSpawn;
+    groupSpawn["resource"] = false;
+    groupSpawn["transforms"] = nlohmann::json::object({ { "CCC", transformCCC } });
+
+    nlohmann::json document;
+    document["markers"] = nlohmann::json::object({ { "Alloys", groupAlloys }, { "Spawn", groupSpawn } });
+
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    Io::ReadMarkersJson(document, recipe, result);
+
+    Check(recipe.markers.size() == 2, "both marker groups survive");
+    if (recipe.markers.size() != 2) return;
+    Check(recipe.markers[0].name == "Alloys" && recipe.markers[1].name == "Spawn",
+          "groups are visited in nlohmann::json's own sorted-key order (Alloys before Spawn)");
+    Check(recipe.markers[0].transforms.size() == 2 && recipe.markers[1].transforms.size() == 1,
+          "both transforms in Alloys and the one transform in Spawn survive");
+    if (recipe.markers[0].transforms.size() != 2 || recipe.markers[1].transforms.empty()) return;
+
+    // Counter starts at 0: AAA (no key) backfills to 0; BBB (has key) still CONSUMES counter
+    // slot 1 before being overwritten to 500 (the counter always advances); CCC (no key, in the
+    // SECOND group) backfills to 2 — proving the counter is threaded across groups, not reset.
+    Check(recipe.markers[0].transforms[0].instanceIdentifier == 0,
+          "AAA (no key) backfills to the counter's value at its own position (0)");
+    Check(recipe.markers[0].transforms[1].instanceIdentifier == 500,
+          "BBB's explicit InstanceIdentifier (500) overwrites the counter's positional default");
+    Check(recipe.markers[1].transforms[0].instanceIdentifier == 2,
+          "CCC (no key, in the SECOND group) backfills to 2, not 0 — the counter is threaded "
+          "across the whole nested walk, never reset per group (ARCH §19.16)");
+}
+
 // STEP119 / ARCH §19.12: a 2-cycle ParentBundleIdentifier chain ({1,2},{2,1}) is detected and
 // repaired — both entries treated as root — with one logged warning per cyclic entry, never a
 // refusal. Mirrors CheckMarkerLayerSynthesisOnEmptyMarkerGroups's direct-call/result.warningCount
@@ -2415,6 +2530,8 @@ int main() {
     SanmapGen::MapFormatTest::CheckMarkerIconNameOverrideLegacyDefault();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundlesLegacyDefault();
     SanmapGen::MapFormatTest::CheckMergedParentBundleIdentifierLegacyDefault();
+    SanmapGen::MapFormatTest::CheckMergedMarkerTypeNameLegacyDefault();
+    SanmapGen::MapFormatTest::CheckMarkerInstanceIdentifierLegacyBackfillAcrossGroups();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairOnImport();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairIsNoOpOnValidChain();
     SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisOnEmptyMarkerGroups();

@@ -749,7 +749,31 @@
         },
         "MarkerScaleAlloy": 0.17000000178813934,
         "MarkerScalePlasma": 0.17000000178813934,
-        "MarkerScaleSpawn": 0.17000000178813934
+        "MarkerScaleSpawn": 0.17000000178813934,
+        "MarkerSelectColorAlloy": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 0.0,
+            "a": 1.0
+        },
+        "MarkerSelectColorPlasma": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 0.0,
+            "a": 1.0
+        },
+        "MarkerSelectColorSpawn": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 0.0,
+            "a": 1.0
+        },
+        "MarkerSelectColorDefault": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 0.0,
+            "a": 1.0
+        }
     },
     "sunRA": 0.0,
     "sunDA": 0.0,

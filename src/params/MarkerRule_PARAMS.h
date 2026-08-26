@@ -83,6 +83,9 @@ struct MarkerRuleLayer {
     bool bHidden  = false;   // still generates (clearance/fairness), just doesn't render — unchanged
     SymmetrySetting symmetry;
     int parentBundleIdentifier = -1;   // ARCH §19.3/§19.4 — -1 = root (ungrouped). Additive.
+    std::string markerTypeName;   // ARCH §19.13 — free-form, same string space as
+                                   // MarkerLayerBundle::markerTypeName (STEP119), NOT MarkerCategory
+                                   // (ARCH §19.21 — the two stay permanently independent). Additive.
     std::vector<MarkerRule> rules;
 };
 

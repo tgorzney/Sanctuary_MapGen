@@ -60,6 +60,7 @@ nlohmann::ordered_json BuildMarkerRuleLayerJson(const Params::MarkerRuleLayer& l
     json["SymmetryMask"] = layer.symmetry.symmetryMask;
     json["RadialSymmetryRepeatCount"] = layer.symmetry.radialSymmetryRepeatCount;
     json["ParentBundleIdentifier"] = layer.parentBundleIdentifier;
+    json["MarkerTypeName"] = layer.markerTypeName;
     nlohmann::ordered_json rules = nlohmann::ordered_json::array();
     for (const Params::MarkerRule& rule : layer.rules)
         rules.push_back(BuildMarkerRuleJson(rule));
@@ -96,6 +97,18 @@ nlohmann::ordered_json BuildGlobalMarkerSettingsJson(const Params::MapRecipe& re
     json["MarkerScaleAlloy"]  = settings.scaleAlloy;
     json["MarkerScalePlasma"] = settings.scalePlasma;
     json["MarkerScaleSpawn"]  = settings.scaleSpawn;
+    json["MarkerSelectColorAlloy"]   = { { "r", settings.selectColorAlloy[0] },
+        { "g", settings.selectColorAlloy[1] }, { "b", settings.selectColorAlloy[2] },
+        { "a", settings.selectColorAlloy[3] } };
+    json["MarkerSelectColorPlasma"]  = { { "r", settings.selectColorPlasma[0] },
+        { "g", settings.selectColorPlasma[1] }, { "b", settings.selectColorPlasma[2] },
+        { "a", settings.selectColorPlasma[3] } };
+    json["MarkerSelectColorSpawn"]   = { { "r", settings.selectColorSpawn[0] },
+        { "g", settings.selectColorSpawn[1] }, { "b", settings.selectColorSpawn[2] },
+        { "a", settings.selectColorSpawn[3] } };
+    json["MarkerSelectColorDefault"] = { { "r", settings.selectColorDefault[0] },
+        { "g", settings.selectColorDefault[1] }, { "b", settings.selectColorDefault[2] },
+        { "a", settings.selectColorDefault[3] } };
     return json;
 }
 
