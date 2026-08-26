@@ -111,6 +111,17 @@ public:
         manualMarkerDragRecipe   = recipeForGlobalSymmetry;
     }
 
+    // STEP126 — the static selection-highlight source: `selectedInstanceIdentifier` is the SAME
+    // address as MarkersTabState::selectedManualInstanceIdentifier (Application_UI.cpp) — one source
+    // of truth, never a second copy. A single scalar pointer, the simplest form of this file's own
+    // established null-safe-injection shape (ARCH §19.19 — closer to SetActivePanelSource's
+    // one-pointer form than SetManualMarkerDragSource's bundle). Null (no shell has wired a selection
+    // source) refuses — the highlight computation treats null identically to "-1: nothing selected,"
+    // never defaulting to "everything selected."
+    void SetManualMarkerSelectionSource(const int* selectedInstanceIdentifier) {
+        manualMarkerSelectedInstanceIdentifier = selectedInstanceIdentifier;
+    }
+
     // One imgui frame; `regionSidePixels` is the square viewport side in screen pixels.
     void Draw(const char* canvasIdentifier, float regionSidePixels);   // MapCanvas_Draw_UI.cpp
 
@@ -188,6 +199,8 @@ private:
     const std::vector<Params::MarkerInstanceLayer>* manualMarkerDragLayers   = nullptr;
     const Params::Geometry*                         manualMarkerDragGeometry = nullptr;
     const Params::MapRecipe*                        manualMarkerDragRecipe   = nullptr;
+    // STEP126 — the static selection-highlight source (injected, see SetManualMarkerSelectionSource).
+    const int*                                      manualMarkerSelectedInstanceIdentifier = nullptr;
     MarkerDragGestureState manualMarkerDragState;
     bool                   bManualMarkerDragActive = false;   // this press started on a manual marker
 };

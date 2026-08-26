@@ -7,6 +7,8 @@
 #include "MarkersTab_Manual_UI.h"
 #include "Combo_UI.h"
 #include "DraggableListWidget_UI.h"
+#include "MarkerInstanceId_UI.h"
+#include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
@@ -37,7 +39,9 @@ bool ApplyMarkerInstanceListSignal(std::vector<Params::MarkerTransform>& transfo
 // back to 0 only for an unselected/stale pick. Both buttons gate on `markerLayers`' lock state:
 // Add on the selected marker layer itself, Remove on the SELECTED INSTANCE's own layer (which may
 // differ from the selected marker layer).
-bool DrawMarkerInstanceListButtons(std::vector<Params::MarkerTransform>& transforms, ManualMarkersState& state,
+bool DrawMarkerInstanceListButtons(std::vector<Params::MarkerTransform>& transforms,
+                                   const std::vector<Params::MarkerInstanceGroup>& markers,   // NEW — STEP126
+                                   ManualMarkersState& state,
                                    const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                    int selectedMarkerLayerIndex) {
     bool bInstancesMoved = false;
@@ -45,6 +49,7 @@ bool DrawMarkerInstanceListButtons(std::vector<Params::MarkerTransform>& transfo
     if (ImGui::Button("Add Instance")) {
         Params::MarkerTransform transform;
         transform.name = NextMarkerInstanceName(static_cast<int>(transforms.size()));
+        transform.instanceIdentifier = NextMarkerInstanceIdentifier(markers);   // NEW — ARCH §19.16
         transform.layerIndex = (selectedMarkerLayerIndex >= 0
                                 && selectedMarkerLayerIndex < static_cast<int>(markerLayers.size()))
                                ? selectedMarkerLayerIndex : 0;
@@ -192,7 +197,9 @@ void DrawMarkerInstanceIconOverridePicker(std::vector<Params::MarkerTransform>& 
 
 } // namespace
 
-void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group, const std::vector<Params::Army>& armies,
+void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
+                               const std::vector<Params::MarkerInstanceGroup>& markers,
+                               const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                ManualMarkersState& state, int selectedMarkerLayerIndex,
                                const IconAtlasManifest* iconManifest) {
@@ -202,7 +209,7 @@ void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group, const std::ve
         DrawMarkerInstanceList(group.transforms, group, armies, markerLayers, state, bAnyInstanceCommitted);
     if (signal.bHasSignal())
         bInstancesMoved = ApplyMarkerInstanceListSignal(group.transforms, state, signal) || bInstancesMoved;
-    bInstancesMoved = DrawMarkerInstanceListButtons(group.transforms, state, markerLayers,
+    bInstancesMoved = DrawMarkerInstanceListButtons(group.transforms, markers, state, markerLayers,
                                                     selectedMarkerLayerIndex) || bInstancesMoved;
     DrawMarkerInstanceIconOverridePicker(group.transforms, state, iconManifest);
     bInstancesMoved = bAnyInstanceCommitted || bInstancesMoved;

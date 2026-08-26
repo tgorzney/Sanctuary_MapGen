@@ -41,12 +41,16 @@ bool HitTestManualMarkers(const std::vector<Params::MarkerInstanceGroup>& marker
 // gesture's whole group tints red and a short status tooltip is drawn. Superseded outright by a
 // future real overlay/icon ticket — not `OverlayLayer_UI`/View-toolbar participation of any kind
 // (ARCH_14_PreviewOverlayLayering.md §14).
+// STEP126: `selectedHighlightInstanceIdentifiers` is this frame's ComputeManualMarkerSelectionHighlight
+// result — every instanceIdentifier that should draw with the select tint (ARCH §19.18), highest
+// priority after refused-drag-red. Empty = nothing selected, no highlight branch taken.
 void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& markers,
                             const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                             const std::vector<Params::Army>& armies,
                             const Params::GlobalMarkerSettings& globalMarkerSettings,
                             const MarkerDragGestureState& dragState, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionOriginX, float regionOriginY,
+                            const std::vector<int>& selectedHighlightInstanceIdentifiers,
                             ImDrawList& drawList);
 
 } // namespace Ui

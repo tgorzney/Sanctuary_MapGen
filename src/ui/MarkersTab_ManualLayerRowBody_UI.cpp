@@ -3,11 +3,12 @@
 // ceiling once STEP120 needed this function callable from outside its own translation unit), both
 // declared by MarkersTab_ManualLayers_UI.h. Mirrors MarkersTab_RuleLayers_UI.cpp/
 // MarkersTab_RuleLayerSettings_UI.cpp's own established aspect split.
-#include "MarkersTab_ManualLayers_UI.h"
+#include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "Checkbox_UI.h"
 #include "MarkerLayerSymmetrySection_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
+#include <string>
 
 namespace SanmapGen {
 namespace Ui {
@@ -24,7 +25,8 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                       std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
                       int globalSymmetryMask, int globalRadialRepeatCount,
-                      Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state) {
+                      Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state,
+                      const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier) {
     TextInputRules nameRules;
     nameRules.maximumLength = 48;
     nameRules.bAllowEmpty   = false;
@@ -46,6 +48,30 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
     ImGui::EndDisabled();
     DrawLayerSymmetrySection(layer, layerIndex, markerLayers, markers, geometry, globalSymmetryMask,
                              globalRadialRepeatCount, markerSymmetryFixSettings, state);
+
+    // STEP126, Open Q7 — the per-Layer instance list. Plain ImGui::Selectable rows, NOT a DraggableList
+    // instantiation (an instance's own home group can differ from this Layer, so there is no single
+    // homogeneous backing vector for a reorder/delete signal to apply against — see the design doc's
+    // own reasoning for rejecting DraggableList<Params::MarkerTransform> here). No delete/reorder
+    // affordance: deletion/repositioning stays owned by the roster editor (MarkersTab_Manual_UI.h).
+    ImGui::Separator();
+    ImGui::TextUnformatted("Instances");
+    const auto instanceIt = instanceIndex.instancesByLayerIndex.find(layerIndex);
+    if (instanceIt == instanceIndex.instancesByLayerIndex.end() || instanceIt->second.empty()) {
+        ImGui::TextDisabled("(none)");
+    } else {
+        for (const std::pair<int, int>& groupTransformIndex : instanceIt->second) {
+            const Params::MarkerInstanceGroup& instanceGroup =
+                markers[static_cast<std::size_t>(groupTransformIndex.first)];
+            const Params::MarkerTransform& instanceTransform =
+                instanceGroup.transforms[static_cast<std::size_t>(groupTransformIndex.second)];
+            const std::string rowLabel = instanceGroup.name + " - " + (!instanceTransform.name.empty()
+                ? instanceTransform.name : std::to_string(groupTransformIndex.second));
+            const bool bRowSelected = selectedManualInstanceIdentifier == instanceTransform.instanceIdentifier;
+            if (ImGui::Selectable(rowLabel.c_str(), bRowSelected))
+                selectedManualInstanceIdentifier = instanceTransform.instanceIdentifier;
+        }
+    }
     return bNameCommitted || bColorOverrideCommitted || bSnapCommitted || bSnapSizeCommitted;
 }
 

@@ -115,7 +115,7 @@ void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
         ImGui::TextUnformatted("Select a marker type to edit its roster.");
     } else {
         ImGui::Separator();
-        DrawMarkerInstanceSection(*group, armies, markerLayers, state, selectedMarkerLayerIndex, iconManifest);
+        DrawMarkerInstanceSection(*group, markers, armies, markerLayers, state, selectedMarkerLayerIndex, iconManifest);
     }
     DrawSectionEnd();
 }

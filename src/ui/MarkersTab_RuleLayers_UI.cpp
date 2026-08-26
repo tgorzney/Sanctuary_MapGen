@@ -64,11 +64,17 @@ bool ApplyRuleLayerFrameSignals(std::vector<Params::MarkerRuleLayer>& markerRule
     return bRecipeMoved;
 }
 
+} // namespace
+
 // The outer list plus the nested rule list. STEP110 Fix part 1: each row draws its OWN
 // DrawRuleLayerSettings inline whenever ITS OWN header is open — never gated on
 // `state.selectedRuleLayerIndex` (the nested rule list still is, drag-safety: DrawRuleLayerBody).
-void DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
-                           Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
+// STEP125: promoted out of the anonymous namespace, gains `markerTypeNameFilter` (ARCH §19.15(c)),
+// and returns whether the LIST signals alone moved the recipe — the non-empty-layer Delete confirm
+// and the trailing NotifyPlacementChange move to the tab-wide DrawMarkerTypeSections (§5(b)).
+bool DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
+                           Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                           const std::string& markerTypeNameFilter) {
     DraggableListSignal ruleSignal;
     int ruleSignalLayerIndex = -1;
     char rowLabel[128] = { 0 };
@@ -82,8 +88,7 @@ void DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
                           layer.name.empty() ? "Marker Layer" : layer.name.c_str(),
                           static_cast<int>(layer.rules.size()), suffix);
             DraggableListRow row;
-            row.bRowSuppressed = (layer.parentBundleIdentifier != -1);   // NEW — STEP120: bundled
-                                                                          // layers show in the tree
+            row.bRowSuppressed = IsMarkerRuleLayerRowSuppressed(layer, markerTypeNameFilter);   // CHANGED — STEP125
             row.label    = rowLabel;
             row.bVisible = layer.bEnabled;
             row.bLocked  = layer.bHidden;
@@ -99,13 +104,9 @@ void DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
         },
         state.selectedRuleLayerIndex);
 
-    bool bRecipeMoved = ApplyRuleLayerFrameSignals(markerRuleLayers, state, ruleSignal,
-                                                   ruleSignalLayerIndex, layerSignal);
-    bRecipeMoved = DrawPendingDeleteRuleLayerDialog(markerRuleLayers, state) || bRecipeMoved;
-    NotifyPlacementChange(bRecipeMoved, previewDriver);
+    return ApplyRuleLayerFrameSignals(markerRuleLayers, state, ruleSignal, ruleSignalLayerIndex, layerSignal);
+    // no DrawPendingDeleteRuleLayerDialog / NotifyPlacementChange here anymore — §5
 }
-
-} // namespace
 
 Params::MarkerRuleLayer* SelectedMarkerRuleLayer(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
                                                  const MarkersTabState& state) {
@@ -137,15 +138,6 @@ bool ApplyMarkerRuleListSignal(Params::MarkerRuleLayer& layer, const DraggableLi
         return true;
     }
     return ApplyDraggableListSignal(rules, signal);
-}
-
-void DrawMarkerRuleLayerList(std::vector<Params::MarkerRuleLayer>& markerRuleLayers,
-                             MarkersTabState& state, Pipeline::PreviewDriver* previewDriver,
-                             const IconAtlasManifest* iconManifest) {
-    DrawRuleLayerListBody(markerRuleLayers, state, previewDriver, iconManifest);
-    DrawRuleLayerButtons(markerRuleLayers, state, previewDriver);
-    // STEP110: no trailing settings draw here — DrawRuleLayerListBody's own row body, above, draws
-    // each row's settings inline, under its own header.
 }
 
 } // namespace Ui

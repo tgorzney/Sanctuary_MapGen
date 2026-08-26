@@ -99,6 +99,11 @@ void Application::WireCallbacks() {
     // SetManualMarkerDragSource. `markers`/`markerLayers` are the SAME vectors the Markers tab
     // edits (recipe.markers/recipe.markerLayers) — one source of truth, never a second copy.
     canvas.SetManualMarkerDragSource(&recipe.markers, &recipe.markerLayers, &recipe.geometry, &recipe);
+    // STEP126 — the static selection-highlight source; see MapCanvas_UI.h's
+    // SetManualMarkerSelectionSource. Points at the SAME MarkersTabState field the Markers tab's own
+    // instance-list rows write (tabState.markers.selectedManualInstanceIdentifier) — one source of
+    // truth, never a second copy.
+    canvas.SetManualMarkerSelectionSource(&tabState.markers.selectedManualInstanceIdentifier);
 }
 
 // The whole of the shell's generation duty. WHICH tier this is was derived by the driver from the

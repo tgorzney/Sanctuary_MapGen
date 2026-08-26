@@ -144,6 +144,88 @@ void TestProceduralOnlyBundleResolvesToEmptyMembership() {
          "a Bundle whose only member is Procedural no-ops on ApplyMarkerLayerBundleRotation");
 }
 
+// STEP125, ARCH §19.15(a): a fixture of 3 bundles typed {"Alloy", "", "Alloy"} filtered by "Alloy"
+// returns exactly the two "Alloy" bundles (by identifier, order preserved); filtered by "" returns
+// exactly the one untyped bundle; filtered by "Plasma" (absent from the fixture) returns empty.
+void TestBuildFilteredMarkerLayerBundlesByType() {
+    std::vector<Params::MarkerLayerBundle> bundles(3);
+    bundles[0].identifier = 1; bundles[0].markerTypeName = "Alloy";
+    bundles[1].identifier = 2; bundles[1].markerTypeName = "";
+    bundles[2].identifier = 3; bundles[2].markerTypeName = "Alloy";
+
+    const std::vector<Params::MarkerLayerBundle> alloyFiltered = BuildFilteredMarkerLayerBundlesByType(bundles, "Alloy");
+    Check(alloyFiltered.size() == 2u && alloyFiltered[0].identifier == 1 && alloyFiltered[1].identifier == 3,
+         "filtering by \"Alloy\" returns exactly the two Alloy bundles, order preserved");
+
+    const std::vector<Params::MarkerLayerBundle> unassignedFiltered = BuildFilteredMarkerLayerBundlesByType(bundles, "");
+    Check(unassignedFiltered.size() == 1u && unassignedFiltered[0].identifier == 2,
+         "filtering by \"\" returns exactly the one untyped bundle");
+
+    const std::vector<Params::MarkerLayerBundle> absentFiltered = BuildFilteredMarkerLayerBundlesByType(bundles, "Plasma");
+    Check(absentFiltered.empty(), "filtering by a type absent from the fixture returns empty");
+}
+
+// STEP125's own required "filtered-copy read/write safety" proof: a fixture of 3 bundles
+// (identifiers 10/20/30, only 20 typed "Alloy"); build the "Alloy" filtered copy (contains only
+// bundle 20); synthesize a Reparent signal DIRECTLY (no imgui, no Render call — the signal is
+// exactly the shape Render would have returned); apply it against the REAL, unfiltered bundles;
+// assert bundle 20's parentBundleIdentifier changed and bundles 10/30 (never in the filtered copy at
+// all) are untouched.
+void TestApplyMarkerLayerBundleTreeSignalFilteredCopyWriteSafety() {
+    std::vector<Params::MarkerLayerBundle> bundles(3);
+    bundles[0].identifier = 10; bundles[0].markerTypeName = "";
+    bundles[1].identifier = 20; bundles[1].markerTypeName = "Alloy";
+    bundles[2].identifier = 30; bundles[2].markerTypeName = "";
+    std::vector<Params::MarkerRuleLayer> ruleLayers;
+    std::vector<Params::MarkerInstanceLayer> instanceLayers;
+    MarkerLayerBundlesState state;
+
+    const std::vector<Params::MarkerLayerBundle> alloyFiltered = BuildFilteredMarkerLayerBundlesByType(bundles, "Alloy");
+    Check(alloyFiltered.size() == 1u && alloyFiltered[0].identifier == 20,
+         "the \"Alloy\" filtered copy contains only bundle 20");
+
+    TreeListSignal<MarkerGroupLeafKey_UI> signal;
+    signal.kind                 = TreeListSignalKind::Reparent;
+    signal.sourceKind            = TreeNodeSourceKind::Node;
+    signal.sourceNodeIdentifier  = 20;
+    signal.targetNodeIdentifier  = -1;
+    signal.dropZone              = TreeDropZone::OnAsChild;
+
+    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, state);
+
+    Check(bundles[1].identifier == 20 && bundles[1].parentBundleIdentifier == -1,
+         "a write sourced from a filtered-copy-driven signal lands on the real vector, by identifier");
+    Check(bundles[0].parentBundleIdentifier == -1 && bundles[2].parentBundleIdentifier == -1,
+         "bundles 10/30 — never present in the filtered copy at all — are untouched");
+}
+
+// The cross-Type-section nested-Bundle cutoff: parent (identifier 1, "Alloy"), child (identifier 2,
+// "Plasma", parentBundleIdentifier = 1). The Alloy-filtered copy contains only the parent (child
+// excluded — different type); the Plasma-filtered copy contains only the child, and within THAT
+// filtered copy the child's own parentBundleIdentifier (still 1) does not resolve to any other entry
+// — precisely the input condition TreeListWidget_UI::Render's own already-proven dangling-parent-is-
+// root rule (TreeListWidget_UI_Test.cpp, STEP120) consumes to render that child as a root.
+void TestCrossTypeSectionNestedBundleCutoff() {
+    std::vector<Params::MarkerLayerBundle> bundles(2);
+    bundles[0].identifier = 1; bundles[0].markerTypeName = "Alloy"; bundles[0].parentBundleIdentifier = -1;
+    bundles[1].identifier = 2; bundles[1].markerTypeName = "Plasma"; bundles[1].parentBundleIdentifier = 1;
+
+    const std::vector<Params::MarkerLayerBundle> alloyFiltered = BuildFilteredMarkerLayerBundlesByType(bundles, "Alloy");
+    Check(alloyFiltered.size() == 1u && alloyFiltered[0].identifier == 1,
+         "the Alloy-filtered copy contains ONLY the parent — the differently-typed child is excluded");
+
+    const std::vector<Params::MarkerLayerBundle> plasmaFiltered = BuildFilteredMarkerLayerBundlesByType(bundles, "Plasma");
+    Check(plasmaFiltered.size() == 1u && plasmaFiltered[0].identifier == 2,
+         "the Plasma-filtered copy contains ONLY the child");
+    bool bParentResolvesWithinFilteredCopy = false;
+    for (const Params::MarkerLayerBundle& candidate : plasmaFiltered)
+        if (candidate.identifier == plasmaFiltered[0].parentBundleIdentifier) bParentResolvesWithinFilteredCopy = true;
+    Check(!bParentResolvesWithinFilteredCopy,
+         "within the Plasma-filtered copy, the child's own parentBundleIdentifier (1) does not resolve "
+         "to any other entry — the exact dangling-parent condition TreeListWidget_UI::Render's own "
+         "already-proven root rule consumes");
+}
+
 } // namespace
 
 int main() {
@@ -152,6 +234,9 @@ int main() {
     TestApplyMarkerLayerBundleMove();
     TestApplyMarkerLayerBundleRotation();
     TestProceduralOnlyBundleResolvesToEmptyMembership();
+    TestBuildFilteredMarkerLayerBundlesByType();
+    TestApplyMarkerLayerBundleTreeSignalFilteredCopyWriteSafety();
+    TestCrossTypeSectionNestedBundleCutoff();
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

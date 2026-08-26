@@ -46,28 +46,39 @@ bool DrawPendingDeleteRuleLayerDialog(std::vector<Params::MarkerRuleLayer>& mark
     return true;
 }
 
-// STEP120: extracted out of DrawRuleLayerButtons so a Bundle node's own "add a Layer here" can reuse
-// it with a non-root parent (MarkersTab_Bundles_UI.cpp). `parentBundleIdentifierForNewLayer < 0` is
-// root scope — DrawRuleLayerButtons' own call below passes -1, unchanged behavior.
+// STEP120: extracted out of the old DrawRuleLayerButtons so a Bundle node's own "add a Layer here"
+// can reuse it with a non-root parent (MarkersTab_Bundles_UI.cpp). `parentBundleIdentifierForNewLayer
+// < 0` is root scope. STEP125: gains `markerTypeNameForNewLayer` (§4) — a Type-section's own
+// "Ungrouped Procedural Rules" sub-list (DrawMarkerTypeSections, MarkersTab_TypeSections_UI.cpp)
+// seeds it with that section's own type, so a layer added there does not mint with
+// `markerTypeName == ""` and visually "vanish" into the Unassigned section next frame. The Bundle
+// node's own call site (MarkersTab_BundleNodeBody_UI.cpp) leaves this parameter at its default —
+// a Bundle-scoped Layer's own type is resolved at the leaf-index lookup, not seeded here.
 bool DrawAddMarkerRuleLayerButton(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
-                                  int parentBundleIdentifierForNewLayer) {
+                                  int parentBundleIdentifierForNewLayer,
+                                  const std::string& markerTypeNameForNewLayer) {
     if (!ImGui::Button(parentBundleIdentifierForNewLayer < 0 ? "Add Layer" : "Add Procedural Layer Here"))
         return false;
     Params::MarkerRuleLayer layer;
     layer.parentBundleIdentifier = parentBundleIdentifierForNewLayer;   // STEP119 field
+    layer.markerTypeName         = markerTypeNameForNewLayer;          // NEW — STEP125
     markerRuleLayers.push_back(layer);
     state.selectedRuleLayerIndex = static_cast<int>(markerRuleLayers.size()) - 1;
     state.selectedRuleIndex      = 0;
     return true;
 }
 
-// Add Layer is always available, including at zero layers. Add Rule / Remove Selected Rule operate
-// on the selected layer and are drawn disabled (never a silent no-op) when none is selected.
-void DrawRuleLayerButtons(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
-                          Pipeline::PreviewDriver* previewDriver) {
-    bool bRecipeMoved = DrawAddMarkerRuleLayerButton(markerRuleLayers, state, -1);   // root, unchanged behavior
+// STEP125: Add Rule / Remove Selected Rule only — the "Add Layer" button is now per-Type-section
+// (DrawAddMarkerRuleLayerButton, above). Both operate on the tab-wide `state.selectedRuleLayerIndex`/
+// `selectedRuleIndex`, which is NOT type-scoped — drawing them once per Type-section would render up
+// to N redundant copies, all operating on the same single global selection (a "Remove Selected Rule"
+// click inside one section could delete a rule actually selected in another). Called exactly ONCE,
+// tab-wide, by DrawMarkerTypeSections (§5(b)) — replaces the retired DrawRuleLayerButtons. Drawn
+// disabled (never a silent no-op) when no layer is selected.
+void DrawMarkerRuleButtons(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
+                           Pipeline::PreviewDriver* previewDriver) {
     Params::MarkerRuleLayer* const layer = SelectedMarkerRuleLayer(markerRuleLayers, state);
-    ImGui::SameLine();
+    bool bRecipeMoved = false;
     ImGui::BeginDisabled(layer == nullptr);
     if (ImGui::Button("Add Rule") && layer != nullptr) {
         layer->rules.push_back(Params::MarkerRule());

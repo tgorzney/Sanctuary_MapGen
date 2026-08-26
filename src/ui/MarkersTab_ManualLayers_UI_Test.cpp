@@ -3,6 +3,8 @@
 // (§3) and `QuantizeMarkerPositionToLayerGrid` (§6). Pure logic only — no imgui frame, no window,
 // no GL context. Mirrors MarkerLayerIndexRepair_UI_Test.cpp's assertion shape.
 #include "MarkersTab_ManualLayers_UI.h"
+#include "ListWidget_TestFrame_UI.h"
+#include "MarkersTab_ManualLayerHelpers_UI.h"
 #include <cmath>
 #include <cstdio>
 
@@ -79,6 +81,121 @@ void RunQuantizeMarkerPositionToLayerGridChecks() {
           "and so does an index at size()");
 }
 
+// STEP126: BuildManualInstanceLayerIndex — three groups, transforms spread across layerIndex
+// 0/1/2, including one group with TWO transforms on the same layerIndex. instancesByLayerIndex[0]
+// holds exactly the expected (groupIndex, transformIndex) pairs, in encounter order; a layerIndex
+// with zero transforms is simply absent from the map (not present with an empty vector) — the
+// find() == end() case DrawLayerRowBody's own "(none)" branch depends on.
+void RunBuildManualInstanceLayerIndexChecks() {
+    std::vector<Params::MarkerInstanceGroup> markers(3);
+    markers[0].transforms.push_back(Params::MarkerTransform{});                       // group 0, transform 0, layerIndex 0
+    markers[0].transforms.back().layerIndex = 0;
+    markers[0].transforms.push_back(Params::MarkerTransform{});                       // group 0, transform 1, layerIndex 1
+    markers[0].transforms.back().layerIndex = 1;
+    markers[1].transforms.push_back(Params::MarkerTransform{});                       // group 1, transform 0, layerIndex 0
+    markers[1].transforms.back().layerIndex = 0;
+    markers[2].transforms.push_back(Params::MarkerTransform{});                       // group 2, transform 0, layerIndex 2
+    markers[2].transforms.back().layerIndex = 2;
+
+    const ManualInstanceLayerIndex_UI index = BuildManualInstanceLayerIndex(markers);
+
+    const auto layerZeroIt = index.instancesByLayerIndex.find(0);
+    Check(layerZeroIt != index.instancesByLayerIndex.end(), "layerIndex 0 is present in the index");
+    if (layerZeroIt != index.instancesByLayerIndex.end()) {
+        Check(static_cast<int>(layerZeroIt->second.size()) == 2, "layerIndex 0 holds exactly two pairs");
+        Check(layerZeroIt->second.size() >= 2
+              && layerZeroIt->second[0] == std::pair<int, int>(0, 0)
+              && layerZeroIt->second[1] == std::pair<int, int>(1, 0),
+              "layerIndex 0's pairs are (0,0) then (1,0), in encounter order");
+    }
+
+    const auto layerOneIt = index.instancesByLayerIndex.find(1);
+    Check(layerOneIt != index.instancesByLayerIndex.end() && layerOneIt->second.size() == 1
+          && layerOneIt->second[0] == std::pair<int, int>(0, 1), "layerIndex 1 holds exactly (0,1)");
+
+    Check(index.instancesByLayerIndex.find(3) == index.instancesByLayerIndex.end(),
+          "a layerIndex with zero transforms is absent from the map, not present with an empty vector");
+}
+
+// STEP125, ARCH §19.15(c): the `||` composition — type-mismatch-only, bundle-membership-only, both,
+// and neither — mirrors IsMarkerRuleLayerRowSuppressed's own four-case shape one tier over
+// (MarkersTab_RuleLayers_UI_Test.cpp), on Params::MarkerInstanceLayer.
+void RunIsMarkerInstanceLayerRowSuppressedChecks() {
+    Params::MarkerInstanceLayer typeMismatchOnly;
+    typeMismatchOnly.parentBundleIdentifier = -1;
+    typeMismatchOnly.markerTypeName         = "Alloy";
+    Check(!IsMarkerInstanceLayerRowSuppressed(typeMismatchOnly, "Alloy"),
+          "an ungrouped layer whose own type matches the filter is NOT suppressed");
+    Check(IsMarkerInstanceLayerRowSuppressed(typeMismatchOnly, "Plasma"),
+          "an ungrouped layer whose own type does NOT match the filter IS suppressed (type-mismatch only)");
+
+    Params::MarkerInstanceLayer bundleMembershipOnly;
+    bundleMembershipOnly.parentBundleIdentifier = 5;
+    bundleMembershipOnly.markerTypeName         = "Alloy";
+    Check(IsMarkerInstanceLayerRowSuppressed(bundleMembershipOnly, "Alloy"),
+          "a bundled layer IS suppressed even when its own type matches the filter (bundle-membership only)");
+
+    Params::MarkerInstanceLayer both;
+    both.parentBundleIdentifier = 5;
+    both.markerTypeName         = "Alloy";
+    Check(IsMarkerInstanceLayerRowSuppressed(both, "Plasma"),
+          "a bundled layer with a mismatched type IS suppressed (the compound case, not an XOR)");
+}
+
+// STEP125: DrawLayerListButtons's new markerTypeNameForNewLayer parameter — mirrors
+// DrawAddMarkerRuleLayerButton's own procedural-side check (MarkersTab_RuleLayers_UI_Test.cpp), a
+// live headless imgui frame since the button must actually be clicked to push a new row.
+struct AddManualLayerButtonFrameResult {
+    ImVec2 origin;
+    ImVec2 size;
+    bool   bReturned = false;
+};
+
+AddManualLayerButtonFrameResult RunAddManualLayerButtonFrame(HeadlessMouseState mouse,
+        std::vector<Params::MarkerInstanceLayer>& layers, ManualMarkerLayersState& state,
+        const std::string& markerTypeNameForNewLayer) {
+    AddManualLayerButtonFrameResult result;
+    RunHeadlessFrame(mouse, ImVec2(300.0f, 100.0f), [&] {
+        result.origin    = ImGui::GetCursorScreenPos();
+        result.bReturned = DrawLayerListButtons(layers, state, -1, markerTypeNameForNewLayer);
+        result.size      = ImGui::GetItemRectSize();
+    });
+    return result;
+}
+
+void ClickAddManualLayerButton(std::vector<Params::MarkerInstanceLayer>& layers, ManualMarkerLayersState& state,
+                               const std::string& markerTypeNameForNewLayer,
+                               AddManualLayerButtonFrameResult& outClickedResult) {
+    const AddManualLayerButtonFrameResult settle =
+        RunAddManualLayerButtonFrame(HeadlessMouseState(), layers, state, markerTypeNameForNewLayer);
+    const ImVec2 center(settle.origin.x + settle.size.x * 0.5f, settle.origin.y + settle.size.y * 0.5f);
+    HeadlessMouseState hover;   hover.position = center;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    RunAddManualLayerButtonFrame(hover, layers, state, markerTypeNameForNewLayer);
+    RunAddManualLayerButtonFrame(press, layers, state, markerTypeNameForNewLayer);
+    outClickedResult = RunAddManualLayerButtonFrame(release, layers, state, markerTypeNameForNewLayer);
+}
+
+void RunDrawLayerListButtonsTypeSeedChecks() {
+    HeadlessImguiSession session;
+
+    std::vector<Params::MarkerInstanceLayer> seededLayers;
+    ManualMarkerLayersState seededState;
+    AddManualLayerButtonFrameResult seededClick;
+    ClickAddManualLayerButton(seededLayers, seededState, "Spawn", seededClick);
+    Check(seededClick.bReturned, "clicking Add Marker Layer reports a layer was added");
+    Check(!seededLayers.empty() && seededLayers.back().markerTypeName == "Spawn",
+          "markerTypeNameForNewLayer = \"Spawn\" lands on the newly pushed layer's own markerTypeName");
+
+    std::vector<Params::MarkerInstanceLayer> defaultLayers;
+    ManualMarkerLayersState defaultState;
+    AddManualLayerButtonFrameResult defaultClick;
+    ClickAddManualLayerButton(defaultLayers, defaultState, "", defaultClick);
+    Check(!defaultLayers.empty() && defaultLayers.back().markerTypeName.empty(),
+          "the parameter omitted (default, empty) leaves markerTypeName empty — unchanged existing behavior");
+}
+
 // STEP118: RT enabled by default for ManualMarkerLayersState's six toggles — RealtimeToggle's
 // own class default stays off (RtToggleWidget_UI_Test.cpp).
 void RunRealtimeDefaultChecks() {
@@ -96,6 +213,9 @@ void RunRealtimeDefaultChecks() {
 int main() {
     RunIsMarkerInstanceLayerLockedChecks();
     RunQuantizeMarkerPositionToLayerGridChecks();
+    RunBuildManualInstanceLayerIndexChecks();
+    RunIsMarkerInstanceLayerRowSuppressedChecks();
+    RunDrawLayerListButtonsTypeSeedChecks();
     RunRealtimeDefaultChecks();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }

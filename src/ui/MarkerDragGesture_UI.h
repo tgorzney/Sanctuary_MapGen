@@ -18,6 +18,7 @@
 #pragma once
 #include <vector>
 #include "MarkerOrbitCorrespondence_UI.h"
+#include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
 #include "MarkersTab_Manual_UI.h"
 #include "../params/Geometry_PARAMS.h"

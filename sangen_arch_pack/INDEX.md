@@ -167,12 +167,20 @@ Scenario authoring/export ratification described above) — the gap that flag na
   `ARCH_19_11_FormatSpecCorrectionBundle.md` §19.11 and `SANMAP_FORMAT_SPEC.md`'s own
   "Conversion / import-export logic" section. Whoever picks this up must also confirm the new
   `ParentBundleIdentifier` merged fields (Correction 19) don't ship with the same write-side gap.
-- **`MarkersTab_ManualLayers_UI.h` was over the §1.5 150-line hard ceiling before this session's
-  fix (2026-08-26).** STEP123 left it at 165 lines; remediated by `ARCH_19_22_ManualLayersHeaderSplit.md`
-  §19.22 (a new sibling header, `MarkersTab_ManualLayerRowBody_UI.h`, pulls
-  `DrawLayerRowBody`/`DrawManualMarkerLayerColorOverrideHeaderControl`'s declarations out to pair
-  with their already-separate `.cpp`). Ruled, not yet built — a coder work-order, dispatched ahead
-  of the Type-Sections Ticket B that would otherwise land more content on top of the violation.
+- **`MarkersTab_ManualLayers_UI.h` was over the §1.5 150-line hard ceiling (2026-08-26), remediation
+  revised same day.** STEP123 left it at 165 lines. `ARCH_19_22_ManualLayersHeaderSplit.md` §19.22
+  originally ruled a single RowBody split (a new sibling header, `MarkersTab_ManualLayerRowBody_UI.h`,
+  pairing `MarkersTab_ManualLayerRowBody_UI.cpp`'s existing definitions with the declaration header
+  they lacked) and stated no further split was needed before Ticket B. **That premise did not hold:**
+  Ticket B's actual draft (`work_orders/STEP125_MarkersTabTypeSections_UI.md`) found the RowBody split
+  still unbuilt AND independently needed its own second split (a new `MarkersTab_ManualLayerHelpers_UI.h`,
+  five pure standalone helpers) to fit its own three new promoted/renamed declarations under the
+  ceiling. §19.22 was rewritten the same day (still §19.22 — no new subsection) to rule BOTH splits
+  happen together, additively, as one authoritative shape: RowBody content in one sibling header,
+  the five pure helpers plus a new `IsMarkerInstanceLayerRowSuppressed` predicate in another, the
+  unused `SelectedManualMarkerLayer` explicitly staying put (dead code, out of scope for either
+  split), landing the parent header at roughly 110-115 lines — comfortably under ceiling. Ruled, not
+  yet built — a coder work-order.
 
 **Fixed since the §15.5 ratification (2026-08-21):** the naval-fleet composition gap flagged
 below the first time this note was written is closed. The live reference
@@ -443,16 +451,30 @@ hang one on). §19.21 closes, with one explicit sentence, that `MarkerRule::cate
 `markerTypeName` are two permanently independent concepts a future ticket may not silently merge.
 
 **Unrelated, time-sensitive item from the same session — `ARCH_19_22_ManualLayersHeaderSplit.md`
-§19.22 (2026-08-26).** `src/ui/MarkersTab_ManualLayers_UI.h` was left at 165 lines by a just-completed
-coder ticket (STEP123), over `ARCH_01_05_FileSizeCeilings.md` §1.5's 150-line hard ceiling (it was
-already exactly at the ceiling before that ticket's own change). Ruled resolved now, ahead of the
-Type-Sections work's Ticket B (which would otherwise land more content on top of an
-already-noncompliant file): split along the file's own established fault line, mirroring its own
-`MarkerLayerIndexRepair_UI.h` precedent — a new sibling header,
+§19.22 (2026-08-26; revised, same day, into its FINAL combined shape once Ticket B's own actual
+draft falsified this section's original "no further split needed" premise — see the "Standing
+recorded defects" entry above for the short version).** `src/ui/MarkersTab_ManualLayers_UI.h` was
+left at 165 lines by a just-completed coder ticket (STEP123), over
+`ARCH_01_05_FileSizeCeilings.md` §1.5's 150-line hard ceiling (it was already exactly at the
+ceiling before that ticket's own change). §19.22's FINAL ruling splits the file along BOTH of its
+real fault lines, additively, in one remediation: (1) a new sibling header,
 `src/ui/MarkersTab_ManualLayerRowBody_UI.h`, gives the already-separately-implemented
 `MarkersTab_ManualLayerRowBody_UI.cpp` the declaration header it should already have had
 (`DrawLayerRowBody`, `DrawManualMarkerLayerColorOverrideHeaderControl`, their two paired
-reserved-width constants), with every real consumer's `#include` list updated explicitly rather
-than relying on the parent header's transitive re-export. Brings the parent header to roughly 143
-lines — under the hard ceiling, with no further split needed before Ticket B is drafted. Ruled,
-not built — a coder work-order, same posture as every other file-shape ruling in this pack.
+reserved-width constants); (2) a new `src/ui/MarkersTab_ManualLayerHelpers_UI.h` (required by
+Ticket B's own `STEP125_MarkersTabTypeSections_UI.md` §6, adopted here as-is) relocates the five
+named pure helpers (`IsMarkerInstanceLayerLocked`, `QuantizeMarkerPositionToLayerGrid`,
+`EffectiveManualMarkerLayerColor`, `ManualMarkerLayerRowLabel`, `NextMarkerLayerName`) plus a new
+`IsMarkerInstanceLayerRowSuppressed` predicate; the unused `SelectedManualMarkerLayer` is an
+explicit carve-out, staying in the parent header untouched (confirmed dead — zero call sites —
+out of scope for either split to relocate or remove). The parent header keeps its
+`ManualMarkerLayersState` struct plus Ticket B's own new/renamed entry-point declarations
+(`DrawLayerList` promoted, `DrawManualMarkerLayerBlockSettings` renamed/promoted from
+`DrawLayerSettings`, `DrawManualMarkerLayerListBody` new, `DrawLayerListButtons` gains a
+`markerTypeNameForNewLayer` parameter) and gains a `DraggableListWidget_UI.h` include it did not
+previously need (for `DraggableListSignal`, `DrawLayerList`'s now-visible-outside-the-.cpp return
+type) — landing at roughly 110-115 lines, well under ceiling. Every real consumer's `#include`
+list is updated explicitly for both new headers, mechanically, at every call site — no reliance on
+either header's transitive re-export. Ruled, not yet built — a coder work-order (implemented as
+part of, or immediately ahead of, Ticket B's own diff — the two splits and Ticket B's new
+declarations land together).

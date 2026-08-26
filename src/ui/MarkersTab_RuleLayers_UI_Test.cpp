@@ -3,6 +3,7 @@
 // or GL context). Sibling TU to MarkersTab_UI_Test.cpp, which owns main() and the shared
 // `Check`/`failureCount` (ARCH §1.5 — one binary, split translation units).
 #include "MarkersTab_UI.h"
+#include "ListWidget_TestFrame_UI.h"
 
 using namespace SanmapGen;
 using namespace SanmapGen::Ui;
@@ -116,6 +117,84 @@ void RunSelectedMarkerRuleFenceChecks() {
     Check(SelectedMarkerRule(emptyLayers, state) == nullptr, "an empty markerRuleLayers resolves to null");
 }
 
+// STEP125, ARCH §19.15(c): the `||` composition — type-mismatch-only, bundle-membership-only, both,
+// and neither — proves the compound case isn't accidentally an XOR.
+void RunIsMarkerRuleLayerRowSuppressedChecks() {
+    Params::MarkerRuleLayer typeMismatchOnly;
+    typeMismatchOnly.parentBundleIdentifier = -1;
+    typeMismatchOnly.markerTypeName         = "Alloy";
+    Check(!IsMarkerRuleLayerRowSuppressed(typeMismatchOnly, "Alloy"),
+          "an ungrouped layer whose own type matches the filter is NOT suppressed");
+    Check(IsMarkerRuleLayerRowSuppressed(typeMismatchOnly, "Plasma"),
+          "an ungrouped layer whose own type does NOT match the filter IS suppressed (type-mismatch only)");
+
+    Params::MarkerRuleLayer bundleMembershipOnly;
+    bundleMembershipOnly.parentBundleIdentifier = 5;
+    bundleMembershipOnly.markerTypeName         = "Alloy";
+    Check(IsMarkerRuleLayerRowSuppressed(bundleMembershipOnly, "Alloy"),
+          "a bundled layer IS suppressed even when its own type matches the filter (bundle-membership only)");
+
+    Params::MarkerRuleLayer both;
+    both.parentBundleIdentifier = 5;
+    both.markerTypeName         = "Alloy";
+    Check(IsMarkerRuleLayerRowSuppressed(both, "Plasma"),
+          "a bundled layer with a mismatched type IS suppressed (the compound case, not an XOR)");
+}
+
+// STEP125: DrawAddMarkerRuleLayerButton's new markerTypeNameForNewLayer parameter. A live headless
+// imgui frame (mirrors MarkersTab_ManualLayerColorOverrideHeader_UI_Test.cpp's own click pattern),
+// since the button must actually be clicked to push a new row.
+struct AddRuleLayerButtonFrameResult {
+    ImVec2 origin;
+    ImVec2 size;
+    bool   bReturned = false;
+};
+
+AddRuleLayerButtonFrameResult RunAddRuleLayerButtonFrame(HeadlessMouseState mouse,
+        std::vector<Params::MarkerRuleLayer>& layers, MarkersTabState& state,
+        const std::string& markerTypeNameForNewLayer) {
+    AddRuleLayerButtonFrameResult result;
+    RunHeadlessFrame(mouse, ImVec2(300.0f, 100.0f), [&] {
+        result.origin    = ImGui::GetCursorScreenPos();
+        result.bReturned = DrawAddMarkerRuleLayerButton(layers, state, -1, markerTypeNameForNewLayer);
+        result.size      = ImGui::GetItemRectSize();
+    });
+    return result;
+}
+
+void ClickAddRuleLayerButton(std::vector<Params::MarkerRuleLayer>& layers, MarkersTabState& state,
+                             const std::string& markerTypeNameForNewLayer,
+                             AddRuleLayerButtonFrameResult& outClickedResult) {
+    const AddRuleLayerButtonFrameResult settle =
+        RunAddRuleLayerButtonFrame(HeadlessMouseState(), layers, state, markerTypeNameForNewLayer);
+    const ImVec2 center(settle.origin.x + settle.size.x * 0.5f, settle.origin.y + settle.size.y * 0.5f);
+    HeadlessMouseState hover;   hover.position = center;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    RunAddRuleLayerButtonFrame(hover, layers, state, markerTypeNameForNewLayer);
+    RunAddRuleLayerButtonFrame(press, layers, state, markerTypeNameForNewLayer);
+    outClickedResult = RunAddRuleLayerButtonFrame(release, layers, state, markerTypeNameForNewLayer);
+}
+
+void RunDrawAddMarkerRuleLayerButtonTypeSeedChecks() {
+    HeadlessImguiSession session;
+
+    std::vector<Params::MarkerRuleLayer> seededLayers;
+    MarkersTabState seededState;
+    AddRuleLayerButtonFrameResult seededClick;
+    ClickAddRuleLayerButton(seededLayers, seededState, "Alloy", seededClick);
+    Check(seededClick.bReturned, "clicking Add Layer reports the recipe moved");
+    Check(!seededLayers.empty() && seededLayers.back().markerTypeName == "Alloy",
+          "markerTypeNameForNewLayer = \"Alloy\" lands on the newly pushed layer's own markerTypeName");
+
+    std::vector<Params::MarkerRuleLayer> defaultLayers;
+    MarkersTabState defaultState;
+    AddRuleLayerButtonFrameResult defaultClick;
+    ClickAddRuleLayerButton(defaultLayers, defaultState, "", defaultClick);
+    Check(!defaultLayers.empty() && defaultLayers.back().markerTypeName.empty(),
+          "the parameter omitted (default, empty) leaves markerTypeName empty — unchanged existing behavior");
+}
+
 } // namespace
 
 void RunMarkerRuleLayerAcceptanceChecks() {
@@ -123,4 +202,6 @@ void RunMarkerRuleLayerAcceptanceChecks() {
     RunRuleLayerDeleteChecks();
     RunOutOfRangeRuleLayerChecks();
     RunSelectedMarkerRuleFenceChecks();
+    RunIsMarkerRuleLayerRowSuppressedChecks();
+    RunDrawAddMarkerRuleLayerButtonTypeSeedChecks();
 }

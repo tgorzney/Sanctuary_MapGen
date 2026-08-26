@@ -164,6 +164,7 @@ Params::MarkerInstanceGroup* DrawMarkerGroupSection(std::vector<Params::MarkerIn
 // `iconManifest` (STEP114) is nullable: with no resident atlas the icon-override picker degrades
 // to text only, same posture DrawMarkersTabGlobals already has.
 void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
+                               const std::vector<Params::MarkerInstanceGroup>& markers,   // NEW — STEP126, for NextMarkerInstanceIdentifier's global-uniqueness scan
                                const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                ManualMarkersState& state, int selectedMarkerLayerIndex,

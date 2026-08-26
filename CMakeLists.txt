@@ -764,6 +764,9 @@ add_sangen_test(MarkersTab_Manual_UI_Test src/ui/MarkersTab_Manual_UI_Test.cpp)
 # STEP60_MarkerInstanceLayer_PARAMS: `NextMarkerLayerId`'s own small binary, mirroring
 # Section_UI_Test's pure-decision shape.
 add_sangen_test(MarkerLayerId_UI_Test     src/ui/MarkerLayerId_UI_Test.cpp)
+# STEP126: NextMarkerInstanceIdentifier's own small binary — mirrors MarkerLayerId_UI_Test's exact
+# pure-decision shape, one tier down (group, then transform; global-uniqueness scan).
+add_sangen_test(MarkerInstanceId_UI_Test  src/ui/MarkerInstanceId_UI_Test.cpp)
 # STEP81: the Manual Marker Layers block's own `layerIndex` repair functions (delete/reorder),
 # the layerId-never-touched regression guard, and the Combo-binding store guard — all pure, no
 # imgui frame needed (MarkerLayerIndexRepair_UI.h).
@@ -777,14 +780,28 @@ add_sangen_test(MarkersTab_ManualLayers_UI_Test src/ui/MarkersTab_ManualLayers_U
 # posture); needs no explicit imgui link, same as that test, since SanGenV2 links imgui PUBLIC.
 add_sangen_test(MarkersTab_ManualLayerColorOverrideHeader_UI_Test
     src/ui/MarkersTab_ManualLayerColorOverrideHeader_UI_Test.cpp)
+# STEP126: DrawLayerRowBody's new per-Layer instance list (Open Q7) — row click selects the right
+# instanceIdentifier, a second click updates (not toggles/adds), and a layer with zero matching
+# instances renders "(none)" with no interactive row. One live headless imgui frame, no window/GL
+# (mirrors MarkersTab_ManualLayerColorOverrideHeader_UI_Test's own posture).
+add_sangen_test(MarkersTab_ManualInstanceListRows_UI_Test
+    src/ui/MarkersTab_ManualInstanceListRows_UI_Test.cpp)
 # STEP120: MarkersTab_Bundles_UI.h's own pure helpers (BuildMarkerLayerBundleLeafIndex,
 # NextMarkerLayerBundleId) and the Move/Rotate Apply functions' own call-boundary behavior — pure,
-# no imgui frame needed (STEP106's "defer the imgui-coupled path" posture).
+# no imgui frame needed (STEP106's "defer the imgui-coupled path" posture). STEP125 extends this
+# binary with BuildFilteredMarkerLayerBundlesByType / ApplyMarkerLayerBundleTreeSignal coverage.
 add_sangen_test(MarkersTab_Bundles_UI_Test src/ui/MarkersTab_Bundles_UI_Test.cpp)
+# STEP125: EnumerateMarkerTypeSectionNames — the Markers tab's dynamic Type-section outer loop
+# (ARCH §19.14) — pure, no imgui frame needed.
+add_sangen_test(MarkersTab_TypeSections_UI_Test src/ui/MarkersTab_TypeSections_UI_Test.cpp)
 # STEP94: MarkerDragGesture_UI's pure gesture state machine (correspondence build/match, live
 # per-frame writes, cardinality growth/shrink, Spawn-refusal freeze, ungrouped free-drag) and
 # RepositionSymmetryGroupMember (R2 §4's roster-slider counterpart) — pure/imgui-free, no window.
 add_sangen_test(MarkerDragGesture_UI_Test src/ui/MarkerDragGesture_UI_Test.cpp)
+# STEP126: ComputeManualMarkerSelectionHighlight's own pure/imgui-free coverage (ARCH §19.19) — the
+# no-selection/stale-identifier safety cases and the position-driven sibling-orbit match, including
+# the freshly-authored, never-dragged (symmetryGroupIdentifier == 0) case.
+add_sangen_test(MarkerSelectionHighlight_UI_Test src/ui/MarkerSelectionHighlight_UI_Test.cpp)
 # STEP94: MapCanvas_MarkerDrag_UI's one imgui-including half — the linear hit-test (including its
 # Picking_UI::PickMarker-mirrored first-match-wins tie rule) and the stopgap at-rest/soft-hide/
 # ghost/Spawn-refused-tint draw. One live headless imgui frame, no window/GL.

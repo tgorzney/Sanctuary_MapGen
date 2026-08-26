@@ -40,6 +40,7 @@
 #include "MarkersTab_Placed_UI.h"
 #include "MarkersTab_RuleLayers_UI.h"
 #include "MarkersTab_Rules_UI.h"
+#include "MarkersTab_TypeSections_UI.h"
 #include "RangeSliderWidget_UI.h"
 #include "../params/MarkerRule_PARAMS.h"
 
@@ -103,9 +104,23 @@ struct MarkersTabState {
     // same frame (MarkersTab_ManualLayers_UI.h).
     ManualMarkerLayersState manualLayers;
 
-    // STEP120: the Group/Bundle tree, drawn before the two "Ungrouped ..." sections it filters
-    // (MarkersTab_Bundles_UI.h).
+    // STEP120: the Group/Bundle tree state (expand/select), shared across every Type-section's own
+    // filtered Render call (MarkersTab_Bundles_UI.h) — a bundle's own expand-state and "is this the
+    // selected bundle" bit are tab-wide concepts, not per-section ones.
     MarkerLayerBundlesState bundles;
+
+    // STEP125: the dynamic Type-section outer loop's own per-type collapse state, keyed by
+    // markerTypeName (MarkersTab_TypeSections_UI.h). `bundles` above still holds the ONE shared
+    // Bundle-tree state (expand/select), reused across every Type-section's own filtered Render call.
+    MarkerTypeSectionsState typeSections;
+
+    // STEP126 — the SINGLE selection target for the per-Layer instance-list click (Open Q7) and the
+    // MapCanvas static highlight (ARCH §19.19/§19.20, manual-only). Lives at the TOP level, not
+    // inside ManualMarkerLayersState/ManualMarkersState, because it must stay visible regardless of
+    // which Layer's own row body happens to be expanded when the click occurs — same reasoning
+    // MarkerLayerBundlesState::selectedBundleIdentifier already applies one tier up its own struct.
+    // -1 = no selection (Constitution §6 sentinel convention).
+    int selectedManualInstanceIdentifier = -1;
 };
 
 // rule -> widget mirrors (the paired min/max fields the range sliders edit, and the int count).

@@ -11,6 +11,7 @@
 // both fronted by this one header, same split MarkersTab_RuleLayers_UI.h/.cpp already uses.
 #pragma once
 #include <algorithm>
+#include <string>
 #include <unordered_map>
 #include <vector>
 #include "MarkerSymmetryFixCommand_UI.h"
@@ -43,7 +44,6 @@ inline bool operator==(const MarkerGroupLeafKey_UI& a, const MarkerGroupLeafKey_
 }
 
 struct MarkerLayerBundlesState {
-    SectionState  section;
     TreeListState treeState;
     int           selectedBundleIdentifier = -1;
     // ONE shared scratch triple for whichever Bundle's own expanded node body is currently drawing
@@ -102,10 +102,31 @@ void DrawMarkerLayerBundleNodeBody(int bundleIdentifier, std::vector<Params::Mar
 
 // MarkersTab_Bundles_UI.cpp — the tree mechanics:
 
-// The Bundle tree Section. `rootState` is the whole MarkersTab state (needed for
-// DrawAddMarkerRuleLayerButton's MarkersTabState& parameter). `geometry`/`globalSymmetryMask`/
-// `globalRadialRepeatCount`/`markerSymmetryFixSettings` thread straight through to each expanded
-// Manual leaf's DrawLayerRowBody, same parameter list DrawManualMarkerLayers already takes.
+// The filtered COPY (ARCH §19.15(a)) — safe to pass as TreeListWidget_UI's `nodes` parameter because
+// Render uses `nodes` for tree LAYOUT only; every mutation path resolves the REAL
+// Params::MarkerLayerBundle& by identifier-keyed lookup into the caller's own `bundles` vector
+// (ApplyMarkerLayerBundleTreeSignal, below), never by position within this copy.
+std::vector<Params::MarkerLayerBundle> BuildFilteredMarkerLayerBundlesByType(
+    const std::vector<Params::MarkerLayerBundle>& bundles, const std::string& markerTypeNameFilter);
+
+// The Select/Reparent signal-application logic DrawMarkerLayerBundleTree already ran inline
+// (STEP120) — extracted verbatim, UNCHANGED behavior, purely so it has a name and can be driven
+// directly by a test fixture without an imgui frame (STEP125's own required "filtered-copy write
+// safety" coverage, see Verify).
+void ApplyMarkerLayerBundleTreeSignal(const TreeListSignal<MarkerGroupLeafKey_UI>& signal,
+                                      std::vector<Params::MarkerLayerBundle>& bundles,
+                                      std::vector<Params::MarkerRuleLayer>& ruleLayers,
+                                      std::vector<Params::MarkerInstanceLayer>& instanceLayers,
+                                      MarkerLayerBundlesState& state);
+
+// The Bundle tree mechanics — no Section wrap of its own (STEP125: the Type-section's own outer
+// DrawSectionBegin, MarkersTab_TypeSections_UI.cpp, supplies that collapsible now). `rootState` is
+// the whole MarkersTab state (needed for DrawAddMarkerRuleLayerButton's MarkersTabState& parameter).
+// `geometry`/`globalSymmetryMask`/`globalRadialRepeatCount`/`markerSymmetryFixSettings` thread
+// straight through to each expanded Manual leaf's DrawLayerRowBody. `markerTypeNameFilter`
+// (ARCH §19.15(a)) scopes both the tree's own filtered copy and "Add Group"'s seeded
+// `bundle.markerTypeName` — every call site is now type-scoped, there is no more "root/global" tree
+// render.
 void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                std::vector<Params::MarkerRuleLayer>& ruleLayers,
                                std::vector<Params::MarkerInstanceLayer>& instanceLayers,
@@ -114,7 +135,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                int globalRadialRepeatCount,
                                Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                MarkerLayerBundlesState& state, MarkersTabState& rootState,
-                               Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest);
+                               Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
+                               const std::string& markerTypeNameFilter);
 
 } // namespace Ui
 } // namespace SanmapGen

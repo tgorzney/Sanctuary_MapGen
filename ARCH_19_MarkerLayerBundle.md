@@ -46,7 +46,7 @@ fields; and a `§1.5` file-size-ceiling remediation this extension required ahea
 | §19.19 | [ARCH_19_19_StaticHighlightComputationAndWiring.md](ARCH_19_19_StaticHighlightComputationAndWiring.md) | Static selection-highlight — one-shot orbit computation (not `MarkerOrbitCorrespondence_UI.h`), tolerance reuse, canvas wiring |
 | §19.20 | [ARCH_19_20_ManualOnlySelectionScope.md](ARCH_19_20_ManualOnlySelectionScope.md) | Manual-only selection scope — formal law, cross-referencing §19.9 |
 | §19.21 | [ARCH_19_21_CategoryVsMarkerTypeNameClosed.md](ARCH_19_21_CategoryVsMarkerTypeNameClosed.md) | `MarkerRule::category` vs. `markerTypeName` — two permanently independent concepts, closed |
-| §19.22 | [ARCH_19_22_ManualLayersHeaderSplit.md](ARCH_19_22_ManualLayersHeaderSplit.md) | File-size ceiling remediation — `MarkersTab_ManualLayers_UI.h` split, resolved ahead of Ticket B |
+| §19.22 | [ARCH_19_22_ManualLayersHeaderSplit.md](ARCH_19_22_ManualLayersHeaderSplit.md) | File-size ceiling remediation, FINAL combined plan (2026-08-26 revision) — `MarkersTab_ManualLayers_UI.h` splits along BOTH the RowBody fault line and Ticket B's own required Helpers fault line, additively; supersedes this section's earlier single-split text once Ticket B's actual draft (`STEP125`) proved it added new declarations of its own |
 
 Related law: `sangen_arch_pack/CONSTITUTION.md`; `ARCH_03_ModuleBoundaries.md` §3.5 (the general
 MATH/PARAMS/PROC placement rule this section's math rulings apply, not re-derive);

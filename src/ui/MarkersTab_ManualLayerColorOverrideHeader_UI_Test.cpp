@@ -6,6 +6,7 @@
 // `RunHeadlessFrame` harness the same way `DraggableListWidget_UI_Test.cpp` does. This is a leaf
 // imgui function, testable standalone — no `DraggableList::Render` wrapper needed.
 #include "ListWidget_TestFrame_UI.h"
+#include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
 #include <cstdio>
 

@@ -9,22 +9,6 @@
 
 namespace SanmapGen {
 namespace Ui {
-namespace {
-
-// The whole procedural stack: the two-level list (MarkersTab_RuleLayers_UI.h). STEP80 moved the
-// list mechanics, the buttons and the layer-level symmetry into that file; STEP110 moved this
-// file's own remaining per-rule detail sections (Gates/Quantity/Area/Focus/Placement Gate/
-// Transform/Template Picker, `DrawRuleSettings`) into the INNER row body too, nested inside its own
-// expanded rule-layer row (MarkersTab_RuleLayerSettings_UI.cpp / MarkersTab_RuleLayers_UI.cpp) — so
-// this function is now just the Section wrapper around the two-level list.
-void DrawRuleStack(Params::MapRecipe& recipe, MarkersTabState& state,
-                   Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
-    if (!DrawSectionBegin("Ungrouped Procedural Rules", state.ruleStackSection)) return;
-    DrawMarkerRuleLayerList(recipe.markerRuleLayers, state, previewDriver, iconManifest);
-    DrawSectionEnd();
-}
-
-} // namespace
 
 // The rule the detail controls edit: a two-index walk, both bounds-checked, null on either miss
 // (STEP80, mirroring `SelectedLayer`, LayersTab_UI.cpp:120-127).
@@ -43,19 +27,11 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     const Data::PlacementInstances* placedMarkers) {
     ImGui::PushID("markersTab");
     DrawMarkersTabGlobals(state.globals, recipe.globalMarkerSettings, iconManifest, pairingLookup);
-    // STEP120: the Group/Bundle tree, drawn before the two "Ungrouped ..." sections it filters —
-    // a bundled layer's own row is suppressed from those sections and shown in the tree instead.
-    DrawMarkerLayerBundleTree(recipe.markerLayerBundles, recipe.markerRuleLayers, recipe.markerLayers,
-                              recipe.markers, recipe.geometry, recipe.globalSymmetryMask,
-                              recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
-                              state.bundles, state, previewDriver, iconManifest);
-    DrawRuleStack(recipe, state, previewDriver, iconManifest);
-    // STEP81: the Manual Marker Layers block, drawn BEFORE the manual roster below so a layer
-    // added this frame is pickable by that roster's Layer combo on the same frame (STEP60 §3's
-    // read-after-populate ordering, applied to authoring rather than import).
-    DrawManualMarkerLayers(state.manualLayers, recipe.markerLayers, recipe.markers, recipe.geometry,
-                          recipe.globalSymmetryMask, recipe.radialSymmetryRepeatCount,
-                          recipe.markerSymmetryFixSettings);
+    // STEP125: replaces the old flat DrawMarkerLayerBundleTree/DrawRuleStack/DrawManualMarkerLayers
+    // trio with the dynamic Type-section outer loop (ARCH §19.14/§19.15) — one collapsible Section
+    // per distinct markerTypeName, each containing its own type-filtered Bundle tree and the two
+    // type-filtered "Ungrouped ..." lists (MarkersTab_TypeSections_UI.h).
+    DrawMarkerTypeSections(recipe, state, previewDriver, iconManifest);
     // STEP49: the hand-authored roster. `DrawManualMarkers` takes no map-size parameter, so the
     // caller resolves the X/Z slider bounds from `recipe.geometry.mapSize` into the state each
     // frame (MarkersTab_Manual_UI.h).
