@@ -127,10 +127,14 @@ WidgetChange DrawSliderScalarInteger(const char* label, int& value, const Scalar
 // PushID(label) -> fixed-width track -> SameLine -> fixed-width DragFloat -> SameLine -> the RT
 // button -> paint the track. DrawSliderScalar/DrawSliderScalarInteger above are UNTOUCHED by this
 // addition — every other caller in the codebase still gets the 3-line shape.
+// `bShowRealtimeToggle` (default true, byte-identical to before this parameter existed): a caller
+// whose field never triggers anything beyond a cheap preview repaint can pass `false` to drop the
+// RT button entirely — `realtimeToggle` still governs the underlying commit timing (unchanged), the
+// caller simply never draws the control that would let a user flip it off.
 WidgetChange DrawSliderScalarCompact(const char* label, float& value, const ScalarSliderRange& range,
                                      RealtimeToggle& realtimeToggle, float trackWidthPixels,
                                      float fieldWidthPixels, const WidgetStyle& style = WidgetStyle(),
-                                     const char* valueFormat = "%.2f");
+                                     const char* valueFormat = "%.2f", bool bShowRealtimeToggle = true);
 
 } // namespace Ui
 } // namespace SanmapGen

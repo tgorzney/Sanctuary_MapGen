@@ -16,7 +16,8 @@ namespace {
 // width, for DrawSliderScalarCompact's narrow field.
 ScalarSliderPointerInput DrawFloatFieldRow(float& value, const ScalarSliderRange& range,
                                            RealtimeToggle& realtimeToggle, const WidgetStyle& style,
-                                           const char* valueFormat, float fieldWidthPixels = 0.0f) {
+                                           const char* valueFormat, float fieldWidthPixels = 0.0f,
+                                           bool bShowRealtimeToggle = true) {
     ScalarSliderPointerInput input;
     const float dragSpeed = range.increment > 0.0f ? range.increment
                                                    : (range.maximumValue - range.minimumValue) * 0.001f;
@@ -27,8 +28,10 @@ ScalarSliderPointerInput DrawFloatFieldRow(float& value, const ScalarSliderRange
         input.bNumericFieldEdited = true;
     }
     input.bNumericFieldActive = ImGui::IsItemActive();
-    ImGui::SameLine();
-    DrawRealtimeToggleButton("realtime", realtimeToggle, style);
+    if (bShowRealtimeToggle) {
+        ImGui::SameLine();
+        DrawRealtimeToggleButton("realtime", realtimeToggle, style);
+    }
     return input;
 }
 
@@ -61,7 +64,7 @@ WidgetChange DrawSliderScalar(const char* label, float& value, const ScalarSlide
 WidgetChange DrawSliderScalarCompact(const char* label, float& value, const ScalarSliderRange& rawRange,
                                      RealtimeToggle& realtimeToggle, float trackWidthPixels,
                                      float fieldWidthPixels, const WidgetStyle& style,
-                                     const char* valueFormat) {
+                                     const char* valueFormat, bool bShowRealtimeToggle) {
     const ScalarSliderRange range = ResolvedScalarSliderRange(rawRange);
     value = ClampScalarSliderValue(value, range);
 
@@ -72,7 +75,7 @@ WidgetChange DrawSliderScalarCompact(const char* label, float& value, const Scal
     ImGui::SameLine();
 
     ScalarSliderPointerInput input =
-        DrawFloatFieldRow(value, range, realtimeToggle, style, valueFormat, fieldWidthPixels);
+        DrawFloatFieldRow(value, range, realtimeToggle, style, valueFormat, fieldWidthPixels, bShowRealtimeToggle);
     input.bHandleGrabbed = bHandleGrabbed;
     input.pointerValue   = ScalarSliderPointerValueAt(geometry, range, ImGui::GetIO().MousePos.x);
 

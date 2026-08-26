@@ -47,6 +47,9 @@ inline const char* const markerGlobalScaleRowLabels[kMarkerGlobalScaleRowCount] 
 inline constexpr float kMarkerGlobalScaleRowTrackWidthPixels  = 60.0f;
 inline constexpr float kMarkerGlobalScaleRowFieldWidthPixels  = 42.0f;
 inline constexpr float kMarkerGlobalScaleRowSwatchWidthPixels = 20.0f;
+// The gap ImGui::SameLine() opens between one type's own control cluster and the next, now that
+// all three rows share one line instead of one line each.
+inline constexpr float kMarkerGlobalScaleRowGroupSpacingPixels = 24.0f;
 
 struct MarkerGlobalScaleRow {
     RealtimeToggle iconScaleToggle{true};
