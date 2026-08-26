@@ -82,6 +82,8 @@ void DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
                           layer.name.empty() ? "Marker Layer" : layer.name.c_str(),
                           static_cast<int>(layer.rules.size()), suffix);
             DraggableListRow row;
+            row.bRowSuppressed = (layer.parentBundleIdentifier != -1);   // NEW — STEP120: bundled
+                                                                          // layers show in the tree
             row.label    = rowLabel;
             row.bVisible = layer.bEnabled;
             row.bLocked  = layer.bHidden;

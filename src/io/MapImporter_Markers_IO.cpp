@@ -139,6 +139,7 @@ void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& out
             ReadJsonBoolean(layerJson, "GridSnapEnabled", layer.bGridSnapEnabled);
             ReadJsonFloat(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeWorldUnits);
             ReadJsonBoolean(layerJson, "ColorOverrideEnabled", layer.bColorOverrideEnabled);
+            ReadJsonInteger(layerJson, "ParentBundleIdentifier", layer.parentBundleIdentifier);
         }
         outRecipe.markerLayers.push_back(layer);
     }

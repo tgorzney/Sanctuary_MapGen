@@ -47,6 +47,7 @@ struct MarkerInstanceLayer {
                                                // colorSpawn), white for an unrecognized group name.
                                                // true: `color` is used verbatim, including a
                                                // deliberately-chosen white.
+    int parentBundleIdentifier = -1;   // ARCH §19.3/§19.4 — -1 = root (ungrouped). Additive.
 };
 
 struct MarkerTransform {

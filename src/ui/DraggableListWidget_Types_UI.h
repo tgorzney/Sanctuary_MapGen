@@ -29,6 +29,13 @@ struct DraggableListRow {
     // STEP150's Bake/Unbake header button is the first user (a click reports `ExtraButton`); keep
     // the "##" id salt fixed across a changing label, same discipline as the icons below.
     const char* extraButtonLabel = nullptr;
+    // STEP120: when true, this row draws NOTHING — no header, no body, no affordances, no drag
+    // source/target. Lets a caller present a FILTERED view of its own backing vector (the "Ungrouped
+    // ..." Markers-tab sections) without DraggableList itself gaining filtering logic; reorder/delete
+    // still operate on real vector indices exactly as today — a suppressed row simply cannot be a
+    // drag source or drop target, an accepted consequence, not a defect (a downward drag can still
+    // "land" past a suppressed row's real index; standard behavior for any filtered reorderable list).
+    bool bRowSuppressed = false;
 };
 // STEP200: `Collapsible` (default, unchanged) keeps every existing DraggableList consumer's
 // CollapsingHeader row untouched. `Flat` is the View popup's opt-in single-line row: no

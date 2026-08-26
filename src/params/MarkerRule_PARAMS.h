@@ -82,6 +82,7 @@ struct MarkerRuleLayer {
     bool bEnabled = true;
     bool bHidden  = false;   // still generates (clearance/fairness), just doesn't render — unchanged
     SymmetrySetting symmetry;
+    int parentBundleIdentifier = -1;   // ARCH §19.3/§19.4 — -1 = root (ungrouped). Additive.
     std::vector<MarkerRule> rules;
 };
 

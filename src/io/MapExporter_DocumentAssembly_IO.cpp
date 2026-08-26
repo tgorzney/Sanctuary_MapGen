@@ -64,6 +64,7 @@ void AppendEntityDomainsJson(const Params::MapRecipe& recipe, nlohmann::ordered_
     document["armies"]      = BuildArmiesJson(recipe);
     document["markers"]     = BuildMarkersJson(recipe);
     document["MarkerGroups"] = BuildMarkerGroupsJson(recipe);
+    document["MarkerLayerBundles"] = BuildMarkerLayerBundlesJson(recipe);
     document["chains"]      = BuildChainsJson(recipe);
     document["decals"]      = BuildDecalsJson(recipe);
     document["props"]       = BuildPropsJson(recipe);

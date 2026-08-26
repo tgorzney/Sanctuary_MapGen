@@ -80,14 +80,16 @@ public:
         for (int rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
             ImGui::PushID(rowIndex);
             const DraggableListRow row = describeRow(rowIndex);
-            const float extraButtonWidthPixels = DraggableListExtraButtonWidthPixels(row);
-            const float rowAvailWidthPixels = ImGui::GetContentRegionAvail().x;
-            if (layout == DraggableListRowLayout::Flat)
-                RowLayoutDetail::RenderFlatRow(payloadIdentifier, row, rowIndex, rowAvailWidthPixels,
-                    extraButtonWidthPixels, selectedRowIndex, drawRowBody, signal);
-            else
-                RowLayoutDetail::RenderCollapsibleRow(payloadIdentifier, row, rowIndex, rowAvailWidthPixels,
-                    extraButtonWidthPixels, selectedRowIndex, drawRowBody, signal);
+            if (!row.bRowSuppressed) {
+                const float extraButtonWidthPixels = DraggableListExtraButtonWidthPixels(row);
+                const float rowAvailWidthPixels = ImGui::GetContentRegionAvail().x;
+                if (layout == DraggableListRowLayout::Flat)
+                    RowLayoutDetail::RenderFlatRow(payloadIdentifier, row, rowIndex, rowAvailWidthPixels,
+                        extraButtonWidthPixels, selectedRowIndex, drawRowBody, signal);
+                else
+                    RowLayoutDetail::RenderCollapsibleRow(payloadIdentifier, row, rowIndex, rowAvailWidthPixels,
+                        extraButtonWidthPixels, selectedRowIndex, drawRowBody, signal);
+            }
             ImGui::PopID();
         }
         ImGui::PopID();

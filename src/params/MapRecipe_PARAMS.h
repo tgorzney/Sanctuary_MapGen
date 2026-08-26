@@ -18,6 +18,7 @@
 #include "MapArea_PARAMS.h"
 #include "MarkerChain_PARAMS.h"
 #include "MarkerInstance_PARAMS.h"
+#include "MarkerLayerBundle_PARAMS.h"
 #include "MarkerRule_PARAMS.h"
 #include "PropInstance_PARAMS.h"
 #include "ScatterRule_PARAMS.h"
@@ -113,6 +114,7 @@ struct MapRecipe {
     // ships already wired end-to-end (export/import) by the same ticket that adds it, unlike
     // those two (see their own comment).
     std::vector<MarkerInstanceLayer> markerLayers;
+    std::vector<MarkerLayerBundle> markerLayerBundles;   // ARCH §19, Correction 19. Additive.
     // Lobby-resolved spawn/alloy scenario data (ARCH_15_05_ParamsScenariosType.md §15.5, amended by
     // ARCH_15_10 §15.10) — same hand-authored, pass-through posture as armies/areas/markers/chains.
     Params::Scenarios                scenarios;

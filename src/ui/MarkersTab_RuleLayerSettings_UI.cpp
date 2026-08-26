@@ -46,17 +46,26 @@ bool DrawPendingDeleteRuleLayerDialog(std::vector<Params::MarkerRuleLayer>& mark
     return true;
 }
 
+// STEP120: extracted out of DrawRuleLayerButtons so a Bundle node's own "add a Layer here" can reuse
+// it with a non-root parent (MarkersTab_Bundles_UI.cpp). `parentBundleIdentifierForNewLayer < 0` is
+// root scope — DrawRuleLayerButtons' own call below passes -1, unchanged behavior.
+bool DrawAddMarkerRuleLayerButton(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
+                                  int parentBundleIdentifierForNewLayer) {
+    if (!ImGui::Button(parentBundleIdentifierForNewLayer < 0 ? "Add Layer" : "Add Procedural Layer Here"))
+        return false;
+    Params::MarkerRuleLayer layer;
+    layer.parentBundleIdentifier = parentBundleIdentifierForNewLayer;   // STEP119 field
+    markerRuleLayers.push_back(layer);
+    state.selectedRuleLayerIndex = static_cast<int>(markerRuleLayers.size()) - 1;
+    state.selectedRuleIndex      = 0;
+    return true;
+}
+
 // Add Layer is always available, including at zero layers. Add Rule / Remove Selected Rule operate
 // on the selected layer and are drawn disabled (never a silent no-op) when none is selected.
 void DrawRuleLayerButtons(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
                           Pipeline::PreviewDriver* previewDriver) {
-    bool bRecipeMoved = false;
-    if (ImGui::Button("Add Layer")) {
-        markerRuleLayers.push_back(Params::MarkerRuleLayer());
-        state.selectedRuleLayerIndex = static_cast<int>(markerRuleLayers.size()) - 1;
-        state.selectedRuleIndex      = 0;
-        bRecipeMoved = true;
-    }
+    bool bRecipeMoved = DrawAddMarkerRuleLayerButton(markerRuleLayers, state, -1);   // root, unchanged behavior
     Params::MarkerRuleLayer* const layer = SelectedMarkerRuleLayer(markerRuleLayers, state);
     ImGui::SameLine();
     ImGui::BeginDisabled(layer == nullptr);

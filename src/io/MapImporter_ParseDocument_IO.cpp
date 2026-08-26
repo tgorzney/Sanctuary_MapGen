@@ -72,6 +72,7 @@ void ParseEntityDomainsJson(const nlohmann::json& document, Params::MapRecipe& o
     ReadAreasJson(document, outRecipe);
     ReadArmiesJson(document, outRecipe);
     ReadMarkerGroupsJson(document, outRecipe);
+    ReadMarkerLayerBundlesJson(document, outRecipe, result);
     ReadMarkersJson(document, outRecipe, result);
     ReconcileMarkerLayers(outRecipe, result);              // STEP115
     ReadChainsJson(document, outRecipe);

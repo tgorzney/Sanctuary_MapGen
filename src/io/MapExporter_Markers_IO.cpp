@@ -9,6 +9,7 @@
 // `UnitTransform`'s: `position`/`rotation`/`scale` are top-level siblings of `alias`.
 #include "MapExporter_Recipe_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include "../params/MarkerLayerBundle_PARAMS.h"
 
 namespace SanmapGen {
 namespace Io {
@@ -78,9 +79,28 @@ nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["GridSnapEnabled"] = layer.bGridSnapEnabled;
         layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeWorldUnits;
         layerJson["ColorOverrideEnabled"] = layer.bColorOverrideEnabled;
+        layerJson["ParentBundleIdentifier"] = layer.parentBundleIdentifier;
         markerGroups.push_back(layerJson);
     }
     return markerGroups;
+}
+
+// `MarkerLayerBundles` — SanGen-owned Group-above-Layer container, top-level PascalCase array
+// (ARCH §19, Correction 19), a fresh sibling of `MarkerGroups`/`markers`. Array order is NOT this
+// array's identity (unlike MarkerGroups/PropGroups/DecalGroups) — membership/nesting resolve by
+// `Identifier`, since a Bundle forest can be reordered/reparented independently of array position.
+nlohmann::ordered_json BuildMarkerLayerBundlesJson(const Params::MapRecipe& recipe) {
+    nlohmann::ordered_json markerLayerBundles = nlohmann::ordered_json::array();
+    for (const Params::MarkerLayerBundle& bundle : recipe.markerLayerBundles) {
+        nlohmann::ordered_json bundleJson;
+        bundleJson["Identifier"] = bundle.identifier;
+        bundleJson["Name"] = bundle.name;
+        bundleJson["ParentBundleIdentifier"] = bundle.parentBundleIdentifier;
+        bundleJson["MarkerTypeName"] = bundle.markerTypeName;
+        bundleJson["AssemblyIdentifier"] = bundle.assemblyIdentifier;
+        markerLayerBundles.push_back(bundleJson);
+    }
+    return markerLayerBundles;
 }
 
 } // namespace Io

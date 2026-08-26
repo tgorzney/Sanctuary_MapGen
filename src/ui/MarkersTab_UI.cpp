@@ -19,7 +19,7 @@ namespace {
 // this function is now just the Section wrapper around the two-level list.
 void DrawRuleStack(Params::MapRecipe& recipe, MarkersTabState& state,
                    Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest) {
-    if (!DrawSectionBegin("Procedural Rules", state.ruleStackSection)) return;
+    if (!DrawSectionBegin("Ungrouped Procedural Rules", state.ruleStackSection)) return;
     DrawMarkerRuleLayerList(recipe.markerRuleLayers, state, previewDriver, iconManifest);
     DrawSectionEnd();
 }
@@ -42,6 +42,12 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     const Data::PlacementInstances* placedMarkers) {
     ImGui::PushID("markersTab");
     DrawMarkersTabGlobals(state.globals, iconManifest);
+    // STEP120: the Group/Bundle tree, drawn before the two "Ungrouped ..." sections it filters —
+    // a bundled layer's own row is suppressed from those sections and shown in the tree instead.
+    DrawMarkerLayerBundleTree(recipe.markerLayerBundles, recipe.markerRuleLayers, recipe.markerLayers,
+                              recipe.markers, recipe.geometry, recipe.globalSymmetryMask,
+                              recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
+                              state.bundles, state, previewDriver, iconManifest);
     DrawRuleStack(recipe, state, previewDriver, iconManifest);
     // STEP81: the Manual Marker Layers block, drawn BEFORE the manual roster below so a layer
     // added this frame is pickable by that roster's Layer combo on the same frame (STEP60 §3's

@@ -91,6 +91,12 @@ bool DrawPendingDeleteRuleLayerDialog(std::vector<Params::MarkerRuleLayer>& mark
 // Add Layer / Add Rule / Remove Selected Rule. Called by DrawMarkerRuleLayerList only.
 void DrawRuleLayerButtons(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
                           Pipeline::PreviewDriver* previewDriver);
+// STEP120: the "Add Layer" button alone, extracted so MarkersTab_Bundles_UI.cpp's per-Bundle "add a
+// Layer here" can reuse it with a non-root parent. `parentBundleIdentifierForNewLayer < 0` (the
+// default) is root scope — DrawRuleLayerButtons' own existing call site, unchanged behavior. Returns
+// whether a layer was actually added (the recipe moved).
+bool DrawAddMarkerRuleLayerButton(std::vector<Params::MarkerRuleLayer>& markerRuleLayers, MarkersTabState& state,
+                                  int parentBundleIdentifierForNewLayer = -1);
 // Name / Enabled / Hidden / Symmetry for ONE rule layer — the caller's own row, not a "selected"
 // lookup (STEP110: called per outer row, inline, by DrawRuleLayerListBody's row body, whenever
 // THAT row's own CollapsingHeader is open — never bled from whatever else happens to be selected).

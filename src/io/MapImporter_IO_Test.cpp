@@ -370,6 +370,7 @@ void CheckMarkerRuleLayerTwoLevelRoundTrip() {
     layerOne.symmetry.bSymmetryUseGlobal = false;
     layerOne.symmetry.symmetryMask = Params::SymmetryAxis::MirrorAcrossX;
     layerOne.symmetry.radialSymmetryRepeatCount = 4;
+    layerOne.parentBundleIdentifier = 5;                          // STEP119, non-default
     Params::MarkerRule ruleOneA; ruleOneA.count = 3; ruleOneA.hydroMultiplier = 1.4f;
     Params::MarkerRule ruleOneB; ruleOneB.count = 5; ruleOneB.mexDensity = 0.25f;
     layerOne.rules.push_back(ruleOneA);
@@ -432,8 +433,10 @@ void CheckMarkerRuleLayerTwoLevelRoundTrip() {
               && loadedLayer.symmetry.symmetryMask == originalLayer.symmetry.symmetryMask
               && loadedLayer.symmetry.radialSymmetryRepeatCount
                      == originalLayer.symmetry.radialSymmetryRepeatCount
+              && loadedLayer.parentBundleIdentifier == originalLayer.parentBundleIdentifier
               && loadedLayer.rules.size() == originalLayer.rules.size(),
-              "the layer's own fields (Name/Enabled/Hidden/symmetry) and rule count survive");
+              "the layer's own fields (Name/Enabled/Hidden/symmetry/parentBundleIdentifier) and "
+              "rule count survive");
         for (std::size_t ruleIndex = 0; ruleIndex < originalLayer.rules.size(); ++ruleIndex) {
             const Params::MarkerRule& originalRule = originalLayer.rules[ruleIndex];
             const Params::MarkerRule& loadedRule   = loadedLayer.rules[ruleIndex];
@@ -673,6 +676,23 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
               "MarkerInstanceLayer::gridSnapSizeWorldUnits survives, non-default");
         Check(loadedLayer.bColorOverrideEnabled == originalLayer.bColorOverrideEnabled,
               "MarkerInstanceLayer::bColorOverrideEnabled survives, non-default");
+        Check(loadedLayer.parentBundleIdentifier == originalLayer.parentBundleIdentifier,
+              "MarkerInstanceLayer::parentBundleIdentifier survives, non-default (STEP119)");
+    }
+
+    Check(loaded.markerLayerBundles.size() == 1, "one MarkerLayerBundle survives (STEP119)");
+    if (!loaded.markerLayerBundles.empty()) {
+        const Params::MarkerLayerBundle& originalBundle = original.markerLayerBundles[0];
+        const Params::MarkerLayerBundle& loadedBundle = loaded.markerLayerBundles[0];
+        Check(loadedBundle.identifier == originalBundle.identifier,
+              "MarkerLayerBundle::identifier survives");
+        Check(loadedBundle.name == originalBundle.name, "MarkerLayerBundle::name survives");
+        Check(loadedBundle.parentBundleIdentifier == originalBundle.parentBundleIdentifier,
+              "MarkerLayerBundle::parentBundleIdentifier survives");
+        Check(loadedBundle.markerTypeName == originalBundle.markerTypeName,
+              "MarkerLayerBundle::markerTypeName survives");
+        Check(loadedBundle.assemblyIdentifier == originalBundle.assemblyIdentifier,
+              "MarkerLayerBundle::assemblyIdentifier survives");
     }
 
     Check(loaded.markers.size() == 1, "one marker group survives");
@@ -1209,7 +1229,19 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerLayer.bGridSnapEnabled = true;                              // STEP106, non-default
     markerLayer.gridSnapSizeWorldUnits = 4.0f;                        // STEP106, non-default
     markerLayer.bColorOverrideEnabled = true;                         // STEP116, non-default
+    markerLayer.parentBundleIdentifier = 42;                          // STEP119, non-default
     recipe.markerLayers.push_back(markerLayer);
+
+    // STEP119: one MarkerLayerBundle, non-default on every field, non-cyclic (parentBundleIdentifier
+    // == -1) so RunRoundTripTests's own "no warning" assertion is not tripped by
+    // RepairCyclicMarkerLayerBundleParents.
+    Params::MarkerLayerBundle bundle;
+    bundle.identifier = 11;
+    bundle.name = "Resource Bundle";
+    bundle.parentBundleIdentifier = -1;
+    bundle.markerTypeName = "Alloy";
+    bundle.assemblyIdentifier = 5;
+    recipe.markerLayerBundles.push_back(bundle);
 
     Params::MarkerTransform markerTransform;
     markerTransform.name = "Mex 0";
@@ -2086,6 +2118,107 @@ void CheckMarkerIconNameOverrideLegacyDefault() {
           "iconNameOverride keeps its struct default (empty) when the key is absent");
 }
 
+// STEP119: a hand-built `MarkerLayerBundles` array entry with none of `"Identifier"`/`"Name"`/
+// `"ParentBundleIdentifier"`/`"MarkerTypeName"`/`"AssemblyIdentifier"` present (a legacy/foreign
+// file with no Bundle concept at all) leaves the struct's own defaults untouched — mirrors
+// CheckMarkerGroupsLegacyLockAndSnapDefaults's exact shape.
+void CheckMarkerLayerBundlesLegacyDefault() {
+    nlohmann::json document;
+    document["MarkerLayerBundles"] = nlohmann::json::array();
+    document["MarkerLayerBundles"].push_back(nlohmann::json::object());   // deliberately empty
+
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    Io::ReadMarkerLayerBundlesJson(document, recipe, result);
+
+    Check(recipe.markerLayerBundles.size() == 1, "the legacy MarkerLayerBundles entry survives");
+    if (recipe.markerLayerBundles.empty()) return;
+    const Params::MarkerLayerBundle& bundle = recipe.markerLayerBundles[0];
+    Check(bundle.identifier == -1, "identifier keeps its struct default (-1) when the key is absent");
+    Check(bundle.name.empty(), "name keeps its struct default (empty) when the key is absent");
+    Check(bundle.parentBundleIdentifier == -1,
+          "parentBundleIdentifier keeps its struct default (-1) when the key is absent");
+    Check(bundle.markerTypeName.empty(),
+          "markerTypeName keeps its struct default (empty) when the key is absent");
+    Check(bundle.assemblyIdentifier == -1,
+          "assemblyIdentifier keeps its struct default (-1) when the key is absent");
+}
+
+// STEP119: the two merged `ParentBundleIdentifier` back-reference keys default to -1 (root) when
+// absent on a legacy `MarkerGroups`/`MarkersStack` entry, mirroring the shape above.
+void CheckMergedParentBundleIdentifierLegacyDefault() {
+    nlohmann::json markerGroupsDocument;
+    markerGroupsDocument["MarkerGroups"] = nlohmann::json::array();
+    markerGroupsDocument["MarkerGroups"].push_back(nlohmann::json::object({ { "Name", "First" } }));
+    Params::MapRecipe markerGroupsRecipe;
+    Io::ReadMarkerGroupsJson(markerGroupsDocument, markerGroupsRecipe);
+    Check(markerGroupsRecipe.markerLayers.size() == 1, "the legacy MarkerGroups entry survives");
+    if (!markerGroupsRecipe.markerLayers.empty())
+        Check(markerGroupsRecipe.markerLayers[0].parentBundleIdentifier == -1,
+              "MarkerInstanceLayer::parentBundleIdentifier defaults to -1 when the key is absent");
+
+    nlohmann::json markersStackDocument;
+    markersStackDocument["MarkersStack"] = nlohmann::json::array();
+    markersStackDocument["MarkersStack"].push_back(nlohmann::json::object({ { "Name", "First" } }));
+    Params::MapRecipe markersStackRecipe;
+    Io::ReadMarkersStackJson(markersStackDocument, markersStackRecipe);
+    Check(markersStackRecipe.markerRuleLayers.size() == 1, "the legacy MarkersStack entry survives");
+    if (!markersStackRecipe.markerRuleLayers.empty())
+        Check(markersStackRecipe.markerRuleLayers[0].parentBundleIdentifier == -1,
+              "MarkerRuleLayer::parentBundleIdentifier defaults to -1 when the key is absent");
+}
+
+// STEP119 / ARCH §19.12: a 2-cycle ParentBundleIdentifier chain ({1,2},{2,1}) is detected and
+// repaired — both entries treated as root — with one logged warning per cyclic entry, never a
+// refusal. Mirrors CheckMarkerLayerSynthesisOnEmptyMarkerGroups's direct-call/result.warningCount
+// assertion style.
+void CheckMarkerLayerBundleCycleRepairOnImport() {
+    nlohmann::json document;
+    document["MarkerLayerBundles"] = nlohmann::json::array({
+        nlohmann::json::object({ { "Identifier", 1 }, { "ParentBundleIdentifier", 2 } }),
+        nlohmann::json::object({ { "Identifier", 2 }, { "ParentBundleIdentifier", 1 } }),
+    });
+
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    Io::ReadMarkerLayerBundlesJson(document, recipe, result);
+
+    Check(recipe.markerLayerBundles.size() == 2, "both cyclic MarkerLayerBundles entries survive");
+    if (recipe.markerLayerBundles.size() == 2) {
+        Check(recipe.markerLayerBundles[0].parentBundleIdentifier == -1,
+              "the first cyclic entry is repaired to root");
+        Check(recipe.markerLayerBundles[1].parentBundleIdentifier == -1,
+              "the second cyclic entry is repaired to root");
+    }
+    Check(result.warningCount == 2, "one warning is logged per cyclic entry");
+}
+
+// STEP119 / ARCH §19.12: a valid 3-level root/child/grandchild chain ({1,-1},{2,1},{3,2}) is left
+// completely untouched — the cycle repair is a true no-op on non-cyclic data, no warnings.
+void CheckMarkerLayerBundleCycleRepairIsNoOpOnValidChain() {
+    nlohmann::json document;
+    document["MarkerLayerBundles"] = nlohmann::json::array({
+        nlohmann::json::object({ { "Identifier", 1 }, { "ParentBundleIdentifier", -1 } }),
+        nlohmann::json::object({ { "Identifier", 2 }, { "ParentBundleIdentifier", 1 } }),
+        nlohmann::json::object({ { "Identifier", 3 }, { "ParentBundleIdentifier", 2 } }),
+    });
+
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    Io::ReadMarkerLayerBundlesJson(document, recipe, result);
+
+    Check(recipe.markerLayerBundles.size() == 3, "all three valid-chain entries survive");
+    if (recipe.markerLayerBundles.size() == 3) {
+        Check(recipe.markerLayerBundles[0].parentBundleIdentifier == -1,
+              "the root entry's parentBundleIdentifier is unchanged");
+        Check(recipe.markerLayerBundles[1].parentBundleIdentifier == 1,
+              "the child entry's parentBundleIdentifier is unchanged");
+        Check(recipe.markerLayerBundles[2].parentBundleIdentifier == 2,
+              "the grandchild entry's parentBundleIdentifier is unchanged");
+    }
+    Check(result.warningCount == 0, "a valid, non-cyclic chain produces zero warnings");
+}
+
 // STEP115: a real, non-SanGen-authored `.sanmap` never carries `MarkerGroups` — build a raw document
 // with a `"markers"` object containing two type-groups and explicitly NO `"MarkerGroups"` key.
 // ReadMarkerGroupsJson is a confirmed no-op (it never fabricates the key); ReconcileMarkerLayers then
@@ -2280,6 +2413,10 @@ int main() {
     SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyLockAndSnapDefaults();
     SanmapGen::MapFormatTest::CheckMarkerLayerIndexClampsOnImport();
     SanmapGen::MapFormatTest::CheckMarkerIconNameOverrideLegacyDefault();
+    SanmapGen::MapFormatTest::CheckMarkerLayerBundlesLegacyDefault();
+    SanmapGen::MapFormatTest::CheckMergedParentBundleIdentifierLegacyDefault();
+    SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairOnImport();
+    SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairIsNoOpOnValidChain();
     SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisOnEmptyMarkerGroups();
     SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisIsNoOpWhenMarkerGroupsPresent();
     SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisPartialCoverageIsNoOp();

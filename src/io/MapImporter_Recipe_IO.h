@@ -67,6 +67,12 @@ void ReadMarkersJson(const nlohmann::json& document, Params::MapRecipe& outRecip
 // Marker Layers tab have something to show for such a file. No-op when markerLayers is non-empty
 // (partial coverage is explicitly out of scope — see the .cpp's own header comment).
 void ReconcileMarkerLayers(Params::MapRecipe& outRecipe, MapImportResult& result);
+// MapImporter_MarkerLayerBundle_IO.cpp — `MarkerLayerBundles` -> `recipe.markerLayerBundles`
+// (ARCH §19, Correction 19). No load-bearing ordering relative to ReadMarkerGroupsJson/
+// ReadMarkersJson/ReadMarkersStackJson — parentBundleIdentifier has no range to validate (§19.4),
+// so nothing downstream depends on markerLayerBundles.size() the way layerIndex's clamp does.
+void ReadMarkerLayerBundlesJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
+                                MapImportResult& result);
 void ReadChainsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 
 // MapImporter_Props_IO.cpp / MapImporter_Decals_IO.cpp — `props`/`decals`/`PropGroups`/

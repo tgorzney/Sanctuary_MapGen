@@ -29,6 +29,7 @@
 #include "ConfirmDialog_UI.h"
 #include "IconGridWidget_UI.h"
 #include "LabelledDialWidget_UI.h"
+#include "MarkersTab_Bundles_UI.h"
 #include "MarkersTab_Globals_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
 #include "MarkersTab_Manual_UI.h"
@@ -97,6 +98,10 @@ struct MarkersTabState {
     // `DrawMarkersTab` so a layer added this frame is pickable by part (b)'s Layer combo on the
     // same frame (MarkersTab_ManualLayers_UI.h).
     ManualMarkerLayersState manualLayers;
+
+    // STEP120: the Group/Bundle tree, drawn before the two "Ungrouped ..." sections it filters
+    // (MarkersTab_Bundles_UI.h).
+    MarkerLayerBundlesState bundles;
 };
 
 // rule -> widget mirrors (the paired min/max fields the range sliders edit, and the int count).

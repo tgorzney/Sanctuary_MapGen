@@ -69,6 +69,7 @@ void CheckArmyIdentitiesWellFormed(const std::vector<Params::Army>& armies, MapE
 // SymmetrySetting triplet, flattened.
 nlohmann::ordered_json BuildMarkersJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildMarkerLayerBundlesJson(const Params::MapRecipe& recipe);
 
 // MapExporter_Chains_IO.cpp — `recipe.chains` -> the top-level `chains` dictionary (JSON object
 // keyed by MarkerChain::name, each value a bare array of {type,name} objects, not a wrapping

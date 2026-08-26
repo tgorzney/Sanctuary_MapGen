@@ -26,40 +26,6 @@ void DrawLayerSettings(ManualMarkerLayersState& state) {
                      state.layerIconScaleToggle, WidgetStyle(), "%.2f");
 }
 
-// The row's own name, tint, icon scale, grid snap and symmetry setting — STEP110: drawn inline in THIS
-// row's own expanded body, not "selected"-gated. Tint hides under the block's shared-color mode
-// (ARCH §4 rival-control rule). Layer-level symmetry is the deliberate, separately-ratified exception
-// manual markers get over Props/Decals (ARCH_14_13_OpenItems.md §14.13 Ruling 3) — returns whether the
-// name committed, so the caller can re-run the uniqueness repair.
-bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
-                      const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                      std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
-                      int globalSymmetryMask, int globalRadialRepeatCount,
-                      Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state) {
-    TextInputRules nameRules;
-    nameRules.maximumLength = 48;
-    nameRules.bAllowEmpty   = false;
-    nameRules.fallbackText  = "Marker Layer";
-    const bool bNameCommitted = DrawTextInput("Name", layer.name, nameRules).bCommitted;
-    bool bColorOverrideCommitted = false;
-    if (!state.bUseGroupColor) {
-        bColorOverrideCommitted = DrawCheckbox("Color Override", layer.bColorOverrideEnabled).bCommitted;
-        ImGui::BeginDisabled(!layer.bColorOverrideEnabled);
-        DrawColorSwatch("Color", layer.color, state.previewColorOptions, state.selectedLayerColorToggle);
-        ImGui::EndDisabled();
-    }
-    DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
-                     state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
-    const bool bSnapCommitted = DrawCheckbox("Snap to Grid", layer.bGridSnapEnabled).bCommitted;
-    ImGui::BeginDisabled(!layer.bGridSnapEnabled);
-    const bool bSnapSizeCommitted = DrawSliderScalar("Grid Size", layer.gridSnapSizeWorldUnits,
-        state.gridSnapSizeRange, state.selectedLayerGridSnapToggle, WidgetStyle(), "%.2f").bCommitted;
-    ImGui::EndDisabled();
-    DrawLayerSymmetrySection(layer, layerIndex, markerLayers, markers, geometry, globalSymmetryMask,
-                             globalRadialRepeatCount, markerSymmetryFixSettings, state);
-    return bNameCommitted || bColorOverrideCommitted || bSnapCommitted || bSnapSizeCommitted;
-}
-
 // The layer stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.
 // STEP110: each row's body, whenever the row's own CollapsingHeader is open (never gated on
 // `state.selectedLayerIndex`), draws that row's OWN settings below its header. `bAnyNameCommitted`
@@ -73,6 +39,7 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
         "manualMarkerLayers", markerLayers,
         [&](int rowIndex) {
             DraggableListRow row;
+            row.bRowSuppressed = (markerLayers[static_cast<std::size_t>(rowIndex)].parentBundleIdentifier != -1);
             row.label   = ManualMarkerLayerRowLabel(markerLayers[static_cast<std::size_t>(rowIndex)]);
             row.bLocked = markerLayers[static_cast<std::size_t>(rowIndex)].bLocked;   // NEW
             return row;
@@ -115,28 +82,33 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
     return bMarkersMoved;
 }
 
+} // namespace
+
 // The Add Marker Layer button. Markers ship with `layerId` from day one (STEP60), unlike Props' still-
 // unimplemented retrofit, so the fresh row mints one via `NextMarkerLayerId` BEFORE the push_back —
 // that function scans for max(layerId) + 1, and calling it after would scan the new row's own `-1`.
-bool DrawLayerListButtons(std::vector<Params::MarkerInstanceLayer>& markerLayers, ManualMarkerLayersState& state) {
-    if (!ImGui::Button("Add Marker Layer")) return false;
+// STEP120: gains an optional Bundle-scoped parent; moved out of the anonymous namespace so
+// MarkersTab_Bundles_UI.cpp can call it for a non-root parent (MarkersTab_ManualLayers_UI.h).
+bool DrawLayerListButtons(std::vector<Params::MarkerInstanceLayer>& markerLayers, ManualMarkerLayersState& state,
+                          int parentBundleIdentifierForNewLayer) {
+    if (!ImGui::Button(parentBundleIdentifierForNewLayer < 0 ? "Add Marker Layer" : "Add Manual Layer Here"))
+        return false;
     Params::MarkerInstanceLayer layer;
-    layer.name    = NextMarkerLayerName(static_cast<int>(markerLayers.size()));
-    layer.layerId = NextMarkerLayerId(markerLayers);
+    layer.name                   = NextMarkerLayerName(static_cast<int>(markerLayers.size()));
+    layer.layerId                = NextMarkerLayerId(markerLayers);
+    layer.parentBundleIdentifier = parentBundleIdentifierForNewLayer;   // STEP119 field
     markerLayers.push_back(layer);
     state.selectedLayerIndex = static_cast<int>(markerLayers.size()) - 1;
     return true;
 }
 
-} // namespace
-
 void DrawManualMarkerLayers(ManualMarkerLayersState& state, std::vector<Params::MarkerInstanceLayer>& markerLayers,
                             std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
                             int globalSymmetryMask, int globalRadialRepeatCount,
                             Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings) {
-    if (!DrawSectionBegin("Manual Marker Layers", state.section)) return;
+    if (!DrawSectionBegin("Ungrouped Manual Marker Layers", state.section)) return;
     DrawLayerSettings(state);
-    bool bLayersMoved = DrawLayerListButtons(markerLayers, state);
+    bool bLayersMoved = DrawLayerListButtons(markerLayers, state, -1);   // root-scope, unchanged behavior
     bool bAnyNameCommitted = false;
     const DraggableListSignal signal = DrawLayerList(markerLayers, markers, geometry, globalSymmetryMask,
         globalRadialRepeatCount, markerSymmetryFixSettings, state, bAnyNameCommitted);

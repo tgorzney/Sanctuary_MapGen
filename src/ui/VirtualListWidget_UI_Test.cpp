@@ -8,7 +8,7 @@
 using namespace SanmapGen;
 using namespace SanmapGen::Ui;
 
-namespace SanmapGen { namespace Ui { void RunDraggableListAcceptance(); } }
+namespace SanmapGen { namespace Ui { void RunDraggableListAcceptance(); void RunTreeListAcceptance(); } }
 
 namespace {
 
@@ -142,6 +142,7 @@ int main() {
     TestStructOfArraysColumnsVirtualizeToo();
     TestDegenerateInputIsSafe();
     RunDraggableListAcceptance();
+    RunTreeListAcceptance();
     if (listWidgetTestFailureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", listWidgetTestFailureCount);
     return 1;

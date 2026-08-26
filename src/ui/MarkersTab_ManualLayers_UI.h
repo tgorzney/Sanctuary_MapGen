@@ -13,14 +13,11 @@
 // SCOPE NOTES (ARCH §8.4 — reported, not invented):
 //  1. No `Data::PlacementInstances` parameter and no read-only transform-list block: unlike Props,
 //     the Markers tab already previews the resolved buffer via `DrawPlacedMarkerList`
-//     (MarkersTab_Placed_UI.h). Porting Props' `DrawTransformList` here would be a rival second
-//     view of the same buffer (STEP81 divergence 1).
+//     (MarkersTab_Placed_UI.h) — a ported `DrawTransformList` would be a rival second view (STEP81 divergence 1).
 //  2. `MarkerInstanceLayer` carries no `bEnabled`/`bHidden` — the shared DraggableList's
-//     visibility/lock affordances stay inert here, the same posture props already have (STEP81
-//     divergence 5). Not invented here; reported as a field-request candidate.
+//     visibility/lock affordances stay inert here, same as props (STEP81 divergence 5).
 //  3. Never notifies `Pipeline::PreviewDriver`: `recipe.markers`/`recipe.markerLayers` feed no
-//     PROC stage (STEP60 confirmed zero `MarkerInstanceGroup` references under `src/proc/`), the
-//     same silent posture STEP49 already adopts for the manual roster.
+//     PROC stage (STEP60), same silent posture STEP49 already adopts for the manual roster.
 #pragma once
 #include <cmath>
 #include "ColorSwatch_UI.h"
@@ -58,12 +55,10 @@ struct ManualMarkerLayersState {
     SectionState   symmetrySection;                             // NEW vs. props — layer-level symmetry
     int            selectedLayerIndex = -1;
 
-    // STEP107 — the "Fix Symmetry" command's own controls. ONE shared instance for the whole block,
-    // not one per row: `Params::MarkerInstanceLayer` is a pure round-tripping type and cannot carry
-    // UI-only scratch state (same constraint `selectedLayerColorToggle`/`selectedLayerIconScaleToggle`
-    // already accept above). `fixSymmetryToleranceRange`/`fixSymmetryToleranceToggle` back the
-    // recipe-level `Params::MarkerSymmetryFixSettings::distanceTolerance` slider — recipe-level, not
-    // per-layer, so one shared pair is correct here (not a per-row storage gap).
+    // STEP107 — the "Fix Symmetry" command's own controls. ONE shared instance for the whole block
+    // (same constraint `selectedLayerColorToggle`/`selectedLayerIconScaleToggle` already accept
+    // above); `fixSymmetryToleranceRange`/`fixSymmetryToleranceToggle` back the recipe-level
+    // `Params::MarkerSymmetryFixSettings::distanceTolerance` slider — recipe-level, not per-layer.
     ScalarSliderRange         fixSymmetryToleranceRange{ 0.01f, 10.0f, 0.0f };
     RealtimeToggle            fixSymmetryToleranceToggle{true};
     bool                      bFixSymmetryOverwrite   = false;
@@ -118,6 +113,26 @@ inline const char* ManualMarkerLayerRowLabel(const Params::MarkerInstanceLayer& 
 
 // The name "Add Marker Layer" seeds a fresh row with, before the shared uniqueness repair runs.
 inline std::string NextMarkerLayerName(int layerCount) { return NextUniqueLabel("Marker Layer", layerCount); }
+
+// MarkersTab_ManualLayerRowBody_UI.cpp — ARCH §1.5 aspect split (Coder-flagged): one row's name/
+// tint/icon scale/grid snap/symmetry, drawn inline in its own expanded body (STEP110). Its own
+// translation unit (not MarkersTab_ManualLayers_UI.cpp's anonymous namespace) so
+// MarkersTab_Bundles_UI.cpp can reuse it UNCHANGED as the tree's Manual leaf-body callback
+// (ARCH_19_07) — this file's own call site (DrawLayerList) is unaffected.
+bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
+                      const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                      std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
+                      int globalSymmetryMask, int globalRadialRepeatCount,
+                      Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state);
+
+// MarkersTab_ManualLayers_UI.cpp:
+
+// The Add Marker Layer button. STEP120: gains an optional Bundle-scoped parent so a Bundle node's
+// own "add a Layer here" (MarkersTab_Bundles_UI.cpp) can reuse it; moved out of the anonymous
+// namespace. `parentBundleIdentifierForNewLayer < 0` (default) is root scope — this file's own
+// existing call site passes -1, unchanged behavior.
+bool DrawLayerListButtons(std::vector<Params::MarkerInstanceLayer>& markerLayers, ManualMarkerLayersState& state,
+                          int parentBundleIdentifierForNewLayer = -1);
 
 // `markers` is `recipe.markers`, repaired here when a layer is deleted or reordered.
 // No `Data::PlacementInstances*` parameter — see SCOPE NOTE 1.

@@ -404,6 +404,7 @@ add_sangen_test(Morton_MATH_Test                src/math/Morton_MATH_Test.cpp)
 add_sangen_test(RadialClearance_MATH_Test       src/math/RadialClearance_MATH_Test.cpp)
 add_sangen_test(Reciprocal_MATH_Test            src/math/Reciprocal_MATH_Test.cpp)
 add_sangen_test(Trigonometry_MATH_Test          src/math/Trigonometry_MATH_Test.cpp)
+add_sangen_test(RigidTransformPivot_MATH_Test   src/math/RigidTransformPivot_MATH_Test.cpp)
 
 # DATA
 add_sangen_test(EntityIdBuffer_DATA_Test        src/data/EntityIdBuffer_DATA_Test.cpp)
@@ -418,6 +419,7 @@ add_sangen_test(GlobalMarkerSettings_PARAMS_Test src/params/GlobalMarkerSettings
 add_sangen_test(GradientRamp_PARAMS_Test        src/params/GradientRamp_PARAMS_Test.cpp)
 add_sangen_test(LayerStack_PARAMS_Test          src/params/LayerStack_PARAMS_Test.cpp)
 add_sangen_test(MapRecipe_PARAMS_Test           src/params/MapRecipe_PARAMS_Test.cpp)
+add_sangen_test(MarkerLayerBundle_PARAMS_Test   src/params/MarkerLayerBundle_PARAMS_Test.cpp)
 add_sangen_test(PlacementRules_PARAMS_Test      src/params/PlacementRules_PARAMS_Test.cpp)
 
 # SYS
@@ -661,7 +663,8 @@ add_sangen_test(ParameterTabs_UI_Test
 # need a live imgui context.
 add_sangen_test(ListWidgets_UI_Test
     src/ui/VirtualListWidget_UI_Test.cpp
-    src/ui/DraggableListWidget_UI_Test.cpp)
+    src/ui/DraggableListWidget_UI_Test.cpp
+    src/ui/TreeListWidget_UI_Test.cpp)
 target_link_libraries(ListWidgets_UI_Test PRIVATE imgui)
 
 # M5-7 app shell, headless. One binary over three translation units driving a REAL Ui::Application
@@ -767,6 +770,10 @@ add_sangen_test(MarkerLayerIndexRepair_UI_Test src/ui/MarkerLayerIndexRepair_UI_
 # STEP106: the Manual Marker Layers block's lock gate (`IsMarkerInstanceLayerLocked`) and
 # per-layer grid-snap quantizer (`QuantizeMarkerPositionToLayerGrid`) — pure, no imgui frame needed.
 add_sangen_test(MarkersTab_ManualLayers_UI_Test src/ui/MarkersTab_ManualLayers_UI_Test.cpp)
+# STEP120: MarkersTab_Bundles_UI.h's own pure helpers (BuildMarkerLayerBundleLeafIndex,
+# NextMarkerLayerBundleId) and the Move/Rotate Apply functions' own call-boundary behavior — pure,
+# no imgui frame needed (STEP106's "defer the imgui-coupled path" posture).
+add_sangen_test(MarkersTab_Bundles_UI_Test src/ui/MarkersTab_Bundles_UI_Test.cpp)
 # STEP94: MarkerDragGesture_UI's pure gesture state machine (correspondence build/match, live
 # per-frame writes, cardinality growth/shrink, Spawn-refusal freeze, ungrouped free-drag) and
 # RepositionSymmetryGroupMember (R2 §4's roster-slider counterpart) — pure/imgui-free, no window.

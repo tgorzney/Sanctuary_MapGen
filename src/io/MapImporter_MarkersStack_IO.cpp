@@ -61,6 +61,7 @@ void ReadMarkerRuleLayerJson(const nlohmann::json& json, Params::MarkerRuleLayer
     ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,
                           Params::radialSymmetryRepeatCountMaximum,
                           layer.symmetry.radialSymmetryRepeatCount);
+    ReadJsonInteger(json, "ParentBundleIdentifier", layer.parentBundleIdentifier);
     ReadRuleArray(json, "Rules", layer.rules, ReadMarkerRuleJson);
 }
 

@@ -59,6 +59,7 @@ nlohmann::ordered_json BuildMarkerRuleLayerJson(const Params::MarkerRuleLayer& l
     json["SymmetryUseGlobal"] = layer.symmetry.bSymmetryUseGlobal;
     json["SymmetryMask"] = layer.symmetry.symmetryMask;
     json["RadialSymmetryRepeatCount"] = layer.symmetry.radialSymmetryRepeatCount;
+    json["ParentBundleIdentifier"] = layer.parentBundleIdentifier;
     nlohmann::ordered_json rules = nlohmann::ordered_json::array();
     for (const Params::MarkerRule& rule : layer.rules)
         rules.push_back(BuildMarkerRuleJson(rule));
