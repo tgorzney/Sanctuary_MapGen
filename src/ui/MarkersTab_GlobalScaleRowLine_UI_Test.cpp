@@ -64,7 +64,7 @@ RowRects DrawRowWithProbes(MarkerGlobalScaleRow& row, Params::GlobalMarkerSettin
     ImGui::SameLine();
 
     rects.sliderMin = ImGui::GetCursorScreenPos();
-    DrawSliderScalarCompact(markerGlobalScaleRowLabels[0], settings.scaleAlloy, globals.iconScaleRange,
+    DrawSliderScalarCompact("Icon Scale (Global)", settings.scaleAlloy, globals.iconScaleRange,
                             row.iconScaleToggle, kMarkerGlobalScaleRowTrackWidthPixels,
                             kMarkerGlobalScaleRowFieldWidthPixels, WidgetStyle(), "%.2f");
     rects.sliderMax = ImGui::GetItemRectMax();

@@ -78,7 +78,7 @@ void DrawGlobalScaleRow(MarkersTabGlobals& globals, int rowIndex, Params::Global
     ImGui::SameLine();
     ImGui::TextUnformatted(markerGlobalScaleRowLabels[rowIndex]);
     ImGui::SameLine();
-    DrawSliderScalarCompact(markerGlobalScaleRowLabels[rowIndex], *fields.scale, globals.iconScaleRange,
+    DrawSliderScalarCompact("Icon Scale (Global)", *fields.scale, globals.iconScaleRange,
                             row.iconScaleToggle, kMarkerGlobalScaleRowTrackWidthPixels,
                             kMarkerGlobalScaleRowFieldWidthPixels, WidgetStyle(), "%.2f");
     ImGui::SameLine();
