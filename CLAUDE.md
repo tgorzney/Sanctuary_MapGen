@@ -1,6 +1,6 @@
 # SanGen — Project Router & Law (always loaded)
 
-This repo is the SanGen map generator, rebuilding to **v2** against a single
+This repo is the SanGen map generator, rebuilding to **v3** against a single
 authoritative architecture (`ARCH.md` — an index over per-section `ARCH_NN_*.md`
 files), maintained by an AI "expert team." The full design lives in the Setup
 Plan; this file is the thin, always-loaded router that points at the law and
