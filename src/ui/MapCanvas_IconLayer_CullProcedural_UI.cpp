@@ -11,11 +11,25 @@
 // per-instance world-rect test here, uniformly. This avoids special-casing markers onto a
 // rule-agnostic grid it would then have to re-filter by rule membership anyway.
 #include "MapCanvas_IconLayer_CullInternal_UI.h"
+#include "MarkerTypeVisibility_UI.h"
 #include "../params/Army_PARAMS.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {
 namespace Ui {
+
+std::unordered_map<int, std::string> BuildMarkerRuleTypeNameLookup(
+        const std::vector<Params::MarkerRuleLayer>& markerRuleLayers) {
+    std::unordered_map<int, std::string> lookup;
+    int flatIndex = 0;
+    for (const Params::MarkerRuleLayer& layer : markerRuleLayers) {
+        for (std::size_t ruleIndexInLayer = 0; ruleIndexInLayer < layer.rules.size(); ++ruleIndexInLayer) {
+            lookup[flatIndex] = layer.markerTypeName;
+            ++flatIndex;
+        }
+    }
+    return lookup;
+}
 
 void ResolveProceduralSubLayer(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,
                                int layerIndex, PlacementCollectionKind_UI collection, int ruleIndex,
@@ -24,6 +38,18 @@ void ResolveProceduralSubLayer(const DrawOverlayIconLayersInput& input, const Ov
                                IconLayerCullDiagnostics_UI* diagnostics,
                                std::vector<OverlayVisibleInstance>& outCandidates) {
     if (input.placements == nullptr || input.ruleBucketIndex == nullptr) return;
+    // STEP133 — the procedural gate: skip this whole sub-layer's candidate walk when its resolved
+    // markerTypeName is hidden. Markers-only (Units/Props/Decals have no Type-section of their own
+    // yet); a ruleIndex with no lookup entry (corrupt/out-of-range data) resolves an empty
+    // markerTypeName, which is never individually hidden by the Hide/Unhide buttons (they only ever
+    // set Alloy/Plasma/Spawn), so it draws exactly as before this ticket.
+    if (collection == PlacementCollectionKind_UI::Markers && input.markerTypeVisibility != nullptr
+        && input.recipe != nullptr) {
+        const std::unordered_map<int, std::string> ruleTypeNames =
+            BuildMarkerRuleTypeNameLookup(input.recipe->markerRuleLayers);
+        const auto found = ruleTypeNames.find(ruleIndex);
+        if (found != ruleTypeNames.end() && input.markerTypeVisibility->IsHidden(found->second)) return;
+    }
     if (diagnostics != nullptr) ++diagnostics->subLayerWalksIssued;
     const Data::PlacementInstances& instances = CollectionInstances(*input.placements, collection);
     const Data::RuleBucketIndex& ruleBucket = CollectionRuleBucket(*input.ruleBucketIndex, collection);

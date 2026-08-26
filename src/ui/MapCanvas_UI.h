@@ -125,6 +125,16 @@ public:
         manualMarkerSelectedInstanceIdentifier = selectedInstanceIdentifier;
     }
 
+    // STEP133 — the Markers tab's per-Type Hide/Unhide preview filter source. Mirrors
+    // SetManualMarkerSelectionSource's exact injected-pointer shape (this header's own established
+    // pattern): a single, caller-owned, read-every-frame pointer, null-safe (null = no filtering,
+    // today's exact behavior). Points at the SAME MarkersTabState field the Markers tab's own
+    // Hide/Unhide buttons write (tabState.markers.markerTypeVisibility) — one source of truth, never
+    // a second copy.
+    void SetMarkerTypeVisibilitySource(const MarkerTypeVisibility_UI* visibility) {
+        markerTypeVisibilitySource = visibility;
+    }
+
     // One imgui frame; `regionSidePixels` is the square viewport side in screen pixels.
     void Draw(const char* canvasIdentifier, float regionSidePixels);   // MapCanvas_Draw_UI.cpp
 
@@ -239,6 +249,9 @@ private:
     const Params::MapRecipe*                        manualMarkerDragRecipe   = nullptr;
     // STEP126 — the static selection-highlight source (injected, see SetManualMarkerSelectionSource).
     const int*                                      manualMarkerSelectedInstanceIdentifier = nullptr;
+    // STEP133 — the per-Type Hide/Unhide preview filter source (injected, see
+    // SetMarkerTypeVisibilitySource).
+    const MarkerTypeVisibility_UI*                  markerTypeVisibilitySource = nullptr;
     MarkerDragGestureState manualMarkerDragState;
     bool                   bManualMarkerDragActive = false;   // this press started on a manual marker
 };

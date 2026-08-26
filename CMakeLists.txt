@@ -587,7 +587,9 @@ add_sangen_test(MapCanvas_IconLayer_UI_Test
     src/ui/MapCanvas_IconLayer_Draw_UI_Test.cpp
     src/ui/MapCanvas_IconLayer_DrawChunk_UI.cpp
     src/ui/MapCanvas_IconLayer_DrawChunk_UI_Test.cpp
-    src/ui/MapCanvas_IconLayer_DrawChunkCache_UI_Test.cpp)
+    src/ui/MapCanvas_IconLayer_DrawChunkCache_UI_Test.cpp
+    # STEP133 — the Markers tab's per-Type Hide/Unhide preview filter acceptance.
+    src/ui/MapCanvas_IconLayer_MarkerTypeVisibility_UI_Test.cpp)
 # STEP59 — §14.9's own-named microbenchmark: STEP53's real transform+cull+compaction candidate-list
 # build and real FlushIconLayerBucket-shaped bulk write, timed directly (not reimplemented), plus a
 # naive per-instance AddImage() comparison written only in this test binary. Own binary (not folded
@@ -780,6 +782,10 @@ add_sangen_test(MarkersTab_ManualLayers_UI_Test src/ui/MarkersTab_ManualLayers_U
 # posture); needs no explicit imgui link, same as that test, since SanGenV2 links imgui PUBLIC.
 add_sangen_test(MarkersTab_ManualLayerColorOverrideHeader_UI_Test
     src/ui/MarkersTab_ManualLayerColorOverrideHeader_UI_Test.cpp)
+# STEP133: the right-aligned Hide/Unhide button composed into each Type-section header — one live
+# headless imgui frame, same posture as the Color Override header test just above.
+add_sangen_test(MarkersTab_TypeSectionHideToggle_UI_Test
+    src/ui/MarkersTab_TypeSectionHideToggle_UI_Test.cpp)
 # STEP134: DrawGlobalScaleRow's new genuine single-line composition (icon / label / compact scale
 # slider / normal-color swatch / select-color swatch) — every control shares one Y, left-to-right,
 # no overlap, fixed widths honored. Same headless-frame posture as

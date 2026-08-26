@@ -10,6 +10,13 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
+// STEP133 — the spread multiplier mixing `markerTypeVisibilityRevision` into the C2 cache's own
+// invalidation key below, so the Hide/Unhide toggle alone (nothing else changed) forces a rebuild —
+// see MarkerTypeVisibility_UI.h's own header comment for why this must never write directly into
+// `OverlayLayerSettings::layerSettingsRevision`. A large prime spreads the two counters' low values
+// apart so an unrelated one-count bump in either counter never collides with the other's.
+constexpr std::uint64_t kMarkerTypeVisibilityRevisionSpreadMultiplier = 1000003ull;
+
 void SplitSelected(const std::vector<OverlayVisibleInstance>& budgeted,
                    std::vector<OverlayVisibleInstance>& outNonSelected,
                    std::vector<OverlayVisibleInstance>& outSelected) {
@@ -107,7 +114,10 @@ void DrawOverlayIconLayers(const DrawOverlayIconLayersInput& input, IconLayerAab
     const float viewCenterX = input.view->ViewCenterPixelX();
     const float viewCenterY = input.view->ViewCenterPixelY();
     const float zoomScale = input.view->ZoomScale();
-    const std::uint64_t revision = input.overlayLayerSettings->layerSettingsRevision;
+    // STEP133 — combines the Markers tab's own per-Type Hide/Unhide revision into the C2 cache's
+    // invalidation key, so toggling it alone (view/selection unchanged) still forces a rebuild.
+    const std::uint64_t revision = input.overlayLayerSettings->layerSettingsRevision
+        + input.markerTypeVisibilityRevision * kMarkerTypeVisibilityRevisionSpreadMultiplier;
     if (ShouldInvalidateIconLayerCache(frameCache, viewCenterX, viewCenterY, zoomScale,
                                        input.selectedInstanceKey, revision)) {
         RebuildAndCache(input, aabbCache, frameCache, drawList, cullDiagnostics, budgetDiagnostics,

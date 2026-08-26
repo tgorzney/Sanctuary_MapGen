@@ -14,6 +14,8 @@ void RunMapCanvasIconLayerBudgetChecks();   // MapCanvas_IconLayer_Budget_UI_Tes
 void RunMapCanvasIconLayerCacheChecks();    // MapCanvas_IconLayer_Cache_UI_Test.cpp
 void RunMapCanvasIconLayerDrawChecks();     // MapCanvas_IconLayer_Draw_UI_Test.cpp
 void RunMapCanvasIconLayerDrawChunkChecks();  // MapCanvas_IconLayer_DrawChunk_UI_Test.cpp
+// STEP133 — the per-Type Hide/Unhide preview filter (MapCanvas_IconLayer_MarkerTypeVisibility_UI_Test.cpp)
+void RunMapCanvasIconLayerMarkerTypeVisibilityChecks();
 } // namespace Ui
 } // namespace SanmapGen
 
@@ -26,6 +28,7 @@ int main() {
     Ui::RunMapCanvasIconLayerCacheChecks();
     Ui::RunMapCanvasIconLayerDrawChecks();
     Ui::RunMapCanvasIconLayerDrawChunkChecks();
+    Ui::RunMapCanvasIconLayerMarkerTypeVisibilityChecks();
 
     if (Ui::previewTestFailureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", Ui::previewTestFailureCount);

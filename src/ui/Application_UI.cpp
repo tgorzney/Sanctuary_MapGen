@@ -114,6 +114,11 @@ void Application::WireCallbacks() {
     // instance-list rows write (tabState.markers.selectedManualInstanceIdentifier) — one source of
     // truth, never a second copy.
     canvas.SetManualMarkerSelectionSource(&tabState.markers.selectedManualInstanceIdentifier);
+    // STEP133 — the per-Type Hide/Unhide preview filter source; see MapCanvas_UI.h's
+    // SetMarkerTypeVisibilitySource. Points at the SAME MarkersTabState field the Markers tab's own
+    // Type-section Hide/Unhide buttons write (tabState.markers.markerTypeVisibility) — one source of
+    // truth, never a second copy.
+    canvas.SetMarkerTypeVisibilitySource(&tabState.markers.markerTypeVisibility);
     // ARCH §19.25, item 5 — the OTHER half of the two-way sync: a Markers-tab instance-list click
     // resolves through this closure into the canvas's own real selection (item 3's SetSelection),
     // mirroring SetManualMarkerSelectionSource's own injection pattern exactly, just in the opposite

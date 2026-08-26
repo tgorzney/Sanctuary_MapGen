@@ -9,6 +9,42 @@
 
 namespace SanmapGen {
 namespace Ui {
+namespace {
+
+// STEP133 — the gap between the Type-section header's own drawn content and the Hide/Unhide button
+// composed into its reserved right edge (Constitution §8: a named constant, never a bare literal at
+// the call site), mirroring HeightmapTab_UI.cpp's kGeoLayerAddButtonSpacingPixels precedent exactly.
+constexpr float kHideToggleButtonSpacingPixels = 8.0f;
+
+// The reserved-right-width `SectionOptions` for one Type-section header: exactly the CURRENT label's
+// ("Hide" or the wider "Unhide") own measured width plus the fixed spacing above, mirroring
+// HeightmapTab_UI.cpp's GeoLayerSectionOptions exactly.
+SectionOptions HideToggleSectionOptions(bool bHidden) {
+    SectionOptions options;
+    const float buttonWidth = ImGui::CalcTextSize(bHidden ? "Unhide" : "Hide").x
+                             + ImGui::GetStyle().FramePadding.x * 2.0f;
+    options.reservedRightWidth = buttonWidth + kHideToggleButtonSpacingPixels;
+    return options;
+}
+
+// Right-aligns the Hide/Unhide SmallButton within the header's own reserved right zone: its right
+// edge lands at the same X regardless of which label ("Hide" vs. the wider "Unhide") is current,
+// rather than sitting flush-left of the reserved zone the way SameLine() alone would leave it
+// (HeightmapTab_UI.cpp's single-label "Add GeoLayer" precedent never needed this). Must be called
+// immediately after ImGui::SameLine(), with the reserved zone the ONLY content still ahead of the
+// cursor on this line — GetContentRegionAvail().x is exactly that zone's remaining width, and
+// DrawSectionBegin sized `barWidth` so this button's own right edge always lands at the header's own
+// full right edge, independent of which label reserved the zone this frame.
+bool DrawRightAlignedHideToggleButton(bool bHidden) {
+    const char* label = bHidden ? "Unhide" : "Hide";
+    const float buttonWidth = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float availableWidth = ImGui::GetContentRegionAvail().x;
+    if (availableWidth > buttonWidth)
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + availableWidth - buttonWidth);
+    return ImGui::SmallButton(label);
+}
+
+} // namespace
 
 // The rule the detail controls edit: a two-index walk, both bounds-checked, null on either miss
 // (STEP80, mirroring `SelectedLayer`, LayersTab_UI.cpp:120-127).
@@ -37,8 +73,16 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
     // no Placed Markers.
     for (const char* typeName : { "Alloy", "Plasma", "Spawn" }) {
         ImGui::PushID(typeName);
-        if (DrawSectionBegin(typeName, state.typeSections.stateByTypeName[typeName].outerSection))
+        // STEP133 — a right-aligned Hide/Unhide button, per Type-section header, toggling that
+        // Type's markers off the map preview entirely (both manual and procedural).
+        const bool bHidden = state.markerTypeVisibility.IsHidden(typeName);
+        if (DrawSectionBegin(typeName, state.typeSections.stateByTypeName[typeName].outerSection,
+                             HideToggleSectionOptions(bHidden))) {
+            ImGui::SameLine();
+            if (DrawRightAlignedHideToggleButton(bHidden))
+                state.markerTypeVisibility.SetHidden(typeName, !bHidden);
             DrawSectionEnd();
+        }
         ImGui::PopID();
     }
     ImGui::PopID();

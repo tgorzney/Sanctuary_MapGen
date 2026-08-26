@@ -42,6 +42,7 @@
 #include "MarkersTab_RuleLayers_UI.h"
 #include "MarkersTab_Rules_UI.h"
 #include "MarkersTab_TypeSections_UI.h"
+#include "MarkerTypeVisibility_UI.h"
 #include "RangeSliderWidget_UI.h"
 #include "../params/MarkerRule_PARAMS.h"
 
@@ -122,6 +123,12 @@ struct MarkersTabState {
     // MarkerLayerBundlesState::selectedBundleIdentifier already applies one tier up its own struct.
     // -1 = no selection (Constitution §6 sentinel convention).
     int selectedManualInstanceIdentifier = -1;
+
+    // STEP133 — the per-Type Hide/Unhide preview filter, one row per Alloy/Plasma/Spawn Type-section
+    // header (MarkersTab_UI.cpp). Session-only UI state, injected into MapCanvas via
+    // MapCanvas::SetMarkerTypeVisibilitySource (MarkerTypeVisibility_UI.h's own header comment) —
+    // never a PARAMS field, never folded into OverlayLayerSettings.
+    MarkerTypeVisibility_UI markerTypeVisibility;
 };
 
 // rule -> widget mirrors (the paired min/max fields the range sliders edit, and the int count).

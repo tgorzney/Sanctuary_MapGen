@@ -4,6 +4,7 @@
 // of this module's public surface (MapCanvas_IconLayer_UI.h); nothing outside this trio includes
 // it. Pure, imgui-free, headless-testable — same posture as the public header.
 #pragma once
+#include <unordered_map>
 #include "MapCanvas_IconLayer_Ops_UI.h"
 #include "OverlayLayer_Settings_UI.h"
 #include "../data/PlacementInstances_DATA.h"
@@ -97,6 +98,21 @@ std::string ResolveMarkerIconTemplateIdentifier(const Params::MarkerTransform& t
 // walk: *outAabb is left untouched (nullptr) and the per-instance AABB test against `*viewRect`
 // gates whether EmitCandidateIfVisible runs at all.
 //
+// STEP133 — the procedural gate's own ruleIndex -> markerTypeName lookup: mirrors SeedMarkerDomains's
+// existing flat-index walk shape (Application_OverlaySetup_Seed_UI.cpp's `flatIndex` counter,
+// incremented once per rule across every markerRuleLayers[*].rules in order) but keeps the FULL
+// `MarkerRuleLayer::markerTypeName` rather than collapsing to a Spawn/non-Spawn bool the way
+// SeedMarkerDomains does — MarkerCategory alone cannot disambiguate Alloy from Plasma (no `Plasma`
+// enumerator exists). Produces the SAME numbering as ProceduralInstanceRuleIndex_UI.h's
+// `FlatMarkerRuleIndexBase` (STEP132) — confirmed by construction: both walk layers-then-rules in
+// order, incrementing once per rule regardless of category/bEnabled/bHidden. Rebuilt fresh on every
+// call, never persisted — the same zero-dirty-hash-participation posture
+// ProceduralInstanceRuleIndex_UI.h's own header comment documents for its sibling index. Declared
+// here (not anonymous) so this trio's own acceptance suite can exercise it directly, mirroring
+// ResolveMarkerIconTemplateIdentifier's own posture.
+std::unordered_map<int, std::string> BuildMarkerRuleTypeNameLookup(
+    const std::vector<Params::MarkerRuleLayer>& markerRuleLayers);
+
 // §1 item 3 — one recipe.*Rules[i]-resolved sub-layer, walked via STEP50's ruleIndex CSR bucket
 // (MapCanvas_IconLayer_CullProcedural_UI.cpp).
 void ResolveProceduralSubLayer(const DrawOverlayIconLayersInput& input, const OverlayLayer_UI& layer,

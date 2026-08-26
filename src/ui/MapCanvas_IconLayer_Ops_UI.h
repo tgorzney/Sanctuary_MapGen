@@ -19,6 +19,7 @@ class MapCanvasView;
 struct OverlayLayerSettings;
 class IconAtlasPairingLookup;
 struct IconAtlasManifest;
+struct MarkerTypeVisibility_UI;   // STEP133 — MarkerTypeVisibility_UI.h; pointer-only here
 
 // Test-observable counters (never read by production code) — how the acceptance tests assert
 // "the grid/bucket was never touched" / "logged once, not per instance" / "generated exactly once".
@@ -56,6 +57,12 @@ struct DrawOverlayIconLayersInput {
     const MapCanvasView*                view                   = nullptr;
     float regionOriginX = 0.0f, regionOriginY = 0.0f, regionSidePixels = 0.0f;
     OverlayInstanceKey_UI selectedInstanceKey;
+    // STEP133 — the Markers tab's per-Type Hide/Unhide preview filter (null = no shell has wired the
+    // source, i.e. today's exact unfiltered behavior). `markerTypeVisibilityRevision` is threaded
+    // separately (0 when the pointer is null) so the C2 cache's own invalidation key
+    // (MapCanvas_IconLayer_Draw_UI.cpp) can combine it without dereferencing the pointer itself.
+    const MarkerTypeVisibility_UI*      markerTypeVisibility          = nullptr;
+    std::uint64_t                       markerTypeVisibilityRevision  = 0;
 };
 
 // §2 — the cross-layer visible-vertex budget + decimation (MapCanvas_IconLayer_Budget_UI.cpp).

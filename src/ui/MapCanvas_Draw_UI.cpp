@@ -6,6 +6,7 @@
 // already rasterized them into the texture and into the entity-id buffer, which is why a click
 // costs one buffer read instead of an imgui loop over every instance.
 #include "MapCanvas_UI.h"
+#include "MarkerTypeVisibility_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cmath>
 #include <imgui.h>
@@ -89,6 +90,11 @@ void MapCanvas::DrawOverlayIconLayerPass(float regionOriginX, float regionOrigin
     iconLayerInput.regionOriginX        = regionOriginX;
     iconLayerInput.regionOriginY        = regionOriginY;
     iconLayerInput.regionSidePixels     = regionSidePixels;
+    // STEP133 — null-safe: no shell has wired SetMarkerTypeVisibilitySource means null/0, i.e.
+    // today's exact unfiltered behavior.
+    iconLayerInput.markerTypeVisibility = markerTypeVisibilitySource;
+    iconLayerInput.markerTypeVisibilityRevision =
+        markerTypeVisibilitySource != nullptr ? markerTypeVisibilitySource->revision : 0;
     // ARCH §19.25 — `selectedInstanceKey` IS the canonical key now (procedural or manual, correctly
     // tagged `bManual`); no longer reconstructed from a bare entity id, which could only ever
     // represent the procedural case.

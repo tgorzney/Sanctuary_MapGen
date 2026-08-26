@@ -15,6 +15,7 @@
 // PARAMS read timing as before (zero DAG coupling, zero staleness); only the match key changed.
 #include "MapCanvas_IconLayer_CullInternal_UI.h"
 #include "Application_Defaults_UI.h"
+#include "MarkerTypeVisibility_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../params/Army_PARAMS.h"
 #include "../params/PropInstance_PARAMS.h"
@@ -149,6 +150,10 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
         overrideTintBlue = overrideLayer.color[2];
     }
     for (const Params::MarkerInstanceGroup& group : input.recipe->markers) {
+        // STEP133 — the per-Type Hide/Unhide preview filter, gated at group level (the group's own
+        // `name` IS the marker Type name, MarkerInstance_PARAMS.h), mirroring ResolvePropsManual's
+        // bReclaimable en-bloc gate above: evaluated once per GROUP, never per transform.
+        if (input.markerTypeVisibility != nullptr && input.markerTypeVisibility->IsHidden(group.name)) continue;
         const bool bIsSpawnGroup = group.name == Params::kSpawnMarkerGroupName;
         if (bIsSpawnGroup != bWantSpawnGroups) continue;
         // Type-default resolves once per GROUP (mirrors ResolvePropsManual's bReclaimable en-bloc
