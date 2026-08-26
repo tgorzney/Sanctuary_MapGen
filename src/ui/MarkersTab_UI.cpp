@@ -140,12 +140,15 @@ int ResolveAddInstanceLayerIndex(const std::vector<Params::MarkerInstanceLayer>&
     return selectedLayerIndex;
 }
 
-// STEP138 — a new Layer's own `parentBundleIdentifier`: the currently-selected Group (Bundle), when
-// one typed to THIS Type-section is selected (human's own instruction — "+ Layer" should add under
-// the selected Group); else root ("the base section"), the existing -1 convention every Bundle/
-// Layer already carries. Guards on `markerTypeName` for the same cross-Type-section-selection
-// reason `ResolveAddInstanceLayerIndex` above does.
-int ResolveAddLayerParentBundleIdentifier(const std::vector<Params::MarkerLayerBundle>& bundles,
+// STEP138/STEP139 — a newly-added Layer's OR Group's own `parentBundleIdentifier`: the currently-
+// selected Group (Bundle), when one typed to THIS Type-section is selected (human's own instruction
+// — "+ Layer"/"+ Group" should add under the selected Group, and Groups stay nestable); else root
+// ("the base section"), the existing -1 convention every Bundle/Layer already carries. Guards on
+// `markerTypeName` for the same cross-Type-section-selection reason `ResolveAddInstanceLayerIndex`
+// above does. Safe to reuse for a brand-new Group too (no cycle check needed — a NEW node can never
+// already be its own ancestor; `WouldReparentMarkerLayerBundleCreateCycle` only guards RE-parenting
+// an EXISTING node, a different, still-untouched code path).
+int ResolveSelectedParentBundleIdentifier(const std::vector<Params::MarkerLayerBundle>& bundles,
                                           int selectedBundleIdentifier, const std::string& typeName) {
     if (selectedBundleIdentifier < 0) return -1;
     for (const Params::MarkerLayerBundle& bundle : bundles)
@@ -250,6 +253,10 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                 Params::MarkerLayerBundle bundle;
                 bundle.identifier = NextMarkerLayerBundleId(recipe.markerLayerBundles);
                 bundle.markerTypeName = typeName;
+                // Groups stay nestable (human's own confirmation) — a Group added while another
+                // Group of this Type is selected nests under it, same "+ Layer" targeting rule below.
+                bundle.parentBundleIdentifier = ResolveSelectedParentBundleIdentifier(
+                    recipe.markerLayerBundles, state.bundles.selectedBundleIdentifier, typeName);
                 recipe.markerLayerBundles.push_back(bundle);
                 state.bundles.selectedBundleIdentifier = bundle.identifier;
             }
@@ -257,7 +264,7 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                 Params::MarkerInstanceLayer layer;
                 layer.name     = NextMarkerLayerName(static_cast<int>(recipe.markerLayers.size()));
                 layer.layerId  = NextMarkerLayerId(recipe.markerLayers);
-                layer.parentBundleIdentifier = ResolveAddLayerParentBundleIdentifier(
+                layer.parentBundleIdentifier = ResolveSelectedParentBundleIdentifier(
                     recipe.markerLayerBundles, state.bundles.selectedBundleIdentifier, typeName);
                 layer.markerTypeName = typeName;
                 recipe.markerLayers.push_back(layer);
@@ -266,7 +273,7 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
             bool bRecipeMoved = false;
             if (buttons.bAddProceduralLayerClicked) {
                 Params::MarkerRuleLayer layer;
-                layer.parentBundleIdentifier = ResolveAddLayerParentBundleIdentifier(
+                layer.parentBundleIdentifier = ResolveSelectedParentBundleIdentifier(
                     recipe.markerLayerBundles, state.bundles.selectedBundleIdentifier, typeName);
                 layer.markerTypeName = typeName;
                 recipe.markerRuleLayers.push_back(layer);
