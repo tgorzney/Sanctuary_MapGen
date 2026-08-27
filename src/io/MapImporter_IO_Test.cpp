@@ -316,25 +316,12 @@ void CheckSymmetryFields(const Params::MapRecipe& original, const Params::MapRec
     }
 }
 
-// STEP13_PlacementStacks_IO: the 4 new `MarkerRule` fields (SANMAP_FORMAT_SPEC Correction 7's
-// confirmed cardinality change: v1 global scalars, now per-layer fields) and the whole
-// `GlobalMarkerSettings` block (ARCH §11), all through the new top-level `MarkersStack`/
-// `GlobalMarkerSettings` keys — REPLACING the deleted `mapGeneratorData.PlacementRules` object.
-void CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(const Params::MapRecipe& original,
-                                                     const Params::MapRecipe& loaded) {
-    Check(!loaded.markerRuleLayers.empty() && !loaded.markerRuleLayers[0].rules.empty()
-          && !original.markerRuleLayers[0].rules.empty()
-          && NearlyEqual(loaded.markerRuleLayers[0].rules[0].hydroMultiplier,
-                        original.markerRuleLayers[0].rules[0].hydroMultiplier)
-          && NearlyEqual(loaded.markerRuleLayers[0].rules[0].reclaimDensity,
-                        original.markerRuleLayers[0].rules[0].reclaimDensity)
-          && NearlyEqual(loaded.markerRuleLayers[0].rules[0].mexDensity,
-                        original.markerRuleLayers[0].rules[0].mexDensity)
-          && loaded.markerRuleLayers[0].rules[0].spawnPointCount
-                 == original.markerRuleLayers[0].rules[0].spawnPointCount,
-          "hydroMultiplier/reclaimDensity/mexDensity/spawnPointCount survive on MarkerRule "
-          "(previously write-only-to-nothing)");
-
+// STEP13_PlacementStacks_IO: the whole `GlobalMarkerSettings` block (ARCH §11) through the new
+// top-level `GlobalMarkerSettings` key — REPLACING the deleted `mapGeneratorData.PlacementRules`
+// object. (This used to also check MarkerRule's own hydroMultiplier/reclaimDensity/mexDensity/
+// spawnPointCount fields — retired: struct-default dead weight with no UI and no PROC consumer.)
+void CheckGlobalMarkerSettingsSurvives(const Params::MapRecipe& original,
+                                       const Params::MapRecipe& loaded) {
     const Params::GlobalMarkerSettings& originalSettings = original.globalMarkerSettings;
     const Params::GlobalMarkerSettings& loadedSettings = loaded.globalMarkerSettings;
     Check(loadedSettings.iconNameAlloy == originalSettings.iconNameAlloy
@@ -389,8 +376,8 @@ void CheckMarkerRuleLayerTwoLevelRoundTrip() {
     layerOne.symmetry.radialSymmetryRepeatCount = 4;
     layerOne.parentBundleIdentifier = 5;                          // STEP119, non-default
     layerOne.markerTypeName = "Alloy";                            // STEP124, non-default
-    Params::MarkerRule ruleOneA; ruleOneA.count = 3; ruleOneA.hydroMultiplier = 1.4f;
-    Params::MarkerRule ruleOneB; ruleOneB.count = 5; ruleOneB.mexDensity = 0.25f;
+    Params::MarkerRule ruleOneA; ruleOneA.count = 3; ruleOneA.clearanceSpacing = 1.4f;
+    Params::MarkerRule ruleOneB; ruleOneB.count = 5; ruleOneB.density = 0.25f;
     layerOne.rules.push_back(ruleOneA);
     layerOne.rules.push_back(ruleOneB);
     original.markerRuleLayers.push_back(layerOne);
@@ -402,8 +389,8 @@ void CheckMarkerRuleLayerTwoLevelRoundTrip() {
     layerTwo.symmetry.bSymmetryUseGlobal = true;
     layerTwo.symmetry.symmetryMask = Params::SymmetryAxis::Radial;
     layerTwo.symmetry.radialSymmetryRepeatCount = 6;
-    Params::MarkerRule ruleTwoA; ruleTwoA.reclaimDensity = 0.6f; ruleTwoA.spawnPointCount = 2;
-    Params::MarkerRule ruleTwoB; ruleTwoB.count = 7; ruleTwoB.hydroMultiplier = 2.2f;
+    Params::MarkerRule ruleTwoA; ruleTwoA.density = 0.6f; ruleTwoA.areaRadiusMinimum = 2.0f;
+    Params::MarkerRule ruleTwoB; ruleTwoB.count = 7; ruleTwoB.clearanceSpacing = 2.2f;
     layerTwo.rules.push_back(ruleTwoA);
     layerTwo.rules.push_back(ruleTwoB);
     original.markerRuleLayers.push_back(layerTwo);
@@ -460,12 +447,11 @@ void CheckMarkerRuleLayerTwoLevelRoundTrip() {
             const Params::MarkerRule& originalRule = originalLayer.rules[ruleIndex];
             const Params::MarkerRule& loadedRule   = loadedLayer.rules[ruleIndex];
             Check(loadedRule.count == originalRule.count
-                  && NearlyEqual(loadedRule.hydroMultiplier, originalRule.hydroMultiplier)
-                  && NearlyEqual(loadedRule.reclaimDensity, originalRule.reclaimDensity)
-                  && NearlyEqual(loadedRule.mexDensity, originalRule.mexDensity)
-                  && loadedRule.spawnPointCount == originalRule.spawnPointCount,
-                  "each rule's own fields (count/HydroMultiplier/ReclaimDensity/MexDensity/"
-                  "SpawnPointCount) survive independent of the layer's symmetry");
+                  && NearlyEqual(loadedRule.clearanceSpacing, originalRule.clearanceSpacing)
+                  && NearlyEqual(loadedRule.density, originalRule.density)
+                  && NearlyEqual(loadedRule.areaRadiusMinimum, originalRule.areaRadiusMinimum),
+                  "each rule's own fields (count/ClearanceSpacing/Density/AreaRadiusMinimum) "
+                  "survive independent of the layer's symmetry");
         }
     }
 }
@@ -1133,12 +1119,6 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     Params::MarkerRule markerRule;
     markerRule.count = 8;
     markerRule.clearanceSpacing = 14.0f;
-    // STEP13_PlacementStacks_IO: the 4 new per-layer fields, non-default
-    // (CheckMarkerRuleNewFieldsAndGlobalMarkerSettings).
-    markerRule.hydroMultiplier = 1.8f;
-    markerRule.reclaimDensity  = 0.35f;
-    markerRule.mexDensity      = 0.6f;
-    markerRule.spawnPointCount = 6;
     markerRuleLayer.rules.push_back(markerRule);
     recipe.markerRuleLayers.push_back(markerRuleLayer);
     Params::PropRule propRule;
@@ -1541,7 +1521,7 @@ void RunRoundTripTests() {
     CheckLayerStackAndRules(original, loaded);
     CheckFootprintBakeFields(original, loaded);
     CheckHeightmapStackTopLevelNotNested(documentText);
-    CheckMarkerRuleNewFieldsAndGlobalMarkerSettings(original, loaded);
+    CheckGlobalMarkerSettingsSurvives(original, loaded);
     CheckPlacementStacksTopLevelNotNested(documentText);
     CheckStratumAppearance(original, loaded);
     CheckStratumGenerationSettings(original, loaded);

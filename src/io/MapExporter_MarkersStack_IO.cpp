@@ -38,12 +38,6 @@ nlohmann::ordered_json BuildMarkerRuleJson(const Params::MarkerRule& rule) {
     json["FocusGradientRadius"] = rule.focusGradientRadius;
     json["FocusGradientStrength"] = rule.focusGradientStrength;
     json["FocusGradientContrast"] = rule.focusGradientContrast;
-    // Correction 7's confirmed cardinality change: v1 global scalars, now per-layer fields
-    // (MarkerRule_PARAMS.h) — a genuine addition, not a relocation.
-    json["HydroMultiplier"] = rule.hydroMultiplier;
-    json["ReclaimDensity"]  = rule.reclaimDensity;
-    json["MexDensity"]      = rule.mexDensity;
-    json["SpawnPointCount"] = rule.spawnPointCount;
     json["Transform"] = BuildScatterTransformJson(rule.transform);
     return json;
 }

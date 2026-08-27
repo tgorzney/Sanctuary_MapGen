@@ -43,10 +43,9 @@ void ReadMarkerRuleJson(const nlohmann::json& json, Params::MarkerRule& rule) {
     ReadJsonFloat(json, "FocusGradientRadius", rule.focusGradientRadius);
     ReadJsonFloat(json, "FocusGradientStrength", rule.focusGradientStrength);
     ReadJsonFloat(json, "FocusGradientContrast", rule.focusGradientContrast);
-    ReadJsonFloat(json, "HydroMultiplier", rule.hydroMultiplier);
-    ReadJsonFloat(json, "ReclaimDensity", rule.reclaimDensity);
-    ReadJsonFloat(json, "MexDensity", rule.mexDensity);
-    ReadJsonInteger(json, "SpawnPointCount", rule.spawnPointCount);
+    // HydroMultiplier/ReclaimDensity/MexDensity/SpawnPointCount retired (never had a UI or a PROC
+    // consumer — struct-default dead weight): a file still carrying those keys just has them
+    // ignored now, the same as any other unrecognized key.
 }
 
 // The `MarkerRuleLayer` wrapper (Correction 15): `Name`/`Enabled`/`Hidden` plus the symmetry
