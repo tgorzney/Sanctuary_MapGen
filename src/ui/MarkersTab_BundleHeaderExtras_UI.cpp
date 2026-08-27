@@ -43,23 +43,56 @@ bool DrawRightAlignedDeleteButton(const char* label) {
     return ImGui::SmallButton(label);
 }
 
-// STEP144 — a Procedural Layer leaf's own [E/D][V/I][X], right-aligned as one cluster (the tree has
-// no built-in affordance strip the way DraggableList's ungrouped rows do, so this is a clean
-// addition, not a duplicate of anything). The coupled toggle rules live in
+} // namespace
+
+// Human's own bug report — the "SYM" button alone, extracted so the flat/ungrouped list (which
+// already gets Enabled/Hidden/Delete from DraggableList's own built-in affordance strip — adding a
+// second explicit set of E/D/V/I/X buttons there would duplicate that strip, not fix anything) can
+// reuse just this piece, while DrawRightAlignedProceduralLayerCluster below (the Bundle tree's own,
+// which has no built-in strip at all) composes it into the full [SYM][E/D][V/I][X] cluster. Flips
+// `layer.symmetry.bSymmetryUseGlobal` directly — TRUE ("on"/highlighted) means this layer follows
+// the recipe's global symmetry, exactly Manual's own SYM=on polarity
+// (DrawMarkerLayerSymmetryToggleHeaderControl, MarkersTab_ManualLayerRowBody_UI.cpp); OFF reveals
+// the per-axis override checkboxes that stay in the body (DrawRuleLayerSettings).
+void DrawRuleLayerSymmetryToggleHeaderControl(Params::MarkerRuleLayer& layer,
+                                              Pipeline::PreviewDriver* previewDriver) {
+    if (layer.symmetry.bSymmetryUseGlobal)
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+    const bool bSymmetryCommitted = ImGui::SmallButton("SYM##symmetry");
+    if (layer.symmetry.bSymmetryUseGlobal) ImGui::PopStyleColor();
+    if (bSymmetryCommitted) {
+        layer.symmetry.bSymmetryUseGlobal = !layer.symmetry.bSymmetryUseGlobal;
+        NotifyPlacementChange(true, previewDriver);
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Use Global Symmetry (off = this layer's own axes, below)");
+}
+
+// Human's own bug report — "Enabled, Hidden and Use Symmetry can be removed from within the
+// [Procedural layer] ... it should now be located in the header as buttons" — [SYM][E/D][V/I][X],
+// right-aligned as one cluster. The E/D+V/I coupled toggle rules live in
 // MarkerLayerEnabledVisibilityToggle_UI.h; a non-structural field flip notifies immediately (unlike
-// delete, which stays deferred — MarkerLayerBundlesState's own pending-delete fields).
+// delete, which stays deferred — MarkerLayerBundlesState's own pending-delete fields). Width uses
+// the SAME fixed reserved-zone-budget constants (MarkersTab_Bundles_UI.h) Manual's own cluster uses
+// — not per-label VisibleButtonWidth measurement (E vs D / V vs I share the same real width in
+// practice, so a fixed budget is exact, and it's what `reservedZoneWidthPixels` — see this
+// function's own declaration comment for why it replaces GetContentRegionAvail() — is expressed
+// against in the first place).
 void DrawRightAlignedProceduralLayerCluster(Params::MarkerRuleLayer& layer, int layerIndex,
                                             MarkerLayerBundlesState& bundlesState,
-                                            Pipeline::PreviewDriver* previewDriver) {
+                                            Pipeline::PreviewDriver* previewDriver,
+                                            float reservedZoneWidthPixels) {
     const char* const enabledLabel = layer.bEnabled ? "E##enabled" : "D##enabled";
     const char* const visibleLabel = layer.bHidden  ? "I##visible" : "V##visible";
     const char* const deleteLabel  = "X##deleteLayer";
-    const float totalWidth = VisibleButtonWidth(enabledLabel) + kClusterButtonSpacingPixels
-                            + VisibleButtonWidth(visibleLabel) + kClusterButtonSpacingPixels
-                            + VisibleButtonWidth(deleteLabel);
-    const float availableWidth = ImGui::GetContentRegionAvail().x;
-    if (availableWidth > totalWidth)
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + availableWidth - totalWidth);
+    const float clusterWidth = kMarkerRuleLayerSymmetryButtonWidthPixels + kClusterButtonSpacingPixels
+                             + kMarkerRuleLayerEnabledButtonWidthPixels + kClusterButtonSpacingPixels
+                             + kMarkerRuleLayerVisibilityButtonWidthPixels + kClusterButtonSpacingPixels
+                             + kMarkerRuleLayerDeleteButtonWidthPixels;
+    if (reservedZoneWidthPixels > clusterWidth)
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + reservedZoneWidthPixels - clusterWidth);
+
+    DrawRuleLayerSymmetryToggleHeaderControl(layer, previewDriver);
+    ImGui::SameLine(0.0f, kClusterButtonSpacingPixels);
 
     if (ImGui::SmallButton(enabledLabel)) {
         ApplyMarkerRuleLayerEnabledToggle(layer.bEnabled, layer.bHidden);
@@ -80,7 +113,40 @@ void DrawRightAlignedProceduralLayerCluster(Params::MarkerRuleLayer& layer, int 
     }
 }
 
-} // namespace
+// Human's own bug report — see this function's own declaration comment (MarkersTab_Bundles_UI.h) for
+// the full contract. Mirrors DrawLayerHeaderNameOverlay's own shape (Manual Layers,
+// MarkersTab_ManualLayerRowBody_UI.cpp) exactly, one tier over.
+bool DrawRuleLayerHeaderNameOverlay(int layerIndex, Params::MarkerRuleLayer& layer,
+                                    MarkerLayerBundlesState& state, Pipeline::PreviewDriver* previewDriver) {
+    const ImVec2 itemMin = ImGui::GetItemRectMin();
+    const float labelStartX = itemMin.x + ImGui::GetTreeNodeToLabelSpacing();
+
+    if (state.renamingProceduralLayerIndex == layerIndex) {
+        ImGui::SetCursorScreenPos(ImVec2(labelStartX, itemMin.y));
+        if (state.bRenameProceduralFocusPending) {
+            ImGui::SetKeyboardFocusHere();
+            state.bRenameProceduralFocusPending = false;
+        }
+        TextInputRules nameRules;
+        nameRules.maximumLength = 48; nameRules.bAllowEmpty = false; nameRules.fallbackText = "Marker Layer";
+        DrawTextInput("##renameRuleLayer", state.renameProceduralScratchText, nameRules, WidgetStyle(), nullptr,
+                     /*bLabelHidden=*/true);
+        if (ImGui::IsItemDeactivated()) {
+            layer.name = SanitizeTextInput(state.renameProceduralScratchText, nameRules);
+            state.renamingProceduralLayerIndex = -1;
+            NotifyPlacementChange(true, previewDriver);
+        }
+        return true;
+    }
+
+    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        state.renamingProceduralLayerIndex  = layerIndex;
+        state.renameProceduralScratchText   = layer.name;
+        state.bRenameProceduralFocusPending = true;
+        return true;
+    }
+    return false;
+}
 
 // A Group's own header-extra: double-click the header (the LAST-submitted item when this runs,
 // RenderNode's own contract, TreeListWidget_RowLayout_UI.h) starts a rename, positioned OVER the
@@ -222,8 +288,12 @@ void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
     }
 
     if (leaf.layerIndex < 0 || leaf.layerIndex >= static_cast<int>(ruleLayers.size())) return;
-    DrawRightAlignedProceduralLayerCluster(ruleLayers[static_cast<std::size_t>(leaf.layerIndex)],
-                                           leaf.layerIndex, bundlesState, previewDriver);
+    Params::MarkerRuleLayer& ruleLayer = ruleLayers[static_cast<std::size_t>(leaf.layerIndex)];
+    // Human's own bug report — double-click-the-header rename FIRST, mirroring the Manual leaf
+    // branch above exactly: while active, it claims the rest of the row.
+    if (DrawRuleLayerHeaderNameOverlay(leaf.layerIndex, ruleLayer, bundlesState, previewDriver)) return;
+    DrawRightAlignedProceduralLayerCluster(ruleLayer, leaf.layerIndex, bundlesState, previewDriver,
+                                           kMarkerLayerHeaderExtraCombinedWidthPixels);
 }
 
 } // namespace Ui

@@ -362,6 +362,42 @@ void TestManualLeafDeleteButtonRecordsPendingIndex() {
          "clicking the X (opening the popup) does not itself erase anything -- deferred to the caller");
 }
 
+// Human's own bug report — "Enabled, Hidden and Use Symmetry can be removed from within the
+// [Procedural layer] ... it should now be located in the header as buttons": the "SYM" button flips
+// the real MarkerRuleLayer's own symmetry.bSymmetryUseGlobal and reports the commit. Mirrors
+// TestManualLeafHeaderExtraDrawsAndFlipsSymmetry's own shape (tested DIRECTLY, not through the full
+// DrawMarkerGroupLeafHeaderExtra composition, for the same reason that test gives).
+void TestRuleLayerSymmetryToggleHeaderControlFlipsGlobalFlag() {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerRuleLayer> ruleLayers(1);
+    Check(ruleLayers[0].symmetry.bSymmetryUseGlobal, "starts true (the struct's own default)");
+
+    const ImVec2 windowSize(300.0f, 100.0f);
+    ImVec2 origin; float boxWidth = 0.0f, boxHeight = 0.0f;
+    RunHeadlessFrame(HeadlessMouseState(), windowSize, [&] {
+        origin = ImGui::GetCursorScreenPos();
+        DrawRuleLayerSymmetryToggleHeaderControl(ruleLayers[0], nullptr);
+        boxWidth  = ImGui::GetItemRectMax().x - ImGui::GetItemRectMin().x;
+        boxHeight = ImGui::GetItemRectMax().y - ImGui::GetItemRectMin().y;
+    });
+    const ImVec2 symButtonCenter(origin.x + boxWidth * 0.5f, origin.y + boxHeight * 0.5f);
+
+    HeadlessMouseState hover;   hover.position = symButtonCenter;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    auto runFrame = [&](HeadlessMouseState mouse) {
+        RunHeadlessFrame(mouse, windowSize, [&] {
+            DrawRuleLayerSymmetryToggleHeaderControl(ruleLayers[0], nullptr);
+        });
+    };
+    runFrame(hover);
+    runFrame(press);
+    runFrame(release);   // ImGui::SmallButton reports pressed on RELEASE-while-hovered, not press
+
+    Check(!ruleLayers[0].symmetry.bSymmetryUseGlobal,
+         "clicking the \"SYM\" button flips the real MarkerRuleLayer's own symmetry.bSymmetryUseGlobal");
+}
+
 // A Rule (Procedural) leaf's header-extra now draws its own E/D + V/I + X cluster too (STEP140/144).
 void TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly() {
     HeadlessImguiSession session;
@@ -579,6 +615,7 @@ int main() {
     TestManualLeafSelectSignalSelectsMemberInstancesAndHighlight();
     TestProceduralLeafSelectSignalClearsManualSelection();
     TestManualLeafHeaderExtraDrawsAndFlipsSymmetry();
+    TestRuleLayerSymmetryToggleHeaderControlFlipsGlobalFlag();
     TestManualLeafDeleteButtonRecordsPendingIndex();
     TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly();
     TestDeleteMarkerLayerBundleGroupOnlyPromotesChildren();

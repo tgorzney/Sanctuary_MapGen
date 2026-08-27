@@ -1,6 +1,7 @@
 // MarkersTab_RuleLayers_UI.cpp — the two-level list mechanics (outer/inner DraggableLists and
 // appliers). Delete confirm / buttons / both tiers' settings live in MarkersTab_RuleLayerSettings_UI.cpp.
 #include "MarkersTab_RuleLayers_UI.h"
+#include "MarkersTab_Bundles_UI.h"
 #include "MarkersTab_UI.h"
 #include "imgui.h"
 #include <cstdio>
@@ -118,6 +119,19 @@ bool DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
                                  layerInstanceListContext);
             if (signal.bHasSignal()) { ruleSignal = signal; ruleSignalLayerIndex = rowIndex; }
         },
+        // Human's own bug report — "any Layer... should be a universal widget": double-click-header
+        // rename, mirroring Manual's own flat-list DrawLayerList exactly. Only the "SYM" button draws
+        // here (not the Bundle tree's own full [SYM][E/D][V/I][X] cluster) — Enabled/Hidden/Delete
+        // already come from THIS list's own built-in DraggableList affordance strip
+        // (row.bVisible/row.bLocked above, wired to bEnabled/bHidden via ApplyMarkerRuleLayerListSignal's
+        // ToggleVisibility/ToggleLock branches, MarkersTab_RuleLayers_UI.h) — a second explicit set of
+        // buttons would duplicate that strip, not fix anything.
+        [&](int rowIndex) {
+            Params::MarkerRuleLayer& layer = markerRuleLayers[static_cast<std::size_t>(rowIndex)];
+            if (DrawRuleLayerHeaderNameOverlay(rowIndex, layer, state.bundles, previewDriver)) return;
+            DrawRuleLayerSymmetryToggleHeaderControl(layer, previewDriver);
+        },
+        kMarkerRuleLayerSymmetryButtonWidthPixels,
         state.selectedRuleLayerIndex);
 
     return ApplyRuleLayerFrameSignals(markerRuleLayers, state, ruleSignal, ruleSignalLayerIndex, layerSignal);

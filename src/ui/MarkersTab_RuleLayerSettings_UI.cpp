@@ -97,21 +97,21 @@ void DrawMarkerRuleButtons(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
     NotifyPlacementChange(bRecipeMoved, previewDriver);
 }
 
-// One rule layer's own fields — Name/Enabled/Hidden/Symmetry — bound to the caller's own row, not
-// a "selected" lookup (STEP110: called per outer row, inline, by DrawRuleLayerListBody's row body,
-// MarkersTab_RuleLayers_UI.cpp — never a trailing draw for whatever else happens to be selected).
+// Human's own bug report — "Enabled, Hidden and Use Symmetry can be removed from within the
+// [Procedural layer] ... it should now be located in the header as buttons": Name/Enabled/Hidden/
+// "Use Global Symmetry" all moved OUT of this body — Name and the three toggles now live on the
+// header (double-click-to-rename mirroring Manual/Group; [SYM][E/D][V/I][X],
+// DrawRuleLayerHeaderNameOverlay/DrawRightAlignedProceduralLayerCluster,
+// MarkersTab_BundleHeaderExtras_UI.cpp) — the exact same "gate moves to the header, detail stays in
+// the body" split STEP142 already made for Manual Layers. Only the per-axis override checkboxes
+// remain here, and only while this layer is NOT following the global mask
+// (`!layer.symmetry.bSymmetryUseGlobal` — DrawPlacementSymmetryAxes's own body-half,
+// DrawIndependentSymmetryAxes, was already conditional on exactly this before this change; the
+// header's own "Use Global Symmetry" checkbox this function used to draw is what moved, not the
+// condition itself).
 void DrawRuleLayerSettings(Params::MarkerRuleLayer& layer, Pipeline::PreviewDriver* previewDriver) {
-    TextInputRules nameRules;
-    nameRules.maximumLength = 48;
-    nameRules.bAllowEmpty   = false;
-    nameRules.fallbackText  = "Marker Layer";
-    NotifyPlacementChange(DrawTextInput("Layer Name", layer.name, nameRules).bCommitted, previewDriver);
-    NotifyPlacementChange(DrawCheckbox("Enabled (off = this whole layer is not generated)",
-                                       layer.bEnabled).bCommitted, previewDriver);
-    NotifyPlacementChange(DrawCheckbox("Hidden (still generated for clearance/fairness, not drawn)",
-                                       layer.bHidden).bCommitted, previewDriver);
-    DrawPlacementSymmetryAxes("markerLayerSymmetry", layer.symmetry.bSymmetryUseGlobal,
-                              layer.symmetry.symmetryMask, previewDriver);
+    if (!layer.symmetry.bSymmetryUseGlobal)
+        DrawIndependentSymmetryAxes(layer.symmetry.symmetryMask, previewDriver);
 }
 
 // One rule's detail sections — Gates/Quantity/Area/Focus/Placement Gate/Transform/Template Picker

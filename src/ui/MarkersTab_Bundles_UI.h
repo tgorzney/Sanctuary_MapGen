@@ -92,7 +92,33 @@ struct MarkerLayerBundlesState {
     int              pendingCreateLayerForBundleIdentifier = -1;
     std::string      pendingCreateLayerMarkerTypeName;
     std::vector<int> pendingCreateLayerInstanceIdentifiers;
+
+    // Human's own bug report — "any Layer... should be a universal widget": a Procedural Rule
+    // Layer's own header now supports the SAME double-click-to-rename mechanism Manual Layers/Groups
+    // already have. A SEPARATE identifier/scratch/focus trio, not a reuse of renamingBundleIdentifier
+    // above — a Bundle identifier and a Rule Layer index are different, potentially-colliding key
+    // spaces (both commonly small ints starting at 0).
+    int         renamingProceduralLayerIndex  = -1;
+    std::string renameProceduralScratchText;
+    bool        bRenameProceduralFocusPending = false;
 };
+
+// Human's own bug report — "Enabled, Hidden and Use Symmetry can be removed from within the
+// [Procedural layer] ... it should now be located in the header as buttons": a Procedural Rule
+// Layer's own header cluster [SYM][E/D][V/I][X], right-aligned as a group mirroring Manual's own
+// [SYM][COL][swatch][V/I][X] convention (MarkersTab_ManualLayerRowBody_UI.h). "SYM" flips
+// `layer.symmetry.bSymmetryUseGlobal` directly — TRUE (highlighted/"on") means this layer follows
+// the recipe's global symmetry, exactly Manual's own SYM=on polarity; OFF reveals the per-axis
+// override checkboxes that stay in the body (DrawRuleLayerSettings), the same "gate moves to the
+// header, configuration detail stays in the body" split Manual's own SYM/body-symmetry-section split
+// already established.
+inline constexpr float kMarkerRuleLayerSymmetryButtonWidthPixels   = 34.0f;
+inline constexpr float kMarkerRuleLayerEnabledButtonWidthPixels    = 30.0f;
+inline constexpr float kMarkerRuleLayerVisibilityButtonWidthPixels = 30.0f;
+inline constexpr float kMarkerRuleLayerDeleteButtonWidthPixels     = 26.0f;
+inline constexpr float kMarkerRuleLayerHeaderExtraCombinedWidthPixels =
+    kMarkerRuleLayerSymmetryButtonWidthPixels + kMarkerRuleLayerEnabledButtonWidthPixels
+    + kMarkerRuleLayerVisibilityButtonWidthPixels + kMarkerRuleLayerDeleteButtonWidthPixels;
 
 // Mints a fresh, never-reused Bundle identifier — the exact NextMarkerLayerId pattern
 // (MarkerLayerId_UI.h), applied one tier up.
@@ -190,6 +216,44 @@ void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     MarkerLayerBundlesState& bundlesState,
                                     const std::vector<int>& selectedManualInstanceIdentifiers,
                                     Pipeline::PreviewDriver* previewDriver, bool& bAnyCommitted);
+
+// Human's own bug report — a Procedural Rule Layer's header now supports double-click-to-rename too,
+// mirroring DrawLayerHeaderNameOverlay's own contract exactly (Manual Layers,
+// MarkersTab_ManualLayerRowBody_UI.h), one tier over. Must be called FIRST in the header-extra
+// callback, immediately after the row's own CollapsingHeader/TreeNodeEx (the "last item" this reads
+// via GetItemRectMin — TreeListWidget_RowLayout_UI.h/DraggableListWidget_RowLayout_UI.h's own shared
+// contract). Returns true while a rename is in progress THIS frame — the caller should then skip
+// drawing its own header cluster and return. A commit calls NotifyPlacementChange(true, ...) itself
+// — unlike a Manual Layer rename, a Procedural rule layer's own name IS pipeline-visible (every
+// other Procedural mutation already notifies immediately; SCOPE NOTE 3's "Manual never notifies"
+// posture, MarkersTab_ManualLayers_UI.h, does not apply here).
+bool DrawRuleLayerHeaderNameOverlay(int layerIndex, Params::MarkerRuleLayer& layer,
+                                    MarkerLayerBundlesState& state, Pipeline::PreviewDriver* previewDriver);
+
+// Human's own bug report — promoted out of MarkersTab_BundleHeaderExtras_UI.cpp's own anonymous
+// namespace so MarkersTab_RuleLayers_UI.cpp's flat/ungrouped list can reuse it too, not a
+// near-duplicate copy. `reservedZoneWidthPixels` is the CALLER's own already-reserved header-extra
+// zone width, used for right-alignment instead of ImGui::GetContentRegionAvail() directly — the
+// Bundle tree's own reserved zone happens to equal exactly GetContentRegionAvail() at the point this
+// runs (RenderLeaf's own SameLine already positioned the cursor there), but a flat DraggableList row
+// has a built-in affordance strip BEYOND the reserved zone that GetContentRegionAvail() would reach
+// into (the exact STEP145 bug DrawRightAlignedSymmetryColorOverrideCluster's own fix avoids, one
+// tier over) — passing the width explicitly keeps this function correct in both contexts. The Bundle
+// tree passes kMarkerLayerHeaderExtraCombinedWidthPixels (the one shared reserved-zone width every
+// leaf kind gets, Manual leaves included); the flat list passes
+// kMarkerRuleLayerHeaderExtraCombinedWidthPixels (this cluster's own, smaller, dedicated width).
+void DrawRightAlignedProceduralLayerCluster(Params::MarkerRuleLayer& layer, int layerIndex,
+                                            MarkerLayerBundlesState& bundlesState,
+                                            Pipeline::PreviewDriver* previewDriver,
+                                            float reservedZoneWidthPixels);
+
+// Human's own bug report — the "SYM" button alone (see this function's own definition comment,
+// MarkersTab_BundleHeaderExtras_UI.cpp, for the full "why"), reused by BOTH the Bundle tree's own
+// full [SYM][E/D][V/I][X] cluster (DrawRightAlignedProceduralLayerCluster, above) and the flat/
+// ungrouped list's header-extra slot (MarkersTab_RuleLayers_UI.cpp), which draws ONLY this button —
+// Enabled/Hidden/Delete already come from DraggableList's own built-in affordance strip there.
+void DrawRuleLayerSymmetryToggleHeaderControl(Params::MarkerRuleLayer& layer,
+                                              Pipeline::PreviewDriver* previewDriver);
 
 // MarkersTab_Bundles_UI.cpp — the tree mechanics:
 
