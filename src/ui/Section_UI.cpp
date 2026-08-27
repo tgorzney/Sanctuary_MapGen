@@ -41,6 +41,7 @@ void DrawDisclosureArrow(ImDrawList* drawList, const ImVec2& origin, float barHe
 
 bool DrawSectionBegin(const char* label, SectionState& state, const SectionOptions& options,
                       const WidgetStyle& style) {
+    if (options.topSpacing > 0.0f) ImGui::Dummy(ImVec2(0.0f, options.topSpacing));
     ImGui::PushID(label);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const float rawBarWidth = ImGui::GetContentRegionAvail().x - options.reservedRightWidth;

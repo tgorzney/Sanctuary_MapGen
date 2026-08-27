@@ -78,13 +78,22 @@ void Application::WireCallbacks() {
     // selectedManualInstanceIdentifier instead, keeping the list's highlight in sync when the CANVAS
     // is what changed the selection (the two-way sync's other half is item 5's
     // selectManualMarkerInstanceCallback, below).
+    // STEP143 (human's own bug report) — an empty-space click's own synthetic miss-key always
+    // constructs with bManual == false (ApplyClick's own SetSelection(std::uint32_t) overload,
+    // MapCanvas_UI.h), so gating purely on key.bManual could never route a miss back to the Markers
+    // tab's own manual selection — the row stayed highlighted after clicking empty space. Branch on
+    // !key.bValid FIRST instead: any deselect (miss or an explicit clear) wipes BOTH selection
+    // domains together, and the multi-select set (STEP141, never otherwise touched by the canvas).
     canvas.SetSelectionChangedCallback([this](const OverlayInstanceKey_UI& key) {
-        if (key.bManual) {
-            tabState.markers.selectedManualInstanceIdentifier = key.bValid ? key.instanceIndex : -1;
-        } else {
-            lastSelectedEntityIdentifier = key.bValid ? static_cast<std::uint32_t>(key.instanceIndex)
-                                                       : Data::EntityIdBuffer::emptySentinel;
+        if (!key.bValid) {
+            tabState.markers.selectedManualInstanceIdentifier = -1;
+            tabState.markers.selectedManualInstanceIdentifiers.clear();
+            tabState.markers.manualInstanceSelectionAnchorIdentifier = -1;
+            lastSelectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;
+            return;
         }
+        if (key.bManual) tabState.markers.selectedManualInstanceIdentifier = key.instanceIndex;
+        else             lastSelectedEntityIdentifier = static_cast<std::uint32_t>(key.instanceIndex);
     });
     // STEP48: picking reads the resolved markers and PIPELINE's spatial index over them, in world
     // space, instead of the baked entity-id buffer — see MapCanvas_UI.h's header comment.

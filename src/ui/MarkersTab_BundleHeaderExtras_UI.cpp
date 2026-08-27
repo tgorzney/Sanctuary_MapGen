@@ -23,7 +23,14 @@ namespace {
 // a Manual leaf's own X naturally reaches after its two preceding controls (mirrors
 // MarkersTab_UI.cpp's own DrawRightAlignedHideToggleButton).
 bool DrawRightAlignedDeleteButton(const char* label) {
-    const float buttonWidth = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    // STEP143 (human's own bug report — "why does X appear with empty space to its right") — the
+    // root cause: `label` carries an imgui "##id" suffix ("X##deleteGroup"), and CalcTextSize's own
+    // `hide_text_after_double_hash` defaults to false, so the ORIGINAL call measured the ENTIRE
+    // string (including the invisible "##deleteGroup" part) instead of just the "X" SmallButton
+    // actually renders — wildly over-estimating buttonWidth, which pushed the button too far LEFT of
+    // where flush-right actually is. Passing `true` here measures only what's really drawn.
+    const float buttonWidth = ImGui::CalcTextSize(label, nullptr, true).x
+                             + ImGui::GetStyle().FramePadding.x * 2.0f;
     const float availableWidth = ImGui::GetContentRegionAvail().x;
     if (availableWidth > buttonWidth)
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + availableWidth - buttonWidth);
@@ -33,20 +40,30 @@ bool DrawRightAlignedDeleteButton(const char* label) {
 } // namespace
 
 // A Group's own header-extra: double-click the header (the LAST-submitted item when this runs,
-// RenderNode's own contract, TreeListWidget_RowLayout_UI.h) starts a rename; otherwise an "X" opens
-// a two-choice delete popup. Renaming and deleting are mutually exclusive on one row at a time —
-// while renaming, no delete button is drawn (nothing to click through it accidentally).
+// RenderNode's own contract, TreeListWidget_RowLayout_UI.h) starts a rename, positioned OVER the
+// header's own name text (GetItemRectMin + GetTreeNodeToLabelSpacing — human's own correction: not
+// the far-right header-extra zone); otherwise an "X" opens a two-choice delete popup. Renaming and
+// deleting are mutually exclusive on one row at a time — while renaming, no delete button is drawn.
+// A SCRATCH buffer, not `bundle.name` directly — see DrawLayerHeaderNameOverlay's own header comment
+// (MarkersTab_ManualLayerRowBody_UI.h) for why live-editing the real field is the wrong move here.
 void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
                                           std::vector<Params::MarkerLayerBundle>& bundles,
                                           MarkerLayerBundlesState& state) {
+    const ImVec2 itemMin = ImGui::GetItemRectMin();
+    const float labelStartX = itemMin.x + ImGui::GetTreeNodeToLabelSpacing();
+
     if (state.renamingBundleIdentifier == bundleIdentifier) {
         for (Params::MarkerLayerBundle& bundle : bundles) {
             if (bundle.identifier != bundleIdentifier) continue;
+            ImGui::SetCursorScreenPos(ImVec2(labelStartX, itemMin.y));
             TextInputRules nameRules;
             nameRules.maximumLength = 48; nameRules.bAllowEmpty = false; nameRules.fallbackText = "Group";
-            DrawTextInput("##renameGroup", bundle.name, nameRules, WidgetStyle(), nullptr,
+            DrawTextInput("##renameGroup", state.renameScratchText, nameRules, WidgetStyle(), nullptr,
                          /*bLabelHidden=*/true);
-            if (ImGui::IsItemDeactivated()) state.renamingBundleIdentifier = -1;
+            if (ImGui::IsItemDeactivated()) {
+                bundle.name = SanitizeTextInput(state.renameScratchText, nameRules);
+                state.renamingBundleIdentifier = -1;
+            }
             return;
         }
         state.renamingBundleIdentifier = -1;   // the bundle vanished (deleted elsewhere) this frame
@@ -55,6 +72,8 @@ void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
 
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         state.renamingBundleIdentifier = bundleIdentifier;
+        for (const Params::MarkerLayerBundle& bundle : bundles)
+            if (bundle.identifier == bundleIdentifier) { state.renameScratchText = bundle.name; break; }
         return;
     }
     if (DrawRightAlignedDeleteButton("X##deleteGroup")) ImGui::OpenPopup("deleteGroupPopup");
@@ -86,14 +105,16 @@ void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     bool& bAnyCommitted) {
     if (leaf.kind == MarkerGroupLeafKey_UI::Kind::Manual) {
         DrawManualLayerInstanceDropTarget(leaf.layerIndex, markers, selectedManualInstanceIdentifiers);
-        if (leaf.layerIndex >= 0 && leaf.layerIndex < static_cast<int>(instanceLayers.size())) {
-            Params::MarkerInstanceLayer& layer = instanceLayers[static_cast<std::size_t>(leaf.layerIndex)];
-            DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
-            ImGui::SameLine();
-            DrawManualMarkerLayerColorOverrideHeaderControl(layer, manualLayersState, bAnyCommitted);
-            ImGui::SameLine();
-        }
-        if (ImGui::SmallButton("X##deleteLayer")) ImGui::OpenPopup("deleteManualLayerPopup");
+        if (leaf.layerIndex < 0 || leaf.layerIndex >= static_cast<int>(instanceLayers.size())) return;
+        Params::MarkerInstanceLayer& layer = instanceLayers[static_cast<std::size_t>(leaf.layerIndex)];
+        // STEP142 — double-click-the-header rename FIRST: while active, it claims the rest of the
+        // row (the name box fills whatever's left), so SYM/COL/X don't draw this frame.
+        if (DrawLayerHeaderNameOverlay(leaf.layerIndex, layer, manualLayersState, bAnyCommitted)) return;
+        DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
+        ImGui::SameLine();
+        DrawManualMarkerLayerColorOverrideHeaderControl(layer, manualLayersState, bAnyCommitted);
+        ImGui::SameLine();
+        if (DrawRightAlignedDeleteButton("X##deleteLayer")) ImGui::OpenPopup("deleteManualLayerPopup");
         if (ImGui::BeginPopup("deleteManualLayerPopup")) {
             if (ImGui::MenuItem("Delete Layer Only (keep instances)")) {
                 bundlesState.pendingDeleteManualLayerIndex    = leaf.layerIndex;

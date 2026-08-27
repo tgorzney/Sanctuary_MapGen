@@ -9,6 +9,7 @@
 #include "MarkersTab_Bundles_UI.h"
 #include "ListWidget_TestFrame_UI.h"
 #include "MarkersTab_BundleDelete_UI.h"
+#include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
 #include <cmath>
 #include <cstdio>
@@ -233,50 +234,48 @@ void TestCrossTypeSectionNestedBundleCutoff() {
          "already-proven root rule consumes");
 }
 
-// STEP130 (ARCH §19.24, item 7(b)) — a Manual leaf's own header-extra draws BOTH controls
-// ([Symmetry toggle][Color Override]); clicking the Symmetry checkbox (the first, leftmost control)
-// flips the real Params::MarkerInstanceLayer's own bSymmetryEnabled and reports the commit.
+// STEP130/STEP142 (ARCH §19.24, item 7(b)) — a Manual leaf's own "SYM" toggle button (was a
+// checkbox) flips the real Params::MarkerInstanceLayer's own bSymmetryEnabled and reports the commit.
 void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
     HeadlessImguiSession session;
     std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
-    std::vector<Params::MarkerInstanceGroup> markers;
-    std::vector<int> selectedManualInstanceIdentifiers;
-    ManualMarkerLayersState state;
-    MarkerLayerBundlesState bundlesState;
-    const MarkerGroupLeafKey_UI manualLeaf{ MarkerGroupLeafKey_UI::Kind::Manual, 0 };
 
+    // STEP142: the Symmetry control is now a "SYM" SmallButton (DrawMarkerLayerSymmetryToggleHeaderControl,
+    // declared, not file-local), tested DIRECTLY here rather than through the full
+    // DrawMarkerGroupLeafHeaderExtra composition — that composition now assumes a REAL preceding row
+    // header item exists (DrawManualLayerInstanceDropTarget/DrawLayerHeaderNameOverlay both read the
+    // LAST item's own rect, TreeNodeEx/CollapsingHeader in production; a standalone call has none),
+    // which this focused test has no need to stand one up for.
     const ImVec2 windowSize(300.0f, 100.0f);
-    ImVec2 origin; float boxSize = 0.0f;
+    ImVec2 origin; float boxWidth = 0.0f, boxHeight = 0.0f;
     bool bSettleCommitted = false;
     RunHeadlessFrame(HeadlessMouseState(), windowSize, [&] {
-        origin  = ImGui::GetCursorScreenPos();
-        boxSize = ResolveWidgetTrackHeight(WidgetStyle());
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
-                                       selectedManualInstanceIdentifiers, bSettleCommitted);
+        origin = ImGui::GetCursorScreenPos();
+        DrawMarkerLayerSymmetryToggleHeaderControl(instanceLayers[0], bSettleCommitted);
+        boxWidth  = ImGui::GetItemRectMax().x - ImGui::GetItemRectMin().x;
+        boxHeight = ImGui::GetItemRectMax().y - ImGui::GetItemRectMin().y;
     });
-    const ImVec2 checkboxCenter(origin.x + boxSize * 0.5f, origin.y + boxSize * 0.5f);
+    const ImVec2 symButtonCenter(origin.x + boxWidth * 0.5f, origin.y + boxHeight * 0.5f);
 
-    HeadlessMouseState hover;   hover.position = checkboxCenter;
+    HeadlessMouseState hover;   hover.position = symButtonCenter;
     HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
     HeadlessMouseState release = hover; release.bLeftButtonDown = false;
     auto runFrame = [&](HeadlessMouseState mouse) {
         bool bCommitted = false;
         RunHeadlessFrame(mouse, windowSize, [&] {
-            DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
-                                           selectedManualInstanceIdentifiers, bCommitted);
+            DrawMarkerLayerSymmetryToggleHeaderControl(instanceLayers[0], bCommitted);
         });
         return bCommitted;
     };
     runFrame(hover);
-    const bool bPressCommitted = runFrame(press);
-    runFrame(release);
+    runFrame(press);
+    // ImGui::SmallButton (ButtonEx's default flags) reports pressed on RELEASE-while-hovered, not
+    // on the mouse-down frame — mirror that here rather than assume press-frame firing.
+    const bool bReleaseCommitted = runFrame(release);
 
     Check(!instanceLayers[0].bSymmetryEnabled,
-         "a Manual leaf's header-extra draws the Symmetry checkbox first -- clicking it flips the "
-         "real MarkerInstanceLayer's own bSymmetryEnabled");
-    Check(bPressCommitted, "and reports a commit on the press frame");
-    Check(bundlesState.pendingDeleteManualLayerIndex == -1,
-         "clicking the Symmetry checkbox never touches the STEP140 pending-delete field");
+         "clicking the \"SYM\" button flips the real MarkerInstanceLayer's own bSymmetryEnabled");
+    Check(bReleaseCommitted, "and reports a commit on the release frame");
 }
 
 // STEP140 — a Manual leaf's own "X" (drawn after Symmetry/Color Override) opens a popup; picking

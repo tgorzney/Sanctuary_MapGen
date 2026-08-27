@@ -73,6 +73,12 @@ struct ManualMarkerLayersState {
     bool                      bFixSymmetryOverwrite   = false;
     bool                      bHasFixSymmetryResult   = false;
     Ui::MarkerSymmetryFixResult lastFixSymmetryResult;
+
+    // STEP142 — double-click-the-header rename (mirrors MarkerLayerBundlesState's own STEP140/142
+    // fields one tier up). -1 = no rename. A SCRATCH buffer, not `layer.name` directly — see
+    // DrawLayerHeaderNameOverlay's own header comment (MarkersTab_ManualLayerRowBody_UI.h) for why.
+    int         renamingLayerIndex = -1;
+    std::string renameScratchText;
 };
 
 // The layer the per-row controls edit, or null when the selection points at nothing

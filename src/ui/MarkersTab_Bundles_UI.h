@@ -49,11 +49,16 @@ struct MarkerLayerBundlesState {
     TreeListState treeState;
     int           selectedBundleIdentifier = -1;
 
-    // STEP140: the body no longer draws Name/Move/Rotate — the header-extra slot now carries
-    // rename (double-click) and delete (see MarkersTab_BundleHeaderExtras_UI.h). -1 = no rename;
-    // renaming edits `bundle.name` directly (non-structural, safe mid-walk — unlike delete/reorder,
-    // nothing else this frame indexes by name), so there is no separate scratch buffer to hold.
-    int renamingBundleIdentifier = -1;
+    // STEP140/STEP142: the body no longer draws Name/Move/Rotate — the header-extra slot now carries
+    // rename (double-click, positioned where the header's own name text shows) and delete (see
+    // MarkersTab_BundleHeaderExtras_UI.h). -1 = no rename. A SCRATCH buffer, not `bundle.name`
+    // directly: `CollapsingHeader`'s own imgui id is computed FROM the label text it draws, so
+    // live-editing the real field would churn that id every keystroke (DraggableList's Collapsible
+    // row hits exactly this — STEP142's own bug report — TreeListWidget's node rows are immune only
+    // because RenderNode already overrides with SetNextItemOpen(..., ImGuiCond_Always), which the
+    // scratch buffer makes moot here anyway: correct regardless of which widget is under it).
+    int         renamingBundleIdentifier = -1;
+    std::string renameScratchText;
 
     // STEP140: pending deletes, applied AFTER the tree's walk finishes this frame — never mid-walk,
     // see MarkersTab_BundleDelete_UI.h. Bundle: Group Only vs cascade All. Manual Layer: Layer Only

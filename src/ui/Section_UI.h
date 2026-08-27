@@ -25,6 +25,12 @@ struct SectionOptions {
     // button into via SameLine() immediately after DrawSectionBegin returns. 0 = today's exact
     // behavior, a full-width header (STEP104).
     float reservedRightWidth = 0.0f;
+    // STEP142 — vertical gap DrawSectionBegin leaves ABOVE its own header bar (human's own
+    // instruction: sections ran together with no visual separation). Applied at the START of every
+    // DrawSectionBegin call, not the end of DrawSectionEnd, so the gap appears BEFORE the section
+    // whether the PREVIOUS one was left open or collapsed (DrawSectionEnd only ever runs for an open
+    // section's own caller, so a trailing-gap approach would miss the collapsed case).
+    float topSpacing = 6.0f;
 };
 
 // The caller-owned bit. One per section instance.

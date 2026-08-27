@@ -34,31 +34,19 @@ void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
                            const std::pair<int, int>& groupTransformIndex,
                            ManualInstanceRowInteractionContext_UI& interaction);
 
-// STEP123 — reserved width for the header's Color Override checkbox + compact swatch
-// (DrawManualMarkerLayerColorOverrideHeaderControl, below), left of DraggableList's own strip.
-// Eyeballed against a live frame (Checkbox_UI.cpp/ColorSwatch_UI.cpp's own "verified by eye, never
-// by test" posture). Shrunk from 90 (checkbox + swatch + RT button) once the swatch's own RT
-// button was removed (color edits are always realtime now, human's own instruction) — the control
-// is narrower by roughly one RT button's own width (WidgetStyle().realtimeButtonWidth, 30px) plus
-// its SameLine gap.
-inline constexpr float kMarkerLayerColorOverrideHeaderWidthPixels = 55.0f;
-inline constexpr float kMarkerLayerColorOverrideSwatchWidthPixels = 24.0f;
-
-// STEP130 (ARCH §19.24) — reserved width for the header's Symmetry-toggle checkbox
-// (DrawMarkerLayerSymmetryToggleHeaderControl, below), placed LEFT of the Color Override control,
-// so the header's own reservation is the sum of both. Eyeballed the same way as the constant above:
-// a plain, no-label checkbox is narrower than the Color Override pair (no swatch), plus its own
-// `ImGui::SameLine()` gap before Color Override starts.
-inline constexpr float kMarkerLayerSymmetryToggleWidthPixels = 30.0f;
-
-// STEP140 — reserved width for the header's own "X" delete button (Manual AND Procedural leaves,
-// and the Bundle tree's Group nodes reuse this SAME combined width — MarkersTab_Bundles_UI.cpp's
-// `Render` call takes one shared width for every row kind), placed RIGHTMOST of everything else on
-// the row. Eyeballed the same way as the constants above.
+// STEP142 — the layer header's own condensed small-button cluster (human's own instruction: no more
+// checkboxes, small buttons instead), right-aligned as a group so the LAST one ("X") always lands
+// flush against the row's true right edge regardless of any individual width's own drift (mirrors
+// MarkersTab_UI.cpp's own SmallButtonWidth/cluster-width pattern) — left to right: "SYM" toggle,
+// "COL" toggle + its swatch, "X" delete. Eyeballed against a live frame, like every other constant
+// in this file.
+inline constexpr float kMarkerLayerSymmetryButtonWidthPixels      = 34.0f;
+inline constexpr float kMarkerLayerColorOverrideButtonWidthPixels = 34.0f;
+inline constexpr float kMarkerLayerColorOverrideSwatchWidthPixels = 20.0f;
 inline constexpr float kMarkerLayerHeaderExtraDeleteButtonWidthPixels = 26.0f;
 inline constexpr float kMarkerLayerHeaderExtraCombinedWidthPixels =
-    kMarkerLayerSymmetryToggleWidthPixels + kMarkerLayerColorOverrideHeaderWidthPixels
-    + kMarkerLayerHeaderExtraDeleteButtonWidthPixels;
+    kMarkerLayerSymmetryButtonWidthPixels + kMarkerLayerColorOverrideButtonWidthPixels
+    + kMarkerLayerColorOverrideSwatchWidthPixels + kMarkerLayerHeaderExtraDeleteButtonWidthPixels;
 
 // The row's own name, tint, icon scale, grid snap, symmetry setting, and (STEP126, Open Q7) its own
 // per-Layer instance list — STEP110: drawn inline in THIS row's own expanded body, not "selected"-
@@ -87,19 +75,35 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                       const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
-// STEP123: the row header's own compact Color Override control (checkbox + swatch), drawn on EVERY
-// row's header line via DraggableList's/TreeListWidget's header-extra slot, not gated on row-expand
-// state. STEP130: this is now the ONLY place Color Override draws — the body copy formerly here for
-// bundled layers (which had no other way to reach the control) is deleted, since the Bundle tree's
-// own `drawLeafHeaderExtra` slot (ARCH §19.23) now reaches this same function for bundled rows too.
+// STEP123/STEP142: the row header's own compact Color Override control — a "COL" SmallButton toggle
+// (was a checkbox, human's own instruction) + its swatch, drawn on EVERY row's header line via
+// DraggableList's/TreeListWidget's header-extra slot, not gated on row-expand state. STEP130: this
+// is now the ONLY place Color Override draws — the body copy formerly here for bundled layers
+// (which had no other way to reach the control) is deleted, since the Bundle tree's own
+// `drawLeafHeaderExtra` slot (ARCH §19.23) now reaches this same function for bundled rows too.
 void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer& layer,
                                                       ManualMarkerLayersState& state, bool& bAnyCommitted);
 
-// STEP130 (ARCH §19.24): the row header's own Symmetry-toggle control — a plain checkbox bound to
-// `layer.bSymmetryEnabled`, no swatch. Mirrors DrawManualMarkerLayerColorOverrideHeaderControl's
-// shape exactly (empty label, hover tooltip). Drawn LEFT of the Color Override control at every
-// call site (`[Symmetry toggle][Color Override]`).
+// STEP130/STEP142: the row header's own Symmetry-toggle control — a "SYM" SmallButton (was a plain
+// checkbox, human's own instruction), highlighted while on. Mirrors
+// DrawManualMarkerLayerColorOverrideHeaderControl's own shape (hover tooltip). Drawn LEFT of the
+// Color Override control at every call site (`[SYM][COL][swatch]`).
 void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted);
+
+// STEP142 — double-click-the-header rename for a Layer row (mirrors the Group's own STEP140
+// mechanism, human's own instruction), positioned OVER the header's own name text rather than in the
+// far-right header-extra zone (human's own correction). Must be called FIRST in the header-extra
+// callback, immediately after the row's own CollapsingHeader/TreeNodeEx (the "last item" this reads
+// via GetItemRectMin — TreeListWidget_RowLayout_UI.h/DraggableListWidget_RowLayout_UI.h's own shared
+// contract). Returns true while a rename is in progress THIS frame — the caller should then skip
+// drawing its own SYM/COL/X controls (the name box already claims the rest of the row) and return.
+// A SCRATCH buffer, not `layer.name` directly: DraggableList's Collapsible row computes its own
+// CollapsingHeader id FROM `row.label` (== the layer's name) every frame, so live-editing the real
+// field churns that id every keystroke and collapses the row out from under whoever is typing — the
+// bug the human reported, root-caused to exactly this (DraggableList has no caller-owned expand-state
+// override the way TreeListWidget's node rows already do via SetNextItemOpen).
+bool DrawLayerHeaderNameOverlay(int layerIndex, Params::MarkerInstanceLayer& layer,
+                                ManualMarkerLayersState& state, bool& bAnyCommitted);
 
 } // namespace Ui
 } // namespace SanmapGen

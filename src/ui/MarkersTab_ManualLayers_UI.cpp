@@ -45,6 +45,24 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
     return bMarkersMoved;
 }
 
+// STEP142 — [SYM][COL][swatch], right-aligned as a cluster so it sits flush against DraggableList's
+// own built-in [o]/[L]/[X] strip with no dead gap — this ungrouped row draws no delete button of its
+// own (that strip's "X##delete" already covers it, unlike the Bundle tree's Manual leaf, which has
+// no such strip and right-aligns its own X directly, DrawRightAlignedDeleteButton,
+// MarkersTab_BundleHeaderExtras_UI.cpp).
+void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer,
+                                                  ManualMarkerLayersState& state, bool& bAnyCommitted) {
+    const float clusterWidth = kMarkerLayerSymmetryButtonWidthPixels
+                              + kMarkerLayerColorOverrideButtonWidthPixels
+                              + kMarkerLayerColorOverrideSwatchWidthPixels;
+    const float availableWidth = ImGui::GetContentRegionAvail().x;
+    if (availableWidth > clusterWidth)
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + availableWidth - clusterWidth);
+    DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
+    ImGui::SameLine();
+    DrawManualMarkerLayerColorOverrideHeaderControl(layer, state, bAnyCommitted);
+}
+
 } // namespace
 
 // STEP125: promoted out of the anonymous namespace (was DrawLayerSettings), called exactly once,
@@ -91,13 +109,14 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
             // STEP141 — this row's own drag-drop TARGET first (same "run before any new widget"
             // reasoning DrawMarkerGroupLeafHeaderExtra's own comment gives, MarkersTab_BundleHeaderExtras_UI.cpp).
             DrawManualLayerInstanceDropTarget(rowIndex, markers, selectedManualInstanceIdentifiers);
-            // STEP130 (ARCH §19.24): [Symmetry toggle][Color Override], in that order, sharing ONE
-            // combined header-extra width.
-            DrawMarkerLayerSymmetryToggleHeaderControl(
-                markerLayers[static_cast<std::size_t>(rowIndex)], bAnyNameCommitted);
-            ImGui::SameLine();
-            DrawManualMarkerLayerColorOverrideHeaderControl(
-                markerLayers[static_cast<std::size_t>(rowIndex)], state, bAnyNameCommitted);
+            Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(rowIndex)];
+            // STEP142 — double-click-the-header rename FIRST: while active it claims the row.
+            if (DrawLayerHeaderNameOverlay(rowIndex, layer, state, bAnyNameCommitted)) return;
+            // STEP130 (ARCH §19.24)/STEP142: [SYM][COL][swatch], right-aligned as a cluster so it
+            // sits flush against DraggableList's own [o]/[L]/[X] strip with no dead gap (this row
+            // draws no delete button of its own — that strip's built-in "X##delete" already covers
+            // it, unlike the Bundle tree's Manual leaf, which has none and right-aligns its own X).
+            DrawRightAlignedSymmetryColorOverrideCluster(layer, state, bAnyNameCommitted);
         },
         kMarkerLayerHeaderExtraCombinedWidthPixels,
         state.selectedLayerIndex);

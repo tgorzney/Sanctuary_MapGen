@@ -33,14 +33,22 @@ ImVec2 ProjectWorldToScreen(const PreviewComposite& composite, const MapCanvasVi
 
 ImU32 ManualMarkerTint(const std::vector<Params::MarkerInstanceLayer>& markerLayers, int layerIndex,
                        const std::string& groupName, const Params::GlobalMarkerSettings& globalMarkerSettings) {
-    if (layerIndex < 0 || layerIndex >= static_cast<int>(markerLayers.size()))
-        return IM_COL32(220, 220, 220, 255);
-    const Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(layerIndex)];
-    if (layer.bColorOverrideEnabled)
+    // A missing/out-of-range layer (the common case — MarkerTransform::layerIndex defaults to 0, and
+    // recipe.markerLayers is empty until a Manual Layer is actually authored) has no override to
+    // apply — same as an IN-range layer with bColorOverrideEnabled == false, both fall through to
+    // the Type's own configured tint, never a hardcoded grey (the bug: grey silently WON over the
+    // real colorAlloy/colorPlasma/colorSpawn for every marker with no explicit per-layer override).
+    const bool bHasOverride = layerIndex >= 0 && layerIndex < static_cast<int>(markerLayers.size())
+        && markerLayers[static_cast<std::size_t>(layerIndex)].bColorOverrideEnabled;
+    if (bHasOverride) {
+        const Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(layerIndex)];
         return ImGui::ColorConvertFloat4ToU32(ImVec4(layer.color[0], layer.color[1], layer.color[2], layer.color[3]));
+    }
     float typeRed = 1.0f, typeGreen = 1.0f, typeBlue = 1.0f;
     Params::ResolveMarkerGroupTypeTintColor(groupName, globalMarkerSettings, typeRed, typeGreen, typeBlue);
-    return ImGui::ColorConvertFloat4ToU32(ImVec4(typeRed, typeGreen, typeBlue, layer.color[3]));
+    const float alpha = (layerIndex >= 0 && layerIndex < static_cast<int>(markerLayers.size()))
+        ? markerLayers[static_cast<std::size_t>(layerIndex)].color[3] : 1.0f;
+    return ImGui::ColorConvertFloat4ToU32(ImVec4(typeRed, typeGreen, typeBlue, alpha));
 }
 
 // Resolves a Spawn-group transform's render tint to its matching army's real color — the ratified

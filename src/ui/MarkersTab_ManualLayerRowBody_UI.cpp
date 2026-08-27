@@ -5,7 +5,6 @@
 // MarkersTab_RuleLayerSettings_UI.cpp's own established aspect split.
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "Checkbox_UI.h"
-#include "MarkerLayerSymmetrySection_UI.h"
 #include "SymmetryClusterInstanceList_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
@@ -77,15 +76,13 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier,
                       std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                       const std::function<void(int)>& selectManualMarkerInstanceCallback) {
-    TextInputRules nameRules;
-    nameRules.maximumLength = 48;
-    nameRules.bAllowEmpty   = false;
-    nameRules.fallbackText  = "Marker Layer";
-    const bool bNameCommitted = DrawTextInput("Name", layer.name, nameRules).bCommitted;
-    // STEP130: Color Override no longer has a body copy — it is reachable from the row header on
-    // every row (ungrouped via DraggableList's header-extra slot, bundled via the Bundle tree's
-    // `drawLeafHeaderExtra` slot), so a second, body-drawn control is redundant (see
-    // DrawManualMarkerLayerColorOverrideHeaderControl below).
+    (void)markerLayers; (void)geometry; (void)globalSymmetryMask; (void)globalRadialRepeatCount;
+    (void)markerSymmetryFixSettings;
+    // STEP142/human's own correction: no Name field here — double-click the header instead
+    // (DrawLayerHeaderNameOverlay). No per-layer Symmetry configuration section either ("I think it
+    // was designed already but ignore [per-layer] for now" — SymmetrySetting::bSymmetryUseGlobal
+    // defaults true and nothing in this body flips it false anymore, so every layer stays on GLOBAL
+    // symmetry whenever its own SYM toggle is on).
     DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
                      state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
     const bool bSnapCommitted = DrawCheckbox("Snap to Grid", layer.bGridSnapEnabled).bCommitted;
@@ -93,8 +90,6 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
     const bool bSnapSizeCommitted = DrawSliderScalar("Grid Size", layer.gridSnapSizeWorldUnits,
         state.gridSnapSizeRange, state.selectedLayerGridSnapToggle, WidgetStyle(), "%.2f").bCommitted;
     ImGui::EndDisabled();
-    DrawLayerSymmetrySection(layer, layerIndex, markerLayers, markers, geometry, globalSymmetryMask,
-                             globalRadialRepeatCount, markerSymmetryFixSettings, state);
 
     // STEP126, Open Q7 — the per-Layer instance list. Plain ImGui::Selectable rows, NOT a DraggableList
     // instantiation (an instance's own home group can differ from this Layer, so there is no single
@@ -136,21 +131,37 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                 DrawManualInstanceRow(markers, groupTransformIndex, interaction);
             });
     }
-    return bNameCommitted || bSnapCommitted || bSnapSizeCommitted;
+    return bSnapCommitted || bSnapSizeCommitted;
 }
 
-// STEP123: the row header's own compact Color Override control — checkbox + a small inline swatch,
-// drawn on EVERY row's collapsed header line via DraggableList's/TreeListWidget's header-extra slot,
-// NOT gated on the row's own expand state. Disabled (not hidden) while state.bUseGroupColor forces
-// one shared tint, so the header's own width never shifts when that block-wide toggle flips.
-// STEP130: this is now the ONLY place Color Override draws for EITHER an ungrouped row (the
-// STEP123 DraggableList slot) or a bundled row (the Bundle tree's `drawLeafHeaderExtra` slot,
-// ARCH §19.23) — the body copy this comment used to explain away is deleted, since both paths now
-// reach this function.
+namespace {
+
+// A pressed/highlighted look for an on/off SmallButton toggle — the shared visual convention every
+// STEP142 button-toggle in this file uses (mirrors the ordinary ButtonActive theme color, the
+// standard imgui "this is currently on" cue).
+void PushToggleButtonStyle(bool bOn) {
+    if (bOn) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+}
+void PopToggleButtonStyle(bool bOn) {
+    if (bOn) ImGui::PopStyleColor();
+}
+
+} // namespace
+
+// STEP123/STEP142: the row header's own compact Color Override control — a "COL" SmallButton toggle
+// (was a checkbox, human's own instruction: no more checkboxes) + a small inline swatch, drawn on
+// EVERY row's collapsed header line via DraggableList's/TreeListWidget's header-extra slot, NOT
+// gated on the row's own expand state. Disabled (not hidden) while state.bUseGroupColor forces one
+// shared tint, so the header's own width never shifts when that block-wide toggle flips. STEP130:
+// this is now the ONLY place Color Override draws for EITHER an ungrouped row (the STEP123
+// DraggableList slot) or a bundled row (the Bundle tree's `drawLeafHeaderExtra` slot, ARCH §19.23).
 void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer& layer,
                                                       ManualMarkerLayersState& state, bool& bAnyCommitted) {
     ImGui::BeginDisabled(state.bUseGroupColor);
-    const bool bOverrideCommitted = DrawCheckbox("", layer.bColorOverrideEnabled).bCommitted;
+    PushToggleButtonStyle(layer.bColorOverrideEnabled);
+    const bool bOverrideCommitted = ImGui::SmallButton("COL##colorOverride");
+    PopToggleButtonStyle(layer.bColorOverrideEnabled);
+    if (bOverrideCommitted) layer.bColorOverrideEnabled = !layer.bColorOverrideEnabled;
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Color Override");
     ImGui::SameLine();
     ImGui::BeginDisabled(!layer.bColorOverrideEnabled);
@@ -167,15 +178,50 @@ void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer
     if (bOverrideCommitted || bColorCommitted) bAnyCommitted = true;
 }
 
-// STEP130 (ARCH §19.24): the row header's own Symmetry-toggle control — a plain checkbox bound to
-// `layer.bSymmetryEnabled`, no swatch, mirroring the Color Override checkbox's own empty-label +
-// hover-tooltip shape exactly. Placed LEFT of Color Override at every call site. Never touches
-// `layer.symmetry`'s own fields — toggling only flips the gate `ResolveEffectiveMarkerSymmetry`
-// reads (MarkerDragGesture_UI.h), so re-enabling restores the prior configuration unchanged.
+// STEP130/STEP142: the row header's own Symmetry-toggle control — a "SYM" SmallButton (was a plain
+// checkbox), highlighted while on, mirroring the Color Override button's own empty-tooltip shape.
+// Placed LEFT of Color Override at every call site. Never touches `layer.symmetry`'s own fields —
+// toggling only flips the gate `ResolveEffectiveMarkerSymmetry` reads (MarkerDragGesture_UI.h), so
+// re-enabling restores the prior configuration unchanged. Human's own instruction: ignore per-layer
+// symmetry configuration for now — `layer.symmetry.bSymmetryUseGlobal` defaults true and nothing
+// left in DrawLayerRowBody's own body flips it, so SYM=on always resolves to GLOBAL symmetry.
 void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted) {
-    const bool bSymmetryCommitted = DrawCheckbox("", layer.bSymmetryEnabled).bCommitted;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Symmetry");
-    if (bSymmetryCommitted) bAnyCommitted = true;
+    PushToggleButtonStyle(layer.bSymmetryEnabled);
+    const bool bSymmetryCommitted = ImGui::SmallButton("SYM##symmetry");
+    PopToggleButtonStyle(layer.bSymmetryEnabled);
+    if (bSymmetryCommitted) { layer.bSymmetryEnabled = !layer.bSymmetryEnabled; bAnyCommitted = true; }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Symmetry (global)");
+}
+
+// STEP142 — see the header's own comment (MarkersTab_ManualLayerRowBody_UI.h) for the full "why".
+// `bAnyCommitted` is set true exactly when a rename COMMITS (not merely while typing) — the SAME
+// signal DrawLayerRowBody's own return used to carry for the retired body Name field, so the
+// caller's existing MakeNamesUnique repair (the wire format keys Layers by name) still runs.
+bool DrawLayerHeaderNameOverlay(int layerIndex, Params::MarkerInstanceLayer& layer,
+                                ManualMarkerLayersState& state, bool& bAnyCommitted) {
+    const ImVec2 itemMin = ImGui::GetItemRectMin();
+    const float labelStartX = itemMin.x + ImGui::GetTreeNodeToLabelSpacing();
+
+    if (state.renamingLayerIndex == layerIndex) {
+        ImGui::SetCursorScreenPos(ImVec2(labelStartX, itemMin.y));
+        TextInputRules nameRules;
+        nameRules.maximumLength = 48; nameRules.bAllowEmpty = false; nameRules.fallbackText = "Marker Layer";
+        DrawTextInput("##renameLayer", state.renameScratchText, nameRules, WidgetStyle(), nullptr,
+                     /*bLabelHidden=*/true);
+        if (ImGui::IsItemDeactivated()) {
+            layer.name = SanitizeTextInput(state.renameScratchText, nameRules);
+            state.renamingLayerIndex = -1;
+            bAnyCommitted = true;
+        }
+        return true;
+    }
+
+    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        state.renamingLayerIndex = layerIndex;
+        state.renameScratchText  = layer.name;
+        return true;
+    }
+    return false;
 }
 
 } // namespace Ui

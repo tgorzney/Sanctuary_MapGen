@@ -211,8 +211,10 @@ void RunSpawnArmyTintChecks() {
         armies[0].name = "ARMY_01";
         DrawManualMarkerRoster(markers, noLayers, armies, globalMarkerSettings, inactiveDragState, *fixture.composite,
                                fixture.view, 0.0f, 0.0f, std::vector<int>{}, drawList);
-        Check(LastVertexColor(drawList) == IM_COL32(220, 220, 220, 255),
-              "an orphaned Spawn slot with no matching army falls back to the neutral layer color");
+        Check(LastVertexColor(drawList)
+                  == ImGui::ColorConvertFloat4ToU32(ImVec4(0.8f, 0.2f, 0.2f, 1.0f)),
+              "an orphaned Spawn slot with no matching army falls back to the Type's own colorSpawn "
+              "(STEP143 fix — no layer override to apply is not the same as grey)");
     }
 
     // A non-Spawn group with a name-colliding transform is unaffected — gated on group identity.
@@ -226,8 +228,10 @@ void RunSpawnArmyTintChecks() {
         armies[0].armyColor[2] = 0.0f; armies[0].armyColor[3] = 1.0f;
         DrawManualMarkerRoster(markers, noLayers, armies, globalMarkerSettings, inactiveDragState, *fixture.composite,
                                fixture.view, 0.0f, 0.0f, std::vector<int>{}, drawList);
-        Check(LastVertexColor(drawList) == IM_COL32(220, 220, 220, 255),
-              "a non-Spawn group whose transform name collides with an army name is unaffected");
+        Check(LastVertexColor(drawList)
+                  == ImGui::ColorConvertFloat4ToU32(ImVec4(0.8f, 0.8f, 0.2f, 1.0f)),
+              "a non-Spawn group whose transform name collides with an army name is unaffected -- "
+              "renders its own Type's colorAlloy, not grey (STEP143 fix)");
     }
 
     // The Spawn-cardinality-refused red tint still wins over army color.
