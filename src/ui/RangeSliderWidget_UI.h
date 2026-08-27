@@ -131,5 +131,24 @@ WidgetChange DrawRangeSlider(const char* label, RangeSliderValues& values,
                              const WidgetStyle& style = WidgetStyle(),
                              const char* valueFormat = "%.3f");
 
+// The single-line variant a caller composing its OWN row reaches for instead (the
+// DrawSliderScalarCompact precedent, SliderScalar_UI.h STEP134; human's own bug report — the
+// three-row shape above cannot fit beside other controls, and the human explicitly asked for
+// "the two values on left and right of slider so it can be single line"): no label line — a
+// fixed-width numeric field for minimumValue, then the fixed-width track with both handles, then a
+// fixed-width numeric field for maximumValue, all on one line, `label` used only to scope the
+// ImGui ID and as a hover tooltip over the track (mirrors DrawSliderScalarCompact's own
+// IsItemHovered()/SetTooltip pattern). DrawRangeSlider above is UNTOUCHED — every existing 3-line
+// caller keeps its current shape; min-cannot-cross-max and the minimumSeparation gap (the
+// caller-configurable "Min Delta") are the SAME `RangeSliderBounds`/interaction logic above, not
+// reimplemented. `bShowRealtimeToggle` mirrors DrawSliderScalarCompact's own escape hatch: a caller
+// whose field never triggers anything beyond a cheap preview repaint can drop the RT button
+// entirely (the underlying commit timing is unaffected — only the control disappears).
+WidgetChange DrawRangeSliderCompact(const char* label, RangeSliderValues& values,
+                                    const RangeSliderBounds& bounds, RealtimeToggle& realtimeToggle,
+                                    float trackWidthPixels, float fieldWidthPixels,
+                                    const WidgetStyle& style = WidgetStyle(),
+                                    const char* valueFormat = "%.3f", bool bShowRealtimeToggle = true);
+
 } // namespace Ui
 } // namespace SanmapGen

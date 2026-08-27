@@ -90,6 +90,59 @@ RangeSliderPointerInput DrawNumericFields(RangeSliderValues& values, const Range
     return fieldInput;
 }
 
+struct RangeSliderHitTest {
+    TrackGeometry geometry;
+    bool bMinimumActive = false;
+    bool bMaximumActive = false;
+    bool bTrackHovered  = false;   // captured right after the reserving Dummy — DrawRangeSliderCompact's
+                                   // own tooltip trigger; the two handle InvisibleButtons drawn after
+                                   // would otherwise become "the last item" imgui's own IsItemHovered
+                                   // reads from.
+};
+
+// Reserves the track row and hit-tests both handles — the split-at-midpoint logic every caller
+// needs — then leaves the imgui cursor exactly where DrawRangeSlider's own numeric-field row always
+// expected it: directly below the track, at the row's own left edge, regardless of where the two
+// handle InvisibleButtons last repositioned it internally. DrawRangeSliderCompact overrides that
+// cursor placement itself (SameLine composition instead of a row below), reading `geometry` back
+// out rather than relying on imgui's own last-item tracking.
+RangeSliderHitTest ReserveAndHitTestTrack(const RangeSliderValues& values, const RangeSliderBounds& bounds,
+                                          const WidgetStyle& style, float requestedWidthPixels) {
+    RangeSliderHitTest result;
+    TrackGeometry& geometry = result.geometry;
+    geometry.origin      = ImGui::GetCursorScreenPos();
+    geometry.width       = requestedWidthPixels > 0.0f ? requestedWidthPixels : ImGui::GetContentRegionAvail().x;
+    geometry.height      = ResolveWidgetTrackHeight(style);
+    geometry.handleWidth = style.handleWidth > 1.0f ? style.handleWidth : 1.0f;
+    geometry.usableWidth = geometry.width - geometry.handleWidth;
+    ImGui::Dummy(ImVec2(geometry.width, geometry.height));       // reserve the track row
+    result.bTrackHovered = ImGui::IsItemHovered();
+    const ImVec2 belowTrack = ImGui::GetCursorScreenPos();
+
+    // Two hit-tests, one per handle. Where the handles overlap in pixels their shared span is
+    // split at the midpoint, so neither handle can ever become unreachable.
+    const float minimumLeftX = geometry.origin.x +
+        RangeSliderHandleOffset(values.minimumValue, bounds, geometry.width, geometry.handleWidth);
+    const float maximumLeftX = geometry.origin.x +
+        RangeSliderHandleOffset(values.maximumValue, bounds, geometry.width, geometry.handleWidth);
+    float splitX = minimumLeftX + geometry.handleWidth;
+    if (splitX > maximumLeftX) splitX = (minimumLeftX + maximumLeftX + geometry.handleWidth) * 0.5f;
+    result.bMinimumActive = HandleIsActive("##minimumHandle", geometry, minimumLeftX, splitX);
+    result.bMaximumActive = HandleIsActive("##maximumHandle", geometry,
+        splitX > maximumLeftX ? splitX : maximumLeftX, maximumLeftX + geometry.handleWidth);
+
+    ImGui::SetCursorScreenPos(belowTrack);
+    return result;
+}
+
+RangeSliderPointerInput HandleFrameInput(const RangeSliderHitTest& hit, const RangeSliderBounds& bounds,
+                                         RangeSliderPointerInput fieldInput) {
+    fieldInput.grabbedHandle = hit.bMinimumActive ? RangeSliderHandle::Minimum
+                             : (hit.bMaximumActive ? RangeSliderHandle::Maximum : RangeSliderHandle::None);
+    fieldInput.pointerValue  = PointerValueAt(hit.geometry, bounds, ImGui::GetIO().MousePos.x);
+    return fieldInput;
+}
+
 } // namespace
 
 WidgetChange DrawRangeSlider(const char* label, RangeSliderValues& values,
@@ -101,35 +154,61 @@ WidgetChange DrawRangeSlider(const char* label, RangeSliderValues& values,
     ImGui::PushID(label);
     ImGui::TextUnformatted(label);
 
-    TrackGeometry geometry;
-    geometry.origin      = ImGui::GetCursorScreenPos();
-    geometry.width       = ImGui::GetContentRegionAvail().x;
-    geometry.height      = ResolveWidgetTrackHeight(style);
-    geometry.handleWidth = style.handleWidth > 1.0f ? style.handleWidth : 1.0f;
-    geometry.usableWidth = geometry.width - geometry.handleWidth;
-    ImGui::Dummy(ImVec2(geometry.width, geometry.height));       // reserve the track row
-    const ImVec2 belowTrack = ImGui::GetCursorScreenPos();
-
-    // Two hit-tests, one per handle. Where the handles overlap in pixels their shared span is
-    // split at the midpoint, so neither handle can ever become unreachable.
-    const float minimumLeftX = geometry.origin.x +
-        RangeSliderHandleOffset(values.minimumValue, bounds, geometry.width, geometry.handleWidth);
-    const float maximumLeftX = geometry.origin.x +
-        RangeSliderHandleOffset(values.maximumValue, bounds, geometry.width, geometry.handleWidth);
-    float splitX = minimumLeftX + geometry.handleWidth;
-    if (splitX > maximumLeftX) splitX = (minimumLeftX + maximumLeftX + geometry.handleWidth) * 0.5f;
-    const bool bMinimumActive = HandleIsActive("##minimumHandle", geometry, minimumLeftX, splitX);
-    const bool bMaximumActive = HandleIsActive("##maximumHandle", geometry,
-        splitX > maximumLeftX ? splitX : maximumLeftX, maximumLeftX + geometry.handleWidth);
-
-    ImGui::SetCursorScreenPos(belowTrack);
-    RangeSliderPointerInput input = DrawNumericFields(values, bounds, realtimeToggle, style, valueFormat);
-    input.grabbedHandle = bMinimumActive ? RangeSliderHandle::Minimum
-                        : (bMaximumActive ? RangeSliderHandle::Maximum : RangeSliderHandle::None);
-    input.pointerValue  = PointerValueAt(geometry, bounds, ImGui::GetIO().MousePos.x);
+    const RangeSliderHitTest hit = ReserveAndHitTestTrack(values, bounds, style, 0.0f);
+    RangeSliderPointerInput input =
+        HandleFrameInput(hit, bounds, DrawNumericFields(values, bounds, realtimeToggle, style, valueFormat));
 
     const WidgetChange change = StepRangeSliderInteraction(realtimeToggle, values, bounds, input);
-    DrawTrack(geometry, values, bounds, style, bMinimumActive, bMaximumActive);   // zero-lag handles
+    DrawTrack(hit.geometry, values, bounds, style, hit.bMinimumActive, hit.bMaximumActive);   // zero-lag handles
+    ImGui::PopID();
+    return change;
+}
+
+// STEP154 — the single-line variant (DrawRangeSliderCompact, see header comment). Composition:
+// minimum field -> SameLine -> fixed-width track -> (cursor placed explicitly, not via SameLine,
+// since the track's own last imgui item by this point is a handle InvisibleButton, not the Dummy
+// SameLine would otherwise chain from) -> maximum field -> SameLine -> RT button (optional).
+WidgetChange DrawRangeSliderCompact(const char* label, RangeSliderValues& values,
+                                    const RangeSliderBounds& rawBounds, RealtimeToggle& realtimeToggle,
+                                    float trackWidthPixels, float fieldWidthPixels, const WidgetStyle& style,
+                                    const char* valueFormat, bool bShowRealtimeToggle) {
+    const RangeSliderBounds bounds = ResolvedRangeSliderBounds(rawBounds);
+    values = ClampRangeSliderValues(values, bounds);
+    const float dragSpeed = bounds.minimumSeparation > 0.0f ? bounds.minimumSeparation
+                                                            : (bounds.upperLimit - bounds.lowerLimit) * 0.001f;
+
+    ImGui::PushID(label);
+
+    RangeSliderPointerInput fieldInput;
+    ImGui::SetNextItemWidth(fieldWidthPixels);
+    if (ImGui::DragFloat("##minimumField", &values.minimumValue, dragSpeed,
+                         bounds.lowerLimit, bounds.upperLimit, valueFormat)) {
+        values = MoveRangeSliderHandle(values, bounds, RangeSliderHandle::Minimum, values.minimumValue);
+        fieldInput.bNumericFieldEdited = true;
+    }
+    fieldInput.bNumericFieldActive = ImGui::IsItemActive();
+    ImGui::SameLine();
+
+    const RangeSliderHitTest hit = ReserveAndHitTestTrack(values, bounds, style, trackWidthPixels);
+    if (hit.bTrackHovered) ImGui::SetTooltip("%s", label);
+    ImGui::SetCursorScreenPos(ImVec2(hit.geometry.origin.x + hit.geometry.width + ImGui::GetStyle().ItemSpacing.x,
+                                     hit.geometry.origin.y));
+
+    ImGui::SetNextItemWidth(fieldWidthPixels);
+    if (ImGui::DragFloat("##maximumField", &values.maximumValue, dragSpeed,
+                         bounds.lowerLimit, bounds.upperLimit, valueFormat)) {
+        values = MoveRangeSliderHandle(values, bounds, RangeSliderHandle::Maximum, values.maximumValue);
+        fieldInput.bNumericFieldEdited = true;
+    }
+    fieldInput.bNumericFieldActive = fieldInput.bNumericFieldActive || ImGui::IsItemActive();
+    if (bShowRealtimeToggle) {
+        ImGui::SameLine();
+        DrawRealtimeToggleButton("realtime", realtimeToggle, style);
+    }
+
+    const RangeSliderPointerInput input = HandleFrameInput(hit, bounds, fieldInput);
+    const WidgetChange change = StepRangeSliderInteraction(realtimeToggle, values, bounds, input);
+    DrawTrack(hit.geometry, values, bounds, style, hit.bMinimumActive, hit.bMaximumActive);   // zero-lag handles
     ImGui::PopID();
     return change;
 }

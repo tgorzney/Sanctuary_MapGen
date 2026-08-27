@@ -64,9 +64,9 @@ void RunPlanLimitChecks() {
           "clearance spacing reaches the plan's 500");
     Check(state.densityRange.minimumValue == 0.0f && state.densityRange.maximumValue == 1.0f,
           "density carries the plan's 0-1");
-    Check(state.ruleDetail.areaRadiusMinimumRange.maximumValue >= 200.0f
-          && state.ruleDetail.areaRadiusMaximumRange.maximumValue >= 500.0f,
-          "both area radius sliders reach the plan's limits");
+    Check(state.ruleDetail.areaRadiusBounds.upperLimit >= 500.0f,
+          "the combined area radius range slider reaches the plan's limits (both the old"
+          " 200 minimum-only and 500 maximum-only ceilings)");
     Check(state.gate.edgePaddingRange.maximumValue >= 200.0f,
           "map edge padding reaches the plan's 200");
     Check(state.ruleDetail.focusRadiusRange.maximumValue >= 1000.0f
@@ -116,8 +116,7 @@ void RunRealtimeDefaultChecks() {
           && state.clearanceSpacingToggle.IsRealtimeEnabled()
           && state.obstacleDistanceToggle.IsRealtimeEnabled(),
           "MarkersTabState's six rule-stack toggles default to realtime ON (STEP118)");
-    Check(state.ruleDetail.areaRadiusMinimumToggle.IsRealtimeEnabled()
-          && state.ruleDetail.areaRadiusMaximumToggle.IsRealtimeEnabled()
+    Check(state.ruleDetail.areaRadiusToggle.IsRealtimeEnabled()
           && state.ruleDetail.areaHeightRangeToggle.IsRealtimeEnabled()
           && state.ruleDetail.focusRadiusToggle.IsRealtimeEnabled()
           && state.ruleDetail.focusStrengthToggle.IsRealtimeEnabled()

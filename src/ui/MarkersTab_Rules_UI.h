@@ -37,15 +37,20 @@ struct MarkerRuleDetailState {
     SectionState areaSection;
     SectionState focusSection;
 
-    ScalarSliderRange areaRadiusMinimumRange{ 0.0f, 200.0f, 0.0f };
-    ScalarSliderRange areaRadiusMaximumRange{ 0.0f, 500.0f, 0.0f };
+    // NEW — the min/max pair DrawMarkerRuleArea now edits with ONE DrawRangeSlider whenever
+    // `bCheckMaximumRadius` is on (was two independent DrawSliderScalar calls with no min-cannot-
+    // cross-max protection at all, the one such gap MarkersTab_Area_UI.cpp had — RangeSliderWidget_
+    // UI's `minimumSeparation` is exactly the caller-configurable "Min Delta" this closes it with).
+    // Both handles now share ONE upper limit (500, the old maximum-slider's own ceiling — comfortably
+    // above the old minimum-slider's 200) since a single track cannot carry two different limits.
+    RangeSliderBounds areaRadiusBounds{ 0.0f, 500.0f, 1.0f };
+    RangeSliderValues areaRadiusValues{ 0.0f, 500.0f };
     ScalarSliderRange areaHeightRange{ 0.0f, 10.0f, 0.0f };
     ScalarSliderRange focusRadiusRange{ 0.0f, 1000.0f, 0.0f };
     ScalarSliderRange focusStrengthRange{ 0.0f, 5.0f, 0.0f };
     ScalarSliderRange focusContrastRange{ 0.1f, 5.0f, 0.0f };
 
-    RealtimeToggle areaRadiusMinimumToggle{true};
-    RealtimeToggle areaRadiusMaximumToggle{true};
+    RealtimeToggle areaRadiusToggle{true};
     RealtimeToggle areaHeightRangeToggle{true};
     RealtimeToggle focusRadiusToggle{true};
     RealtimeToggle focusStrengthToggle{true};

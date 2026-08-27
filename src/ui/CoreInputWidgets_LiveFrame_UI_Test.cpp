@@ -23,13 +23,25 @@ static Ui::RealtimeToggle    sliderToggle;                 // RT off — the def
 static float                 dialValue = 5.0f;
 static Ui::RealtimeToggle    dialToggle;
 
+// STEP154 — the compact single-line variant, drawn alongside the three-row DrawRangeSlider above so
+// this same headless frame proves its explicit SetCursorScreenPos track placement (Draw
+// RangeSliderWidget_UI.cpp) actually lands the hit-test where the control is visually drawn, not
+// just that the pure interaction math (shared with DrawRangeSlider, already covered above) is sound.
+static Ui::RangeSliderValues compactValues{0.3f, 0.7f};
+static Ui::RangeSliderBounds compactBounds;                // 0..1, default separation
+static Ui::RealtimeToggle    compactToggle;                // RT off — the deferring case
+constexpr float kCompactTrackWidth = 120.0f;
+constexpr float kCompactFieldWidth = 40.0f;
+
 struct FrameResult {
     Ui::WidgetChange sliderChange;
     Ui::WidgetChange dialChange;
+    Ui::WidgetChange compactChange;
     ImVec2 trackOrigin = ImVec2(0.0f, 0.0f);
     float  trackWidth  = 0.0f;
     float  trackHeight = 0.0f;
     ImVec2 knobOrigin  = ImVec2(0.0f, 0.0f);
+    ImVec2 compactTrackOrigin = ImVec2(0.0f, 0.0f);
     int    vertexCount = 0;
 };
 
@@ -55,6 +67,16 @@ static FrameResult RunFrame(float cursorX, float cursorY, bool bMouseDown) {
     dialRange.pixelsForFullSweep = 200.0f;
     result.knobOrigin = ImGui::GetCursorScreenPos();
     result.dialChange = Ui::DrawLabelledDial("Erosion rate", dialValue, dialRange, dialToggle);
+
+    // The compact row's own track sits immediately after its minimum field — this test computes
+    // that same offset independently (fieldWidth + one ItemSpacing) so a drag at the computed
+    // position proves DrawRangeSliderCompact's internal SetCursorScreenPos actually put the track's
+    // real hit-test there, not just somewhere that happens to look right.
+    const ImVec2 compactRowCursor = ImGui::GetCursorScreenPos();
+    result.compactChange = Ui::DrawRangeSliderCompact("Compact range", compactValues, compactBounds,
+                                                      compactToggle, kCompactTrackWidth, kCompactFieldWidth);
+    result.compactTrackOrigin = ImVec2(compactRowCursor.x + kCompactFieldWidth + ImGui::GetStyle().ItemSpacing.x,
+                                       compactRowCursor.y);
 
     ImGui::End();
     ImGui::Render();
@@ -103,6 +125,27 @@ static void TestDialGrabDoesNotSnap(const FrameResult& layout) {
     Check(RunFrame(knobCenterX, knobCenterY - 40.0f, false).dialChange.bCommitted, "the dial commits on release");
 }
 
+// STEP154 — drags the compact slider's maximum handle by its computed on-screen position (not the
+// row-below layout DrawRangeSlider's own test above uses), proving the explicit
+// SetCursorScreenPos/SameLine composition in DrawRangeSliderCompact places the real hit-test where
+// the control is visually drawn.
+static void TestCompactSliderDragHitsWhereItIsDrawn(const FrameResult& layout) {
+    const float handleWidth = Ui::WidgetStyle().handleWidth;
+    const float maximumHandleCenterX = layout.compactTrackOrigin.x + handleWidth * 0.5f +
+        Ui::RangeSliderHandleOffset(compactValues.maximumValue, compactBounds, kCompactTrackWidth, handleWidth);
+    const float trackCenterY = layout.compactTrackOrigin.y + layout.trackHeight * 0.5f;
+
+    RunFrame(maximumHandleCenterX, trackCenterY, true);   // press
+    const float valueBeforeDrag = compactValues.maximumValue;
+    RunFrame(maximumHandleCenterX - 20.0f, trackCenterY, true);   // drag left
+    Check(compactValues.maximumValue < valueBeforeDrag - 0.02f,
+         "dragging the compact slider's maximum handle at its computed on-screen position moves it");
+    Check(compactValues.minimumValue > 0.29f && compactValues.minimumValue < 0.31f,
+         "its partner (drawn to the LEFT of the track, in the minimum numeric field) holds still");
+    Check(RunFrame(maximumHandleCenterX - 20.0f, trackCenterY, false).compactChange.bCommitted,
+         "the compact slider's own commit fires on release, same deferred-commit contract as the 3-row widget");
+}
+
 int main() {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -118,6 +161,7 @@ int main() {
 
     TestSliderDragDefersInALiveFrame(layout);
     TestDialGrabDoesNotSnap(layout);
+    TestCompactSliderDragHitsWhereItIsDrawn(layout);
 
     ImGui::DestroyContext();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }

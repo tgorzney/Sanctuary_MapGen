@@ -9,20 +9,31 @@ namespace SanmapGen {
 namespace Ui {
 
 // The area a marker claims: how large a flat patch it needs, and — when the maximum is checked —
-// how large a patch disqualifies it.
+// how large a patch disqualifies it. Human's own bug report — this pair had no min-cannot-cross-max
+// protection at all (two independent sliders): with the maximum checked, ONE DrawRangeSlider now
+// edits both ends together, enforcing min<=max and the "Min Delta" gap (areaRadiusBounds.
+// minimumSeparation) the same way every other min/max pair in the app already does.
 void DrawMarkerRuleArea(Params::MarkerRule& rule, MarkerRuleDetailState& state,
                         Pipeline::PreviewDriver* previewDriver) {
     if (!DrawSectionBegin("Area", state.areaSection)) return;
-    NotifyPlacementChange(DrawSliderScalar("Area Radius Minimum", rule.areaRadiusMinimum,
-                                           state.areaRadiusMinimumRange, state.areaRadiusMinimumToggle,
-                                           WidgetStyle(), "%.1f").bCommitted, previewDriver);
     NotifyPlacementChange(DrawCheckbox("Check Maximum Radius", rule.bCheckMaximumRadius).bCommitted,
                           previewDriver);
-    if (rule.bCheckMaximumRadius)
-        NotifyPlacementChange(DrawSliderScalar("Area Radius Maximum", rule.areaRadiusMaximum,
-                                               state.areaRadiusMaximumRange,
-                                               state.areaRadiusMaximumToggle, WidgetStyle(),
-                                               "%.1f").bCommitted, previewDriver);
+    if (rule.bCheckMaximumRadius) {
+        state.areaRadiusValues.minimumValue = rule.areaRadiusMinimum;
+        state.areaRadiusValues.maximumValue = rule.areaRadiusMaximum;
+        const WidgetChange change = DrawRangeSlider("Area Radius", state.areaRadiusValues,
+                                                     state.areaRadiusBounds, state.areaRadiusToggle,
+                                                     WidgetStyle(), "%.1f");
+        rule.areaRadiusMinimum = state.areaRadiusValues.minimumValue;
+        rule.areaRadiusMaximum = state.areaRadiusValues.maximumValue;
+        NotifyPlacementChange(change.bCommitted, previewDriver);
+    } else {
+        NotifyPlacementChange(DrawSliderScalar("Area Radius Minimum", rule.areaRadiusMinimum,
+                                               ScalarSliderRange{ state.areaRadiusBounds.lowerLimit,
+                                                                  state.areaRadiusBounds.upperLimit, 0.0f },
+                                               state.areaRadiusToggle, WidgetStyle(), "%.1f").bCommitted,
+                              previewDriver);
+    }
     NotifyPlacementChange(DrawSliderScalar("Area Height Range", rule.areaHeightRange,
                                            state.areaHeightRange, state.areaHeightRangeToggle,
                                            WidgetStyle(), "%.2f").bCommitted, previewDriver);
