@@ -43,7 +43,8 @@ template <typename LeafLabelFn, typename DrawExpandedLeafBodyFn, typename DrawLe
          typename LeafKeyT>
 inline void RenderLeaf(const char* payloadIdentifier, const LeafKeyT& leaf, LeafLabelFn leafLabel,
     DrawExpandedLeafBodyFn drawExpandedLeafBody, DrawLeafHeaderExtraFn drawLeafHeaderExtra,
-    float headerExtraWidthPixels, TreeListState& state, TreeListSignal<LeafKeyT>& signal) {
+    float headerExtraWidthPixels, TreeListState& state, const LeafKeyT& selectedLeaf,
+    TreeListSignal<LeafKeyT>& signal) {
     // A leaf has no stable int identifier of its own to key expand-state by (unlike a node) — this
     // v1 keys off imgui's own per-label id scope instead (bExpanded local, not persisted in
     // TreeListState), acceptable since a leaf's inline body is cheap to redraw/recollapse; label
@@ -55,9 +56,12 @@ inline void RenderLeaf(const char* payloadIdentifier, const LeafKeyT& leaf, Leaf
     // on ANY single click (label included), fighting every plain select click below. OpenOnArrow
     // keeps the arrow's own single-click toggle (mirrors RenderNode's Group header, just below,
     // which already carries OpenOnArrow); OpenOnDoubleClick adds the label's own double-click toggle.
+    // Human's own bug report — a selected Layer's header must highlight, mirroring RenderNode's own
+    // Group header Selected flag just below.
     const bool bExpanded = ImGui::TreeNodeEx(leafLabel(leaf),
         ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_NoTreePushOnOpen
-        | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick);
+        | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick
+        | (leaf == selectedLeaf ? ImGuiTreeNodeFlags_Selected : 0));
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
         RecordTreeSignal(signal, TreeListSignalKind::Select, TreeNodeSourceKind::Leaf,
                          -1, leaf, -1, TreeDropZone::OnAsChild);
@@ -81,7 +85,7 @@ inline void RenderNode(const char* payloadIdentifier, const std::vector<T>& node
     NameOfFn nameOf, DrawNodeBodyFn drawNodeBody, DescribeLeavesFn describeLeaves, LeafLabelFn leafLabel,
     DrawExpandedLeafBodyFn drawExpandedLeafBody, DrawNodeHeaderExtraFn drawNodeHeaderExtra,
     DrawLeafHeaderExtraFn drawLeafHeaderExtra, float headerExtraWidthPixels, TreeListState& state,
-    int selectedNodeIdentifier, TreeListSignal<LeafKeyT>& signal) {
+    int selectedNodeIdentifier, const LeafKeyT& selectedLeaf, TreeListSignal<LeafKeyT>& signal) {
     const T& node = nodes[static_cast<std::size_t>(nodeIndex)];
     const int nodeIdentifier = idOf(node);
     ImGui::PushID(nodeIdentifier);
@@ -113,10 +117,11 @@ inline void RenderNode(const char* payloadIdentifier, const std::vector<T>& node
             for (int childIndex : childIt->second)
                 RenderNode<T, LeafKeyT>(payloadIdentifier, nodes, childIndex, childrenOf, idOf, parentIdOf, nameOf,
                           drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody, drawNodeHeaderExtra,
-                          drawLeafHeaderExtra, headerExtraWidthPixels, state, selectedNodeIdentifier, signal);
+                          drawLeafHeaderExtra, headerExtraWidthPixels, state, selectedNodeIdentifier,
+                          selectedLeaf, signal);
         for (const LeafKeyT& leaf : describeLeaves(nodeIdentifier))
             RenderLeaf(payloadIdentifier, leaf, leafLabel, drawExpandedLeafBody, drawLeafHeaderExtra,
-                      headerExtraWidthPixels, state, signal);
+                      headerExtraWidthPixels, state, selectedLeaf, signal);
         ImGui::Unindent();
     }
     ImGui::PopID();

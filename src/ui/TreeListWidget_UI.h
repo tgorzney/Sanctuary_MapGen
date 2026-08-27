@@ -39,10 +39,10 @@ public:
     static TreeListSignal<LeafKeyT> Render(const char* treeIdentifier, const std::vector<T>& nodes,
         IdOfFn idOf, ParentIdOfFn parentIdOf, NameOfFn nameOf, DrawNodeBodyFn drawNodeBody,
         DescribeLeavesFn describeLeaves, LeafLabelFn leafLabel, DrawExpandedLeafBodyFn drawExpandedLeafBody,
-        TreeListState& state, int selectedNodeIdentifier = -1) {
+        TreeListState& state, int selectedNodeIdentifier = -1, const LeafKeyT& selectedLeaf = LeafKeyT()) {
         return Render(treeIdentifier, nodes, idOf, parentIdOf, nameOf, drawNodeBody, describeLeaves,
                      leafLabel, drawExpandedLeafBody, [](int) {}, [](const LeafKeyT&) {}, 0.0f, state,
-                     selectedNodeIdentifier);
+                     selectedNodeIdentifier, selectedLeaf);
     }
 
     // STEP129 (ARCH §19.23): the OPTIONAL per-row header-extra slot — TWO callbacks, not one,
@@ -60,7 +60,8 @@ public:
         IdOfFn idOf, ParentIdOfFn parentIdOf, NameOfFn nameOf, DrawNodeBodyFn drawNodeBody,
         DescribeLeavesFn describeLeaves, LeafLabelFn leafLabel, DrawExpandedLeafBodyFn drawExpandedLeafBody,
         DrawNodeHeaderExtraFn drawNodeHeaderExtra, DrawLeafHeaderExtraFn drawLeafHeaderExtra,
-        float headerExtraWidthPixels, TreeListState& state, int selectedNodeIdentifier = -1) {
+        float headerExtraWidthPixels, TreeListState& state, int selectedNodeIdentifier = -1,
+        const LeafKeyT& selectedLeaf = LeafKeyT()) {
         TreeListSignal<LeafKeyT> signal;
         if (treeIdentifier == nullptr) return signal;
         const char* const payloadIdentifier =
@@ -85,7 +86,7 @@ public:
             TreeListDetail::RenderNode(payloadIdentifier, nodes, rootIndex, childrenOf, idOf, parentIdOf, nameOf,
                                        drawNodeBody, describeLeaves, leafLabel, drawExpandedLeafBody,
                                        drawNodeHeaderExtra, drawLeafHeaderExtra, headerExtraWidthPixels, state,
-                                       selectedNodeIdentifier, signal);
+                                       selectedNodeIdentifier, selectedLeaf, signal);
 
         ImGui::PopID();
         return signal;

@@ -27,9 +27,33 @@ void ApplyMarkerLayerBundleTreeSignal(const TreeListSignal<MarkerGroupLeafKey_UI
                                       std::vector<Params::MarkerLayerBundle>& bundles,
                                       std::vector<Params::MarkerRuleLayer>& ruleLayers,
                                       std::vector<Params::MarkerInstanceLayer>& instanceLayers,
-                                      MarkerLayerBundlesState& state) {
-    if (signal.kind == TreeListSignalKind::Select && signal.sourceKind == TreeNodeSourceKind::Node)
-        state.selectedBundleIdentifier = signal.sourceNodeIdentifier;
+                                      const std::vector<Params::MarkerInstanceGroup>& markers,
+                                      const ManualInstanceLayerIndex_UI& instanceIndex,
+                                      MarkerLayerBundlesState& state, int& selectedManualInstanceIdentifier,
+                                      std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier) {
+    if (signal.kind == TreeListSignalKind::Select) {
+        if (signal.sourceKind == TreeNodeSourceKind::Node) {
+            state.selectedBundleIdentifier = signal.sourceNodeIdentifier;
+        } else {
+            // Human's own bug report — a single click on a Layer header selects that Layer (the
+            // highlight) AND every Instance it owns (a Procedural leaf owns none, so it clears the
+            // manual selection instead — it is not a "no selection change" no-op).
+            state.selectedLeaf = signal.sourceLeaf;
+            selectedManualInstanceIdentifiers.clear();
+            if (signal.sourceLeaf.kind == MarkerGroupLeafKey_UI::Kind::Manual) {
+                const auto memberIt = instanceIndex.instancesByLayerIndex.find(signal.sourceLeaf.layerIndex);
+                if (memberIt != instanceIndex.instancesByLayerIndex.end())
+                    for (const std::pair<int, int>& groupTransformIndex : memberIt->second)
+                        selectedManualInstanceIdentifiers.push_back(
+                            markers[static_cast<std::size_t>(groupTransformIndex.first)]
+                                .transforms[static_cast<std::size_t>(groupTransformIndex.second)]
+                                .instanceIdentifier);
+            }
+            anchorIdentifier = selectedManualInstanceIdentifiers.empty()
+                              ? -1 : selectedManualInstanceIdentifiers.front();
+            selectedManualInstanceIdentifier = anchorIdentifier;
+        }
+    }
 
     if (signal.kind == TreeListSignalKind::Reparent) {
         if (signal.sourceKind == TreeNodeSourceKind::Leaf) {

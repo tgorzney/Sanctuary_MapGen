@@ -128,6 +128,7 @@ void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
         for (Params::MarkerLayerBundle& bundle : bundles) {
             if (bundle.identifier != bundleIdentifier) continue;
             ImGui::SetCursorScreenPos(ImVec2(labelStartX, itemMin.y));
+            if (state.bRenameFocusPending) { ImGui::SetKeyboardFocusHere(); state.bRenameFocusPending = false; }
             TextInputRules nameRules;
             nameRules.maximumLength = 48; nameRules.bAllowEmpty = false; nameRules.fallbackText = "Group";
             DrawTextInput("##renameGroup", state.renameScratchText, nameRules, WidgetStyle(), nullptr,
@@ -144,6 +145,7 @@ void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
 
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         state.renamingBundleIdentifier = bundleIdentifier;
+        state.bRenameFocusPending      = true;
         for (const Params::MarkerLayerBundle& bundle : bundles)
             if (bundle.identifier == bundleIdentifier) { state.renameScratchText = bundle.name; break; }
         return;
@@ -186,6 +188,12 @@ void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
         // STEP142 — double-click-the-header rename FIRST: while active, it claims the rest of the
         // row (the name box fills whatever's left), so SYM/COL/V-I/X don't draw this frame.
         if (DrawLayerHeaderNameOverlay(leaf.layerIndex, layer, manualLayersState, bAnyCommitted)) return;
+        // Human's own bug report — Icon Size/Snap to Grid now live in the header, mirroring how
+        // SYM/COL already do (left of them, same [SYM][COL][swatch][V/I][X] cluster convention).
+        DrawMarkerLayerIconSizeHeaderControl(layer, manualLayersState, bAnyCommitted);
+        ImGui::SameLine();
+        DrawMarkerLayerGridSnapHeaderControl(layer, manualLayersState, bAnyCommitted);
+        ImGui::SameLine();
         DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
         ImGui::SameLine();
         DrawManualMarkerLayerColorOverrideHeaderControl(layer, manualLayersState, bAnyCommitted);

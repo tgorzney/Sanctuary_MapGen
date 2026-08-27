@@ -15,6 +15,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "ManualInstanceLayerIndex_UI.h"
 #include "MarkerSymmetryFixCommand_UI.h"
 #include "Section_UI.h"
 #include "SliderScalar_UI.h"
@@ -48,6 +49,13 @@ inline bool operator==(const MarkerGroupLeafKey_UI& a, const MarkerGroupLeafKey_
 struct MarkerLayerBundlesState {
     TreeListState treeState;
     int           selectedBundleIdentifier = -1;
+    // Human's own bug report — a single click on a Layer's header must both highlight that Layer's
+    // own row (mirrors selectedBundleIdentifier's own Group highlight above) and select every
+    // Instance belonging to it (see ApplyMarkerLayerBundleTreeSignal's own Leaf-select branch,
+    // MarkersTab_BundleTreeSignals_UI.cpp). Default `{Procedural, -1}` never matches a real leaf
+    // (layerIndex is never -1 for a genuine selection), the same "-1 sentinel never collides with a
+    // real index" posture selectedBundleIdentifier already relies on.
+    MarkerGroupLeafKey_UI selectedLeaf;
 
     // STEP140/STEP142: the body no longer draws Name/Move/Rotate — the header-extra slot now carries
     // rename (double-click, positioned where the header's own name text shows) and delete (see
@@ -59,6 +67,12 @@ struct MarkerLayerBundlesState {
     // scratch buffer makes moot here anyway: correct regardless of which widget is under it).
     int         renamingBundleIdentifier = -1;
     std::string renameScratchText;
+    // Human's own bug report — double-clicking to rename required a SECOND click before the text
+    // cursor actually focused into the box. Set true the SAME frame renaming toggles on (that frame
+    // draws no InputText yet — see the toggle-on site below); the NEXT frame, when the InputText
+    // first draws, consumes this to call SetKeyboardFocusHere() then clears it, so every subsequent
+    // frame while still renaming leaves keyboard focus wherever the user last put it.
+    bool        bRenameFocusPending = false;
 
     // STEP140: pending deletes, applied AFTER the tree's walk finishes this frame — never mid-walk,
     // see MarkersTab_BundleDelete_UI.h. Bundle: Group Only vs cascade All. Manual Layer: Layer Only
@@ -190,11 +204,19 @@ std::vector<Params::MarkerLayerBundle> BuildFilteredMarkerLayerBundlesByType(
 // (STEP120) — extracted verbatim, UNCHANGED behavior, purely so it has a name and can be driven
 // directly by a test fixture without an imgui frame (STEP125's own required "filtered-copy write
 // safety" coverage, see Verify).
+// Human's own bug report — a Leaf Select signal now ALSO records `state.selectedLeaf` (the header
+// highlight) and, for a Manual leaf, replaces the caller's whole selection set with every Instance
+// belonging to that Layer (via `instanceIndex`, already built once per frame by the caller — see
+// DrawMarkerLayerBundleTree). A Procedural leaf select still highlights but clears the manual
+// selection (it owns no Instances of its own).
 void ApplyMarkerLayerBundleTreeSignal(const TreeListSignal<MarkerGroupLeafKey_UI>& signal,
                                       std::vector<Params::MarkerLayerBundle>& bundles,
                                       std::vector<Params::MarkerRuleLayer>& ruleLayers,
                                       std::vector<Params::MarkerInstanceLayer>& instanceLayers,
-                                      MarkerLayerBundlesState& state);
+                                      const std::vector<Params::MarkerInstanceGroup>& markers,
+                                      const ManualInstanceLayerIndex_UI& instanceIndex,
+                                      MarkerLayerBundlesState& state, int& selectedManualInstanceIdentifier,
+                                      std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier);
 
 // The Bundle tree mechanics — no Section wrap of its own (STEP125: the Type-section's own outer
 // DrawSectionBegin, MarkersTab_TypeSections_UI.cpp, supplies that collapsible now). `rootState` is

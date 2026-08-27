@@ -7,6 +7,7 @@
 #include "MapCanvas_UI.h"
 #include "PreviewComposite_TestScene_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include <cmath>
 #include <imgui.h>
 
 namespace SanmapGen {
@@ -54,6 +55,28 @@ ImVec2 PressPositionOnMarker(MapCanvas& canvas, const PreviewComposite& composit
     const RegionLocalPoint regionLocal =
         canvas.View().ProjectPreviewPixelToRegionLocal(previewPixel.pixelX, previewPixel.pixelY);
     return ImVec2(regionOrigin.x + regionLocal.regionLocalX, regionOrigin.y + regionLocal.regionLocalY);
+}
+
+// Human's own bug report — clicking a manual marker in the preview never selected it:
+// TryBeginManualMarkerDrag's own press-time hit-test claimed EVERY press landing on a marker as a
+// drag gesture, even one that never actually moved, so ApplyPointerInput's plain-click path (the
+// ONLY thing that calls ApplyClick/SetSelection for a hit) never ran. Mirrors
+// SimulatePressDragRelease's own press/hold/release shape, MINUS the position-changing frame — zero
+// travel end to end, a click rather than a drag.
+void SimulateStationaryClick(MapCanvas& canvas, ImVec2 clickPosition) {
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddMousePosEvent(clickPosition.x, clickPosition.y);
+    io.AddMouseButtonEvent(0, false);
+    BeginHeadlessFrame();
+    DrawOneFrame(canvas);
+    io.AddMouseButtonEvent(0, true);
+    BeginHeadlessFrame();
+    DrawOneFrame(canvas);
+    BeginHeadlessFrame();   // held, same position — zero delta this frame too
+    DrawOneFrame(canvas);
+    io.AddMouseButtonEvent(0, false);
+    BeginHeadlessFrame();
+    DrawOneFrame(canvas);
 }
 
 void SimulatePressDragRelease(MapCanvas& canvas, ImVec2 pressPosition) {
@@ -143,6 +166,79 @@ void RunMapCanvasActivePanelGateChecks(Sys::GpuResourceManager& manager) {
     SimulatePressDragRelease(noPanelSourceCanvas, noPanelPressPosition);
     check(transform.positionX == kMarkerWorldX && transform.positionZ == kMarkerWorldZ,
           "no panel source wired: null refuses the drag rather than defaulting to permit it");
+    ImGui::DestroyContext();
+}
+
+// Human's own bug report — see SimulateStationaryClick's own comment for the full "why". A
+// stationary press-and-release directly on a manual marker must fire selection exactly once, tagged
+// as a manual hit, and must leave the marker's own position untouched (this is a click, not a drag).
+void RunMapCanvasClickSelectsManualMarkerChecks(Sys::GpuResourceManager& manager) {
+    // World (0.5, 0.5), NOT kMarkerWorldX/Z (2,2) — the shared test scene's own lone PROCEDURAL
+    // marker already sits at (2,2) (MapCanvas_Picking_UI_Test.cpp's own comment), and ApplyClick
+    // always tries a procedural pick FIRST; landing the manual marker on the SAME point would select
+    // the procedural one instead and never reach the manual fallback this test exists to exercise —
+    // mirrors RunManualMarkerSelectionChecks' own "far enough to miss the procedural pick first" note.
+    constexpr float kManualMarkerWorldX = 0.5f;
+    constexpr float kManualMarkerWorldZ = 0.5f;
+
+    PreviewTestScene scene;
+    BuildPreviewTestScene(scene);
+    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+                               scene.instances, scene.entityIdentifiers);
+    ConfigurePreviewSettings(composite.Settings());
+    composite.Settings().previewResolution = kPreviewResolution;
+    composite.SetGpuResourceManager(&manager);
+    composite.Compose();
+
+    // ApplyClick's own manual-marker fallback is gated behind non-null procedural picking fields
+    // (MapCanvas_UI.cpp) — wired here even though this scene's one procedural marker sits elsewhere,
+    // so the procedural pick correctly MISSES and falls through to the manual hit-test.
+    Data::SpatialGrid markerSpatialGrid;
+    markerSpatialGrid.Configure(static_cast<float>(scene.geometry.mapSize) * scene.geometry.worldUnitsPerCell);
+    markerSpatialGrid.Build(scene.instances.positionX.data(), scene.instances.positionZ.data(),
+                            static_cast<std::int32_t>(scene.instances.Count()));
+
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.push_back(Params::MarkerTransform{});
+    Params::InstancedTransform& transform = markers[0].transforms[0].transform;
+    markers[0].transforms[0].name               = "Marker";
+    markers[0].transforms[0].instanceIdentifier  = 77;
+    transform.positionX = kManualMarkerWorldX; transform.positionZ = kManualMarkerWorldZ;
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+    Params::MapRecipe recipe;
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(600.0f, 600.0f);
+    io.IniFilename = nullptr;
+
+    MapCanvas canvas;
+    WireCanvas(canvas, manager, composite, markers, markerLayers, scene.geometry, recipe);
+    canvas.SetMarkerPickingSource(&scene.instances, &markerSpatialGrid);
+    canvas.SetMarkerPickRadiusScreenPixels(8.0f);
+    const ImVec2 clickPosition =
+        PressPositionOnMarker(canvas, composite, kManualMarkerWorldX, kManualMarkerWorldZ);
+    ApplicationPanel activePanel = ApplicationPanel::Markers;
+    canvas.SetActivePanelSource(&activePanel);
+
+    OverlayInstanceKey_UI lastKey;
+    int selectionChangeCount = 0;
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key) {
+        lastKey = key; ++selectionChangeCount;
+    });
+
+    SimulateStationaryClick(canvas, clickPosition);
+
+    check(selectionChangeCount == 1,
+          "a stationary click directly on a manual marker fires exactly one selection change");
+    check(lastKey.bValid && lastKey.bManual && lastKey.instanceIndex == 77,
+          "the reported key is the manual marker under the cursor, correctly tagged bManual");
+    // Tolerance, not exact equality — regionLocal -> preview-pixel -> world is a real round-trip
+    // conversion (MapCanvasView::ResolvePreviewPixel/PreviewComposite::PreviewPixelToWorld), and
+    // ContinueManualMarkerDrag re-runs it every held frame even at a nominally unmoved cursor; the
+    // point of this check is "no real drag happened", not float-bit-identical round-trip noise.
+    check(std::fabs(transform.positionX - kManualMarkerWorldX) < 0.1f
+       && std::fabs(transform.positionZ - kManualMarkerWorldZ) < 0.1f,
+          "the marker's own position is untouched — a zero-travel gesture is a click, not a drag");
     ImGui::DestroyContext();
 }
 

@@ -3,7 +3,7 @@
 // VirtualList for the placed markers, IconGrid for the pickers, Section/Checkbox/Combo/RangeSlider/
 // Dial for the scalars. No ImGui::SliderFloat / DragFloat / VSliderFloat in this file.
 #include "MarkersTab_UI.h"
-#include "MarkerInstanceId_UI.h"
+#include "MarkerInstanceCreateSymmetric_UI.h"
 #include "MarkerLayerId_UI.h"
 #include "MarkersTab_BundleDelete_UI.h"
 #include "MarkersTab_ManualInstanceSelection_UI.h"
@@ -265,18 +265,20 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                 state.globals, rowIndex, recipe.globalMarkerSettings, iconManifest, pairingLookup, bHidden);
 
             if (buttons.bAddInstanceClicked) {
+                // Human's own bug report — "When creating an Instance, symmetry needs to be checked
+                // and duplicates created for proper symmetry": a plain single push_back never
+                // consulted symmetry at all. CreateSymmetricManualMarkerInstances resolves the target
+                // Layer's own effective mask/count and materializes every resulting orbit point (a
+                // 1-point orbit — symmetry off — still creates exactly the one instance, unchanged
+                // behavior for that case).
                 Params::MarkerInstanceGroup& group =
                     FindOrCreateMarkerInstanceGroupByName(recipe.markers, typeName);
-                Params::MarkerTransform transform;
-                transform.name = NextMarkerInstanceName(static_cast<int>(group.transforms.size()));
-                transform.instanceIdentifier = NextMarkerInstanceIdentifier(recipe.markers);
                 const float mapCenter = MapCenterWorldUnits(recipe.geometry);
-                transform.transform.positionX = mapCenter;
-                transform.transform.positionZ = mapCenter;
-                transform.layerIndex = ResolveAddInstanceLayerIndex(
+                const int layerIndex = ResolveAddInstanceLayerIndex(
                     recipe.markerLayers, state.manualLayers.selectedLayerIndex, typeName);
-                group.transforms.push_back(transform);
-                state.selectedManualInstanceIdentifier = transform.instanceIdentifier;
+                state.selectedManualInstanceIdentifier = CreateSymmetricManualMarkerInstances(
+                    group, recipe.markers, recipe.markerLayers, recipe.geometry, recipe.globalSymmetryMask,
+                    recipe.radialSymmetryRepeatCount, layerIndex, mapCenter, 0.0f, mapCenter);
             }
             if (buttons.bAddGroupClicked) {
                 Params::MarkerLayerBundle bundle;

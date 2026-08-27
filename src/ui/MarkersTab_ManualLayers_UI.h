@@ -81,6 +81,9 @@ struct ManualMarkerLayersState {
     // DrawLayerHeaderNameOverlay's own header comment (MarkersTab_ManualLayerRowBody_UI.h) for why.
     int         renamingLayerIndex = -1;
     std::string renameScratchText;
+    // Human's own bug report — see MarkerLayerBundlesState::bRenameFocusPending's own comment
+    // (MarkersTab_Bundles_UI.h) for the full "why"; this is the same mechanism, one tier down.
+    bool        bRenameFocusPending = false;
 };
 
 // The layer the per-row controls edit, or null when the selection points at nothing

@@ -223,7 +223,12 @@ void TestApplyMarkerLayerBundleTreeSignalFilteredCopyWriteSafety() {
     bundles[2].identifier = 30; bundles[2].markerTypeName = "";
     std::vector<Params::MarkerRuleLayer> ruleLayers;
     std::vector<Params::MarkerInstanceLayer> instanceLayers;
+    std::vector<Params::MarkerInstanceGroup> markers;
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
     MarkerLayerBundlesState state;
+    int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int anchorIdentifier = -1;
 
     const std::vector<Params::MarkerLayerBundle> alloyFiltered = BuildFilteredMarkerLayerBundlesByType(bundles, "Alloy");
     Check(alloyFiltered.size() == 1u && alloyFiltered[0].identifier == 20,
@@ -236,7 +241,9 @@ void TestApplyMarkerLayerBundleTreeSignalFilteredCopyWriteSafety() {
     signal.targetNodeIdentifier  = -1;
     signal.dropZone              = TreeDropZone::OnAsChild;
 
-    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, state);
+    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, markers, instanceIndex, state,
+                                     selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers,
+                                     anchorIdentifier);
 
     Check(bundles[1].identifier == 20 && bundles[1].parentBundleIdentifier == -1,
          "a write sourced from a filtered-copy-driven signal lands on the real vector, by identifier");
@@ -473,6 +480,78 @@ void TestDeleteMarkerInstanceLayerCascadeDeletesInstances() {
          "the survivor (originally layer 1) shifts down to the only remaining layer's new position");
 }
 
+// Human's own bug report — "A single click on a Layer header should select all instances in that
+// layer": a Leaf Select signal now records state.selectedLeaf (the header highlight) AND replaces
+// the caller's whole manual selection with every Instance belonging to that Manual layer.
+void TestManualLeafSelectSignalSelectsMemberInstancesAndHighlight() {
+    std::vector<Params::MarkerLayerBundle> bundles;
+    std::vector<Params::MarkerRuleLayer> ruleLayers;
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(2);
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.resize(3);
+    markers[0].transforms[0].instanceIdentifier = 10; markers[0].transforms[0].layerIndex = 0;
+    markers[0].transforms[1].instanceIdentifier = 11; markers[0].transforms[1].layerIndex = 0;
+    markers[0].transforms[2].instanceIdentifier = 12; markers[0].transforms[2].layerIndex = 1;   // a DIFFERENT layer
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    MarkerLayerBundlesState state;
+    int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers{ 999 };   // pre-populated: must be REPLACED, not appended to
+    int anchorIdentifier = -1;
+
+    TreeListSignal<MarkerGroupLeafKey_UI> signal;
+    signal.kind        = TreeListSignalKind::Select;
+    signal.sourceKind  = TreeNodeSourceKind::Leaf;
+    signal.sourceLeaf  = MarkerGroupLeafKey_UI{ MarkerGroupLeafKey_UI::Kind::Manual, 0 };
+
+    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, markers, instanceIndex, state,
+                                     selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers,
+                                     anchorIdentifier);
+
+    Check(state.selectedLeaf == signal.sourceLeaf,
+         "the Leaf select signal records state.selectedLeaf, driving the header's own highlight");
+    Check(selectedManualInstanceIdentifiers.size() == 2u,
+         "selecting the layer replaces the selection with exactly its own two member instances");
+    bool bHas10 = false, bHas11 = false, bHas12 = false;
+    for (int identifier : selectedManualInstanceIdentifiers) {
+        if (identifier == 10) bHas10 = true;
+        if (identifier == 11) bHas11 = true;
+        if (identifier == 12) bHas12 = true;
+    }
+    Check(bHas10 && bHas11 && !bHas12,
+         "the selection holds instances 10/11 (this layer) and never 12 (a different layer)");
+    Check(anchorIdentifier == 10 && selectedManualInstanceIdentifier == 10,
+         "the anchor and primary selection both land on the first member instance");
+}
+
+// The Procedural sibling: a Procedural leaf owns no Instances, so selecting one still highlights
+// (state.selectedLeaf) but CLEARS the manual selection rather than leaving a stale one standing.
+void TestProceduralLeafSelectSignalClearsManualSelection() {
+    std::vector<Params::MarkerLayerBundle> bundles;
+    std::vector<Params::MarkerRuleLayer> ruleLayers(1);
+    std::vector<Params::MarkerInstanceLayer> instanceLayers;
+    std::vector<Params::MarkerInstanceGroup> markers;
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    MarkerLayerBundlesState state;
+    int selectedManualInstanceIdentifier = 5;
+    std::vector<int> selectedManualInstanceIdentifiers{ 5, 6 };
+    int anchorIdentifier = 5;
+
+    TreeListSignal<MarkerGroupLeafKey_UI> signal;
+    signal.kind        = TreeListSignalKind::Select;
+    signal.sourceKind  = TreeNodeSourceKind::Leaf;
+    signal.sourceLeaf  = MarkerGroupLeafKey_UI{ MarkerGroupLeafKey_UI::Kind::Procedural, 0 };
+
+    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, markers, instanceIndex, state,
+                                     selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers,
+                                     anchorIdentifier);
+
+    Check(state.selectedLeaf == signal.sourceLeaf, "a Procedural leaf select still records the header highlight");
+    Check(selectedManualInstanceIdentifiers.empty(),
+         "but clears the manual instance selection — a Procedural leaf owns no Instances of its own");
+    Check(anchorIdentifier == -1 && selectedManualInstanceIdentifier == -1,
+         "the anchor and primary selection both clear to -1 alongside it");
+}
+
 // STEP140 — a Procedural Layer's own single delete action: a plain positional erase.
 void TestDeleteMarkerRuleLayerErases() {
     std::vector<Params::MarkerRuleLayer> ruleLayers(3);
@@ -497,6 +576,8 @@ int main() {
     TestBuildFilteredMarkerLayerBundlesByType();
     TestApplyMarkerLayerBundleTreeSignalFilteredCopyWriteSafety();
     TestCrossTypeSectionNestedBundleCutoff();
+    TestManualLeafSelectSignalSelectsMemberInstancesAndHighlight();
+    TestProceduralLeafSelectSignalClearsManualSelection();
     TestManualLeafHeaderExtraDrawsAndFlipsSymmetry();
     TestManualLeafDeleteButtonRecordsPendingIndex();
     TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly();

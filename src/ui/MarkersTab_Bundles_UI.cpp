@@ -154,9 +154,12 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                                bHeaderExtraCommitted);
             },
             kMarkerLayerHeaderExtraCombinedWidthPixels,
-            state.treeState, state.selectedBundleIdentifier);
+            state.treeState, state.selectedBundleIdentifier, state.selectedLeaf);
 
-    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, state);
+    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, markers, instanceIndex, state,
+                                     rootState.selectedManualInstanceIdentifier,
+                                     rootState.selectedManualInstanceIdentifiers,
+                                     rootState.manualInstanceSelectionAnchorIdentifier);
 }
 
 } // namespace Ui

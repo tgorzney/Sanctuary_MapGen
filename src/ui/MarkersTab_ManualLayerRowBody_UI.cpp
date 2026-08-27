@@ -4,7 +4,6 @@
 // declared by MarkersTab_ManualLayers_UI.h. Mirrors MarkersTab_RuleLayers_UI.cpp/
 // MarkersTab_RuleLayerSettings_UI.cpp's own established aspect split.
 #include "MarkersTab_ManualLayerRowBody_UI.h"
-#include "Checkbox_UI.h"
 #include "SymmetryClusterInstanceList_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
@@ -82,14 +81,10 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
     // (DrawLayerHeaderNameOverlay). No per-layer Symmetry configuration section either ("I think it
     // was designed already but ignore [per-layer] for now" — SymmetrySetting::bSymmetryUseGlobal
     // defaults true and nothing in this body flips it false anymore, so every layer stays on GLOBAL
-    // symmetry whenever its own SYM toggle is on).
-    DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
-                     state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
-    const bool bSnapCommitted = DrawCheckbox("Snap to Grid", layer.bGridSnapEnabled).bCommitted;
-    ImGui::BeginDisabled(!layer.bGridSnapEnabled);
-    const bool bSnapSizeCommitted = DrawSliderScalar("Grid Size", layer.gridSnapSizeWorldUnits,
-        state.gridSnapSizeRange, state.selectedLayerGridSnapToggle, WidgetStyle(), "%.2f").bCommitted;
-    ImGui::EndDisabled();
+    // symmetry whenever its own SYM toggle is on). Human's own bug report — Icon Size/Snap to
+    // Grid/Grid Size moved out of this body entirely, into the header cluster
+    // (DrawMarkerLayerIconSizeHeaderControl/DrawMarkerLayerGridSnapHeaderControl, below), the exact
+    // same "no longer drawn here" move STEP142 already made for Symmetry/Color Override.
 
     // STEP126, Open Q7 — the per-Layer instance list. Plain ImGui::Selectable rows, NOT a DraggableList
     // instantiation (an instance's own home group can differ from this Layer, so there is no single
@@ -131,7 +126,10 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                 DrawManualInstanceRow(markers, groupTransformIndex, interaction);
             });
     }
-    return bSnapCommitted || bSnapSizeCommitted;
+    // Icon Scale/Snap to Grid/Grid Size used to report their own commit here (before they moved to
+    // the header cluster, above) — nothing left in this body commits anything the caller's own
+    // MakeNamesUnique repair cares about (that's the header rename overlay's own bAnyCommitted now).
+    return false;
 }
 
 namespace {
@@ -193,6 +191,40 @@ void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& lay
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Symmetry (global)");
 }
 
+// Human's own bug report — Icon Size, promoted from the row's own expanded body into the
+// always-visible header cluster. No RT button (bShowRealtimeToggle=false): a compact header field
+// has no room for one, and an icon-scale drag has no expensive downstream recompute to defer anyway.
+void DrawMarkerLayerIconSizeHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
+                                          bool& bAnyCommitted) {
+    if (DrawSliderScalarCompact("Icon Size", layer.iconScale, state.iconScaleRange,
+                                state.selectedLayerIconScaleToggle, kMarkerLayerIconSizeTrackWidthPixels,
+                                kMarkerLayerIconSizeFieldWidthPixels, WidgetStyle(), "%.2f",
+                                /*bShowRealtimeToggle=*/false).bCommitted)
+        bAnyCommitted = true;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Icon Size");
+}
+
+// Human's own bug report — Snap to Grid, promoted from a body Checkbox + Grid Size slider into a
+// "GRID" SmallButton toggle (mirrors SYM/COL's own "no more checkboxes" convention) plus its own
+// grid-size field, disabled while the toggle is off.
+void DrawMarkerLayerGridSnapHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
+                                          bool& bAnyCommitted) {
+    PushToggleButtonStyle(layer.bGridSnapEnabled);
+    const bool bGridToggleCommitted = ImGui::SmallButton("GRID##gridSnap");
+    PopToggleButtonStyle(layer.bGridSnapEnabled);
+    if (bGridToggleCommitted) { layer.bGridSnapEnabled = !layer.bGridSnapEnabled; bAnyCommitted = true; }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Snap to Grid");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!layer.bGridSnapEnabled);
+    if (DrawSliderScalarCompact("Grid Size", layer.gridSnapSizeWorldUnits, state.gridSnapSizeRange,
+                                state.selectedLayerGridSnapToggle, kMarkerLayerGridSizeTrackWidthPixels,
+                                kMarkerLayerGridSizeFieldWidthPixels, WidgetStyle(), "%.2f",
+                                /*bShowRealtimeToggle=*/false).bCommitted)
+        bAnyCommitted = true;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Grid Size");
+    ImGui::EndDisabled();
+}
+
 // STEP142 — see the header's own comment (MarkersTab_ManualLayerRowBody_UI.h) for the full "why".
 // `bAnyCommitted` is set true exactly when a rename COMMITS (not merely while typing) — the SAME
 // signal DrawLayerRowBody's own return used to carry for the retired body Name field, so the
@@ -204,6 +236,7 @@ bool DrawLayerHeaderNameOverlay(int layerIndex, Params::MarkerInstanceLayer& lay
 
     if (state.renamingLayerIndex == layerIndex) {
         ImGui::SetCursorScreenPos(ImVec2(labelStartX, itemMin.y));
+        if (state.bRenameFocusPending) { ImGui::SetKeyboardFocusHere(); state.bRenameFocusPending = false; }
         TextInputRules nameRules;
         nameRules.maximumLength = 48; nameRules.bAllowEmpty = false; nameRules.fallbackText = "Marker Layer";
         DrawTextInput("##renameLayer", state.renameScratchText, nameRules, WidgetStyle(), nullptr,
@@ -217,8 +250,9 @@ bool DrawLayerHeaderNameOverlay(int layerIndex, Params::MarkerInstanceLayer& lay
     }
 
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        state.renamingLayerIndex = layerIndex;
-        state.renameScratchText  = layer.name;
+        state.renamingLayerIndex   = layerIndex;
+        state.renameScratchText    = layer.name;
+        state.bRenameFocusPending  = true;
         return true;
     }
     return false;

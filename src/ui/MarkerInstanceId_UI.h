@@ -23,5 +23,17 @@ inline int NextMarkerInstanceIdentifier(const std::vector<Params::MarkerInstance
     return maximumId + 1;
 }
 
+// Same shape, one field over — `symmetryGroupIdentifier`'s own sentinel is 0 (ungrouped), NOT -1
+// (MarkerSymmetryFixCommand_UI.cpp's own CollectInLayerOrigins comment), so the scan floor starts at
+// 0 rather than -1: an all-ungrouped/empty roster mints 1, never a value that would collide with
+// "ungrouped".
+inline int NextMarkerSymmetryGroupIdentifier(const std::vector<Params::MarkerInstanceGroup>& markers) {
+    int maximumId = 0;
+    for (const Params::MarkerInstanceGroup& group : markers)
+        for (const Params::MarkerTransform& transform : group.transforms)
+            maximumId = std::max(maximumId, transform.symmetryGroupIdentifier);
+    return maximumId + 1;
+}
+
 } // namespace Ui
 } // namespace SanmapGen

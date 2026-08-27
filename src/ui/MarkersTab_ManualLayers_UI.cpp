@@ -19,10 +19,25 @@ namespace {
 // a reordered layer renumbers them (RenumberMarkerLayerIndicesForReorder, called BEFORE the layers
 // vector moves). Reports whether `markers` moved, which feeds no pipeline stage (SCOPE NOTE 3).
 bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                         std::vector<Params::MarkerInstanceGroup>& markers, ManualMarkerLayersState& state,
-                         const DraggableListSignal& signal) {
+                         std::vector<Params::MarkerInstanceGroup>& markers,
+                         const ManualInstanceLayerIndex_UI& instanceIndex, ManualMarkerLayersState& state,
+                         int& selectedManualInstanceIdentifier, std::vector<int>& selectedManualInstanceIdentifiers,
+                         int& anchorIdentifier, const DraggableListSignal& signal) {
     if (signal.kind == DraggableListSignalKind::Select) {
         state.selectedLayerIndex = signal.sourceRowIndex;
+        // Human's own bug report — mirrors the Bundle tree's own Leaf-select branch
+        // (MarkersTab_BundleTreeSignals_UI.cpp): a single click on a Layer header also selects every
+        // Instance it owns.
+        selectedManualInstanceIdentifiers.clear();
+        const auto memberIt = instanceIndex.instancesByLayerIndex.find(signal.sourceRowIndex);
+        if (memberIt != instanceIndex.instancesByLayerIndex.end())
+            for (const std::pair<int, int>& groupTransformIndex : memberIt->second)
+                selectedManualInstanceIdentifiers.push_back(
+                    markers[static_cast<std::size_t>(groupTransformIndex.first)]
+                        .transforms[static_cast<std::size_t>(groupTransformIndex.second)].instanceIdentifier);
+        anchorIdentifier = selectedManualInstanceIdentifiers.empty()
+                          ? -1 : selectedManualInstanceIdentifiers.front();
+        selectedManualInstanceIdentifier = anchorIdentifier;
         return false;
     }
     if (signal.kind == DraggableListSignalKind::ToggleLock) {
@@ -64,7 +79,13 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
 // anonymous namespace — see the header's own comment (MarkersTab_ManualLayers_UI.h) for why.
 void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer,
                                                   ManualMarkerLayersState& state, bool& bAnyCommitted) {
-    const float clusterWidth = kMarkerLayerSymmetryButtonWidthPixels
+    // Human's own bug report — Icon Size/Snap to Grid join this cluster, left of [SYM], same
+    // right-align-against-the-reserved-zone math as before (V/I and X are NOT part of clusterWidth
+    // here — DraggableList's own built-in affordance strip already draws those, see this function's
+    // own header comment above).
+    const float clusterWidth = kMarkerLayerIconSizeControlWidthPixels
+                              + kMarkerLayerGridSizeControlWidthPixels
+                              + kMarkerLayerSymmetryButtonWidthPixels
                               + kMarkerLayerColorOverrideButtonWidthPixels
                               + kMarkerLayerColorOverrideSwatchWidthPixels;
     // Right-align within the row's own FIXED header-extra budget, not GetContentRegionAvail(): the
@@ -77,6 +98,10 @@ void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& l
     // right-aligning against IT lands this cluster flush against the strip with no gap and no overlap.
     if (kMarkerLayerHeaderExtraCombinedWidthPixels > clusterWidth)
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kMarkerLayerHeaderExtraCombinedWidthPixels - clusterWidth);
+    DrawMarkerLayerIconSizeHeaderControl(layer, state, bAnyCommitted);
+    ImGui::SameLine();
+    DrawMarkerLayerGridSnapHeaderControl(layer, state, bAnyCommitted);
+    ImGui::SameLine();
     DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
     ImGui::SameLine();
     DrawManualMarkerLayerColorOverrideHeaderControl(layer, state, bAnyCommitted);
@@ -184,7 +209,9 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
         instanceIndex, selectedManualInstanceIdentifier,
         selectedManualInstanceIdentifiers, anchorIdentifier, markerTypeNameFilter,
         selectManualMarkerInstanceCallback);
-    if (signal.bHasSignal()) ApplyLayerListSignal(markerLayers, markers, state, signal);
+    if (signal.bHasSignal())
+        ApplyLayerListSignal(markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
+                             selectedManualInstanceIdentifiers, anchorIdentifier, signal);
     bLayersMoved = bAnyNameCommitted || bLayersMoved;
     // The export keys layers by NAME parity with Armies/Areas/Props (cosmetic here — `MarkerGroups`
     // exports as a plain array, STEP60 §3) — the repair runs on the frames a name settled.

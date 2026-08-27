@@ -48,8 +48,25 @@ inline constexpr float kMarkerLayerColorOverrideButtonWidthPixels = 34.0f;
 inline constexpr float kMarkerLayerColorOverrideSwatchWidthPixels = 20.0f;
 inline constexpr float kMarkerLayerVisibilityButtonWidthPixels    = 30.0f;
 inline constexpr float kMarkerLayerHeaderExtraDeleteButtonWidthPixels = 26.0f;
+// Human's own bug report — Icon Size and Snap to Grid (a "GRID" toggle button, mirroring SYM/COL's
+// own "no more checkboxes" convention, plus its grid-size field) move from the row's own expanded
+// body up into this same always-visible header cluster, left of [SYM][COL]. Both numeric fields use
+// DrawSliderScalarCompact (SliderScalar_UI.h's single-line, caller-fixed-width variant, built for
+// exactly this "compose beside other header controls" case), with no RT button (bShowRealtimeToggle
+// = false) to keep the cluster narrow.
+inline constexpr float kMarkerLayerIconSizeTrackWidthPixels    = 26.0f;
+inline constexpr float kMarkerLayerIconSizeFieldWidthPixels    = 32.0f;
+inline constexpr float kMarkerLayerIconSizeControlWidthPixels  =
+    kMarkerLayerIconSizeTrackWidthPixels + kMarkerLayerIconSizeFieldWidthPixels;
+inline constexpr float kMarkerLayerGridToggleButtonWidthPixels = 40.0f;
+inline constexpr float kMarkerLayerGridSizeTrackWidthPixels    = 26.0f;
+inline constexpr float kMarkerLayerGridSizeFieldWidthPixels    = 32.0f;
+inline constexpr float kMarkerLayerGridSizeControlWidthPixels  =
+    kMarkerLayerGridToggleButtonWidthPixels + kMarkerLayerGridSizeTrackWidthPixels
+    + kMarkerLayerGridSizeFieldWidthPixels;
 inline constexpr float kMarkerLayerHeaderExtraCombinedWidthPixels =
-    kMarkerLayerSymmetryButtonWidthPixels + kMarkerLayerColorOverrideButtonWidthPixels
+    kMarkerLayerIconSizeControlWidthPixels + kMarkerLayerGridSizeControlWidthPixels
+    + kMarkerLayerSymmetryButtonWidthPixels + kMarkerLayerColorOverrideButtonWidthPixels
     + kMarkerLayerColorOverrideSwatchWidthPixels + kMarkerLayerVisibilityButtonWidthPixels
     + kMarkerLayerHeaderExtraDeleteButtonWidthPixels;
 
@@ -94,6 +111,18 @@ void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer
 // DrawManualMarkerLayerColorOverrideHeaderControl's own shape (hover tooltip). Drawn LEFT of the
 // Color Override control at every call site (`[SYM][COL][swatch]`).
 void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted);
+
+// Human's own bug report — Icon Size, promoted from the row's own expanded body (where it used to be
+// the only way to reach it) up into the always-visible header cluster, mirroring the SYM/COL
+// controls' own precedent. Drawn LEFT of [GRID] at every call site.
+void DrawMarkerLayerIconSizeHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
+                                          bool& bAnyCommitted);
+
+// Human's own bug report — Snap to Grid, promoted from a body Checkbox + Grid Size slider into a
+// "GRID" SmallButton toggle (mirrors SYM/COL's own "no more checkboxes" convention) plus its
+// grid-size field, disabled while the toggle is off. Drawn LEFT of [SYM] at every call site.
+void DrawMarkerLayerGridSnapHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
+                                          bool& bAnyCommitted);
 
 // STEP142 — double-click-the-header rename for a Layer row (mirrors the Group's own STEP140
 // mechanism, human's own instruction), positioned OVER the header's own name text rather than in the

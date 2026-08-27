@@ -818,6 +818,9 @@ add_sangen_test(MarkersTab_TypeSections_UI_Test src/ui/MarkersTab_TypeSections_U
 # per-frame writes, cardinality growth/shrink, Spawn-refusal freeze, ungrouped free-drag) and
 # RepositionSymmetryGroupMember (R2 §4's roster-slider counterpart) — pure/imgui-free, no window.
 add_sangen_test(MarkerDragGesture_UI_Test src/ui/MarkerDragGesture_UI_Test.cpp)
+# Human's own bug report — "When creating an Instance, symmetry needs to be checked and duplicates
+# created for proper symmetry": CreateSymmetricManualMarkerInstances' own pure/imgui-free coverage.
+add_sangen_test(MarkerInstanceCreateSymmetric_UI_Test src/ui/MarkerInstanceCreateSymmetric_UI_Test.cpp)
 # STEP126: ComputeManualMarkerSelectionHighlight's own pure/imgui-free coverage (ARCH §19.19) — the
 # no-selection/stale-identifier safety cases and the position-driven sibling-orbit match, including
 # the freshly-authored, never-dragged (symmetryGroupIdentifier == 0) case.

@@ -92,8 +92,18 @@ void Application::WireCallbacks() {
             lastSelectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;
             return;
         }
-        if (key.bManual) tabState.markers.selectedManualInstanceIdentifier = key.instanceIndex;
-        else             lastSelectedEntityIdentifier = static_cast<std::uint32_t>(key.instanceIndex);
+        if (key.bManual) {
+            // Human's own bug report — a canvas pick only ever wrote the SINGULAR field here; the
+            // Manual Instance list row's own highlight reads the PLURAL selection set instead
+            // (MarkersTab_ManualLayerRowBody_UI.cpp's bRowSelected), so a canvas-driven selection
+            // never showed as selected in the list. A plain canvas click is a single-instance
+            // selection, same as a plain (non-Ctrl/Shift) list-row click.
+            tabState.markers.selectedManualInstanceIdentifier      = key.instanceIndex;
+            tabState.markers.selectedManualInstanceIdentifiers     = { key.instanceIndex };
+            tabState.markers.manualInstanceSelectionAnchorIdentifier = key.instanceIndex;
+        } else {
+            lastSelectedEntityIdentifier = static_cast<std::uint32_t>(key.instanceIndex);
+        }
     });
     // STEP48: picking reads the resolved markers and PIPELINE's spatial index over them, in world
     // space, instead of the baked entity-id buffer — see MapCanvas_UI.h's header comment.

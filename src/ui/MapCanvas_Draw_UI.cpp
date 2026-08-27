@@ -138,12 +138,16 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
         bManualMarkerDragActive = TryBeginManualMarkerDrag(regionLocalX, regionLocalY);
     }
     if (bPressActive && ImGui::IsItemActive()) {
+        // Human's own bug report — this must accumulate regardless of which branch below runs: it
+        // used to live only in the pan (else) branch, so a manual-marker gesture's own
+        // pressTravelPixels stayed frozen at its activation-time 0.0f for the gesture's ENTIRE
+        // duration, no matter how far the mouse actually moved — the release check just below would
+        // then treat every drag, however large, as a zero-travel click.
+        pressTravelPixels += std::fabs(io.MouseDelta.x) + std::fabs(io.MouseDelta.y);
         if (bManualMarkerDragActive) {
             ContinueManualMarkerDrag(regionLocalX, regionLocalY);
-        } else {
-            pressTravelPixels += std::fabs(io.MouseDelta.x) + std::fabs(io.MouseDelta.y);
-            if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)
-                ApplyDrag(io.MouseDelta.x, io.MouseDelta.y);
+        } else if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f) {
+            ApplyDrag(io.MouseDelta.x, io.MouseDelta.y);
         }
     }
     if (bPressActive && ImGui::IsItemDeactivated()) {
@@ -151,6 +155,14 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
         if (bManualMarkerDragActive) {
             EndManualMarkerDrag();
             bManualMarkerDragActive = false;
+            // Human's own bug report — clicking a marker in the preview never selected it.
+            // TryBeginManualMarkerDrag's own press-time hit-test claims EVERY press that lands on a
+            // marker as a drag gesture, even a stationary click with zero travel, so the plain-click
+            // path below never got a chance to run for a hit. A gesture that never actually moved
+            // (still under the SAME click-vs-drag travel tolerance the miss path already uses) is a
+            // click in disguise — settle the (no-op) gesture above, then still select.
+            if (pressTravelPixels <= view.settings.clickDragTolerancePixels)
+                ApplyClick(regionLocalX, regionLocalY);
         } else if (pressTravelPixels <= view.settings.clickDragTolerancePixels) {
             ApplyClick(regionLocalX, regionLocalY);
         }
