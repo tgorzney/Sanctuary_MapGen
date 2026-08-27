@@ -50,8 +50,14 @@ inline void RenderLeaf(const char* payloadIdentifier, const LeafKeyT& leaf, Leaf
     // uniqueness within one node's own leaf set is the caller's job, same posture MakeNamesUnique
     // already gives Manual Layers elsewhere.
     ImGui::PushID(leafLabel(leaf));
+    // Human's own instruction — a Layer needs a single click to SELECT and a double click to
+    // collapse: without OpenOnArrow/OpenOnDoubleClick, TreeNodeEx's own default toggles open/closed
+    // on ANY single click (label included), fighting every plain select click below. OpenOnArrow
+    // keeps the arrow's own single-click toggle (mirrors RenderNode's Group header, just below,
+    // which already carries OpenOnArrow); OpenOnDoubleClick adds the label's own double-click toggle.
     const bool bExpanded = ImGui::TreeNodeEx(leafLabel(leaf),
-        ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+        ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_NoTreePushOnOpen
+        | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick);
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
         RecordTreeSignal(signal, TreeListSignalKind::Select, TreeNodeSourceKind::Leaf,
                          -1, leaf, -1, TreeDropZone::OnAsChild);

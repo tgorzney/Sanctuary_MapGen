@@ -44,18 +44,20 @@ FrameResult RunHeaderControlFrame(HeadlessMouseState mouse, Params::MarkerInstan
     return result;
 }
 
-// Hover, press, release -- mirrors DraggableList_TestScene_UI.h's ClickAt pattern. A plain checkbox
-// has no AllowOverlap hover requirement, but matching the established click helper shape costs
-// nothing (per the ticket). `layer`/`state` are re-drawn on every frame of the sequence, exactly as
-// the real DraggableList row header does.
+// Hover, press, release -- mirrors DraggableList_TestScene_UI.h's ClickAt pattern. `layer`/`state`
+// are re-drawn on every frame of the sequence, exactly as the real DraggableList row header does.
+// STEP142 converted these controls from plain Checkbox to ImGui::SmallButton (human's own
+// instruction: no more checkboxes) — SmallButton (ButtonEx's default flags) reports pressed on the
+// RELEASE-while-hovered frame, not the press/mouse-down frame, so the caller reads THAT frame's
+// result now (mirrors MarkersTab_Bundles_UI_Test.cpp's own TestManualLeafHeaderExtraDrawsAndFlips-
+// Symmetry fix for the identical gotcha).
 FrameResult ClickAt(ImVec2 position, Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state) {
     HeadlessMouseState hover;   hover.position = position;
     HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
     HeadlessMouseState release = hover; release.bLeftButtonDown = false;
     RunHeaderControlFrame(hover, layer, state);
-    const FrameResult pressResult = RunHeaderControlFrame(press, layer, state);
-    RunHeaderControlFrame(release, layer, state);
-    return pressResult;   // TickBoxWasClicked uses IsItemClicked(), which fires on the PRESS frame
+    RunHeaderControlFrame(press, layer, state);
+    return RunHeaderControlFrame(release, layer, state);   // SmallButton fires on release, not press
 }
 
 // Clicking the checkbox flips the real field, independent of any row-expand state (this function
@@ -164,11 +166,11 @@ void RunSymmetryToggleFlipCheck() {
         return bCommitted;
     };
     runFrame(hover);
-    const bool bPressCommitted = runFrame(press);
-    runFrame(release);
+    runFrame(press);
+    const bool bReleaseCommitted = runFrame(release);   // SmallButton fires on release, not press
 
     Check(!layer.bSymmetryEnabled, "clicking the Symmetry header checkbox flips bSymmetryEnabled false");
-    Check(bPressCommitted, "and reports a commit on the press frame (IsItemClicked)");
+    Check(bReleaseCommitted, "and reports a commit on the release frame (SmallButton)");
     Check(!layer.symmetry.bSymmetryUseGlobal
           && layer.symmetry.symmetryMask == (Params::SymmetryAxis::MirrorAcrossX | Params::SymmetryAxis::Radial)
           && layer.symmetry.radialSymmetryRepeatCount == 7,

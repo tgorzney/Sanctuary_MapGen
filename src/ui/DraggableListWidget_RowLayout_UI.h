@@ -28,10 +28,14 @@ void RenderCollapsibleRow(const char* payloadIdentifier, const DraggableListRow&
                           DraggableListSignal& signal) {
     const float stripStartX = ImGui::GetCursorScreenPos().x + rowAvailWidthPixels
         - static_cast<float>(kAffordanceStripWidthPixels) - extraButtonWidthPixels - headerExtraWidthPixels;
+    // Human's own instruction (mirrored into the Bundle tree's own leaf row, TreeListWidget_RowLayout_UI.h's
+    // RenderLeaf) — a single click SELECTS, a double click collapses: OpenOnArrow already keeps a
+    // plain label click from toggling open/closed here (only the arrow did); OpenOnDoubleClick adds
+    // the label's own double-click toggle, purely additive for every existing consumer of this row.
     const bool bExpanded = ImGui::CollapsingHeader(
         row.label != nullptr ? row.label : "",
         ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_SpanFullWidth |
-        ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DefaultOpen |
+        ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_DefaultOpen |
         (rowIndex == selectedRowIndex ? ImGuiTreeNodeFlags_Selected : 0));
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && ImGui::GetIO().MousePos.x < stripStartX)
         RecordSignal(signal, DraggableListSignalKind::Select, rowIndex);
