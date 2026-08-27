@@ -2416,7 +2416,14 @@ void CheckMarkerLayerSynthesisOnEmptyMarkerGroups() {
           && synthesizedLayer.bLocked == defaultLayer.bLocked
           && synthesizedLayer.bGridSnapEnabled == defaultLayer.bGridSnapEnabled
           && NearlyEqual(synthesizedLayer.gridSnapSizeWorldUnits, defaultLayer.gridSnapSizeWorldUnits),
-          "a synthesized layer is struct-default in every field but name/layerId (white-as-unset)");
+          "a synthesized layer is struct-default in every field but name/layerId/markerTypeName"
+          " (white-as-unset)");
+    // NEW — human's own bug report: an unset markerTypeName meant a synthesized layer never matched
+    // any Type-section, so a real import's Alloy markers never showed up anywhere but the flat
+    // fallback list. Canonicalized: the real group name is plural ("Alloys") but the Type-section
+    // this layer must match is singular ("Alloy").
+    Check(recipe.markerLayers[0].markerTypeName == "Alloy" && recipe.markerLayers[1].markerTypeName == "Spawn",
+          "a synthesized layer's markerTypeName is the alias-canonicalized marker-group name");
     Check(result.warningCount == 1,
           "exactly one aggregate warning fires for the whole synthesis, not one per layer");
 }

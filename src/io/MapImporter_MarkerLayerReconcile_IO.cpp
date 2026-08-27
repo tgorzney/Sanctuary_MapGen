@@ -26,6 +26,13 @@ void ReconcileMarkerLayers(Params::MapRecipe& outRecipe, MapImportResult& result
     for (Params::MarkerInstanceGroup& group : outRecipe.markers) {
         Params::MarkerInstanceLayer layer;
         layer.name = group.name;
+        // NEW — human's own bug report: an unset markerTypeName meant a synthesized layer never
+        // matched any Type-section's `markerTypeName == typeName` test (MarkersTab_UI.cpp), so every
+        // freshly-imported instance fell through to the flat "Instances" fallback list instead of a
+        // real Layer. Canonicalized (CanonicalMarkerTypeSectionName) so a real map's plural group
+        // name ("Alloys") still resolves to the singular Type-section ("Alloy") this field is
+        // compared against everywhere else.
+        layer.markerTypeName = Params::CanonicalMarkerTypeSectionName(group.name);
         const int newLayerIndex = static_cast<int>(outRecipe.markerLayers.size());
         layer.layerId = newLayerIndex;   // same sequential convention as ReadMarkerGroupsJson's own
                                           // legacy-backfill default (MapImporter_Markers_IO.cpp:121).

@@ -101,5 +101,20 @@ struct MarkerInstanceGroup {
 // share one symbol instead of three independent occurrences of the same literal).
 inline constexpr const char* kSpawnMarkerGroupName = "Spawn";
 
+// A real, non-SanGen-authored `.sanmap` names its Alloy/Plasma groups in the PLURAL ("Alloys"/
+// "Plasmas") — SanGen's own convention (this file, GlobalMarkerSettings_PARAMS.h,
+// ResolveMarkerIconTemplateIdentifier/MapCanvas_IconLayer_CullManual_UI.cpp) is singular. Every
+// Type-section-membership comparison needs the SAME alias folding those three sites already apply
+// to color/scale/icon resolution, or a plural-named import (human's own bug report — Alloy markers
+// vanishing from the Markers tab on a real map import) silently falls outside every Type-section's
+// exact-string match. Any other group name (Generic/Expansion/freeform) passes through unchanged —
+// this is alias resolution, not a taxonomy.
+inline std::string CanonicalMarkerTypeSectionName(const std::string& groupName) {
+    if (groupName == kSpawnMarkerGroupName || groupName == "Spawns") return kSpawnMarkerGroupName;
+    if (groupName == "Alloy" || groupName == "Alloys")               return "Alloy";
+    if (groupName == "Plasma" || groupName == "Plasmas")             return "Plasma";
+    return groupName;
+}
+
 } // namespace Params
 } // namespace SanmapGen

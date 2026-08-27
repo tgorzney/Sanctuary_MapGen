@@ -110,10 +110,14 @@ TypeSectionHeaderButtons_UI DrawRightAlignedTypeSectionHeaderButtons(
 // `name` matches this Type-section, minting one on first use. Real map data (a human-confirmed live
 // re-import of an existing .sanmap) already stores its Alloy/Spawn markers in exactly this group, so
 // "Add Instance" appends to the SAME roster that data already occupies rather than a parallel one.
+// `name` arrives as a canonical Type-section name (e.g. "Alloy"). A real imported map's own group
+// may be named the PLURAL alias ("Alloys") instead — CanonicalMarkerTypeSectionName folds both
+// forms together so "+ Instance" appends to that SAME existing roster rather than minting a second,
+// empty "Alloy" group that splits the data the comment above already promises stays unified.
 Params::MarkerInstanceGroup& FindOrCreateMarkerInstanceGroupByName(
         std::vector<Params::MarkerInstanceGroup>& markers, const std::string& name) {
     for (Params::MarkerInstanceGroup& group : markers)
-        if (group.name == name) return group;
+        if (Params::CanonicalMarkerTypeSectionName(group.name) == name) return group;
     Params::MarkerInstanceGroup group;
     group.name = name;
     markers.push_back(group);
@@ -162,7 +166,9 @@ void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>&
     std::vector<std::pair<int, int>> baseInstances;
     for (int groupIndex = 0; groupIndex < static_cast<int>(markers.size()); ++groupIndex) {
         Params::MarkerInstanceGroup& group = markers[static_cast<std::size_t>(groupIndex)];
-        if (group.name != typeName) continue;
+        // Alias-folded (Params::CanonicalMarkerTypeSectionName) — a real import's plural group name
+        // ("Alloys") must still land in the singular "Alloy" Type-section, human's own bug report.
+        if (Params::CanonicalMarkerTypeSectionName(group.name) != typeName) continue;
         for (int transformIndex = 0; transformIndex < static_cast<int>(group.transforms.size()); ++transformIndex) {
             const int layerIndex = group.transforms[static_cast<std::size_t>(transformIndex)].layerIndex;
             const bool bHasOwnTypeLayer = layerIndex >= 0 && layerIndex < static_cast<int>(markerLayers.size())

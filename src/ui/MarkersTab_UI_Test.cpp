@@ -152,6 +152,27 @@ void RunResolveAddInstanceLayerIndexChecks() {
          "an empty markerLayers vector falls back to -1 too — there is no markerLayers[0] to guess at");
 }
 
+// Human's own bug report — Alloy markers vanishing from the Markers tab on a real map import: a
+// real (non-SanGen) `.sanmap` names its groups in the PLURAL ("Alloys"/"Plasmas"), but every
+// Type-section is keyed by the singular form. `CanonicalMarkerTypeSectionName` is the fold every
+// Type-section-membership comparison now goes through (DrawBaseSectionManualInstanceList's
+// `group.name` filter, FindOrCreateMarkerInstanceGroupByName's lookup,
+// Io::ReconcileMarkerLayers's markerTypeName — MarkersTab_UI.cpp / MapImporter_MarkerLayerReconcile_IO.cpp).
+void RunCanonicalMarkerTypeSectionNameChecks() {
+    Check(Params::CanonicalMarkerTypeSectionName("Alloys") == "Alloy",
+         "a real import's plural Alloy group name folds to the singular Type-section name");
+    Check(Params::CanonicalMarkerTypeSectionName("Plasmas") == "Plasma",
+         "and likewise for Plasma");
+    Check(Params::CanonicalMarkerTypeSectionName("Spawns") == Params::kSpawnMarkerGroupName,
+         "and Spawn's plural form, though no real map has been seen to use it");
+    Check(Params::CanonicalMarkerTypeSectionName("Alloy") == "Alloy"
+         && Params::CanonicalMarkerTypeSectionName("Plasma") == "Plasma"
+         && Params::CanonicalMarkerTypeSectionName(Params::kSpawnMarkerGroupName) == Params::kSpawnMarkerGroupName,
+         "SanGen's own already-singular names pass through unchanged");
+    Check(Params::CanonicalMarkerTypeSectionName("Generic") == "Generic",
+         "an unrelated/freeform group name passes through unchanged — this is alias resolution, not a taxonomy");
+}
+
 } // namespace
 
 int main() {
@@ -161,6 +182,7 @@ int main() {
     RunSelectionFenceChecks();
     RunRealtimeDefaultChecks();
     RunResolveAddInstanceLayerIndexChecks();
+    RunCanonicalMarkerTypeSectionNameChecks();
     RunMarkerRuleLayerAcceptanceChecks();
     RunGlobalMarkerScaleRowFieldsAcceptanceChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
