@@ -91,7 +91,22 @@ void DrawRightAlignedProceduralLayerCluster(Params::MarkerRuleLayer& layer, int 
 // (MarkersTab_ManualLayerRowBody_UI.h) for why live-editing the real field is the wrong move here.
 void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
                                           std::vector<Params::MarkerLayerBundle>& bundles,
+                                          const std::vector<Params::MarkerInstanceLayer>& instanceLayers,
+                                          std::vector<Params::MarkerInstanceGroup>& markers,
+                                          const std::vector<int>& selectedManualInstanceIdentifiers,
                                           MarkerLayerBundlesState& state) {
+    // STEP148 (human's own bug report — "I tried to drag an instance to a group, and it stayed
+    // where it was") — run FIRST, before any other widget in this callback draws (the drop target
+    // binds to the LAST item imgui submitted, the Group's own CollapsingHeader, RenderNode's own
+    // contract, TreeListWidget_RowLayout_UI.h — same "run first" reasoning
+    // DrawMarkerGroupLeafHeaderExtra's own Manual-leaf drop target already follows). Human's own
+    // choice: land on the Group's first Manual Layer; FirstManualLayerIndexInBundle returns -1 when
+    // the Group has none yet, in which case this is skipped entirely — the drop silently does
+    // nothing, same as before this fix, the accepted behavior for that specific case.
+    const int firstLayerIndex = FirstManualLayerIndexInBundle(bundleIdentifier, instanceLayers);
+    if (firstLayerIndex >= 0)
+        DrawManualLayerInstanceDropTarget(firstLayerIndex, markers, selectedManualInstanceIdentifiers);
+
     const ImVec2 itemMin = ImGui::GetItemRectMin();
     const float labelStartX = itemMin.x + ImGui::GetTreeNodeToLabelSpacing();
 

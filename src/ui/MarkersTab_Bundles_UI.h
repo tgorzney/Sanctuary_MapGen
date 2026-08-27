@@ -89,6 +89,16 @@ MarkerLayerBundleLeafIndex_UI BuildMarkerLayerBundleLeafIndex(
     const std::vector<Params::MarkerRuleLayer>& ruleLayers,
     const std::vector<Params::MarkerInstanceLayer>& instanceLayers);
 
+// STEP148 (human's own bug report — dragging an Instance onto a Group did nothing) — the drop
+// target's own resolution: a Group has no direct Instance membership of its own (only Layers do,
+// MarkersTab_UI.cpp's own "no PARAMS+IO field for this" note still applies), so human's own choice
+// on scoping this was to land a dropped Instance on the Group's FIRST (by vector position) Manual
+// Layer — mirrors DrawMarkerInstanceLayerPicker's own precedent of never type-checking the pick
+// (MarkersTab_ManualInstance_UI.cpp). -1 if the Group has no Manual Layer of its own yet — the drop
+// then silently does nothing, the accepted behavior for that case.
+int FirstManualLayerIndexInBundle(int bundleIdentifier,
+                                  const std::vector<Params::MarkerInstanceLayer>& instanceLayers);
+
 // MarkersTab_BundleNodeBody_UI.cpp — the aspect-split sibling (ARCH §1.5): Move/Rotate, both scoped
 // to the Bundle's MANUAL-ONLY resolved membership (§19.9) — a Procedural Layer under a Bundle
 // contributes zero members here, by design. Declared here (not anonymous-namespace-local) so
@@ -122,8 +132,15 @@ void DrawMarkerLayerBundleNodeBody(int bundleIdentifier, std::vector<Params::Mar
 // position-based lookups for the rest of this frame); the caller applies them AFTER the tree
 // returns (MarkersTab_BundleDelete_UI.h). Declared here so MarkersTab_Bundles_UI_Test.cpp can drive
 // both directly.
+// STEP148: `instanceLayers`/`markers`/`selectedManualInstanceIdentifiers` back the Group's own new
+// drop target (an Instance dropped here reassigns to FirstManualLayerIndexInBundle's resolve, above)
+// — mirrors DrawMarkerGroupLeafHeaderExtra's own Manual-leaf drop target
+// (MarkersTab_ManualInstanceSelection_UI.h's DrawManualLayerInstanceDropTarget), one tier up.
 void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
                                           std::vector<Params::MarkerLayerBundle>& bundles,
+                                          const std::vector<Params::MarkerInstanceLayer>& instanceLayers,
+                                          std::vector<Params::MarkerInstanceGroup>& markers,
+                                          const std::vector<int>& selectedManualInstanceIdentifiers,
                                           MarkerLayerBundlesState& state);
 // STEP141: `markers`/`selectedManualInstanceIdentifiers` are the drag-drop TARGET side (a Manual
 // leaf only — Procedural has no Instances to receive) — MarkersTab_ManualInstanceSelection_UI.h's

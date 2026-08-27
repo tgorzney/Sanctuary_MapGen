@@ -59,6 +59,13 @@ const char* MarkerGroupLeafLabel(const MarkerGroupLeafKey_UI& leaf,
 // DrawMarkerLayerBundleNodeHeaderExtra/DrawMarkerGroupLeafHeaderExtra (STEP130/STEP140) now live in
 // the aspect-split sibling MarkersTab_BundleHeaderExtras_UI.cpp — this file had no headroom left.
 
+int FirstManualLayerIndexInBundle(int bundleIdentifier,
+                                  const std::vector<Params::MarkerInstanceLayer>& instanceLayers) {
+    for (int i = 0; i < static_cast<int>(instanceLayers.size()); ++i)
+        if (instanceLayers[static_cast<std::size_t>(i)].parentBundleIdentifier == bundleIdentifier) return i;
+    return -1;
+}
+
 MarkerLayerBundleLeafIndex_UI BuildMarkerLayerBundleLeafIndex(
         const std::vector<Params::MarkerRuleLayer>& ruleLayers,
         const std::vector<Params::MarkerInstanceLayer>& instanceLayers) {
@@ -123,7 +130,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                         instanceIndex, selectManualMarkerInstanceCallback);
             },
             [&](int bundleIdentifier) {   // STEP140 — a Group's own rename/delete
-                DrawMarkerLayerBundleNodeHeaderExtra(bundleIdentifier, bundles, state);
+                DrawMarkerLayerBundleNodeHeaderExtra(bundleIdentifier, bundles, instanceLayers, markers,
+                                                     rootState.selectedManualInstanceIdentifiers, state);
             },
             [&](const MarkerGroupLeafKey_UI& leaf) {
                 DrawMarkerGroupLeafHeaderExtra(leaf, ruleLayers, instanceLayers, markers, rootState.manualLayers,

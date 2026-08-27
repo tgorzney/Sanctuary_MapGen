@@ -58,6 +58,22 @@ void TestBuildMarkerLayerBundleLeafIndex() {
     Check(index.leavesByBundleIdentifier.count(2) == 0, "no leaf-index entry exists for an unreferenced bundle");
 }
 
+// STEP148 (human's own bug report — "I tried to drag an instance to a group, and it stayed where it
+// was") — FirstManualLayerIndexInBundle's own resolution: the first (by vector position) Manual
+// Layer belonging to a Bundle, -1 when it has none.
+void TestFirstManualLayerIndexInBundle() {
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(3);
+    instanceLayers[0].parentBundleIdentifier = -1;   // ungrouped
+    instanceLayers[1].parentBundleIdentifier = 5;
+    instanceLayers[2].parentBundleIdentifier = 5;
+    Check(FirstManualLayerIndexInBundle(5, instanceLayers) == 1,
+         "the FIRST (lowest position) Layer belonging to the Bundle wins, not the last");
+    Check(FirstManualLayerIndexInBundle(7, instanceLayers) == -1,
+         "a Bundle with no Manual Layer of its own resolves to -1");
+    Check(FirstManualLayerIndexInBundle(5, std::vector<Params::MarkerInstanceLayer>{}) == -1,
+         "an empty instanceLayers vector resolves to -1 too");
+}
+
 void TestNextMarkerLayerBundleId() {
     const std::vector<Params::MarkerLayerBundle> emptyBundles;
     Check(NextMarkerLayerBundleId(emptyBundles) == 0, "an empty bundle vector mints identifier 0");
@@ -451,6 +467,7 @@ void TestDeleteMarkerRuleLayerErases() {
 
 int main() {
     TestBuildMarkerLayerBundleLeafIndex();
+    TestFirstManualLayerIndexInBundle();
     TestNextMarkerLayerBundleId();
     TestApplyMarkerLayerBundleMove();
     TestApplyMarkerLayerBundleRotation();
