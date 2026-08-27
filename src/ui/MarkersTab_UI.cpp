@@ -5,6 +5,7 @@
 #include "MarkersTab_UI.h"
 #include "MarkerInstanceId_UI.h"
 #include "MarkerLayerId_UI.h"
+#include "MarkersTab_BundleDelete_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "PlacementRuleSections_UI.h"
@@ -292,6 +293,46 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                                       recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
                                       state.bundles, state, previewDriver, iconManifest, typeName,
                                       selectManualMarkerInstanceCallback);
+
+            // STEP140 — the tree's own header-extra "X" only RECORDS a pending choice (mutating
+            // bundles/ruleLayers/instanceLayers mid-walk would desync the walk's own position-based
+            // lookups for the rest of this frame); apply it now the walk above is fully done.
+            if (state.bundles.pendingDeleteBundleIdentifier >= 0) {
+                const int deletedBundleIdentifier = state.bundles.pendingDeleteBundleIdentifier;
+                if (state.bundles.bPendingDeleteBundleCascade)
+                    DeleteMarkerLayerBundleCascade(deletedBundleIdentifier, recipe.markerLayerBundles,
+                                                   recipe.markerRuleLayers, recipe.markerLayers, recipe.markers);
+                else
+                    DeleteMarkerLayerBundleGroupOnly(deletedBundleIdentifier, recipe.markerLayerBundles,
+                                                     recipe.markerRuleLayers, recipe.markerLayers);
+                if (state.bundles.selectedBundleIdentifier == deletedBundleIdentifier)
+                    state.bundles.selectedBundleIdentifier = -1;
+                state.bundles.pendingDeleteBundleIdentifier = -1;
+            }
+            if (state.bundles.pendingDeleteManualLayerIndex >= 0) {
+                const int deletedLayerIndex = state.bundles.pendingDeleteManualLayerIndex;
+                if (state.bundles.bPendingDeleteManualLayerCascade)
+                    DeleteMarkerInstanceLayerCascade(deletedLayerIndex, recipe.markerLayers, recipe.markers);
+                else
+                    DeleteMarkerInstanceLayerOnly(deletedLayerIndex, recipe.markerLayers, recipe.markers);
+                if (state.manualLayers.selectedLayerIndex == deletedLayerIndex)
+                    state.manualLayers.selectedLayerIndex = -1;
+                else if (state.manualLayers.selectedLayerIndex > deletedLayerIndex)
+                    --state.manualLayers.selectedLayerIndex;
+                state.bundles.pendingDeleteManualLayerIndex = -1;
+            }
+            if (state.bundles.pendingDeleteProceduralLayerIndex >= 0) {
+                const int deletedLayerIndex = state.bundles.pendingDeleteProceduralLayerIndex;
+                DeleteMarkerRuleLayer(deletedLayerIndex, recipe.markerRuleLayers);
+                if (state.selectedRuleLayerIndex == deletedLayerIndex) {
+                    state.selectedRuleLayerIndex = -1;
+                    state.selectedRuleIndex      = 0;
+                } else if (state.selectedRuleLayerIndex > deletedLayerIndex) {
+                    --state.selectedRuleLayerIndex;
+                }
+                state.bundles.pendingDeleteProceduralLayerIndex = -1;
+                bRecipeMoved = true;
+            }
             ImGui::Separator();
             bRecipeMoved = DrawRuleLayerListBody(recipe.markerRuleLayers, state, previewDriver, iconManifest,
                                                  typeName, placedMarkers, selectProceduralMarkerInstanceCallback)

@@ -93,10 +93,15 @@ inline WidgetChange StepTextInputInteraction(std::string& value, const std::stri
 }
 
 // Draws the label + the edit box and runs the interaction above. `hintText` is the greyed
-// placeholder shown while the box is empty; null draws none.
+// placeholder shown while the box is empty; null draws none. `bLabelHidden` (default false, every
+// existing call site unchanged) drops the visible label text while `label` still salts the imgui id
+// — for a caller that draws its own label elsewhere (e.g. an inline rename box in a tree row's own
+// header-extra zone, MarkersTab_BundleHeaderExtras_UI.h), mirroring ColorSwatchOptions::bLabelHidden's
+// established shape.
 WidgetChange DrawTextInput(const char* label, std::string& value,
                            const TextInputRules& rules = TextInputRules(),
-                           const WidgetStyle& style = WidgetStyle(), const char* hintText = nullptr);
+                           const WidgetStyle& style = WidgetStyle(), const char* hintText = nullptr,
+                           bool bLabelHidden = false);
 
 } // namespace Ui
 } // namespace SanmapGen

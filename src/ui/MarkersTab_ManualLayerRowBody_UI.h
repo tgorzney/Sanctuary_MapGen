@@ -48,8 +48,15 @@ inline constexpr float kMarkerLayerColorOverrideSwatchWidthPixels = 24.0f;
 // a plain, no-label checkbox is narrower than the Color Override pair (no swatch), plus its own
 // `ImGui::SameLine()` gap before Color Override starts.
 inline constexpr float kMarkerLayerSymmetryToggleWidthPixels = 30.0f;
+
+// STEP140 — reserved width for the header's own "X" delete button (Manual AND Procedural leaves,
+// and the Bundle tree's Group nodes reuse this SAME combined width — MarkersTab_Bundles_UI.cpp's
+// `Render` call takes one shared width for every row kind), placed RIGHTMOST of everything else on
+// the row. Eyeballed the same way as the constants above.
+inline constexpr float kMarkerLayerHeaderExtraDeleteButtonWidthPixels = 26.0f;
 inline constexpr float kMarkerLayerHeaderExtraCombinedWidthPixels =
-    kMarkerLayerSymmetryToggleWidthPixels + kMarkerLayerColorOverrideHeaderWidthPixels;
+    kMarkerLayerSymmetryToggleWidthPixels + kMarkerLayerColorOverrideHeaderWidthPixels
+    + kMarkerLayerHeaderExtraDeleteButtonWidthPixels;
 
 // The row's own name, tint, icon scale, grid snap, symmetry setting, and (STEP126, Open Q7) its own
 // per-Layer instance list — STEP110: drawn inline in THIS row's own expanded body, not "selected"-

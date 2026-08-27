@@ -54,21 +54,8 @@ const char* MarkerGroupLeafLabel(const MarkerGroupLeafKey_UI& leaf,
 
 } // namespace
 
-// STEP130 (ARCH §19.24, item 7(b)): the Bundle tree's `drawLeafHeaderExtra` body — the FIRST real
-// consumer of STEP129's slot. Rule (Procedural) leaves have no color/symmetry field, so the guard
-// returns before resolving into `instanceLayers`; a Manual leaf draws [Symmetry toggle][Color
-// Override], same order/shape as the flat/ungrouped DraggableList rows. Declared in the header so
-// MarkersTab_Bundles_UI_Test.cpp can drive it directly without a full tree frame.
-void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
-                                    std::vector<Params::MarkerInstanceLayer>& instanceLayers,
-                                    ManualMarkerLayersState& manualLayersState, bool& bAnyCommitted) {
-    if (leaf.kind != MarkerGroupLeafKey_UI::Kind::Manual) return;
-    if (leaf.layerIndex < 0 || leaf.layerIndex >= static_cast<int>(instanceLayers.size())) return;
-    Params::MarkerInstanceLayer& layer = instanceLayers[static_cast<std::size_t>(leaf.layerIndex)];
-    DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
-    ImGui::SameLine();
-    DrawManualMarkerLayerColorOverrideHeaderControl(layer, manualLayersState, bAnyCommitted);
-}
+// DrawMarkerLayerBundleNodeHeaderExtra/DrawMarkerGroupLeafHeaderExtra (STEP130/STEP140) now live in
+// the aspect-split sibling MarkersTab_BundleHeaderExtras_UI.cpp — this file had no headroom left.
 
 MarkerLayerBundleLeafIndex_UI BuildMarkerLayerBundleLeafIndex(
         const std::vector<Params::MarkerRuleLayer>& ruleLayers,
@@ -133,10 +120,12 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                         globalRadialRepeatCount, markerSymmetryFixSettings, rootState, previewDriver,
                                         instanceIndex, selectManualMarkerInstanceCallback);
             },
-            [](int) {},   // drawNodeHeaderExtra — no-op, Bundle nodes have no color/symmetry field of
-                          // their own (ARCH §19.24's controls are per-Layer, not per-Group).
+            [&](int bundleIdentifier) {   // STEP140 — a Group's own rename/delete
+                DrawMarkerLayerBundleNodeHeaderExtra(bundleIdentifier, bundles, state);
+            },
             [&](const MarkerGroupLeafKey_UI& leaf) {
-                DrawMarkerGroupLeafHeaderExtra(leaf, instanceLayers, rootState.manualLayers, bHeaderExtraCommitted);
+                DrawMarkerGroupLeafHeaderExtra(leaf, instanceLayers, rootState.manualLayers, state,
+                                               bHeaderExtraCommitted);
             },
             kMarkerLayerHeaderExtraCombinedWidthPixels,
             state.treeState, state.selectedBundleIdentifier);

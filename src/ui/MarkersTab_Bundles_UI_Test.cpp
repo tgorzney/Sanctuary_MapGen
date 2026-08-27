@@ -8,6 +8,7 @@
 // harness, since that one function is genuinely imgui-coupled.
 #include "MarkersTab_Bundles_UI.h"
 #include "ListWidget_TestFrame_UI.h"
+#include "MarkersTab_BundleDelete_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
 #include <cmath>
 #include <cstdio>
@@ -239,6 +240,7 @@ void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
     HeadlessImguiSession session;
     std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
     ManualMarkerLayersState state;
+    MarkerLayerBundlesState bundlesState;
     const MarkerGroupLeafKey_UI manualLeaf{ MarkerGroupLeafKey_UI::Kind::Manual, 0 };
 
     const ImVec2 windowSize(300.0f, 100.0f);
@@ -247,7 +249,7 @@ void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
     RunHeadlessFrame(HeadlessMouseState(), windowSize, [&] {
         origin  = ImGui::GetCursorScreenPos();
         boxSize = ResolveWidgetTrackHeight(WidgetStyle());
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bSettleCommitted);
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bSettleCommitted);
     });
     const ImVec2 checkboxCenter(origin.x + boxSize * 0.5f, origin.y + boxSize * 0.5f);
 
@@ -257,7 +259,7 @@ void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
     auto runFrame = [&](HeadlessMouseState mouse) {
         bool bCommitted = false;
         RunHeadlessFrame(mouse, windowSize, [&] {
-            DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bCommitted);
+            DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bCommitted);
         });
         return bCommitted;
     };
@@ -269,32 +271,169 @@ void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
          "a Manual leaf's header-extra draws the Symmetry checkbox first -- clicking it flips the "
          "real MarkerInstanceLayer's own bSymmetryEnabled");
     Check(bPressCommitted, "and reports a commit on the press frame");
+    Check(bundlesState.pendingDeleteManualLayerIndex == -1,
+         "clicking the Symmetry checkbox never touches the STEP140 pending-delete field");
 }
 
-// A Rule (Procedural) leaf's header-extra draws NOTHING (the `kind != Manual` guard returns before
-// any widget call) -- the cursor is exactly unmoved, no commit fires, and `instanceLayers` (present,
-// same index by coincidence) is never touched.
-void TestProceduralLeafHeaderExtraDrawsNothing() {
+// STEP140 — a Manual leaf's own "X" (drawn after Symmetry/Color Override) opens a popup; picking
+// "Delete Layer Only" records the leaf's own layerIndex as pending WITHOUT touching instanceLayers
+// itself (the caller applies it later, MarkersTab_UI.cpp).
+void TestManualLeafDeleteButtonRecordsPendingIndex() {
     HeadlessImguiSession session;
     std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
     ManualMarkerLayersState state;
+    MarkerLayerBundlesState bundlesState;
+    const MarkerGroupLeafKey_UI manualLeaf{ MarkerGroupLeafKey_UI::Kind::Manual, 0 };
+    bool bAnyCommitted = false;
+
+    // Find the "X##deleteLayer" button's own center by probing item rects across the row.
+    ImVec2 deleteButtonCenter;
+    RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 100.0f), [&] {
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bAnyCommitted);
+        deleteButtonCenter = ImGui::GetItemRectMin();
+        const ImVec2 maxRect = ImGui::GetItemRectMax();
+        deleteButtonCenter.x = (deleteButtonCenter.x + maxRect.x) * 0.5f;
+        deleteButtonCenter.y = (deleteButtonCenter.y + maxRect.y) * 0.5f;
+    });
+
+    HeadlessMouseState click; click.position = deleteButtonCenter; click.bLeftButtonDown = true;
+    RunHeadlessFrame(click, ImVec2(300.0f, 100.0f), [&] {
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bAnyCommitted);
+    });
+    HeadlessMouseState release = click; release.bLeftButtonDown = false;
+    RunHeadlessFrame(release, ImVec2(300.0f, 100.0f), [&] {
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bAnyCommitted);
+    });
+
+    Check(instanceLayers.size() == 1,
+         "clicking the X (opening the popup) does not itself erase anything -- deferred to the caller");
+}
+
+// A Rule (Procedural) leaf's header-extra now draws its own "X" too (STEP140) -- unlike a Manual
+// leaf it has no Symmetry/Color Override pair first, so the button is the row's only control.
+void TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly() {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
+    ManualMarkerLayersState state;
+    MarkerLayerBundlesState bundlesState;
     const MarkerGroupLeafKey_UI proceduralLeaf{ MarkerGroupLeafKey_UI::Kind::Procedural, 0 };
 
     bool bAnyCommitted = false;
     ImVec2 cursorBefore, cursorAfter;
     RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 100.0f), [&] {
         cursorBefore = ImGui::GetCursorScreenPos();
-        DrawMarkerGroupLeafHeaderExtra(proceduralLeaf, instanceLayers, state, bAnyCommitted);
+        DrawMarkerGroupLeafHeaderExtra(proceduralLeaf, instanceLayers, state, bundlesState, bAnyCommitted);
         cursorAfter = ImGui::GetCursorScreenPos();
     });
 
-    Check(cursorBefore.x == cursorAfter.x && cursorBefore.y == cursorAfter.y,
-         "a Procedural leaf's header-extra draws nothing at all -- the cursor is exactly unmoved "
-         "(the kind != Manual guard, not merely an empty-looking control)");
-    Check(!bAnyCommitted, "and reports no commit");
+    Check(cursorBefore.x != cursorAfter.x || cursorBefore.y != cursorAfter.y,
+         "a Procedural leaf's header-extra now draws its own delete button (STEP140) -- the cursor "
+         "moves, unlike the old kind != Manual no-op");
+    Check(!bAnyCommitted, "drawing the button alone reports no Symmetry/Color-Override commit");
     Check(instanceLayers[0].bSymmetryEnabled && !instanceLayers[0].bColorOverrideEnabled,
          "instanceLayers[0] -- present at the same index by coincidence -- is left at its struct "
          "defaults, never resolved into for a Procedural leaf");
+    Check(bundlesState.pendingDeleteProceduralLayerIndex == -1,
+         "drawing the button alone (no click) records no pending delete");
+}
+
+// STEP140 — "Group Only": the deleted Bundle's DIRECT children (a sub-Bundle, a Rule Layer, an
+// Instance Layer) all promote to ITS OWN parent; a GRANDCHILD (parented to the sub-Bundle, not
+// directly to the deleted one) is untouched.
+void TestDeleteMarkerLayerBundleGroupOnlyPromotesChildren() {
+    std::vector<Params::MarkerLayerBundle> bundles(3);
+    bundles[0].identifier = 0; bundles[0].parentBundleIdentifier = -1;
+    bundles[1].identifier = 1; bundles[1].parentBundleIdentifier = 0;   // direct child of 0
+    bundles[2].identifier = 2; bundles[2].parentBundleIdentifier = 1;   // grandchild, via 1
+    std::vector<Params::MarkerRuleLayer> ruleLayers(1);
+    ruleLayers[0].parentBundleIdentifier = 0;
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
+    instanceLayers[0].parentBundleIdentifier = 0;
+
+    DeleteMarkerLayerBundleGroupOnly(0, bundles, ruleLayers, instanceLayers);
+
+    Check(bundles.size() == 2, "the deleted Bundle alone is erased");
+    Check(bundles[0].identifier == 1 && bundles[0].parentBundleIdentifier == -1,
+         "its direct child Bundle promotes to root -- the deleted Bundle's OWN parent");
+    Check(bundles[1].identifier == 2 && bundles[1].parentBundleIdentifier == 1,
+         "a grandchild (parented to the sub-Bundle, not directly) is untouched");
+    Check(ruleLayers[0].parentBundleIdentifier == -1, "a direct Rule Layer child promotes to root too");
+    Check(instanceLayers[0].parentBundleIdentifier == -1, "and a direct Instance Layer child");
+}
+
+// STEP140 — "All": the Bundle, its descendant, every Layer parented to either, AND every Instance
+// that belonged to one of those Instance Layers are all erased together.
+void TestDeleteMarkerLayerBundleCascadeDeletesEverything() {
+    std::vector<Params::MarkerLayerBundle> bundles(2);
+    bundles[0].identifier = 0; bundles[0].parentBundleIdentifier = -1;
+    bundles[1].identifier = 1; bundles[1].parentBundleIdentifier = 0;
+    std::vector<Params::MarkerRuleLayer> ruleLayers(1);
+    ruleLayers[0].parentBundleIdentifier = 0;
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(2);
+    instanceLayers[0].parentBundleIdentifier = 0;
+    instanceLayers[1].parentBundleIdentifier = 1;
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.resize(2);
+    markers[0].transforms[0].layerIndex = 0;
+    markers[0].transforms[1].layerIndex = 1;
+
+    DeleteMarkerLayerBundleCascade(0, bundles, ruleLayers, instanceLayers, markers);
+
+    Check(bundles.empty(), "both the Bundle and its descendant are erased");
+    Check(ruleLayers.empty(), "every Rule Layer parented to either is erased");
+    Check(instanceLayers.empty(), "every Instance Layer parented to either is erased");
+    Check(markers[0].transforms.empty(),
+         "every Instance that belonged to one of those Instance Layers is erased too, not just kept");
+}
+
+// STEP140 — a Manual Layer's own "Layer Only": the layer is erased, every Instance that referenced
+// it is re-clamped (the SAME safe convention ClampMarkerLayerIndicesForRemovedLayer already gives a
+// single ungrouped-layer delete), not destroyed.
+void TestDeleteMarkerInstanceLayerOnlyKeepsInstances() {
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(2);
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.resize(3);
+    markers[0].transforms[0].layerIndex = 0;
+    markers[0].transforms[1].layerIndex = 0;
+    markers[0].transforms[2].layerIndex = 1;
+
+    DeleteMarkerInstanceLayerOnly(0, instanceLayers, markers);
+
+    Check(instanceLayers.size() == 1, "layer 0 alone is erased");
+    Check(markers[0].transforms.size() == 3, "no Instance is deleted");
+    Check(markers[0].transforms[0].layerIndex == 0 && markers[0].transforms[1].layerIndex == 0
+          && markers[0].transforms[2].layerIndex == 0,
+         "every Instance re-clamps: the two already at 0 stay there, the one at 1 shifts down to the "
+         "only surviving layer's new position");
+}
+
+// STEP140 — a Manual Layer's own "All": the layer AND every Instance that referenced it are erased.
+void TestDeleteMarkerInstanceLayerCascadeDeletesInstances() {
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(2);
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.resize(3);
+    markers[0].transforms[0].layerIndex = 0;
+    markers[0].transforms[1].layerIndex = 0;
+    markers[0].transforms[2].layerIndex = 1;
+
+    DeleteMarkerInstanceLayerCascade(0, instanceLayers, markers);
+
+    Check(instanceLayers.size() == 1, "layer 0 alone is erased");
+    Check(markers[0].transforms.size() == 1,
+         "both Instances that referenced layer 0 are erased with it");
+    Check(markers[0].transforms[0].layerIndex == 0,
+         "the survivor (originally layer 1) shifts down to the only remaining layer's new position");
+}
+
+// STEP140 — a Procedural Layer's own single delete action: a plain positional erase.
+void TestDeleteMarkerRuleLayerErases() {
+    std::vector<Params::MarkerRuleLayer> ruleLayers(3);
+    ruleLayers[0].name = "A"; ruleLayers[1].name = "B"; ruleLayers[2].name = "C";
+
+    DeleteMarkerRuleLayer(1, ruleLayers);
+
+    Check(ruleLayers.size() == 2 && ruleLayers[0].name == "A" && ruleLayers[1].name == "C",
+         "the layer at the given position is erased, the others keep their relative order");
 }
 
 } // namespace
@@ -309,7 +448,13 @@ int main() {
     TestApplyMarkerLayerBundleTreeSignalFilteredCopyWriteSafety();
     TestCrossTypeSectionNestedBundleCutoff();
     TestManualLeafHeaderExtraDrawsAndFlipsSymmetry();
-    TestProceduralLeafHeaderExtraDrawsNothing();
+    TestManualLeafDeleteButtonRecordsPendingIndex();
+    TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly();
+    TestDeleteMarkerLayerBundleGroupOnlyPromotesChildren();
+    TestDeleteMarkerLayerBundleCascadeDeletesEverything();
+    TestDeleteMarkerInstanceLayerOnlyKeepsInstances();
+    TestDeleteMarkerInstanceLayerCascadeDeletesInstances();
+    TestDeleteMarkerRuleLayerErases();
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

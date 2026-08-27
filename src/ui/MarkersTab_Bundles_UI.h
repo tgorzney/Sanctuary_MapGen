@@ -48,18 +48,21 @@ inline bool operator==(const MarkerGroupLeafKey_UI& a, const MarkerGroupLeafKey_
 struct MarkerLayerBundlesState {
     TreeListState treeState;
     int           selectedBundleIdentifier = -1;
-    // ONE shared scratch triple for whichever Bundle's own expanded node body is currently drawing
-    // its Move/Rotate controls — Params::MarkerLayerBundle is a pure round-tripping type and cannot
-    // carry UI-only scratch state (same constraint ManualMarkerLayersState's
-    // selectedLayerColorToggle/selectedLayerIconScaleToggle already accept, MarkersTab_ManualLayers_UI.h:51-56).
-    float             moveOffsetX     = 0.0f;
-    float             moveOffsetZ     = 0.0f;
-    float             rotationDegrees = 0.0f;
-    ScalarSliderRange moveOffsetRange{ -512.0f, 512.0f, 0.0f };        // Constitution §8
-    ScalarSliderRange rotationDegreesRange{ -180.0f, 180.0f, 0.0f };
-    RealtimeToggle    moveOffsetXToggle{true};
-    RealtimeToggle    moveOffsetZToggle{true};
-    RealtimeToggle    rotationDegreesToggle{true};
+
+    // STEP140: the body no longer draws Name/Move/Rotate — the header-extra slot now carries
+    // rename (double-click) and delete (see MarkersTab_BundleHeaderExtras_UI.h). -1 = no rename;
+    // renaming edits `bundle.name` directly (non-structural, safe mid-walk — unlike delete/reorder,
+    // nothing else this frame indexes by name), so there is no separate scratch buffer to hold.
+    int renamingBundleIdentifier = -1;
+
+    // STEP140: pending deletes, applied AFTER the tree's walk finishes this frame — never mid-walk,
+    // see MarkersTab_BundleDelete_UI.h. Bundle: Group Only vs cascade All. Manual Layer: Layer Only
+    // vs cascade All. Procedural Layer: single action (its Rules ARE the layer, nothing to keep).
+    int  pendingDeleteBundleIdentifier     = -1;
+    bool bPendingDeleteBundleCascade       = false;
+    int  pendingDeleteManualLayerIndex     = -1;
+    bool bPendingDeleteManualLayerCascade  = false;
+    int  pendingDeleteProceduralLayerIndex = -1;
 };
 
 // Mints a fresh, never-reused Bundle identifier — the exact NextMarkerLayerId pattern
@@ -93,8 +96,11 @@ void ApplyMarkerLayerBundleRotation(int bundleIdentifier, const std::vector<Para
                                     std::vector<Params::MarkerInstanceGroup>& markers, float degrees);
 
 // One Bundle's own inline body, drawn by DrawMarkerLayerBundleTree's own `drawNodeBody` callback
-// whenever that node's row is expanded. `rootState` is the whole MarkersTab state (needed for
-// DrawAddMarkerRuleLayerButton's MarkersTabState& parameter).
+// whenever that node's row is expanded. STEP140/human's own correction: intentionally empty now —
+// Name/Move/Rotate/Delete all moved out (rename + delete now live in the header-extra slot,
+// MarkersTab_BundleHeaderExtras_UI.h); kept as a real function (not a bare `[](int){}` inline) so
+// the call site and this declaration don't need to change again if the body gains real content
+// later. `rootState` is unused today but kept for the same reason.
 void DrawMarkerLayerBundleNodeBody(int bundleIdentifier, std::vector<Params::MarkerLayerBundle>& bundles,
                                    std::vector<Params::MarkerRuleLayer>& ruleLayers,
                                    std::vector<Params::MarkerInstanceLayer>& instanceLayers,
@@ -102,11 +108,22 @@ void DrawMarkerLayerBundleNodeBody(int bundleIdentifier, std::vector<Params::Mar
                                    MarkerLayerBundlesState& state, MarkersTabState& rootState,
                                    Pipeline::PreviewDriver* previewDriver);
 
-// STEP130 (ARCH §19.24, item 7(b)): the Bundle tree's own `drawLeafHeaderExtra` body (see
-// MarkersTab_Bundles_UI.cpp). Declared here so MarkersTab_Bundles_UI_Test.cpp can drive it directly.
+// MarkersTab_BundleHeaderExtras_UI.cpp (STEP140) — the Bundle tree's `drawNodeHeaderExtra`/
+// `drawLeafHeaderExtra` bodies: a Group's own double-click-to-rename + "X" delete (Group Only/All),
+// and a Layer leaf's own "X" delete (Manual: Layer Only/All; Procedural: single action), alongside
+// STEP130's pre-existing Symmetry/Color Override controls on Manual leaves. Both record into
+// `MarkerLayerBundlesState`'s pending-rename/pending-delete fields ONLY — never mutate
+// bundles/ruleLayers/instanceLayers directly (mid-tree-walk mutation would desync the walk's own
+// position-based lookups for the rest of this frame); the caller applies them AFTER the tree
+// returns (MarkersTab_BundleDelete_UI.h). Declared here so MarkersTab_Bundles_UI_Test.cpp can drive
+// both directly.
+void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
+                                          std::vector<Params::MarkerLayerBundle>& bundles,
+                                          MarkerLayerBundlesState& state);
 void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     std::vector<Params::MarkerInstanceLayer>& instanceLayers,
-                                    ManualMarkerLayersState& manualLayersState, bool& bAnyCommitted);
+                                    ManualMarkerLayersState& manualLayersState,
+                                    MarkerLayerBundlesState& bundlesState, bool& bAnyCommitted);
 
 // MarkersTab_Bundles_UI.cpp — the tree mechanics:
 
