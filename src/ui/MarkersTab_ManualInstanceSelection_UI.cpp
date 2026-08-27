@@ -40,18 +40,24 @@ void ReassignManualInstanceLayers(std::vector<Params::MarkerInstanceGroup>& mark
                 transform.layerIndex = newLayerIndex;
 }
 
-void DrawManualLayerInstanceDropTarget(int layerIndex, std::vector<Params::MarkerInstanceGroup>& markers,
-                                       const std::vector<int>& selectedIdentifiers) {
-    if (!ImGui::BeginDragDropTarget()) return;
+std::vector<int> DetectManualInstanceDropTarget(const std::vector<int>& selectedIdentifiers) {
+    std::vector<int> movedIdentifiers;
+    if (!ImGui::BeginDragDropTarget()) return movedIdentifiers;
     if (const ImGuiPayload* const payload = ImGui::AcceptDragDropPayload("markerInstanceDrag")) {
         if (payload->DataSize == static_cast<int>(sizeof(int))) {
             const int droppedIdentifier = *static_cast<const int*>(payload->Data);
-            const std::vector<int> movedIdentifiers = IsManualInstanceSelected(selectedIdentifiers, droppedIdentifier)
+            movedIdentifiers = IsManualInstanceSelected(selectedIdentifiers, droppedIdentifier)
                 ? selectedIdentifiers : std::vector<int>{ droppedIdentifier };
-            ReassignManualInstanceLayers(markers, movedIdentifiers, layerIndex);
         }
     }
     ImGui::EndDragDropTarget();
+    return movedIdentifiers;
+}
+
+void DrawManualLayerInstanceDropTarget(int layerIndex, std::vector<Params::MarkerInstanceGroup>& markers,
+                                       const std::vector<int>& selectedIdentifiers) {
+    const std::vector<int> movedIdentifiers = DetectManualInstanceDropTarget(selectedIdentifiers);
+    if (!movedIdentifiers.empty()) ReassignManualInstanceLayers(markers, movedIdentifiers, layerIndex);
 }
 
 } // namespace Ui

@@ -53,6 +53,15 @@ struct ManualInstanceRowInteractionContext_UI {
 void ReassignManualInstanceLayers(std::vector<Params::MarkerInstanceGroup>& markers,
                                   const std::vector<int>& movedIdentifiers, int newLayerIndex);
 
+// STEP148 — the same drop mechanics DrawManualLayerInstanceDropTarget wraps below, split out for a
+// target that has no concrete `layerIndex` to reassign onto YET (a Group with no Manual Layer of
+// its own — MarkersTab_BundleHeaderExtras_UI.cpp's own drop target on a Group header creates one).
+// Returns the dropped/moved instance identifiers instead of reassigning immediately, so the caller
+// can defer creating the Layer (a STRUCTURAL mutation to `instanceLayers`, unsafe mid-tree-walk,
+// same posture as every other pending-delete field on MarkerLayerBundlesState) until after the
+// walk finishes this frame. Empty when nothing was dropped this frame.
+std::vector<int> DetectManualInstanceDropTarget(const std::vector<int>& selectedIdentifiers);
+
 // Drag-drop TARGET only (draws nothing itself) — attaches to whatever the CALLER last submitted, so
 // it must be called immediately after that row's own header widget (mirrors
 // TreeListWidget_RowLayout_UI.h's own DetectTreeRowDragAndDrop contract). Accepts a "markerInstanceDrag"

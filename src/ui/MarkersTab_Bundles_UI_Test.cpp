@@ -74,6 +74,27 @@ void TestFirstManualLayerIndexInBundle() {
          "an empty instanceLayers vector resolves to -1 too");
 }
 
+// STEP148 correction (human's own correction — "I thought I told you to have it create a new layer
+// if one did not exist") — ApplyPendingCreateLayerForBundle mints a fresh Layer under the Bundle and
+// reassigns every recorded instance identifier onto it, in one call.
+void TestApplyPendingCreateLayerForBundle() {
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+    markerLayers[0].layerId = 3;   // pre-existing layer, so the new one must NOT reuse id 3
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.resize(2);
+    markers[0].transforms[0].instanceIdentifier = 10; markers[0].transforms[0].layerIndex = 0;
+    markers[0].transforms[1].instanceIdentifier = 11; markers[0].transforms[1].layerIndex = 0;
+
+    ApplyPendingCreateLayerForBundle(5, "Alloy", { 10 }, markerLayers, markers);
+
+    Check(markerLayers.size() == 2, "a new Layer is appended");
+    Check(markerLayers[1].parentBundleIdentifier == 5, "the new Layer is parented to the target Bundle");
+    Check(markerLayers[1].markerTypeName == "Alloy", "the new Layer takes on the recorded marker type");
+    Check(markerLayers[1].layerId == 4, "the new Layer mints a fresh, never-reused layerId (max+1, not 0)");
+    Check(markers[0].transforms[0].layerIndex == 1, "the recorded instance (10) lands on the new Layer's index");
+    Check(markers[0].transforms[1].layerIndex == 0, "an instance NOT in the recorded set (11) is untouched");
+}
+
 void TestNextMarkerLayerBundleId() {
     const std::vector<Params::MarkerLayerBundle> emptyBundles;
     Check(NextMarkerLayerBundleId(emptyBundles) == 0, "an empty bundle vector mints identifier 0");
@@ -468,6 +489,7 @@ void TestDeleteMarkerRuleLayerErases() {
 int main() {
     TestBuildMarkerLayerBundleLeafIndex();
     TestFirstManualLayerIndexInBundle();
+    TestApplyPendingCreateLayerForBundle();
     TestNextMarkerLayerBundleId();
     TestApplyMarkerLayerBundleMove();
     TestApplyMarkerLayerBundleRotation();

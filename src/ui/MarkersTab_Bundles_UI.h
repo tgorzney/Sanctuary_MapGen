@@ -68,6 +68,16 @@ struct MarkerLayerBundlesState {
     int  pendingDeleteManualLayerIndex     = -1;
     bool bPendingDeleteManualLayerCascade  = false;
     int  pendingDeleteProceduralLayerIndex = -1;
+
+    // STEP148 correction (human's own correction — "I thought I told you to have it create a new
+    // layer if one did not exist") — dropping an Instance onto a Group with no Manual Layer of its
+    // own creates one, rather than silently no-op-ing. Same deferred posture as the pending-delete
+    // fields above: push_back-ing a new Layer mid-tree-walk would desync the walk's own leaf-index
+    // snapshot, so the drop only RECORDS here; the caller creates the Layer AND reassigns the
+    // recorded instances in one atomic step AFTER the walk finishes this frame (MarkersTab_UI.cpp).
+    int              pendingCreateLayerForBundleIdentifier = -1;
+    std::string      pendingCreateLayerMarkerTypeName;
+    std::vector<int> pendingCreateLayerInstanceIdentifiers;
 };
 
 // Mints a fresh, never-reused Bundle identifier — the exact NextMarkerLayerId pattern
@@ -98,6 +108,17 @@ MarkerLayerBundleLeafIndex_UI BuildMarkerLayerBundleLeafIndex(
 // then silently does nothing, the accepted behavior for that case.
 int FirstManualLayerIndexInBundle(int bundleIdentifier,
                                   const std::vector<Params::MarkerInstanceLayer>& instanceLayers);
+
+// STEP148 correction (human's own correction — "I thought I told you to have it create a new layer
+// if one did not exist") — the pending-create fields' own apply step: mints a fresh Manual Layer
+// under `bundleIdentifier` (name/layerId via the same NextMarkerLayerName/NextMarkerLayerId the
+// "+Add Layer" button already uses, MarkersTab_ManualLayers_UI.cpp) and reassigns every one of
+// `instanceIdentifiers` onto it, in one atomic step. Called from MarkersTab_UI.cpp AFTER the tree's
+// own walk finishes this frame — never mid-walk, MarkerLayerBundlesState's own comment on why.
+void ApplyPendingCreateLayerForBundle(int bundleIdentifier, const std::string& markerTypeName,
+                                      const std::vector<int>& instanceIdentifiers,
+                                      std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                      std::vector<Params::MarkerInstanceGroup>& markers);
 
 // MarkersTab_BundleNodeBody_UI.cpp — the aspect-split sibling (ARCH §1.5): Move/Rotate, both scoped
 // to the Bundle's MANUAL-ONLY resolved membership (§19.9) — a Procedural Layer under a Bundle

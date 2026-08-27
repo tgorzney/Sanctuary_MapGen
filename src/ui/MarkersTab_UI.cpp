@@ -361,6 +361,21 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                 state.bundles.pendingDeleteProceduralLayerIndex = -1;
                 bRecipeMoved = true;
             }
+            // STEP148 correction (human's own correction — "I thought I told you to have it create a
+            // new layer if one did not exist") — a Group's own drop target records this instead of
+            // reassigning immediately whenever it has no Manual Layer yet (structural push_back to
+            // recipe.markerLayers, unsafe mid-walk, same reasoning as the pending-deletes above);
+            // create the Layer AND reassign the recorded instances in one atomic step, now the walk
+            // is fully done.
+            if (state.bundles.pendingCreateLayerForBundleIdentifier >= 0) {
+                ApplyPendingCreateLayerForBundle(state.bundles.pendingCreateLayerForBundleIdentifier,
+                                                 state.bundles.pendingCreateLayerMarkerTypeName,
+                                                 state.bundles.pendingCreateLayerInstanceIdentifiers,
+                                                 recipe.markerLayers, recipe.markers);
+                state.bundles.pendingCreateLayerForBundleIdentifier = -1;
+                state.bundles.pendingCreateLayerMarkerTypeName.clear();
+                state.bundles.pendingCreateLayerInstanceIdentifiers.clear();
+            }
             ImGui::Separator();
             bRecipeMoved = DrawRuleLayerListBody(recipe.markerRuleLayers, state, previewDriver, iconManifest,
                                                  typeName, placedMarkers, selectProceduralMarkerInstanceCallback)

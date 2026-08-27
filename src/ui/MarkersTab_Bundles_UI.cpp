@@ -7,6 +7,8 @@
 // the 150-line hard ceiling once ARCH §19.15(a)'s filtered-copy plumbing landed here (§6's own
 // coder-flagged remediation clause, mirroring the BundleNodeBody split's identical precedent).
 #include "MarkersTab_Bundles_UI.h"
+#include "MarkerLayerId_UI.h"
+#include "MarkersTab_ManualInstanceSelection_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
@@ -64,6 +66,19 @@ int FirstManualLayerIndexInBundle(int bundleIdentifier,
     for (int i = 0; i < static_cast<int>(instanceLayers.size()); ++i)
         if (instanceLayers[static_cast<std::size_t>(i)].parentBundleIdentifier == bundleIdentifier) return i;
     return -1;
+}
+
+void ApplyPendingCreateLayerForBundle(int bundleIdentifier, const std::string& markerTypeName,
+                                      const std::vector<int>& instanceIdentifiers,
+                                      std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                      std::vector<Params::MarkerInstanceGroup>& markers) {
+    Params::MarkerInstanceLayer newLayer;
+    newLayer.name                   = NextMarkerLayerName(static_cast<int>(markerLayers.size()));
+    newLayer.layerId                = NextMarkerLayerId(markerLayers);
+    newLayer.parentBundleIdentifier = bundleIdentifier;
+    newLayer.markerTypeName         = markerTypeName;
+    markerLayers.push_back(newLayer);
+    ReassignManualInstanceLayers(markers, instanceIdentifiers, static_cast<int>(markerLayers.size()) - 1);
 }
 
 MarkerLayerBundleLeafIndex_UI BuildMarkerLayerBundleLeafIndex(

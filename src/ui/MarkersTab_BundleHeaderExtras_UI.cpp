@@ -99,13 +99,27 @@ void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
     // where it was") — run FIRST, before any other widget in this callback draws (the drop target
     // binds to the LAST item imgui submitted, the Group's own CollapsingHeader, RenderNode's own
     // contract, TreeListWidget_RowLayout_UI.h — same "run first" reasoning
-    // DrawMarkerGroupLeafHeaderExtra's own Manual-leaf drop target already follows). Human's own
-    // choice: land on the Group's first Manual Layer; FirstManualLayerIndexInBundle returns -1 when
-    // the Group has none yet, in which case this is skipped entirely — the drop silently does
-    // nothing, same as before this fix, the accepted behavior for that specific case.
+    // DrawMarkerGroupLeafHeaderExtra's own Manual-leaf drop target already follows). Lands on the
+    // Group's first Manual Layer when one exists; when FirstManualLayerIndexInBundle returns -1
+    // (the Group has none yet), STEP148's correction creates one instead of no-op-ing — recorded
+    // into `state`'s pending-create fields (a structural instanceLayers mutation, unsafe mid-walk,
+    // MarkerLayerBundlesState's own comment) for the caller to apply after the walk finishes.
     const int firstLayerIndex = FirstManualLayerIndexInBundle(bundleIdentifier, instanceLayers);
-    if (firstLayerIndex >= 0)
+    if (firstLayerIndex >= 0) {
         DrawManualLayerInstanceDropTarget(firstLayerIndex, markers, selectedManualInstanceIdentifiers);
+    } else {
+        const std::vector<int> droppedIdentifiers =
+            DetectManualInstanceDropTarget(selectedManualInstanceIdentifiers);
+        if (!droppedIdentifiers.empty()) {
+            for (const Params::MarkerLayerBundle& bundle : bundles)
+                if (bundle.identifier == bundleIdentifier) {
+                    state.pendingCreateLayerForBundleIdentifier = bundleIdentifier;
+                    state.pendingCreateLayerMarkerTypeName      = bundle.markerTypeName;
+                    state.pendingCreateLayerInstanceIdentifiers = droppedIdentifiers;
+                    break;
+                }
+        }
+    }
 
     const ImVec2 itemMin = ImGui::GetItemRectMin();
     const float labelStartX = itemMin.x + ImGui::GetTreeNodeToLabelSpacing();
