@@ -163,6 +163,15 @@ inline bool StoreMarkerRuleValues(const MarkersTabState& state, Params::MarkerRu
     return bMoved;
 }
 
+// STEP137 (STEP152 correction) — the target layerIndex a fresh "+ Instance" lands on: the currently
+// selected Manual Layer's own position, ONLY when it's typed to THIS Type-section; else -1 ("no
+// specific layer" — MarkerLayerIndexRepair_UI.h's own convention), NEVER a positional fallback like
+// `0` (that used to silently land a non-matching-type instance on whichever Layer happens to sit at
+// global index 0 — human's own bug report, "+ Instance" for a non-Alloy type landing under Alloy).
+// Declared here (not file-local) so a test can drive it directly without an imgui frame.
+int ResolveAddInstanceLayerIndex(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                 int selectedLayerIndex, const std::string& typeName);
+
 // The rule the detail controls edit, or null when either index misses: an out-of-range layer, or
 // an in-range layer whose rule index misses (STEP80's two-index walk, mirroring `SelectedLayer`,
 // LayersTab_UI.cpp:120-127).

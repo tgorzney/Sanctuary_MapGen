@@ -129,6 +129,29 @@ void RunRealtimeDefaultChecks() {
           "MarkerGlobalScaleRow's three toggles default to realtime ON (STEP118, +selectColorToggle STEP134)");
 }
 
+// Human's own bug report (STEP152 correction) — "+ Instance" for a non-Alloy type was silently
+// landing under an ALLOY layer: ResolveAddInstanceLayerIndex used to fall back to a bare `0` (i.e.
+// markerLayers[0], whichever Layer happens to sit at global index 0, roster-wide) instead of a real
+// "no specific layer". Both fallback branches must now report -1, never a position.
+void RunResolveAddInstanceLayerIndexChecks() {
+    std::vector<Params::MarkerInstanceLayer> markerLayers(3);
+    markerLayers[0].markerTypeName = "Alloy";
+    markerLayers[1].markerTypeName = "Plasma";
+    markerLayers[2].markerTypeName = "Alloy";
+
+    Check(ResolveAddInstanceLayerIndex(markerLayers, 1, "Plasma") == 1,
+         "a selected Layer typed to THIS Type-section is used as-is");
+    Check(ResolveAddInstanceLayerIndex(markerLayers, 0, "Plasma") == -1,
+         "a selected Layer typed to a DIFFERENT Type-section falls back to -1, never that Layer's own "
+         "position (the reported cross-type contamination: markerLayers[0] happening to be Alloy)");
+    Check(ResolveAddInstanceLayerIndex(markerLayers, -1, "Plasma") == -1,
+         "no selection at all (-1) falls back to -1, not markerLayers[0]");
+    Check(ResolveAddInstanceLayerIndex(markerLayers, 99, "Plasma") == -1,
+         "an out-of-range selection falls back to -1, not markerLayers[0]");
+    Check(ResolveAddInstanceLayerIndex({}, 0, "Plasma") == -1,
+         "an empty markerLayers vector falls back to -1 too — there is no markerLayers[0] to guess at");
+}
+
 } // namespace
 
 int main() {
@@ -137,6 +160,7 @@ int main() {
     RunEnumMirrorChecks();
     RunSelectionFenceChecks();
     RunRealtimeDefaultChecks();
+    RunResolveAddInstanceLayerIndexChecks();
     RunMarkerRuleLayerAcceptanceChecks();
     RunGlobalMarkerScaleRowFieldsAcceptanceChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }

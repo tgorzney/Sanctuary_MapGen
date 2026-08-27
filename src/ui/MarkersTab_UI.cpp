@@ -128,20 +128,6 @@ float MapCenterWorldUnits(const Params::Geometry& geometry) {
     return static_cast<float>(geometry.mapSize) * geometry.worldUnitsPerCell * 0.5f;
 }
 
-// STEP137 — the selected Manual Layer's own plain vector position (`MarkerTransform::layerIndex`'s
-// established convention, MarkerLayerIndexRepair_UI.h), when a Layer typed to THIS Type-section is
-// currently selected; else the SAME "no specific layer" fallback every other layer-losing path
-// already uses (`ClampMarkerLayerIndicesForRemovedLayer`'s own clamp-to-0 — layerIndex has no
-// "unassigned" sentinel to invent here, only the existing ratified convention to reuse). Guards on
-// `markerTypeName` so a Layer selected under a DIFFERENT Type-section's "+ Layer"/tree click never
-// silently receives another Type's instance.
-int ResolveAddInstanceLayerIndex(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
-                                 int selectedLayerIndex, const std::string& typeName) {
-    if (selectedLayerIndex < 0 || selectedLayerIndex >= static_cast<int>(markerLayers.size())) return 0;
-    if (markerLayers[static_cast<std::size_t>(selectedLayerIndex)].markerTypeName != typeName) return 0;
-    return selectedLayerIndex;
-}
-
 // STEP138/STEP139 — a newly-added Layer's OR Group's own `parentBundleIdentifier`: the currently-
 // selected Group (Bundle), when one typed to THIS Type-section is selected (human's own instruction
 // — "+ Layer"/"+ Group" should add under the selected Group, and Groups stay nestable); else root
@@ -224,6 +210,33 @@ void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>&
 }
 
 } // namespace
+
+// STEP137 — the selected Manual Layer's own plain vector position (`MarkerTransform::layerIndex`'s
+// established convention, MarkerLayerIndexRepair_UI.h), when a Layer typed to THIS Type-section is
+// currently selected. Guards on `markerTypeName` so a Layer selected under a DIFFERENT Type-section's
+// "+ Layer"/tree click never silently receives another Type's instance.
+//
+// Human's own bug report (STEP152 correction) — "+ Instance" for a non-Alloy type was silently
+// landing under an ALLOY layer, selectable-together with Alloy's own instances, whenever no matching
+// Layer for THIS type was selected: this function used to fall back to a bare `0` in both guard
+// branches, i.e. "markerLayers[0]", not a real "no specific layer" — and `recipe.markerLayers[0]` is
+// whichever Layer was created FIRST, roster-wide, regardless of type (the reported "if I delete the
+// layer, it puts them under a DIFFERENT layer" is exactly this: deleting index 0 just shifts index 1
+// into the same wrong role). STEP137's own comment reasoned "layerIndex has no unassigned sentinel
+// to invent here" — true when it was written, but `-1` (Constitution §6/MarkerLayerIndexRepair_UI.h)
+// is now the fully-supported "no Layer" convention (the drag-to-Instances-list "unassign" fix, and
+// `DrawBaseSectionManualInstanceList`'s own "no Layer at all" case) — the RIGHT fallback here, not a
+// positional guess. `ResolveEffectiveMarkerSymmetry`'s own `layerIndex < 0` branch already falls back
+// to the recipe's GLOBAL symmetry settings for exactly this case, which is what actually caused the
+// report's "only 1 created in preview" half: instances were being resolved against ALLOY's own layer
+// settings instead of global ones. Promoted out of the anonymous namespace (was file-local) so a test
+// can drive it directly without an imgui frame.
+int ResolveAddInstanceLayerIndex(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                 int selectedLayerIndex, const std::string& typeName) {
+    if (selectedLayerIndex < 0 || selectedLayerIndex >= static_cast<int>(markerLayers.size())) return -1;
+    if (markerLayers[static_cast<std::size_t>(selectedLayerIndex)].markerTypeName != typeName) return -1;
+    return selectedLayerIndex;
+}
 
 // The rule the detail controls edit: a two-index walk, both bounds-checked, null on either miss
 // (STEP80, mirroring `SelectedLayer`, LayersTab_UI.cpp:120-127).
