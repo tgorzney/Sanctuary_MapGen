@@ -119,6 +119,48 @@ void RunMintsNextSymmetryGroupIdentifierChecks() {
          "instanceIdentifier likewise continues from the roster-wide maximum (11), never restarting at 0");
 }
 
+// Human's own follow-up bug report — "symmetry duplicates are not created". Root cause: the map's
+// own dead CENTER is a FIXED POINT under RotateHalfTurn — the recipe's own DEFAULT global mask
+// (Params::MapRecipe::globalSymmetryMask, MapRecipe_PARAMS.h) — so "+ Instance"'s own default spawn
+// position (MapCenterWorldUnits, MarkersTab_UI.cpp) always collapsed the orbit to 1 point regardless
+// of the target layer's symmetry settings. This documents BOTH the exact collapse (on-center, the
+// pre-fix bug) and the fix (MarkersTab_UI.cpp's own small diagonal nudge off center actually breaks
+// the fixed point, under the REAL default mask — not just MirrorAcrossX, this file's other checks).
+void RunRotateHalfTurnCenterFixedPointChecks() {
+    const Params::Geometry geometry = MakeTestGeometry();   // mapCenter == world (5, 5)
+    std::vector<Params::MarkerInstanceLayer> layers(1);     // default: bSymmetryEnabled=true, uses global
+
+    {
+        Params::MarkerInstanceGroup onCenterGroup;
+        const std::vector<Params::MarkerInstanceGroup> markers;
+        CreateSymmetricManualMarkerInstances(onCenterGroup, markers, layers, geometry,
+                                             Params::SymmetryAxis::RotateHalfTurn, 0,
+                                             /*layerIndex=*/0, /*worldX=*/5.0f, /*worldY=*/0.0f, /*worldZ=*/5.0f);
+        Check(onCenterGroup.transforms.size() == 1u,
+             "the pre-fix bug, reproduced directly: a create exactly on the map's dead center is a "
+             "RotateHalfTurn fixed point — the orbit collapses to 1 point even though symmetry is on");
+    }
+    {
+        // Mirrors MarkersTab_UI.cpp's own fix exactly: mapCenter + kNewInstanceCenterOffsetWorldUnits (4.0f)
+        // on both axes.
+        Params::MarkerInstanceGroup offCenterGroup;
+        const std::vector<Params::MarkerInstanceGroup> markers;
+        CreateSymmetricManualMarkerInstances(offCenterGroup, markers, layers, geometry,
+                                             Params::SymmetryAxis::RotateHalfTurn, 0,
+                                             /*layerIndex=*/0, /*worldX=*/9.0f, /*worldY=*/0.0f, /*worldZ=*/9.0f);
+        Check(offCenterGroup.transforms.size() == 2u,
+             "the fix: nudged 4 world units off center on both axes, the SAME default global mask "
+             "now produces a real symmetric pair");
+        Check(NearlyEqual(offCenterGroup.transforms[1].transform.positionX, 1.0f)
+           && NearlyEqual(offCenterGroup.transforms[1].transform.positionZ, 1.0f),
+             "the rotated sibling lands at the expected 180-degree point about center (5,5)");
+        Check(offCenterGroup.transforms[0].symmetryGroupIdentifier != 0
+           && offCenterGroup.transforms[0].symmetryGroupIdentifier
+              == offCenterGroup.transforms[1].symmetryGroupIdentifier,
+             "the pair shares one freshly-minted, non-zero symmetryGroupIdentifier — properly grouped");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -126,6 +168,7 @@ int main() {
     RunOnAxisCreatesSingleUngroupedInstanceChecks();
     RunSymmetryDisabledLayerCreatesSingleInstanceChecks();
     RunMintsNextSymmetryGroupIdentifierChecks();
+    RunRotateHalfTurnCenterFixedPointChecks();
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);
     return 1;

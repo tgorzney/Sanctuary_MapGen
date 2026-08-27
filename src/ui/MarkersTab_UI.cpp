@@ -271,14 +271,26 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                 // Layer's own effective mask/count and materializes every resulting orbit point (a
                 // 1-point orbit — symmetry off — still creates exactly the one instance, unchanged
                 // behavior for that case).
+                //
+                // Human's own follow-up report — "symmetry duplicates are not created": the map's own
+                // dead CENTER (MapCenterWorldUnits, this button's own default spawn X/Z) is a FIXED
+                // POINT under every one of the engine's symmetry kinds that passes through center —
+                // RotateHalfTurn (the recipe's own default global mask), MirrorAcrossX, MirrorAcrossZ,
+                // and Radial all map the center to itself — so the orbit collapsed to 1 point
+                // regardless of the target layer's own symmetry settings. A small diagonal nudge off
+                // BOTH axes keeps the default spawn point off every one of those fixed points at once
+                // (kNewInstanceCenterOffsetWorldUnits: small enough to still read as "the center",
+                // and a multiple of the default grid-snap size so a grid-snapped layer lands clean).
+                constexpr float kNewInstanceCenterOffsetWorldUnits = 4.0f;
                 Params::MarkerInstanceGroup& group =
                     FindOrCreateMarkerInstanceGroupByName(recipe.markers, typeName);
                 const float mapCenter = MapCenterWorldUnits(recipe.geometry);
+                const float spawnCoordinate = mapCenter + kNewInstanceCenterOffsetWorldUnits;
                 const int layerIndex = ResolveAddInstanceLayerIndex(
                     recipe.markerLayers, state.manualLayers.selectedLayerIndex, typeName);
                 state.selectedManualInstanceIdentifier = CreateSymmetricManualMarkerInstances(
                     group, recipe.markers, recipe.markerLayers, recipe.geometry, recipe.globalSymmetryMask,
-                    recipe.radialSymmetryRepeatCount, layerIndex, mapCenter, 0.0f, mapCenter);
+                    recipe.radialSymmetryRepeatCount, layerIndex, spawnCoordinate, 0.0f, spawnCoordinate);
             }
             if (buttons.bAddGroupClicked) {
                 Params::MarkerLayerBundle bundle;
