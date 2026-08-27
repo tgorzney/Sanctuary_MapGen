@@ -9,6 +9,7 @@
 // Everything above the draw declarations is PURE (WidgetHelpers_UI.h "THE SPLIT"), so the mask
 // arithmetic and the transform mirrors are testable with no imgui frame, window or GL context.
 #pragma once
+#include <functional>
 #include "IconGridWidget_UI.h"
 #include "RangeSliderWidget_UI.h"
 #include "Section_UI.h"
@@ -126,6 +127,22 @@ void DrawPlacementGateSection(int& maskStratumIndex, float& maskWeightMinimum, i
 void DrawPlacementTemplatePicker(Params::ScatterTransform& transform, IconGridState& iconGridState,
                                  float iconGridHeight, const IconAtlasManifest* iconManifest,
                                  Pipeline::PreviewDriver* previewDriver);
+
+// The slope/height terrain gate — the one block Marker/Prop/Decal/Unit rules all draw as two
+// identical DrawRangeSlider calls (DrawMarkerRuleGates/DrawPropRuleGates/DrawDecalGates/
+// DrawUnitRuleSettings, four near-verbatim copies this collapses into one). Each caller's own
+// `minSlope`/`maxSlope`/`minHeight`/`maxHeight` fields stay on ITS OWN rule struct (no shared
+// SymmetrySetting-style retrofit here — this is a widget-level consolidation only) and its own
+// tested LoadXxxRuleValues/StoreXxxRuleValues pair is untouched; `storeValues` is that caller's own
+// Store function, invoked only on the frame a handle actually moved, exactly as every existing call
+// site already gated it. `slopeLabel`/`heightLabel` preserve each caller's own wording ("Bounds" vs
+// "Range") — this is a draw-path consolidation, not a copy-editing pass.
+void DrawPlacementSlopeHeightGate(RangeSliderValues& slopeValues, const RangeSliderBounds& slopeBounds,
+                                  RealtimeToggle& slopeToggle, RangeSliderValues& heightValues,
+                                  const RangeSliderBounds& heightBounds, RealtimeToggle& heightToggle,
+                                  const char* slopeLabel, const char* heightLabel,
+                                  const std::function<void()>& storeValues,
+                                  Pipeline::PreviewDriver* previewDriver);
 
 } // namespace Ui
 } // namespace SanmapGen

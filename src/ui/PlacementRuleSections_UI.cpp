@@ -77,6 +77,24 @@ void DrawPlacementGateSection(int& maskStratumIndex, float& maskWeightMinimum, i
     DrawSectionEnd();
 }
 
+// The slope/height terrain gate every Marker/Prop/Decal/Unit rule draws identically (see header
+// comment) — the one caller-side difference is the label wording, so that stays a parameter rather
+// than being folded away.
+void DrawPlacementSlopeHeightGate(RangeSliderValues& slopeValues, const RangeSliderBounds& slopeBounds,
+                                  RealtimeToggle& slopeToggle, RangeSliderValues& heightValues,
+                                  const RangeSliderBounds& heightBounds, RealtimeToggle& heightToggle,
+                                  const char* slopeLabel, const char* heightLabel,
+                                  const std::function<void()>& storeValues,
+                                  Pipeline::PreviewDriver* previewDriver) {
+    WidgetChange change = DrawRangeSlider(slopeLabel, slopeValues, slopeBounds, slopeToggle,
+                                          WidgetStyle(), "%.1f");
+    if (change.bValueChanged) storeValues();
+    NotifyPlacementChange(change.bCommitted, previewDriver);
+    change = DrawRangeSlider(heightLabel, heightValues, heightBounds, heightToggle);
+    if (change.bValueChanged) storeValues();
+    NotifyPlacementChange(change.bCommitted, previewDriver);
+}
+
 // The template (`tpId`) a rule spawns: typed here, browsed in the resident atlas beside it.
 // ICON PICKER SCOPE (ARCH §8.4): the manifest belongs to the app shell (M5-7) and is passed in;
 // it carries an `iconId` and nothing in the tree maps that id back to a game `tpId`, so the grid

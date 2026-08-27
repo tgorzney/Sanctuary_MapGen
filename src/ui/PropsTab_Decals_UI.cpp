@@ -14,14 +14,10 @@ namespace {
 void DrawDecalGates(Params::DecalRule& rule, DecalRuleStackState& state,
                     Pipeline::PreviewDriver* previewDriver) {
     if (!DrawSectionBegin("Decal Gates", state.gateSection)) return;
-    WidgetChange change = DrawRangeSlider("Slope Range (degrees)", state.slopeValues,
-                                          state.slopeBounds, state.slopeToggle, WidgetStyle(), "%.1f");
-    if (change.bValueChanged) StoreDecalRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
-    change = DrawRangeSlider("Height Range (normalized)", state.heightValues, state.heightBounds,
-                             state.heightToggle);
-    if (change.bValueChanged) StoreDecalRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
+    DrawPlacementSlopeHeightGate(state.slopeValues, state.slopeBounds, state.slopeToggle,
+                                 state.heightValues, state.heightBounds, state.heightToggle,
+                                 "Slope Range (degrees)", "Height Range (normalized)",
+                                 [&]{ StoreDecalRuleValues(state, rule); }, previewDriver);
     NotifyPlacementChange(DrawLabelledDial("Density", rule.density, state.densityRange,
                                            state.densityToggle, WidgetStyle(), "%.4f").bCommitted,
                           previewDriver);

@@ -25,14 +25,10 @@ std::string BoundedTemplateIdentifierText(const char (&templateIdentifier)[8]) {
 void DrawPropRuleGates(Params::PropRule& rule, PropsTabState& state,
                        Pipeline::PreviewDriver* previewDriver) {
     if (!DrawSectionBegin("Gates", state.ruleDetail.gateSection)) return;
-    WidgetChange change = DrawRangeSlider("Slope Range (degrees)", state.slopeValues,
-                                          state.slopeBounds, state.slopeToggle, WidgetStyle(), "%.1f");
-    if (change.bValueChanged) StorePropRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
-    change = DrawRangeSlider("Height Range (normalized)", state.heightValues, state.heightBounds,
-                             state.heightToggle);
-    if (change.bValueChanged) StorePropRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
+    DrawPlacementSlopeHeightGate(state.slopeValues, state.slopeBounds, state.slopeToggle,
+                                 state.heightValues, state.heightBounds, state.heightToggle,
+                                 "Slope Range (degrees)", "Height Range (normalized)",
+                                 [&]{ StorePropRuleValues(state, rule); }, previewDriver);
     NotifyPlacementChange(DrawLabelledDial("Density", rule.density, state.densityRange,
                                            state.densityToggle, WidgetStyle(), "%.4f").bCommitted,
                           previewDriver);

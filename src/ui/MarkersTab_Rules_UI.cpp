@@ -35,14 +35,10 @@ void DrawMarkerRuleGates(Params::MarkerRule& rule, MarkersTabState& state,
         rule.category = static_cast<Params::MarkerCategory>(state.ruleDetail.categoryIndex);
     NotifyPlacementChange(DrawCheckbox("Hidden (still generated for clearance/fairness)",
                                        rule.bHidden).bCommitted, previewDriver);
-    WidgetChange change = DrawRangeSlider("Slope Bounds (degrees)", state.slopeValues,
-                                          state.slopeBounds, state.slopeToggle, WidgetStyle(), "%.1f");
-    if (change.bValueChanged) StoreMarkerRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
-    change = DrawRangeSlider("Height Bounds (normalized)", state.heightValues, state.heightBounds,
-                             state.heightToggle);
-    if (change.bValueChanged) StoreMarkerRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
+    DrawPlacementSlopeHeightGate(state.slopeValues, state.slopeBounds, state.slopeToggle,
+                                 state.heightValues, state.heightBounds, state.heightToggle,
+                                 "Slope Bounds (degrees)", "Height Bounds (normalized)",
+                                 [&]{ StoreMarkerRuleValues(state, rule); }, previewDriver);
     NotifyPlacementChange(DrawLabelledDial("Obstacle Distance Minimum", rule.obstacleDistanceMinimum,
                                            state.obstacleDistanceRange, state.obstacleDistanceToggle,
                                            WidgetStyle(), "%.2f").bCommitted, previewDriver);

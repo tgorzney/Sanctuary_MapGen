@@ -72,14 +72,10 @@ void DrawUnitRuleSettings(Params::UnitRule& rule, ArmyUnitListState& state,
     NotifyPlacementChange(DrawSliderScalar("Spacing Minimum (cells)", rule.spacingMinimum,
                                            state.spacingRange, state.spacingToggle, WidgetStyle(),
                                            "%.2f").bCommitted, previewDriver);
-    WidgetChange change = DrawRangeSlider("Slope Range (degrees)", state.slopeValues,
-                                          state.slopeBounds, state.slopeToggle, WidgetStyle(), "%.1f");
-    if (change.bValueChanged) StoreUnitRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
-    change = DrawRangeSlider("Height Range (normalized)", state.heightValues, state.heightBounds,
-                             state.heightToggle);
-    if (change.bValueChanged) StoreUnitRuleValues(state, rule);
-    NotifyPlacementChange(change.bCommitted, previewDriver);
+    DrawPlacementSlopeHeightGate(state.slopeValues, state.slopeBounds, state.slopeToggle,
+                                 state.heightValues, state.heightBounds, state.heightToggle,
+                                 "Slope Range (degrees)", "Height Range (normalized)",
+                                 [&]{ StoreUnitRuleValues(state, rule); }, previewDriver);
     DrawSectionEnd();
 }
 
