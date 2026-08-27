@@ -159,14 +159,15 @@ int ResolveSelectedParentBundleIdentifier(const std::vector<Params::MarkerLayerB
     return -1;
 }
 
-// STEP138 — this Type's own instances whose `layerIndex` does not resolve to any Layer OF THIS
-// TYPE (no manual Layer exists yet for it, or the index is a legacy/cross-type stale reference),
-// rendered at the base of the section, after every Group and Layer, still indented under the
-// collapsible Type-section. `MarkerTransform::layerIndex` has no real "unassigned" sentinel
-// (MarkerLayerIndexRepair_UI.h's own clamp-to-0 convention) — this IS the one "no Layer" case the
-// current data model can actually represent; an instance "in a Group but no Layer" (human's other
-// stated case) needs a real PARAMS+IO field this ticket does not add (out of scope, flagged not
-// guessed).
+// STEP138/146 — this Type's own instances whose `layerIndex` does not resolve to any Layer OF THIS
+// TYPE (no manual Layer exists yet for it, `-1` — genuinely unassigned, STEP146 — or a legacy/
+// cross-type stale reference), rendered at the base of the section, after every Group and Layer,
+// still indented under the collapsible Type-section. STEP146 (human's own bug report — dragging an
+// instance here from a Layer did nothing) makes this list a real drop target too, reassigning to
+// `layerIndex = -1`: this IS the one "no Layer" case the current data model can represent; an
+// instance "in a Group but no Layer" (human's other stated case — a direct Group reference
+// independent of any Layer) still needs a real PARAMS+IO field this ticket does not add (out of
+// scope, flagged not guessed).
 void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>& markers,
                                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                        const std::string& typeName, int& selectedManualInstanceIdentifier,
@@ -184,11 +185,20 @@ void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>&
         }
     }
     ImGui::TextUnformatted("Instances");
+    // STEP146 (human's own bug report — dragging an instance out of a Layer onto this base list did
+    // nothing) — attached to the "Instances" text itself, not gated behind `!baseInstances.empty()`
+    // below, so the list is a real drop target even while empty (the common starting case: no
+    // unassigned instances yet). `DrawManualLayerInstanceDropTarget` already accepts ANY layerIndex
+    // with no bounds-check of its own (MarkersTab_ManualInstanceSelection_UI.cpp) — passing -1 here
+    // reassigns the dropped instance(s) to "no layer of my own type," which `bHasOwnTypeLayer` above
+    // already treats as belonging in this exact list (any negative/out-of-range/different-type
+    // layerIndex does). No PARAMS/IO change needed: -1 was always a safe value to WRITE into
+    // `layerIndex` (every read site bounds-checks `>= 0` first, MarkerLayerIndexRepair_UI.h and
+    // friends) — the only gap was that nothing ever wrote it.
+    DrawManualLayerInstanceDropTarget(-1, markers, selectedManualInstanceIdentifiers);
     if (baseInstances.empty()) { ImGui::TextDisabled("(none)"); return; }
 
-    // STEP141 — this list's own display-order identifiers, for Shift-range selection. Not a drop
-    // TARGET (dragging an instance back to "no layer" hits the same not-yet-representable gap
-    // DrawBaseSectionManualInstanceList's own header comment already flags — only a drag SOURCE).
+    // STEP141 — this list's own display-order identifiers, for Shift-range selection.
     std::vector<int> rowOrder;
     rowOrder.reserve(baseInstances.size());
     for (const std::pair<int, int>& groupTransformIndex : baseInstances)

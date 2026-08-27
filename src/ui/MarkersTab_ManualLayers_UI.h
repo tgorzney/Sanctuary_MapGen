@@ -21,8 +21,10 @@
 //  1. No `Data::PlacementInstances` parameter and no read-only transform-list block: unlike Props,
 //     the Markers tab already previews the resolved buffer via `DrawPlacedMarkerList`
 //     (MarkersTab_Placed_UI.h) — a ported `DrawTransformList` would be a rival second view (STEP81 divergence 1).
-//  2. `MarkerInstanceLayer` carries no `bEnabled`/`bHidden` — the shared DraggableList's
-//     visibility/lock affordances stay inert here, same as props (STEP81 divergence 5).
+//  2. STEP144: `MarkerInstanceLayer::bHidden` now backs the shared DraggableList's built-in
+//     visibility icon (no `bEnabled` — a hand-placed Manual layer has no "generation enabled"
+//     concept, unlike Procedural's coupled E/D+V/I). Lock stays inert, same as props (STEP81
+//     divergence 5).
 //  3. Never notifies `Pipeline::PreviewDriver`: `recipe.markers`/`recipe.markerLayers` feed no
 //     PROC stage (STEP60), same silent posture STEP49 already adopts for the manual roster.
 #pragma once
@@ -97,6 +99,18 @@ inline Params::MarkerInstanceLayer* SelectedManualMarkerLayer(
 // exactly ONCE, before the Type-section loop, by DrawMarkerTypeSections — these are map-wide UI-only
 // preview preferences with no Type/Bundle scope of their own.
 void DrawManualMarkerLayerBlockSettings(ManualMarkerLayersState& state);
+
+// STEP142/144 — [SYM][COL][swatch], right-aligned as a cluster so it sits flush against
+// DraggableList's own built-in [o]/[L]/[X] strip with no dead gap (this ungrouped row draws no
+// delete button of its own — that strip's "X##delete" already covers it). Promoted out of the
+// anonymous namespace (was file-local) so a headless test can verify it lands flush against, not
+// overlapping, the strip it was designed to sit beside — see MarkersTab_ManualLayers_UI_Test.cpp's
+// RunUngroupedClusterDoesNotOverlapAffordanceStripCheck for the bug this closes (STEP145): using
+// `ImGui::GetContentRegionAvail()` to size the right-align push reached all the way to the row's
+// TRUE right edge, PAST the strip's own reserved space, so the push overshot and landed this
+// cluster on top of the strip instead of beside it.
+void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer,
+                                                  ManualMarkerLayersState& state, bool& bAnyCommitted);
 
 // The layer stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.
 // STEP110: each row's body, whenever the row's own CollapsingHeader is open (never gated on

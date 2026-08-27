@@ -54,25 +54,33 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
     return bMarkersMoved;
 }
 
-// STEP142 — [SYM][COL][swatch], right-aligned as a cluster so it sits flush against DraggableList's
-// own built-in [o]/[L]/[X] strip with no dead gap — this ungrouped row draws no delete button of its
-// own (that strip's "X##delete" already covers it, unlike the Bundle tree's Manual leaf, which has
-// no such strip and right-aligns its own X directly, DrawRightAlignedDeleteButton,
-// MarkersTab_BundleHeaderExtras_UI.cpp).
+} // namespace
+
+// STEP142/144 — [SYM][COL][swatch], right-aligned as a cluster so it sits flush against
+// DraggableList's own built-in [o]/[L]/[X] strip with no dead gap — this ungrouped row draws no
+// delete button of its own (that strip's "X##delete" already covers it, unlike the Bundle tree's
+// Manual leaf, which has no such strip and right-aligns its own X directly,
+// DrawRightAlignedDeleteButton, MarkersTab_BundleHeaderExtras_UI.cpp). STEP145: promoted out of the
+// anonymous namespace — see the header's own comment (MarkersTab_ManualLayers_UI.h) for why.
 void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer,
                                                   ManualMarkerLayersState& state, bool& bAnyCommitted) {
     const float clusterWidth = kMarkerLayerSymmetryButtonWidthPixels
                               + kMarkerLayerColorOverrideButtonWidthPixels
                               + kMarkerLayerColorOverrideSwatchWidthPixels;
-    const float availableWidth = ImGui::GetContentRegionAvail().x;
-    if (availableWidth > clusterWidth)
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + availableWidth - clusterWidth);
+    // Right-align within the row's own FIXED header-extra budget, not GetContentRegionAvail(): the
+    // live content region reaches all the way to the row's TRUE right edge, which is PAST the
+    // built-in [o]/[L]/[X] strip's own reserved kAffordanceStripWidthPixels (DrawRowAffordances,
+    // DraggableListWidget_RowAffordances_UI.h) — using it here pushed this cluster 84px too far
+    // right, landing it squarely on top of the strip (the human's own "buttons ... overlapping each
+    // other" report). kMarkerLayerHeaderExtraCombinedWidthPixels IS this row's own reserved zone
+    // width (the same fixed budget DraggableList<T>::Render was given as headerExtraWidthPixels), so
+    // right-aligning against IT lands this cluster flush against the strip with no gap and no overlap.
+    if (kMarkerLayerHeaderExtraCombinedWidthPixels > clusterWidth)
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kMarkerLayerHeaderExtraCombinedWidthPixels - clusterWidth);
     DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
     ImGui::SameLine();
     DrawManualMarkerLayerColorOverrideHeaderControl(layer, state, bAnyCommitted);
 }
-
-} // namespace
 
 // STEP125: promoted out of the anonymous namespace (was DrawLayerSettings), called exactly once,
 // tab-wide, by DrawMarkerTypeSections — see MarkersTab_ManualLayers_UI.h.
@@ -101,6 +109,11 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                 markerLayers[static_cast<std::size_t>(rowIndex)], markerTypeNameFilter);   // CHANGED — STEP125
             row.label   = ManualMarkerLayerRowLabel(markerLayers[static_cast<std::size_t>(rowIndex)]);
             row.bLocked = markerLayers[static_cast<std::size_t>(rowIndex)].bLocked;
+            // STEP144/145 — the built-in [o]/[-] icon's own displayed state: bHidden wasn't wired
+            // here when the field was added, so the icon always showed "visible" regardless of the
+            // real state (clicking it still correctly flipped bHidden via ApplyLayerListSignal's
+            // ToggleVisibility branch, but the icon itself never reflected it back).
+            row.bVisible = !markerLayers[static_cast<std::size_t>(rowIndex)].bHidden;
             return row;
         },
         [&](int rowIndex) {

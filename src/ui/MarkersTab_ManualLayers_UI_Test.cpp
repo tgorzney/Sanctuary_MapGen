@@ -5,6 +5,7 @@
 #include "MarkersTab_ManualLayers_UI.h"
 #include "ListWidget_TestFrame_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
+#include "MarkersTab_ManualLayerRowBody_UI.h"
 #include <cmath>
 #include <cstdio>
 
@@ -209,6 +210,45 @@ void RunRealtimeDefaultChecks() {
           "ManualMarkerLayersState's five toggles default to realtime ON (STEP118)");
 }
 
+// STEP145 (human's own bug report — "the buttons on the Layer Header are all overlapping each
+// other slightly") — DrawRightAlignedSymmetryColorOverrideCluster's own right-align push used to
+// size itself off `ImGui::GetContentRegionAvail()`, which reaches the row's TRUE right edge, PAST
+// the built-in [o]/[L]/[X] affordance strip's own reserved kAffordanceStripWidthPixels
+// (DraggableListWidget_RowAffordances_UI.h) — overshooting by exactly that strip width and landing
+// the cluster on top of it. Reproduces both reservations at the SAME row width production uses
+// (`kMarkerLayerHeaderExtraCombinedWidthPixels`, `RenderCollapsibleRow`'s own SameLine contract,
+// DraggableListWidget_RowLayout_UI.h) and asserts the cluster's own rightmost edge lands AT OR
+// BEFORE the strip's leftmost edge — never past it.
+void RunUngroupedClusterDoesNotOverlapAffordanceStripCheck() {
+    HeadlessImguiSession session;
+    Params::MarkerInstanceLayer layer;
+    ManualMarkerLayersState state;
+    bool bAnyCommitted = false;
+    DraggableListRow row;   // bLocked/bVisible default (irrelevant to this geometry check)
+    DraggableListSignal signal;
+
+    ImVec2 clusterMax, stripMin;
+    RunHeadlessFrame(HeadlessMouseState(), ImVec2(400.0f, 100.0f), [&] {
+        ImGui::PushID("row");
+        ImGui::CollapsingHeader("Some Fairly Long Manual Layer Name",
+            ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow);
+        const float rowAvailWidthPixels = ImGui::GetContentRegionAvail().x;
+        // Mirrors RenderCollapsibleRow's own two calls, in the SAME order (DraggableListWidget_RowLayout_UI.h):
+        // the header-extra zone first, then the affordance strip.
+        ImGui::SameLine(rowAvailWidthPixels - static_cast<float>(kAffordanceStripWidthPixels)
+            - kMarkerLayerHeaderExtraCombinedWidthPixels);
+        DrawRightAlignedSymmetryColorOverrideCluster(layer, state, bAnyCommitted);
+        clusterMax = ImGui::GetItemRectMax();
+        RowLayoutDetail::DrawRowAffordances(row, 0, signal, 0.0f, rowAvailWidthPixels, false);
+        stripMin = ImGui::GetItemRectMin();   // the strip's FIRST item, [o]/[-] visibility
+        ImGui::PopID();
+    });
+
+    Check(clusterMax.x <= stripMin.x + 0.5f,
+         "the [SYM][COL][swatch] cluster's own rightmost edge lands at or before the built-in "
+         "[o]/[L]/[X] strip's leftmost edge -- never past it (STEP145)");
+}
+
 } // namespace
 
 int main() {
@@ -218,6 +258,7 @@ int main() {
     RunIsMarkerInstanceLayerRowSuppressedChecks();
     RunDrawLayerListButtonsTypeSeedChecks();
     RunRealtimeDefaultChecks();
+    RunUngroupedClusterDoesNotOverlapAffordanceStripCheck();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

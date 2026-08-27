@@ -99,6 +99,24 @@ void RunReassignManualInstanceLayersChecks() {
     Check(markers[0].transforms[2].layerIndex == 2, "the other moved identifier (3) lands on the new layerIndex too");
 }
 
+// STEP146 (human's own bug report — dragging an instance out of a Layer onto the Type-section's own
+// base "Instances" list did nothing) — DrawBaseSectionManualInstanceList (MarkersTab_UI.cpp) now
+// calls DrawManualLayerInstanceDropTarget(-1, ...) on that list; the reassignment underneath it is
+// this same generic function, which never bounds-checked `newLayerIndex` — -1 flows through exactly
+// like any other value, no new logic needed. This proves the -1 case explicitly.
+void RunReassignManualInstanceLayersToUnassignedChecks() {
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.resize(2);
+    markers[0].transforms[0].instanceIdentifier = 1; markers[0].transforms[0].layerIndex = 0;
+    markers[0].transforms[1].instanceIdentifier = 2; markers[0].transforms[1].layerIndex = 0;
+
+    ReassignManualInstanceLayers(markers, { 1 }, -1);
+
+    Check(markers[0].transforms[0].layerIndex == -1,
+         "dropping onto the base Instances list reassigns to layerIndex -1 (\"no layer\")");
+    Check(markers[0].transforms[1].layerIndex == 0, "an identifier NOT in the moved set is untouched");
+}
+
 } // namespace
 
 int main() {
@@ -109,6 +127,7 @@ int main() {
     RunShiftWithIdentifierNotInRowOrderFallsBackChecks();
     RunIsManualInstanceSelectedChecks();
     RunReassignManualInstanceLayersChecks();
+    RunReassignManualInstanceLayersToUnassignedChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;
