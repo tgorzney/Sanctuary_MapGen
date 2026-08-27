@@ -8,6 +8,7 @@
 // MarkerLayerBundlesState for the caller to apply AFTER the tree's own recursive walk finishes this
 // frame (see that struct's own field comments, MarkersTab_Bundles_UI.h).
 #include "MarkersTab_Bundles_UI.h"
+#include "MarkersTab_ManualInstanceSelection_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
@@ -71,13 +72,20 @@ void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
 }
 
 // A Layer leaf's own header-extra: STEP130's Symmetry/Color Override pair (Manual only — Procedural
-// has neither field) plus, STEP140, an "X" delete on EVERY leaf. Manual offers a choice (its
-// Instances are separable content); Procedural is a single action (its Rules are not).
+// has neither field) plus, STEP140, an "X" delete on EVERY leaf, plus, STEP141, a drag-drop TARGET
+// on a Manual leaf's own row (an Instance dropped here reassigns to THIS layerIndex — Procedural
+// leaves accept no Instances). The drop-target check runs FIRST, before anything else in this
+// function draws a new widget, so it still attaches to the leaf's own TreeNodeEx row (the "last
+// item" at the moment this callback starts, RenderLeaf's own contract).
 void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     std::vector<Params::MarkerInstanceLayer>& instanceLayers,
+                                    std::vector<Params::MarkerInstanceGroup>& markers,
                                     ManualMarkerLayersState& manualLayersState,
-                                    MarkerLayerBundlesState& bundlesState, bool& bAnyCommitted) {
+                                    MarkerLayerBundlesState& bundlesState,
+                                    const std::vector<int>& selectedManualInstanceIdentifiers,
+                                    bool& bAnyCommitted) {
     if (leaf.kind == MarkerGroupLeafKey_UI::Kind::Manual) {
+        DrawManualLayerInstanceDropTarget(leaf.layerIndex, markers, selectedManualInstanceIdentifiers);
         if (leaf.layerIndex >= 0 && leaf.layerIndex < static_cast<int>(instanceLayers.size())) {
             Params::MarkerInstanceLayer& layer = instanceLayers[static_cast<std::size_t>(leaf.layerIndex)];
             DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);

@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 #include "ManualInstanceLayerIndex_UI.h"
+#include "MarkersTab_ManualInstanceSelection_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
 #include "../params/Geometry_PARAMS.h"
 #include "../params/MarkerInstance_PARAMS.h"
@@ -22,15 +23,16 @@
 namespace SanmapGen {
 namespace Ui {
 
-// One instance row's own body (Selectable + click -> select, both the tab-local write and the
-// canvas-selection callback). Declared here (not file-local/anonymous) so MarkersTab_UI.cpp's
-// base-section instance list (STEP138 — the one "in a Group/Section with no Layer" case the current
-// data model can represent, since layerIndex has no true unassigned sentinel) draws an IDENTICAL
-// row rather than a near-duplicate copy.
+// One instance row's own body: Selectable + click (Ctrl toggle/Shift range/plain, STEP141) -> both
+// the multi-select set AND the single "primary" selection (the tab-local write, canvas-selection
+// callback) update together, plus a drag SOURCE so the row can be dropped onto a Layer elsewhere
+// (MarkersTab_ManualInstanceSelection_UI.h's own DrawManualLayerInstanceDropTarget). Declared here
+// (not file-local/anonymous) so MarkersTab_UI.cpp's base-section instance list (STEP138 — the one
+// "no Layer at all" case the current data model can represent) draws an IDENTICAL row rather than a
+// near-duplicate copy.
 void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
                            const std::pair<int, int>& groupTransformIndex,
-                           int& selectedManualInstanceIdentifier,
-                           const std::function<void(int)>& selectManualMarkerInstanceCallback);
+                           ManualInstanceRowInteractionContext_UI& interaction);
 
 // STEP123 — reserved width for the header's Color Override checkbox + compact swatch
 // (DrawManualMarkerLayerColorOverrideHeaderControl, below), left of DraggableList's own strip.
@@ -72,12 +74,17 @@ inline constexpr float kMarkerLayerHeaderExtraCombinedWidthPixels =
 // tab-local write, not instead of it: the tab-local write keeps the list's own highlight in sync
 // with itself, and the callback additionally drives the canvas's REAL selection (the actual fix —
 // see MapCanvas_UI.h's SelectManualMarkerByInstanceIdentifier).
+// STEP141: `selectedManualInstanceIdentifiers`/`anchorIdentifier` are the Ctrl/Shift multi-select
+// set (MarkersTabState's own new fields) — threaded through so this row's own click can update both
+// the multi-select AND the pre-existing single "primary" selection together
+// (MarkersTab_ManualInstanceSelection_UI.h).
 bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                       std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
                       int globalSymmetryMask, int globalRadialRepeatCount,
                       Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state,
                       const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier,
+                      std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                       const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
 // STEP123: the row header's own compact Color Override control (checkbox + swatch), drawn on EVERY

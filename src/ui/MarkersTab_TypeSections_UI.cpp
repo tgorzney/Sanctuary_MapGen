@@ -100,6 +100,8 @@ void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
                                           recipe.geometry, recipe.globalSymmetryMask,
                                           recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
                                           typeName, state.selectedManualInstanceIdentifier,
+                                          state.selectedManualInstanceIdentifiers,
+                                          state.manualInstanceSelectionAnchorIdentifier,
                                           selectManualMarkerInstanceCallback);
 
             DrawSectionEnd();   // outer Type-section

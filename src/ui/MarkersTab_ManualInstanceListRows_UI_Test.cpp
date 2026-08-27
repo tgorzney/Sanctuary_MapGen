@@ -47,14 +47,16 @@ FrameResult RunRowBodyFrame(HeadlessMouseState mouse, Params::MarkerInstanceLaye
                             const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                             std::vector<Params::MarkerInstanceGroup>& markers,
                             const ManualInstanceLayerIndex_UI& instanceIndex, ManualMarkerLayersState& state,
-                            int& selectedManualInstanceIdentifier) {
+                            int& selectedManualInstanceIdentifier,
+                            std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier) {
     FrameResult result;
     const Params::Geometry geometry;
     Params::MarkerSymmetryFixSettings symmetryFixSettings;
     RunHeadlessFrame(mouse, kWindowSize, [&] {
         result.bReturned = DrawLayerRowBody(layer, /*layerIndex=*/0, markerLayers, markers, geometry,
                                             Params::SymmetryAxis::None, 3, symmetryFixSettings, state,
-                                            instanceIndex, selectedManualInstanceIdentifier);
+                                            instanceIndex, selectedManualInstanceIdentifier,
+                                            selectedManualInstanceIdentifiers, anchorIdentifier);
         result.lastItemMin = ImGui::GetItemRectMin();
         result.lastItemMax = ImGui::GetItemRectMax();
         result.lastItemId  = ImGui::GetItemID();
@@ -66,14 +68,18 @@ FrameResult ClickAt(ImVec2 position, Params::MarkerInstanceLayer& layer,
                     const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                     std::vector<Params::MarkerInstanceGroup>& markers,
                     const ManualInstanceLayerIndex_UI& instanceIndex, ManualMarkerLayersState& state,
-                    int& selectedManualInstanceIdentifier) {
+                    int& selectedManualInstanceIdentifier,
+                    std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier) {
     HeadlessMouseState hover;   hover.position = position;
     HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
     HeadlessMouseState release = hover; release.bLeftButtonDown = false;
-    RunRowBodyFrame(hover, layer, markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier);
+    RunRowBodyFrame(hover, layer, markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
+                   selectedManualInstanceIdentifiers, anchorIdentifier);
     const FrameResult pressResult =
-        RunRowBodyFrame(press, layer, markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier);
-    RunRowBodyFrame(release, layer, markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier);
+        RunRowBodyFrame(press, layer, markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
+                        selectedManualInstanceIdentifiers, anchorIdentifier);
+    RunRowBodyFrame(release, layer, markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
+                    selectedManualInstanceIdentifiers, anchorIdentifier);
     return pressResult;
 }
 
@@ -98,9 +104,12 @@ void RunInstanceRowClickChecks() {
 
     ManualMarkerLayersState state;
     int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int anchorIdentifier = -1;
 
     const FrameResult settle = RunRowBodyFrame(HeadlessMouseState(), markerLayers[0], markerLayers, markers,
-                                               instanceIndex, state, selectedManualInstanceIdentifier);
+                                               instanceIndex, state, selectedManualInstanceIdentifier,
+                                               selectedManualInstanceIdentifiers, anchorIdentifier);
     Check(settle.lastItemId != 0, "the last-drawn item is a real, interactive Selectable row, not inert text");
     const float rowHeight  = settle.lastItemMax.y - settle.lastItemMin.y;
     const float rowSpacing = ImGui::GetStyle().ItemSpacing.y;
@@ -109,12 +118,14 @@ void RunInstanceRowClickChecks() {
     const ImVec2 firstRowCenter(secondRowCenter.x, secondRowCenter.y - (rowHeight + rowSpacing));
 
     const FrameResult firstClick = ClickAt(firstRowCenter, markerLayers[0], markerLayers, markers,
-                                           instanceIndex, state, selectedManualInstanceIdentifier);
+                                           instanceIndex, state, selectedManualInstanceIdentifier,
+                                           selectedManualInstanceIdentifiers, anchorIdentifier);
     Check(selectedManualInstanceIdentifier == 100, "clicking the first row selects its own instanceIdentifier (100)");
     Check(!firstClick.bReturned, "a selection click never sets the function's own commit return value");
 
     const FrameResult secondClick = ClickAt(secondRowCenter, markerLayers[0], markerLayers, markers,
-                                            instanceIndex, state, selectedManualInstanceIdentifier);
+                                            instanceIndex, state, selectedManualInstanceIdentifier,
+                                            selectedManualInstanceIdentifiers, anchorIdentifier);
     Check(selectedManualInstanceIdentifier == 101, "clicking the SECOND row updates to its own instanceIdentifier (101), not additive/toggled");
     Check(!secondClick.bReturned, "and still reports no commit");
 }
@@ -135,13 +146,17 @@ void RunNoInstancesRendersNoneChecks() {
 
     ManualMarkerLayersState state;
     int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int anchorIdentifier = -1;
     const FrameResult settle = RunRowBodyFrame(HeadlessMouseState(), markerLayers[0], markerLayers, markers,
-                                               instanceIndex, state, selectedManualInstanceIdentifier);
+                                               instanceIndex, state, selectedManualInstanceIdentifier,
+                                               selectedManualInstanceIdentifiers, anchorIdentifier);
     Check(settle.lastItemId == 0, "the last-drawn item is inert (\"(none)\" text), not an interactive Selectable");
 
     const ImVec2 rowCenter((settle.lastItemMin.x + settle.lastItemMax.x) * 0.5f,
                            (settle.lastItemMin.y + settle.lastItemMax.y) * 0.5f);
-    ClickAt(rowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier);
+    ClickAt(rowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
+           selectedManualInstanceIdentifiers, anchorIdentifier);
     Check(selectedManualInstanceIdentifier == -1, "clicking where a row would have been does nothing — no row exists");
 }
 
@@ -160,13 +175,16 @@ float RunRowBodyHeight(bool bUseGroupColor) {
     ManualMarkerLayersState state;
     state.bUseGroupColor = bUseGroupColor;
     int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int anchorIdentifier = -1;
     const Params::Geometry geometry;
     Params::MarkerSymmetryFixSettings symmetryFixSettings;
     float height = 0.0f;
     RunHeadlessFrame(HeadlessMouseState(), kWindowSize, [&] {
         const float startY = ImGui::GetCursorPosY();
         DrawLayerRowBody(markerLayers[0], 0, markerLayers, markers, geometry, Params::SymmetryAxis::None, 3,
-                         symmetryFixSettings, state, instanceIndex, selectedManualInstanceIdentifier);
+                         symmetryFixSettings, state, instanceIndex, selectedManualInstanceIdentifier,
+                         selectedManualInstanceIdentifiers, anchorIdentifier);
         height = ImGui::GetCursorPosY() - startY;
     });
     return height;
@@ -244,9 +262,12 @@ void RunSymmetryGroupedInstanceRowClickChecks() {
 
     ManualMarkerLayersState state;
     int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int anchorIdentifier = -1;
 
     const FrameResult settle = RunRowBodyFrame(HeadlessMouseState(), markerLayers[0], markerLayers, markers,
-                                               instanceIndex, state, selectedManualInstanceIdentifier);
+                                               instanceIndex, state, selectedManualInstanceIdentifier,
+                                               selectedManualInstanceIdentifiers, anchorIdentifier);
     Check(settle.lastItemId != 0, "the last-drawn item, inside the open cluster, is a real, interactive row");
     const float rowHeight  = settle.lastItemMax.y - settle.lastItemMin.y;
     const float rowSpacing = ImGui::GetStyle().ItemSpacing.y;
@@ -255,12 +276,12 @@ void RunSymmetryGroupedInstanceRowClickChecks() {
     const ImVec2 firstRowCenter(secondRowCenter.x, secondRowCenter.y - (rowHeight + rowSpacing));
 
     ClickAt(firstRowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state,
-           selectedManualInstanceIdentifier);
+           selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers, anchorIdentifier);
     Check(selectedManualInstanceIdentifier == 300,
           "clicking the first row inside an open cluster still selects its own instanceIdentifier (300)");
 
     ClickAt(secondRowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state,
-           selectedManualInstanceIdentifier);
+           selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers, anchorIdentifier);
     Check(selectedManualInstanceIdentifier == 301,
           "clicking the second row inside the SAME cluster still updates to its own id (301), not additive");
 }

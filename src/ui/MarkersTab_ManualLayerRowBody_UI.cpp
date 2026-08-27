@@ -23,22 +23,41 @@ namespace Ui {
 // identical row rather than a near-duplicate copy.
 void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
                            const std::pair<int, int>& groupTransformIndex,
-                           int& selectedManualInstanceIdentifier,
-                           const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+                           ManualInstanceRowInteractionContext_UI& interaction) {
     const Params::MarkerInstanceGroup& instanceGroup =
         markers[static_cast<std::size_t>(groupTransformIndex.first)];
     const Params::MarkerTransform& instanceTransform =
         instanceGroup.transforms[static_cast<std::size_t>(groupTransformIndex.second)];
+    const int instanceIdentifier = instanceTransform.instanceIdentifier;
     const std::string rowLabel = instanceGroup.name + " - " + (!instanceTransform.name.empty()
         ? instanceTransform.name : std::to_string(groupTransformIndex.second));
-    const bool bRowSelected = selectedManualInstanceIdentifier == instanceTransform.instanceIdentifier;
+    const bool bRowSelected = interaction.selectedIdentifiers != nullptr
+        && IsManualInstanceSelected(*interaction.selectedIdentifiers, instanceIdentifier);
     if (ImGui::Selectable(rowLabel.c_str(), bRowSelected)) {
-        selectedManualInstanceIdentifier = instanceTransform.instanceIdentifier;
+        // STEP141 — Ctrl (toggle)/Shift (range within THIS list)/plain click, "typical expectations".
+        if (interaction.selectedIdentifiers != nullptr && interaction.anchorIdentifier != nullptr
+            && interaction.rowOrder != nullptr)
+            ApplyManualInstanceSelectionClick(*interaction.rowOrder, instanceIdentifier,
+                                              ImGui::GetIO().KeyCtrl, ImGui::GetIO().KeyShift,
+                                              *interaction.selectedIdentifiers, *interaction.anchorIdentifier);
+        if (interaction.primaryIdentifier != nullptr) *interaction.primaryIdentifier = instanceIdentifier;
         // ARCH §19.25, item 5 — IN ADDITION TO the tab-local write above, not instead of it:
         // drives the canvas's own real selection, so the REAL icon-sprite render path
         // (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) reflects this click too.
-        if (selectManualMarkerInstanceCallback)
-            selectManualMarkerInstanceCallback(instanceTransform.instanceIdentifier);
+        if (interaction.selectManualMarkerInstanceCallback)
+            interaction.selectManualMarkerInstanceCallback(instanceIdentifier);
+    }
+    // STEP141 — drag SOURCE: carries just this row's own instanceIdentifier; the RECEIVER (a Layer's
+    // own drop target, DrawManualLayerInstanceDropTarget) decides whether the WHOLE multi-select
+    // moves (this row is part of it) or just this one (it isn't) — the standard "drag a
+    // non-selected item" convention.
+    if (ImGui::BeginDragDropSource()) {
+        ImGui::SetDragDropPayload("markerInstanceDrag", &instanceIdentifier, sizeof(int));
+        const int movedCount = (interaction.selectedIdentifiers != nullptr
+                               && IsManualInstanceSelected(*interaction.selectedIdentifiers, instanceIdentifier))
+                              ? static_cast<int>(interaction.selectedIdentifiers->size()) : 1;
+        ImGui::Text("Moving %d marker(s)", movedCount);
+        ImGui::EndDragDropSource();
     }
 }
 
@@ -56,6 +75,7 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       int globalSymmetryMask, int globalRadialRepeatCount,
                       Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state,
                       const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier,
+                      std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                       const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     TextInputRules nameRules;
     nameRules.maximumLength = 48;
@@ -91,6 +111,20 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
     if (instanceIt == instanceIndex.instancesByLayerIndex.end() || instanceIt->second.empty()) {
         ImGui::TextDisabled("(none)");
     } else {
+        // STEP141 — this list's own display-order identifiers, for Shift-range selection.
+        std::vector<int> rowOrder;
+        rowOrder.reserve(instanceIt->second.size());
+        for (const std::pair<int, int>& groupTransformIndex : instanceIt->second)
+            rowOrder.push_back(markers[static_cast<std::size_t>(groupTransformIndex.first)]
+                .transforms[static_cast<std::size_t>(groupTransformIndex.second)].instanceIdentifier);
+
+        ManualInstanceRowInteractionContext_UI interaction;
+        interaction.primaryIdentifier   = &selectedManualInstanceIdentifier;
+        interaction.selectedIdentifiers = &selectedManualInstanceIdentifiers;
+        interaction.anchorIdentifier    = &anchorIdentifier;
+        interaction.rowOrder            = &rowOrder;
+        interaction.selectManualMarkerInstanceCallback = selectManualMarkerInstanceCallback;
+
         DrawSymmetryClusterInstanceList<std::pair<int, int>>(instanceIt->second,
             [&](const std::pair<int, int>& groupTransformIndex) {
                 return markers[static_cast<std::size_t>(groupTransformIndex.first)]
@@ -99,8 +133,7 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
             },
             [](int groupIdentifier, int /*bucketSize*/) { return groupIdentifier != 0; },
             [&](const std::pair<int, int>& groupTransformIndex) {
-                DrawManualInstanceRow(markers, groupTransformIndex, selectedManualInstanceIdentifier,
-                                      selectManualMarkerInstanceCallback);
+                DrawManualInstanceRow(markers, groupTransformIndex, interaction);
             });
     }
     return bNameCommitted || bSnapCommitted || bSnapSizeCommitted;

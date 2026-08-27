@@ -37,6 +37,8 @@ void DrawMarkerGroupLeafBody(const MarkerGroupLeafKey_UI& leaf, std::vector<Para
                          instanceLayers, markers, geometry, globalSymmetryMask, globalRadialRepeatCount,
                          markerSymmetryFixSettings, rootState.manualLayers,
                          instanceIndex, rootState.selectedManualInstanceIdentifier,
+                         rootState.selectedManualInstanceIdentifiers,
+                         rootState.manualInstanceSelectionAnchorIdentifier,
                          selectManualMarkerInstanceCallback);
     }
 }
@@ -124,8 +126,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                 DrawMarkerLayerBundleNodeHeaderExtra(bundleIdentifier, bundles, state);
             },
             [&](const MarkerGroupLeafKey_UI& leaf) {
-                DrawMarkerGroupLeafHeaderExtra(leaf, instanceLayers, rootState.manualLayers, state,
-                                               bHeaderExtraCommitted);
+                DrawMarkerGroupLeafHeaderExtra(leaf, instanceLayers, markers, rootState.manualLayers, state,
+                                               rootState.selectedManualInstanceIdentifiers, bHeaderExtraCommitted);
             },
             kMarkerLayerHeaderExtraCombinedWidthPixels,
             state.treeState, state.selectedBundleIdentifier);

@@ -239,6 +239,8 @@ void TestCrossTypeSectionNestedBundleCutoff() {
 void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
     HeadlessImguiSession session;
     std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
+    std::vector<Params::MarkerInstanceGroup> markers;
+    std::vector<int> selectedManualInstanceIdentifiers;
     ManualMarkerLayersState state;
     MarkerLayerBundlesState bundlesState;
     const MarkerGroupLeafKey_UI manualLeaf{ MarkerGroupLeafKey_UI::Kind::Manual, 0 };
@@ -249,7 +251,8 @@ void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
     RunHeadlessFrame(HeadlessMouseState(), windowSize, [&] {
         origin  = ImGui::GetCursorScreenPos();
         boxSize = ResolveWidgetTrackHeight(WidgetStyle());
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bSettleCommitted);
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
+                                       selectedManualInstanceIdentifiers, bSettleCommitted);
     });
     const ImVec2 checkboxCenter(origin.x + boxSize * 0.5f, origin.y + boxSize * 0.5f);
 
@@ -259,7 +262,8 @@ void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
     auto runFrame = [&](HeadlessMouseState mouse) {
         bool bCommitted = false;
         RunHeadlessFrame(mouse, windowSize, [&] {
-            DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bCommitted);
+            DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
+                                           selectedManualInstanceIdentifiers, bCommitted);
         });
         return bCommitted;
     };
@@ -281,6 +285,8 @@ void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
 void TestManualLeafDeleteButtonRecordsPendingIndex() {
     HeadlessImguiSession session;
     std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
+    std::vector<Params::MarkerInstanceGroup> markers;
+    std::vector<int> selectedManualInstanceIdentifiers;
     ManualMarkerLayersState state;
     MarkerLayerBundlesState bundlesState;
     const MarkerGroupLeafKey_UI manualLeaf{ MarkerGroupLeafKey_UI::Kind::Manual, 0 };
@@ -289,7 +295,8 @@ void TestManualLeafDeleteButtonRecordsPendingIndex() {
     // Find the "X##deleteLayer" button's own center by probing item rects across the row.
     ImVec2 deleteButtonCenter;
     RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 100.0f), [&] {
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bAnyCommitted);
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
+                                       selectedManualInstanceIdentifiers, bAnyCommitted);
         deleteButtonCenter = ImGui::GetItemRectMin();
         const ImVec2 maxRect = ImGui::GetItemRectMax();
         deleteButtonCenter.x = (deleteButtonCenter.x + maxRect.x) * 0.5f;
@@ -298,11 +305,13 @@ void TestManualLeafDeleteButtonRecordsPendingIndex() {
 
     HeadlessMouseState click; click.position = deleteButtonCenter; click.bLeftButtonDown = true;
     RunHeadlessFrame(click, ImVec2(300.0f, 100.0f), [&] {
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bAnyCommitted);
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
+                                       selectedManualInstanceIdentifiers, bAnyCommitted);
     });
     HeadlessMouseState release = click; release.bLeftButtonDown = false;
     RunHeadlessFrame(release, ImVec2(300.0f, 100.0f), [&] {
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, state, bundlesState, bAnyCommitted);
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
+                                       selectedManualInstanceIdentifiers, bAnyCommitted);
     });
 
     Check(instanceLayers.size() == 1,
@@ -314,6 +323,8 @@ void TestManualLeafDeleteButtonRecordsPendingIndex() {
 void TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly() {
     HeadlessImguiSession session;
     std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
+    std::vector<Params::MarkerInstanceGroup> markers;
+    std::vector<int> selectedManualInstanceIdentifiers;
     ManualMarkerLayersState state;
     MarkerLayerBundlesState bundlesState;
     const MarkerGroupLeafKey_UI proceduralLeaf{ MarkerGroupLeafKey_UI::Kind::Procedural, 0 };
@@ -322,7 +333,8 @@ void TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly() {
     ImVec2 cursorBefore, cursorAfter;
     RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 100.0f), [&] {
         cursorBefore = ImGui::GetCursorScreenPos();
-        DrawMarkerGroupLeafHeaderExtra(proceduralLeaf, instanceLayers, state, bundlesState, bAnyCommitted);
+        DrawMarkerGroupLeafHeaderExtra(proceduralLeaf, instanceLayers, markers, state, bundlesState,
+                                       selectedManualInstanceIdentifiers, bAnyCommitted);
         cursorAfter = ImGui::GetCursorScreenPos();
     });
 

@@ -798,6 +798,10 @@ add_sangen_test(MarkersTab_GlobalScaleRowLine_UI_Test
 # (mirrors MarkersTab_ManualLayerColorOverrideHeader_UI_Test's own posture).
 add_sangen_test(MarkersTab_ManualInstanceListRows_UI_Test
     src/ui/MarkersTab_ManualInstanceListRows_UI_Test.cpp)
+# STEP141: MarkersTab_ManualInstanceSelection_UI.h's own pure logic (Ctrl/Shift multi-select,
+# ReassignManualInstanceLayers) — pure, no imgui frame needed.
+add_sangen_test(MarkersTab_ManualInstanceSelection_UI_Test
+    src/ui/MarkersTab_ManualInstanceSelection_UI_Test.cpp)
 # STEP120: MarkersTab_Bundles_UI.h's own pure helpers (BuildMarkerLayerBundleLeafIndex,
 # NextMarkerLayerBundleId) and the Move/Rotate Apply functions' own call-boundary behavior — pure,
 # no imgui frame needed (STEP106's "defer the imgui-coupled path" posture). STEP125 extends this

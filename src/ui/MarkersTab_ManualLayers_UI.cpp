@@ -6,6 +6,7 @@
 #include "Checkbox_UI.h"
 #include "MarkerLayerId_UI.h"
 #include "MarkerLayerIndexRepair_UI.h"
+#include "MarkersTab_ManualInstanceSelection_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "imgui.h"
@@ -62,6 +63,7 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                   ManualMarkerLayersState& state, bool& bAnyNameCommitted,
                                   const ManualInstanceLayerIndex_UI& instanceIndex,
                                   int& selectedManualInstanceIdentifier,
+                                  std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                   const std::string& markerTypeNameFilter,
                                   const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     return DraggableList<Params::MarkerInstanceLayer>::Render(
@@ -81,10 +83,14 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
             if (DrawLayerRowBody(layer, rowIndex, markerLayers, markers,
                                  geometry, globalSymmetryMask, globalRadialRepeatCount, markerSymmetryFixSettings,
                                  state, instanceIndex, selectedManualInstanceIdentifier,
+                                 selectedManualInstanceIdentifiers, anchorIdentifier,
                                  selectManualMarkerInstanceCallback))
                 bAnyNameCommitted = true;
         },
         [&](int rowIndex) {
+            // STEP141 — this row's own drag-drop TARGET first (same "run before any new widget"
+            // reasoning DrawMarkerGroupLeafHeaderExtra's own comment gives, MarkersTab_BundleHeaderExtras_UI.cpp).
+            DrawManualLayerInstanceDropTarget(rowIndex, markers, selectedManualInstanceIdentifiers);
             // STEP130 (ARCH §19.24): [Symmetry toggle][Color Override], in that order, sharing ONE
             // combined header-extra width.
             DrawMarkerLayerSymmetryToggleHeaderControl(
@@ -124,6 +130,7 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                    const std::string& markerTypeNameFilter,
                                    int& selectedManualInstanceIdentifier,
+                                   std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                    const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     // STEP138/human's own correction: no "Add Marker Layer" button here — fully redundant with the
     // Type-section header's own "+ Layer" (MarkersTab_UI.cpp), and drawing both produced the same
@@ -133,7 +140,8 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
     const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
     const DraggableListSignal signal = DrawLayerList(markerLayers, markers, geometry, globalSymmetryMask,
         globalRadialRepeatCount, markerSymmetryFixSettings, state, bAnyNameCommitted,
-        instanceIndex, selectedManualInstanceIdentifier, markerTypeNameFilter,
+        instanceIndex, selectedManualInstanceIdentifier,
+        selectedManualInstanceIdentifiers, anchorIdentifier, markerTypeNameFilter,
         selectManualMarkerInstanceCallback);
     if (signal.bHasSignal()) ApplyLayerListSignal(markerLayers, markers, state, signal);
     bLayersMoved = bAnyNameCommitted || bLayersMoved;

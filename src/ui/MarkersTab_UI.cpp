@@ -6,6 +6,7 @@
 #include "MarkerInstanceId_UI.h"
 #include "MarkerLayerId_UI.h"
 #include "MarkersTab_BundleDelete_UI.h"
+#include "MarkersTab_ManualInstanceSelection_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "PlacementRuleSections_UI.h"
@@ -169,6 +170,7 @@ int ResolveSelectedParentBundleIdentifier(const std::vector<Params::MarkerLayerB
 void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>& markers,
                                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                        const std::string& typeName, int& selectedManualInstanceIdentifier,
+                                       std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                        const std::function<void(int)>& selectManualMarkerInstanceCallback) {
     std::vector<std::pair<int, int>> baseInstances;
     for (int groupIndex = 0; groupIndex < static_cast<int>(markers.size()); ++groupIndex) {
@@ -183,6 +185,23 @@ void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>&
     }
     ImGui::TextUnformatted("Instances");
     if (baseInstances.empty()) { ImGui::TextDisabled("(none)"); return; }
+
+    // STEP141 — this list's own display-order identifiers, for Shift-range selection. Not a drop
+    // TARGET (dragging an instance back to "no layer" hits the same not-yet-representable gap
+    // DrawBaseSectionManualInstanceList's own header comment already flags — only a drag SOURCE).
+    std::vector<int> rowOrder;
+    rowOrder.reserve(baseInstances.size());
+    for (const std::pair<int, int>& groupTransformIndex : baseInstances)
+        rowOrder.push_back(markers[static_cast<std::size_t>(groupTransformIndex.first)]
+            .transforms[static_cast<std::size_t>(groupTransformIndex.second)].instanceIdentifier);
+
+    ManualInstanceRowInteractionContext_UI interaction;
+    interaction.primaryIdentifier   = &selectedManualInstanceIdentifier;
+    interaction.selectedIdentifiers = &selectedManualInstanceIdentifiers;
+    interaction.anchorIdentifier    = &anchorIdentifier;
+    interaction.rowOrder            = &rowOrder;
+    interaction.selectManualMarkerInstanceCallback = selectManualMarkerInstanceCallback;
+
     DrawSymmetryClusterInstanceList<std::pair<int, int>>(baseInstances,
         [&](const std::pair<int, int>& groupTransformIndex) {
             return markers[static_cast<std::size_t>(groupTransformIndex.first)]
@@ -190,8 +209,7 @@ void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>&
         },
         [](int groupIdentifier, int /*bucketSize*/) { return groupIdentifier != 0; },
         [&](const std::pair<int, int>& groupTransformIndex) {
-            DrawManualInstanceRow(markers, groupTransformIndex, selectedManualInstanceIdentifier,
-                                  selectManualMarkerInstanceCallback);
+            DrawManualInstanceRow(markers, groupTransformIndex, interaction);
         });
 }
 
@@ -341,10 +359,14 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                                           recipe.geometry, recipe.globalSymmetryMask,
                                           recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
                                           typeName, state.selectedManualInstanceIdentifier,
+                                          state.selectedManualInstanceIdentifiers,
+                                          state.manualInstanceSelectionAnchorIdentifier,
                                           selectManualMarkerInstanceCallback);
             ImGui::Separator();
             DrawBaseSectionManualInstanceList(recipe.markers, recipe.markerLayers, typeName,
                                               state.selectedManualInstanceIdentifier,
+                                              state.selectedManualInstanceIdentifiers,
+                                              state.manualInstanceSelectionAnchorIdentifier,
                                               selectManualMarkerInstanceCallback);
 
             NotifyPlacementChange(bRecipeMoved, previewDriver);

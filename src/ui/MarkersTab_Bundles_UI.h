@@ -120,10 +120,16 @@ void DrawMarkerLayerBundleNodeBody(int bundleIdentifier, std::vector<Params::Mar
 void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
                                           std::vector<Params::MarkerLayerBundle>& bundles,
                                           MarkerLayerBundlesState& state);
+// STEP141: `markers`/`selectedManualInstanceIdentifiers` are the drag-drop TARGET side (a Manual
+// leaf only — Procedural has no Instances to receive) — MarkersTab_ManualInstanceSelection_UI.h's
+// own DrawManualLayerInstanceDropTarget.
 void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     std::vector<Params::MarkerInstanceLayer>& instanceLayers,
+                                    std::vector<Params::MarkerInstanceGroup>& markers,
                                     ManualMarkerLayersState& manualLayersState,
-                                    MarkerLayerBundlesState& bundlesState, bool& bAnyCommitted);
+                                    MarkerLayerBundlesState& bundlesState,
+                                    const std::vector<int>& selectedManualInstanceIdentifiers,
+                                    bool& bAnyCommitted);
 
 // MarkersTab_Bundles_UI.cpp — the tree mechanics:
 

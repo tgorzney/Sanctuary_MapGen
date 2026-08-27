@@ -124,6 +124,13 @@ struct MarkersTabState {
     // -1 = no selection (Constitution §6 sentinel convention).
     int selectedManualInstanceIdentifier = -1;
 
+    // STEP141 — Ctrl (toggle)/Shift (range) multi-select for Instance rows, "typical expectations"
+    // (human's own instruction). Drives ONLY row highlighting and bulk drag-reparenting
+    // (MarkersTab_ManualInstanceSelection_UI.h); `selectedManualInstanceIdentifier` above is
+    // UNCHANGED and still what MapCanvas's own highlight/drag-gesture reads.
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int               manualInstanceSelectionAnchorIdentifier = -1;
+
     // STEP133 — the per-Type Hide/Unhide preview filter, one row per Alloy/Plasma/Spawn Type-section
     // header (MarkersTab_UI.cpp). Session-only UI state, injected into MapCanvas via
     // MapCanvas::SetMarkerTypeVisibilitySource (MarkerTypeVisibility_UI.h's own header comment) —

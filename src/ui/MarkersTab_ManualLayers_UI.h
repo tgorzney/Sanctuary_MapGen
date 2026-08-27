@@ -101,6 +101,8 @@ void DrawManualMarkerLayerBlockSettings(ManualMarkerLayersState& state);
 // ARCH §19.25, item 5: `selectManualMarkerInstanceCallback` threads straight through to
 // DrawLayerRowBody's own per-row instance-list click. Empty default — every existing call site
 // compiles unchanged.
+// STEP141: `selectedManualInstanceIdentifiers`/`anchorIdentifier` are the Ctrl/Shift multi-select
+// set (MarkersTabState's own new fields), threaded through to DrawLayerRowBody's own instance rows.
 DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                   std::vector<Params::MarkerInstanceGroup>& markers,
                                   const Params::Geometry& geometry, int globalSymmetryMask, int globalRadialRepeatCount,
@@ -108,6 +110,7 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                   ManualMarkerLayersState& state, bool& bAnyNameCommitted,
                                   const ManualInstanceLayerIndex_UI& instanceIndex,
                                   int& selectedManualInstanceIdentifier,
+                                  std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                   const std::string& markerTypeNameFilter,
                                   const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
@@ -137,6 +140,7 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                    const std::string& markerTypeNameFilter,
                                    int& selectedManualInstanceIdentifier,
+                                   std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                    const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
 
 } // namespace Ui
