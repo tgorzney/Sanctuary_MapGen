@@ -80,8 +80,8 @@ std::size_t HashMarkerRuleLayer(std::size_t seed, const Params::MarkerRuleLayer&
 std::size_t HashPropRule(std::size_t seed, const Params::PropRule& rule) {
     seed = HashGateCore(seed, rule);
     seed = HashInteger(seed, (rule.bEnabled ? 1 : 0) | (rule.bAvoidWater ? 2 : 0)
-                           | (rule.bNearCliffs ? 4 : 0) | (rule.bSymmetryUseGlobal ? 8 : 0));
-    seed = HashInteger(seed, rule.symmetryMask);
+                           | (rule.bNearCliffs ? 4 : 0) | (rule.symmetry.bSymmetryUseGlobal ? 8 : 0));
+    seed = HashInteger(seed, rule.symmetry.symmetryMask);
     seed = HashFloat(seed, rule.density);
     seed = HashFloat(seed, rule.spacingMinimum);
     seed = HashFloat(seed, rule.obstacleDistanceMinimum);
@@ -90,10 +90,10 @@ std::size_t HashPropRule(std::size_t seed, const Params::PropRule& rule) {
 
 std::size_t HashUnitRule(std::size_t seed, const Params::UnitRule& rule) {
     seed = HashGateCore(seed, rule);
-    seed = HashInteger(seed, (rule.bEnabled ? 1 : 0) | (rule.bSymmetryUseGlobal ? 2 : 0));
+    seed = HashInteger(seed, (rule.bEnabled ? 1 : 0) | (rule.symmetry.bSymmetryUseGlobal ? 2 : 0));
     seed = HashInteger(seed, rule.armyIndex);
     seed = HashInteger(seed, rule.count);
-    seed = HashInteger(seed, rule.symmetryMask);
+    seed = HashInteger(seed, rule.symmetry.symmetryMask);
     return HashFloat(seed, rule.spacingMinimum);
 }
 

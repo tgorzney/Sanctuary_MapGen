@@ -29,3 +29,4 @@ needs, not the full deferred design.
 | §16.8 | [ARCH_16_08_SpawnArmyShrink.md](ARCH_16_08_SpawnArmyShrink.md) | Spawn/Army shrink — confirmed: no new PARAMS type or field needed |
 | §16.9 | [ARCH_16_09_NonArchItems.md](ARCH_16_09_NonArchItems.md) | Non-ARCH items — confirmed out of scope for this ratification |
 | §16.10 | [ARCH_16_10_ConsultRoutingSummary.md](ARCH_16_10_ConsultRoutingSummary.md) | Consult routing summary — what remains before a coder work-order can be written |
+| §16.11 | [ARCH_16_11_ScatterRuleSymmetryUnification.md](ARCH_16_11_ScatterRuleSymmetryUnification.md) | The §16.1 non-binding follow-on, now taken — `SymmetrySetting symmetry;` retrofitted onto `PropRule`/`DecalRule`/`UnitRule`; no JSON/migration change |

@@ -24,9 +24,9 @@ nlohmann::ordered_json BuildUnitRuleJson(const Params::UnitRule& rule) {
     json["MapEdgePadding"] = rule.mapEdgePadding;
     json["MaskStratumIndex"] = rule.maskStratumIndex;
     json["MaskWeightMinimum"] = rule.maskWeightMinimum;
-    json["SymmetryUseGlobal"] = rule.bSymmetryUseGlobal;
-    json["SymmetryMask"] = rule.symmetryMask;
-    json["RadialSymmetryRepeatCount"] = rule.radialSymmetryRepeatCount;
+    json["SymmetryUseGlobal"] = rule.symmetry.bSymmetryUseGlobal;
+    json["SymmetryMask"] = rule.symmetry.symmetryMask;
+    json["RadialSymmetryRepeatCount"] = rule.symmetry.radialSymmetryRepeatCount;
     json["Transform"] = BuildScatterTransformJson(rule.transform);
     return json;
 }

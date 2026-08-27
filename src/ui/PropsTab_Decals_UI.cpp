@@ -60,7 +60,7 @@ DraggableListSignal DrawDecalList(std::vector<Params::DecalRule>& decalRules,
             DrawDecalGates(rule, state, previewDriver);
             DrawPlacementGateSection(rule.maskStratumIndex, rule.maskWeightMinimum,
                                      rule.mapEdgePadding, state.gate, previewDriver);
-            DrawPlacementSymmetryAxes("decalSymmetry", rule.bSymmetryUseGlobal, rule.symmetryMask,
+            DrawPlacementSymmetryAxes("decalSymmetry", rule.symmetry.bSymmetryUseGlobal, rule.symmetry.symmetryMask,
                                       previewDriver);
             DrawPlacementTransformSection(rule.transform, state.transform, previewDriver);
             DrawPlacementTemplatePicker(rule.transform, state.iconGridState, state.iconGridHeight,

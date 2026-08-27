@@ -48,7 +48,7 @@ DraggableListSignal DrawRuleList(std::vector<Params::PropRule>& propRules, Props
             DrawPropRuleAffinities(rule, state, previewDriver);
             DrawPlacementGateSection(rule.maskStratumIndex, rule.maskWeightMinimum,
                                      rule.mapEdgePadding, state.gate, previewDriver);
-            DrawPlacementSymmetryAxes("propSymmetry", rule.bSymmetryUseGlobal, rule.symmetryMask,
+            DrawPlacementSymmetryAxes("propSymmetry", rule.symmetry.bSymmetryUseGlobal, rule.symmetry.symmetryMask,
                                       previewDriver);
             DrawPlacementTransformSection(rule.transform, state.transform, previewDriver);
             DrawPlacementTemplatePicker(rule.transform, state.iconGridState, state.iconGridHeight,

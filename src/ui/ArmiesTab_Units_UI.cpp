@@ -111,7 +111,7 @@ void DrawArmyUnitList(std::vector<Params::UnitRule>& unitRules, int armyIndex,
     DrawUnitRuleSettings(*rule, state, previewDriver);
     DrawPlacementGateSection(rule->maskStratumIndex, rule->maskWeightMinimum, rule->mapEdgePadding,
                              state.gate, previewDriver);
-    DrawPlacementSymmetryAxes("unitSymmetry", rule->bSymmetryUseGlobal, rule->symmetryMask,
+    DrawPlacementSymmetryAxes("unitSymmetry", rule->symmetry.bSymmetryUseGlobal, rule->symmetry.symmetryMask,
                               previewDriver);
     DrawPlacementTransformSection(rule->transform, state.transform, previewDriver);
     DrawPlacementTemplatePicker(rule->transform, state.iconGridState, state.iconGridHeight,

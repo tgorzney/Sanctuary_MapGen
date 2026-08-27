@@ -21,7 +21,7 @@ spec(s) a question needs — never the whole pack.
 | gamedata layout — folder map (units/props/stratum/icons), sprite pairs, sizes | `specs/GAMEDATA_LAYOUT_SPEC.md` |
 | noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
 | the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights` | `specs/MASKING_SPEC.md` |
-| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
+| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the `SymmetrySetting` retrofit onto `PropRule`/`DecalRule`/`UnitRule`, ARCH §16.11; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
 | pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
@@ -181,6 +181,13 @@ Scenario authoring/export ratification described above) — the gap that flag na
   unused `SelectedManualMarkerLayer` explicitly staying put (dead code, out of scope for either
   split), landing the parent header at roughly 110-115 lines — comfortably under ceiling. Ruled, not
   yet built — a coder work-order.
+- **`SANMAP_FORMAT_SPEC.md` Correction 15's closing paragraph is stale (2026-08-27, flagged not
+  fixed).** Its sentence "`PropRule`/`DecalRule`/`UnitRule` keep the triplet exactly where it is;
+  only `MarkerRule` loses it" no longer holds after `ARCH_16_11_ScatterRuleSymmetryUnification.md`
+  §16.11 (below) — a full-file edit was judged too high-risk this session given the file's size
+  (1,100+ lines); `PLACEMENT_SCATTER_SPEC.md`'s matching sentence was corrected in place. Whoever
+  next touches `SANMAP_FORMAT_SPEC.md` should fold in the correction; the wire format itself did
+  not change, so this blocks nothing.
 
 **Fixed since the §15.5 ratification (2026-08-21):** the naval-fleet composition gap flagged
 below the first time this note was written is closed. The live reference
@@ -530,3 +537,22 @@ free-text Marker Type field on empty ungrouped rows, mirroring the Bundle's own 
 flattening the "Ungrouped Procedural Rules"/"Ungrouped Manual Marker Layers" sub-sections into plain
 rows — were reviewed and raise no ARCH objection; no new subsection was written for either, per the
 design doc's own assessment that neither introduces a new field or cross-cutting contract.
+
+**New `ARCH_16_11_ScatterRuleSymmetryUnification.md` §16.11 (2026-08-27) — takes the non-binding
+follow-on §16.1 explicitly left open.** `PropRule`/`DecalRule`/`UnitRule` (`src/params/ScatterRule_PARAMS.h`)
+each replace their inline `bSymmetryUseGlobal`/`symmetryMask`/`radialSymmetryRepeatCount` triplet
+with a composed `Params::SymmetrySetting symmetry;` member, the same field name/type
+`MarkerRuleLayer`/`MarkerInstanceLayer` already carry — closing the last of the four sites §16.1
+identified as sharing the old flat convention (`MapRecipe::globalSymmetryMask`, the fifth, stays
+out of scope — a top-level default, not a per-rule override). Confirmed by direct read of all six
+exporter/importer files (`MapExporter_{Props,Decals,Units}Stack_IO.cpp` and their importer
+counterparts) before ruling: every one already writes `SymmetryUseGlobal`/`SymmetryMask`/
+`RadialSymmetryRepeatCount` as flat sibling JSON keys, the same convention Correction 15 already
+documents for the composed marker types — so this is a **pure C++-internal field-grouping
+refactor** with a byte-identical `.sanmap` wire shape, no `SanGenVersion` bump, no
+`IO_MIGRATION_SPEC` entry, and (unlike §16.6's marker migration) compile-fail-safe rather than
+silent-failure-prone, since the three flat members are removed outright. Full touch list (PARAMS,
+two PROC files, three UI draw call sites, six IO files) and the one still-open documentation
+follow-up (`SANMAP_FORMAT_SPEC.md` Correction 15's closing paragraph, flagged in the "Standing
+recorded defects" list above, not fixed this session) are in §16.11 itself;
+`PLACEMENT_SCATTER_SPEC.md`'s matching stale sentence was corrected in place this session.

@@ -23,10 +23,12 @@ void AppendPropRules(const PlacementConstants& constants, const Params::MapRecip
         if (!rule.bEnabled) continue;
         ScatterRuleConfiguration configuration = MakeCommonConfiguration(
             constants, recipe.geometry, recipe.water, rule, static_cast<int>(index), 1);
-        configuration.symmetryMask = ResolveSymmetryMask(rule.bSymmetryUseGlobal, rule.symmetryMask,
+        configuration.symmetryMask = ResolveSymmetryMask(rule.symmetry.bSymmetryUseGlobal,
+                                                         rule.symmetry.symmetryMask,
                                                          recipe.globalSymmetryMask);
         const int radialSymmetryRepeatCount = ResolveRadialSymmetryRepeatCount(
-            rule.bSymmetryUseGlobal, rule.radialSymmetryRepeatCount, recipe.radialSymmetryRepeatCount);
+            rule.symmetry.bSymmetryUseGlobal, rule.symmetry.radialSymmetryRepeatCount,
+            recipe.radialSymmetryRepeatCount);
         configuration.density                  = rule.density;
         configuration.spacingMinimum           = rule.spacingMinimum;
         configuration.obstacleDistanceMinimum  = rule.obstacleDistanceMinimum;
@@ -49,10 +51,12 @@ void AppendUnitRules(const PlacementConstants& constants, const Params::MapRecip
         if (!rule.bEnabled) continue;
         ScatterRuleConfiguration configuration = MakeCommonConfiguration(
             constants, recipe.geometry, recipe.water, rule, static_cast<int>(index), 2);
-        configuration.symmetryMask = ResolveSymmetryMask(rule.bSymmetryUseGlobal, rule.symmetryMask,
+        configuration.symmetryMask = ResolveSymmetryMask(rule.symmetry.bSymmetryUseGlobal,
+                                                         rule.symmetry.symmetryMask,
                                                          recipe.globalSymmetryMask);
         const int radialSymmetryRepeatCount = ResolveRadialSymmetryRepeatCount(
-            rule.bSymmetryUseGlobal, rule.radialSymmetryRepeatCount, recipe.radialSymmetryRepeatCount);
+            rule.symmetry.bSymmetryUseGlobal, rule.symmetry.radialSymmetryRepeatCount,
+            recipe.radialSymmetryRepeatCount);
         configuration.armyIndex      = rule.armyIndex;
         configuration.targetCount    = rule.count;
         configuration.spacingMinimum = rule.spacingMinimum;
@@ -71,10 +75,12 @@ void AppendDecalRules(const PlacementConstants& constants, const Params::MapReci
         if (!rule.bEnabled) continue;
         ScatterRuleConfiguration configuration = MakeCommonConfiguration(
             constants, recipe.geometry, recipe.water, rule, static_cast<int>(index), 3);
-        configuration.symmetryMask = ResolveSymmetryMask(rule.bSymmetryUseGlobal, rule.symmetryMask,
+        configuration.symmetryMask = ResolveSymmetryMask(rule.symmetry.bSymmetryUseGlobal,
+                                                         rule.symmetry.symmetryMask,
                                                          recipe.globalSymmetryMask);
         const int radialSymmetryRepeatCount = ResolveRadialSymmetryRepeatCount(
-            rule.bSymmetryUseGlobal, rule.radialSymmetryRepeatCount, recipe.radialSymmetryRepeatCount);
+            rule.symmetry.bSymmetryUseGlobal, rule.symmetry.radialSymmetryRepeatCount,
+            recipe.radialSymmetryRepeatCount);
         configuration.density        = rule.density;
         configuration.spacingMinimum = rule.spacingMinimum;
         configuration.selectionFlags |= ScatterSelectionFlag::UseDensity;

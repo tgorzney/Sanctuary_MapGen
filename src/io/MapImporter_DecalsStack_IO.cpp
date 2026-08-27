@@ -15,10 +15,10 @@ void ReadDecalRuleJson(const nlohmann::json& json, Params::DecalRule& rule) {
     ReadSharedRuleGates(json, rule);
     ReadJsonFloat(json, "Density", rule.density);
     ReadJsonFloat(json, "SpacingMinimum", rule.spacingMinimum);
-    ReadJsonBoolean(json, "SymmetryUseGlobal", rule.bSymmetryUseGlobal);
-    ReadJsonInteger(json, "SymmetryMask", rule.symmetryMask);
+    ReadJsonBoolean(json, "SymmetryUseGlobal", rule.symmetry.bSymmetryUseGlobal);
+    ReadJsonInteger(json, "SymmetryMask", rule.symmetry.symmetryMask);
     ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,
-                          Params::radialSymmetryRepeatCountMaximum, rule.radialSymmetryRepeatCount);
+                          Params::radialSymmetryRepeatCountMaximum, rule.symmetry.radialSymmetryRepeatCount);
 }
 
 } // namespace

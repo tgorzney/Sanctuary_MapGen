@@ -165,14 +165,16 @@ void CheckLayerStackAndRules(const Params::MapRecipe& original, const Params::Ma
     // each (a never-baked one, acceptance test 5) alongside the original baked one — size 2, not 1.
     Check(loaded.propRules.size() == 2 && loaded.propRules[0].bAvoidWater
           && loaded.propRules[0].bReclaimable
-          && loaded.propRules[0].bSymmetryUseGlobal == false && loaded.propRules[0].symmetryMask == 2,
+          && loaded.propRules[0].symmetry.bSymmetryUseGlobal == false
+          && loaded.propRules[0].symmetry.symmetryMask == 2,
           "the prop rules survive, including the per-rule symmetry override");
     Check(loaded.decalRules.size() == 1 && NearlyEqual(loaded.decalRules[0].spacingMinimum, 6.0f)
-          && loaded.decalRules[0].bSymmetryUseGlobal == false && loaded.decalRules[0].symmetryMask == 8,
+          && loaded.decalRules[0].symmetry.bSymmetryUseGlobal == false
+          && loaded.decalRules[0].symmetry.symmetryMask == 8,
           "the decal rules survive, including the per-rule symmetry override");
     Check(loaded.unitRules.size() == 2 && loaded.unitRules[0].armyIndex == 2
-          && loaded.unitRules[0].count == 5 && loaded.unitRules[0].bSymmetryUseGlobal == false
-          && loaded.unitRules[0].symmetryMask == 4,
+          && loaded.unitRules[0].count == 5 && loaded.unitRules[0].symmetry.bSymmetryUseGlobal == false
+          && loaded.unitRules[0].symmetry.symmetryMask == 4,
           "the unit rules survive, including the per-rule symmetry override");
 }
 
@@ -287,17 +289,20 @@ void CheckSymmetryFields(const Params::MapRecipe& original, const Params::MapRec
           "MarkerRuleLayer::symmetry.radialSymmetryRepeatCount survives, sibling of SymmetryMask "
           "(STEP66: promoted off the individual MarkerRule)");
     Check(!loaded.propRules.empty()
-          && loaded.propRules[0].radialSymmetryRepeatCount == original.propRules[0].radialSymmetryRepeatCount
-          && original.propRules[0].radialSymmetryRepeatCount == 7,
-          "PropRule::radialSymmetryRepeatCount survives, sibling of SymmetryMask");
+          && loaded.propRules[0].symmetry.radialSymmetryRepeatCount
+                 == original.propRules[0].symmetry.radialSymmetryRepeatCount
+          && original.propRules[0].symmetry.radialSymmetryRepeatCount == 7,
+          "PropRule::symmetry.radialSymmetryRepeatCount survives, sibling of SymmetryMask");
     Check(!loaded.decalRules.empty()
-          && loaded.decalRules[0].radialSymmetryRepeatCount == original.decalRules[0].radialSymmetryRepeatCount
-          && original.decalRules[0].radialSymmetryRepeatCount == 8,
-          "DecalRule::radialSymmetryRepeatCount survives, sibling of SymmetryMask");
+          && loaded.decalRules[0].symmetry.radialSymmetryRepeatCount
+                 == original.decalRules[0].symmetry.radialSymmetryRepeatCount
+          && original.decalRules[0].symmetry.radialSymmetryRepeatCount == 8,
+          "DecalRule::symmetry.radialSymmetryRepeatCount survives, sibling of SymmetryMask");
     Check(!loaded.unitRules.empty()
-          && loaded.unitRules[0].radialSymmetryRepeatCount == original.unitRules[0].radialSymmetryRepeatCount
-          && original.unitRules[0].radialSymmetryRepeatCount == 9,
-          "UnitRule::radialSymmetryRepeatCount survives, sibling of SymmetryMask");
+          && loaded.unitRules[0].symmetry.radialSymmetryRepeatCount
+                 == original.unitRules[0].symmetry.radialSymmetryRepeatCount
+          && original.unitRules[0].symmetry.radialSymmetryRepeatCount == 9,
+          "UnitRule::symmetry.radialSymmetryRepeatCount survives, sibling of SymmetryMask");
 
     if (!loaded.layerStack.geoLayers.empty()) {
         const Params::GeoLayer& originalGeoLayer = original.layerStack.geoLayers[0];
@@ -1125,10 +1130,10 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     propRule.density = 0.4f;
     propRule.bAvoidWater = true;
     propRule.bReclaimable = true;
-    propRule.bSymmetryUseGlobal = false;
-    propRule.symmetryMask = 2;
+    propRule.symmetry.bSymmetryUseGlobal = false;
+    propRule.symmetry.symmetryMask = 2;
     // STEP16_SymmetryGlobalSettings_IO: the new sibling field, non-default (CheckSymmetryFields).
-    propRule.radialSymmetryRepeatCount = 7;
+    propRule.symmetry.radialSymmetryRepeatCount = 7;
     // STEP96_FootprintBakeAndStalenessCheck_IO.md acceptance test 4: a baked PropRule, non-default
     // and distinct from the unit rule's own values below (catches a field mix-up between the two).
     propRule.baseFootprintWidth  = 5.5f;
@@ -1143,16 +1148,16 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     recipe.propRules.push_back(Params::PropRule());
     Params::DecalRule decalRule;
     decalRule.spacingMinimum = 6.0f;
-    decalRule.bSymmetryUseGlobal = false;
-    decalRule.symmetryMask = 8;
-    decalRule.radialSymmetryRepeatCount = 8;
+    decalRule.symmetry.bSymmetryUseGlobal = false;
+    decalRule.symmetry.symmetryMask = 8;
+    decalRule.symmetry.radialSymmetryRepeatCount = 8;
     recipe.decalRules.push_back(decalRule);
     Params::UnitRule unitRule;
     unitRule.armyIndex = 2;
     unitRule.count = 5;
-    unitRule.bSymmetryUseGlobal = false;
-    unitRule.symmetryMask = 4;
-    unitRule.radialSymmetryRepeatCount = 9;
+    unitRule.symmetry.bSymmetryUseGlobal = false;
+    unitRule.symmetry.symmetryMask = 4;
+    unitRule.symmetry.radialSymmetryRepeatCount = 9;
     unitRule.baseFootprintWidth  = 1.4f;
     unitRule.baseFootprintDepth  = 1.6f;
     unitRule.footprintBakeFingerprint.sourcePath   = "Templates/Units/uca1001.santp";

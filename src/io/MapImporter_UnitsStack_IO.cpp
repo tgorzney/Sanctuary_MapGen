@@ -20,10 +20,10 @@ void ReadUnitRuleJson(const nlohmann::json& json, Params::UnitRule& rule) {
     ReadJsonFloat(json, "BaseFootprintWidth", rule.baseFootprintWidth);
     ReadJsonFloat(json, "BaseFootprintDepth", rule.baseFootprintDepth);
     ReadFootprintBakeFingerprintJson(json, "FootprintBakeFingerprint", rule.footprintBakeFingerprint);
-    ReadJsonBoolean(json, "SymmetryUseGlobal", rule.bSymmetryUseGlobal);
-    ReadJsonInteger(json, "SymmetryMask", rule.symmetryMask);
+    ReadJsonBoolean(json, "SymmetryUseGlobal", rule.symmetry.bSymmetryUseGlobal);
+    ReadJsonInteger(json, "SymmetryMask", rule.symmetry.symmetryMask);
     ReadJsonIntegerClamped(json, "RadialSymmetryRepeatCount", Params::radialSymmetryRepeatCountMinimum,
-                          Params::radialSymmetryRepeatCountMaximum, rule.radialSymmetryRepeatCount);
+                          Params::radialSymmetryRepeatCountMaximum, rule.symmetry.radialSymmetryRepeatCount);
 }
 
 } // namespace

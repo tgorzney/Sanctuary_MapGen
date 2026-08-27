@@ -263,6 +263,9 @@ enable/hide-able set of `MarkerRule`s (`MarkersStack`'s new Group tier — wire 
 unaffected — the triplet stays exactly where "Rules — `MarkerRule`" and the "IO
 wrapping" section above describe it for those three types; only `MarkerRule` moved.
 
+**Superseded by ARCH §16.11 (see below) — do not read the sentence above as still
+current for `PropRule`/`DecalRule`/`UnitRule`.**
+
 `Params::MarkerInstanceLayer` (extends the earlier Gap 1 shape,
 `GAP_MarkerLayerAndSymmetry_PARAMS.md`) gets the same `SymmetrySetting` field for
 the manual/hand-placed marker layer side (`MarkerGroups`, `SANMAP_FORMAT_SPEC`
@@ -279,4 +282,21 @@ reach into PROC.
 This is a genuine breaking `.sanmap` schema change on an already-shipped field
 family (`MarkerRule`'s symmetry triplet). Migration mechanics are the IO
 Architecture Expert's domain (ARCH §16.6), not ratified on this page.
-</content>
+
+## `PropRule`/`DecalRule`/`UnitRule` symmetry unification (ARCH §16.11, later ratification)
+
+**Corrects the "`PropRule`/`DecalRule`/`UnitRule` are unaffected" sentence in the
+section above.** §16.1 explicitly left that unification open as a non-binding
+follow-on; §16.11 takes it: all three types replace their inline
+`bSymmetryUseGlobal`/`symmetryMask`/`radialSymmetryRepeatCount` triplet with a
+composed `Params::SymmetrySetting symmetry;` member, the identical field name and
+type `MarkerRuleLayer`/`MarkerInstanceLayer` already carry. This is a **pure
+C++-internal field-grouping refactor** — every exporter/importer already writes
+`SymmetryUseGlobal`/`SymmetryMask`/`RadialSymmetryRepeatCount` as flat sibling
+wire keys (the same flattening convention `SANMAP_FORMAT_SPEC` Correction 15
+already documents for the composed marker types), so the `.sanmap` JSON shape for
+`PropsStack`/`DecalsStack`/`UnitsStack` does not change at all, and no
+`SanGenVersion` bump or `IO_MIGRATION_SPEC` entry applies. Not the same kind of
+change as `MarkerRule`'s own migration above (that one is a genuine breaking
+schema change — a field-tier removal, not a same-tier C++ regrouping). Full
+ruling and touch list: `ARCH_16_11_ScatterRuleSymmetryUnification.md`.

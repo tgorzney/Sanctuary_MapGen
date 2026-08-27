@@ -27,9 +27,9 @@ nlohmann::ordered_json BuildPropRuleJson(const Params::PropRule& rule) {
     json["BaseFootprintWidth"] = rule.baseFootprintWidth;
     json["BaseFootprintDepth"] = rule.baseFootprintDepth;
     json["FootprintBakeFingerprint"] = BuildFootprintBakeFingerprintJson(rule.footprintBakeFingerprint);
-    json["SymmetryUseGlobal"] = rule.bSymmetryUseGlobal;
-    json["SymmetryMask"] = rule.symmetryMask;
-    json["RadialSymmetryRepeatCount"] = rule.radialSymmetryRepeatCount;
+    json["SymmetryUseGlobal"] = rule.symmetry.bSymmetryUseGlobal;
+    json["SymmetryMask"] = rule.symmetry.symmetryMask;
+    json["RadialSymmetryRepeatCount"] = rule.symmetry.radialSymmetryRepeatCount;
     json["Transform"] = BuildScatterTransformJson(rule.transform);
     return json;
 }

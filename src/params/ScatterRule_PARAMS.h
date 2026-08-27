@@ -6,6 +6,7 @@
 #pragma once
 #include "FootprintBakeFingerprint_PARAMS.h"
 #include "ScatterTransform_PARAMS.h"
+#include "Symmetry_PARAMS.h"
 
 namespace SanmapGen {
 namespace Params {
@@ -47,13 +48,12 @@ struct PropRule {
     // compared, never auto-rewritten, by Io::CheckFootprintBakeStaleness.
     FootprintBakeFingerprint footprintBakeFingerprint;
 
-    bool  bSymmetryUseGlobal = true;
-    int   symmetryMask       = 0;
-    // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
-    // `symmetryMask`. Consumed by `AppendRadialTurns`/`BuildSymmetryOrbit` via
-    // `ResolveRadialSymmetryRepeatCount` (STEP23), the same `bSymmetryUseGlobal` switch
-    // `ResolveSymmetryMask` already uses for `symmetryMask`.
-    int   radialSymmetryRepeatCount = 3;
+    // ARCH §16.11 — composed, matching MarkerRuleLayer/MarkerInstanceLayer verbatim (was an inline
+    // bSymmetryUseGlobal/symmetryMask/radialSymmetryRepeatCount triplet; ARCH_16_01 §16.1 explicitly
+    // left this convergence as a non-binding follow-on, now ratified). JSON shape is unchanged — the
+    // exporter still writes SymmetryUseGlobal/SymmetryMask/RadialSymmetryRepeatCount as flat sibling
+    // keys (SANMAP_FORMAT_SPEC Correction 15's flattening convention).
+    SymmetrySetting symmetry;
 
     ScatterTransform transform;
 };
@@ -71,13 +71,8 @@ struct DecalRule {
     int   maskStratumIndex = -1;
     float maskWeightMinimum = 0.0f;
 
-    bool  bSymmetryUseGlobal = true;
-    int   symmetryMask       = 0;
-    // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
-    // `symmetryMask`. Consumed by `AppendRadialTurns`/`BuildSymmetryOrbit` via
-    // `ResolveRadialSymmetryRepeatCount` (STEP23), the same `bSymmetryUseGlobal` switch
-    // `ResolveSymmetryMask` already uses for `symmetryMask`.
-    int   radialSymmetryRepeatCount = 3;
+    // ARCH §16.11 — see PropRule's own comment above.
+    SymmetrySetting symmetry;
 
     ScatterTransform transform;
 };
@@ -108,13 +103,8 @@ struct UnitRule {
     float baseFootprintDepth = 2.0f;
     FootprintBakeFingerprint footprintBakeFingerprint;
 
-    bool  bSymmetryUseGlobal = true;
-    int   symmetryMask       = 0;
-    // Companion count for the `SymmetryAxis::Radial` bit (ARCH §13) — a flat sibling of
-    // `symmetryMask`. Consumed by `AppendRadialTurns`/`BuildSymmetryOrbit` via
-    // `ResolveRadialSymmetryRepeatCount` (STEP23), the same `bSymmetryUseGlobal` switch
-    // `ResolveSymmetryMask` already uses for `symmetryMask`.
-    int   radialSymmetryRepeatCount = 3;
+    // ARCH §16.11 — see PropRule's own comment above.
+    SymmetrySetting symmetry;
 
     ScatterTransform transform;
 };
