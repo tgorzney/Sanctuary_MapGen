@@ -24,6 +24,7 @@
 #include <functional>
 #include <string>
 #include "DraggableListWidget_UI.h"
+#include "MarkerLayerEnabledVisibilityToggle_UI.h"
 #include "ProceduralInstanceRuleIndex_UI.h"
 #include "../params/MarkerRule_PARAMS.h"
 
@@ -45,12 +46,15 @@ inline bool ApplyMarkerRuleLayerListSignal(std::vector<Params::MarkerRuleLayer>&
     if (signal.sourceRowIndex < 0 || signal.sourceRowIndex >= layerCount) return false;
     Params::MarkerRuleLayer& layer =
         markerRuleLayers[static_cast<std::size_t>(signal.sourceRowIndex)];
+    // STEP144 — the E/D + V/I coupled toggle rules (human's own explicit rule set): the row's
+    // built-in "visibility" icon IS Enabled/Disabled and its "lock" icon IS Visible/Invisible for a
+    // Procedural layer (bEnabled/bHidden, not literal show/lock) — {Disabled,Visible} never occurs.
     if (signal.kind == DraggableListSignalKind::ToggleVisibility) {
-        layer.bEnabled = !layer.bEnabled;
+        ApplyMarkerRuleLayerEnabledToggle(layer.bEnabled, layer.bHidden);
         return true;
     }
     if (signal.kind == DraggableListSignalKind::ToggleLock) {
-        layer.bHidden = !layer.bHidden;
+        ApplyMarkerRuleLayerVisibilityToggle(layer.bEnabled, layer.bHidden);
         return true;
     }
     if (signal.kind == DraggableListSignalKind::Select) {

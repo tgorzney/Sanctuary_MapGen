@@ -133,6 +133,13 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
                           std::vector<OverlayVisibleInstance>& outCandidates,
                           const int* targetInstanceIdentifier) {
     const bool bWantSpawnGroups = (layer.domainKind == OverlayDomainKind_UI::SpawnsArmies);
+    // STEP144 — a hidden Layer contributes NO candidates at all, checked first so a hidden layer's
+    // own group/transform walk below never runs. Bounds-checked the same defensive way
+    // bLayerOverrideEnabled/layerIconScale already are, just below.
+    if (subLayerArrayIndex >= 0
+        && static_cast<std::size_t>(subLayerArrayIndex) < input.recipe->markerLayers.size()
+        && input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)].bHidden)
+        return;
     // STEP116: the override check is hoisted ONCE per call — subLayerArrayIndex/markerLayers are
     // invariant for the whole function.
     const bool bLayerOverrideEnabled = subLayerArrayIndex >= 0

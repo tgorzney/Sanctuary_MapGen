@@ -55,14 +55,17 @@ void RunRuleLayerReorderAndToggleChecks() {
     Check(selectedLayerIndex == 1 && selectedRuleIndex == 0,
           "Select moved the layer selection and reset the rule selection");
 
+    // STEP144 — the E/D + V/I coupled rules: Disabled always forces Hidden too, and toggling V/I
+    // FROM {Disabled,Hidden} toward Visible auto-enables ({Disabled,Visible} never occurs).
     Check(ApplyMarkerRuleLayerListSignal(layers, MakeSignal(DraggableListSignalKind::ToggleVisibility, 0),
                                          selectedLayerIndex, selectedRuleIndex)
-              && !layers[0].bEnabled,
-          "ToggleVisibility flips the layer's own bEnabled and moves the recipe");
+              && !layers[0].bEnabled && layers[0].bHidden,
+          "ToggleVisibility (E/D) disables the layer AND forces it Hidden, and moves the recipe");
     Check(ApplyMarkerRuleLayerListSignal(layers, MakeSignal(DraggableListSignalKind::ToggleLock, 0),
                                          selectedLayerIndex, selectedRuleIndex)
-              && layers[0].bHidden,
-          "ToggleLock flips the layer's own bHidden and moves the recipe");
+              && layers[0].bEnabled && !layers[0].bHidden,
+          "ToggleLock (V/I), from Disabled/Hidden, auto-enables while becoming Visible, and moves "
+          "the recipe");
 }
 
 // Acceptance item 3: deleting a layer takes every one of its rules with it — nothing orphaned,

@@ -802,6 +802,10 @@ add_sangen_test(MarkersTab_ManualInstanceListRows_UI_Test
 # ReassignManualInstanceLayers) — pure, no imgui frame needed.
 add_sangen_test(MarkersTab_ManualInstanceSelection_UI_Test
     src/ui/MarkersTab_ManualInstanceSelection_UI_Test.cpp)
+# STEP144: MarkerLayerEnabledVisibilityToggle_UI.h's own pure E/D + V/I coupled toggle rules — pure,
+# no imgui frame needed.
+add_sangen_test(MarkerLayerEnabledVisibilityToggle_UI_Test
+    src/ui/MarkerLayerEnabledVisibilityToggle_UI_Test.cpp)
 # STEP120: MarkersTab_Bundles_UI.h's own pure helpers (BuildMarkerLayerBundleLeafIndex,
 # NextMarkerLayerBundleId) and the Move/Rotate Apply functions' own call-boundary behavior — pure,
 # no imgui frame needed (STEP106's "defer the imgui-coupled path" posture). STEP125 extends this

@@ -689,6 +689,8 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
               "MarkerInstanceLayer::iconScale survives");
         Check(loadedLayer.layerId == originalLayer.layerId, "MarkerInstanceLayer::layerId (7) survives");
         Check(loadedLayer.bLocked == originalLayer.bLocked, "MarkerInstanceLayer::bLocked survives, non-default");
+        Check(loadedLayer.bHidden == originalLayer.bHidden,
+              "MarkerInstanceLayer::bHidden survives, non-default (STEP144)");
         Check(loadedLayer.bGridSnapEnabled == originalLayer.bGridSnapEnabled,
               "MarkerInstanceLayer::bGridSnapEnabled survives, non-default");
         Check(NearlyEqual(loadedLayer.gridSnapSizeWorldUnits, originalLayer.gridSnapSizeWorldUnits),
@@ -1261,6 +1263,7 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerLayer.iconScale = 1.25f;
     markerLayer.layerId = 7;                                          // non-default, survives verbatim
     markerLayer.bLocked = true;                                       // STEP106, non-default
+    markerLayer.bHidden = true;                                       // STEP144, non-default
     markerLayer.bGridSnapEnabled = true;                              // STEP106, non-default
     markerLayer.gridSnapSizeWorldUnits = 4.0f;                        // STEP106, non-default
     markerLayer.bColorOverrideEnabled = true;                         // STEP116, non-default
@@ -2103,6 +2106,8 @@ void CheckMarkerGroupsLegacyLockAndSnapDefaults() {
     if (recipe.markerLayers.empty()) return;
     const Params::MarkerInstanceLayer& layer = recipe.markerLayers[0];
     Check(layer.bLocked == false, "bLocked keeps its struct default (false) when the key is absent");
+    Check(layer.bHidden == false,
+          "bHidden (STEP144) keeps its struct default (false) when the key is absent");
     Check(layer.bGridSnapEnabled == false,
           "bGridSnapEnabled keeps its struct default (false) when the key is absent");
     Check(NearlyEqual(layer.gridSnapSizeWorldUnits, 1.0f),

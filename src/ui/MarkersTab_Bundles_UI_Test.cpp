@@ -283,6 +283,7 @@ void TestManualLeafHeaderExtraDrawsAndFlipsSymmetry() {
 // itself (the caller applies it later, MarkersTab_UI.cpp).
 void TestManualLeafDeleteButtonRecordsPendingIndex() {
     HeadlessImguiSession session;
+    std::vector<Params::MarkerRuleLayer> ruleLayers;
     std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
     std::vector<Params::MarkerInstanceGroup> markers;
     std::vector<int> selectedManualInstanceIdentifiers;
@@ -294,8 +295,8 @@ void TestManualLeafDeleteButtonRecordsPendingIndex() {
     // Find the "X##deleteLayer" button's own center by probing item rects across the row.
     ImVec2 deleteButtonCenter;
     RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 100.0f), [&] {
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
-                                       selectedManualInstanceIdentifiers, bAnyCommitted);
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, ruleLayers, instanceLayers, markers, state, bundlesState,
+                                       selectedManualInstanceIdentifiers, nullptr, bAnyCommitted);
         deleteButtonCenter = ImGui::GetItemRectMin();
         const ImVec2 maxRect = ImGui::GetItemRectMax();
         deleteButtonCenter.x = (deleteButtonCenter.x + maxRect.x) * 0.5f;
@@ -304,23 +305,23 @@ void TestManualLeafDeleteButtonRecordsPendingIndex() {
 
     HeadlessMouseState click; click.position = deleteButtonCenter; click.bLeftButtonDown = true;
     RunHeadlessFrame(click, ImVec2(300.0f, 100.0f), [&] {
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
-                                       selectedManualInstanceIdentifiers, bAnyCommitted);
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, ruleLayers, instanceLayers, markers, state, bundlesState,
+                                       selectedManualInstanceIdentifiers, nullptr, bAnyCommitted);
     });
     HeadlessMouseState release = click; release.bLeftButtonDown = false;
     RunHeadlessFrame(release, ImVec2(300.0f, 100.0f), [&] {
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, instanceLayers, markers, state, bundlesState,
-                                       selectedManualInstanceIdentifiers, bAnyCommitted);
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, ruleLayers, instanceLayers, markers, state, bundlesState,
+                                       selectedManualInstanceIdentifiers, nullptr, bAnyCommitted);
     });
 
     Check(instanceLayers.size() == 1,
          "clicking the X (opening the popup) does not itself erase anything -- deferred to the caller");
 }
 
-// A Rule (Procedural) leaf's header-extra now draws its own "X" too (STEP140) -- unlike a Manual
-// leaf it has no Symmetry/Color Override pair first, so the button is the row's only control.
+// A Rule (Procedural) leaf's header-extra now draws its own E/D + V/I + X cluster too (STEP140/144).
 void TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly() {
     HeadlessImguiSession session;
+    std::vector<Params::MarkerRuleLayer> ruleLayers(1);
     std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
     std::vector<Params::MarkerInstanceGroup> markers;
     std::vector<int> selectedManualInstanceIdentifiers;
@@ -332,20 +333,19 @@ void TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly() {
     ImVec2 cursorBefore, cursorAfter;
     RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 100.0f), [&] {
         cursorBefore = ImGui::GetCursorScreenPos();
-        DrawMarkerGroupLeafHeaderExtra(proceduralLeaf, instanceLayers, markers, state, bundlesState,
-                                       selectedManualInstanceIdentifiers, bAnyCommitted);
+        DrawMarkerGroupLeafHeaderExtra(proceduralLeaf, ruleLayers, instanceLayers, markers, state, bundlesState,
+                                       selectedManualInstanceIdentifiers, nullptr, bAnyCommitted);
         cursorAfter = ImGui::GetCursorScreenPos();
     });
 
     Check(cursorBefore.x != cursorAfter.x || cursorBefore.y != cursorAfter.y,
-         "a Procedural leaf's header-extra now draws its own delete button (STEP140) -- the cursor "
-         "moves, unlike the old kind != Manual no-op");
-    Check(!bAnyCommitted, "drawing the button alone reports no Symmetry/Color-Override commit");
+         "a Procedural leaf's header-extra now draws its own E/D+V/I+X cluster (STEP140/144) -- the "
+         "cursor moves, unlike the old kind != Manual no-op");
     Check(instanceLayers[0].bSymmetryEnabled && !instanceLayers[0].bColorOverrideEnabled,
          "instanceLayers[0] -- present at the same index by coincidence -- is left at its struct "
          "defaults, never resolved into for a Procedural leaf");
     Check(bundlesState.pendingDeleteProceduralLayerIndex == -1,
-         "drawing the button alone (no click) records no pending delete");
+         "drawing the buttons alone (no click) records no pending delete");
 }
 
 // STEP140 — "Group Only": the deleted Bundle's DIRECT children (a sub-Bundle, a Rule Layer, an

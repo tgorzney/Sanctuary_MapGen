@@ -77,6 +77,7 @@ nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["SymmetryMask"] = layer.symmetry.symmetryMask;
         layerJson["RadialSymmetryRepeatCount"] = layer.symmetry.radialSymmetryRepeatCount;
         layerJson["Locked"] = layer.bLocked;
+        layerJson["Hidden"] = layer.bHidden;   // STEP144
         layerJson["GridSnapEnabled"] = layer.bGridSnapEnabled;
         layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeWorldUnits;
         layerJson["ColorOverrideEnabled"] = layer.bColorOverrideEnabled;

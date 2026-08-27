@@ -127,14 +127,17 @@ void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
                                           MarkerLayerBundlesState& state);
 // STEP141: `markers`/`selectedManualInstanceIdentifiers` are the drag-drop TARGET side (a Manual
 // leaf only — Procedural has no Instances to receive) — MarkersTab_ManualInstanceSelection_UI.h's
-// own DrawManualLayerInstanceDropTarget.
+// own DrawManualLayerInstanceDropTarget. STEP144: `ruleLayers`/`previewDriver` back a Procedural
+// leaf's own E/D + V/I coupled toggle buttons (MarkerLayerEnabledVisibilityToggle_UI.h) — a
+// non-structural field flip is safe to notify/apply immediately, unlike delete/reparent.
 void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
+                                    std::vector<Params::MarkerRuleLayer>& ruleLayers,
                                     std::vector<Params::MarkerInstanceLayer>& instanceLayers,
                                     std::vector<Params::MarkerInstanceGroup>& markers,
                                     ManualMarkerLayersState& manualLayersState,
                                     MarkerLayerBundlesState& bundlesState,
                                     const std::vector<int>& selectedManualInstanceIdentifiers,
-                                    bool& bAnyCommitted);
+                                    Pipeline::PreviewDriver* previewDriver, bool& bAnyCommitted);
 
 // MarkersTab_Bundles_UI.cpp — the tree mechanics:
 

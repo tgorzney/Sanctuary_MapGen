@@ -41,6 +41,12 @@ struct MarkerInstanceLayer {
                                          // configuration — re-enabling recovers it unchanged.
     bool  bLocked = false;                    // STEP106 §1. Blocks drag/reposition/add/remove for
                                                // every marker on this layer.
+    bool  bHidden = false;                    // STEP144. Hides every marker on this layer from the
+                                               // map preview WITHOUT touching bLocked or removing
+                                               // anything — the Manual-side sibling of
+                                               // MarkerRuleLayer::bHidden (that one also stays
+                                               // "generated"; this one has no generation to keep
+                                               // running, so it is a plain preview-visibility flag).
     bool  bGridSnapEnabled = false;            // STEP106 §2. Per-layer, not global (see §2).
     float gridSnapSizeWorldUnits = 1.0f;       // STEP106 §2. World-unit cell size; only meaningful
                                                // while bGridSnapEnabled is true.

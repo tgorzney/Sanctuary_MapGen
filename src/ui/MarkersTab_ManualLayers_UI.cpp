@@ -31,6 +31,15 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
                 !markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked;
         return false;   // cosmetic-only: no structural move, same posture as Select
     }
+    // STEP144 — the row's own built-in visibility icon now does something: MarkerInstanceLayer::
+    // bHidden (new field), a straight V/I toggle (no E/D concept for a hand-placed Manual layer, so
+    // no coupling the way the Procedural sibling needs — MarkerLayerEnabledVisibilityToggle_UI.h).
+    if (signal.kind == DraggableListSignalKind::ToggleVisibility) {
+        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(markerLayers.size()))
+            markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bHidden =
+                !markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bHidden;
+        return false;   // cosmetic-only: no structural move, same posture as ToggleLock
+    }
     const bool bDeleting            = signal.kind == DraggableListSignalKind::Delete;
     const bool bReordering          = signal.kind == DraggableListSignalKind::Reorder;
     const int  sourceLayerIndex     = signal.sourceRowIndex;

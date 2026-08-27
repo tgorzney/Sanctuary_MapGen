@@ -38,6 +38,9 @@ void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& out
             ReadJsonInteger(layerJson, "SymmetryMask", layer.symmetry.symmetryMask);
             ReadJsonInteger(layerJson, "RadialSymmetryRepeatCount", layer.symmetry.radialSymmetryRepeatCount);
             ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
+            ReadJsonBoolean(layerJson, "Hidden", layer.bHidden);   // STEP144 — absent (pre-existing
+                                                                    // file) leaves the struct default,
+                                                                    // false, i.e. visible.
             ReadJsonBoolean(layerJson, "GridSnapEnabled", layer.bGridSnapEnabled);
             ReadJsonFloat(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeWorldUnits);
             ReadJsonBoolean(layerJson, "ColorOverrideEnabled", layer.bColorOverrideEnabled);

@@ -34,19 +34,24 @@ void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
                            const std::pair<int, int>& groupTransformIndex,
                            ManualInstanceRowInteractionContext_UI& interaction);
 
-// STEP142 — the layer header's own condensed small-button cluster (human's own instruction: no more
-// checkboxes, small buttons instead), right-aligned as a group so the LAST one ("X") always lands
-// flush against the row's true right edge regardless of any individual width's own drift (mirrors
-// MarkersTab_UI.cpp's own SmallButtonWidth/cluster-width pattern) — left to right: "SYM" toggle,
-// "COL" toggle + its swatch, "X" delete. Eyeballed against a live frame, like every other constant
-// in this file.
+// STEP142/STEP144 — the layer header's own condensed small-button cluster (human's own instruction:
+// no more checkboxes, small buttons instead), right-aligned as a group so the LAST one ("X") always
+// lands flush against the row's true right edge regardless of any individual width's own drift
+// (mirrors MarkersTab_UI.cpp's own SmallButtonWidth/cluster-width pattern) — left to right for a
+// Manual leaf: "SYM" toggle, "COL" toggle + its swatch, "V/I" visibility toggle, "X" delete (a
+// Procedural leaf's own "E/D"+"V/I"+"X" cluster, MarkersTab_BundleHeaderExtras_UI.cpp, is narrower
+// and simply has some unused margin within this SAME shared reserved zone — the tree passes one
+// width for every row kind, Group nodes included). Eyeballed against a live frame, like every other
+// constant in this file.
 inline constexpr float kMarkerLayerSymmetryButtonWidthPixels      = 34.0f;
 inline constexpr float kMarkerLayerColorOverrideButtonWidthPixels = 34.0f;
 inline constexpr float kMarkerLayerColorOverrideSwatchWidthPixels = 20.0f;
+inline constexpr float kMarkerLayerVisibilityButtonWidthPixels    = 30.0f;
 inline constexpr float kMarkerLayerHeaderExtraDeleteButtonWidthPixels = 26.0f;
 inline constexpr float kMarkerLayerHeaderExtraCombinedWidthPixels =
     kMarkerLayerSymmetryButtonWidthPixels + kMarkerLayerColorOverrideButtonWidthPixels
-    + kMarkerLayerColorOverrideSwatchWidthPixels + kMarkerLayerHeaderExtraDeleteButtonWidthPixels;
+    + kMarkerLayerColorOverrideSwatchWidthPixels + kMarkerLayerVisibilityButtonWidthPixels
+    + kMarkerLayerHeaderExtraDeleteButtonWidthPixels;
 
 // The row's own name, tint, icon scale, grid snap, symmetry setting, and (STEP126, Open Q7) its own
 // per-Layer instance list — STEP110: drawn inline in THIS row's own expanded body, not "selected"-
