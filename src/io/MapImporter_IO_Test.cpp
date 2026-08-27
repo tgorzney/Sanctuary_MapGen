@@ -1749,6 +1749,34 @@ void CheckRadialSymmetryRepeatCountClampsOnImport() {
                      == Params::radialSymmetryRepeatCountMaximum,
               "MarkersStack[0].RadialSymmetryRepeatCount clamps 500 down to the [2, 12] maximum on import");
     }
+
+    // --- the manual-layer stack (MarkerGroups, MarkerInstanceLayer::symmetry): the one IO site of
+    // the 8 that used to read this field with a plain, unclamped ReadJsonInteger — the fix this
+    // test pins down.
+    {
+        nlohmann::json document;
+        document["MarkerGroups"] = nlohmann::json::array();
+        document["MarkerGroups"].push_back(
+            nlohmann::json::object({ { "RadialSymmetryRepeatCount", 0 } }));
+        Params::MapRecipe loaded;
+        Io::ReadMarkerGroupsJson(document, loaded);
+        Check(!loaded.markerLayers.empty()
+              && loaded.markerLayers[0].symmetry.radialSymmetryRepeatCount
+                     == Params::radialSymmetryRepeatCountMinimum,
+              "MarkerGroups[0].RadialSymmetryRepeatCount clamps 0 up to the [2, 12] minimum on import");
+    }
+    {
+        nlohmann::json document;
+        document["MarkerGroups"] = nlohmann::json::array();
+        document["MarkerGroups"].push_back(
+            nlohmann::json::object({ { "RadialSymmetryRepeatCount", 500 } }));
+        Params::MapRecipe loaded;
+        Io::ReadMarkerGroupsJson(document, loaded);
+        Check(!loaded.markerLayers.empty()
+              && loaded.markerLayers[0].symmetry.radialSymmetryRepeatCount
+                     == Params::radialSymmetryRepeatCountMaximum,
+              "MarkerGroups[0].RadialSymmetryRepeatCount clamps 500 down to the [2, 12] maximum on import");
+    }
 }
 
 // STEP25_MapNameCredits_IO acceptance test item 2: a document with a missing or empty top-level

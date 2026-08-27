@@ -41,6 +41,16 @@ namespace Ui {
 struct SymmetryTabState {
     ScalarSliderRange detectionToleranceRange{ 0.0f, 0.25f, 0.0f };
     RealtimeToggle    detectionToleranceToggle;
+    // NEW — Radial's own companion count field, `recipe.radialSymmetryRepeatCount`, had NO UI
+    // control anywhere (PlacementRuleSections_UI.h's own header comment: "a real, separately
+    // tracked gap (STEP95 'Explicit out-of-scope'), not an oversight" — the field was only
+    // reachable by hand-editing a `.sanmap`'s JSON, then clamped to [2, 12] on import). Range
+    // mirrors that same IO clamp (Params::radialSymmetryRepeatCountMinimum/Maximum) so the UI and
+    // IO ceilings can never drift apart.
+    ScalarSliderRange radialSymmetryRepeatCountRange{
+        static_cast<float>(Params::radialSymmetryRepeatCountMinimum),
+        static_cast<float>(Params::radialSymmetryRepeatCountMaximum), 1.0f };
+    RealtimeToggle    radialSymmetryRepeatCountToggle;
     // One per section, held HERE and never as a function-local in the draw path: a local would
     // reset every frame, so a collapsed section could never stay collapsed (the v1 defect the
     // shared library exists to kill).

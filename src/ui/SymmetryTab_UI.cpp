@@ -19,8 +19,20 @@ void NotifyChange(bool bCommitted, Pipeline::PreviewDriver* previewDriver) {
     if (bCommitted && previewDriver != nullptr) previewDriver->NotifyParametersChanged();
 }
 
-void DrawAxisRow(Params::MapRecipe& recipe, Pipeline::PreviewDriver* previewDriver) {
+// Radial's own axis index in placementSymmetryAxisLabels/PlacementSymmetryAxisBit
+// (PlacementRuleSections_UI.h) — "Radial" is the table's 5th (index 4) entry.
+constexpr int kRadialSymmetryAxisIndex = 4;
+
+void DrawAxisRow(Params::MapRecipe& recipe, SymmetryTabState& state, Pipeline::PreviewDriver* previewDriver) {
     DrawIndependentSymmetryAxes(recipe.globalSymmetryMask, previewDriver);
+    // Hidden while Radial isn't set — the same "cannot mean anything yet" convention every other
+    // conditionally-relevant scalar in this app already follows (e.g. DrawMarkerRuleArea's Maximum
+    // Radius, DrawPropRuleAffinities's Near Cliff Distance).
+    if (IsPlacementSymmetryAxisSet(recipe.globalSymmetryMask, kRadialSymmetryAxisIndex))
+        NotifyChange(DrawSliderScalarInteger("Radial Repeat Count", recipe.radialSymmetryRepeatCount,
+                                             state.radialSymmetryRepeatCountRange,
+                                             state.radialSymmetryRepeatCountToggle).bCommitted,
+                    previewDriver);
 }
 
 void DrawDetectionSettings(Params::SymmetryDetection& symmetryDetection, SymmetryTabState& state,
@@ -38,7 +50,7 @@ void DrawSymmetryTab(Params::MapRecipe& recipe, Params::SymmetryDetection& symme
                      SymmetryTabState& state, Pipeline::PreviewDriver* previewDriver) {
     ImGui::PushID("symmetryTab");
     if (DrawSectionBegin("Global Symmetry", state.globalSymmetrySection)) {
-        DrawAxisRow(recipe, previewDriver);
+        DrawAxisRow(recipe, state, previewDriver);
         DrawSectionEnd();
     }
     if (DrawSectionBegin("Detection", state.detectionSection)) {

@@ -10,6 +10,7 @@
 // the call order in MapImporter_ParseDocument_IO.cpp.
 #include "JsonPrimitives_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include "../params/Symmetry_PARAMS.h"   // radialSymmetryRepeatCountMinimum/Maximum
 
 namespace SanmapGen {
 namespace Io {
@@ -36,7 +37,14 @@ void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& out
             ReadJsonInteger(layerJson, "Id", layer.layerId);
             ReadJsonBoolean(layerJson, "SymmetryUseGlobal", layer.symmetry.bSymmetryUseGlobal);
             ReadJsonInteger(layerJson, "SymmetryMask", layer.symmetry.symmetryMask);
-            ReadJsonInteger(layerJson, "RadialSymmetryRepeatCount", layer.symmetry.radialSymmetryRepeatCount);
+            // Clamped (was a plain ReadJsonInteger — the one IO site of the 8 that read this field
+            // unbounded, inconsistent with the rest): Params::symmetryOrbitMaximum's own fixed-size
+            // orbit buffer (ARCH_13_RadialSymmetry.md Defect 2, Placement_Accept_PROC.cpp) is only
+            // provably safe for radialSymmetryRepeatCount in [2,12].
+            ReadJsonIntegerClamped(layerJson, "RadialSymmetryRepeatCount",
+                                  Params::radialSymmetryRepeatCountMinimum,
+                                  Params::radialSymmetryRepeatCountMaximum,
+                                  layer.symmetry.radialSymmetryRepeatCount);
             ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
             ReadJsonBoolean(layerJson, "Hidden", layer.bHidden);   // STEP144 — absent (pre-existing
                                                                     // file) leaves the struct default,
