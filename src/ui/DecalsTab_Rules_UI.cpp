@@ -1,7 +1,7 @@
-// PropsTab_Decals_UI.cpp — the imgui composition of the Decal Rules stack. Layer: UI.
+// DecalsTab_Rules_UI.cpp — the imgui composition of the Decal Rules stack. Layer: UI.
 // Shared widgets only: DraggableList for the ordered stack, RangeSlider/Dial for the scalars,
 // Section for the blocks, IconGrid for the template picker.
-#include "PropsTab_Decals_UI.h"
+#include "DecalsTab_Rules_UI.h"
 #include "DraggableListWidget_UI.h"
 #include "imgui.h"
 #include <cstdio>

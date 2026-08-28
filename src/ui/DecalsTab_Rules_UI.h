@@ -1,6 +1,6 @@
-// PropsTab_Decals_UI.h — the Decal Rules stack the Props tab hosts beside the prop stack.
+// DecalsTab_Rules_UI.h — the Decal Rules stack, part of the standalone Decals tab (ARCH §20).
 // Layer: UI. Accuracy class: Visual. It edits exactly one recipe slice — `recipe.decalRules`.
-// TAB_REBUILD_PLAN "§ Props · Decal Rules stack".
+// TAB_REBUILD_PLAN "§ Props · Decal Rules stack" (Decals split out of the Props tab per §20).
 //
 // A decal rule is a prop rule without the water/cliff affinities
 // (`Params::DecalRule` carries neither field), so the stack is drawn from the same shared blocks —

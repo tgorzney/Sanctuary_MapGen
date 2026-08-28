@@ -1,8 +1,8 @@
-// PropsTab_UI.h — the prop tab: the manual prop layers, the procedural prop stack and the decal
-// stack. Layer: UI. Accuracy class: Visual. It edits two recipe slices — `recipe.propRules`
-// (`Params::PropRule`: density + slope/height gates + Poisson spacing + the water/cliff gates)
-// and, through PropsTab_Decals_UI, `recipe.decalRules`. TAB_REBUILD_PLAN "§ Props"; extended by
-// tab-rebuild WO C4.
+// PropsTab_UI.h — the prop tab: the manual prop layers and the procedural prop stack. Layer: UI.
+// Accuracy class: Visual. It edits one recipe slice — `recipe.propRules` (`Params::PropRule`:
+// density + slope/height gates + Poisson spacing + the water/cliff gates). TAB_REBUILD_PLAN
+// "§ Props"; extended by tab-rebuild WO C4. Decals were originally a sub-block of this tab but are
+// now their own standalone tab (ARCH §20, `DecalsTab_UI.h`) — see ARCH_20_DecalsTopLevelTab.md.
 //
 // Both procedural stacks are DraggableLists — rule ORDER decides which rule claims a contested
 // position first, so every row is a drop target — while the read-only resolved transform list is
@@ -18,15 +18,13 @@
 //  1. `Params::PropRule` has NO separate "physics simulate" flag and NO collision TAG: the one
 //     gameplay flag the tree models is `ScatterTransform::bCollidable`, drawn once in the shared
 //     Instance Transform block. A second control over it would be a rival toggle (ARCH §4).
-//  2. Manual prop/decal layers have a real PARAMS home now — see PropsTab_Manual_UI.h /
-//     PropsTab_ManualDecals_UI.h (STEP22). The manual decal layers block is a SIBLING FILE joining
-//     this tab, not a new "Decals tab" — there isn't one (ARCH §8.4, STEP22 ruling #7).
+//  2. Manual prop layers have a real PARAMS home now — see PropsTab_Manual_UI.h (STEP22). Manual
+//     decal layers are the same shape, but live on the standalone Decals tab (ARCH §20,
+//     `DecalsTab_Manual_UI.h`), not here.
 #pragma once
 #include "IconGridWidget_UI.h"
 #include "LabelledDialWidget_UI.h"
-#include "PropsTab_Decals_UI.h"
 #include "PropsTab_Manual_UI.h"
-#include "PropsTab_ManualDecals_UI.h"
 #include "PropsTab_Rules_UI.h"
 #include "RangeSliderWidget_UI.h"
 #include "../params/ScatterRule_PARAMS.h"
@@ -70,8 +68,6 @@ struct PropsTabState {
     PlacementGateState      gate;
     PlacementTransformState transform;
     ManualPropLayersState   manualLayers;
-    ManualDecalLayersState  manualDecalLayers;
-    DecalRuleStackState     decalStack;
 
     // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — the selected rule's own "Resolve Footprint"
     // inline message (a bake-not-found notice; empty otherwise). One shared slot, same posture as
@@ -105,16 +101,14 @@ inline bool StorePropRuleValues(const PropsTabState& state, Params::PropRule& ru
 Params::PropRule* SelectedPropRule(std::vector<Params::PropRule>& propRules,
                                    const PropsTabState& state);
 
-// `iconManifest`, `placedProps` and `placedDecals` are all nullable: with no resident atlas the
-// picker degrades to the typed tpId, and before the first generation the transform lists simply
-// say so. `placedDecals` is STEP22-new, mirroring the existing `placedProps`.
+// `iconManifest` and `placedProps` are both nullable: with no resident atlas the picker degrades to
+// the typed tpId, and before the first generation the transform list simply says so.
 // `templateIngestReport` is nullable (STEP90/91's session-scoped ingestion state) — the "Resolve
 // Footprint" button degrades to its "no ingested data" inline message with nothing bound.
 void DrawPropsTab(Params::MapRecipe& recipe, PropsTabState& state,
                   Pipeline::PreviewDriver* previewDriver,
                   const IconAtlasManifest* iconManifest = nullptr,
                   const Data::PlacementInstances* placedProps = nullptr,
-                  const Data::PlacementInstances* placedDecals = nullptr,
                   const Io::TemplateIngestReport* templateIngestReport = nullptr);
 
 } // namespace Ui

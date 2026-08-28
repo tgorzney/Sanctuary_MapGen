@@ -1,11 +1,11 @@
-// PropsTab_ManualDecals_UI_Test.cpp — STEP22 acceptance for the manual decal layers block, a
+// DecalsTab_Manual_UI_Test.cpp — STEP22 acceptance for the manual decal layers block, a
 // mirror of PropsTab_UI_Test.cpp's manual prop layer checks over `Params::DecalInstanceLayer`/
 // `recipe.decals`. The checks that matter: deleting a layer must never drop a decal instance
 // (CLAMPS every referencing `layerIndex` to 0); reordering layers must renumber every referencing
 // `layerIndex` (below-target, above-target, no-op); and two "Add Decal Layer" clicks must never
-// collide on export. All of it is pure (PropsTab_ManualDecals_UI.h), so the binary needs no imgui
+// collide on export. All of it is pure (DecalsTab_Manual_UI.h), so the binary needs no imgui
 // frame, no window and no GL context.
-#include "PropsTab_ManualDecals_UI.h"
+#include "DecalsTab_Manual_UI.h"
 #include <cstdio>
 
 using namespace SanmapGen;

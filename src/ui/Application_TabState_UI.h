@@ -17,6 +17,7 @@
 #include "AreasTab_UI.h"
 #include "ArmiesTab_UI.h"
 #include "AtmosphereTab_UI.h"
+#include "DecalsTab_UI.h"
 #include "DetailNormalTab_UI.h"
 #include "FilesTab_UI.h"
 #include "FlowTab_UI.h"
@@ -55,6 +56,7 @@ struct ApplicationTabState {
     MarkersTabState      markers;
     ArmiesTabState       armies;
     PropsTabState        props;
+    DecalsTabState       decals;
     AreasTabState        areas;
     ScenariosTabState    scenarios;
 

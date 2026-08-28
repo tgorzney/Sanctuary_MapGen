@@ -1,9 +1,10 @@
 // ApplicationShell_Layout_UI_Test.cpp — tab-rebuild WO E acceptance, part 1: the left column IS the
-// v1 layout, and it is asserted rather than eyeballed. Three group headers, nineteen rows in the
+// v1 layout, and it is asserted rather than eyeballed. Three group headers, twenty rows in the
 // order TAB_REBUILD_PLAN "Layout (keep v1 shape)" states (STEP74 added Scenarios to ENVIRONMENT,
-// after Areas), and the `[O]`/`[ ]` toggle on every row v1 gave one to (and on neither SYSTEM row,
-// which v1 drew with a plain Selectable, nor Scenarios — STEP74: `recipe.scenarios` feeds no PROC
-// stage, so the composite has nothing that row's toggle could drive).
+// after Areas; ARCH §20 split Decals out of the Props tab into its own row, right after Props), and
+// the `[O]`/`[ ]` toggle on every row v1 gave one to (and on neither SYSTEM row, which v1 drew with
+// a plain Selectable, nor Scenarios — STEP74: `recipe.scenarios` feeds no PROC stage, so the
+// composite has nothing that row's toggle could drive).
 // Headless: the catalogue is pure data, so no imgui frame, no window and no GL context.
 #include "Application_UI.h"
 #include "ApplicationShell_TestSupport_UI.h"
@@ -21,7 +22,7 @@ const char* const expectedTerrainLabels[] = {
     "Tint", "Holes", "Smoothness"
 };
 const char* const expectedEnvironmentLabels[] = {
-    "Water", "Atmosphere", "Markers", "Armies", "Props", "Areas", "Scenarios"
+    "Water", "Atmosphere", "Markers", "Armies", "Props", "Decals", "Areas", "Scenarios"
 };
 const char* const expectedSystemLabels[] = { "Performance", "Files" };
 
@@ -47,12 +48,12 @@ void CheckGroupOrder(ApplicationPanelGroup group, const char* const* expectedLab
 }
 
 void RunCatalogueChecks() {
-    Check(kApplicationPanelCount == 19, "the left column hosts all nineteen tabs");
+    Check(kApplicationPanelCount == 20, "the left column hosts all twenty tabs");
     Check(kApplicationPanelGroupCount == 3, "under exactly three group headers");
     CheckGroupOrder(ApplicationPanelGroup::TerrainAndLayers, expectedTerrainLabels, 10,
                     "TERRAIN & LAYERS carries ten rows in the plan's order");
-    CheckGroupOrder(ApplicationPanelGroup::Environment, expectedEnvironmentLabels, 7,
-                    "ENVIRONMENT carries seven rows in the plan's order");
+    CheckGroupOrder(ApplicationPanelGroup::Environment, expectedEnvironmentLabels, 8,
+                    "ENVIRONMENT carries eight rows in the plan's order");
     CheckGroupOrder(ApplicationPanelGroup::System, expectedSystemLabels, 2,
                     "SYSTEM carries two rows in the plan's order");
     for (const ApplicationPanelEntry& entry : applicationPanelEntries) {

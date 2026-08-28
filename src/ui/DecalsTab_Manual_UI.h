@@ -1,9 +1,9 @@
-// PropsTab_ManualDecals_UI.h — the manual decal layers block of the Props tab. Layer: UI.
-// Accuracy class: Visual/Exact. STEP22 exact mirror of PropsTab_Manual_UI.h for
-// `Params::DecalInstanceLayer`/`recipe.decalLayers`/`recipe.decals`/`placedDecals` — there is no
-// "Decals tab" (`DrawPropsTab` draws decals as a sub-block, `PropsTab_Decals_UI.h`'s
-// `DrawDecalRuleStack`); this block joins it as another sub-block, never a new top-level tab
-// (ARCH §8.4, STEP22 ruling #7).
+// DecalsTab_Manual_UI.h — the manual decal layers block, part of the standalone Decals tab
+// (ARCH §20; STEP22's original "no Decals tab" comment cited a ruling that was never actually
+// ratified into the ARCH pack — see ARCH_20_DecalsTopLevelTab.md). Layer: UI. Accuracy class:
+// Visual/Exact. STEP22 exact mirror of PropsTab_Manual_UI.h for
+// `Params::DecalInstanceLayer`/`recipe.decalLayers`/`recipe.decals`/`placedDecals`, now drawn by
+// `DecalsTab_UI.h`'s `DrawDecalsTab` rather than joining the Props tab as a sub-block.
 //
 // It edits `recipe.decalLayers` (`Params::DecalInstanceLayer`, the layer metadata array) and
 // repairs `recipe.decals` (`Params::DecalInstanceGroup::transforms[].layerIndex`, the hand-placed/

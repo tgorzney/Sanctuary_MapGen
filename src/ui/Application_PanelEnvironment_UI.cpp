@@ -9,6 +9,7 @@
 #include "AreasTab_UI.h"
 #include "ArmiesTab_UI.h"
 #include "AtmosphereTab_UI.h"
+#include "DecalsTab_UI.h"
 #include "MarkersTab_UI.h"
 #include "PropsTab_UI.h"
 #include "ScenariosTab_UI.h"
@@ -46,8 +47,11 @@ void Application::DrawEnvironmentGroupPanel() {
             break;
         case ApplicationPanel::Props:
             DrawPropsTab(recipe, tabState.props, &previewDriver, ActiveIconManifest(),
-                         &assembler.Placements().props, &assembler.Placements().decals,
-                         &assetBridge.templateIngestReport);
+                         &assembler.Placements().props, &assetBridge.templateIngestReport);
+            break;
+        case ApplicationPanel::Decals:
+            DrawDecalsTab(recipe, tabState.decals, &previewDriver, ActiveIconManifest(),
+                         &assembler.Placements().decals);
             break;
         case ApplicationPanel::Areas:
             DrawAreasTab(recipe, tabState.areas, &previewDriver);

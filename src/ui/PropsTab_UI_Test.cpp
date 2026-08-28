@@ -1,7 +1,8 @@
-// PropsTab_UI_Test.cpp — tab-rebuild WO C4 acceptance, part 4: the Props tab and the two other
-// stacks it hosts (the manual prop layers and the decal rules). Pure logic only — the rule<->widget
-// mirrors, the layer-color override, the label fallbacks and the tpId probe — so the binary needs
-// no imgui frame, no window and no GL context.
+// PropsTab_UI_Test.cpp — tab-rebuild WO C4 acceptance, part 4: the Props tab and the manual prop
+// layers block it hosts. Pure logic only — the rule<->widget mirrors, the layer-color override, the
+// label fallbacks and the tpId probe — so the binary needs no imgui frame, no window and no GL
+// context. Decals had their own mirror checks here until ARCH §20 split them onto their own tab —
+// see DecalsTab_UI_Test.cpp.
 // STEP22: the manual prop layers retype onto the real `Params::PropInstanceLayer`, and this file
 // gains the clamp/renumber repair checks for `recipe.props[].transforms[].layerIndex` — the checks
 // that matter: deleting a layer must never drop a prop instance (CLAMPS to layer 0, the DELIBERATE
@@ -38,22 +39,6 @@ void RunPropRuleMirrorChecks() {
           "and a real edit reports the move and lands on the rule");
     Check(state.densityRange.minimumValue == 0.0f && state.densityRange.maximumValue == 1.0f,
           "density is a 0-1 proportion");
-}
-
-// A decal rule is a prop rule without the water/cliff affinities and without symmetry, so it gets
-// its own mirrors rather than borrowing the prop ones (Params::DecalRule is a different struct).
-void RunDecalRuleMirrorChecks() {
-    Params::DecalRule rule;
-    rule.minSlope = 1.0f; rule.maxSlope = 15.0f; rule.minHeight = 0.05f; rule.maxHeight = 0.55f;
-    DecalRuleStackState state;
-    LoadDecalRuleValues(rule, state);
-    Check(state.slopeValues.maximumValue == 15.0f && state.heightValues.maximumValue == 0.55f,
-          "a decal rule's bands reach their own mirrors");
-    Check(!StoreDecalRuleValues(state, rule), "storing back what was loaded reports no move");
-    state.heightValues.maximumValue = 0.6f;
-    Check(StoreDecalRuleValues(state, rule) && rule.maxHeight == 0.6f,
-          "and a real edit reports the move and lands on the rule");
-    Check(state.selectedRuleIndex == 0, "the decal stack opens on its first row");
 }
 
 // The tpId is a fixed 8-byte field whose last byte need not be a terminator, so "has a template"
@@ -262,7 +247,6 @@ void RunIsPropInstanceLayerLockedChecks() {
 
 int main() {
     RunPropRuleMirrorChecks();
-    RunDecalRuleMirrorChecks();
     RunTemplateIdentifierChecks();
     RunResolveFootprintBakeChecks();
     RunManualPropLayerChecks();

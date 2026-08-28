@@ -25,7 +25,7 @@ inline const char* const applicationPanelGroupLabels[kApplicationPanelGroupCount
 // Every panel the shell hosts. Declaration order IS the left column's order.
 enum class ApplicationPanel : int {
     Symmetry, Heightmap, Slope, Flow, Accumulation, Stratums, DetailNormal, Tint, Holes, Smoothness,
-    Water, Atmosphere, Markers, Armies, Props, Areas, Scenarios,
+    Water, Atmosphere, Markers, Armies, Props, Decals, Areas, Scenarios,
     Performance, Files, Count
 };
 
@@ -78,6 +78,10 @@ inline constexpr ApplicationPanelEntry applicationPanelEntries[kApplicationPanel
     { ApplicationPanel::Armies,       "Armies",        ApplicationPanelGroup::Environment,
       true,  false, PreviewVisibilityTarget::Entities,   PreviewLayerKind::HeightRamp },
     { ApplicationPanel::Props,        "Props",         ApplicationPanelGroup::Environment,
+      true,  false, PreviewVisibilityTarget::Entities,   PreviewLayerKind::HeightRamp },
+    // ARCH §20 — Decals was a Props sub-block until this ticket; it is now its own top-level tab,
+    // same row shape as Props (entity overlay, hidden by default).
+    { ApplicationPanel::Decals,       "Decals",        ApplicationPanelGroup::Environment,
       true,  false, PreviewVisibilityTarget::Entities,   PreviewLayerKind::HeightRamp },
     { ApplicationPanel::Areas,        "Areas",         ApplicationPanelGroup::Environment,
       true,  false, PreviewVisibilityTarget::None,       PreviewLayerKind::HeightRamp },

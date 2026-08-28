@@ -1,9 +1,9 @@
-// PropsTab_ManualDecals_UI.cpp — the imgui composition of the manual decal layers block.
+// DecalsTab_Manual_UI.cpp — the imgui composition of the manual decal layers block.
 // Layer: UI. STEP22 exact mirror of PropsTab_Manual_UI.cpp for the decal domain. Shared widgets
 // only: DraggableList for the layer stack, VirtualList for the read-only transform list, Checkbox /
 // ColorSwatch / SliderScalar / TextInput / Section for the rest.
-// Nothing here notifies Pipeline::PreviewDriver (PropsTab_ManualDecals_UI.h SCOPE NOTE 1).
-#include "PropsTab_ManualDecals_UI.h"
+// Nothing here notifies Pipeline::PreviewDriver (DecalsTab_Manual_UI.h SCOPE NOTE 1).
+#include "DecalsTab_Manual_UI.h"
 #include "Checkbox_UI.h"
 #include "DraggableListWidget_UI.h"
 #include "TextInput_UI.h"
