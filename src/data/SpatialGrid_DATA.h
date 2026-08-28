@@ -39,6 +39,16 @@ public:
         return ClampedCellCoordinate(worldY) * chunkResolution + ClampedCellCoordinate(worldX);
     }
 
+    // ARCH §21.6 — the row/column split CellIndexAt's own formula composes, exposed so a region
+    // (box) query can compute its cellX/cellY span ONCE and walk it without re-deriving
+    // CellIndexAt's multiply per cell. Additive; CellIndexAt itself is unchanged and still the
+    // single mapping a point query uses.
+    int CellCoordinateXAt(float worldX) const { return ClampedCellCoordinate(worldX); }
+    int CellCoordinateYAt(float worldY) const { return ClampedCellCoordinate(worldY); }
+    // Inputs are ALREADY-CLAMPED cell coordinates (from the two accessors above) — this does NOT
+    // re-clamp; it is the other half of CellIndexAt's own formula.
+    int CellIndexAtCoordinate(int cellX, int cellY) const { return cellY * chunkResolution + cellX; }
+
     // [begin, end) into InstanceIndexAt for one cell; out-of-range cells and every cell of an
     // empty grid answer with an empty range.
     std::int32_t BucketBegin(int cellIndex) const {

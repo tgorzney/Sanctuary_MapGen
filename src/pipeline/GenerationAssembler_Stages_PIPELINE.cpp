@@ -23,18 +23,32 @@ void GenerationAssembler::AddStage(const std::string& stageName, RegenerationTie
     pipeline.AddStage(stageName, std::move(computeParameterHash), std::move(run));
 }
 
-// ARCH §8.3: the spatial grid is a derived INDEX over the resolved markers, not a new physical
-// quantity, so it gets no PROC stage of its own — PIPELINE is its single writer (§3.4.1) and
-// builds it immediately after Placement, inside the same registered run. A refresh that does not
-// re-run Placement therefore cannot move it, which is exactly what the preview tier relies on.
-// The horizontal pair is positionX/positionZ; positionY is terrain HEIGHT (PlacementInstance_DATA),
-// and the picker compares against those same two columns (Picking_UI).
-void GenerationAssembler::BuildMarkerSpatialGrid() {
-    const Data::PlacementInstances& markers = placementResults.markers;
-    markerSpatialGrid.Configure(static_cast<float>(recipe.geometry.mapSize) * WorldUnitsPerCell(),
-                                spatialGridChunkResolution);
-    markerSpatialGrid.Build(markers.positionX.data(), markers.positionZ.data(),
-                            static_cast<std::int32_t>(markers.Count()));
+// ARCH §8.3/§21.6: the spatial grid is a derived INDEX over the resolved placement results, not a
+// new physical quantity, so it gets no PROC stage of its own — PIPELINE is its single writer
+// (§3.4.1) and builds it immediately after Placement, inside the same registered run. A refresh
+// that does not re-run Placement therefore cannot move it, which is exactly what the preview tier
+// relies on. The horizontal pair is positionX/positionZ; positionY is terrain HEIGHT
+// (PlacementInstance_DATA), and the picker compares against those same two columns (Picking_UI).
+// One grid per Data::PlacementResults collection (Data::SpatialGridSet, mirrors
+// BuildRuleBucketIndex's own already-four-way shape immediately below).
+void GenerationAssembler::BuildSpatialGridSet() {
+    const float mapWorldSize = static_cast<float>(recipe.geometry.mapSize) * WorldUnitsPerCell();
+    spatialGridSet.markers.Configure(mapWorldSize, spatialGridChunkResolution);
+    spatialGridSet.markers.Build(placementResults.markers.positionX.data(),
+                                 placementResults.markers.positionZ.data(),
+                                 static_cast<std::int32_t>(placementResults.markers.Count()));
+    spatialGridSet.props.Configure(mapWorldSize, spatialGridChunkResolution);
+    spatialGridSet.props.Build(placementResults.props.positionX.data(),
+                               placementResults.props.positionZ.data(),
+                               static_cast<std::int32_t>(placementResults.props.Count()));
+    spatialGridSet.units.Configure(mapWorldSize, spatialGridChunkResolution);
+    spatialGridSet.units.Build(placementResults.units.positionX.data(),
+                               placementResults.units.positionZ.data(),
+                               static_cast<std::int32_t>(placementResults.units.Count()));
+    spatialGridSet.decals.Configure(mapWorldSize, spatialGridChunkResolution);
+    spatialGridSet.decals.Build(placementResults.decals.positionX.data(),
+                                placementResults.decals.positionZ.data(),
+                                static_cast<std::int32_t>(placementResults.decals.Count()));
     ++spatialGridBuildCount;
 }
 
@@ -85,7 +99,7 @@ void GenerationAssembler::RegisterStages() {
     AddStage("Mask", full, [this] { return maskStage.ComputeParameterHash(); },
              [this] { maskStage.Run(); });
     AddStage("Placement", full, [this] { return placementStage.ComputeParameterHash(); },
-             [this] { placementStage.Run(); BuildMarkerSpatialGrid(); BuildRuleBucketIndex(); });
+             [this] { placementStage.Run(); BuildSpatialGridSet(); BuildRuleBucketIndex(); });
     AddStage("Bake", RegenerationTier::PreviewOnly, [this] { return bakeStage.ComputeParameterHash(); },
              [this] { bakeStage.Run(); });
 }

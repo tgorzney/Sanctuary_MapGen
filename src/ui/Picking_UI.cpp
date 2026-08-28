@@ -62,5 +62,41 @@ std::int32_t PickMarker(const Data::SpatialGrid& grid, const Data::PlacementInst
     return nearestInstance;
 }
 
+void PickInstancesInRegion(const Data::SpatialGrid& grid, const Data::PlacementInstances& instances,
+                           float worldMinX, float worldMinY, float worldMaxX, float worldMaxY,
+                           std::vector<std::int32_t>& outInstanceIndices) {
+    outInstanceIndices.clear();
+    const std::int32_t instanceCount = HorizontalInstanceCount(instances);
+    // A degenerate/NaN box (min > max, or either bound non-finite in a way that breaks the
+    // exact-position test below) answers empty rather than silently scanning the whole grid.
+    if (instanceCount <= 0 || !(worldMaxX >= worldMinX) || !(worldMaxY >= worldMinY)) return;
+
+    const int minCellX = grid.CellCoordinateXAt(worldMinX);
+    const int maxCellX = grid.CellCoordinateXAt(worldMaxX);
+    const int minCellY = grid.CellCoordinateYAt(worldMinY);
+    const int maxCellY = grid.CellCoordinateYAt(worldMaxY);
+    const std::int32_t entryCount = grid.EntryCount();
+
+    for (int cellY = minCellY; cellY <= maxCellY; ++cellY) {
+        for (int cellX = minCellX; cellX <= maxCellX; ++cellX) {
+            const int cellIndex = grid.CellIndexAtCoordinate(cellX, cellY);
+            const std::int32_t bucketBegin = grid.BucketBegin(cellIndex);
+            const std::int32_t bucketEnd = grid.BucketEnd(cellIndex);
+            const std::int32_t walkEnd = bucketEnd < entryCount ? bucketEnd : entryCount;
+            for (std::int32_t position = bucketBegin; position < walkEnd; ++position) {
+                const std::int32_t instance = grid.InstanceIndexAt(position);
+                if (instance < 0 || instance >= instanceCount) continue;
+                const std::size_t column = static_cast<std::size_t>(instance);
+                const float positionX = instances.positionX[column];
+                const float positionY = instances.positionZ[column];   // positionZ, not positionY: see PickMarker's own comment
+                if (positionX < worldMinX || positionX > worldMaxX
+                    || positionY < worldMinY || positionY > worldMaxY)
+                    continue;   // this cell straddles the box edge; this candidate falls outside it
+                outInstanceIndices.push_back(instance);
+            }
+        }
+    }
+}
+
 } // namespace Ui
 } // namespace SanmapGen

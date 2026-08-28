@@ -20,6 +20,7 @@
 #include "../data/PlacementResults_DATA.h"
 #include "../data/RuleBucketIndexSet_DATA.h"
 #include "../data/SpatialGrid_DATA.h"
+#include "../data/SpatialGridSet_DATA.h"
 #include "../data/StratumArt_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../proc/Bake_PROC.h"
@@ -66,10 +67,13 @@ public:
     const Data::PlacementResults& Placements() const { return placementResults; }
     Proc::BakedTextureSet&  BakedTextures() { return bakedTextures; }
 
-    // The marker hit-test index (ARCH §8.3). PIPELINE is its SINGLE writer (§3.4.1): it is
-    // rebuilt inside the Placement stage's registered run, so a refresh that does not re-run
-    // Placement cannot move it, and no other layer may write it — Picking_UI only reads.
-    const Data::SpatialGrid& MarkerSpatialGrid() const { return markerSpatialGrid; }
+    // The per-collection hit-test index (ARCH §8.3, widened to all four PlacementResults
+    // collections by ARCH §21.6). PIPELINE is its SINGLE writer (§3.4.1): it is rebuilt inside the
+    // Placement stage's registered run, so a refresh that does not re-run Placement cannot move
+    // it, and no other layer may write it — Picking_UI only reads.
+    const Data::SpatialGridSet& SpatialGridSet() const { return spatialGridSet; }
+    // Thin back-compat accessor — every existing caller compiles unchanged.
+    const Data::SpatialGrid& MarkerSpatialGrid() const { return spatialGridSet.markers; }
     int SpatialGridBuildCount() const { return spatialGridBuildCount; }
     // Chunk count of that index — a tweakable (Constitution §8), applied on the next build.
     void SetSpatialGridChunkResolution(int resolution) { spatialGridChunkResolution = resolution; }
@@ -116,7 +120,7 @@ public:
 
 private:
     void RegisterStages();                // GenerationAssembler_Stages_PIPELINE.cpp
-    void BuildMarkerSpatialGrid();        // GenerationAssembler_Stages_PIPELINE.cpp
+    void BuildSpatialGridSet();           // GenerationAssembler_Stages_PIPELINE.cpp
     void BuildRuleBucketIndex();          // GenerationAssembler_Stages_PIPELINE.cpp
     void AddStage(const std::string& stageName, RegenerationTier tier,
                   std::function<std::size_t()> computeParameterHash, std::function<void()> run);
@@ -128,7 +132,7 @@ private:
     Data::MapFields        mapFields;          // declared before the stages that reference them
     Data::PlacementResults placementResults;
     Proc::BakedTextureSet  bakedTextures;
-    Data::SpatialGrid      markerSpatialGrid;  // derived index over placementResults.markers
+    Data::SpatialGridSet   spatialGridSet;     // derived per-collection index over placementResults
     Data::RuleBucketIndexSet ruleBucketIndex;  // derived per-collection CSR index over placementResults
 
     Proc::NoiseBlendStage       noiseBlendStage;

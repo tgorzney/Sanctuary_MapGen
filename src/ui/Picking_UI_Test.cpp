@@ -3,6 +3,7 @@
 #include "Picking_UI.h"
 #include <cstdio>
 #include <cstdint>
+#include <vector>
 
 using namespace SanmapGen;
 
@@ -98,6 +99,46 @@ int main() {
     const Data::PlacementInstances emptyInstances;
     check(Ui::PickMarker(grid, emptyInstances, 705.0f, 302.0f, 20.0f) == Ui::kNoMarkerPicked,
           "empty instance buffer safe");
+
+    // ---- ARCH §21.6: PickInstancesInRegion — the marquee/box-select counterpart to PickMarker.
+    std::vector<std::int32_t> hits;
+    Ui::PickInstancesInRegion(grid, instances, 0.0f, 0.0f, 200.0f, 200.0f, hits);
+    check(hits.size() == 2 && hits[0] == 0 && hits[1] == 1,
+          "a box over chunk 0 alone finds exactly the two markers there, in bucket order");
+
+    Ui::PickInstancesInRegion(grid, instances, 650.0f, 250.0f, 750.0f, 350.0f, hits);
+    check(hits.size() == 2 && hits[0] == 2 && hits[1] == 3,
+          "a box over chunk 21 alone finds exactly the two markers there");
+
+    // A box spanning chunks 0 and 21 (but not 63) finds all four, never the fifth.
+    Ui::PickInstancesInRegion(grid, instances, 50.0f, 50.0f, 750.0f, 350.0f, hits);
+    check(hits.size() == 4, "a multi-chunk box finds every marker across the chunks it spans");
+
+    // The whole map finds all five.
+    Ui::PickInstancesInRegion(grid, instances, 0.0f, 0.0f, 1024.0f, 1024.0f, hits);
+    check(hits.size() == 5, "a box covering the whole map finds every marker");
+
+    // A box that geometrically excludes a marker whose CHUNK it still touches is excluded by the
+    // exact-position test, not just cell membership (chunk 21 spans [512,640) — wait, spans a
+    // 128-unit chunk starting at 512..640 for cellX=4 — use a box that overlaps chunk 21's cell
+    // range but stops short of marker 2/3's actual (700,300) position).
+    Ui::PickInstancesInRegion(grid, instances, 640.0f, 250.0f, 695.0f, 350.0f, hits);
+    check(hits.empty(),
+          "a box overlapping a marker's CHUNK but not its exact position excludes it (cell "
+          "membership alone is not sufficient)");
+
+    // ---- A single-instance box (min==max) still finds an exact hit — not a degenerate no-op.
+    Ui::PickInstancesInRegion(grid, instances, 100.0f, 100.0f, 100.0f, 100.0f, hits);
+    check(hits.size() == 1 && hits[0] == 0, "a zero-area box exactly on an instance still finds it");
+
+    // ---- Degenerate/empty input is safe (Constitution §6), never a crash, always clears first.
+    hits = { 999 };   // stale contents from a previous call
+    Ui::PickInstancesInRegion(grid, instances, 200.0f, 200.0f, 0.0f, 0.0f, hits);
+    check(hits.empty(), "a degenerate box (min > max) clears stale contents and finds nothing");
+    Ui::PickInstancesInRegion(emptyGrid, instances, 0.0f, 0.0f, 1024.0f, 1024.0f, hits);
+    check(hits.empty(), "empty grid safe");
+    Ui::PickInstancesInRegion(grid, emptyInstances, 0.0f, 0.0f, 1024.0f, 1024.0f, hits);
+    check(hits.empty(), "empty instance buffer safe");
 
     if (failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failures);

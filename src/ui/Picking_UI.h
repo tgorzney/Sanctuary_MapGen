@@ -6,6 +6,7 @@
 // Both functions are pure functions of their inputs: they mutate no DATA they read.
 #pragma once
 #include <cstdint>
+#include <vector>
 #include "../data/EntityIdBuffer_DATA.h"
 #include "../data/PlacementInstances_DATA.h"
 #include "../data/SpatialGrid_DATA.h"
@@ -46,6 +47,24 @@ std::uint32_t PickEntity(const Data::EntityIdBuffer& entityIdBuffer, int cursorX
 std::int32_t PickMarker(const Data::SpatialGrid& grid, const Data::PlacementInstances& instances,
                         float worldX, float worldY, float pickRadius,
                         std::int32_t* visitedEntryCount = nullptr);
+
+// ARCH §21.6 — the marquee/box-select counterpart to PickMarker: every instance whose exact
+// position falls inside [worldMinX,worldMaxX] x [worldMinY,worldMaxY], not just the nearest one.
+// Generic over any (SpatialGrid, PlacementInstances) pair — the same grid+instances contract
+// PickMarker already takes, so this one function serves Markers/Props/Units/Decals alike via
+// Data::SpatialGridSet, never duplicated per collection (hence the domain-neutral name: this is
+// NOT "PickMarkersInRegion").
+//
+// Clears `outInstanceIndices` first — a single-call contract, mirroring Data::SpatialGrid::Build's
+// own "replaces... never accumulates" posture; never appends onto a caller's stale contents. Walks
+// the cell span the box covers (SpatialGrid::CellCoordinateXAt/YAt on the box's corners, then
+// CellIndexAtCoordinate per cell in that row x column range) and exact-position-tests every
+// candidate against the box — a cell can extend past the query box at its own edges, so cell
+// membership alone is never sufficient. A degenerate box (min > max), an empty grid, or an empty
+// instance buffer all answer with an empty `outInstanceIndices` (Constitution §6).
+void PickInstancesInRegion(const Data::SpatialGrid& grid, const Data::PlacementInstances& instances,
+                           float worldMinX, float worldMinY, float worldMaxX, float worldMaxY,
+                           std::vector<std::int32_t>& outInstanceIndices);
 
 } // namespace Ui
 } // namespace SanmapGen

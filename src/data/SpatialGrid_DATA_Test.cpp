@@ -26,6 +26,15 @@ int main() {
     check(grid.CellIndexAt(-99999.0f, -99999.0f) == 0, "clamp below range");
     check(grid.CellIndexAt(99999.0f, 99999.0f) == 63, "clamp above range");
     check(grid.CellIndexAt(1024.0f, 1024.0f) == 63, "clamp at exact upper bound");
+
+    // ---- ARCH §21.6: the row/column split composes back to CellIndexAt's own formula exactly.
+    check(grid.CellCoordinateXAt(1000.0f) == 7 && grid.CellCoordinateYAt(10.0f) == 0,
+          "CellCoordinateXAt/YAt match CellIndexAt's own row/column split");
+    check(grid.CellIndexAtCoordinate(grid.CellCoordinateXAt(1000.0f), grid.CellCoordinateYAt(10.0f))
+              == grid.CellIndexAt(1000.0f, 10.0f),
+          "CellCoordinateXAt/YAt + CellIndexAtCoordinate reproduces CellIndexAt for the same point");
+    check(grid.CellCoordinateXAt(-99999.0f) == 0 && grid.CellCoordinateXAt(99999.0f) == 7,
+          "CellCoordinateXAt clamps the same way CellIndexAt does");
     // ---- Empty grid is valid and answers every query with an empty range.
     check(grid.IsEmpty() && grid.EntryCount() == 0, "starts empty");
     for (int cell = 0; cell < grid.CellCount(); ++cell)
