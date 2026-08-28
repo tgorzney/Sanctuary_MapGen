@@ -79,18 +79,27 @@ void ReadChainsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe
 
 // MapImporter_Props_IO.cpp / MapImporter_Decals_IO.cpp — `props`/`decals`/`PropGroups`/
 // `DecalGroups` -> the matching `recipe.*` fields (STEP4_PropsDecals_IO; MapImporter_IO.h SCOPE
-// NOTE 3). `ReadPropGroupsJson`/`ReadDecalGroupsJson` MUST run before `ReadPropsJson`/
-// `ReadDecalsJson` — see each .cpp's own header comment for the `layerIndex` clamp reason.
+// NOTE 3). `ReadPropGroupsJson`/`ReadDecalGroupsJson` (MapImporter_PropGroups_IO.cpp/
+// MapImporter_DecalGroups_IO.cpp, ARCH §20 split) MUST run before `ReadPropsJson`/`ReadDecalsJson`
+// — see each .cpp's own header comment for the `layerIndex` clamp reason.
 void ReadPropGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadPropsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
 // STEP115 — same synthesis posture as ReconcileMarkerLayers above, mirrored per domain (own .cpp,
 // see MapImporter_Props_IO.cpp's own header comment on the new function).
 void ReconcilePropLayers(Params::MapRecipe& outRecipe, MapImportResult& result);
+// MapImporter_PropLayerBundle_IO.cpp — `PropLayerBundles` -> `recipe.propLayerBundles` (ARCH §20).
+// No load-bearing ordering relative to the readers above — mirrors
+// MapImporter_MarkerLayerBundle_IO.cpp's own no-ordering-dependency note.
+void ReadPropLayerBundlesJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
+                              MapImportResult& result);
 void ReadDecalGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadDecalsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe, MapImportResult& result);
 // STEP115 — same synthesis posture as ReconcileMarkerLayers above, mirrored per domain (own .cpp,
 // see MapImporter_Decals_IO.cpp's own header comment on the new function).
 void ReconcileDecalLayers(Params::MapRecipe& outRecipe, MapImportResult& result);
+// MapImporter_DecalLayerBundle_IO.cpp — `DecalLayerBundles` -> `recipe.decalLayerBundles` (ARCH §20).
+void ReadDecalLayerBundlesJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
+                               MapImportResult& result);
 
 // MapImporter_Atmosphere_IO.cpp — ~49 top-level `.sanmap` keys -> `recipe.atmosphere`
 // (ATMOSPHERE_PARAMS_SPEC; MapImporter_IO.h SCOPE NOTE 3). `result` logs the one fail-safe
@@ -132,7 +141,9 @@ void ReadStratumGenerationSettingsJson(const nlohmann::json& document, Params::M
 void ReadMarkersStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadGlobalMarkerSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadPropsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadGlobalPropSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadDecalsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
+void ReadGlobalDecalSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 void ReadUnitsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe);
 
 // MapImporter_Symmetry_IO.cpp — the top-level `Symmetry` object -> `recipe.globalSymmetryMask`/

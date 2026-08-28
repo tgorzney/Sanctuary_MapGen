@@ -6,9 +6,9 @@
 //
 // `props` is a plain ARRAY (finding 1) — a plain array walk, no name-keyed-object helper (that
 // pattern doesn't apply here; `PropInstanceGroup`/`PropTransform` have no folded-in name).
-// `ReadPropGroupsJson` MUST run before `ReadPropsJson` when both are used: the `layerIndex`
-// range-clamp (ARCH §12) validates against `outRecipe.propLayers.size()`, which `ReadPropGroupsJson`
-// populates.
+// `ReadPropGroupsJson` (MapImporter_PropGroups_IO.cpp, ARCH §20 split) MUST run before
+// `ReadPropsJson` when both are used: the `layerIndex` range-clamp (ARCH §12) validates against
+// `outRecipe.propLayers.size()`, which `ReadPropGroupsJson` populates.
 #include "JsonPrimitives_IO.h"
 #include "MapImporter_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -92,31 +92,6 @@ void ReadPropsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
         Params::PropInstanceGroup group;
         ReadPropInstanceGroupJson(groupJson, group, mapSize, propLayerCount, result);
         outRecipe.props.push_back(group);
-    }
-}
-
-// `PropGroups` — a plain array walk, same shape as `ReadArmyColorJson`'s `{r,g,b,a}` read
-// (STEP2_ArmiesAreas_IO), reused verbatim for `Color` (finding 5).
-void ReadPropGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
-    if (!document.contains("PropGroups") || !document["PropGroups"].is_array()) return;
-    outRecipe.propLayers.clear();
-    for (const nlohmann::json& layerJson : document["PropGroups"]) {
-        Params::PropInstanceLayer layer;
-        layer.layerId = static_cast<int>(outRecipe.propLayers.size());   // legacy-backfill default
-        if (layerJson.is_object()) {
-            ReadJsonText(layerJson, "Name", layer.name);
-            if (layerJson.contains("Color") && layerJson["Color"].is_object()) {
-                const nlohmann::json& color = layerJson["Color"];
-                ReadJsonFloat(color, "r", layer.color[0]);
-                ReadJsonFloat(color, "g", layer.color[1]);
-                ReadJsonFloat(color, "b", layer.color[2]);
-                ReadJsonFloat(color, "a", layer.color[3]);
-            }
-            ReadJsonFloat(layerJson, "IconScale", layer.iconScale);
-            ReadJsonInteger(layerJson, "Id", layer.layerId);
-            ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
-        }
-        outRecipe.propLayers.push_back(layer);
     }
 }
 

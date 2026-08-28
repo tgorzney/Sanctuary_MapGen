@@ -43,5 +43,17 @@ nlohmann::ordered_json BuildPropsStackJson(const Params::MapRecipe& recipe) {
     return propsStack;
 }
 
+// `GlobalPropSettings` — its own top-level key, a sibling of `PropsStack` (ARCH §20, mirrors
+// `BuildGlobalMarkerSettingsJson`'s placement beside `MarkersStack`), not nested inside it.
+nlohmann::ordered_json BuildGlobalPropSettingsJson(const Params::MapRecipe& recipe) {
+    const Params::GlobalPropSettings& settings = recipe.globalPropSettings;
+    nlohmann::ordered_json json;
+    json["ColorProp"] = { { "r", settings.colorProp[0] }, { "g", settings.colorProp[1] },
+                          { "b", settings.colorProp[2] }, { "a", settings.colorProp[3] } };
+    json["ColorReclaim"] = { { "r", settings.colorReclaim[0] }, { "g", settings.colorReclaim[1] },
+                             { "b", settings.colorReclaim[2] }, { "a", settings.colorReclaim[3] } };
+    return json;
+}
+
 } // namespace Io
 } // namespace SanmapGen

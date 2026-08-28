@@ -2,8 +2,8 @@
 // `recipe.decals`/`recipe.decalLayers`. Layer: IO. The exact inverse of MapExporter_Decals_IO.cpp.
 //
 // Called from `ParseSanmapJsonText` — see MapImporter_Props_IO.cpp's header note; the same posture
-// applies here. `ReadDecalGroupsJson` MUST run before `ReadDecalsJson` when both are used, for the
-// same `layerIndex` range-clamp reason.
+// applies here. `ReadDecalGroupsJson` (MapImporter_DecalGroups_IO.cpp, ARCH §20 split) MUST run
+// before `ReadDecalsJson` when both are used, for the same `layerIndex` range-clamp reason.
 #include "JsonPrimitives_IO.h"
 #include "MapImporter_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -84,31 +84,6 @@ void ReadDecalsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe
         Params::DecalInstanceGroup group;
         ReadDecalInstanceGroupJson(groupJson, group, mapSize, decalLayerCount, result);
         outRecipe.decals.push_back(group);
-    }
-}
-
-// `DecalGroups` — a plain array walk, same `{r,g,b,a}` Color shape as `ReadArmyColorJson`
-// (STEP2_ArmiesAreas_IO), reused verbatim (finding 5).
-void ReadDecalGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
-    if (!document.contains("DecalGroups") || !document["DecalGroups"].is_array()) return;
-    outRecipe.decalLayers.clear();
-    for (const nlohmann::json& layerJson : document["DecalGroups"]) {
-        Params::DecalInstanceLayer layer;
-        layer.layerId = static_cast<int>(outRecipe.decalLayers.size());   // legacy-backfill default
-        if (layerJson.is_object()) {
-            ReadJsonText(layerJson, "Name", layer.name);
-            if (layerJson.contains("Color") && layerJson["Color"].is_object()) {
-                const nlohmann::json& color = layerJson["Color"];
-                ReadJsonFloat(color, "r", layer.color[0]);
-                ReadJsonFloat(color, "g", layer.color[1]);
-                ReadJsonFloat(color, "b", layer.color[2]);
-                ReadJsonFloat(color, "a", layer.color[3]);
-            }
-            ReadJsonFloat(layerJson, "IconScale", layer.iconScale);
-            ReadJsonInteger(layerJson, "Id", layer.layerId);
-            ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
-        }
-        outRecipe.decalLayers.push_back(layer);
     }
 }
 

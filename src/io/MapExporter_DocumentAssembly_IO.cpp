@@ -50,7 +50,8 @@ void BuildDocumentEnvelopeJson(const Params::MapRecipe& recipe, nlohmann::ordere
 }
 
 // `stratumLayers`, `StratumGenerationSettings`, `areas`, `armies`, `markers`, `chains`, `decals`,
-// `props`, `PropGroups`, `DecalGroups`, `Scenarios` — the recipe's own authored entities.
+// `props`, `PropGroups`, `PropLayerBundles`, `DecalGroups`, `DecalLayerBundles`, `Scenarios` — the
+// recipe's own authored entities.
 void AppendEntityDomainsJson(const Params::MapRecipe& recipe, nlohmann::ordered_json& document) {
     document["stratumLayers"] = BuildStratumLayersJson(recipe);
     // SANMAP_FORMAT_SPEC Correction 12: soil physics + slope-gate overrides, index-aligned with
@@ -69,14 +70,16 @@ void AppendEntityDomainsJson(const Params::MapRecipe& recipe, nlohmann::ordered_
     document["decals"]      = BuildDecalsJson(recipe);
     document["props"]       = BuildPropsJson(recipe);
     document["PropGroups"]  = BuildPropGroupsJson(recipe);
+    document["PropLayerBundles"] = BuildPropLayerBundlesJson(recipe);
     document["DecalGroups"] = BuildDecalGroupsJson(recipe);
+    document["DecalLayerBundles"] = BuildDecalLayerBundlesJson(recipe);
     // STEP69_ParamsScenariosRoundTrip_IO: lobby-resolved spawn/alloy scenario data, same tier,
     // sibling of the above (NOT nested in `mapGeneratorData`).
     document["Scenarios"]   = BuildScenariosJson(recipe);
 }
 
-// `MarkersStack`, `PropsStack`, `DecalsStack`, `UnitsStack`, `GlobalMarkerSettings` — the
-// placement-rule vectors and their shared settings.
+// `MarkersStack`, `PropsStack`, `DecalsStack`, `UnitsStack`, `GlobalMarkerSettings`,
+// `GlobalPropSettings`, `GlobalDecalSettings` — the placement-rule vectors and their shared settings.
 void AppendStackDomainsJson(const Params::MapRecipe& recipe, nlohmann::ordered_json& document) {
     // SANMAP_FORMAT_SPEC Correction 7: the four placement-rule vectors as bare top-level arrays,
     // siblings of `mapGeneratorData` (ruling #1), REPLACING the legacy nested
@@ -88,6 +91,8 @@ void AppendStackDomainsJson(const Params::MapRecipe& recipe, nlohmann::ordered_j
     document["DecalsStack"]  = BuildDecalsStackJson(recipe);
     document["UnitsStack"]   = BuildUnitsStackJson(recipe);
     document["GlobalMarkerSettings"] = BuildGlobalMarkerSettingsJson(recipe);
+    document["GlobalPropSettings"] = BuildGlobalPropSettingsJson(recipe);
+    document["GlobalDecalSettings"] = BuildGlobalDecalSettingsJson(recipe);
 }
 
 // `BuildAtmosphereJson`, `SlopeDefaults`, `GeneralMapSettings`, `HeightmapStack`, `Symmetry`,

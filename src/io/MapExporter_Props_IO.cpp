@@ -13,6 +13,7 @@
 // flattening-on-the-wire pattern `MarkerTransform` already established.
 #include "MapExporter_Recipe_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include "../params/ScatterLayerBundle_PARAMS.h"
 
 namespace SanmapGen {
 namespace Io {
@@ -57,6 +58,8 @@ nlohmann::ordered_json BuildPropsJson(const Params::MapRecipe& recipe) {
 
 // `PropGroups` — SanGen-owned manual-layer metadata, top-level PascalCase array, SANMAP_FORMAT_SPEC
 // Correction 14. `Color` reuses the `{r,g,b,a}` shape already shipped for `armyColor` (Step 2).
+// ARCH §20: full field parity with `BuildMarkerGroupsJson` (MapExporter_Markers_IO.cpp), plus the
+// Prop-only `PropTypeName` (not `MarkerTypeName` reused — see ScatterInstanceLayer_PARAMS.h).
 nlohmann::ordered_json BuildPropGroupsJson(const Params::MapRecipe& recipe) {
     nlohmann::ordered_json propGroups = nlohmann::ordered_json::array();
     for (const Params::PropInstanceLayer& layer : recipe.propLayers) {
@@ -66,10 +69,37 @@ nlohmann::ordered_json BuildPropGroupsJson(const Params::MapRecipe& recipe) {
                                { "b", layer.color[2] }, { "a", layer.color[3] } };
         layerJson["IconScale"] = layer.iconScale;
         layerJson["Id"] = layer.layerId;
+        layerJson["SymmetryUseGlobal"] = layer.symmetry.bSymmetryUseGlobal;
+        layerJson["SymmetryMask"] = layer.symmetry.symmetryMask;
+        layerJson["RadialSymmetryRepeatCount"] = layer.symmetry.radialSymmetryRepeatCount;
         layerJson["Locked"] = layer.bLocked;
+        layerJson["Hidden"] = layer.bHidden;
+        layerJson["GridSnapEnabled"] = layer.bGridSnapEnabled;
+        layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeWorldUnits;
+        layerJson["ColorOverrideEnabled"] = layer.bColorOverrideEnabled;
+        layerJson["SymmetryEnabled"] = layer.bSymmetryEnabled;
+        layerJson["ParentBundleIdentifier"] = layer.parentBundleIdentifier;
+        layerJson["PropTypeName"] = layer.propTypeName;
         propGroups.push_back(layerJson);
     }
     return propGroups;
+}
+
+// `PropLayerBundles` — SanGen-owned Group-above-Layer container, top-level PascalCase array (ARCH
+// §20), a fresh sibling of `PropGroups`/`props`, mirroring `BuildMarkerLayerBundlesJson`'s shape.
+// Array order is NOT this array's identity — membership/nesting resolve by `Identifier`.
+nlohmann::ordered_json BuildPropLayerBundlesJson(const Params::MapRecipe& recipe) {
+    nlohmann::ordered_json propLayerBundles = nlohmann::ordered_json::array();
+    for (const Params::PropLayerBundle& bundle : recipe.propLayerBundles) {
+        nlohmann::ordered_json bundleJson;
+        bundleJson["Identifier"] = bundle.identifier;
+        bundleJson["Name"] = bundle.name;
+        bundleJson["ParentBundleIdentifier"] = bundle.parentBundleIdentifier;
+        bundleJson["PropTypeName"] = bundle.propTypeName;
+        bundleJson["AssemblyIdentifier"] = bundle.assemblyIdentifier;
+        propLayerBundles.push_back(bundleJson);
+    }
+    return propLayerBundles;
 }
 
 } // namespace Io

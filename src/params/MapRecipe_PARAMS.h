@@ -14,6 +14,7 @@
 #include "GeneralMapSettings_PARAMS.h"
 #include "Geometry_PARAMS.h"
 #include "GlobalMarkerSettings_PARAMS.h"
+#include "GlobalScatterSettings_PARAMS.h"
 #include "LayerStack_PARAMS.h"
 #include "MapArea_PARAMS.h"
 #include "MarkerChain_PARAMS.h"
@@ -21,6 +22,7 @@
 #include "MarkerLayerBundle_PARAMS.h"
 #include "MarkerRule_PARAMS.h"
 #include "PropInstance_PARAMS.h"
+#include "ScatterLayerBundle_PARAMS.h"
 #include "ScatterRule_PARAMS.h"
 #include "Scenario_PARAMS.h"
 #include "SlopeDefaults_PARAMS.h"
@@ -124,6 +126,12 @@ struct MapRecipe {
     std::vector<DecalInstanceGroup>  decals;
     std::vector<PropInstanceLayer>   propLayers;
     std::vector<DecalInstanceLayer>  decalLayers;
+    std::vector<PropLayerBundle>     propLayerBundles;    // ARCH §20. Additive.
+    std::vector<DecalLayerBundle>    decalLayerBundles;   // ARCH §20. Additive.
+    // Map-wide default colors for the Props/Decals Type Sections (ARCH §20) — flat siblings of
+    // `globalMarkerSettings`, same posture.
+    GlobalPropSettings               globalPropSettings;
+    GlobalDecalSettings              globalDecalSettings;
 
     bool IsValid() const { return geometry.IsValid(); }
 };

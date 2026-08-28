@@ -363,6 +363,31 @@ void CheckGlobalMarkerSettingsSurvives(const Params::MapRecipe& original,
           "GlobalMarkerSettings's four selectColor* fields survive, all four components each");
 }
 
+// ARCH §20: `GlobalPropSettings`/`GlobalDecalSettings` through their own top-level keys, siblings
+// of `PropsStack`/`DecalsStack`, mirroring `CheckGlobalMarkerSettingsSurvives`'s exact style.
+void CheckGlobalPropDecalSettingsSurvives(const Params::MapRecipe& original,
+                                          const Params::MapRecipe& loaded) {
+    const Params::GlobalPropSettings& originalProp = original.globalPropSettings;
+    const Params::GlobalPropSettings& loadedProp = loaded.globalPropSettings;
+    Check(NearlyEqual(loadedProp.colorProp[0], originalProp.colorProp[0])
+          && NearlyEqual(loadedProp.colorProp[1], originalProp.colorProp[1])
+          && NearlyEqual(loadedProp.colorProp[2], originalProp.colorProp[2])
+          && NearlyEqual(loadedProp.colorProp[3], originalProp.colorProp[3])
+          && NearlyEqual(loadedProp.colorReclaim[0], originalProp.colorReclaim[0])
+          && NearlyEqual(loadedProp.colorReclaim[1], originalProp.colorReclaim[1])
+          && NearlyEqual(loadedProp.colorReclaim[2], originalProp.colorReclaim[2])
+          && NearlyEqual(loadedProp.colorReclaim[3], originalProp.colorReclaim[3]),
+          "GlobalPropSettings's two colors survive, all four components each");
+
+    const Params::GlobalDecalSettings& originalDecal = original.globalDecalSettings;
+    const Params::GlobalDecalSettings& loadedDecal = loaded.globalDecalSettings;
+    Check(NearlyEqual(loadedDecal.colorDecal[0], originalDecal.colorDecal[0])
+          && NearlyEqual(loadedDecal.colorDecal[1], originalDecal.colorDecal[1])
+          && NearlyEqual(loadedDecal.colorDecal[2], originalDecal.colorDecal[2])
+          && NearlyEqual(loadedDecal.colorDecal[3], originalDecal.colorDecal[3]),
+          "GlobalDecalSettings's color survives, all four components");
+}
+
 // STEP66_MarkerRuleLayer_PARAMS acceptance test: a recipe with 2 `MarkerRuleLayer`s (different
 // symmetry settings, 2+ rules each, including non-default per-rule fields) round-trips exactly
 // through `MarkersStack`'s two-level shape (ARCH_16_01_NewParamsShapes.md §16.1,
@@ -775,9 +800,40 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
 void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
     Check(loaded.propLayers.size() == 1, "one prop layer survives");
     Check(loaded.props.size() == 1, "one prop group survives");
-    if (!loaded.propLayers.empty())
-        Check(loaded.propLayers[0].layerId == original.propLayers[0].layerId,
+    if (!loaded.propLayers.empty()) {
+        const Params::PropInstanceLayer& originalLayer = original.propLayers[0];
+        const Params::PropInstanceLayer& loadedLayer = loaded.propLayers[0];
+        Check(loadedLayer.layerId == originalLayer.layerId,
               "PropInstanceLayer::layerId survives the live BuildSanmapJsonText/ParseSanmapJsonText path");
+        Check(loadedLayer.bLocked == originalLayer.bLocked, "PropInstanceLayer::bLocked survives, non-default");
+        Check(loadedLayer.bHidden == originalLayer.bHidden,
+              "PropInstanceLayer::bHidden survives, non-default (ARCH §20)");
+        Check(loadedLayer.bGridSnapEnabled == originalLayer.bGridSnapEnabled,
+              "PropInstanceLayer::bGridSnapEnabled survives, non-default (ARCH §20)");
+        Check(NearlyEqual(loadedLayer.gridSnapSizeWorldUnits, originalLayer.gridSnapSizeWorldUnits),
+              "PropInstanceLayer::gridSnapSizeWorldUnits survives, non-default (ARCH §20)");
+        Check(loadedLayer.bColorOverrideEnabled == originalLayer.bColorOverrideEnabled,
+              "PropInstanceLayer::bColorOverrideEnabled survives, non-default (ARCH §20)");
+        Check(loadedLayer.bSymmetryEnabled == originalLayer.bSymmetryEnabled && !loadedLayer.bSymmetryEnabled,
+              "PropInstanceLayer::bSymmetryEnabled survives, non-default (ARCH §20)");
+        Check(loadedLayer.parentBundleIdentifier == originalLayer.parentBundleIdentifier,
+              "PropInstanceLayer::parentBundleIdentifier survives, non-default (ARCH §20)");
+        Check(loadedLayer.propTypeName == originalLayer.propTypeName,
+              "PropInstanceLayer::propTypeName survives, non-default (ARCH §20)");
+    }
+
+    Check(loaded.propLayerBundles.size() == 1, "one PropLayerBundle survives (ARCH §20)");
+    if (!loaded.propLayerBundles.empty()) {
+        const Params::PropLayerBundle& originalBundle = original.propLayerBundles[0];
+        const Params::PropLayerBundle& loadedBundle = loaded.propLayerBundles[0];
+        Check(loadedBundle.identifier == originalBundle.identifier, "PropLayerBundle::identifier survives");
+        Check(loadedBundle.name == originalBundle.name, "PropLayerBundle::name survives");
+        Check(loadedBundle.parentBundleIdentifier == originalBundle.parentBundleIdentifier,
+              "PropLayerBundle::parentBundleIdentifier survives");
+        Check(loadedBundle.propTypeName == originalBundle.propTypeName, "PropLayerBundle::propTypeName survives");
+        Check(loadedBundle.assemblyIdentifier == originalBundle.assemblyIdentifier,
+              "PropLayerBundle::assemblyIdentifier survives");
+    }
     if (!loaded.propLayers.empty() && !loaded.props.empty()) {
         const Params::PropInstanceGroup& originalGroup = original.props[0];
         const Params::PropInstanceGroup& loadedGroup = loaded.props[0];
@@ -799,9 +855,37 @@ void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRec
 
     Check(loaded.decalLayers.size() == 1, "one decal layer survives");
     Check(loaded.decals.size() == 1, "one decal group survives");
-    if (!loaded.decalLayers.empty())
-        Check(loaded.decalLayers[0].layerId == original.decalLayers[0].layerId,
+    if (!loaded.decalLayers.empty()) {
+        const Params::DecalInstanceLayer& originalLayer = original.decalLayers[0];
+        const Params::DecalInstanceLayer& loadedLayer = loaded.decalLayers[0];
+        Check(loadedLayer.layerId == originalLayer.layerId,
               "DecalInstanceLayer::layerId survives the live BuildSanmapJsonText/ParseSanmapJsonText path");
+        Check(loadedLayer.bLocked == originalLayer.bLocked, "DecalInstanceLayer::bLocked survives, non-default");
+        Check(loadedLayer.bHidden == originalLayer.bHidden,
+              "DecalInstanceLayer::bHidden survives, non-default (ARCH §20)");
+        Check(loadedLayer.bGridSnapEnabled == originalLayer.bGridSnapEnabled,
+              "DecalInstanceLayer::bGridSnapEnabled survives, non-default (ARCH §20)");
+        Check(NearlyEqual(loadedLayer.gridSnapSizeWorldUnits, originalLayer.gridSnapSizeWorldUnits),
+              "DecalInstanceLayer::gridSnapSizeWorldUnits survives, non-default (ARCH §20)");
+        Check(loadedLayer.bColorOverrideEnabled == originalLayer.bColorOverrideEnabled,
+              "DecalInstanceLayer::bColorOverrideEnabled survives, non-default (ARCH §20)");
+        Check(loadedLayer.bSymmetryEnabled == originalLayer.bSymmetryEnabled && !loadedLayer.bSymmetryEnabled,
+              "DecalInstanceLayer::bSymmetryEnabled survives, non-default (ARCH §20)");
+        Check(loadedLayer.parentBundleIdentifier == originalLayer.parentBundleIdentifier,
+              "DecalInstanceLayer::parentBundleIdentifier survives, non-default (ARCH §20)");
+    }
+
+    Check(loaded.decalLayerBundles.size() == 1, "one DecalLayerBundle survives (ARCH §20)");
+    if (!loaded.decalLayerBundles.empty()) {
+        const Params::DecalLayerBundle& originalBundle = original.decalLayerBundles[0];
+        const Params::DecalLayerBundle& loadedBundle = loaded.decalLayerBundles[0];
+        Check(loadedBundle.identifier == originalBundle.identifier, "DecalLayerBundle::identifier survives");
+        Check(loadedBundle.name == originalBundle.name, "DecalLayerBundle::name survives");
+        Check(loadedBundle.parentBundleIdentifier == originalBundle.parentBundleIdentifier,
+              "DecalLayerBundle::parentBundleIdentifier survives");
+        Check(loadedBundle.assemblyIdentifier == originalBundle.assemblyIdentifier,
+              "DecalLayerBundle::assemblyIdentifier survives");
+    }
     if (!loaded.decalLayers.empty() && !loaded.decals.empty()) {
         const Params::DecalInstanceGroup& originalGroup = original.decals[0];
         const Params::DecalInstanceGroup& loadedGroup = loaded.decals[0];
@@ -1190,6 +1274,17 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     globalMarkerSettings.selectColorSpawn[2] = 0.73f; globalMarkerSettings.selectColorSpawn[3] = 0.74f;
     globalMarkerSettings.selectColorDefault[0] = 0.41f; globalMarkerSettings.selectColorDefault[1] = 0.42f;
     globalMarkerSettings.selectColorDefault[2] = 0.43f; globalMarkerSettings.selectColorDefault[3] = 0.44f;
+
+    // ARCH §20: GlobalPropSettings/GlobalDecalSettings, every field non-default.
+    Params::GlobalPropSettings& globalPropSettings = recipe.globalPropSettings;
+    globalPropSettings.colorProp[0] = 0.15f; globalPropSettings.colorProp[1] = 0.25f;
+    globalPropSettings.colorProp[2] = 0.35f; globalPropSettings.colorProp[3] = 0.45f;
+    globalPropSettings.colorReclaim[0] = 0.55f; globalPropSettings.colorReclaim[1] = 0.65f;
+    globalPropSettings.colorReclaim[2] = 0.75f; globalPropSettings.colorReclaim[3] = 0.85f;
+
+    Params::GlobalDecalSettings& globalDecalSettings = recipe.globalDecalSettings;
+    globalDecalSettings.colorDecal[0] = 0.05f; globalDecalSettings.colorDecal[1] = 0.95f;
+    globalDecalSettings.colorDecal[2] = 0.15f; globalDecalSettings.colorDecal[3] = 0.85f;
 }
 
 void FillFixtureArmiesAndAreas(Params::MapRecipe& recipe) {
@@ -1307,7 +1402,26 @@ void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
     propLayer.color[2] = 0.3f; propLayer.color[3] = 0.4f;
     propLayer.iconScale = 1.5f;
     propLayer.layerId = 7;                    // non-default: exercises the "Id" wire key round-trip
+    propLayer.bLocked = true;                                       // non-default
+    propLayer.bHidden = true;                                       // ARCH §20, non-default
+    propLayer.bGridSnapEnabled = true;                              // ARCH §20, non-default
+    propLayer.gridSnapSizeWorldUnits = 4.0f;                        // ARCH §20, non-default
+    propLayer.bColorOverrideEnabled = true;                         // ARCH §20, non-default
+    propLayer.bSymmetryEnabled = false;                             // ARCH §20, non-default
+    propLayer.parentBundleIdentifier = 42;                          // ARCH §20, non-default
+    propLayer.propTypeName = "Reclaim";                             // ARCH §20, non-default
     recipe.propLayers.push_back(propLayer);
+
+    // ARCH §20: one PropLayerBundle, non-default on every field, non-cyclic (parentBundleIdentifier
+    // == -1) so RunRoundTripTests's own "no warning" assertion is not tripped by
+    // RepairCyclicPropLayerBundleParents.
+    Params::PropLayerBundle propBundle;
+    propBundle.identifier = 11;
+    propBundle.name = "Reclaim Bundle";
+    propBundle.parentBundleIdentifier = -1;
+    propBundle.propTypeName = "Reclaim";
+    propBundle.assemblyIdentifier = 5;
+    recipe.propLayerBundles.push_back(propBundle);
 
     Params::PropTransform propTransform;
     propTransform.transform.positionX = 5.0f;
@@ -1330,7 +1444,24 @@ void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
     decalLayer.color[2] = 0.7f; decalLayer.color[3] = 0.8f;
     decalLayer.iconScale = 0.75f;
     decalLayer.layerId = 7;                     // non-default: exercises the "Id" wire key round-trip
+    decalLayer.bLocked = true;                                       // non-default
+    decalLayer.bHidden = true;                                       // ARCH §20, non-default
+    decalLayer.bGridSnapEnabled = true;                              // ARCH §20, non-default
+    decalLayer.gridSnapSizeWorldUnits = 2.0f;                        // ARCH §20, non-default
+    decalLayer.bColorOverrideEnabled = true;                         // ARCH §20, non-default
+    decalLayer.bSymmetryEnabled = false;                             // ARCH §20, non-default
+    decalLayer.parentBundleIdentifier = 13;                          // ARCH §20, non-default
     recipe.decalLayers.push_back(decalLayer);
+
+    // ARCH §20: one DecalLayerBundle, non-default on every field, non-cyclic (parentBundleIdentifier
+    // == -1) so RunRoundTripTests's own "no warning" assertion is not tripped by
+    // RepairCyclicDecalLayerBundleParents.
+    Params::DecalLayerBundle decalBundle;
+    decalBundle.identifier = 9;
+    decalBundle.name = "Ground Bundle";
+    decalBundle.parentBundleIdentifier = -1;
+    decalBundle.assemblyIdentifier = 3;
+    recipe.decalLayerBundles.push_back(decalBundle);
 
     Params::DecalTransform decalTransform;
     decalTransform.transform.positionX = 8.0f;
@@ -1527,6 +1658,7 @@ void RunRoundTripTests() {
     CheckFootprintBakeFields(original, loaded);
     CheckHeightmapStackTopLevelNotNested(documentText);
     CheckGlobalMarkerSettingsSurvives(original, loaded);
+    CheckGlobalPropDecalSettingsSurvives(original, loaded);
     CheckPlacementStacksTopLevelNotNested(documentText);
     CheckStratumAppearance(original, loaded);
     CheckStratumGenerationSettings(original, loaded);
@@ -2132,6 +2264,50 @@ void CheckMarkerGroupsLegacyLockAndSnapDefaults() {
           "§19.24) — every pre-existing/legacy layer's configured symmetry mask stays live");
 }
 
+// ARCH §20: the Prop/Decal-typed mirror of CheckMarkerGroupsLegacyLockAndSnapDefaults — a hand-built
+// `PropGroups`/`DecalGroups` entry with none of the new fields present (a file saved before this
+// ticket) leaves every new struct field on its own default.
+void CheckPropDecalGroupsLegacyDefaults() {
+    nlohmann::json document;
+    document["PropGroups"] = nlohmann::json::array();
+    document["PropGroups"].push_back(nlohmann::json::object({ { "Name", "First" } }));
+    document["DecalGroups"] = nlohmann::json::array();
+    document["DecalGroups"].push_back(nlohmann::json::object({ { "Name", "First" } }));
+
+    Params::MapRecipe recipe;
+    Io::ReadPropGroupsJson(document, recipe);
+    Io::ReadDecalGroupsJson(document, recipe);
+    Check(recipe.propLayers.size() == 1, "the legacy PropGroups entry survives");
+    Check(recipe.decalLayers.size() == 1, "the legacy DecalGroups entry survives");
+    if (!recipe.propLayers.empty()) {
+        const Params::PropInstanceLayer& layer = recipe.propLayers[0];
+        Check(layer.bLocked == false, "PropInstanceLayer::bLocked keeps its struct default when absent");
+        Check(layer.bHidden == false, "PropInstanceLayer::bHidden keeps its struct default when absent");
+        Check(layer.bGridSnapEnabled == false,
+              "PropInstanceLayer::bGridSnapEnabled keeps its struct default when absent");
+        Check(NearlyEqual(layer.gridSnapSizeWorldUnits, 1.0f),
+              "PropInstanceLayer::gridSnapSizeWorldUnits keeps its struct default (1.0f) when absent");
+        Check(layer.bColorOverrideEnabled == false,
+              "PropInstanceLayer::bColorOverrideEnabled keeps its struct default when absent");
+        Check(layer.bSymmetryEnabled == true,
+              "PropInstanceLayer::bSymmetryEnabled keeps its struct default (true) when absent");
+        Check(layer.propTypeName.empty(), "PropInstanceLayer::propTypeName keeps its struct default (empty) when absent");
+    }
+    if (!recipe.decalLayers.empty()) {
+        const Params::DecalInstanceLayer& layer = recipe.decalLayers[0];
+        Check(layer.bLocked == false, "DecalInstanceLayer::bLocked keeps its struct default when absent");
+        Check(layer.bHidden == false, "DecalInstanceLayer::bHidden keeps its struct default when absent");
+        Check(layer.bGridSnapEnabled == false,
+              "DecalInstanceLayer::bGridSnapEnabled keeps its struct default when absent");
+        Check(NearlyEqual(layer.gridSnapSizeWorldUnits, 1.0f),
+              "DecalInstanceLayer::gridSnapSizeWorldUnits keeps its struct default (1.0f) when absent");
+        Check(layer.bColorOverrideEnabled == false,
+              "DecalInstanceLayer::bColorOverrideEnabled keeps its struct default when absent");
+        Check(layer.bSymmetryEnabled == true,
+              "DecalInstanceLayer::bSymmetryEnabled keeps its struct default (true) when absent");
+    }
+}
+
 // STEP60_MarkerInstanceLayer_PARAMS: a hand-built `markers` entry with an out-of-range
 // `layerIndex` (5, against zero MarkerGroups entries) must clamp to 0 on import and log a
 // warning — mirrors MapImporter_PropsDecals_IO_Test.cpp's own `ClampPropLayerIndex` coverage.
@@ -2379,6 +2555,65 @@ void CheckMarkerLayerBundleCycleRepairIsNoOpOnValidChain() {
     Check(result.warningCount == 0, "a valid, non-cyclic chain produces zero warnings");
 }
 
+// ARCH §20: the Prop-typed mirror of CheckMarkerLayerBundleCycleRepairOnImport/
+// CheckMarkerLayerBundleCycleRepairIsNoOpOnValidChain, combined into one function since the
+// underlying cycle predicate (WouldReparentPropLayerBundleCreateCycle) is a verbatim duplicate of
+// the Marker one — both the cyclic-repair and the valid-chain no-op cases are exercised.
+void CheckPropLayerBundleCycleRepair() {
+    nlohmann::json cyclicDocument;
+    cyclicDocument["PropLayerBundles"] = nlohmann::json::array({
+        nlohmann::json::object({ { "Identifier", 1 }, { "ParentBundleIdentifier", 2 } }),
+        nlohmann::json::object({ { "Identifier", 2 }, { "ParentBundleIdentifier", 1 } }),
+    });
+    Params::MapRecipe cyclicRecipe;
+    Io::MapImportResult cyclicResult;
+    Io::ReadPropLayerBundlesJson(cyclicDocument, cyclicRecipe, cyclicResult);
+    Check(cyclicRecipe.propLayerBundles.size() == 2, "both cyclic PropLayerBundles entries survive");
+    if (cyclicRecipe.propLayerBundles.size() == 2) {
+        Check(cyclicRecipe.propLayerBundles[0].parentBundleIdentifier == -1, "the first cyclic entry is repaired to root");
+        Check(cyclicRecipe.propLayerBundles[1].parentBundleIdentifier == -1, "the second cyclic entry is repaired to root");
+    }
+    Check(cyclicResult.warningCount == 2, "one warning is logged per cyclic PropLayerBundle entry");
+
+    nlohmann::json validDocument;
+    validDocument["PropLayerBundles"] = nlohmann::json::array({
+        nlohmann::json::object({ { "Identifier", 1 }, { "ParentBundleIdentifier", -1 } }),
+        nlohmann::json::object({ { "Identifier", 2 }, { "ParentBundleIdentifier", 1 } }),
+    });
+    Params::MapRecipe validRecipe;
+    Io::MapImportResult validResult;
+    Io::ReadPropLayerBundlesJson(validDocument, validRecipe, validResult);
+    Check(validResult.warningCount == 0, "a valid, non-cyclic PropLayerBundle chain produces zero warnings");
+}
+
+// ARCH §20: the Decal-typed mirror of CheckPropLayerBundleCycleRepair.
+void CheckDecalLayerBundleCycleRepair() {
+    nlohmann::json cyclicDocument;
+    cyclicDocument["DecalLayerBundles"] = nlohmann::json::array({
+        nlohmann::json::object({ { "Identifier", 1 }, { "ParentBundleIdentifier", 2 } }),
+        nlohmann::json::object({ { "Identifier", 2 }, { "ParentBundleIdentifier", 1 } }),
+    });
+    Params::MapRecipe cyclicRecipe;
+    Io::MapImportResult cyclicResult;
+    Io::ReadDecalLayerBundlesJson(cyclicDocument, cyclicRecipe, cyclicResult);
+    Check(cyclicRecipe.decalLayerBundles.size() == 2, "both cyclic DecalLayerBundles entries survive");
+    if (cyclicRecipe.decalLayerBundles.size() == 2) {
+        Check(cyclicRecipe.decalLayerBundles[0].parentBundleIdentifier == -1, "the first cyclic entry is repaired to root");
+        Check(cyclicRecipe.decalLayerBundles[1].parentBundleIdentifier == -1, "the second cyclic entry is repaired to root");
+    }
+    Check(cyclicResult.warningCount == 2, "one warning is logged per cyclic DecalLayerBundle entry");
+
+    nlohmann::json validDocument;
+    validDocument["DecalLayerBundles"] = nlohmann::json::array({
+        nlohmann::json::object({ { "Identifier", 1 }, { "ParentBundleIdentifier", -1 } }),
+        nlohmann::json::object({ { "Identifier", 2 }, { "ParentBundleIdentifier", 1 } }),
+    });
+    Params::MapRecipe validRecipe;
+    Io::MapImportResult validResult;
+    Io::ReadDecalLayerBundlesJson(validDocument, validRecipe, validResult);
+    Check(validResult.warningCount == 0, "a valid, non-cyclic DecalLayerBundle chain produces zero warnings");
+}
+
 // STEP115: a real, non-SanGen-authored `.sanmap` never carries `MarkerGroups` — build a raw document
 // with a `"markers"` object containing two type-groups and explicitly NO `"MarkerGroups"` key.
 // ReadMarkerGroupsJson is a confirmed no-op (it never fabricates the key); ReconcileMarkerLayers then
@@ -2578,6 +2813,7 @@ int main() {
     SanmapGen::MapFormatTest::CheckPureOldShapedDocumentStillImportsFromLegacyBlobAlone();
     SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyBackfill();
     SanmapGen::MapFormatTest::CheckMarkerGroupsLegacyLockAndSnapDefaults();
+    SanmapGen::MapFormatTest::CheckPropDecalGroupsLegacyDefaults();
     SanmapGen::MapFormatTest::CheckMarkerLayerIndexClampsOnImport();
     SanmapGen::MapFormatTest::CheckMarkerIconNameOverrideLegacyDefault();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundlesLegacyDefault();
@@ -2587,6 +2823,8 @@ int main() {
     SanmapGen::MapFormatTest::CheckMarkerInstanceIdentifierLegacyBackfillAcrossGroups();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairOnImport();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairIsNoOpOnValidChain();
+    SanmapGen::MapFormatTest::CheckPropLayerBundleCycleRepair();
+    SanmapGen::MapFormatTest::CheckDecalLayerBundleCycleRepair();
     SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisOnEmptyMarkerGroups();
     SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisIsNoOpWhenMarkerGroupsPresent();
     SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisPartialCoverageIsNoOp();

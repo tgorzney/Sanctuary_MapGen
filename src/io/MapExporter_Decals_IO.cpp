@@ -10,6 +10,7 @@
 // plus `layerIndex`, flattened on the wire exactly like `PropTransform`.
 #include "MapExporter_Recipe_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include "../params/ScatterLayerBundle_PARAMS.h"
 
 namespace SanmapGen {
 namespace Io {
@@ -53,6 +54,8 @@ nlohmann::ordered_json BuildDecalsJson(const Params::MapRecipe& recipe) {
 
 // `DecalGroups` — SanGen-owned manual-layer metadata, top-level PascalCase array, SANMAP_FORMAT_
 // SPEC Correction 14. `Color` reuses the `{r,g,b,a}` shape already shipped for `armyColor` (Step 2).
+// ARCH §20: full field parity with `BuildMarkerGroupsJson` (MapExporter_Markers_IO.cpp) — EXCEPT no
+// type-tag field (Decals has exactly one Type Section; see ScatterInstanceLayer_PARAMS.h).
 nlohmann::ordered_json BuildDecalGroupsJson(const Params::MapRecipe& recipe) {
     nlohmann::ordered_json decalGroups = nlohmann::ordered_json::array();
     for (const Params::DecalInstanceLayer& layer : recipe.decalLayers) {
@@ -62,10 +65,35 @@ nlohmann::ordered_json BuildDecalGroupsJson(const Params::MapRecipe& recipe) {
                                { "b", layer.color[2] }, { "a", layer.color[3] } };
         layerJson["IconScale"] = layer.iconScale;
         layerJson["Id"] = layer.layerId;
+        layerJson["SymmetryUseGlobal"] = layer.symmetry.bSymmetryUseGlobal;
+        layerJson["SymmetryMask"] = layer.symmetry.symmetryMask;
+        layerJson["RadialSymmetryRepeatCount"] = layer.symmetry.radialSymmetryRepeatCount;
         layerJson["Locked"] = layer.bLocked;
+        layerJson["Hidden"] = layer.bHidden;
+        layerJson["GridSnapEnabled"] = layer.bGridSnapEnabled;
+        layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeWorldUnits;
+        layerJson["ColorOverrideEnabled"] = layer.bColorOverrideEnabled;
+        layerJson["SymmetryEnabled"] = layer.bSymmetryEnabled;
+        layerJson["ParentBundleIdentifier"] = layer.parentBundleIdentifier;
         decalGroups.push_back(layerJson);
     }
     return decalGroups;
+}
+
+// `DecalLayerBundles` — SanGen-owned Group-above-Layer container, top-level PascalCase array (ARCH
+// §20), a fresh sibling of `DecalGroups`/`decals`, mirroring `BuildMarkerLayerBundlesJson`'s shape
+// minus the type-tag field (see `PropLayerBundle`'s own comment for why Decals has none).
+nlohmann::ordered_json BuildDecalLayerBundlesJson(const Params::MapRecipe& recipe) {
+    nlohmann::ordered_json decalLayerBundles = nlohmann::ordered_json::array();
+    for (const Params::DecalLayerBundle& bundle : recipe.decalLayerBundles) {
+        nlohmann::ordered_json bundleJson;
+        bundleJson["Identifier"] = bundle.identifier;
+        bundleJson["Name"] = bundle.name;
+        bundleJson["ParentBundleIdentifier"] = bundle.parentBundleIdentifier;
+        bundleJson["AssemblyIdentifier"] = bundle.assemblyIdentifier;
+        decalLayerBundles.push_back(bundleJson);
+    }
+    return decalLayerBundles;
 }
 
 } // namespace Io

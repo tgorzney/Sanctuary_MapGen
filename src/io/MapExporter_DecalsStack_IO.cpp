@@ -35,5 +35,15 @@ nlohmann::ordered_json BuildDecalsStackJson(const Params::MapRecipe& recipe) {
     return decalsStack;
 }
 
+// `GlobalDecalSettings` — its own top-level key, a sibling of `DecalsStack` (ARCH §20, mirrors
+// `BuildGlobalMarkerSettingsJson`'s placement beside `MarkersStack`), not nested inside it.
+nlohmann::ordered_json BuildGlobalDecalSettingsJson(const Params::MapRecipe& recipe) {
+    const Params::GlobalDecalSettings& settings = recipe.globalDecalSettings;
+    nlohmann::ordered_json json;
+    json["ColorDecal"] = { { "r", settings.colorDecal[0] }, { "g", settings.colorDecal[1] },
+                           { "b", settings.colorDecal[2] }, { "a", settings.colorDecal[3] } };
+    return json;
+}
+
 } // namespace Io
 } // namespace SanmapGen

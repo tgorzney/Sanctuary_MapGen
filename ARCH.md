@@ -150,6 +150,15 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §19.25 | [ARCH_19_25_SelectionRepresentationUnification.md](ARCH_19_25_SelectionRepresentationUnification.md) | Canvas/list selection unification — `OverlayInstanceKey_UI::bManual`, `MapCanvas`'s widened selection surface, the shell-mediated tab↔canvas callback; corrects and narrows §19.20 | 51 lines |
 | §19.26 | [ARCH_19_26_ManualInstanceSymmetryGrouping.md](ARCH_19_26_ManualInstanceSymmetryGrouping.md) | Manual-instance symmetry-cluster grouping in the instance list — UI composition only, no PARAMS change | 21 lines |
 | §19.27 | [ARCH_19_27_ProceduralInstanceSelectionMechanism.md](ARCH_19_27_ProceduralInstanceSelectionMechanism.md) | Procedural marker-instance listing/selection — per-frame `ruleIndex` positional index, convergence with §19.25, bucket-size symmetry-grouping rule; narrows §19.20 | 39 lines |
+| **§20** | [ARCH_20_PropsDecalsAuthoringParity.md](ARCH_20_PropsDecalsAuthoringParity.md) | Props/Decals authoring parity with Markers — `RuleLayer`/`InstanceLayer` field parity, the `LayerBundle` tree, Type Sections (ARCH ruling; §20.4 and §20.5 item 3 are gated on separate, not-yet-done UI Expert / IO Architecture Expert consults) | index → 8 subsection files |
+| §20.1 | [ARCH_20_01_ParamsGenericitySplit.md](ARCH_20_01_ParamsGenericitySplit.md) | `PropRuleLayer`/`DecalRuleLayer`/`PropLayerBundle`/`DecalLayerBundle` — hand-written per domain, not templated; new file homes | 51 lines |
+| §20.2 | [ARCH_20_02_ConsumingLogicPlacement.md](ARCH_20_02_ConsumingLogicPlacement.md) | Grid-snap / effective-symmetry resolvers — duplicated per domain, in PARAMS; a Marker-side placement finding | 28 lines |
+| §20.3 | [ARCH_20_03_GlobalPropDecalSettings.md](ARCH_20_03_GlobalPropDecalSettings.md) | `GlobalPropSettings`/`GlobalDecalSettings` — scoped to what has a real analog, not a blind mirror | 36 lines |
+| §20.4 | [ARCH_20_04_DragGestureSubstrateRouting.md](ARCH_20_04_DragGestureSubstrateRouting.md) | Drag-gesture/selection substrate — **gated on a UI Expert design round, not yet done** | 42 lines |
+| §20.5 | [ARCH_20_05_RuleLayerMigrationRouting.md](ARCH_20_05_RuleLayerMigrationRouting.md) | IO — additive parts confirmed no-bump; `RuleLayer` wrapping tier **gated on an IO Architecture Expert consult, not yet done** | 42 lines |
+| §20.6 | [ARCH_20_06_TypeSectionReuse.md](ARCH_20_06_TypeSectionReuse.md) | Type Sections — reuse §19.14's mechanism verbatim; field named per domain (`propTypeName`, never `markerTypeName` on a Prop/Decal struct; Decals gets no field at all) | 30 lines |
+| §20.7 | [ARCH_20_07_Housekeeping.md](ARCH_20_07_Housekeeping.md) | Naming / file-size / `MapRecipe` flatness housekeeping | 22 lines |
+| §20.8 | [ARCH_20_08_DecalsTopLevelTab.md](ARCH_20_08_DecalsTopLevelTab.md) | Decals is a standalone top-level tab — ratifies the already-shipped split (STEP159), closes a dangling forward-reference | 27 lines |
 
 ### Oversized files — known, accepted
 

@@ -77,9 +77,11 @@ void ParseEntityDomainsJson(const nlohmann::json& document, Params::MapRecipe& o
     ReconcileMarkerLayers(outRecipe, result);              // STEP115
     ReadChainsJson(document, outRecipe);
     ReadPropGroupsJson(document, outRecipe);
+    ReadPropLayerBundlesJson(document, outRecipe, result);   // ARCH §20
     ReadPropsJson(document, outRecipe, result);
     ReconcilePropLayers(outRecipe, result);                // STEP115
     ReadDecalGroupsJson(document, outRecipe);
+    ReadDecalLayerBundlesJson(document, outRecipe, result);   // ARCH §20
     ReadDecalsJson(document, outRecipe, result);
     ReconcileDecalLayers(outRecipe, result);                // STEP115
     ReadStratumLayersJson(document, outRecipe, result);
@@ -98,7 +100,9 @@ void ParseStackDomainsJson(const nlohmann::json& document, Params::MapRecipe& ou
     ReadMarkersStackJson(document, outRecipe);
     ReadGlobalMarkerSettingsJson(document, outRecipe);
     ReadPropsStackJson(document, outRecipe);
+    ReadGlobalPropSettingsJson(document, outRecipe);
     ReadDecalsStackJson(document, outRecipe);
+    ReadGlobalDecalSettingsJson(document, outRecipe);
     ReadUnitsStackJson(document, outRecipe);
 }
 

@@ -21,8 +21,8 @@ spec(s) a question needs — never the whole pack.
 | gamedata layout — folder map (units/props/stratum/icons), sprite pairs, sizes | `specs/GAMEDATA_LAYOUT_SPEC.md` |
 | noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
 | the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights` | `specs/MASKING_SPEC.md` |
-| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the `SymmetrySetting` retrofit onto `PropRule`/`DecalRule`/`UnitRule`, ARCH §16.11; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
-| pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
+| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the `SymmetrySetting` retrofit onto `PropRule`/`DecalRule`/`UnitRule`, ARCH §16.11; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19; Props/Decals `RuleLayer`/`LayerBundle`/Type-Section authoring parity, ARCH §20), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
+| pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling; `PropInstanceLayer`/`DecalInstanceLayer` gain full field parity with `MarkerInstanceLayer` under ARCH §20 (not yet reflected in this spec's own field tables — see the §20 narrative below) | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
 | preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix; the ratified v2 screen-space overlay-layering design (six domains — Alloy/SpawnsArmies/Units/Props/Reclaim/Decals; LOD icon rendering; four dirty-flag tiers A/B/C/C2; the View toolbar's two-section popup; ARCH §14) | `specs/PREVIEW_COMPOSITING_SPEC.md` |
@@ -188,6 +188,11 @@ Scenario authoring/export ratification described above) — the gap that flag na
   (1,100+ lines); `PLACEMENT_SCATTER_SPEC.md`'s matching sentence was corrected in place. Whoever
   next touches `SANMAP_FORMAT_SPEC.md` should fold in the correction; the wire format itself did
   not change, so this blocks nothing.
+- **`PropsTab_UI.h`/`DecalsTab_UI.h`/`DecalsTab_Manual_UI.h` cite a filename mismatch (ARCH §20.8,
+  2026-08-27).** All three shipped comments (STEP159) cite `ARCH_20_DecalsTopLevelTab.md`; the real
+  ratifying file is `ARCH_20_08_DecalsTopLevelTab.md` (§20.8, per this pack's own
+  `ARCH_NN_MM_Topic.md` subsection-naming convention). Comment-only, not urgent — fix opportunistically
+  the next time any of the three files is touched for another reason.
 
 **Fixed since the §15.5 ratification (2026-08-21):** the naval-fleet composition gap flagged
 below the first time this note was written is closed. The live reference
@@ -556,3 +561,45 @@ two PROC files, three UI draw call sites, six IO files) and the one still-open d
 follow-up (`SANMAP_FORMAT_SPEC.md` Correction 15's closing paragraph, flagged in the "Standing
 recorded defects" list above, not fixed this session) are in §16.11 itself;
 `PLACEMENT_SCATTER_SPEC.md`'s matching stale sentence was corrected in place this session.
+
+**New `ARCH_20_PropsDecalsAuthoringParity.md` §20 (2026-08-27) — extends §19's Marker-specific
+Group-above-Layer model to Props and Decals**, per a consult ruling grounded by direct reads of
+`MarkerRule_PARAMS.h`, `MarkerInstance_PARAMS.h`, `MarkerLayerBundle_PARAMS.h`,
+`PropInstance_PARAMS.h`, `ScatterRule_PARAMS.h`, `GlobalMarkerSettings_PARAMS.h`,
+`MapRecipe_PARAMS.h`, `MarkerDragGesture_UI.h`, `MarkersTab_ManualLayerHelpers_UI.h`. `PropRuleLayer`/
+`DecalRuleLayer`/`PropLayerBundle`/`DecalLayerBundle` are hand-written per-domain structs, not
+templated — applying §19.2's already-standing rule, which named Props/Decals explicitly, rather
+than re-deriving it (§20.1); new file homes `ScatterRuleLayer_PARAMS.h`/`ScatterLayerBundle_PARAMS.h`,
+and `PropInstanceLayer`/`DecalInstanceLayer` move out of the now-too-small `PropInstance_PARAMS.h`
+once they gain full field parity. The grid-snap/effective-symmetry resolver functions are likewise
+duplicated per domain, in PARAMS this time (matching where `ResolvePropInstanceLayerId` already
+lives) — with a recorded, non-blocking finding that the Marker originals are themselves misplaced
+in UI by the same §3.5 rule (§20.2). `GlobalPropSettings`/`GlobalDecalSettings` are new, but scoped
+to what has a real per-domain analog rather than a blind `GlobalMarkerSettings` mirror — no
+icon-name fields (Props/Decals already resolve real icons from `blueprintPath`), and
+`GlobalDecalSettings` skips a name-matching resolver entirely since it only ever has one value
+(§20.3). **Two items are explicitly gated, not resolved by this ratification:** the Prop/Decal
+drag-reposition + selection substrate needs a UI Expert design round, unified with the
+separately-paused canvas click/box-select initiative, rather than a third hand-mirrored
+`MarkerDragGesture_UI` copy (§20.4); and the `PropRuleLayer`/`DecalRuleLayer` flat-to-two-tier wire
+restructuring is the same *class* of breaking change as Markers' own still-open `§16.6` migration
+gap, and is routed to the IO Architecture Expert as one shared migration-shape consult covering all
+three domains together, not an independently-invented second migration (§20.5). Type Sections reuse
+§19.14's UI-derived mechanism verbatim, but the field is named `propTypeName` (never `markerTypeName`
+on a Prop struct) and Decals gets no equivalent field at all, since it has exactly one implicit type
+(§20.6); `PropRule`/`PropInstanceGroup::bReclaimable` stays permanently independent of `propTypeName`,
+the same closure §19.21 already ruled for `MarkerRule::category` vs. `markerTypeName`. §20.7 flags,
+without reversing, that this keeps growing `MapRecipe_PARAMS.h`'s flat top-level member list rather
+than nesting per-domain authoring data — in tension with the opening hit-list's god-object-
+dismemberment direction, but ruled to stay flat for consistency with Markers' own already-shipped
+flat shape. §20.8 separately ratifies an already-shipped, unrelated fact a STEP159 comment pass
+had pre-emptively cited: Decals is a real standalone top-level tab (`DecalsTab_UI.h`), not a
+sub-block of `PropsTab_UI.h` — closing a dangling forward-reference to a file
+(`ARCH_20_DecalsTopLevelTab.md`) that did not exist until this session (the real file is
+`ARCH_20_08_DecalsTopLevelTab.md`, a citation-spelling mismatch recorded above as a standing,
+non-blocking defect). **No coder work-order may build against §20.4, or the live-IO half of §20.5,
+until their respective gated consults land and are ratified into their own new ARCH subsections** —
+everything else in §20 is fully ratified and buildable now. `PLACEMENT_SCATTER_SPEC.md` and
+`ENTITY_AUTHORING_PARAMS_SPEC.md` still need fuller narrative updates naming these new types once
+the gated consults land and the shape settles further — not done this session, flagged in both the
+topic table above and `ARCH_20_PropsDecalsAuthoringParity.md`'s own "Related law" so it is not lost.

@@ -694,7 +694,9 @@
         }
     ],
     "PropGroups": [],
+    "PropLayerBundles": [],
     "DecalGroups": [],
+    "DecalLayerBundles": [],
     "Scenarios": {
         "PatternScenarios": [],
         "CountScenarios": [],
@@ -772,6 +774,28 @@
             "r": 1.0,
             "g": 1.0,
             "b": 0.0,
+            "a": 1.0
+        }
+    },
+    "GlobalPropSettings": {
+        "ColorProp": {
+            "r": 0.6000000238418579,
+            "g": 0.6000000238418579,
+            "b": 0.6000000238418579,
+            "a": 1.0
+        },
+        "ColorReclaim": {
+            "r": 0.20000000298023224,
+            "g": 0.800000011920929,
+            "b": 0.30000001192092896,
+            "a": 1.0
+        }
+    },
+    "GlobalDecalSettings": {
+        "ColorDecal": {
+            "r": 0.6000000238418579,
+            "g": 0.4000000059604645,
+            "b": 0.20000000298023224,
             "a": 1.0
         }
     },

@@ -44,7 +44,9 @@ nlohmann::ordered_json BuildHeightmapStackJson(const Params::LayerStack& layerSt
 nlohmann::ordered_json BuildMarkersStackJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildGlobalMarkerSettingsJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildPropsStackJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildGlobalPropSettingsJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildDecalsStackJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildGlobalDecalSettingsJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildUnitsStackJson(const Params::MapRecipe& recipe);
 
 // MapExporter_Areas_IO.cpp — `recipe.areas` -> the top-level `areas` dictionary (JSON object keyed
@@ -83,10 +85,14 @@ nlohmann::ordered_json BuildChainsJson(const Params::MapRecipe& recipe);
 // PropTransform/DecalTransform.transform.positionZ. Called from BuildSanmapJsonText
 // (STEP5_PropsDecalsValidation_UI live-wired these); `blueprintPath` resolution against a sanpack
 // is a separate, sibling pre-flight step (`Io::ValidatePropAndDecalBlueprintPaths`), not this pass.
+// `recipe.propLayerBundles`/`recipe.decalLayerBundles` -> the top-level `PropLayerBundles`/
+// `DecalLayerBundles` PascalCase arrays (ARCH §20), fresh siblings of `PropGroups`/`DecalGroups`.
 nlohmann::ordered_json BuildPropsJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildPropGroupsJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildPropLayerBundlesJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildDecalsJson(const Params::MapRecipe& recipe);
 nlohmann::ordered_json BuildDecalGroupsJson(const Params::MapRecipe& recipe);
+nlohmann::ordered_json BuildDecalLayerBundlesJson(const Params::MapRecipe& recipe);
 
 // MapExporter_Atmosphere_IO.cpp — `recipe.atmosphere` -> ~49 FLAT top-level `.sanmap` document
 // keys (ATMOSPHERE_PARAMS_SPEC). SHAPE DIFFERENCE from every `Build*Json` above: this one takes

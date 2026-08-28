@@ -30,10 +30,33 @@ void ReadPropRuleJson(const nlohmann::json& json, Params::PropRule& rule) {
                           Params::radialSymmetryRepeatCountMaximum, rule.symmetry.radialSymmetryRepeatCount);
 }
 
+// The inverse of `BuildGlobalPropSettingsJson`'s `{r,g,b,a}` shape, mirroring
+// `MapImporter_MarkersStack_IO.cpp`'s own `ReadJsonColorRgba` (each domain keeps its own copy).
+bool ReadJsonColorRgba(const nlohmann::json& parent, const char* key, float destination[4]) {
+    if (!parent.contains(key) || !parent[key].is_object()) return false;
+    const nlohmann::json& color = parent[key];
+    bool bAnyComponentRead = false;
+    bAnyComponentRead |= ReadJsonFloat(color, "r", destination[0]);
+    bAnyComponentRead |= ReadJsonFloat(color, "g", destination[1]);
+    bAnyComponentRead |= ReadJsonFloat(color, "b", destination[2]);
+    bAnyComponentRead |= ReadJsonFloat(color, "a", destination[3]);
+    return bAnyComponentRead;
+}
+
 } // namespace
 
 void ReadPropsStackJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
     ReadRuleArray(document, "PropsStack", outRecipe.propRules, ReadPropRuleJson);
+}
+
+// `GlobalPropSettings` — its own top-level key, a sibling of `PropsStack` (ARCH §20).
+void ReadGlobalPropSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
+    if (!document.contains("GlobalPropSettings") || !document["GlobalPropSettings"].is_object())
+        return;
+    const nlohmann::json& json = document["GlobalPropSettings"];
+    Params::GlobalPropSettings& settings = outRecipe.globalPropSettings;
+    ReadJsonColorRgba(json, "ColorProp", settings.colorProp);
+    ReadJsonColorRgba(json, "ColorReclaim", settings.colorReclaim);
 }
 
 } // namespace Io
