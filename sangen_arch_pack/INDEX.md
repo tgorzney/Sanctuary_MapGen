@@ -223,7 +223,8 @@ long-deferred Group/Layer hierarchy gets its first real tier, scoped to `Markers
 here. Three items remain explicitly routed, not resolved by this ratification (§16.10): the
 Format Expert (wire key spelling, `MarkerGroups` shape, the STEP49 export-warning interaction),
 the IO Architecture Expert (the `MarkersStack` migration mechanics for the breaking field-tier
-move), and the Generator Expert (a mechanical `Placement_Rules_PROC.cpp` call-site update).
+move — since shipped in full, see the "§16.6 fully shipped" note below), and the Generator Expert
+(a mechanical `Placement_Rules_PROC.cpp` call-site update).
 
 **Fixed since the ARCH §16 ratification:** the Format Expert's wire-key/shape follow-up
 flagged above has landed — `SANMAP_FORMAT_SPEC` Correction 15 (`MarkersStack`'s
@@ -236,9 +237,10 @@ STEP49 export-warning scope: per-`Army`, which subsumes the missing-group case).
 `ENTITY_AUTHORING_PARAMS_SPEC.md` (`MarkerTransform::layerIndex`/`symmetryGroupIdentifier`, the
 new `MarkerInstanceLayer` type, the `MapRecipe::markerLayers` field, and matching field-rename
 table rows) now carry the matching narrative updates that were flagged as outstanding above —
-that flag is resolved. Two items from §16.10's routing remain open, not touched by this pass:
-the IO Architecture Expert's `MarkersStack` migration mechanics (§16.6), and the Generator
-Expert's mechanical `Placement_Rules_PROC.cpp` call-site update. The Format Expert also flagged,
+that flag is resolved. One item from §16.10's routing remained open as of this pass (since
+resolved — see the "§16.6 fully shipped" note below): the IO Architecture Expert's `MarkersStack`
+migration mechanics (§16.6). The Generator Expert's mechanical `Placement_Rules_PROC.cpp`
+call-site update is not addressed by this note. The Format Expert also flagged,
 without re-ruling, that `MarkerInstanceLayer::layerId` (STEP60/STEP56, both still undispatched)
 carries the same "Id" abbreviation defect ARCH §16.5 rejected for `symmetryGroupIdentifier` —
 recorded in `SANMAP_FORMAT_SPEC` Correction 16 as a probable follow-up naming correction
@@ -246,6 +248,17 @@ recorded in `SANMAP_FORMAT_SPEC` Correction 16 as a probable follow-up naming co
 STEP60 ship, not acted on by this pass. **Superseded by ARCH §1.9 (2026-08-25): both fields have
 since shipped, so this is a real standing defect, not a pre-ship freebie — see the "Standing
 recorded defects" list above.**
+
+**§16.6 fully shipped (confirmed 2026-08-27):** the IO Architecture Expert's `MarkersStack`
+migration mechanics, described as "still open" in both paragraphs above at the time they were
+written, have since landed as real code, not just design — `src/io/MarkersStack_Migrate_V3_IO.h`/
+`.cpp` (the `MarkersStack_Migrate_V3` grouping transform), registered under `sourceVersion = 3`
+in `src/io/Sanmap_MigrationManifest_IO.cpp`, tested by
+`src/io/MarkersStack_Migrate_V3_IO_Test.cpp` (covering every
+`work_orders/STEP67_MarkersStackSymmetryMigration_IO.md` acceptance item, including the required
+`bIndependentlySelectable`-isolation test). `ARCH_16_06_MigrationRouting.md` §16.6 carries the
+full ruling plus this shipped note. Any other reference in this pack to §16.6's migration as
+"still open" or "unbuilt" is stale and should be read against this note instead.
 
 **Fixed since ARCH §15.7's ownership split (2026-08-21):** the Format Expert's follow-up
 `SANMAP_FORMAT_SPEC` Correction defining the `Scenarios` `.sanmap` section has landed —
@@ -582,9 +595,12 @@ icon-name fields (Props/Decals already resolve real icons from `blueprintPath`),
 drag-reposition + selection substrate needs a UI Expert design round, unified with the
 separately-paused canvas click/box-select initiative, rather than a third hand-mirrored
 `MarkerDragGesture_UI` copy (§20.4); and the `PropRuleLayer`/`DecalRuleLayer` flat-to-two-tier wire
-restructuring is the same *class* of breaking change as Markers' own still-open `§16.6` migration
-gap, and is routed to the IO Architecture Expert as one shared migration-shape consult covering all
-three domains together, not an independently-invented second migration (§20.5). Type Sections reuse
+restructuring is the same *class* of breaking change as Markers' own `§16.6` migration — which has
+since shipped in full (see the "§16.6 fully shipped" note above; Props/Decals still need their own
+version-step built against the new arrays, not a free pass by analogy) — and is routed to the IO
+Architecture Expert as one shared migration-shape consult covering all three domains together
+(reusing Markers' shipped `MarkersStack_Migrate_V3_IO` as its working precedent), not an
+independently-invented second migration (§20.5). Type Sections reuse
 §19.14's UI-derived mechanism verbatim, but the field is named `propTypeName` (never `markerTypeName`
 on a Prop struct) and Decals gets no equivalent field at all, since it has exactly one implicit type
 (§20.6); `PropRule`/`PropInstanceGroup::bReclaimable` stays permanently independent of `propTypeName`,

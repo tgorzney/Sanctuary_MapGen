@@ -18,3 +18,13 @@ discarded per-rule divergence per Constitution §6 — or split into multiple si
 preserve every distinct combination). This is real, potentially-lossy migration design, squarely
 the IO Architecture Expert's charter, not asserted as decided here.
 
+**Shipped — §16.6 fully discharged (confirmed 2026-08-27):** the IO Architecture Expert's
+consult landed as `work_orders/STEP67_MarkersStackSymmetryMigration_IO.md`
+(`HANDOFF_TRACK_MarkerLayerSymmetry.md`) and the mechanics are built and merged as real code, not
+just designed: `src/io/MarkersStack_Migrate_V3_IO.h`/`.cpp` (the `MarkersStack_Migrate_V3`
+grouping transform, `sourceVersion = 3`), registered correctly in
+`src/io/Sanmap_MigrationManifest_IO.cpp`, with `src/io/MarkersStack_Migrate_V3_IO_Test.cpp`
+covering all of STEP67's acceptance items, including the required
+`bIndependentlySelectable`-isolation test. There is no remaining open item under §16.6 — do not
+describe this migration as "still open" or "unbuilt" elsewhere in the pack; any such reference is
+stale and should be corrected to point here.
