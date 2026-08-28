@@ -140,7 +140,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §19.15 | [ARCH_19_15_TypeSectionTreeComposition.md](ARCH_19_15_TypeSectionTreeComposition.md) | Type-section × Bundle-tree composition — filtered-copy `TreeListWidget_UI` per type, the cross-Type-section nesting cutoff, `bRowSuppressed`'s two-predicate composition | 52 lines |
 | §19.16 | [ARCH_19_16_InstanceIdentifier.md](ARCH_19_16_InstanceIdentifier.md) | `MarkerTransform::instanceIdentifier` — global uniqueness, wire key `"InstanceIdentifier"`, legacy-backfill mirrors `layerId`'s precedent | 37 lines |
 | §19.17 | [ARCH_19_17_SelectColorFields.md](ARCH_19_17_SelectColorFields.md) | `GlobalMarkerSettings` select-color fields — strict 3-field mirror plus the signed-off `selectColorDefault` deviation | 36 lines |
-| §19.18 | [ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md](ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md) | Selection tint — canonical priority order; "selected replaces fill" distinct from the drag-ghost's unfilled-ring vocabulary | 29 lines |
+| §19.18 | [ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md](ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md) | Selection tint — canonical priority order; "selected replaces fill" distinct from the drag-ghost's unfilled-ring vocabulary; **amended by §21.5** (locked-item exclusion) | 40 lines |
 | §19.19 | [ARCH_19_19_StaticHighlightComputationAndWiring.md](ARCH_19_19_StaticHighlightComputationAndWiring.md) | Static selection-highlight — one-shot orbit computation (not `MarkerOrbitCorrespondence_UI.h`), tolerance reuse, canvas wiring | 57 lines |
 | §19.20 | [ARCH_19_20_ManualOnlySelectionScope.md](ARCH_19_20_ManualOnlySelectionScope.md) | Manual-only selection scope — formal law, cross-referencing §19.9; **narrowed by §19.25/§19.27** | 20 lines → revised |
 | §19.21 | [ARCH_19_21_CategoryVsMarkerTypeNameClosed.md](ARCH_19_21_CategoryVsMarkerTypeNameClosed.md) | `MarkerRule::category` vs. `markerTypeName` — two permanently independent concepts, closed | 17 lines |
@@ -150,15 +150,23 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §19.25 | [ARCH_19_25_SelectionRepresentationUnification.md](ARCH_19_25_SelectionRepresentationUnification.md) | Canvas/list selection unification — `OverlayInstanceKey_UI::bManual`, `MapCanvas`'s widened selection surface, the shell-mediated tab↔canvas callback; corrects and narrows §19.20 | 51 lines |
 | §19.26 | [ARCH_19_26_ManualInstanceSymmetryGrouping.md](ARCH_19_26_ManualInstanceSymmetryGrouping.md) | Manual-instance symmetry-cluster grouping in the instance list — UI composition only, no PARAMS change | 21 lines |
 | §19.27 | [ARCH_19_27_ProceduralInstanceSelectionMechanism.md](ARCH_19_27_ProceduralInstanceSelectionMechanism.md) | Procedural marker-instance listing/selection — per-frame `ruleIndex` positional index, convergence with §19.25, bucket-size symmetry-grouping rule; narrows §19.20 | 39 lines |
-| **§20** | [ARCH_20_PropsDecalsAuthoringParity.md](ARCH_20_PropsDecalsAuthoringParity.md) | Props/Decals authoring parity with Markers — `RuleLayer`/`InstanceLayer` field parity, the `LayerBundle` tree, Type Sections (ARCH ruling; §20.4 and §20.5 item 3 are gated on separate, not-yet-done UI Expert / IO Architecture Expert consults) | index → 8 subsection files |
+| **§20** | [ARCH_20_PropsDecalsAuthoringParity.md](ARCH_20_PropsDecalsAuthoringParity.md) | Props/Decals authoring parity with Markers — `RuleLayer`/`InstanceLayer` field parity, the `LayerBundle` tree, Type Sections (ARCH ruling; §20.4's gate is **closed by §21**, §20.5 item 3 remains gated on a not-yet-done IO Architecture Expert consult) | index → 8 subsection files |
 | §20.1 | [ARCH_20_01_ParamsGenericitySplit.md](ARCH_20_01_ParamsGenericitySplit.md) | `PropRuleLayer`/`DecalRuleLayer`/`PropLayerBundle`/`DecalLayerBundle` — hand-written per domain, not templated; new file homes | 51 lines |
 | §20.2 | [ARCH_20_02_ConsumingLogicPlacement.md](ARCH_20_02_ConsumingLogicPlacement.md) | Grid-snap / effective-symmetry resolvers — duplicated per domain, in PARAMS; a Marker-side placement finding | 28 lines |
 | §20.3 | [ARCH_20_03_GlobalPropDecalSettings.md](ARCH_20_03_GlobalPropDecalSettings.md) | `GlobalPropSettings`/`GlobalDecalSettings` — scoped to what has a real analog, not a blind mirror | 36 lines |
-| §20.4 | [ARCH_20_04_DragGestureSubstrateRouting.md](ARCH_20_04_DragGestureSubstrateRouting.md) | Drag-gesture/selection substrate — **gated on a UI Expert design round, not yet done** | 42 lines |
+| §20.4 | [ARCH_20_04_DragGestureSubstrateRouting.md](ARCH_20_04_DragGestureSubstrateRouting.md) | Drag-gesture/selection substrate — routing record; **gate closed by §21** | 42 lines + closing note |
 | §20.5 | [ARCH_20_05_RuleLayerMigrationRouting.md](ARCH_20_05_RuleLayerMigrationRouting.md) | IO — additive parts confirmed no-bump; `RuleLayer` wrapping tier **gated on an IO Architecture Expert consult, not yet done** | 42 lines |
 | §20.6 | [ARCH_20_06_TypeSectionReuse.md](ARCH_20_06_TypeSectionReuse.md) | Type Sections — reuse §19.14's mechanism verbatim; field named per domain (`propTypeName`, never `markerTypeName` on a Prop/Decal struct; Decals gets no field at all) | 30 lines |
 | §20.7 | [ARCH_20_07_Housekeeping.md](ARCH_20_07_Housekeeping.md) | Naming / file-size / `MapRecipe` flatness housekeeping | 22 lines |
 | §20.8 | [ARCH_20_08_DecalsTopLevelTab.md](ARCH_20_08_DecalsTopLevelTab.md) | Decals is a standalone top-level tab — ratifies the already-shipped split (STEP159), closes a dangling forward-reference | 27 lines |
+| **§21** | [ARCH_21_CanvasInteractionUnification.md](ARCH_21_CanvasInteractionUnification.md) | Canvas interaction unification — multi-select, drag-gesture genericization, uniform locked-item exclusion, shared picking substrate (ARCH ruling, closes §20.4's gate) | index → 7 subsection files |
+| §21.1 | [ARCH_21_01_MultiSelectRepresentation.md](ARCH_21_01_MultiSelectRepresentation.md) | Multi-select representation — `OverlayInstanceKeySet_UI`, the widened `MapCanvas` selection surface, the callback signature | 69 lines |
+| §21.2 | [ARCH_21_02_GestureOwnership.md](ARCH_21_02_GestureOwnership.md) | Gesture ownership — press-time drag-begin-first, release-time click/marquee, the independent right-button pan | 49 lines |
+| §21.3 | [ARCH_21_03_DragGestureGenericization.md](ARCH_21_03_DragGestureGenericization.md) | Drag-gesture genericization — `InstanceDragGestureState`, `Begin/Update/EndInstanceDragGesture<Traits>`, `MarkerDragTraits`/`PropDragTraits`/`DecalDragTraits`, `HitTestManualInstances<GroupT>`/`CollectManualInstancesInWorldRegion<GroupT>` | 122 lines |
+| §21.4 | [ARCH_21_04_PropDecalInstanceIdentityFields.md](ARCH_21_04_PropDecalInstanceIdentityFields.md) | `PropTransform`/`DecalTransform` gain `instanceIdentifier`/`symmetryGroupIdentifier` — mirrors `MarkerTransform` verbatim | 49 lines |
+| §21.5 | [ARCH_21_05_LockedItemExclusionCorrection.md](ARCH_21_05_LockedItemExclusionCorrection.md) | Locked-item exclusion — corrects §19.18; uniform across click/marquee/drag; procedural instances unaffected | 39 lines |
+| §21.6 | [ARCH_21_06_PickingInfrastructure.md](ARCH_21_06_PickingInfrastructure.md) | Picking infrastructure — `Data::SpatialGridSet`, `BuildSpatialGridSet`, three new `SpatialGrid` accessors, `PickInstancesInRegion` (renamed from the design's `PickMarkersInRegion`) | 64 lines |
+| §21.7 | [ARCH_21_07_FileSizeCeilingFlag.md](ARCH_21_07_FileSizeCeilingFlag.md) | File-size ceiling flag — `MapCanvas_UI.h` | 15 lines |
 
 ### Oversized files — known, accepted
 
@@ -167,7 +175,11 @@ rulings with no internal subsection structure to split on; splitting them furthe
 would break the `§N.M` ↔ file rule for no gain. The seventh, `ARCH_03_ModuleBoundaries.md`,
 is §3 itself — a section this pack has never split into per-subsection files (unlike
 §1/§7/§14/§15/§16/§18) — accepting one additional general rule (§3.5) appended in place
-rather than forking that established non-split pattern for a single new subsection.
+rather than forking that established non-split pattern for a single new subsection. The
+eighth, `ARCH_21_03_DragGestureGenericization.md`, is one interlocking ruling (the
+`Traits` contract, the state-struct de-templating refinement, and the name-field
+refinement all depend on each other for context) — splitting it would scatter a single
+coherent correction across files with no citation gain.
 
 | File | Lines | Why it stays whole |
 |------|-------|--------------------|
@@ -177,6 +189,7 @@ rather than forking that established non-split pattern for a single new subsecti
 | `ARCH_15_10_SlotPatternConstructionMoves.md` | 119 | One ruling: slot-pattern construction moves into the runtime |
 | `ARCH_15_05_ParamsScenariosType.md` | 118 | One ruling: the full `Params::Scenarios` shape |
 | `ARCH_14_16_PerArmyUnitsOverlayRows.md` | 114 | One ruling: per-army row seeding + procedural-unit routing + tint source + default-palette prerequisite, deliberately kept together as one shippable unit |
+| `ARCH_21_03_DragGestureGenericization.md` | 122 | One ruling: the `Traits` contract plus its two load-bearing refinements (state de-templating, the missing-`name`-field fix) |
 | `ARCH_14_15_ManualCullStableIdMigration.md` | 106 | One ruling: the cull-path stable-id migration |
 
 ---

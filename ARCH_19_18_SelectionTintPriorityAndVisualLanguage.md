@@ -13,8 +13,9 @@ implementation detail.** Extends `DrawManualMarkerRoster`'s existing branch chai
 3. Army color (`ManualSpawnArmyTint`, Spawn groups only).
 4. Per-layer override / type-default color (`ManualMarkerTint`, unchanged).
 
-`bLocked` carries no tint effect today (gates drag/reposition only, by its own doc comment); this
-ruling gives it none — a locked+selected instance gets the select tint normally, no conflict.
+`bLocked` carries no DIRECT tint effect of its own today (gates drag/reposition only, by its own
+doc comment); this ruling gives it none — a locked+selected instance gets the select tint normally,
+no conflict.
 
 **"Selected replaces fill" — ratified as its own named visual language, explicitly distinct from the
 drag-ghost's unfilled-ring vocabulary; no shared meaning between the two.** Confirmed by direct
@@ -26,3 +27,18 @@ Ratified: selection is communicated by REPLACING the marker's normal filled-dot 
 (still `AddCircleFilled`, a different `tint`), never by an outline/ring. The two vocabularies stay
 permanently non-overlapping: filled-dot color = identity/selection state; unfilled ring = ephemeral
 drag-ghost slot.
+
+---
+
+**Amended by `ARCH_21_05_LockedItemExclusionCorrection.md` §21.5 (2026-08-28).** At the time of this
+ruling, `bLocked` gated drag/reposition only — a locked instance could still become freshly
+click-selected (confirmed live by direct read, at the time this correction was written:
+`HitTestManualMarkers` performed no lock check at all). §21.5 corrects that: `bLocked` now ALSO
+gates ACQUIRING a selection — click, marquee, AND drag-begin, uniformly across Markers/Props/
+Decals — so a locked instance can no longer become freshly selected by any of the three paths. This
+paragraph's own priority-order ruling and its "`bLocked` carries no DIRECT tint effect" sentence
+above are UNCHANGED and still have real force for the one case §21.5 explicitly does not touch: an
+instance already selected before its layer became locked keeps drawing the select tint normally
+(locking is never a retroactive deselect) — `bLocked` still carries no tint effect of its own, only
+this now-narrower gate on how a selection can be freshly acquired. See §21.5 for the full binding
+rule and mechanism.

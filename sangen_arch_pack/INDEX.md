@@ -22,7 +22,7 @@ spec(s) a question needs — never the whole pack.
 | noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
 | the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights` | `specs/MASKING_SPEC.md` |
 | marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the `SymmetrySetting` retrofit onto `PropRule`/`DecalRule`/`UnitRule`, ARCH §16.11; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19; Props/Decals `RuleLayer`/`LayerBundle`/Type-Section authoring parity, ARCH §20), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
-| pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling; `PropInstanceLayer`/`DecalInstanceLayer` gain full field parity with `MarkerInstanceLayer` under ARCH §20 (not yet reflected in this spec's own field tables — see the §20 narrative below) | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
+| pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling; `PropInstanceLayer`/`DecalInstanceLayer` gain full field parity with `MarkerInstanceLayer` under ARCH §20 (not yet reflected in this spec's own field tables — see the §20 narrative below); `PropTransform`/`DecalTransform` gain `instanceIdentifier`/`symmetryGroupIdentifier` under ARCH §21.4 (also not yet reflected — see the §21 narrative below) | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
 | preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix; the ratified v2 screen-space overlay-layering design (six domains — Alloy/SpawnsArmies/Units/Props/Reclaim/Decals; LOD icon rendering; four dirty-flag tiers A/B/C/C2; the View toolbar's two-section popup; ARCH §14) | `specs/PREVIEW_COMPOSITING_SPEC.md` |
@@ -193,6 +193,13 @@ Scenario authoring/export ratification described above) — the gap that flag na
   ratifying file is `ARCH_20_08_DecalsTopLevelTab.md` (§20.8, per this pack's own
   `ARCH_NN_MM_Topic.md` subsection-naming convention). Comment-only, not urgent — fix opportunistically
   the next time any of the three files is touched for another reason.
+- **`ResolvePropsManual`/`ResolveDecalsManual` still key `OverlayInstanceKey_UI` by per-group array
+  position with `bManual` defaulted false (ARCH §21.4, 2026-08-28, flagged not fixed).** The exact
+  index-space collision §19.25 already fixed for Markers — confirmed still live by direct read of
+  `MapCanvas_IconLayer_CullManual_UI.cpp`'s `ConsiderManualInstance` call sites for Props/Decals.
+  Blocked on `ARCH_21_04_PropDecalInstanceIdentityFields.md` §21.4's new `PropTransform`/
+  `DecalTransform::instanceIdentifier` fields landing first (ruled, not yet built); full fix shape
+  is in §21.4 itself.
 
 **Fixed since the §15.5 ratification (2026-08-21):** the naval-fleet composition gap flagged
 below the first time this note was written is closed. The live reference
@@ -388,7 +395,10 @@ already ratified. Instead, two small inline helpers (`Params::ResolvePropInstanc
 `ResolveDecalInstanceLayerId`) are promoted into `PropInstance_PARAMS.h` as the single source of
 truth for the id-resolution formula, shared by `Placement_Manual_PROC.cpp`'s PROC-baked copy and
 the UI cull path's live resolution, so the two never drift. Ruled dispatchable as-is — narrow, two
-call sites, exact before/after text specified in §14.15 itself.
+call sites, exact before/after text specified in §14.15 itself. **These two resolvers have since
+moved to `ScatterInstanceLayer_PARAMS.h` alongside `PropInstanceLayer`/`DecalInstanceLayer`
+themselves (ARCH §20.1); `PropInstance_PARAMS.h` includes that file so every existing call site
+still compiles.**
 
 **New `ARCH_19_MarkerLayerBundle.md` §19 (2026-08-25) — ratifies `work_orders/DESIGN_MarkerGroupLayerRestructure_R1.md`,
 firms up open items in the still-unratified `work_orders/DESIGN_Assembly_R1.md`.** The new
@@ -462,8 +472,9 @@ gap the deviation closes, not an arbitrary 4th field. §19.18 records the canoni
 priority order (refused-drag > selected > army-color > layer/type color) and rules "selected
 replaces fill" a visual language kept permanently distinct from the drag-ghost's existing
 unfilled-ring vocabulary (confirmed by direct read: the ghost uses `AddCircle`, not
-`AddCircleFilled`) — two vocabularies, never colliding. §19.19 confirms the static
-symmetric-sibling highlight computes fresh every frame via the existing
+`AddCircleFilled`) — two vocabularies, never colliding; **§19.18 is itself later amended by §21.5
+(2026-08-28) to correct a locked-instance selectability premise — see that note below.** §19.19
+confirms the static symmetric-sibling highlight computes fresh every frame via the existing
 `Pipeline::BuildWorldSymmetryOrbit` plus a small one-shot inline nearest-match — deliberately NOT
 `MarkerOrbitCorrespondence_UI.h`, a heavier cross-frame stability matcher solving a drift problem
 this one-shot feature doesn't have — reusing `markerSymmetryFixSettings.distanceTolerance` for the
@@ -591,31 +602,71 @@ in UI by the same §3.5 rule (§20.2). `GlobalPropSettings`/`GlobalDecalSettings
 to what has a real per-domain analog rather than a blind `GlobalMarkerSettings` mirror — no
 icon-name fields (Props/Decals already resolve real icons from `blueprintPath`), and
 `GlobalDecalSettings` skips a name-matching resolver entirely since it only ever has one value
-(§20.3). **Two items are explicitly gated, not resolved by this ratification:** the Prop/Decal
-drag-reposition + selection substrate needs a UI Expert design round, unified with the
+(§20.3). **Two items were explicitly gated, not resolved by that ratification:** the Prop/Decal
+drag-reposition + selection substrate needed a UI Expert design round, unified with the
 separately-paused canvas click/box-select initiative, rather than a third hand-mirrored
-`MarkerDragGesture_UI` copy (§20.4); and the `PropRuleLayer`/`DecalRuleLayer` flat-to-two-tier wire
-restructuring is the same *class* of breaking change as Markers' own `§16.6` migration — which has
-since shipped in full (see the "§16.6 fully shipped" note above; Props/Decals still need their own
-version-step built against the new arrays, not a free pass by analogy) — and is routed to the IO
-Architecture Expert as one shared migration-shape consult covering all three domains together
-(reusing Markers' shipped `MarkersStack_Migrate_V3_IO` as its working precedent), not an
-independently-invented second migration (§20.5). Type Sections reuse
-§19.14's UI-derived mechanism verbatim, but the field is named `propTypeName` (never `markerTypeName`
-on a Prop struct) and Decals gets no equivalent field at all, since it has exactly one implicit type
-(§20.6); `PropRule`/`PropInstanceGroup::bReclaimable` stays permanently independent of `propTypeName`,
-the same closure §19.21 already ruled for `MarkerRule::category` vs. `markerTypeName`. §20.7 flags,
-without reversing, that this keeps growing `MapRecipe_PARAMS.h`'s flat top-level member list rather
-than nesting per-domain authoring data — in tension with the opening hit-list's god-object-
-dismemberment direction, but ruled to stay flat for consistency with Markers' own already-shipped
-flat shape. §20.8 separately ratifies an already-shipped, unrelated fact a STEP159 comment pass
-had pre-emptively cited: Decals is a real standalone top-level tab (`DecalsTab_UI.h`), not a
-sub-block of `PropsTab_UI.h` — closing a dangling forward-reference to a file
-(`ARCH_20_DecalsTopLevelTab.md`) that did not exist until this session (the real file is
+`MarkerDragGesture_UI` copy (§20.4 — **closed by §21, see below**); and the `PropRuleLayer`/
+`DecalRuleLayer` flat-to-two-tier wire restructuring is the same *class* of breaking change as
+Markers' own `§16.6` migration — which has since shipped in full (see the "§16.6 fully shipped"
+note above; Props/Decals still need their own version-step built against the new arrays, not a
+free pass by analogy) — and is routed to the IO Architecture Expert as one shared migration-shape
+consult covering all three domains together (reusing Markers' shipped `MarkersStack_Migrate_V3_IO`
+as its working precedent), not an independently-invented second migration (§20.5, still open).
+Type Sections reuse §19.14's UI-derived mechanism verbatim, but the field is named `propTypeName`
+(never `markerTypeName` on a Prop struct) and Decals gets no equivalent field at all, since it has
+exactly one implicit type (§20.6); `PropRule`/`PropInstanceGroup::bReclaimable` stays permanently
+independent of `propTypeName`, the same closure §19.21 already ruled for `MarkerRule::category` vs.
+`markerTypeName`. §20.7 flags, without reversing, that this keeps growing `MapRecipe_PARAMS.h`'s
+flat top-level member list rather than nesting per-domain authoring data — in tension with the
+opening hit-list's god-object-dismemberment direction, but ruled to stay flat for consistency with
+Markers' own already-shipped flat shape. §20.8 separately ratifies an already-shipped, unrelated
+fact a STEP159 comment pass had pre-emptively cited: Decals is a real standalone top-level tab
+(`DecalsTab_UI.h`), not a sub-block of `PropsTab_UI.h` — closing a dangling forward-reference to a
+file (`ARCH_20_DecalsTopLevelTab.md`) that did not exist until this session (the real file is
 `ARCH_20_08_DecalsTopLevelTab.md`, a citation-spelling mismatch recorded above as a standing,
-non-blocking defect). **No coder work-order may build against §20.4, or the live-IO half of §20.5,
-until their respective gated consults land and are ratified into their own new ARCH subsections** —
-everything else in §20 is fully ratified and buildable now. `PLACEMENT_SCATTER_SPEC.md` and
-`ENTITY_AUTHORING_PARAMS_SPEC.md` still need fuller narrative updates naming these new types once
-the gated consults land and the shape settles further — not done this session, flagged in both the
-topic table above and `ARCH_20_PropsDecalsAuthoringParity.md`'s own "Related law" so it is not lost.
+non-blocking defect). `PLACEMENT_SCATTER_SPEC.md` and `ENTITY_AUTHORING_PARAMS_SPEC.md` still need
+fuller narrative updates naming these new types once §20.5 lands and the shape settles further —
+not done yet, flagged in both the topic table above and `ARCH_20_PropsDecalsAuthoringParity.md`'s
+own "Related law" so it is not lost.
+
+**New `ARCH_21_CanvasInteractionUnification.md` §21 (2026-08-28) — closes §20.4's gate; ratifies the
+UI Expert's canvas multi-select/drag-gesture/picking design round, unified as that gate required,
+grounded by direct reads of `MapCanvas_UI.h`/`.cpp`, `MapCanvas_Draw_UI.cpp`,
+`MapCanvas_IconLayer_UI.h`, `MapCanvas_IconLayer_CullManual_UI.cpp`, `Picking_UI.h`/`.cpp`,
+`SpatialGrid_DATA.h`, `RuleBucketIndexSet_DATA.h`, `GenerationAssembler_PIPELINE.h`,
+`GenerationAssembler_Stages_PIPELINE.cpp`, `MarkerDragGesture_UI.h`/`.cpp`,
+`MarkerDragGesture_Frame_UI.cpp`, `MarkerOrbitCorrespondence_UI.h`, `PropInstance_PARAMS.h`,
+`UniqueNameList_UI.h`, `Application_UI.cpp`.** §21.1 widens `MapCanvas`'s selection from one
+`OverlayInstanceKey_UI` to an ordered `OverlayInstanceKeySet_UI` (new `MapCanvas_SelectionSet_UI.h`/
+`.cpp`) with a precisely-specified MRU-primary/Replace/Toggle/Union contract and a widened
+`SetSelectionChangedCallback((primary, selectedKeys))`, generalizing `Application::WireCallbacks()`'s
+closure to partition the set into the already-existing `tabState.markers.selectedManualInstanceIdentifiers`
+plural field (STEP141) rather than the single-element list it wrote before. §21.2 rules press-time
+drag-begin-first / release-time click-or-marquee for the left button, and moves the WHOLE pan
+gesture onto a brand-new, independent right-button tracker (`ImGuiMouseButton_Right`/raw
+`io.MouseDown[1]`, since imgui's item-activation only tracks the left button — confirmed by direct
+read) — a real, deliberate UX change, not incidental. §21.3 genericizes the Marker-only drag-gesture
+machinery behind a `Traits` policy struct (mirroring `TreeListWidget_UI<T,LeafKeyT>`'s own
+accessor-parameterization precedent), with two corrections this session's own direct read forced:
+the gesture STATE struct itself needs no template parameter at all (every field was already
+`Params::`-free), and `PropTransform`/`DecalTransform` carry no `name` field (confirmed by direct
+read of `PropInstance_PARAMS.h`) — so two of the design's `Traits` hooks are ruled inert-by-
+construction for Props/Decals rather than left to fail to compile. §21.4 ratifies the human's
+decision to add `PropTransform`/`DecalTransform::instanceIdentifier`/`symmetryGroupIdentifier`,
+verbatim mirrors of `MarkerTransform`'s own fields, PARAMS/IO-only and severable from the rest of
+§21 — closing the identity-collision gap `ResolvePropsManual`/`ResolveDecalsManual` still carry
+today (confirmed still live by direct read, recorded above in "Standing recorded defects"). §21.5
+ratifies the human's second decision — locked instances are now excluded from click-select,
+marquee-select, AND drag uniformly across Markers/Props/Decals, procedural instances unaffected —
+as a direct, in-place CORRECTION to `ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md` §19.18's
+prior implicit "a locked instance can still be freshly selected" premise, not a new rule left
+standing beside the old one. §21.6 ships `Data::SpatialGridSet` (a `RuleBucketIndexSet`-shaped
+4-way mirror of the existing single `Data::SpatialGrid`), three new `SpatialGrid` accessors
+exposing its private cell-coordinate split, and a region-query function — corrected in name from
+the relayed design's `PickMarkersInRegion` to `PickInstancesInRegion`, since the function's own
+stated contract is fully domain-generic and ARCH §1.1 does not permit a domain-generic function to
+carry a specific domain's name. §21.7 flags `MapCanvas_UI.h`'s file-size ceiling as a foreseeable
+consequence for the coder work-order to re-measure, per §8.4's scope law, rather than pre-ruling a
+split shape. `PLACEMENT_SCATTER_SPEC.md`, `UI_FRAMEWORK_SPEC.md`, and `ENTITY_AUTHORING_PARAMS_SPEC.md`
+all still need fuller narrative updates naming §21's new types once the gated §21.3 Prop/Decal
+`Traits` land and the shape settles further — not done this session, flagged here so it is not lost.

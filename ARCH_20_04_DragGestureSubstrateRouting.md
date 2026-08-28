@@ -39,3 +39,14 @@ precedented sequencing here — `MarkerInstanceLayer::symmetry`'s own shipped co
 exactly this posture ("No consumer/writer UI exists yet... this ticket only gives the field its
 PARAMS+IO home"). The Props/Decals PARAMS/IO/Type-Section/Bundle-tree work proceeds
 independently of this gate.
+
+---
+
+**Closed by `ARCH_21_CanvasInteractionUnification.md` §21 (2026-08-28).** The UI Expert design
+round this gate required has landed and been ratified — §21.1-§21.3 cover the drag-reposition
+substrate's genericization and its unification with click/box-select exactly as this section
+requested; §21.4 ships the prerequisite `PropTransform`/`DecalTransform` fields this gate's own
+`MarkerInstanceLayer::symmetry` precedent anticipated; §21.5 additionally rules a locked-item
+exclusion correction (a human decision made alongside the §21 consult, not itself part of this
+gate's original scope). A coder work-order MAY now build against §21 directly. This section stays
+in place as the historical routing record and is not itself re-ruled.
