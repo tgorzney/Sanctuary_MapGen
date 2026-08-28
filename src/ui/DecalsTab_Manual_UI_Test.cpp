@@ -180,10 +180,23 @@ void RunIsDecalInstanceLayerLockedChecks() {
           "an index at size() resolves to false, never trusted as 'locked'");
 }
 
+// ARCH §20 — a bundled layer is suppressed from the "Ungrouped" list; an ungrouped one is not (no
+// type check here, unlike Props: Decals has no type-tag field at all).
+void RunIsDecalInstanceLayerRowSuppressedChecks() {
+    Params::DecalInstanceLayer ungrouped;
+    ungrouped.parentBundleIdentifier = -1;
+    Check(!IsDecalInstanceLayerRowSuppressed(ungrouped), "an ungrouped layer is NOT suppressed");
+
+    Params::DecalInstanceLayer grouped;
+    grouped.parentBundleIdentifier = 5;
+    Check(IsDecalInstanceLayerRowSuppressed(grouped), "a bundled layer IS suppressed");
+}
+
 } // namespace
 
 int main() {
     RunManualDecalLayerChecks();
+    RunIsDecalInstanceLayerRowSuppressedChecks();
     RunDecalLayerRemovalChecks();
     RunDecalLayerReorderRenumberChecks();
     RunDecalLayerNameUniquenessChecks();

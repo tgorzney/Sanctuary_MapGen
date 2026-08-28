@@ -12,7 +12,8 @@ void DrawDecalsTab(Params::MapRecipe& recipe, DecalsTabState& state,
                    Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                    const Data::PlacementInstances* placedDecals) {
     ImGui::PushID("decalsTab");
-    DrawManualDecalLayers(state.manualDecalLayers, recipe.decalLayers, recipe.decals, placedDecals);
+    DrawManualDecalLayers(state.manualDecalLayers, recipe.decalLayers, recipe.decals,
+                         recipe.decalLayerBundles, placedDecals);
     DrawDecalRuleStack(recipe.decalRules, state.decalStack, previewDriver, iconManifest);
     ImGui::PopID();
 }

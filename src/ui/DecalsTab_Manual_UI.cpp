@@ -1,7 +1,9 @@
-// DecalsTab_Manual_UI.cpp — the imgui composition of the manual decal layers block.
-// Layer: UI. STEP22 exact mirror of PropsTab_Manual_UI.cpp for the decal domain. Shared widgets
-// only: DraggableList for the layer stack, VirtualList for the read-only transform list, Checkbox /
-// ColorSwatch / SliderScalar / TextInput / Section for the rest.
+// DecalsTab_Manual_UI.cpp — the imgui composition of the manual decal layers block, plus (ARCH §20)
+// its Group/Bundle tree. Layer: UI. Mirrors PropsTab_Manual_UI.cpp for the decal domain, minus the
+// Type Section loop — Decals has exactly one implicit Type Section (see DecalsTab_Bundles_UI.h).
+// Shared widgets only: DraggableList for the ungrouped-layer stack, TreeListWidget for the Bundle
+// tree, VirtualList for the read-only transform list, Checkbox / ColorSwatch / SliderScalar /
+// TextInput / Section for the rest.
 // Nothing here notifies Pipeline::PreviewDriver (DecalsTab_Manual_UI.h SCOPE NOTE 1).
 #include "DecalsTab_Manual_UI.h"
 #include "Checkbox_UI.h"
@@ -27,10 +29,10 @@ void DrawLayerSettings(ManualDecalLayersState& state) {
                      state.layerIconScaleToggle, WidgetStyle(), "%.2f");
 }
 
-// One row's own name, tint and icon scale. The tint is hidden while the block is set to one shared
-// color: two live controls over one drawn color would be a rival control (ARCH §4). Reports whether
-// the name committed, the only field the uniqueness repair cares about. STEP110: was `DrawSelectedLayer`,
-// drawn once at the bottom for the global `selectedLayerIndex`; now inline per row (STEP104's pattern).
+// One row's own name, tint, icon scale, and (ARCH §20) lock/hidden/grid-snap/color-override/
+// symmetry-enabled. The tint is hidden while the block is set to one shared color: two live
+// controls over one drawn color would be a rival control (ARCH §4). Reports whether the name
+// committed, the only field the uniqueness repair cares about.
 bool DrawLayerRowSettings(Params::DecalInstanceLayer& layer, ManualDecalLayersState& state) {
     TextInputRules nameRules;
     nameRules.maximumLength = 48;
@@ -41,21 +43,31 @@ bool DrawLayerRowSettings(Params::DecalInstanceLayer& layer, ManualDecalLayersSt
         DrawColorSwatch("Color", layer.color, state.previewColorOptions, state.selectedLayerColorToggle);
     DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
                      state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
+    DrawCheckbox("Hidden", layer.bHidden);
+    DrawCheckbox("Snap to Grid", layer.bGridSnapEnabled);
+    if (layer.bGridSnapEnabled)
+        DrawSliderScalar("Grid Size", layer.gridSnapSizeWorldUnits, state.gridSnapSizeRange,
+                         state.selectedLayerGridSnapToggle, WidgetStyle(), "%.2f");
+    DrawCheckbox("Color Override", layer.bColorOverrideEnabled);
+    DrawCheckbox("Symmetry Enabled", layer.bSymmetryEnabled);
     return bNameCommitted;
 }
 
-// The layer stack. STEP110: each row's body, whenever the row's own CollapsingHeader is open
-// (DraggableList's own per-row expand/collapse state — never gated on `state.selectedLayerIndex`),
-// draws that row's OWN settings directly, so an expanded row never shows another row's settings.
-// `bAnyNameCommitted` is set (never cleared) when any row's name commits this frame.
+// The "Ungrouped" layer stack — layers belonging to a Bundle (shown in the tree instead) are
+// suppressed (bRowSuppressed), never filtered into a copy — reorder/delete still apply against
+// real `decalLayers` indices. `bAnyNameCommitted` is set (never cleared) when any row's name
+// commits this frame.
 DraggableListSignal DrawLayerList(std::vector<Params::DecalInstanceLayer>& decalLayers,
                                   ManualDecalLayersState& state, bool& bAnyNameCommitted) {
     return DraggableList<Params::DecalInstanceLayer>::Render(
         "manualDecalLayers", decalLayers,
         [&](int rowIndex) {
+            const Params::DecalInstanceLayer& layer = decalLayers[static_cast<std::size_t>(rowIndex)];
             DraggableListRow row;
-            row.label   = ManualDecalLayerRowLabel(decalLayers[static_cast<std::size_t>(rowIndex)]);
-            row.bLocked = decalLayers[static_cast<std::size_t>(rowIndex)].bLocked;   // NEW
+            row.bRowSuppressed = IsDecalInstanceLayerRowSuppressed(layer);
+            row.label   = ManualDecalLayerRowLabel(layer);
+            row.bLocked = layer.bLocked;
+            row.bVisible = !layer.bHidden;
             return row;
         },
         [&](int rowIndex) {
@@ -69,7 +81,7 @@ DraggableListSignal DrawLayerList(std::vector<Params::DecalInstanceLayer>& decal
 // instance (ClampDecalLayerIndicesForRemovedLayer, STEP22 ruling #5); a reordered layer renumbers
 // them (RenumberDecalLayerIndicesForReorder, called BEFORE the layers vector itself moves — the
 // renumber needs the pre-move layer count). Reports whether `decals` moved, which feeds no pipeline
-// stage (PropsTab_ManualDecals_UI.h SCOPE NOTE 1), so the caller never notifies the preview driver
+// stage (DecalsTab_Manual_UI.h SCOPE NOTE 1), so the caller never notifies the preview driver
 // with it.
 bool ApplyLayerListSignal(std::vector<Params::DecalInstanceLayer>& decalLayers,
                          std::vector<Params::DecalInstanceGroup>& decals, ManualDecalLayersState& state,
@@ -84,6 +96,12 @@ bool ApplyLayerListSignal(std::vector<Params::DecalInstanceLayer>& decalLayers,
                 !decalLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked;
         return false;
     }
+    if (signal.kind == DraggableListSignalKind::ToggleVisibility) {
+        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(decalLayers.size()))
+            decalLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bHidden =
+                !decalLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bHidden;
+        return false;
+    }
     const bool bDeleting            = signal.kind == DraggableListSignalKind::Delete;
     const bool bReordering          = signal.kind == DraggableListSignalKind::Reorder;
     const int  sourceLayerIndex     = signal.sourceRowIndex;
@@ -96,18 +114,6 @@ bool ApplyLayerListSignal(std::vector<Params::DecalInstanceLayer>& decalLayers,
     if (state.selectedLayerIndex >= static_cast<int>(decalLayers.size()))
         state.selectedLayerIndex = static_cast<int>(decalLayers.size()) - 1;
     return bDecalsMoved;
-}
-
-// The Add Decal Layer button. Reports whether a layer was added, so the caller knows to run the
-// name-uniqueness repair (cosmetic here, STEP22 ruling #6 — see UniqueNameList_UI.h).
-bool DrawLayerListButtons(std::vector<Params::DecalInstanceLayer>& decalLayers, ManualDecalLayersState& state) {
-    if (!ImGui::Button("Add Decal Layer")) return false;
-    Params::DecalInstanceLayer layer;
-    layer.name = NextDecalLayerName(static_cast<int>(decalLayers.size()));
-    layer.layerId = NextDecalLayerId(decalLayers);
-    decalLayers.push_back(layer);
-    state.selectedLayerIndex = static_cast<int>(decalLayers.size()) - 1;
-    return true;
 }
 
 // The resolved transforms, read-only and virtualized (SCOPE NOTE 2). Unfiltered, unrelated to
@@ -137,13 +143,33 @@ void DrawTransformList(ManualDecalLayersState& state, const Data::PlacementInsta
 
 void DrawManualDecalLayers(ManualDecalLayersState& state, std::vector<Params::DecalInstanceLayer>& decalLayers,
                            std::vector<Params::DecalInstanceGroup>& decals,
+                           std::vector<Params::DecalLayerBundle>& decalLayerBundles,
                            const Data::PlacementInstances* placedDecals) {
     if (!DrawSectionBegin("Manual Decal Layers", state.section)) return;
     DrawLayerSettings(state);
-    bool bLayersMoved = DrawLayerListButtons(decalLayers, state);
+
+    if (ImGui::Button("+ Group")) {
+        Params::DecalLayerBundle bundle;
+        bundle.identifier = NextDecalLayerBundleId(decalLayerBundles);
+        bundle.parentBundleIdentifier = state.bundles.selectedBundleIdentifier;
+        decalLayerBundles.push_back(bundle);
+        state.bundles.selectedBundleIdentifier = bundle.identifier;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("+ Layer")) {
+        Params::DecalInstanceLayer layer;
+        layer.name    = NextDecalLayerName(static_cast<int>(decalLayers.size()));
+        layer.layerId = NextDecalLayerId(decalLayers);
+        layer.parentBundleIdentifier = state.bundles.selectedBundleIdentifier;
+        decalLayers.push_back(layer);
+        state.selectedLayerIndex = static_cast<int>(decalLayers.size()) - 1;
+    }
+
+    DrawDecalLayerBundleTree(decalLayerBundles, decalLayers, decals, state.bundles, state);
+
     bool bAnyNameCommitted = false;
     const DraggableListSignal signal = DrawLayerList(decalLayers, state, bAnyNameCommitted);
-    if (signal.bHasSignal()) ApplyLayerListSignal(decalLayers, decals, state, signal);
+    bool bLayersMoved = signal.bHasSignal() && ApplyLayerListSignal(decalLayers, decals, state, signal);
     bLayersMoved = bAnyNameCommitted || bLayersMoved;
     DrawTransformList(state, placedDecals);
     // The export keys layers by NAME parity with Armies/Areas (cosmetic here, STEP22 ruling #6) —

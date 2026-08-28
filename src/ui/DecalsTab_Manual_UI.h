@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include "ColorSwatch_UI.h"
+#include "DecalsTab_Bundles_UI.h"
 #include "Section_UI.h"
 #include "SliderScalar_UI.h"
 #include "UniqueNameList_UI.h"
@@ -39,6 +40,8 @@ struct ManualDecalLayersState {
     SectionState       transformListSection;
     ColorSwatchOptions previewColorOptions;                       // picker only, no RGBA fields
     ScalarSliderRange  iconScaleRange{ 0.1f, 10.0f, 0.0f };
+    // ARCH §20 — grid-snap size range, sibling of iconScaleRange; mirrors ManualPropLayersState.
+    ScalarSliderRange  gridSnapSizeRange{ 0.1f, 50.0f, 0.0f };
 
     bool           bUseGroupColor = false;                        // one tint for every layer
     float          groupColor[kColorSwatchChannelCount] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -46,15 +49,21 @@ struct ManualDecalLayersState {
     RealtimeToggle groupColorToggle;
     RealtimeToggle layerIconScaleToggle;
 
-    // ONE shared toggle set for the SELECTED row's own color/scale — `Params::DecalInstanceLayer`
-    // is a pure round-tripping type and cannot carry a `RealtimeToggle` member of its own; mirrors
-    // `ManualPropLayersState`.
+    // ONE shared toggle set for the SELECTED/expanded row's own color/scale/grid-snap —
+    // `Params::DecalInstanceLayer` is a pure round-tripping type and cannot carry a
+    // `RealtimeToggle` member of its own; mirrors `ManualPropLayersState`.
     RealtimeToggle selectedLayerColorToggle;
     RealtimeToggle selectedLayerIconScaleToggle;
+    RealtimeToggle selectedLayerGridSnapToggle;   // ARCH §20
 
     int   selectedLayerIndex  = -1;
     float transformRowHeight  = 20.0f;    // the TRUE row height: the clipper scrolls with it
     float transformListHeight = 160.0f;
+
+    // ARCH §20 — the Group/Bundle tree's own state. Decals has exactly one implicit Type Section
+    // (no type-tag field, see ScatterInstanceLayer_PARAMS.h's header note), so there is only ever
+    // one tree, unlike Props' per-type array.
+    DecalLayerBundlesState bundles;
 };
 
 // The layer the per-row controls edit, or null when the selection points at nothing
@@ -70,6 +79,13 @@ inline bool IsDecalInstanceLayerLocked(const std::vector<Params::DecalInstanceLa
                                        int layerIndex) {
     if (layerIndex < 0 || layerIndex >= static_cast<int>(decalLayers.size())) return false;
     return decalLayers[static_cast<std::size_t>(layerIndex)].bLocked;
+}
+
+// ARCH §20 — a layer belonging to a Bundle (shown in the Group/Bundle tree instead) is suppressed
+// from the "Ungrouped" flat list. No type check (unlike IsPropInstanceLayerRowSuppressed): Decals
+// has no type-tag field at all — exactly one implicit Type Section.
+inline bool IsDecalInstanceLayerRowSuppressed(const Params::DecalInstanceLayer& layer) {
+    return layer.parentBundleIdentifier != -1;
 }
 
 // The color a layer actually draws with: its own, unless the block is set to one shared tint.
@@ -136,9 +152,11 @@ inline bool RenumberDecalLayerIndicesForReorder(std::vector<Params::DecalInstanc
 }
 
 // `decals` is `recipe.decals`, repaired here when a layer is deleted/reordered (SCOPE NOTE above).
-// `placedDecals` is nullable: before the first generation there is no resolved buffer.
+// `decalLayerBundles` is `recipe.decalLayerBundles` (ARCH §20) — the Group/Bundle tree this block
+// now hosts. `placedDecals` is nullable: before the first generation there is no resolved buffer.
 void DrawManualDecalLayers(ManualDecalLayersState& state, std::vector<Params::DecalInstanceLayer>& decalLayers,
                            std::vector<Params::DecalInstanceGroup>& decals,
+                           std::vector<Params::DecalLayerBundle>& decalLayerBundles,
                            const Data::PlacementInstances* placedDecals);
 
 } // namespace Ui

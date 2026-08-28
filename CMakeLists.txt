@@ -838,6 +838,7 @@ add_sangen_test(MarkerSymmetryFixCommand_UI_Test src/ui/MarkerSymmetryFixCommand
 add_sangen_test(ArmiesTab_UI_Test         src/ui/ArmiesTab_UI_Test.cpp)
 add_sangen_test(PropsTab_UI_Test          src/ui/PropsTab_UI_Test.cpp)
 add_sangen_test(PropsTab_Bundles_UI_Test  src/ui/PropsTab_Bundles_UI_Test.cpp)
+add_sangen_test(DecalsTab_Bundles_UI_Test src/ui/DecalsTab_Bundles_UI_Test.cpp)
 add_sangen_test(DecalsTab_UI_Test          src/ui/DecalsTab_UI_Test.cpp)
 add_sangen_test(DecalsTab_Manual_UI_Test  src/ui/DecalsTab_Manual_UI_Test.cpp)
 add_sangen_test(AreasTab_UI_Test          src/ui/AreasTab_UI_Test.cpp)
