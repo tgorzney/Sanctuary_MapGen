@@ -26,6 +26,8 @@ void RunMapCanvasScenarioEditModeOwnershipChecks(Sys::GpuResourceManager& manage
 void RunMapCanvasActivePanelGateChecks(Sys::GpuResourceManager& manager);
 // Human's own bug report — MapCanvas_ActivePanelGate_UI_Test.cpp.
 void RunMapCanvasClickSelectsManualMarkerChecks(Sys::GpuResourceManager& manager);
+// ARCH §21.2/§21.5 — MapCanvas_GestureOwnership_UI_Test.cpp.
+void RunMapCanvasGestureOwnershipChecks(Sys::GpuResourceManager& manager);
 } // namespace Ui
 } // namespace SanmapGen
 
@@ -49,6 +51,7 @@ int main(int argumentCount, char** argumentValues) {
     Ui::RunMapCanvasScenarioEditModeOwnershipChecks(manager);
     Ui::RunMapCanvasActivePanelGateChecks(manager);
     Ui::RunMapCanvasClickSelectsManualMarkerChecks(manager);
+    Ui::RunMapCanvasGestureOwnershipChecks(manager);
     wglMakeCurrent(nullptr, nullptr);
     wglDeleteContext(glContext);
     ReleaseDC(window, deviceContext);

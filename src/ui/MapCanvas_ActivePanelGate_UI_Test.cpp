@@ -148,15 +148,18 @@ void RunMapCanvasActivePanelGateChecks(Sys::GpuResourceManager& manager) {
     check(transform.positionX != kMarkerWorldX || transform.positionZ != kMarkerWorldZ,
           "Markers panel active: a press-drag-release on a manual marker moves it");
 
-    // --- Case 2: a non-Markers panel active — refused; falls through to the normal pan path ---
+    // --- Case 2: a non-Markers panel active — the drag is refused; ARCH §21.2 — a refused drag
+    // never falls through to a pan (left button never pans at all, only right-drag does now) — it
+    // merely lets travel accumulate, which a release past tolerance resolves as a marquee instead.
     transform.positionX = kMarkerWorldX; transform.positionZ = kMarkerWorldZ;
     activePanel = ApplicationPanel::Heightmap;   // same MapCanvas, same pointer, new value
     SimulatePressDragRelease(canvas, pressPosition);
     check(transform.positionX == kMarkerWorldX && transform.positionZ == kMarkerWorldZ,
           "a non-Markers panel active: the identical gesture leaves the marker untouched");
-    check(canvas.View().ViewCenterPixelX() != initialViewCenterX
-       || canvas.View().ViewCenterPixelY() != initialViewCenterY,
-          "a non-Markers panel active: the press falls through to the normal pan path");
+    check(canvas.View().ViewCenterPixelX() == initialViewCenterX
+       && canvas.View().ViewCenterPixelY() == initialViewCenterY,
+          "ARCH §21.2 — a non-Markers panel active: the refused drag still never pans the view "
+          "(left button never pans, no fallthrough pan path exists any more)");
 
     // --- Case 3: no panel source wired (activePanelSource left at its nullptr default) ---
     MapCanvas noPanelSourceCanvas;   // SetActivePanelSource deliberately never called on this canvas

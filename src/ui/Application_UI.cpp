@@ -113,6 +113,10 @@ void Application::WireCallbacks() {
     canvas.SetPreviewComposite(&composite);
     canvas.SetMarkerPickingSource(&assembler.Placements().markers, &assembler.MarkerSpatialGrid());
     canvas.SetMarkerPickRadiusScreenPixels(settings.markerIconRadiusPixels);
+    // ARCH §21.2/§21.6 — the marquee's procedural region-query source: the SAME resolved
+    // Data::PlacementResults SetOverlayPlacementSource below already injects (via overlayPlacements),
+    // paired with PIPELINE's own SpatialGridSet (STEP166) instead of just the Markers-only grid above.
+    canvas.SetSpatialGridSetSource(&assembler.SpatialGridSet());
     // STEP53 — the screen-space overlay icon draw pass's sources, every one a push-in pointer
     // (§0's correction: never an Application reach-back from inside MapCanvas).
     canvas.SetOverlayLayerSettings(&overlaySettings);
@@ -131,6 +135,11 @@ void Application::WireCallbacks() {
     // SetManualMarkerDragSource. `markers`/`markerLayers` are the SAME vectors the Markers tab
     // edits (recipe.markers/recipe.markerLayers) — one source of truth, never a second copy.
     canvas.SetManualMarkerDragSource(&recipe.markers, &recipe.markerLayers, &recipe.geometry, &recipe);
+    // ARCH §21.2/§21.7 — mirrors SetManualMarkerDragSource exactly, one tier over: Props/Decals'
+    // first drag-and-follow source of any kind. `props`/`propLayers`/`decals`/`decalLayers` are the
+    // SAME vectors the Props/Decals tabs edit — one source of truth, never a second copy.
+    canvas.SetManualPropDragSource(&recipe.props, &recipe.propLayers, &recipe.geometry, &recipe);
+    canvas.SetManualDecalDragSource(&recipe.decals, &recipe.decalLayers, &recipe.geometry, &recipe);
     // STEP126 — the static selection-highlight source; see MapCanvas_UI.h's
     // SetManualMarkerSelectionSource. Points at the SAME MarkersTabState field the Markers tab's own
     // instance-list rows write (tabState.markers.selectedManualInstanceIdentifier) — one source of

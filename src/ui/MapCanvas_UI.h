@@ -27,16 +27,21 @@
 #include <functional>
 #include <vector>
 #include "Application_Panels_UI.h"
+#include "DecalDragGesture_UI.h"
+#include "ManualInstanceHitTest_UI.h"
 #include "MapCanvasView_UI.h"
 #include "MapCanvas_IconLayer_Ops_UI.h"
+#include "MapCanvas_ManualDragSources_UI.h"
 #include "MapCanvas_ScenarioEditMode_Ops_UI.h"
 #include "MapCanvas_SelectionSet_UI.h"
 #include "MarkerDragGesture_UI.h"
 #include "OverlayLayer_Settings_UI.h"
 #include "PreviewComposite_UI.h"
+#include "PropDragGesture_UI.h"
 #include "../data/EntityIdBuffer_DATA.h"
 #include "../data/PlacementInstances_DATA.h"
 #include "../data/SpatialGrid_DATA.h"
+#include "../data/SpatialGridSet_DATA.h"
 #include "../io/WorldFootprintSizeTable_IO.h"
 #include "../sys/GpuResource_SYS.h"
 
@@ -61,6 +66,12 @@ public:
         pickMarkerInstances = markerInstances;
         pickMarkerSpatialGrid = markerSpatialGrid;
     }
+    // ARCH §21.2/§21.6 — the marquee release's PROCEDURAL half: one region query per collection
+    // (Markers/Props/Decals; Units out of scope, §21's own closing note) against the SAME
+    // `Data::SpatialGridSet` PIPELINE already builds (STEP166). The instances themselves are the
+    // SAME `overlayPlacements` this canvas already reads for the icon draw pass (SetOverlayPlacementSource,
+    // below) — never a second copy of that pointer.
+    void SetSpatialGridSetSource(const Data::SpatialGridSet* grids) { pickSpatialGridSet = grids; }
     // The constant on-screen radius a click must land within to hit a marker icon (Constitution
     // §8 — a named setting, not a literal). Matches Phase 3's icon draw radius; the two must agree
     // or a click can miss a visibly-hit icon.
@@ -119,6 +130,27 @@ public:
         manualMarkerDragLayers   = markerLayers;
         manualMarkerDragGeometry = geometry;
         manualMarkerDragRecipe   = recipeForGlobalSymmetry;
+    }
+    // ARCH §21.7 — mirrors SetManualMarkerDragSource's exact shape, one tier over: Props/Decals'
+    // first drag-and-follow source of any kind (ARCH §21.2). `props`/`decals` are the only mutable
+    // pointers, same "UI sets PARAMS, never simulates" posture as the Marker sibling.
+    void SetManualPropDragSource(std::vector<Params::PropInstanceGroup>* props,
+                                 const std::vector<Params::PropInstanceLayer>* propLayers,
+                                 const Params::Geometry* geometry,
+                                 const Params::MapRecipe* recipeForGlobalSymmetry) {
+        manualPropDrag.props    = props;
+        manualPropDrag.layers   = propLayers;
+        manualPropDrag.geometry = geometry;
+        manualPropDrag.recipe   = recipeForGlobalSymmetry;
+    }
+    void SetManualDecalDragSource(std::vector<Params::DecalInstanceGroup>* decals,
+                                  const std::vector<Params::DecalInstanceLayer>* decalLayers,
+                                  const Params::Geometry* geometry,
+                                  const Params::MapRecipe* recipeForGlobalSymmetry) {
+        manualDecalDrag.decals   = decals;
+        manualDecalDrag.layers   = decalLayers;
+        manualDecalDrag.geometry = geometry;
+        manualDecalDrag.recipe   = recipeForGlobalSymmetry;
     }
 
     // STEP126 — the static selection-highlight source: `selectedInstanceIdentifier` is the SAME
@@ -223,13 +255,49 @@ private:
     // above (MapCanvas_Draw_UI.cpp).
     void DrawScenarioEditModeOverlayPass(float regionOriginX, float regionOriginY);
     // STEP94 — Gap 6's minimal stopgap draw + the live gesture's ghost/refused-tint dots
-    // (MapCanvas_MarkerDrag_UI.cpp).
+    // (MapCanvas_MarkerDrag_UI.cpp). Props/Decals need no equivalent — their manual instances
+    // already render every frame through the real icon-atlas overlay pass (DrawOverlayIconLayerPass,
+    // ARCH §20's ResolvePropsManual/ResolveDecalsManual), which re-reads the SAME live `recipe.props`/
+    // `recipe.decals` a drag writes into, so a Prop/Decal drag needs no stopgap draw of its own.
     void DrawManualMarkerDragPass(float regionOriginX, float regionOriginY);
-    // STEP94 — the drag gesture's three lifecycle calls (MapCanvas_MarkerDrag_UI.cpp), tried at
-    // press-time before the existing pan-vs-click disambiguation (MapCanvas_Draw_UI.cpp).
-    bool TryBeginManualMarkerDrag(float regionLocalX, float regionLocalY);
-    void ContinueManualMarkerDrag(float regionLocalX, float regionLocalY);
-    void EndManualMarkerDrag();
+    // ARCH §21.2/§21.3 — the drag gesture's three lifecycle calls, generalized across Markers/Props/
+    // Decals (renamed from TryBeginManualMarkerDrag; MapCanvas_ManualDragDispatch_UI.cpp), tried at
+    // press-time before the click/marquee disambiguation (MapCanvas_Draw_UI.cpp). `TryBeginManualInstanceDrag`
+    // is the shared 3-way nearest-hit-wins dispatcher (§21.3's own "hand-written, NOT templated" ruling
+    // — it touches three concrete `Params::` group types by name in one function body); `Continue`/`End`
+    // dispatch to whichever ONE domain's own `b*ManualDragActive` flag is set.
+    bool TryBeginManualInstanceDrag(float regionLocalX, float regionLocalY);
+    void ContinueManualInstanceDrag(float regionLocalX, float regionLocalY);
+    void EndManualInstanceDrag();
+    // The shared cross-domain hit-test both `TryBeginManualInstanceDrag` (press-time) and
+    // `ApplyClickGesture` (release-time click resolution — "re-runs the hit-test from scratch," §21.2's
+    // own explicitly-granted implementation freedom) call. NOT active-panel-gated itself (a click may
+    // select any domain's manual instance regardless of which tab is open, preserving §19.25's existing
+    // ungated manual-marker click-select behavior) — `TryBeginManualInstanceDrag` applies the
+    // per-domain active-panel gate itself, AFTER this returns its nearest hit, refusing only the DRAG.
+    bool HitTestManualInstanceAcrossDomains(float regionLocalX, float regionLocalY,
+                                            PlacementCollectionKind_UI& outCollection,
+                                            int& outGroupIndex, int& outTransformIndex) const;
+    // Resolves a (collection, groupIndex, transformIndex) triple — from either
+    // HitTestManualInstanceAcrossDomains or a CollectManualInstancesInWorldRegion pair — into the
+    // real selection key, reading that transform's own `instanceIdentifier` (ARCH §21.4) from the
+    // matching domain's own vector. Shared by ApplyClickGesture and ApplyMarqueeGesture so the key
+    // construction rule lives in exactly one place (MapCanvas_SelectionGesture_UI.cpp).
+    OverlayInstanceKey_UI ResolveManualHitKey(PlacementCollectionKind_UI collection, int groupIndex,
+                                              int transformIndex) const;
+    // ARCH §21.2 — the modifier-aware click resolution `ApplyClick` now wraps (MapCanvas_SelectionGesture_UI.cpp):
+    // a manual hit (any of the three domains, via the shared cross-domain hit-test above) wins first;
+    // a miss falls through to the existing procedural Markers-only PickMarker path (§21's own "today
+    // only markers have a working picker" note — Props/Decals gain no procedural single-click picker
+    // here, only §21.6's region query below, for marquee).
+    void ApplyClickGesture(float regionLocalX, float regionLocalY, bool bCtrlHeld, bool bShiftHeld);
+    // ARCH §21.2/§21.6 — the release-time marquee resolver: one world-space AABB (from the press-start
+    // and release-time region-local points) feeds both `Picking_UI::PickInstancesInRegion` (procedural,
+    // Markers/Props/Decals, against `pickSpatialGridSet`) and `CollectManualInstancesInWorldRegion`
+    // (manual, Markers/Props/Decals, each lock-gated) — every resulting key concatenated into one
+    // ordered list and resolved through `ApplySelectionGesture`'s batch overload.
+    void ApplyMarqueeGesture(float pressRegionLocalX, float pressRegionLocalY, float releaseRegionLocalX,
+                             float releaseRegionLocalY, bool bCtrlHeld, bool bShiftHeld);
 
     MapCanvasView view;
     Sys::GpuResourceManager*        gpuResourceManager = nullptr;
@@ -237,6 +305,9 @@ private:
     const PreviewComposite*         composite = nullptr;
     const Data::PlacementInstances* pickMarkerInstances = nullptr;
     const Data::SpatialGrid*        pickMarkerSpatialGrid = nullptr;
+    // ARCH §21.2/§21.6 — the marquee's procedural region-query source (SetSpatialGridSetSource);
+    // `overlayPlacements` below already carries the matching instances, one source of truth.
+    const Data::SpatialGridSet*     pickSpatialGridSet = nullptr;
     float                           pickRadiusScreenPixels = 8.0f;   // Constitution §8; wired from
                                                                        // ApplicationSettings::markerIconRadiusPixels
     std::function<void(const OverlayInstanceKey_UI& primary, const OverlayInstanceKeySet_UI& selectedKeys)>
@@ -262,6 +333,17 @@ private:
     IconLayerFrameCache   overlayIconLayerFrameCache;
     float         pressTravelPixels        = 0.0f;    // how far the current press has dragged
     bool          bPressActive             = false;
+    // ARCH §21.2 — the press-start region-local point, captured the SAME frame `pressTravelPixels`
+    // resets to 0 (IsItemActivated()); paired with the release-time point to form the marquee's one
+    // world-space AABB. Mirrors `pressTravelPixels`'s own naming convention (§21.2's own instruction).
+    float         pressStartRegionLocalX   = 0.0f;
+    float         pressStartRegionLocalY   = 0.0f;
+    // ARCH §21.2 — the independent right-button pan tracker, replacing today's left-drag-pans
+    // entirely. Keyed off raw `io.MouseDown[ImGuiMouseButton_Right]` (imgui's item-activation is
+    // left-button-only for a default-flags InvisibleButton) — begins on a hovered right-click,
+    // persists across every frame the button stays down independent of hover (mirroring how
+    // IsItemActive() persists for the left button once a press began), ends on release.
+    bool          bRightPressActive        = false;
 
     // STEP78 — Scenario Edit Mode's own state (Application-owned, injected).
     ScenarioEditModeState* scenarioEditModeState = nullptr;
@@ -282,6 +364,15 @@ private:
     const MarkerTypeVisibility_UI*                  markerTypeVisibilitySource = nullptr;
     MarkerDragGestureState manualMarkerDragState;
     bool                   bManualMarkerDragActive = false;   // this press started on a manual marker
+    // ARCH §21.2/§21.7 — Props/Decals' own drag sources + live gesture state, grouped into two small
+    // structs (MapCanvas_ManualDragSources_UI.h) rather than eight more scattered fields here (this
+    // file's own flagged file-size ceiling, §21.7). Exactly one of the three `b*ManualDragActive`
+    // flags is ever true at once — `TryBeginManualInstanceDrag`'s own nearest-hit-wins dispatch
+    // never begins more than one domain's gesture for the same press.
+    ManualPropDragSources_UI  manualPropDrag;
+    ManualDecalDragSources_UI manualDecalDrag;
+    bool                       bManualPropDragActive  = false;
+    bool                       bManualDecalDragActive = false;
 };
 
 } // namespace Ui

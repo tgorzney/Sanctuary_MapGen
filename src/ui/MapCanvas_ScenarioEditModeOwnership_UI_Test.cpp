@@ -62,6 +62,26 @@ void SimulatePressDragRelease(MapCanvas& canvas, ImVec2 pressPosition) {
     DrawOneFrame(canvas);
 }
 
+// ARCH §21.2 — the RIGHT button is the only pan gesture left button-index 1, not 0 (imgui's
+// convention: 0 = left, 1 = right). Mirrors SimulatePressDragRelease's own shape exactly.
+void SimulateRightPressDragRelease(MapCanvas& canvas, ImVec2 pressPosition) {
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddMousePosEvent(pressPosition.x, pressPosition.y);
+    io.AddMouseButtonEvent(1, false);
+    BeginHeadlessFrame();
+    DrawOneFrame(canvas);
+
+    io.AddMouseButtonEvent(1, true);
+    BeginHeadlessFrame();
+    DrawOneFrame(canvas);
+    io.AddMousePosEvent(pressPosition.x + 60.0f, pressPosition.y + 60.0f);
+    BeginHeadlessFrame();
+    DrawOneFrame(canvas);
+    io.AddMouseButtonEvent(1, false);
+    BeginHeadlessFrame();
+    DrawOneFrame(canvas);
+}
+
 } // namespace
 
 void RunMapCanvasScenarioEditModeOwnershipChecks(Sys::GpuResourceManager& manager) {
@@ -105,19 +125,31 @@ void RunMapCanvasScenarioEditModeOwnershipChecks(Sys::GpuResourceManager& manage
     const float initialViewCenterY = canvas.View().ViewCenterPixelY();
     const ImVec2 pressPosition(regionOrigin.x + 40.0f, regionOrigin.y + 40.0f);
 
-    // --- Mode ACTIVE: exclusive ownership — the gesture never reaches the pan path at all ---
+    // --- Mode ACTIVE: exclusive ownership — the gesture never reaches the pan path at all.
+    // ARCH §21.2 — the left button never pans at all any more (left = click/marquee-select only);
+    // the RIGHT button is the actual pan path now, and Scenario Edit Mode's exclusivity gate covers
+    // it too ("no right-button pan while it owns the canvas", §21.2's own instruction) — proven with
+    // the right-button gesture, the only one that could otherwise pan.
     scenarioEditMode.Activate(body, nullptr, nullptr, 1);
     SimulatePressDragRelease(canvas, pressPosition);
     check(canvas.View().ViewCenterPixelX() == initialViewCenterX
        && canvas.View().ViewCenterPixelY() == initialViewCenterY,
-          "while Scenario Edit Mode is active, a drag gesture never pans the view");
+          "while Scenario Edit Mode is active, a LEFT-button gesture never pans the view (it never "
+          "pans at all any more, active or not)");
+    SimulateRightPressDragRelease(canvas, pressPosition);
+    check(canvas.View().ViewCenterPixelX() == initialViewCenterX
+       && canvas.View().ViewCenterPixelY() == initialViewCenterY,
+          "while Scenario Edit Mode is active, a RIGHT-button drag is ALSO refused — no right-button "
+          "pan while Scenario Edit Mode owns the canvas");
 
-    // --- Mode OFF: the identical gesture shape pans normally (ownership returned) ---
+    // --- Mode OFF: the RIGHT-button gesture pans normally (ownership returned) — the left-button
+    // gesture from before is no longer a meaningful proof of "ownership returned," since it never
+    // pans regardless of mode.
     scenarioEditMode.Deactivate();
-    SimulatePressDragRelease(canvas, pressPosition);
+    SimulateRightPressDragRelease(canvas, pressPosition);
     check(canvas.View().ViewCenterPixelX() != initialViewCenterX
        || canvas.View().ViewCenterPixelY() != initialViewCenterY,
-          "mode toggled off returns exclusive interaction ownership to the normal pan path");
+          "mode toggled off returns exclusive interaction ownership to the normal RIGHT-button pan path");
 
     ImGui::DestroyContext();
 }

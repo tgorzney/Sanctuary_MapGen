@@ -105,8 +105,10 @@ void MapCanvas::DrawOverlayIconLayerPass(float regionOriginX, float regionOrigin
                          *ImGui::GetWindowDrawList());
 }
 
-// Wheel = zoom about the cursor; left-drag = pan; a left press that barely moved = select.
-// Separating click from drag by travelled distance is what lets one button do both.
+// Wheel = zoom about the cursor. Left button = click-to-select / drag-a-manual-instance /
+// box-marquee-select — never pans (ARCH §21.2). Right button = the independent pan tracker below,
+// entirely separate from the left-button state machine. Separating click from drag-or-marquee by
+// travelled distance is what lets one (left) button do both.
 void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
     const ImGuiIO& io = ImGui::GetIO();
     const float regionLocalX = io.MousePos.x - regionOriginX;
@@ -115,8 +117,8 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
     if (ImGui::IsItemHovered() && io.MouseWheel != 0.0f)
         ApplyScroll(regionLocalX, regionLocalY, io.MouseWheel);
 
-    // STEP78 — exclusive interaction ownership: while active, drag/click never reach the normal
-    // pan/pick path below at all (zoom above stays available; it does not conflict with editing).
+    // STEP78 — exclusive interaction ownership: while active, drag/click/marquee/pan never reach the
+    // normal path below at all (zoom above stays available; it does not conflict with editing).
     if (scenarioEditModeState != nullptr && scenarioEditModeState->IsActive()) {
         if (composite != nullptr) {
             ScenarioEditModePointerFrame_UI pointerFrame;
@@ -131,42 +133,56 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
         return;
     }
 
-    // STEP94 — before the existing pan-vs-click disambiguation: a press that lands on a manual
-    // marker starts a drag gesture instead (a hit on an ungrouped marker still starts one, with an
-    // empty correspondence table); a miss falls through to the pan/click path below unchanged.
+    // ARCH §21.2 — LEFT BUTTON: press-time drag-begin-first-else-click/marquee.
+    // A press that lands on a manual instance (any of Markers/Props/Decals, nearest-hit-wins, each
+    // lock-gated) starts a drag gesture instead; a miss starts neither a drag nor a pan — it merely
+    // lets travel accumulate (no left-drag-pans branch at all, ARCH §21.2's own instruction).
     if (ImGui::IsItemActivated()) {
         bPressActive = true; pressTravelPixels = 0.0f;
-        bManualMarkerDragActive = TryBeginManualMarkerDrag(regionLocalX, regionLocalY);
+        pressStartRegionLocalX = regionLocalX; pressStartRegionLocalY = regionLocalY;
+        TryBeginManualInstanceDrag(regionLocalX, regionLocalY);
     }
+    const bool bManualDragActive = bManualMarkerDragActive || bManualPropDragActive || bManualDecalDragActive;
     if (bPressActive && ImGui::IsItemActive()) {
-        // Human's own bug report — this must accumulate regardless of which branch below runs: it
-        // used to live only in the pan (else) branch, so a manual-marker gesture's own
-        // pressTravelPixels stayed frozen at its activation-time 0.0f for the gesture's ENTIRE
-        // duration, no matter how far the mouse actually moved — the release check just below would
+        // Human's own bug report (predates §21.2, still applies) — this must accumulate regardless
+        // of which branch below runs, or a gesture's own pressTravelPixels would stay frozen at its
+        // activation-time 0.0f for the gesture's ENTIRE duration, and the release check below would
         // then treat every drag, however large, as a zero-travel click.
         pressTravelPixels += std::fabs(io.MouseDelta.x) + std::fabs(io.MouseDelta.y);
-        if (bManualMarkerDragActive) {
-            ContinueManualMarkerDrag(regionLocalX, regionLocalY);
-        } else if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f) {
-            ApplyDrag(io.MouseDelta.x, io.MouseDelta.y);
-        }
+        if (bManualDragActive) ContinueManualInstanceDrag(regionLocalX, regionLocalY);
     }
     if (bPressActive && ImGui::IsItemDeactivated()) {
         bPressActive = false;
-        if (bManualMarkerDragActive) {
-            EndManualMarkerDrag();
-            bManualMarkerDragActive = false;
-            // Human's own bug report — clicking a marker in the preview never selected it.
-            // TryBeginManualMarkerDrag's own press-time hit-test claims EVERY press that lands on a
-            // marker as a drag gesture, even a stationary click with zero travel, so the plain-click
-            // path below never got a chance to run for a hit. A gesture that never actually moved
-            // (still under the SAME click-vs-drag travel tolerance the miss path already uses) is a
-            // click in disguise — settle the (no-op) gesture above, then still select.
-            if (pressTravelPixels <= view.settings.clickDragTolerancePixels)
-                ApplyClick(regionLocalX, regionLocalY);
-        } else if (pressTravelPixels <= view.settings.clickDragTolerancePixels) {
-            ApplyClick(regionLocalX, regionLocalY);
+        const bool bClick = pressTravelPixels <= view.settings.clickDragTolerancePixels;
+        if (bManualDragActive) {
+            // Settle the (no-op, if it never moved) gesture first, exactly as before §21.2.
+            EndManualInstanceDrag();
+            // A drag that WAS active never reaches marquee resolution — its own end-of-gesture
+            // handling above is exclusive for this press (ARCH §21.2's own instruction). A gesture
+            // that never actually moved is a click in disguise (human's own bug report, predates
+            // §21.2) — still resolves through the real click path, with live modifier state.
+            if (bClick) ApplyClickGesture(regionLocalX, regionLocalY, io.KeyCtrl, io.KeyShift);
+        } else if (bClick) {
+            ApplyClickGesture(regionLocalX, regionLocalY, io.KeyCtrl, io.KeyShift);
+        } else {
+            // pressTravelPixels > tolerance AND no drag was active: a marquee release.
+            ApplyMarqueeGesture(pressStartRegionLocalX, pressStartRegionLocalY, regionLocalX, regionLocalY,
+                                io.KeyCtrl, io.KeyShift);
         }
+    }
+
+    // ARCH §21.2 — RIGHT BUTTON: the independent pan tracker, replacing left-drag-pans entirely.
+    // ImGui's item-activation (IsItemActivated/IsItemActive/IsItemDeactivated) is LEFT-button-only
+    // for a default-flags InvisibleButton, so this reads raw button-1 state instead — the SAME idiom
+    // ScenarioEditModePointerFrame_UI::bRightClicked already uses just above in this exact file.
+    if (!bRightPressActive && ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+        bRightPressActive = true;
+    if (bRightPressActive) {
+        // Persists every frame the button stays down, independent of hover — mirroring how
+        // IsItemActive() persists for the left button once a press began, even after the cursor
+        // leaves the item.
+        if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f) ApplyDrag(io.MouseDelta.x, io.MouseDelta.y);
+        if (ImGui::IsMouseReleased(ImGuiMouseButton_Right)) bRightPressActive = false;
     }
 }
 

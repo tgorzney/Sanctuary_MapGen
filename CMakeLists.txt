@@ -576,7 +576,11 @@ add_sangen_test(MapCanvas_UI_Test
     src/ui/MapCanvas_View_UI_Test.cpp
     src/ui/MapCanvas_Picking_UI_Test.cpp
     src/ui/MapCanvas_ScenarioEditModeOwnership_UI_Test.cpp
-    src/ui/MapCanvas_ActivePanelGate_UI_Test.cpp)
+    src/ui/MapCanvas_ActivePanelGate_UI_Test.cpp
+    # ARCH §21.2/§21.5 — end-to-end pointer-state-machine coverage: right-button pans, left-button
+    # never pans (drag-a-manual-instance or marquee-select instead), a marquee's lock-gate exclusion,
+    # and a live Ctrl-click toggle.
+    src/ui/MapCanvas_GestureOwnership_UI_Test.cpp)
 # STEP53 — the screen-space overlay icon draw pass. Culling/LOD, budget/decimation, and the C2
 # cache's invalidation decision are headless (no imgui frame, no GL); bucketing + the bulk vertex
 # write need one live headless imgui frame (no GL, no window backend) — mirrors MapCanvas_UI_Test's

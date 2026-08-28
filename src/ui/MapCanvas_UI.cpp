@@ -6,8 +6,6 @@
 // tests no placement rule — a pick walks exactly one chunk's bucket in O(1)
 // (UI_FRAMEWORK_SPEC §4), never a scan of 100k instances.
 #include "MapCanvas_UI.h"
-#include "MapCanvas_MarkerDrag_UI.h"
-#include "Picking_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <cmath>
 
@@ -33,47 +31,12 @@ unsigned long long MapCanvas::PresentationIdentifier() const {
 // the exact inverse of the mapping BuildEntityPoints bakes marker marks through), and PickMarker
 // hit-tests the ONE SpatialGrid chunk that world point falls in. Off the image, no source wired, or
 // no composite baked yet — selects nothing.
+// ARCH §21.2 — now a thin wrapper over the modifier-aware ApplyClickGesture
+// (MapCanvas_SelectionGesture_UI.cpp), bCtrlHeld=bShiftHeld=false: an unconditional Replace, the
+// exact behavior this public entry point always had, preserved byte-identically for every existing
+// caller/test that never threaded modifier state through it.
 std::uint32_t MapCanvas::ApplyClick(float regionLocalX, float regionLocalY) {
-    lastPickedPixel = view.ResolvePreviewPixel(regionLocalX, regionLocalY);
-    if (!lastPickedPixel.bInsideImage || pickMarkerInstances == nullptr
-        || pickMarkerSpatialGrid == nullptr || composite == nullptr
-        || composite->PixelsPerPreviewCell() <= 0.0f) {
-        SetSelection(Data::EntityIdBuffer::emptySentinel);
-        return SelectedEntityIdentifier();
-    }
-    const PreviewComposite::PreviewWorldPoint worldPoint =
-        composite->PreviewPixelToWorld(static_cast<float>(lastPickedPixel.pixelX),
-                                       static_cast<float>(lastPickedPixel.pixelY));
-    // Screen pixels -> preview pixels (view.PreviewPixelsPerRegionPixel()) -> world units, so the
-    // pick radius stays a constant ON-SCREEN size at every zoom level (the texel-space coupling
-    // this migration exists to remove).
-    const float pickRadiusWorldUnits = pickRadiusScreenPixels
-        * view.PreviewPixelsPerRegionPixel()
-        * composite->Settings().worldUnitsPerCell / composite->PixelsPerPreviewCell();
-    const std::int32_t pickedIndex = PickMarker(*pickMarkerSpatialGrid, *pickMarkerInstances,
-                                                worldPoint.worldX, worldPoint.worldZ,
-                                                pickRadiusWorldUnits);
-    if (pickedIndex != kNoMarkerPicked) {
-        SetSelection(static_cast<std::uint32_t>(pickedIndex));
-        return SelectedEntityIdentifier();
-    }
-    // ARCH §19.25, item 3 — a procedural miss tries a manual hit next: the SAME linear,
-    // authoring-scale hit-test TryBeginManualMarkerDrag already uses (MapCanvas_MarkerHitTest_UI.cpp
-    // — "no grid needed" for a manual roster at authoring scale), reused rather than re-derived, so a
-    // canvas click can select a manual marker for the first time.
-    if (manualMarkerDragMarkers != nullptr) {
-        int hitGroupIndex = -1, hitTransformIndex = -1;
-        if (HitTestManualMarkers(*manualMarkerDragMarkers, *composite, view, regionLocalX, regionLocalY,
-                                 pickRadiusScreenPixels, hitGroupIndex, hitTransformIndex)) {
-            const Params::MarkerTransform& hitTransform =
-                (*manualMarkerDragMarkers)[static_cast<std::size_t>(hitGroupIndex)]
-                    .transforms[static_cast<std::size_t>(hitTransformIndex)];
-            SetSelection(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers,
-                                               hitTransform.instanceIdentifier, true, /*bManual=*/true});
-            return SelectedEntityIdentifier();
-        }
-    }
-    SetSelection(Data::EntityIdBuffer::emptySentinel);   // both pickers missed: nothing selected
+    ApplyClickGesture(regionLocalX, regionLocalY, /*bCtrlHeld=*/false, /*bShiftHeld=*/false);
     return SelectedEntityIdentifier();
 }
 

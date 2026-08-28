@@ -36,12 +36,17 @@ class PreviewComposite;
 // transform) index. A locked owning layer (`isLayerLocked(transform.layerIndex)` true) is skipped
 // entirely — never becomes a candidate, ARCH §21.5. Answers false (both out-params left at -1) for
 // an unbaked composite, an empty roster, or no unlocked instance within radius.
+// `outDistanceSquared`, when given, receives the winning candidate's own squared screen-pixel
+// distance from the cursor — ARCH §21.2's `TryBeginManualInstanceDrag`/click-resolution 3-way
+// cross-domain dispatcher needs it to compare a hit found in one domain against a hit found in
+// another (this function itself only ever ranks WITHIN its own one domain's instances).
 template<typename GroupT>
 bool HitTestManualInstances(const std::vector<GroupT>& instances, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionLocalX, float regionLocalY,
                             float pickRadiusScreenPixels,
                             const std::function<bool(int layerIndex)>& isLayerLocked,
-                            int& outGroupIndex, int& outTransformIndex);
+                            int& outGroupIndex, int& outTransformIndex,
+                            float* outDistanceSquared = nullptr);
 
 // The marquee/box-select counterpart: every (groupIndex, transformIndex) pair whose exact world
 // position falls inside [worldMinX,worldMaxX] x [worldMinZ,worldMaxZ] AND whose owning layer is not

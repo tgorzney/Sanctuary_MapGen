@@ -15,8 +15,9 @@ bool HitTestManualInstances(const std::vector<GroupT>& instances, const PreviewC
                             const MapCanvasView& view, float regionLocalX, float regionLocalY,
                             float pickRadiusScreenPixels,
                             const std::function<bool(int layerIndex)>& isLayerLocked,
-                            int& outGroupIndex, int& outTransformIndex) {
+                            int& outGroupIndex, int& outTransformIndex, float* outDistanceSquared) {
     outGroupIndex = -1; outTransformIndex = -1;
+    if (outDistanceSquared != nullptr) *outDistanceSquared = 0.0f;
     if (composite.PixelsPerPreviewCell() <= 0.0f) return false;
     const float radiusSquared = pickRadiusScreenPixels * pickRadiusScreenPixels;
     float bestDistanceSquared = radiusSquared;
@@ -41,6 +42,7 @@ bool HitTestManualInstances(const std::vector<GroupT>& instances, const PreviewC
                 bestDistanceSquared = distanceSquared;
                 outGroupIndex = static_cast<int>(groupIndex);
                 outTransformIndex = static_cast<int>(transformIndex);
+                if (outDistanceSquared != nullptr) *outDistanceSquared = distanceSquared;
             }
         }
     }
@@ -70,13 +72,13 @@ void CollectManualInstancesInWorldRegion(const std::vector<GroupT>& instances,
 
 template bool HitTestManualInstances<Params::MarkerInstanceGroup>(
     const std::vector<Params::MarkerInstanceGroup>&, const PreviewComposite&, const MapCanvasView&,
-    float, float, float, const std::function<bool(int)>&, int&, int&);
+    float, float, float, const std::function<bool(int)>&, int&, int&, float*);
 template bool HitTestManualInstances<Params::PropInstanceGroup>(
     const std::vector<Params::PropInstanceGroup>&, const PreviewComposite&, const MapCanvasView&,
-    float, float, float, const std::function<bool(int)>&, int&, int&);
+    float, float, float, const std::function<bool(int)>&, int&, int&, float*);
 template bool HitTestManualInstances<Params::DecalInstanceGroup>(
     const std::vector<Params::DecalInstanceGroup>&, const PreviewComposite&, const MapCanvasView&,
-    float, float, float, const std::function<bool(int)>&, int&, int&);
+    float, float, float, const std::function<bool(int)>&, int&, int&, float*);
 
 template void CollectManualInstancesInWorldRegion<Params::MarkerInstanceGroup>(
     const std::vector<Params::MarkerInstanceGroup>&, float, float, float, float,
