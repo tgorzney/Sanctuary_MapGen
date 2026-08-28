@@ -461,7 +461,17 @@ function Scenario.SpawnNavalFleets(area)
     local totalPlaced, totalMissed = 0, 0
 
     for armyIndex, army in pairs(Armies) do
-        if not army.lobbyOptions.isEmptySlot then
+        -- ⚠️ GUARDED, NOT `army.lobbyOptions.isEmptySlot` -- CONFIRMED LIVE BUG 2026-08-28.
+        -- The unguarded form THROWS when lobbyOptions is nil (an AI army is the confirmed case).
+        -- Because the caller wraps this in pcall and Warn() goes to the F1 console (unreliable in
+        -- this build), the throw is swallowed and ZERO units spawn with no visible error.
+        -- Reproduced live: human in slot 5 + AI in slot 6 -> correct playable area, correct alloy
+        -- handling, zero units. Latent for a long time because the old naval path was only ever
+        -- exercised by an all-human composition.
+        -- nil lobbyOptions => treat as OCCUPIED (an AI slot IS filled). Never treat a missing
+        -- options table as an empty slot -- that silently skips real players.
+        local bIsEmptySlot = army.lobbyOptions and army.lobbyOptions.isEmptySlot
+        if not bIsEmptySlot then
             local armyOk, armyErr = pcall(function()
                 local spawnMarker = GameInfo.MapData.markers.Spawn
                     and GameInfo.MapData.markers.Spawn.transforms

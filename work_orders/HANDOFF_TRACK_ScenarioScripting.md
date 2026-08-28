@@ -268,6 +268,49 @@ verified zero matches for `Scenario`/`LuaTableWriter`/`resources/lua` in that ch
 `sangen-io-architecture-expert.md` (design question settled → option (c), pointers to §15.4–15.7),
 `sangen-generator-expert.md` (generated markers are subject to post-load scenario mutation).
 
+**G.14 — CONFIRMED LIVE: the exact working method for spawning units from a per-map script.**
+Proven in-game this session (BigBots visibly appeared), and the same pattern the live map's
+naval-fleet feature already uses successfully:
+```lua
+-- inside the single NewThread callback (Armies is NOT populated during LoadMapData)
+for armyIndex, army in pairs(Armies) do
+    local x, z = 1024, 1024
+    local errCode, height = Engine.SampleTerrainHeightFromCell(
+        EngineClasses.int2(math.floor(x), math.floor(z)))
+    if errCode ~= EngineErrorCode.Success then height = 100 end
+    pcall(CreateUnit, armyIndex, "ucl4004", EngineClasses.float3(x, height, z))
+end
+```
+- `CreateUnit(armyIndex, tpId, float3)` — confirmed working. `ucl4004` = Chosen T4 BigBot.
+- `armyIndex` comes from iterating the engine's own `Armies` table, never a derived/assumed index.
+- `Engine.SampleTerrainHeightFromCell(int2)` returns **two** values: `(errorCode, height)`.
+- ⚠️ **Units outside the active playable area are CULLED** — models *and* strategic icons. Early
+  diagnostics placed at `z=1224`/`z=1284` (outside `AREA_169`'s z-range 824–1224) rendered nothing
+  and were misread as "the code didn't run." Always spawn inside the active area when using units
+  as a diagnostic signal.
+- ⚠️ **`army.lobbyOptions.isEmptySlot` unguarded is a CONFIRMED LIVE BUG — fixed 2026-08-28.**
+  `lobbyOptions` is nil on at least some army entries (an **AI army** is the confirmed case), so
+  the unguarded dereference **throws**. Because the caller wraps the spawn in `pcall` and `Warn()`
+  goes to the unreliable F1 console (G.3), the throw is swallowed and **zero units spawn with no
+  visible error anywhere.**
+  **Reproduced live:** 1v1 with a HUMAN in slot 5 and an AI in slot 6 → correct `AREA_FULL`
+  playable area (set before the spawn call, never touches `lobbyOptions`) and correct alloy
+  handling (`ApplyScenario`'s occupancy branch keys off `slotPattern`) — but **zero units**.
+  **Latent for a long time:** the old `SpawnNavalFleets` used the identical unguarded check, but
+  `navy`/`spawnsUnits` was only ever true on the all-human `4human` scenario, so no AI army
+  reached it until `slots5to8AnyFilled` shipped.
+  **Fix (applied to the live file AND STEP72):**
+  `local bIsEmptySlot = army.lobbyOptions and army.lobbyOptions.isEmptySlot`
+  nil `lobbyOptions` ⇒ treat as **OCCUPIED** (an AI slot IS filled). Never treat a missing options
+  table as an empty slot — that silently skips real players.
+  Also prefer per-army `pcall` isolation over one wrapping `pcall`, so a single bad entry cannot
+  abort the whole loop silently.
+
+**Separate, also confirmed:** alloy markers can be created by writing into
+`GameInfo.MapData.markers.Alloys.transforms` **before** `RunMapSetup` (a plain table insert with
+`rotation`/`scale`/`position` sub-tables). That is how every diagnostic marker row in this session
+was produced, and it is a synchronous `LoadMapData`-time mechanism, not a `NewThread` one.
+
 **G.13 — `resources/lua/` needs no new ARCH layer. Settled.**
 The repo already has a top-level `shaders/` tree holding `.glsl`, staged beside the executable at
 build time, entirely outside `src/`. ARCH §2's layer map governs `src/` subdirectories only.
