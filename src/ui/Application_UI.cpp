@@ -78,32 +78,35 @@ void Application::WireCallbacks() {
     // selectedManualInstanceIdentifier instead, keeping the list's highlight in sync when the CANVAS
     // is what changed the selection (the two-way sync's other half is item 5's
     // selectManualMarkerInstanceCallback, below).
-    // STEP143 (human's own bug report) — an empty-space click's own synthetic miss-key always
-    // constructs with bManual == false (ApplyClick's own SetSelection(std::uint32_t) overload,
-    // MapCanvas_UI.h), so gating purely on key.bManual could never route a miss back to the Markers
-    // tab's own manual selection — the row stayed highlighted after clicking empty space. Branch on
-    // !key.bValid FIRST instead: any deselect (miss or an explicit clear) wipes BOTH selection
-    // domains together, and the multi-select set (STEP141, never otherwise touched by the canvas).
-    canvas.SetSelectionChangedCallback([this](const OverlayInstanceKey_UI& key) {
-        if (!key.bValid) {
-            tabState.markers.selectedManualInstanceIdentifier = -1;
-            tabState.markers.selectedManualInstanceIdentifiers.clear();
-            tabState.markers.manualInstanceSelectionAnchorIdentifier = -1;
+    // ARCH §21.1 — the closure now generalizes by PARTITIONING THE FULL SET, not just reading the
+    // primary: `selectedManualInstanceIdentifiers` (STEP141's already-shipped plural field) now
+    // sources from the real multi-select set instead of a synthesized single-element list — nothing
+    // else about it changes. Props/Decals: no-op, unchanged (no tab-level plural field exists yet).
+    canvas.SetSelectionChangedCallback([this](const OverlayInstanceKey_UI& primary,
+                                              const OverlayInstanceKeySet_UI& selectedKeys) {
+        tabState.markers.selectedManualInstanceIdentifiers.clear();
+        for (const OverlayInstanceKey_UI& key : selectedKeys.keys)
+            if (key.bValid && key.collection == PlacementCollectionKind_UI::Markers && key.bManual)
+                tabState.markers.selectedManualInstanceIdentifiers.push_back(key.instanceIndex);
+
+        // STEP143 (human's own bug report) — an empty-space click's own synthetic miss-key always
+        // constructs with bManual == false, so gating purely on bManual could never route a miss back
+        // to the Markers tab's own manual selection — the row stayed highlighted after clicking empty
+        // space. Re-derived from the SET's primary here (not the lone callback argument §19.25 read),
+        // for exactly the same reason: an invalid primary (miss or explicit clear) always resolves
+        // both fields to "nothing selected" together.
+        const bool bPrimaryIsManualMarker = primary.bValid
+            && primary.collection == PlacementCollectionKind_UI::Markers && primary.bManual;
+        tabState.markers.selectedManualInstanceIdentifier        = bPrimaryIsManualMarker ? primary.instanceIndex : -1;
+        tabState.markers.manualInstanceSelectionAnchorIdentifier = bPrimaryIsManualMarker ? primary.instanceIndex : -1;
+
+        if (!primary.bValid) {
             lastSelectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;
-            return;
+        } else if (!primary.bManual) {
+            lastSelectedEntityIdentifier = static_cast<std::uint32_t>(primary.instanceIndex);
         }
-        if (key.bManual) {
-            // Human's own bug report — a canvas pick only ever wrote the SINGULAR field here; the
-            // Manual Instance list row's own highlight reads the PLURAL selection set instead
-            // (MarkersTab_ManualLayerRowBody_UI.cpp's bRowSelected), so a canvas-driven selection
-            // never showed as selected in the list. A plain canvas click is a single-instance
-            // selection, same as a plain (non-Ctrl/Shift) list-row click.
-            tabState.markers.selectedManualInstanceIdentifier      = key.instanceIndex;
-            tabState.markers.selectedManualInstanceIdentifiers     = { key.instanceIndex };
-            tabState.markers.manualInstanceSelectionAnchorIdentifier = key.instanceIndex;
-        } else {
-            lastSelectedEntityIdentifier = static_cast<std::uint32_t>(key.instanceIndex);
-        }
+        // A valid MANUAL primary touches neither `lastSelectedEntityIdentifier` — it stays whatever
+        // the last procedural selection left it, exactly §19.25's own original behavior.
     });
     // STEP48: picking reads the resolved markers and PIPELINE's spatial index over them, in world
     // space, instead of the baked entity-id buffer — see MapCanvas_UI.h's header comment.

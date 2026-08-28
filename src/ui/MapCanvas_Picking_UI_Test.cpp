@@ -56,7 +56,7 @@ void RunMapCanvasPickingChecks() {
     // ARCH §19.25 — the callback now carries the full OverlayInstanceKey_UI; this test only cares
     // about the procedural entity id it reports, so it reads `.instanceIndex` back the same way
     // MapCanvas::SelectedEntityIdentifier() itself does (a thin cast, `bValid == false` -> emptySentinel).
-    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key) {
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&) {
         reportedSelection = static_cast<std::uint32_t>(key.instanceIndex);
         ++selectionChangeCount;
     });
@@ -120,7 +120,7 @@ void RunManualMarkerSelectionChecks() {
 
     OverlayInstanceKey_UI lastReportedKey;
     int selectionChangeCount = 0;
-    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key) {
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&) {
         lastReportedKey = key; ++selectionChangeCount;
     });
 
@@ -165,7 +165,7 @@ void RunProceduralMarkerListSelectionChecks() {
     MapCanvas canvas;
     OverlayInstanceKey_UI lastReportedKey;
     int selectionChangeCount = 0;
-    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key) {
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&) {
         lastReportedKey = key; ++selectionChangeCount;
     });
 

@@ -105,13 +105,40 @@ void MapCanvas::ApplyScroll(float regionLocalX, float regionLocalY, float wheelS
     view.ZoomAtRegionPoint(regionLocalX, regionLocalY, zoomStepScale);
 }
 
-// ARCH §19.25 — the canonical full-key setter every selection-setting path resolves through
-// (ApplyClick's procedural/manual branches above, SelectManualMarkerByInstanceIdentifier). The old
-// `std::uint32_t` overload is now the thin wrapper declared inline in MapCanvas_UI.h.
-void MapCanvas::SetSelection(const OverlayInstanceKey_UI& key) {
-    if (OverlayInstanceKeysEqual(key, selectedInstanceKey)) return;
-    selectedInstanceKey = key;
-    if (selectionChangedCallback) selectionChangedCallback(selectedInstanceKey);
+// ARCH §21.1 — the canonical entry point every selection-setting path resolves through (ApplyClick's
+// procedural/manual branches above, SelectManualMarkerByInstanceIdentifier, and the old §19.25
+// `SetSelection`, now the thin single-key/bCtrl=false/bShift=false wrapper declared inline in
+// MapCanvas_UI.h). Fires the widened callback only when the set actually changed — mirroring
+// §19.25's own SetSelection equal-key short-circuit, extended to the whole ordered set.
+void MapCanvas::ApplySelectionGesture(const OverlayInstanceKey_UI& touchedKey, bool bCtrlHeld, bool bShiftHeld) {
+    const OverlayInstanceKeySet_UI previous = selectedInstanceKeys;
+    if (bCtrlHeld) {
+        ToggleInSelectionSet(selectedInstanceKeys, touchedKey);
+    } else if (bShiftHeld) {
+        UnionIntoSelectionSet(selectedInstanceKeys, {touchedKey});
+    } else {
+        ReplaceSelectionSet(selectedInstanceKeys, {touchedKey});
+    }
+    if (SelectionSetsEqual(previous, selectedInstanceKeys)) return;
+    if (selectionChangedCallback)
+        selectionChangedCallback(PrimaryOfSelectionSet(selectedInstanceKeys), selectedInstanceKeys);
+}
+
+// The marquee/list-batch counterpart. `ToggleInSelectionSet` takes a single key only (never a legal
+// operation for a batch, per its own header comment), so a batch gesture only ever resolves to
+// Replace (no modifier) or Union (Ctrl OR Shift held) — the same "no per-batch toggle mechanism
+// exists" reading `ManualInstanceHitTest_UI.h`'s own release-time consumer (ARCH §21.2) depends on.
+void MapCanvas::ApplySelectionGesture(const std::vector<OverlayInstanceKey_UI>& touchedKeys, bool bCtrlHeld,
+                                      bool bShiftHeld) {
+    const OverlayInstanceKeySet_UI previous = selectedInstanceKeys;
+    if (bCtrlHeld || bShiftHeld) {
+        UnionIntoSelectionSet(selectedInstanceKeys, touchedKeys);
+    } else {
+        ReplaceSelectionSet(selectedInstanceKeys, touchedKeys);
+    }
+    if (SelectionSetsEqual(previous, selectedInstanceKeys)) return;
+    if (selectionChangedCallback)
+        selectionChangedCallback(PrimaryOfSelectionSet(selectedInstanceKeys), selectedInstanceKeys);
 }
 
 } // namespace Ui

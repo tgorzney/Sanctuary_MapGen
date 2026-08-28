@@ -97,9 +97,10 @@ void MapCanvas::DrawOverlayIconLayerPass(float regionOriginX, float regionOrigin
         markerTypeVisibilitySource != nullptr ? markerTypeVisibilitySource->revision : 0;
     // ARCH §19.25 — `selectedInstanceKey` IS the canonical key now (procedural or manual, correctly
     // tagged `bManual`); no longer reconstructed from a bare entity id, which could only ever
-    // represent the procedural case.
+    // represent the procedural case. ARCH §21.1 — the draw pass still highlights only the PRIMARY;
+    // widening it to the whole multi-select set is a visual-language ticket of its own, not this one.
     if (HasSelection())
-        iconLayerInput.selectedInstanceKey = selectedInstanceKey;
+        iconLayerInput.selectedInstanceKey = PrimaryOfSelectionSet(selectedInstanceKeys);
     DrawOverlayIconLayers(iconLayerInput, overlayLayerAabbCache, overlayIconLayerFrameCache,
                          *ImGui::GetWindowDrawList());
 }

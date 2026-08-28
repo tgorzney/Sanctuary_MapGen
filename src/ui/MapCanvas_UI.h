@@ -30,6 +30,7 @@
 #include "MapCanvasView_UI.h"
 #include "MapCanvas_IconLayer_Ops_UI.h"
 #include "MapCanvas_ScenarioEditMode_Ops_UI.h"
+#include "MapCanvas_SelectionSet_UI.h"
 #include "MarkerDragGesture_UI.h"
 #include "OverlayLayer_Settings_UI.h"
 #include "PreviewComposite_UI.h"
@@ -67,7 +68,13 @@ public:
     // ARCH §19.25 — widened from `void(std::uint32_t)` to carry the full key: a manual selection's
     // `instanceIndex` is a MarkerTransform::instanceIdentifier, not an entity id, and only the full
     // key (with `bManual`) lets Application::WireCallbacks() tell the two cases apart.
-    void SetSelectionChangedCallback(std::function<void(const OverlayInstanceKey_UI&)> selectionChanged) {
+    // ARCH §21.1 — widened again to also carry the full multi-select set: `primary` is
+    // `PrimaryOfSelectionSet(selectedKeys)`, restated as its own argument so every existing
+    // primary-only caller (every one before this ticket) keeps compiling by simply ignoring the
+    // second parameter, never re-deriving the primary itself.
+    void SetSelectionChangedCallback(
+        std::function<void(const OverlayInstanceKey_UI& primary, const OverlayInstanceKeySet_UI& selectedKeys)>
+            selectionChanged) {
         selectionChangedCallback = std::move(selectionChanged);
     }
 
@@ -166,19 +173,37 @@ public:
     // Presentation state of a viewport: what the user last selected. `emptySentinel` = nothing.
     // ARCH §19.25 — both stay thin reads of the widened `selectedInstanceKey` for existing
     // procedural-only callers (Application_Draw_UI.cpp): `.instanceIndex`/`.bValid` respectively.
+    // ARCH §21.1 — now thin reads of the multi-select set's own PRIMARY (computed on demand,
+    // authoring-scale set, no caching needed — same posture PrimaryOfSelectionSet's own header
+    // comment states).
     std::uint32_t SelectedEntityIdentifier() const {
-        return static_cast<std::uint32_t>(selectedInstanceKey.instanceIndex);
+        return static_cast<std::uint32_t>(PrimaryOfSelectionSet(selectedInstanceKeys).instanceIndex);
     }
-    bool HasSelection() const { return selectedInstanceKey.bValid; }
+    bool HasSelection() const { return PrimaryOfSelectionSet(selectedInstanceKeys).bValid; }
+    // ARCH §21.1 — the full ordered multi-select set, for any caller that needs more than the
+    // primary (e.g. Application::WireCallbacks()'s own partition into tabState.markers.
+    // selectedManualInstanceIdentifiers).
+    const OverlayInstanceKeySet_UI& SelectedInstanceKeys() const { return selectedInstanceKeys; }
     const PreviewPixelCoordinate& LastPickedPixel() const { return lastPickedPixel; }
     // The toolkit identifier the image draw uses; zero when nothing has been composited yet.
     unsigned long long PresentationIdentifier() const;
 
 private:
-    // ARCH §19.25 — the canonical full-key setter: every selection-setting path (canvas click-pick,
-    // a Markers-tab list click for a manual instance) resolves through this ONE function, never a
-    // second divergent one. Defined in MapCanvas_UI.cpp.
-    void SetSelection(const OverlayInstanceKey_UI& key);
+    // ARCH §21.1 — the canonical entry point, widened from §19.25's `SetSelection`: every
+    // selection-setting path (canvas click-pick, a Markers-tab list click for a manual instance)
+    // resolves through one of these two overloads, never a second divergent one. Both resolve to
+    // exactly one of Replace/Toggle/Union (Ctrl wins if both are somehow held), update
+    // `selectedInstanceKeys`, and fire the widened callback ONLY when the set actually changed.
+    // Defined in MapCanvas_UI.cpp.
+    void ApplySelectionGesture(const OverlayInstanceKey_UI& touchedKey, bool bCtrlHeld, bool bShiftHeld);
+    void ApplySelectionGesture(const std::vector<OverlayInstanceKey_UI>& touchedKeys, bool bCtrlHeld,
+                               bool bShiftHeld);
+    // The pre-§21.1 canonical full-key setter, now a thin wrapper: every existing single-target call
+    // site (ApplyClick's procedural/manual branches, SelectManualMarkerByInstanceIdentifier,
+    // SelectProceduralMarkerInstanceByArrayPosition) keeps calling this unqualified name with
+    // `bCtrlHeld=false, bShiftHeld=false` — an unconditional Replace, byte-identical to the old
+    // SetSelection's own behavior.
+    void SetSelection(const OverlayInstanceKey_UI& key) { ApplySelectionGesture(key, false, false); }
     // The pre-existing procedural overload, now a thin wrapper over the canonical one above — every
     // existing procedural call site (ApplyClick's PickMarker branch) compiles unchanged.
     // `entityIdentifier != emptySentinel` is `bValid`; `bManual` is always false here (a procedural
@@ -214,12 +239,15 @@ private:
     const Data::SpatialGrid*        pickMarkerSpatialGrid = nullptr;
     float                           pickRadiusScreenPixels = 8.0f;   // Constitution §8; wired from
                                                                        // ApplicationSettings::markerIconRadiusPixels
-    std::function<void(const OverlayInstanceKey_UI&)> selectionChangedCallback;
+    std::function<void(const OverlayInstanceKey_UI& primary, const OverlayInstanceKeySet_UI& selectedKeys)>
+        selectionChangedCallback;
     PreviewPixelCoordinate lastPickedPixel;
     // ARCH §19.25 — replaces the old bare `std::uint32_t selectedEntityIdentifier`; default-
     // constructed (`instanceIndex = -1, bValid = false, bManual = false`) is exactly "nothing
     // selected", the same state `emptySentinel` represented before.
-    OverlayInstanceKey_UI selectedInstanceKey;
+    // ARCH §21.1 — widened from a single key to the ordered multi-select set; an empty `keys` vector
+    // is exactly "nothing selected" (PrimaryOfSelectionSet answers the same default invalid key).
+    OverlayInstanceKeySet_UI selectedInstanceKeys;
 
     // STEP53 — overlay icon draw pass sources (read-only, injected) and its own per-canvas state.
     const OverlayLayerSettings*         overlayLayerSettings    = nullptr;

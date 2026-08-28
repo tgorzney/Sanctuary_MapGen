@@ -834,6 +834,10 @@ add_sangen_test(DecalDragGesture_UI_Test  src/ui/DecalDragGesture_UI_Test.cpp)
 # Marker-only test nor its behavior ever exercised before this ticket. CPU-composited fixture, no
 # imgui frame, no window/GL.
 add_sangen_test(ManualInstanceHitTest_UI_Test src/ui/ManualInstanceHitTest_UI_Test.cpp)
+# ARCH §21.1 — the ordered multi-select set: primary-as-last-element, Replace/Toggle/Union's exact
+# contracts, and the order-sensitive equality the release-time gesture resolver depends on to skip a
+# no-op callback. Pure/imgui-free, no window.
+add_sangen_test(MapCanvas_SelectionSet_UI_Test src/ui/MapCanvas_SelectionSet_UI_Test.cpp)
 # Human's own bug report — "When creating an Instance, symmetry needs to be checked and duplicates
 # created for proper symmetry": CreateSymmetricManualMarkerInstances' own pure/imgui-free coverage.
 add_sangen_test(MarkerInstanceCreateSymmetric_UI_Test src/ui/MarkerInstanceCreateSymmetric_UI_Test.cpp)
