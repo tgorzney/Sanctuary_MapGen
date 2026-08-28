@@ -423,6 +423,7 @@ add_sangen_test(GradientRamp_PARAMS_Test        src/params/GradientRamp_PARAMS_T
 add_sangen_test(LayerStack_PARAMS_Test          src/params/LayerStack_PARAMS_Test.cpp)
 add_sangen_test(MapRecipe_PARAMS_Test           src/params/MapRecipe_PARAMS_Test.cpp)
 add_sangen_test(MarkerLayerBundle_PARAMS_Test   src/params/MarkerLayerBundle_PARAMS_Test.cpp)
+add_sangen_test(PropInstance_PARAMS_Test        src/params/PropInstance_PARAMS_Test.cpp)
 add_sangen_test(PlacementRules_PARAMS_Test      src/params/PlacementRules_PARAMS_Test.cpp)
 
 # SYS

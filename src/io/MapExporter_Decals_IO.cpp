@@ -31,6 +31,9 @@ nlohmann::ordered_json BuildDecalTransformJson(const Params::DecalTransform& dec
                          { "z", transform.rotationZ }, { "w", transform.rotationW } };
     json["scale"]    = { { "x", transform.scaleX }, { "y", transform.scaleY }, { "z", transform.scaleZ } };
     json["layerIndex"] = decalTransform.layerIndex;
+    // ARCH §21.4 — sibling of layerIndex, mirroring MarkerTransform's own two fields exactly.
+    json["InstanceIdentifier"] = decalTransform.instanceIdentifier;
+    json["SymmetryGroupIdentifier"] = decalTransform.symmetryGroupIdentifier;
     return json;
 }
 

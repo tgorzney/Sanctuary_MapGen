@@ -850,6 +850,10 @@ void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRec
                   "prop positionZ round-trips through the flip back to its original value");
             Check(loadedTransform.layerIndex == originalTransform.layerIndex,
                   "the in-range prop layerIndex survives exactly");
+            Check(loadedTransform.instanceIdentifier == originalTransform.instanceIdentifier,
+                  "PropTransform::instanceIdentifier survives, non-default (ARCH §21.4)");
+            Check(loadedTransform.symmetryGroupIdentifier == originalTransform.symmetryGroupIdentifier,
+                  "PropTransform::symmetryGroupIdentifier survives, non-default (ARCH §21.4)");
         }
     }
 
@@ -902,6 +906,10 @@ void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRec
                   "decal positionZ round-trips through the flip back to its original value");
             Check(loadedTransform.layerIndex == originalTransform.layerIndex,
                   "the in-range decal layerIndex survives exactly");
+            Check(loadedTransform.instanceIdentifier == originalTransform.instanceIdentifier,
+                  "DecalTransform::instanceIdentifier survives, non-default (ARCH §21.4)");
+            Check(loadedTransform.symmetryGroupIdentifier == originalTransform.symmetryGroupIdentifier,
+                  "DecalTransform::symmetryGroupIdentifier survives, non-default (ARCH §21.4)");
         }
     }
 }
@@ -1432,6 +1440,8 @@ void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
     propTransform.transform.scaleX = 2.0f; propTransform.transform.scaleY = 3.0f;
     propTransform.transform.scaleZ = 4.0f;                        // non-unit
     propTransform.layerIndex = 0;                                 // in range: no clamp warning
+    propTransform.instanceIdentifier = 42;                        // ARCH §21.4, non-default
+    propTransform.symmetryGroupIdentifier = 7;                    // ARCH §21.4, non-default
 
     Params::PropInstanceGroup propGroup;
     propGroup.blueprintPath = "Props/Rock/Rock01.santp";
@@ -1472,6 +1482,8 @@ void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
     decalTransform.transform.scaleX = 1.5f; decalTransform.transform.scaleY = 1.25f;
     decalTransform.transform.scaleZ = 1.75f;                      // non-unit
     decalTransform.layerIndex = 0;                                // in range: no clamp warning
+    decalTransform.instanceIdentifier = 84;                       // ARCH §21.4, non-default
+    decalTransform.symmetryGroupIdentifier = 14;                  // ARCH §21.4, non-default
 
     Params::DecalInstanceGroup decalGroup;
     decalGroup.blueprintPath = "Decals/Blood/Blood01.santp";
@@ -2504,6 +2516,78 @@ void CheckMarkerInstanceIdentifierLegacyBackfillAcrossGroups() {
           "across the whole nested walk, never reset per group (ARCH §19.16)");
 }
 
+// ARCH §21.4: the Prop-typed mirror of CheckMarkerInstanceIdentifierLegacyBackfillAcrossGroups —
+// `props` is a plain ORDERED ARRAY (not name-keyed), so there's no sort-order concern, but the
+// counter-threaded-across-groups requirement is identical.
+void CheckPropInstanceIdentifierLegacyBackfillAcrossGroups() {
+    nlohmann::json transformAAA = nlohmann::json::object();        // no "InstanceIdentifier" key
+    nlohmann::json transformBBB; transformBBB["InstanceIdentifier"] = 500;
+    nlohmann::json groupOne;
+    groupOne["blueprintPath"] = "Props/One.santp";
+    groupOne["transforms"] = nlohmann::json::array({ transformAAA, transformBBB });
+
+    nlohmann::json transformCCC = nlohmann::json::object();        // no "InstanceIdentifier" key
+    nlohmann::json groupTwo;
+    groupTwo["blueprintPath"] = "Props/Two.santp";
+    groupTwo["transforms"] = nlohmann::json::array({ transformCCC });
+
+    nlohmann::json document;
+    document["props"] = nlohmann::json::array({ groupOne, groupTwo });
+
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    Io::ReadPropsJson(document, recipe, result);
+
+    Check(recipe.props.size() == 2, "both prop groups survive");
+    if (recipe.props.size() != 2) return;
+    Check(recipe.props[0].transforms.size() == 2 && recipe.props[1].transforms.size() == 1,
+          "both transforms in group one and the one transform in group two survive");
+    if (recipe.props[0].transforms.size() != 2 || recipe.props[1].transforms.empty()) return;
+
+    Check(recipe.props[0].transforms[0].instanceIdentifier == 0,
+          "AAA (no key) backfills to the counter's value at its own position (0)");
+    Check(recipe.props[0].transforms[1].instanceIdentifier == 500,
+          "BBB's explicit InstanceIdentifier (500) overwrites the counter's positional default");
+    Check(recipe.props[1].transforms[0].instanceIdentifier == 2,
+          "CCC (no key, in the SECOND group) backfills to 2, not 0 — the counter is threaded "
+          "across the whole array walk, never reset per group (ARCH §21.4)");
+}
+
+// ARCH §21.4: the Decal-typed mirror of CheckPropInstanceIdentifierLegacyBackfillAcrossGroups.
+void CheckDecalInstanceIdentifierLegacyBackfillAcrossGroups() {
+    nlohmann::json transformAAA = nlohmann::json::object();
+    nlohmann::json transformBBB; transformBBB["InstanceIdentifier"] = 500;
+    nlohmann::json groupOne;
+    groupOne["blueprintPath"] = "Decals/One.santp";
+    groupOne["transforms"] = nlohmann::json::array({ transformAAA, transformBBB });
+
+    nlohmann::json transformCCC = nlohmann::json::object();
+    nlohmann::json groupTwo;
+    groupTwo["blueprintPath"] = "Decals/Two.santp";
+    groupTwo["transforms"] = nlohmann::json::array({ transformCCC });
+
+    nlohmann::json document;
+    document["decals"] = nlohmann::json::array({ groupOne, groupTwo });
+
+    Params::MapRecipe recipe;
+    Io::MapImportResult result;
+    Io::ReadDecalsJson(document, recipe, result);
+
+    Check(recipe.decals.size() == 2, "both decal groups survive");
+    if (recipe.decals.size() != 2) return;
+    Check(recipe.decals[0].transforms.size() == 2 && recipe.decals[1].transforms.size() == 1,
+          "both transforms in group one and the one transform in group two survive");
+    if (recipe.decals[0].transforms.size() != 2 || recipe.decals[1].transforms.empty()) return;
+
+    Check(recipe.decals[0].transforms[0].instanceIdentifier == 0,
+          "AAA (no key) backfills to the counter's value at its own position (0)");
+    Check(recipe.decals[0].transforms[1].instanceIdentifier == 500,
+          "BBB's explicit InstanceIdentifier (500) overwrites the counter's positional default");
+    Check(recipe.decals[1].transforms[0].instanceIdentifier == 2,
+          "CCC (no key, in the SECOND group) backfills to 2, not 0 — the counter is threaded "
+          "across the whole array walk, never reset per group (ARCH §21.4)");
+}
+
 // STEP119 / ARCH §19.12: a 2-cycle ParentBundleIdentifier chain ({1,2},{2,1}) is detected and
 // repaired — both entries treated as root — with one logged warning per cyclic entry, never a
 // refusal. Mirrors CheckMarkerLayerSynthesisOnEmptyMarkerGroups's direct-call/result.warningCount
@@ -2821,6 +2905,8 @@ int main() {
     SanmapGen::MapFormatTest::CheckMergedMarkerTypeNameLegacyDefault();
     SanmapGen::MapFormatTest::CheckGlobalMarkerSettingsLegacyDefault();
     SanmapGen::MapFormatTest::CheckMarkerInstanceIdentifierLegacyBackfillAcrossGroups();
+    SanmapGen::MapFormatTest::CheckPropInstanceIdentifierLegacyBackfillAcrossGroups();
+    SanmapGen::MapFormatTest::CheckDecalInstanceIdentifierLegacyBackfillAcrossGroups();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairOnImport();
     SanmapGen::MapFormatTest::CheckMarkerLayerBundleCycleRepairIsNoOpOnValidChain();
     SanmapGen::MapFormatTest::CheckPropLayerBundleCycleRepair();

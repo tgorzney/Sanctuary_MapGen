@@ -688,7 +688,9 @@
                         "y": 1.0,
                         "z": 1.0
                     },
-                    "layerIndex": 0
+                    "layerIndex": 0,
+                    "InstanceIdentifier": -1,
+                    "SymmetryGroupIdentifier": 0
                 }
             ]
         }

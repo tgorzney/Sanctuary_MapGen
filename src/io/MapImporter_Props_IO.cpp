@@ -22,7 +22,8 @@ namespace {
 // sibling — written into the COMPOSED `propTransform.transform` member (PropTransform composes
 // InstancedTransform, it does not flatten it). `positionZ` inverts the export-side flip (finding 3):
 // `positionZ = mapSize - jsonZ - 1`.
-void ReadPropTransformJson(const nlohmann::json& json, Params::PropTransform& propTransform, int mapSize) {
+void ReadPropTransformJson(const nlohmann::json& json, Params::PropTransform& propTransform, int mapSize,
+                           int& inOutNextInstanceIdentifier) {
     Params::InstancedTransform& transform = propTransform.transform;
     if (json.contains("position") && json["position"].is_object()) {
         const nlohmann::json& position = json["position"];
@@ -50,6 +51,14 @@ void ReadPropTransformJson(const nlohmann::json& json, Params::PropTransform& pr
         ReadJsonFloat(scale, "z", transform.scaleZ);
     }
     ReadJsonInteger(json, "layerIndex", propTransform.layerIndex);
+    // Correction 16-equivalent (ARCH §21.4): no range to validate — 0 is always legal.
+    ReadJsonInteger(json, "SymmetryGroupIdentifier", propTransform.symmetryGroupIdentifier);
+    // ARCH §21.4 — legacy-backfill mirrors ReadMarkerTransformJson's own precedent exactly: the
+    // counter's CURRENT value is always assigned first (so an absent key backfills to this
+    // transform's position in the encounter order), then overwritten if the file actually carries
+    // the key. The counter always advances regardless.
+    propTransform.instanceIdentifier = inOutNextInstanceIdentifier++;
+    ReadJsonInteger(json, "InstanceIdentifier", propTransform.instanceIdentifier);
 }
 
 // ARCH §12 / Constitution §6: an out-of-range layerIndex is a loud, logged clamp to 0, applied
@@ -67,14 +76,15 @@ void ClampPropLayerIndex(Params::PropTransform& propTransform, std::size_t propL
 }
 
 void ReadPropInstanceGroupJson(const nlohmann::json& json, Params::PropInstanceGroup& group,
-                               int mapSize, std::size_t propLayerCount, MapImportResult& result) {
+                               int mapSize, std::size_t propLayerCount, MapImportResult& result,
+                               int& inOutNextInstanceIdentifier) {
     ReadJsonText(json, "blueprintPath", group.blueprintPath);
     ReadJsonBoolean(json, "Reclaimable", group.bReclaimable);
     if (!json.contains("transforms") || !json["transforms"].is_array()) return;
     for (const nlohmann::json& transformJson : json["transforms"]) {
         if (!transformJson.is_object()) continue;
         Params::PropTransform propTransform;
-        ReadPropTransformJson(transformJson, propTransform, mapSize);
+        ReadPropTransformJson(transformJson, propTransform, mapSize, inOutNextInstanceIdentifier);
         ClampPropLayerIndex(propTransform, propLayerCount, result);
         group.transforms.push_back(propTransform);
     }
@@ -86,11 +96,13 @@ void ReadPropsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe,
     if (!document.contains("props") || !document["props"].is_array()) return;
     const int mapSize = outRecipe.geometry.mapSize;
     const std::size_t propLayerCount = outRecipe.propLayers.size();
+    // ARCH §21.4 — threaded across the ENTIRE array walk below, never reset per group.
+    int nextInstanceIdentifier = 0;
     outRecipe.props.clear();
     for (const nlohmann::json& groupJson : document["props"]) {
         if (!groupJson.is_object()) continue;
         Params::PropInstanceGroup group;
-        ReadPropInstanceGroupJson(groupJson, group, mapSize, propLayerCount, result);
+        ReadPropInstanceGroupJson(groupJson, group, mapSize, propLayerCount, result, nextInstanceIdentifier);
         outRecipe.props.push_back(group);
     }
 }

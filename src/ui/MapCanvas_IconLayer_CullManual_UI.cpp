@@ -109,12 +109,17 @@ void ResolvePropsManual(const DrawOverlayIconLayersInput& input, const OverlayLa
         for (std::size_t index = 0; index < group.transforms.size(); ++index) {
             const Params::PropTransform& propTransform = group.transforms[index];
             if (Params::ResolvePropInstanceLayerId(propTransform.layerIndex, input.recipe->propLayers) != targetLayerId) continue;
+            // ARCH §21.4 — the selection key is `propTransform.instanceIdentifier` (globally
+            // unique within Props, minted, never reused), NOT the per-group `index` above — the
+            // same array-position/stable-identity collision §19.25 already fixed for Markers.
+            // `bManual=true` tags the key so a procedural array-position key of the same numeric
+            // value never compares equal to it.
             ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
                                    propTransform.transform.positionX, propTransform.transform.positionZ,
                                    propTransform.transform.scaleX, PlacementCollectionKind_UI::Props,
-                                   static_cast<std::int32_t>(index), layerTintRed, layerTintGreen, layerTintBlue,
+                                   propTransform.instanceIdentifier, layerTintRed, layerTintGreen, layerTintBlue,
                                    stableOrderCounter, outAabb, viewRect,
-                                   diagnostics, outCandidates);
+                                   diagnostics, outCandidates, /*bManual=*/true);
         }
     }
 }
@@ -219,12 +224,13 @@ void ResolveDecalsManual(const DrawOverlayIconLayersInput& input, const OverlayL
         for (std::size_t index = 0; index < group.transforms.size(); ++index) {
             const Params::DecalTransform& decalTransform = group.transforms[index];
             if (Params::ResolveDecalInstanceLayerId(decalTransform.layerIndex, input.recipe->decalLayers) != targetLayerId) continue;
+            // ARCH §21.4 — same array-position/stable-identity fix as ResolvePropsManual above.
             ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
                                    decalTransform.transform.positionX, decalTransform.transform.positionZ,
                                    decalTransform.transform.scaleX, PlacementCollectionKind_UI::Decals,
-                                   static_cast<std::int32_t>(index), layerTintRed, layerTintGreen, layerTintBlue,
+                                   decalTransform.instanceIdentifier, layerTintRed, layerTintGreen, layerTintBlue,
                                    stableOrderCounter, outAabb, viewRect,
-                                   diagnostics, outCandidates);
+                                   diagnostics, outCandidates, /*bManual=*/true);
         }
     }
 }

@@ -16,7 +16,8 @@ namespace {
 // `position`/`rotation`/`scale` are nested {x,y,z}/{x,y,z,w} objects, `layerIndex` a flattened
 // sibling — written into the COMPOSED `decalTransform.transform` member. `positionZ` inverts the
 // export-side flip (finding 3): `positionZ = mapSize - jsonZ - 1`.
-void ReadDecalTransformJson(const nlohmann::json& json, Params::DecalTransform& decalTransform, int mapSize) {
+void ReadDecalTransformJson(const nlohmann::json& json, Params::DecalTransform& decalTransform, int mapSize,
+                            int& inOutNextInstanceIdentifier) {
     Params::InstancedTransform& transform = decalTransform.transform;
     if (json.contains("position") && json["position"].is_object()) {
         const nlohmann::json& position = json["position"];
@@ -44,6 +45,11 @@ void ReadDecalTransformJson(const nlohmann::json& json, Params::DecalTransform& 
         ReadJsonFloat(scale, "z", transform.scaleZ);
     }
     ReadJsonInteger(json, "layerIndex", decalTransform.layerIndex);
+    // Correction 16-equivalent (ARCH §21.4): no range to validate — 0 is always legal.
+    ReadJsonInteger(json, "SymmetryGroupIdentifier", decalTransform.symmetryGroupIdentifier);
+    // ARCH §21.4 — legacy-backfill mirrors ReadMarkerTransformJson's own precedent exactly.
+    decalTransform.instanceIdentifier = inOutNextInstanceIdentifier++;
+    ReadJsonInteger(json, "InstanceIdentifier", decalTransform.instanceIdentifier);
 }
 
 // ARCH §12 / Constitution §6: an out-of-range layerIndex is a loud, logged clamp to 0, applied
@@ -60,13 +66,14 @@ void ClampDecalLayerIndex(Params::DecalTransform& decalTransform, std::size_t de
 }
 
 void ReadDecalInstanceGroupJson(const nlohmann::json& json, Params::DecalInstanceGroup& group,
-                                int mapSize, std::size_t decalLayerCount, MapImportResult& result) {
+                                int mapSize, std::size_t decalLayerCount, MapImportResult& result,
+                                int& inOutNextInstanceIdentifier) {
     ReadJsonText(json, "blueprintPath", group.blueprintPath);
     if (!json.contains("transforms") || !json["transforms"].is_array()) return;
     for (const nlohmann::json& transformJson : json["transforms"]) {
         if (!transformJson.is_object()) continue;
         Params::DecalTransform decalTransform;
-        ReadDecalTransformJson(transformJson, decalTransform, mapSize);
+        ReadDecalTransformJson(transformJson, decalTransform, mapSize, inOutNextInstanceIdentifier);
         ClampDecalLayerIndex(decalTransform, decalLayerCount, result);
         group.transforms.push_back(decalTransform);
     }
@@ -78,11 +85,13 @@ void ReadDecalsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe
     if (!document.contains("decals") || !document["decals"].is_array()) return;
     const int mapSize = outRecipe.geometry.mapSize;
     const std::size_t decalLayerCount = outRecipe.decalLayers.size();
+    // ARCH §21.4 — threaded across the ENTIRE array walk below, never reset per group.
+    int nextInstanceIdentifier = 0;
     outRecipe.decals.clear();
     for (const nlohmann::json& groupJson : document["decals"]) {
         if (!groupJson.is_object()) continue;
         Params::DecalInstanceGroup group;
-        ReadDecalInstanceGroupJson(groupJson, group, mapSize, decalLayerCount, result);
+        ReadDecalInstanceGroupJson(groupJson, group, mapSize, decalLayerCount, result, nextInstanceIdentifier);
         outRecipe.decals.push_back(group);
     }
 }
