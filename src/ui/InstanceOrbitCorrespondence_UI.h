@@ -1,8 +1,10 @@
-// MarkerOrbitCorrespondence_UI.h — the one-shot "which sibling is which orbit slot" matcher behind
-// STEP94's drag-and-follow. Layer: UI. Pure, imgui-free, header-only-declared (implementation in
-// the sibling .cpp) — split out of MarkerDragGesture_UI.h purely to keep that header under the
-// ARCH_01_05_FileSizeCeilings.md §1.5 soft-100 ceiling, mirroring MarkerLayerIndexRepair_UI.h's own
-// split off MarkersTab_ManualLayers_UI.h.
+// InstanceOrbitCorrespondence_UI.h — the one-shot "which sibling is which orbit slot" matcher behind
+// the manual drag gesture (originally STEP94's Marker-only MarkerOrbitCorrespondence_UI.h; renamed,
+// struct dropping "Marker" too, ARCH §21.3 — the matcher itself was already domain-neutral, touching
+// only world positions, so genericizing the drag gesture around it needed no algorithm change here,
+// only the name). Layer: UI. Pure, imgui-free, header-only-declared (implementation in the sibling
+// .cpp) — split out of the gesture header purely to keep it under the ARCH_01_05_FileSizeCeilings.md
+// §1.5 soft-100 ceiling, mirroring MarkerLayerIndexRepair_UI.h's own split off MarkersTab_ManualLayers_UI.h.
 //
 // R2 §1's "gesture-start proof" establishes EXACT-value equality only at the moment a gesture
 // begins (an unmoved point cloud). This ticket's own acceptance test 3 (a two-bit mask, e.g.
@@ -27,15 +29,16 @@
 namespace SanmapGen {
 namespace Ui {
 
-// One tracked sibling: which `MarkerTransform` it is, the world point it is expected near this
-// call (refreshed after every frame that actually wrote it), and where `MatchCorrespondenceToOrbit`
-// last resolved it to (-1 = unmatched this call, i.e. soft-hidden/collapsed).
-struct MarkerOrbitCorrespondence {
-    int   transformIndex      = -1;  // index into recipe.markers[groupIndex].transforms
+// One tracked sibling: which transform it is (an index into its own group/collection's transform
+// array — Markers, Props, or Decals, all equally), the world point it is expected near this call
+// (refreshed after every frame that actually wrote it), and where `MatchCorrespondenceToOrbit` last
+// resolved it to (-1 = unmatched this call, i.e. soft-hidden/collapsed).
+struct InstanceOrbitCorrespondence {
+    int   transformIndex      = -1;  // index into the owning group's own transforms array
     float referenceWorldX     = 0.0f;
     float referenceWorldZ     = 0.0f;
     int   lastMatchedOrbitSlot = -1; // index into the orbit array passed to the most recent match
-    bool  bSoftHidden          = false; // this frame only; never written to recipe.markers
+    bool  bSoftHidden          = false; // this frame only; never written back to PARAMS
 };
 
 // Matches every `correspondence` entry to the nearest still-unclaimed slot in
@@ -46,7 +49,7 @@ struct MarkerOrbitCorrespondence {
 // growth/ghost candidates. Returns how many entries were left unmatched (their `lastMatchedOrbitSlot`
 // is set to -1) — the collapse/soft-hide candidates. Safe against an empty `correspondence` or an
 // `orbitCount` of 0 or 1 (no siblings to claim anything).
-int MatchCorrespondenceToOrbit(std::vector<MarkerOrbitCorrespondence>& correspondence,
+int MatchCorrespondenceToOrbit(std::vector<InstanceOrbitCorrespondence>& correspondence,
                                const Pipeline::WorldSymmetryOrbitPoint* orbitPoints, int orbitCount,
                                std::vector<int>* outUnclaimedSlots);
 

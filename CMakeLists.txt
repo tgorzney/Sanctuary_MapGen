@@ -822,6 +822,18 @@ add_sangen_test(MarkersTab_TypeSections_UI_Test src/ui/MarkersTab_TypeSections_U
 # per-frame writes, cardinality growth/shrink, Spawn-refusal freeze, ungrouped free-drag) and
 # RepositionSymmetryGroupMember (R2 §4's roster-slider counterpart) — pure/imgui-free, no window.
 add_sangen_test(MarkerDragGesture_UI_Test src/ui/MarkerDragGesture_UI_Test.cpp)
+# ARCH §21.3 — the generic InstanceDragGesture_UI.h core, proven for a second and third Traits
+# instantiation (Props, Decals) beyond MarkerDragGesture_UI_Test.cpp's own Marker coverage: live
+# mirror-follow, growth+materialize with the no-op name hooks, lock refusal, no reserved
+# cardinality-frozen group, and each domain's own symmetry-gate resolver. Pure/imgui-free, no window.
+add_sangen_test(PropDragGesture_UI_Test   src/ui/PropDragGesture_UI_Test.cpp)
+add_sangen_test(DecalDragGesture_UI_Test  src/ui/DecalDragGesture_UI_Test.cpp)
+# ARCH §21.3/§21.5 — the generic HitTestManualInstances<GroupT>/CollectManualInstancesInWorldRegion
+# <GroupT>: parity with the old Marker-only hit-test across all three domains, plus the new lock gate
+# (a locked instance is excluded from candidacy entirely, never merely deprioritized) neither the old
+# Marker-only test nor its behavior ever exercised before this ticket. CPU-composited fixture, no
+# imgui frame, no window/GL.
+add_sangen_test(ManualInstanceHitTest_UI_Test src/ui/ManualInstanceHitTest_UI_Test.cpp)
 # Human's own bug report — "When creating an Instance, symmetry needs to be checked and duplicates
 # created for proper symmetry": CreateSymmetricManualMarkerInstances' own pure/imgui-free coverage.
 add_sangen_test(MarkerInstanceCreateSymmetric_UI_Test src/ui/MarkerInstanceCreateSymmetric_UI_Test.cpp)

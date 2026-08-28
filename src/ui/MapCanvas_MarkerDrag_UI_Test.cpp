@@ -137,7 +137,7 @@ void RunDrawAtRestAndSoftHideChecks() {
     // Now make transform 1 the gesture's soft-hidden sibling: its dot must be skipped entirely.
     dragState.bActive = true;
     dragState.groupIndex = 0;
-    MarkerOrbitCorrespondence hiddenEntry;
+    InstanceOrbitCorrespondence hiddenEntry;
     hiddenEntry.transformIndex = 1;
     hiddenEntry.bSoftHidden = true;
     dragState.correspondence.push_back(hiddenEntry);

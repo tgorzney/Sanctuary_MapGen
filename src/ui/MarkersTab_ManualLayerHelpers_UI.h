@@ -57,6 +57,31 @@ inline void QuantizeMarkerPositionToLayerGrid(const std::vector<Params::MarkerIn
     worldZ = std::round(worldZ / cellSize) * cellSize;
 }
 
+// The raw, already-valid mask/count for `layerIndex` — `layer.symmetry.bSymmetryUseGlobal` selects
+// between the layer's own fields and the two global ones, per STEP68's own two-line ternary
+// (`SymmetryOrbitQuery_PIPELINE.h`'s wrapper deliberately does not resolve this itself). An
+// out-of-range `layerIndex` (Constitution §6) falls back to the global pair. ARCH §19.24: a
+// `bSymmetryEnabled == false` layer forces the EFFECTIVE mask to `Params::SymmetryAxis::None`
+// (radial repeat count 0) WITHOUT touching `layer.symmetry`'s own configured fields — the gate
+// applies only here, at read time. Relocated from MarkerDragGesture_UI.h (ARCH §21.3) once that file
+// shrank to just `MarkerDragTraits` — this is its natural sibling among the other pure per-layer
+// helpers in this file, unchanged in every other respect.
+inline void ResolveEffectiveMarkerSymmetry(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                           int layerIndex, int globalSymmetryMask,
+                                           int globalRadialRepeatCount, int& outMask,
+                                           int& outRadialRepeatCount) {
+    if (layerIndex < 0 || layerIndex >= static_cast<int>(markerLayers.size())) {
+        outMask = globalSymmetryMask; outRadialRepeatCount = globalRadialRepeatCount; return;
+    }
+    const Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(layerIndex)];
+    if (!layer.bSymmetryEnabled) {
+        outMask = Params::SymmetryAxis::None; outRadialRepeatCount = 0; return;
+    }
+    outMask = layer.symmetry.bSymmetryUseGlobal ? globalSymmetryMask : layer.symmetry.symmetryMask;
+    outRadialRepeatCount = layer.symmetry.bSymmetryUseGlobal ? globalRadialRepeatCount
+                                                              : layer.symmetry.radialSymmetryRepeatCount;
+}
+
 // The color a layer actually draws with: its own, unless the block is set to one shared tint.
 inline const float* EffectiveManualMarkerLayerColor(const ManualMarkerLayersState& state,
                                                      const Params::MarkerInstanceLayer& layer) {

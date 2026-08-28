@@ -197,7 +197,7 @@ void RunSpawnRefusalChecks() {
 
     MarkerDragGestureState state;
     BeginMarkerDragGesture(state, markers, {}, geometry, Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0);
-    Check(state.bSpawnGroup, "the group is recognized as the reserved Spawn roster");
+    Check(state.bCardinalityFrozen, "the group is recognized as the reserved Spawn roster");
 
     UpdateMarkerDragGesture(state, markers, {}, geometry, 4.0f, 3.0f);   // same-count reposition
     Check(!state.bSpawnCardinalityRefused, "an ordinary, same-count Spawn drag is unrestricted");

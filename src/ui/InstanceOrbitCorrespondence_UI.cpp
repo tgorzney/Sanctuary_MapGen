@@ -1,5 +1,5 @@
-// MarkerOrbitCorrespondence_UI.cpp — see MarkerOrbitCorrespondence_UI.h for the full rationale.
-#include "MarkerOrbitCorrespondence_UI.h"
+// InstanceOrbitCorrespondence_UI.cpp — see InstanceOrbitCorrespondence_UI.h for the full rationale.
+#include "InstanceOrbitCorrespondence_UI.h"
 #include <algorithm>
 
 namespace SanmapGen {
@@ -14,10 +14,10 @@ struct OrbitMatchCandidate {
 
 } // namespace
 
-int MatchCorrespondenceToOrbit(std::vector<MarkerOrbitCorrespondence>& correspondence,
+int MatchCorrespondenceToOrbit(std::vector<InstanceOrbitCorrespondence>& correspondence,
                                const Pipeline::WorldSymmetryOrbitPoint* orbitPoints, int orbitCount,
                                std::vector<int>* outUnclaimedSlots) {
-    for (MarkerOrbitCorrespondence& entry : correspondence) entry.lastMatchedOrbitSlot = -1;
+    for (InstanceOrbitCorrespondence& entry : correspondence) entry.lastMatchedOrbitSlot = -1;
     if (orbitPoints == nullptr || orbitCount <= 1 || correspondence.empty()) {
         if (outUnclaimedSlots != nullptr)
             for (int slotIndex = 1; slotIndex < orbitCount; ++slotIndex) outUnclaimedSlots->push_back(slotIndex);
@@ -27,7 +27,7 @@ int MatchCorrespondenceToOrbit(std::vector<MarkerOrbitCorrespondence>& correspon
     std::vector<OrbitMatchCandidate> candidates;
     candidates.reserve(correspondence.size() * static_cast<std::size_t>(orbitCount - 1));
     for (std::size_t entryIndex = 0; entryIndex < correspondence.size(); ++entryIndex) {
-        const MarkerOrbitCorrespondence& entry = correspondence[entryIndex];
+        const InstanceOrbitCorrespondence& entry = correspondence[entryIndex];
         for (int slotIndex = 1; slotIndex < orbitCount; ++slotIndex) {
             const float deltaX = orbitPoints[slotIndex].worldPositionX - entry.referenceWorldX;
             const float deltaZ = orbitPoints[slotIndex].worldPositionZ - entry.referenceWorldZ;
