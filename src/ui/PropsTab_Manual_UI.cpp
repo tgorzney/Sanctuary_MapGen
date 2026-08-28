@@ -1,6 +1,8 @@
-// PropsTab_Manual_UI.cpp — the imgui composition of the manual prop layers block. Layer: UI.
-// Shared widgets only: DraggableList for the layer stack, VirtualList for the read-only transform
-// list, Checkbox / ColorSwatch / SliderScalar / TextInput / Section for the rest.
+// PropsTab_Manual_UI.cpp — the imgui composition of the manual prop layers block, plus (ARCH §20)
+// its two Type Sections ("Prop"/"Reclaim") and the Group/Bundle tree each one hosts. Layer: UI.
+// Shared widgets only: DraggableList for the ungrouped-layer stack, TreeListWidget for the Bundle
+// tree (PropsTab_Bundles_UI.h), VirtualList for the read-only transform list, Checkbox / ColorSwatch
+// / SliderScalar / TextInput / Section for the rest.
 // Nothing here notifies Pipeline::PreviewDriver (PropsTab_Manual_UI.h SCOPE NOTE 1).
 #include "PropsTab_Manual_UI.h"
 #include "Checkbox_UI.h"
@@ -26,10 +28,10 @@ void DrawLayerSettings(ManualPropLayersState& state) {
                      state.layerIconScaleToggle, WidgetStyle(), "%.2f");
 }
 
-// One row's own name, tint and icon scale. The tint is hidden while the block is set to one shared
-// color: two live controls over one drawn color would be a rival control (ARCH §4). Reports whether
-// the name committed, the only field the uniqueness repair cares about. STEP110: was `DrawSelectedLayer`,
-// drawn once at the bottom for the global `selectedLayerIndex`; now inline per row (STEP104's pattern).
+// One row's own name, tint, icon scale, and (ARCH §20) lock/hidden/grid-snap/color-override/
+// symmetry-enabled. The tint is hidden while the block is set to one shared color: two live
+// controls over one drawn color would be a rival control (ARCH §4). Reports whether the name
+// committed, the only field the uniqueness repair cares about.
 bool DrawLayerRowSettings(Params::PropInstanceLayer& layer, ManualPropLayersState& state) {
     TextInputRules nameRules;
     nameRules.maximumLength = 48;
@@ -40,21 +42,32 @@ bool DrawLayerRowSettings(Params::PropInstanceLayer& layer, ManualPropLayersStat
         DrawColorSwatch("Color", layer.color, state.previewColorOptions, state.selectedLayerColorToggle);
     DrawSliderScalar("Icon Scale", layer.iconScale, state.iconScaleRange,
                      state.selectedLayerIconScaleToggle, WidgetStyle(), "%.2f");
+    DrawCheckbox("Hidden", layer.bHidden);
+    DrawCheckbox("Snap to Grid", layer.bGridSnapEnabled);
+    if (layer.bGridSnapEnabled)
+        DrawSliderScalar("Grid Size", layer.gridSnapSizeWorldUnits, state.gridSnapSizeRange,
+                         state.selectedLayerGridSnapToggle, WidgetStyle(), "%.2f");
+    DrawCheckbox("Color Override", layer.bColorOverrideEnabled);
+    DrawCheckbox("Symmetry Enabled", layer.bSymmetryEnabled);
     return bNameCommitted;
 }
 
-// The layer stack. STEP110: each row's body, whenever the row's own CollapsingHeader is open
-// (DraggableList's own per-row expand/collapse state — never gated on `state.selectedLayerIndex`),
-// draws that row's OWN settings directly, so an expanded row never shows another row's settings.
-// `bAnyNameCommitted` is set (never cleared) when any row's name commits this frame.
+// The "Ungrouped" layer stack for ONE Type Section — layers belonging to a Bundle (shown in the
+// tree instead) or a different type are suppressed (bRowSuppressed), never filtered into a copy —
+// reorder/delete still apply against real `propLayers` indices. `bAnyNameCommitted` is set (never
+// cleared) when any row's name commits this frame.
 DraggableListSignal DrawLayerList(std::vector<Params::PropInstanceLayer>& propLayers,
-                                  ManualPropLayersState& state, bool& bAnyNameCommitted) {
+                                  ManualPropLayersState& state, const std::string& propTypeNameFilter,
+                                  bool& bAnyNameCommitted) {
     return DraggableList<Params::PropInstanceLayer>::Render(
         "manualPropLayers", propLayers,
         [&](int rowIndex) {
+            const Params::PropInstanceLayer& layer = propLayers[static_cast<std::size_t>(rowIndex)];
             DraggableListRow row;
-            row.label   = ManualPropLayerRowLabel(propLayers[static_cast<std::size_t>(rowIndex)]);
-            row.bLocked = propLayers[static_cast<std::size_t>(rowIndex)].bLocked;   // NEW
+            row.bRowSuppressed = IsPropInstanceLayerRowSuppressed(layer, propTypeNameFilter);
+            row.label   = ManualPropLayerRowLabel(layer);
+            row.bLocked = layer.bLocked;
+            row.bVisible = !layer.bHidden;
             return row;
         },
         [&](int rowIndex) {
@@ -83,6 +96,12 @@ bool ApplyLayerListSignal(std::vector<Params::PropInstanceLayer>& propLayers,
                 !propLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked;
         return false;   // cosmetic-only: no structural move, same posture as Select
     }
+    if (signal.kind == DraggableListSignalKind::ToggleVisibility) {
+        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(propLayers.size()))
+            propLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bHidden =
+                !propLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bHidden;
+        return false;
+    }
     const bool bDeleting            = signal.kind == DraggableListSignalKind::Delete;
     const bool bReordering          = signal.kind == DraggableListSignalKind::Reorder;
     const int  sourceLayerIndex     = signal.sourceRowIndex;
@@ -95,18 +114,6 @@ bool ApplyLayerListSignal(std::vector<Params::PropInstanceLayer>& propLayers,
     if (state.selectedLayerIndex >= static_cast<int>(propLayers.size()))
         state.selectedLayerIndex = static_cast<int>(propLayers.size()) - 1;
     return bPropsMoved;
-}
-
-// The Add Prop Layer button. Reports whether a layer was added, so the caller knows to run the
-// name-uniqueness repair (cosmetic here, STEP22 ruling #6 — see UniqueNameList_UI.h).
-bool DrawLayerListButtons(std::vector<Params::PropInstanceLayer>& propLayers, ManualPropLayersState& state) {
-    if (!ImGui::Button("Add Prop Layer")) return false;
-    Params::PropInstanceLayer layer;
-    layer.name = NextPropLayerName(static_cast<int>(propLayers.size()));
-    layer.layerId = NextPropLayerId(propLayers);
-    propLayers.push_back(layer);
-    state.selectedLayerIndex = static_cast<int>(propLayers.size()) - 1;
-    return true;
 }
 
 // The resolved transforms, read-only and virtualized (SCOPE NOTE 2). Unfiltered, unrelated to
@@ -132,22 +139,62 @@ void DrawTransformList(ManualPropLayersState& state, const Data::PlacementInstan
     DrawSectionEnd();
 }
 
+// One Type Section's own body: "+ Group"/"+ Layer" buttons, the Bundle tree, then this type's own
+// Ungrouped layer stack. Returns whether `propLayers`/`props` moved.
+bool DrawPropTypeSectionBody(const char* typeName, std::vector<Params::PropLayerBundle>& propLayerBundles,
+                             std::vector<Params::PropInstanceLayer>& propLayers,
+                             std::vector<Params::PropInstanceGroup>& props, ManualPropLayersState& state) {
+    if (ImGui::Button("+ Group")) {
+        Params::PropLayerBundle bundle;
+        bundle.identifier    = NextPropLayerBundleId(propLayerBundles);
+        bundle.propTypeName  = typeName;
+        bundle.parentBundleIdentifier = state.bundles.selectedBundleIdentifier;
+        propLayerBundles.push_back(bundle);
+        state.bundles.selectedBundleIdentifier = bundle.identifier;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("+ Layer")) {
+        Params::PropInstanceLayer layer;
+        layer.name           = NextPropLayerName(static_cast<int>(propLayers.size()));
+        layer.layerId         = NextPropLayerId(propLayers);
+        layer.propTypeName    = typeName;
+        layer.parentBundleIdentifier = state.bundles.selectedBundleIdentifier;
+        propLayers.push_back(layer);
+        state.selectedLayerIndex = static_cast<int>(propLayers.size()) - 1;
+    }
+
+    DrawPropLayerBundleTree(propLayerBundles, propLayers, props, state.bundles, state, typeName);
+
+    bool bAnyNameCommitted = false;
+    const DraggableListSignal signal = DrawLayerList(propLayers, state, typeName, bAnyNameCommitted);
+    bool bPropsMoved = signal.bHasSignal() && ApplyLayerListSignal(propLayers, props, state, signal);
+    bPropsMoved = bAnyNameCommitted || bPropsMoved;
+    if (bPropsMoved) MakeNamesUnique(propLayers);
+    return bPropsMoved;
+}
+
 } // namespace
 
 void DrawManualPropLayers(ManualPropLayersState& state, std::vector<Params::PropInstanceLayer>& propLayers,
                           std::vector<Params::PropInstanceGroup>& props,
+                          std::vector<Params::PropLayerBundle>& propLayerBundles,
                           const Data::PlacementInstances* placedProps) {
     if (!DrawSectionBegin("Manual Prop Layers", state.section)) return;
+    bool bPropsMoved = false;
+    for (int typeIndex = 0; typeIndex < kPropTypeSectionCount; ++typeIndex) {
+        const char* const typeName = kPropTypeSectionNames[typeIndex];
+        ImGui::PushID(typeName);
+        if (DrawSectionBegin(typeName, state.typeSections[typeIndex])) {
+            bPropsMoved = DrawPropTypeSectionBody(typeName, propLayerBundles, propLayers, props, state)
+                        || bPropsMoved;
+            DrawSectionEnd();
+        }
+        ImGui::PopID();
+    }
+    ImGui::Separator();
     DrawLayerSettings(state);
-    bool bLayersMoved = DrawLayerListButtons(propLayers, state);
-    bool bAnyNameCommitted = false;
-    const DraggableListSignal signal = DrawLayerList(propLayers, state, bAnyNameCommitted);
-    if (signal.bHasSignal()) ApplyLayerListSignal(propLayers, props, state, signal);
-    bLayersMoved = bAnyNameCommitted || bLayersMoved;
     DrawTransformList(state, placedProps);
-    // The export keys layers by NAME parity with Armies/Areas (cosmetic here, STEP22 ruling #6) —
-    // the repair runs on the frames a name settled, not every frame.
-    if (bLayersMoved) MakeNamesUnique(propLayers);
+    (void)bPropsMoved;   // SCOPE NOTE 1: no pipeline stage reads any of this — nothing to notify
     DrawSectionEnd();
 }
 

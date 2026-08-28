@@ -243,10 +243,35 @@ void RunIsPropInstanceLayerLockedChecks() {
           "an index at size() resolves to false, never trusted as 'locked'");
 }
 
+// ARCH §20: the `||`-composed, not-XOR shape — type-mismatch-only, bundle-membership-only, both,
+// and neither — mirrors IsMarkerInstanceLayerRowSuppressed's own four-case coverage.
+void RunIsPropInstanceLayerRowSuppressedChecks() {
+    Params::PropInstanceLayer typeMismatchOnly;
+    typeMismatchOnly.parentBundleIdentifier = -1;
+    typeMismatchOnly.propTypeName           = "Prop";
+    Check(!IsPropInstanceLayerRowSuppressed(typeMismatchOnly, "Prop"),
+          "an ungrouped layer whose own type matches the filter is NOT suppressed");
+    Check(IsPropInstanceLayerRowSuppressed(typeMismatchOnly, "Reclaim"),
+          "an ungrouped layer whose own type does NOT match the filter IS suppressed (type-mismatch only)");
+
+    Params::PropInstanceLayer bundleMembershipOnly;
+    bundleMembershipOnly.parentBundleIdentifier = 5;
+    bundleMembershipOnly.propTypeName           = "Prop";
+    Check(IsPropInstanceLayerRowSuppressed(bundleMembershipOnly, "Prop"),
+          "a bundled layer IS suppressed even when its own type matches the filter (bundle-membership only)");
+
+    Params::PropInstanceLayer both;
+    both.parentBundleIdentifier = 5;
+    both.propTypeName           = "Prop";
+    Check(IsPropInstanceLayerRowSuppressed(both, "Reclaim"),
+          "a bundled layer with a mismatched type IS suppressed (the compound case, not an XOR)");
+}
+
 } // namespace
 
 int main() {
     RunPropRuleMirrorChecks();
+    RunIsPropInstanceLayerRowSuppressedChecks();
     RunTemplateIdentifierChecks();
     RunResolveFootprintBakeChecks();
     RunManualPropLayerChecks();

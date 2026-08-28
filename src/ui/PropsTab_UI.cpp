@@ -122,7 +122,8 @@ void DrawPropsTab(Params::MapRecipe& recipe, PropsTabState& state,
                   const Data::PlacementInstances* placedProps,
                   const Io::TemplateIngestReport* templateIngestReport) {
     ImGui::PushID("propsTab");
-    DrawManualPropLayers(state.manualLayers, recipe.propLayers, recipe.props, placedProps);
+    DrawManualPropLayers(state.manualLayers, recipe.propLayers, recipe.props, recipe.propLayerBundles,
+                        placedProps);
     DrawRuleStack(recipe, state, previewDriver, iconManifest, templateIngestReport);
     ImGui::PopID();
 }

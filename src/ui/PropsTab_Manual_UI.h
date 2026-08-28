@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 #include "ColorSwatch_UI.h"
+#include "PropsTab_Bundles_UI.h"
 #include "Section_UI.h"
 #include "SliderScalar_UI.h"
 #include "UniqueNameList_UI.h"
@@ -41,11 +42,21 @@ namespace SanmapGen {
 namespace Data { class PlacementInstances; }
 namespace Ui {
 
+// ARCH §20 — Props' two Type Sections. `PropInstanceLayer::propTypeName`/`PropLayerBundle::
+// propTypeName` carry one of these two values; "Reclaim" has no other mechanism (not derived from
+// `PropInstanceGroup::bReclaimable`, which stays permanently independent — see
+// ScatterInstanceLayer_PARAMS.h's header note).
+inline constexpr int kPropTypeSectionCount = 2;
+inline constexpr const char* const kPropTypeSectionNames[kPropTypeSectionCount] = { "Prop", "Reclaim" };
+
 struct ManualPropLayersState {
     SectionState       section;
     SectionState       transformListSection;
     ColorSwatchOptions previewColorOptions;                       // picker only, no RGBA fields
     ScalarSliderRange  iconScaleRange{ 0.1f, 10.0f, 0.0f };
+    // ARCH §20 — grid-snap size range, sibling of iconScaleRange; mirrors
+    // ManualMarkerLayersState::gridSnapSizeRange.
+    ScalarSliderRange  gridSnapSizeRange{ 0.1f, 50.0f, 0.0f };
 
     bool           bUseGroupColor = false;                        // one tint for every layer
     float          groupColor[kColorSwatchChannelCount] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -53,16 +64,27 @@ struct ManualPropLayersState {
     RealtimeToggle groupColorToggle;
     RealtimeToggle layerIconScaleToggle;
 
-    // ONE shared toggle set for the SELECTED row's own color/scale — `Params::PropInstanceLayer` is
-    // a pure round-tripping type (ENTITY_AUTHORING_PARAMS_SPEC) and cannot carry a `RealtimeToggle`
-    // member the way the retired `ManualPropGroup` did; same posture `ArmiesTabState` already uses
-    // for `Params::Army`'s own fields (STEP22 ruling — mirrors ArmiesTab_UI.h).
+    // ONE shared toggle set for the SELECTED/expanded row's own color/scale/grid-snap —
+    // `Params::PropInstanceLayer` is a pure round-tripping type (ENTITY_AUTHORING_PARAMS_SPEC) and
+    // cannot carry a `RealtimeToggle` member the way the retired `ManualPropGroup` did; same posture
+    // `ArmiesTabState` already uses for `Params::Army`'s own fields (STEP22 ruling — mirrors
+    // ArmiesTab_UI.h).
     RealtimeToggle selectedLayerColorToggle;
     RealtimeToggle selectedLayerIconScaleToggle;
+    RealtimeToggle selectedLayerGridSnapToggle;   // ARCH §20
 
     int   selectedLayerIndex  = -1;
     float transformRowHeight  = 20.0f;    // the TRUE row height: the clipper scrolls with it
     float transformListHeight = 160.0f;
+
+    // ARCH §20 — the Group/Bundle tree's own state, one instance per tab (mirrors
+    // ManualMarkerLayersState carrying no separate bundle state of its own only because
+    // MarkersTabState hosts it directly one tier up; Props has no such extra tier, so it lives here).
+    // `selectedLayerIndex`/`bundles.selectedBundleIdentifier` are shared across both Type Sections
+    // (matches Markers' own single shared selection, MarkersTabState) — only the collapsible header
+    // open/closed state needs one slot PER section, hence the array below.
+    PropLayerBundlesState bundles;
+    SectionState typeSections[kPropTypeSectionCount];
 };
 
 // The layer the per-row controls edit, or null when the selection points at nothing
@@ -81,6 +103,15 @@ inline bool IsPropInstanceLayerLocked(const std::vector<Params::PropInstanceLaye
                                       int layerIndex) {
     if (layerIndex < 0 || layerIndex >= static_cast<int>(propLayers.size())) return false;
     return propLayers[static_cast<std::size_t>(layerIndex)].bLocked;
+}
+
+// ARCH §20 — a layer belonging to a Bundle (shown in the Group/Bundle tree instead) or to a
+// DIFFERENT Type Section than the one currently drawing is suppressed from this "Ungrouped" flat
+// list. Mirrors IsMarkerInstanceLayerRowSuppressed's exact compound shape (not an XOR — both
+// conditions independently suppress).
+inline bool IsPropInstanceLayerRowSuppressed(const Params::PropInstanceLayer& layer,
+                                             const std::string& propTypeNameFilter) {
+    return layer.parentBundleIdentifier != -1 || layer.propTypeName != propTypeNameFilter;
 }
 
 // The color a layer actually draws with: its own, unless the block is set to one shared tint.
@@ -154,9 +185,11 @@ inline bool RenumberPropLayerIndicesForReorder(std::vector<Params::PropInstanceG
 }
 
 // `props` is `recipe.props`, repaired here when a layer is deleted/reordered (SCOPE NOTE above).
-// `placedProps` is nullable: before the first generation there is no resolved buffer.
+// `propLayerBundles` is `recipe.propLayerBundles` (ARCH §20) — the Group/Bundle tree each Type
+// Section hosts. `placedProps` is nullable: before the first generation there is no resolved buffer.
 void DrawManualPropLayers(ManualPropLayersState& state, std::vector<Params::PropInstanceLayer>& propLayers,
                           std::vector<Params::PropInstanceGroup>& props,
+                          std::vector<Params::PropLayerBundle>& propLayerBundles,
                           const Data::PlacementInstances* placedProps);
 
 } // namespace Ui
