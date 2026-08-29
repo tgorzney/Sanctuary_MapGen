@@ -104,7 +104,7 @@ DrawnImageRectangle DrawCanvasFrame(MapCanvas& canvas) {
 void RunMapCanvasRenderChecks(Sys::GpuResourceManager& manager) {
     PreviewTestScene scene;
     BuildRenderScene(scene);
-    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                scene.instances, scene.entityIdentifiers);
     ConfigurePreviewSettings(composite.Settings());
     composite.Settings().previewResolution = renderPreviewResolution;

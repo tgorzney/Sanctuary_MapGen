@@ -37,6 +37,7 @@ constexpr unsigned kConfiguration          = 8;
 constexpr unsigned kLayerConfigurations    = 9;
 constexpr unsigned kStratumConfigurations  = 10;
 constexpr unsigned kSlope                  = 11;  // the Mask stage's baked slope (M5-0c)
+constexpr unsigned kMapAreaRectangles      = 12;  // ARCH §14.17 — binding 7 stays vacant (see above)
 } // namespace CompositeBinding
 
 // IMAGE units are their own binding namespace in GL — an image unit never collides with an SSBO
@@ -62,6 +63,7 @@ constexpr const char* kConfiguration         = "previewCompositeConfiguration";
 constexpr const char* kLayerConfigurations   = "previewCompositeLayerConfigurations";
 constexpr const char* kStratumConfigurations = "previewCompositeStratumConfigurations";
 constexpr const char* kSlope                 = "previewCompositeSlope";
+constexpr const char* kMapAreaRectangles     = "previewCompositeMapAreaRectangles";
 } // namespace CompositeBufferName
 
 // The name the composited image texture is keyed by in GpuResourceManager — same lifecycle rule
@@ -96,6 +98,20 @@ struct PreviewStratumConfiguration {
     float previewColorGreen = 1.0f;
     float previewColorBlue  = 1.0f;
     int   bEnabled          = 1;
+};
+
+// One map area, flattened to the composite's own CELL space and its presentation color.
+// 8 scalars = 32 bytes. Areas are PRESENTATION geometry: no placement rule stands behind them,
+// so this record re-decides nothing a PROC stage resolved (ARCH §14.17 item 1).
+struct PreviewMapAreaRectangle {
+    float minimumX = 0.0f;
+    float minimumZ = 0.0f;
+    float maximumX = 0.0f;
+    float maximumZ = 0.0f;
+    float colorRed = 0.0f;
+    float colorGreen = 0.0f;
+    float colorBlue = 0.0f;
+    float colorAlpha = 0.0f;
 };
 
 // One resolved entity, already mapped to preview-image pixel coordinates on the Cpu.

@@ -90,6 +90,9 @@ void PreviewComposite::BindComposeBuffers(Sys::GpuResourceManager& manager) {
     EnsureAndBind(manager, CompositeBufferName::kStratumConfigurations, stratumConfigurations.data(),
                   stratumConfigurations.size() * sizeof(PreviewStratumConfiguration),
                   CompositeBinding::kStratumConfigurations);
+    EnsureAndBind(manager, CompositeBufferName::kMapAreaRectangles, mapAreaRectangles.data(),
+                  mapAreaRectangles.size() * sizeof(PreviewMapAreaRectangle),
+                  CompositeBinding::kMapAreaRectangles);
 }
 
 } // namespace Ui

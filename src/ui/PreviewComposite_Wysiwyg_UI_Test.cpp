@@ -38,7 +38,7 @@ void MutateSimulationInputsWithoutRebaking(Ui::PreviewTestScene& scene) {
 void TestSimulationInputsDoNotMoveThePreview() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Compose();
@@ -57,7 +57,7 @@ void TestSimulationInputsDoNotMoveThePreview() {
 void TestBakedFieldsDoMoveThePreview() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Compose();
@@ -86,7 +86,7 @@ void TestBakedFieldsDoMoveThePreview() {
 void TestWaterReadsTheBakedHeight() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Settings().gradientRamps.push_back(Ui::MakeConstantRamp(0.0f, 0.2f, 1.0f, 1.0f));
@@ -114,7 +114,7 @@ void TestWaterReadsTheBakedHeight() {
 void TestEntitiesAreDrawnNotFiltered() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Compose();

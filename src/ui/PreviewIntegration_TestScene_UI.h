@@ -26,7 +26,7 @@ struct PreviewIntegrationScene {
     PreviewIntegrationScene()
         : recipe(AssemblerTest::MakeRecipe(4242u)),
           assembler(recipe),
-          composite(recipe.geometry, recipe.water, recipe.strata, assembler.Fields(),
+          composite(recipe.geometry, recipe.water, recipe.strata, recipe.areas, assembler.Fields(),
                     assembler.Placements().markers, entityIdentifiers),
           driver(assembler) {
         AssemblerTest::ConfigureStages(assembler);

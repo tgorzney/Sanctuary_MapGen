@@ -77,7 +77,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | **§11** | [ARCH_11_GlobalMarkerSettings.md](ARCH_11_GlobalMarkerSettings.md) | `Params::GlobalMarkerSettings` (ARCH ruling, completes `SANMAP_FORMAT_SPEC` Correction 7) | 40 lines |
 | **§12** | [ARCH_12_ManualPropDecalLayers.md](ARCH_12_ManualPropDecalLayers.md) | Manual-layer authoring for props/decals — `layerIndex` + `PropGroups`/`DecalGroups` (ARCH ruling, revises `ENTITY_AUTHORING_PARAMS_SPEC`) | 59 lines |
 | **§13** | [ARCH_13_RadialSymmetry.md](ARCH_13_RadialSymmetry.md) | Radial N-fold symmetry — `SymmetryAxis::Radial` + `radialSymmetryRepeatCount` (ARCH ruling, amends `Symmetry_PARAMS.h`, `SANMAP_FORMAT_SPEC` Correction 4) | 70 lines |
-| **§14** | [ARCH_14_PreviewOverlayLayering.md](ARCH_14_PreviewOverlayLayering.md) | Preview overlay layering — six-domain screen-space compositor (ARCH ruling, ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`) | index → 16 subsection files |
+| **§14** | [ARCH_14_PreviewOverlayLayering.md](ARCH_14_PreviewOverlayLayering.md) | Preview overlay layering — six-domain screen-space compositor (ARCH ruling, ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`) | index → 17 subsection files |
 | §14.1 | [ARCH_14_01_ModuleBoundaryDataVsParams.md](ARCH_14_01_ModuleBoundaryDataVsParams.md) | Module boundary and the DATA-vs-PARAMS split | 16 lines |
 | §14.2 | [ARCH_14_02_DataModel.md](ARCH_14_02_DataModel.md) | Data model (binding shape) | 43 lines |
 | §14.3 | [ARCH_14_03_IconRenderingLod.md](ARCH_14_03_IconRenderingLod.md) | Icon rendering — two-mode LOD, not constant-screen-size-only | 32 lines |
@@ -94,6 +94,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §14.14 | [ARCH_14_14_AlloySpawnsArmiesManualRouting.md](ARCH_14_14_AlloySpawnsArmiesManualRouting.md) | Alloy/SpawnsArmies Manual sub-layer routing — no discriminator field on `MarkerInstanceLayer`; routed per-transform by the reserved `"Spawn"` group name (responds to `STEP97_AlloySpawnsArmiesManualSubLayers_UI.md`) | 51 lines |
 | §14.15 | [ARCH_14_15_ManualCullStableIdMigration.md](ARCH_14_15_ManualCullStableIdMigration.md) | Manual props/decals cull-path stable-id migration — corrects §14.13 item 3's stale "unscheduled" line (both work-orders shipped); rules `MapCanvas_IconLayer_CullManual_UI.cpp` migrates its match key from positional `layerIndex` to stable `manualLayerId`, resolved live against PARAMS (not read from `Data::PlacementInstances`, a confirmed staleness hazard) | 106 lines |
 | §14.16 | [ARCH_14_16_PerArmyUnitsOverlayRows.md](ARCH_14_16_PerArmyUnitsOverlayRows.md) | Per-army Units overlay rows — dynamic row-per-army (not a fixed enum), real `UnitRule::armyIndex` plumbing for procedural units (corrects a relayed "Faction-only" premise), per-army tint reads `Army::armyColor` directly, plus the v1 default-color-palette port this ruling needs to not be inert | 114 lines |
+| §14.17 | [ARCH_14_17_MapAreaFieldLayer.md](ARCH_14_17_MapAreaFieldLayer.md) | Map areas are a composited FIELD LAYER, not a seventh overlay domain — `PreviewLayerKind::MapAreas`, analytic rectangles flattened from PARAMS at `PrepareRun()` (binding 12, 32-byte record, no `PreviewCompositeConfiguration` growth); states the general rule that §14's separation is about `Data::PlacementInstances`, not about "anything that is not a `Data::FloatField`"; amends §21.8's draw-pass ruling (two recomposites per drag, edit-time-only border) | 318 lines |
 | **§15** | [ARCH_15_MapScenarioSystem.md](ARCH_15_MapScenarioSystem.md) | The SanGen Map Scenario system — formalized as first-class law (ratifies `MAP_SCENARIO_SPEC.md`) | index → 10 subsection files |
 | §15.1 | [ARCH_15_01_LayerClassification.md](ARCH_15_01_LayerClassification.md) | Layer classification | 13 lines |
 | §15.2 | [ARCH_15_02_IoScopeRuling.md](ARCH_15_02_IoScopeRuling.md) | IO scope ruling — corrects an earlier assumption, does not reverse it | 39 lines |
@@ -167,12 +168,12 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §21.5 | [ARCH_21_05_LockedItemExclusionCorrection.md](ARCH_21_05_LockedItemExclusionCorrection.md) | Locked-item exclusion — corrects §19.18; uniform across click/marquee/drag; procedural instances unaffected | 39 lines |
 | §21.6 | [ARCH_21_06_PickingInfrastructure.md](ARCH_21_06_PickingInfrastructure.md) | Picking infrastructure — `Data::SpatialGridSet`, `BuildSpatialGridSet`, three new `SpatialGrid` accessors, `PickInstancesInRegion` (renamed from the design's `PickMarkersInRegion`) | 64 lines |
 | §21.7 | [ARCH_21_07_FileSizeCeilingFlag.md](ARCH_21_07_FileSizeCeilingFlag.md) | File-size ceiling flag — `MapCanvas_UI.h` | 15 lines |
-| §21.8 | [ARCH_21_08_AreaCanvasGesture.md](ARCH_21_08_AreaCanvasGesture.md) | Area canvas gesture — create-by-drag, 8-handle resize + body-move for `Params::MapArea`, its own hand-written (non-`Traits`) substrate; independently dispatchable, not part of §21.1-§21.7's interlocking mechanism | 320 lines |
-| **§22** | [ARCH_22_NavmapModifierBlockers.md](ARCH_22_NavmapModifierBlockers.md) | Navmap Modifier blockers — formalizes a hand-authoring technique proven live twice on Pandemonium Isthmus (ARCH ruling, ratifies `NAVMAP_MODIFIER_BLOCKER_SPEC.md`); not yet a SanGen `PARAMS`/`IO`/`UI` construct (§22.9) | index → 9 subsection files |
+| §21.8 | [ARCH_21_08_AreaCanvasGesture.md](ARCH_21_08_AreaCanvasGesture.md) | Area canvas gesture — create-by-drag, 8-handle resize + body-move for `Params::MapArea`, its own hand-written (non-`Traits`) substrate; independently dispatchable, not part of §21.1-§21.7's interlocking mechanism. **AMENDED 2026-08-29** — the draw pass is re-scoped by §14.17: the composite owns the steady-state fill, the immediate-mode fill/border is edit-time-only, and a drag costs exactly two recomposites | 385 lines |
+| **§22** | [ARCH_22_NavmapModifierBlockers.md](ARCH_22_NavmapModifierBlockers.md) | Navmap Modifier blockers — formalizes a hand-authoring technique proven live on Pandemonium Isthmus, both the all-layer technique (confirmed twice) and the partial-layer technique (confirmed once, 2026-08-29) (ARCH ruling, ratifies `NAVMAP_MODIFIER_BLOCKER_SPEC.md`); not yet a SanGen `PARAMS`/`IO`/`UI` construct (§22.9) | index → 9 subsection files |
 | §22.1 | [ARCH_22_01_LayerClassification.md](ARCH_22_01_LayerClassification.md) | Layer classification — game-side Lua, not SanGen C++ (mirrors §15.1) | 14 lines |
 | §22.2 | [ARCH_22_02_NativePrimitiveGroundTruth.md](ARCH_22_02_NativePrimitiveGroundTruth.md) | The native `NavmapModifierTemplate` primitive — recorded ground truth, binding on both techniques | 26 lines |
 | §22.3 | [ARCH_22_03_AllLayerBlockerTechnique.md](ARCH_22_03_AllLayerBlockerTechnique.md) | All-layer blocker via the global `PlayableAreaBarrier` prefab — ratified, confirmed shipped | 21 lines |
-| §22.4 | [ARCH_22_04_PartialLayerBlockerTechnique.md](ARCH_22_04_PartialLayerBlockerTechnique.md) | Partial/single-layer blocker requires a purpose-built prefab — ⚠️ designed, not shipped; promotion-to-shared-helper guidance | 23 lines |
+| §22.4 | [ARCH_22_04_PartialLayerBlockerTechnique.md](ARCH_22_04_PartialLayerBlockerTechnique.md) | Partial/single-layer blocker requires a purpose-built prefab — confirmed shipped (2026-08-29); promotion-to-shared-helper guidance still open | 23 lines |
 | §22.5 | [ARCH_22_05_PerLuaStateExecutionNuance.md](ARCH_22_05_PerLuaStateExecutionNuance.md) | Per-Lua-state execution nuance — distinct from `MAP_UNIT_SPAWNING_SPEC` §2's `Import`-cache double-execution hazard | 19 lines |
 | §22.6 | [ARCH_22_06_NewThreadOrderingLaw.md](ARCH_22_06_NewThreadOrderingLaw.md) | Ordering law inside the shared `NewThread` — extends, does not replace, existing ordering law; **binding `pcall`-per-call rule** — ordering reduces the chance of a failure, `pcall` removes the consequence, and only one ordering constraint (playable area final before instantiation) survives as load-bearing once every call is wrapped | 38 lines |
 | §22.7 | [ARCH_22_07_MaskToRectangleWorkflow.md](ARCH_22_07_MaskToRectangleWorkflow.md) | Mask-to-rectangle authoring workflow — recorded as the current manual (non-SanGen) process | 14 lines |
@@ -196,7 +197,12 @@ gesture substrate, injected-pointer setter, press/release dispatch wiring, draw 
 a full page of explicit open-question rulings a coder work-order needs with no ambiguity
 left) that the human's own request scoped as ONE new subsection file, not a further
 `§21.8.N` breakdown this pack's numbering scheme does not otherwise use — kept whole
-rather than invent a nesting depth no other section has.
+rather than invent a nesting depth no other section has. The tenth,
+`ARCH_14_17_MapAreaFieldLayer.md`, is one ruling whose fourteen numbered items are a
+single seam specification (enum value → GPU `#define` → binding index → record layout →
+`LayerSourceField` case → both twins' color function → defaults → drag cost → border
+rule): each item is unusable without the others, and every one of them must be read
+together by whoever writes the coder work-order.
 
 | File | Lines | Why it stays whole |
 |------|-------|--------------------|
@@ -208,7 +214,8 @@ rather than invent a nesting depth no other section has.
 | `ARCH_14_16_PerArmyUnitsOverlayRows.md` | 114 | One ruling: per-army row seeding + procedural-unit routing + tint source + default-palette prerequisite, deliberately kept together as one shippable unit |
 | `ARCH_21_03_DragGestureGenericization.md` | 122 | One ruling: the `Traits` contract plus its two load-bearing refinements (state de-templating, the missing-`name`-field fix) |
 | `ARCH_14_15_ManualCullStableIdMigration.md` | 106 | One ruling: the cull-path stable-id migration |
-| `ARCH_21_08_AreaCanvasGesture.md` | 320 | One whole, self-contained canvas-authoring subsystem — substrate, setter, dispatch wiring, draw pass, and every open-question ruling a coder needs, deliberately kept together as one shippable unit rather than forking a new `§N.M.K` nesting depth |
+| `ARCH_14_17_MapAreaFieldLayer.md` | 318 | One CPU↔GPU seam specification — enum, `#define`, binding, 32-byte record, both twins' color function, defaults, drag cost and border rule — no item of which is usable without the rest |
+| `ARCH_21_08_AreaCanvasGesture.md` | 385 | One whole, self-contained canvas-authoring subsystem — substrate, setter, dispatch wiring, draw pass, and every open-question ruling a coder needs, deliberately kept together as one shippable unit rather than forking a new `§N.M.K` nesting depth; plus the 2026-08-29 §14.17 draw-pass amendment appended in place |
 
 ---
 

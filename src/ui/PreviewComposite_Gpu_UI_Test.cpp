@@ -116,9 +116,9 @@ void CheckGpuPathAndParity(Sys::GpuResourceManager& manager) {
     Ui::PreviewTestScene gpuScene, cpuScene;
     BuildVariedScene(gpuScene);
     BuildVariedScene(cpuScene);
-    Ui::PreviewComposite gpuComposite(gpuScene.geometry, gpuScene.water, gpuScene.strata,
+    Ui::PreviewComposite gpuComposite(gpuScene.geometry, gpuScene.water, gpuScene.strata, gpuScene.areas,
                                       gpuScene.fields, gpuScene.instances, gpuScene.entityIdentifiers);
-    Ui::PreviewComposite cpuComposite(cpuScene.geometry, cpuScene.water, cpuScene.strata,
+    Ui::PreviewComposite cpuComposite(cpuScene.geometry, cpuScene.water, cpuScene.strata, cpuScene.areas,
                                       cpuScene.fields, cpuScene.instances, cpuScene.entityIdentifiers);
     ConfigureVariedSettings(gpuComposite.Settings());
     ConfigureVariedSettings(cpuComposite.Settings());
@@ -158,9 +158,9 @@ void CheckAllBlendModesParity(Sys::GpuResourceManager& manager) {
         Ui::PreviewTestScene gpuScene, cpuScene;
         BuildVariedScene(gpuScene);
         BuildVariedScene(cpuScene);
-        Ui::PreviewComposite gpuComposite(gpuScene.geometry, gpuScene.water, gpuScene.strata,
+        Ui::PreviewComposite gpuComposite(gpuScene.geometry, gpuScene.water, gpuScene.strata, gpuScene.areas,
                                           gpuScene.fields, gpuScene.instances, gpuScene.entityIdentifiers);
-        Ui::PreviewComposite cpuComposite(cpuScene.geometry, cpuScene.water, cpuScene.strata,
+        Ui::PreviewComposite cpuComposite(cpuScene.geometry, cpuScene.water, cpuScene.strata, cpuScene.areas,
                                           cpuScene.fields, cpuScene.instances, cpuScene.entityIdentifiers);
         ConfigureVariedSettings(gpuComposite.Settings());
         ConfigureVariedSettings(cpuComposite.Settings());

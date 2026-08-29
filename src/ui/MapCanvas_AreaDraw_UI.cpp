@@ -1,8 +1,15 @@
-// MapCanvas_AreaDraw_UI.cpp — MapCanvas::DrawAreaOverlayPass (ARCH §21.8): fill+border every area
-// every frame (a deliberate v2 simplification over v1's drag-only fill, §21.8's own note — the
-// always-on fill re-reads the same live, possibly-dragged rect every frame for free), the 8 handles
-// for the selected area only, and hover-only cursor-shape feedback (cosmetic; never threaded through
-// AreaDragGestureState).
+// MapCanvas_AreaDraw_UI.cpp — MapCanvas::DrawAreaOverlayPass. Fill/border/handles per
+// ARCH_21_08_AreaCanvasGesture.md's 2026-08-29 amendment / ARCH_14_17_MapAreaFieldLayer.md §14.17
+// item 12 (STEP211, unchanged by this ticket): the FILL is the composite's own job in the steady
+// state (PreviewLayerKind::MapAreas) — this pass draws the fill ONLY for the one area currently
+// suppressed from the composite (the one being dragged/resized/moved). The BORDER draws only when
+// the MapAreas layer is enabled AND this is the suppressed area AND it is selected. The 8 handles
+// (selected-area only) are unchanged. STEP212 — the hover-only cursor-shape feedback now gates on
+// the SELECTED area's own per-area lock (MapCanvas::IsAreaLocked, MapCanvas_AreaDragDispatch_UI.cpp):
+// while locked, no cursor override at all — the pre-STEP212 version hit-tested handles and set a
+// resize cursor purely from proximity, regardless of lock, which is the exact "cursor lies" bug this
+// ticket fixes (a locked area's handles showed a resize cursor even though TryBeginAreaDrag silently
+// refused the click).
 #include "MapCanvas_UI.h"
 #include "AreasTab_List_UI.h"       // ResolveAreaColor
 #include "PreviewComposite_UI.h"
@@ -10,12 +17,27 @@
 
 namespace SanmapGen {
 namespace Ui {
+namespace {
+
+// §14.17 item 12's own preferred path: read (a) through the canvas's existing `const
+// PreviewComposite*` — it needs no new plumbing at all, since `Settings()` already has a const
+// overload. A plain linear scan (not `PreviewFieldLayerOfKind`, which has no const overload) since
+// this is the one place a const settings reference is available.
+bool IsMapAreasLayerEnabled(const PreviewCompositeSettings& settings) {
+    for (const PreviewFieldLayer& layer : settings.fieldLayers)
+        if (layer.kind == PreviewLayerKind::MapAreas) return layer.bEnabled;
+    return false;
+}
+
+} // namespace
 
 void MapCanvas::DrawAreaOverlayPass(float regionOriginX, float regionOriginY) {
     if (composite == nullptr || manualAreaDrag.areas == nullptr) return;
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
     const std::vector<Params::MapArea>& areas = *manualAreaDrag.areas;
     const int selectedIndex = manualAreaDrag.selectedAreaIndex != nullptr ? *manualAreaDrag.selectedAreaIndex : -1;
+    const int suppressedIndex = manualAreaDrag.mapAreaSuppressedIndex != nullptr
+                              ? *manualAreaDrag.mapAreaSuppressedIndex : -1;
 
     auto ToScreen = [&](float worldX, float worldZ) {
         const PreviewComposite::PreviewPixelPoint pixel = composite->WorldToPreviewPixel(worldX, worldZ);
@@ -23,8 +45,9 @@ void MapCanvas::DrawAreaOverlayPass(float regionOriginX, float regionOriginY) {
         return ImVec2(regionOriginX + local.regionLocalX, regionOriginY + local.regionLocalY);
     };
 
-    for (int index = 0; index < static_cast<int>(areas.size()); ++index) {
-        const Params::MapArea& area = areas[static_cast<std::size_t>(index)];
+    // ARCH §14.17 item 12 — fill + (conditional) border, ONLY for the suppressed area.
+    if (suppressedIndex >= 0 && suppressedIndex < static_cast<int>(areas.size())) {
+        const Params::MapArea& area = areas[static_cast<std::size_t>(suppressedIndex)];
         const ImVec2 nwScreen = ToScreen(area.originX, area.originZ);
         const ImVec2 seScreen = ToScreen(area.originX + area.width, area.originZ + area.length);
 
@@ -34,9 +57,14 @@ void MapCanvas::DrawAreaOverlayPass(float regionOriginX, float regionOriginY) {
             ? ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], color[3]))
             : ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 0.35f));
         drawList->AddRectFilled(nwScreen, seScreen, fillColor);
-        drawList->AddRect(nwScreen, seScreen, ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
 
-        if (index != selectedIndex) continue;
+        if (IsMapAreasLayerEnabled(composite->Settings()) && suppressedIndex == selectedIndex)
+            drawList->AddRect(nwScreen, seScreen, ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)));
+    }
+
+    // The 8 handles — selected-area-only. Unchanged.
+    if (selectedIndex >= 0 && selectedIndex < static_cast<int>(areas.size())) {
+        const Params::MapArea& area = areas[static_cast<std::size_t>(selectedIndex)];
         AreaHandleWorldPoint_UI handlePoints[8];
         ComputeAreaHandleWorldPoints(area, handlePoints);
         const ImU32 handleColor = ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -45,10 +73,16 @@ void MapCanvas::DrawAreaOverlayPass(float regionOriginX, float regionOriginY) {
                                       kAreaHandleScreenRadiusPixels, handleColor);
     }
 
-    // Cursor-shape feedback: hover-only, re-hit-tested fresh against the CURRENT cursor position —
+    // Cursor-shape feedback — hover-only, re-hit-tested fresh against the CURRENT cursor position —
     // gated on the cursor being within the canvas region (view.RegionSidePixels(), not
     // ImGui::IsItemHovered(), since this pass runs before this frame's InvisibleButton is declared).
     if (selectedIndex < 0 || selectedIndex >= static_cast<int>(areas.size())) return;
+    // STEP212 fix — a LOCKED selected area shows no drag-affordance cursor at all: falls through to
+    // imgui's own default arrow (no ImGuiMouseCursor_NotAllowed substitution — see this ticket's own
+    // "Interpretation calls made," item 3, for why). Reuses IsAreaLocked, the SAME query
+    // TryBeginAreaDrag itself gates on (MapCanvas_AreaDragDispatch_UI.cpp) — one lock check, not a
+    // second, independently-maintained one.
+    if (IsAreaLocked(selectedIndex)) return;
     const ImGuiIO& io = ImGui::GetIO();
     const float hoverRegionLocalX = io.MousePos.x - regionOriginX;
     const float hoverRegionLocalY = io.MousePos.y - regionOriginY;

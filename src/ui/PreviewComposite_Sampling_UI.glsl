@@ -39,6 +39,14 @@ layout(std430, binding = PREVIEW_BINDING_CONFIGURATION)  readonly buffer Configu
 layout(std430, binding = PREVIEW_BINDING_LAYERS)  readonly buffer LayerConfigurations   { LayerConfiguration layerConfigurations[]; };
 layout(std430, binding = PREVIEW_BINDING_STRATA)  readonly buffer StratumConfigurations { StratumConfiguration stratumConfigurations[]; };
 
+// ARCH §14.17 item 4 — one map area, cell-space bounds + resolved color. Declared in THIS unit only
+// (the pass unit reaches it only through layerColorAtPixel, this file's own stated convention).
+struct MapAreaRectangle {
+    float minimumX;  float minimumZ;  float maximumX;  float maximumZ;
+    float colorRed;  float colorGreen; float colorBlue; float colorAlpha;
+};
+layout(std430, binding = PREVIEW_BINDING_MAP_AREAS) readonly buffer MapAreaRectangles { MapAreaRectangle mapAreaRectangles[]; };
+
 // Provided by PreviewComposite_Color_UI.glsl.
 float clampUnit(float value);
 float normalizeToDomain(float value, float domainMinimum, float domainRangeReciprocal);
@@ -127,6 +135,17 @@ vec4 splatSurfaceStrata(float sampleX, float sampleY) {
     return splat;
 }
 
+vec4 mapAreaColorAtCell(float sampleX, float sampleY) {
+    vec4 result = vec4(0.0);
+    for (int index = 0; index < mapAreaRectangles.length(); ++index) {
+        MapAreaRectangle area = mapAreaRectangles[index];
+        if (sampleX < area.minimumX || sampleX > area.maximumX) continue;
+        if (sampleY < area.minimumZ || sampleY > area.maximumZ) continue;
+        result = vec4(area.colorRed, area.colorGreen, area.colorBlue, area.colorAlpha);
+    }
+    return result;
+}
+
 // The pass unit reaches the layer records only through these, so the buffer is declared once.
 int   layerBlendMode(int layerIndex) { return layerConfigurations[layerIndex].blendMode; }
 float layerOpacity(int layerIndex)   { return layerConfigurations[layerIndex].opacity; }
@@ -134,6 +153,7 @@ float layerOpacity(int layerIndex)   { return layerConfigurations[layerIndex].op
 vec4 layerColorAtPixel(int layerIndex, float sampleX, float sampleY) {
     LayerConfiguration layer = layerConfigurations[layerIndex];
     if (layer.layerKind == PREVIEW_LAYER_STRATUM_SPLAT) return splatSurfaceStrata(sampleX, sampleY);
+    if (layer.layerKind == PREVIEW_LAYER_MAP_AREAS) return mapAreaColorAtCell(sampleX, sampleY);
     if (layer.layerKind == PREVIEW_LAYER_WATER) {
         if (configuration[0].bWaterEnabled == 0) return vec4(0.0);
         float depth = normalizedWaterDepth(sampleFieldBilinear(layer.layerKind, sampleX, sampleY),

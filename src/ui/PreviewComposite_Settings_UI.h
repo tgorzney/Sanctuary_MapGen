@@ -8,18 +8,21 @@
 // settings (`Params::GradientRamp`, ARCH §8.2) and are referenced by index.
 #pragma once
 #include <vector>
+#include "AreaColorTable_UI.h"
 #include "../params/GradientRamp_PARAMS.h"
 
 namespace SanmapGen {
 namespace Ui {
 
-// Which BAKED field a layer colorizes. Every entry names a field `Data::MapFields` actually
-// carries. `Slope` colorizes the field the MASK stage bakes (M5-0c) — the composite SAMPLES it
-// like any other baked field and derives no gradient of its own, which is what keeps the
-// shadow-sim deleted (ARCH §3.2, PREVIEW_COMPOSITING_SPEC "the shadow-sim problem"). Slope is in
-// the pinned unit (gradient magnitude = rise/run), so a slope layer's domain is stated in that
-// unit; mapping it onto the ramp's 0..1 is the consumer's job as for every other field (§8.2).
-enum class PreviewLayerKind { HeightRamp, StratumSplat, Flow, Accumulation, Water, Slope };
+// Which per-pixel COLOR SOURCE a layer draws — a baked `Data::MapFields` field, SAMPLED and never
+// re-derived (Slope is the Mask stage's own bake, colorized as-is: this is what keeps the shadow-sim
+// deleted, ARCH §3.2), a PARAMS-flattened analytic source with no baked field behind it at all
+// (StratumSplat's nine weight fields + tints; MapAreas' rectangles + colors,
+// ARCH_14_17_MapAreaFieldLayer.md §14.17 item 1), or a combination (Water: a threshold over the
+// heightfield, parameterized by `Params::Water`). What a layer may NEVER be is a re-decision of a
+// PLACEMENT rule (markers/props/decals/units/reclaim) — that is the shadow-sim defect this comment
+// used to describe too narrowly by omission (PREVIEW_COMPOSITING_SPEC "the shadow-sim problem").
+enum class PreviewLayerKind { HeightRamp, StratumSplat, Flow, Accumulation, Water, Slope, MapAreas };
 
 // The preview-only Z-order blend (PREVIEW_COMPOSITING_SPEC). Distinct from the geometry
 // `Params::HeightBlendMode`, which blends terrain height, not pixels.
@@ -91,6 +94,19 @@ struct PreviewCompositeSettings {
     // positions with (`Params::Geometry::worldUnitsPerCell` — map geometry, M5-0a). PIPELINE
     // sets this mirror and Placement's reader from that one recipe value (M4-5).
     float worldUnitsPerCell = 1.0f;
+
+    // ARCH_14_17_MapAreaFieldLayer.md §14.17 item 9 — the single owner of the per-area presentation
+    // color, moved here from `AreasTabState::areaColors` (removed, not duplicated): the Areas tab,
+    // MapCanvas's own drag gesture and the composite's own field-layer flattening all need the SAME
+    // mutable table, and this is the category `gradientRamps`/`clearColor` already occupy —
+    // presentation state that never serializes into `mapGeneratorData`.
+    std::vector<AreaColorEntry> areaColors;
+
+    // ARCH §14.17 item 11 — the ONE area currently mid-drag/resize/move on the canvas, omitted from
+    // this frame's composited input so a live drag costs exactly two recomposites (begin+end), never
+    // one per frame. Transient interaction state: NEVER serialized, and an out-of-range value
+    // suppresses nothing (the safe degradation if a list reorder ever races a gesture).
+    int mapAreaSuppressedIndex = -1;
 };
 
 } // namespace Ui

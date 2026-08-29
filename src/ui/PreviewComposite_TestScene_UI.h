@@ -14,6 +14,9 @@ struct PreviewTestScene {
     Params::Geometry             geometry;
     Params::Water                water;
     std::vector<Params::Stratum> strata;
+    // ARCH §14.17 — empty by default; BuildMapAreaConfigurations pushes a degenerate sentinel
+    // rectangle for an empty list, so leaving this untouched is a legal, no-op scene.
+    std::vector<Params::MapArea> areas;
     Data::MapFields              fields;
     Data::PlacementInstances     instances;
     Data::EntityIdBuffer         entityIdentifiers;

@@ -7,7 +7,10 @@
 // which is exactly what that widget exists for — and every scalar is a shared SliderScalar
 // carrying its own RealtimeToggle. The color is the picker-only ColorSwatch with its alpha BAR
 // enabled: the areas tab is the one caller ColorSwatchOptions::bAlphaBarShown was added for.
-// The pure list rules, and the UI-only per-area color side table, live in AreasTab_List_UI.h.
+// The pure list rules live in AreasTab_List_UI.h. The UI-only per-area color side table lives in
+// `PreviewCompositeSettings::areaColors` (`AreaColorTable_UI.h` for the type itself,
+// ARCH_14_17_MapAreaFieldLayer.md §14.17 item 9) — this tab reaches it through a `DrawAreasTab`
+// parameter, not a field of its own state.
 //
 // SCOPE NOTES (ARCH §8.4 — a coder never invents a missing type; reported, not invented):
 //  1. They DO notify Pipeline::PreviewDriver. An area is drawn on the composite, and because no
@@ -31,10 +34,16 @@ struct AreasTabState {
     SectionState       globalSection;
     SectionState       areaSection;
     ColorSwatchOptions colorOptions = ColorSwatchOptions();
-    std::vector<AreaColorEntry> areaColors;    // UI-only, keyed by MapArea::name (STEP21 ruling #4)
     int  selectedAreaIndex = -1;
-    bool bAreasLocked      = true;    // v1 parity, including v1's default: while set, the map
-                                      // canvas may not drag or resize an area (WO E reads it)
+    // STEP212 — replaces the retired global `bool bAreasLocked = true;`: one lock bit PER AREA, the
+    // same UI-only, name-keyed side-table shape `PreviewCompositeSettings::areaColors` uses for
+    // color (AreaLockTable_UI.h's AreaLockEntry/ResolveAreaLocked) — but owned HERE, tab-side, not
+    // by the composite, because lock never affects what gets drawn in the GPU-composited fill, only
+    // whether the canvas gesture accepts input (see AreaLockTable_UI.h's own header comment). A
+    // pre-existing area defaults LOCKED on first resolve; a freshly created one (Add New Area below,
+    // or the canvas's own CreateAreaFromDrag) is inserted UNLOCKED explicitly, before this table's
+    // own lazy default would otherwise apply.
+    std::vector<AreaLockEntry> areaLocks;
 
     // ONE shared toggle set for the currently-selected area's detail section — not per-row: only
     // the selected area's settings ever draw, the same posture ArmiesTabState uses for its own
@@ -84,9 +93,11 @@ inline int ResolvedAreaSelection(int selectedAreaIndex, int areaCount) {
 }
 
 // `recipe.areas` is edited directly (STEP21) — the tab reads `geometry.mapSize` to size its
-// sliders and the Set to Map Size button, and writes back through `recipe.areas`.
+// sliders and the Set to Map Size button, and writes back through `recipe.areas`. `areaColors` is
+// `PreviewCompositeSettings::areaColors` (ARCH §14.17 item 9) — the tab's own call site passes
+// `composite.Settings().areaColors`, never a copy of its own.
 void DrawAreasTab(Params::MapRecipe& recipe, AreasTabState& state,
-                  Pipeline::PreviewDriver* previewDriver);
+                  Pipeline::PreviewDriver* previewDriver, std::vector<AreaColorEntry>& areaColors);
 
 } // namespace Ui
 } // namespace SanmapGen

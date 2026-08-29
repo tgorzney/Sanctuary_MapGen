@@ -43,7 +43,7 @@ struct DrawFixture {
     MapCanvasView view;
     DrawFixture() {
         BuildPreviewTestScene(scene);
-        composite = new PreviewComposite(scene.geometry, scene.water, scene.strata, scene.fields,
+        composite = new PreviewComposite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                          scene.instances, scene.entityIdentifiers);
         ConfigurePreviewSettings(composite->Settings());
         composite->ComposeOnCpu();

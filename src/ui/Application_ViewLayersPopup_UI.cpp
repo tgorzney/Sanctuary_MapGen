@@ -15,7 +15,7 @@ namespace Ui {
 namespace {
 
 const char* const previewLayerKindNames[] = {
-    "HeightRamp", "StratumSplat", "Flow", "Accumulation", "Water", "Slope"
+    "HeightRamp", "StratumSplat", "Flow", "Accumulation", "Water", "Slope", "MapAreas"
 };
 // PreviewBlendMode's own enum order (PreviewComposite_Settings_UI.h) — distinct from
 // Params::HeightBlendMode's label set (LayersTab_UI.cpp's blendModeNames); do not merge the two.

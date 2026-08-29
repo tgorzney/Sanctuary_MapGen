@@ -54,7 +54,7 @@ void Application::DrawEnvironmentGroupPanel() {
                          &assembler.Placements().decals);
             break;
         case ApplicationPanel::Areas:
-            DrawAreasTab(recipe, tabState.areas, &previewDriver);
+            DrawAreasTab(recipe, tabState.areas, &previewDriver, composite.Settings().areaColors);
             break;
         case ApplicationPanel::Scenarios:
             // Passed for interface parity only, exactly like every other tab's call site here —

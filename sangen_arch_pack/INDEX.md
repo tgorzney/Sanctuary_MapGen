@@ -11,7 +11,7 @@ spec(s) a question needs — never the whole pack.
 | map scripting & events, lua sandbox, Tags, AI system, modding, validators | `specs/MODDING_SCRIPTING_SPEC.md` |
 | the Map Scenario system — `<MapName>_data.lua`/`<MapName>_Scenarios_Runtime.lua`/`<MapName>_Scenarios_Data.lua` three-file split, module API contract, three-tier scenario matching, `alloyMode` semantics, the mandatory-`spawns` hard requirement, execution/timing law, the ratified export-only IO design (`Params::Scenarios`, overwrite safety, ARCH §15) | `specs/MAP_SCENARIO_SPEC.md` |
 | how to spawn units from a per-map Lua script — the load/execution chain, the `Import()`-cache double-execution hazard, `Import()` semantics, the one-`NewThread`-per-script rule + ordering, the `CreateUnit` call, position validation, diagnostics, known-good `tpId`s (companion to `MAP_SCENARIO_SPEC.md`, not restated there) | `specs/MAP_UNIT_SPAWNING_SPEC.md` |
-| the engine's native per-navigation-layer pathing-block primitive (Navmap Modifiers) — the all-layer blocker technique (confirmed shipped) and the partial/single-layer technique (⚠️ designed, not shipped), the per-Lua-state execution nuance distinct from `MAP_UNIT_SPAWNING_SPEC`'s own double-execution hazard, the shared-`NewThread` ordering law and its `pcall`-per-call corollary, and the current manual mask-to-rectangle authoring workflow (ARCH §22) | `specs/NAVMAP_MODIFIER_BLOCKER_SPEC.md` |
+| the engine's native per-navigation-layer pathing-block primitive (Navmap Modifiers) — the all-layer blocker technique (confirmed shipped, twice) and the partial/single-layer technique (confirmed shipped), the per-Lua-state execution nuance distinct from `MAP_UNIT_SPAWNING_SPEC`'s own double-execution hazard, the shared-`NewThread` ordering law (blocker work runs LAST, after unit spawning) and its `pcall`-per-call corollary, and the current manual mask-to-rectangle authoring workflow (ARCH §22) | `specs/NAVMAP_MODIFIER_BLOCKER_SPEC.md` |
 | data model (GenerationParams), generation pipeline, GPU toggles, enums | `specs/PARAMS_PIPELINE_SPEC.md` |
 | height/material layers, GeoLayers, sim layers, thickness model, baking, stratum masks | `specs/LAYER_SYSTEM_SPEC.md` |
 | erosion (hydraulic droplet), thermal/talus, flow/accumulation, CPU-vs-GPU parity | `specs/SIM_ALGORITHMS_SPEC.md` |
@@ -27,7 +27,7 @@ spec(s) a question needs — never the whole pack.
 | pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling; `PropInstanceLayer`/`DecalInstanceLayer` gain full field parity with `MarkerInstanceLayer` under ARCH §20 (not yet reflected in this spec's own field tables — see the §20 narrative below); `PropTransform`/`DecalTransform` gain `instanceIdentifier`/`symmetryGroupIdentifier` under ARCH §21.4 (also not yet reflected — see the §21 narrative below) | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
-| preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix; the ratified v2 screen-space overlay-layering design (six domains — Alloy/SpawnsArmies/Units/Props/Reclaim/Decals; LOD icon rendering; four dirty-flag tiers A/B/C/C2; the View toolbar's two-section popup; ARCH §14) | `specs/PREVIEW_COMPOSITING_SPEC.md` |
+| preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix; the ratified v2 screen-space overlay-layering design (six domains — Alloy/SpawnsArmies/Units/Props/Reclaim/Decals; LOD icon rendering; four dirty-flag tiers A/B/C/C2; the View toolbar's two-section popup; ARCH §14); map areas as a composited FIELD layer, not an overlay domain (`PreviewLayerKind::MapAreas`, ARCH §14.17) | `specs/PREVIEW_COMPOSITING_SPEC.md` |
 | core math library — SIMD/fast-math/Morton/spatial internals (stub reality + v2 target) | `specs/MATH_SIMD_SPEC.md` |
 | future sim passes — fluvial/glacial/snow-melt design on the shared sim framework | `specs/FUTURE_SIM_TYPES_SPEC.md` |
 | map AI-analyzability invariants + host/client shared-generation protocol | `specs/AI_HOSTCLIENT_SPEC.md` |
@@ -769,12 +769,15 @@ twice:** reusing that global prefab is the correct, sole technique for an all-la
 — `Engine.InstantiatePrefab` + `GetNavmapModifierIDs`/`SetNavmapModifiersSize`/
 `SetNavmapModifiersEnabled`, the exact sequence `playableAreaBarrier.lua`'s own
 `CreateBarrier`/`SetBarrierSize`/`SetBarrierEnabled` already use, with navmap modifiers host-only
-and the client touching only its local grid-modifier preview. **⚠️ Designed, not yet shipped:** a
+and the client touching only its local grid-modifier preview. ~~**⚠️ Designed, not yet shipped:** a
 partial/single-layer blocker (e.g. Sea-only) cannot reuse that global prefab — its other five
 layers' modifier children sit at real, active `disabled=false`/`size=(1,1)` template defaults and
 would silently drop stray blockers — so it needs its own purpose-built prefab; §22.4 rules this may
 stay a map-local `_data.lua` helper today, recommending (not mandating) promotion to a shared
-`common/loading/*.lua` helper only once a second map needs the same pattern. §22.5 records a
+`common/loading/*.lua` helper only once a second map needs the same pattern.~~ **This paragraph's
+partial-layer status claim is now stale — see the correction appended at the end of this file
+(2026-08-29, later same day).** The stray-1×1-blocker reasoning it states is still correct; only
+the shipped-status framing needed the update. §22.5 records a
 debugging-load-bearing nuance confirmed by direct read of `script.lua` — a solo/listen-server match
 runs the shared per-map chunk once per **Lua state** (not per `Import`-cache-key, which is the
 **different**, already-documented `MAP_UNIT_SPAWNING_SPEC.md` §2 hazard) — explicitly flagged so
@@ -783,7 +786,10 @@ extends (does not replace) the existing shared-`NewThread` ordering law with two
 (after `SetPlayableArea`, before any not-yet-proven code) and records the concrete resolved order
 on Pandemonium Isthmus today, explicitly flagged as differing from the illustrative/documented
 order in `MAP_UNIT_SPAWNING_SPEC.md` §4 and `MAP_SCENARIO_SPEC.md` §3.1 (both now cross-reference
-this ruling so neither is silently trusted as still-current on its own). §22.7 records, without
+this ruling so neither is silently trusted as still-current on its own). **This ordering claim is
+ALSO stale — see the same correction appended at the end of this file; the "differs from" framing
+was wrong, and the actual live order is unit-spawn-then-blocker, not blocker-then-unit-spawn.**
+§22.7 records, without
 ratifying as a SanGen feature, the current ad hoc Python mask-to-rectangle authoring pipeline
 (exact rectangle decomposition + tunable-overshoot agglomerative merge + mandatory zero-miss
 verification) used to produce both live tests' rectangle lists, flagging it as a strong future
@@ -824,3 +830,70 @@ sufficient evidence a fix is correct, and any script-driven regeneration of a Lu
 the table itself, since a wide find-and-replace can silently delete adjacent real code with no
 diagnostic of any kind. Full text: `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6.1 (new);
 `ARCH_22_06_NewThreadOrderingLaw.md` §22.6 carries the corresponding binding amendment.
+
+**Second and third corrections to the §22 ratification above (2026-08-29, later same day) — one
+status update, one ordering-claim retraction, both independently re-verified against the live game
+files before being recorded here, not taken on a relayed report's word alone.**
+
+1. **Partial-layer technique now also confirmed shipped.** The human has confirmed the Sea-only
+   partial-layer blocker (Technique B, §22.4 / `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §4) working live
+   in-game on Pandemonium Isthmus — the same evidentiary bar as §22.3's all-layer technique. Every
+   "⚠️ Designed, not yet shipped" framing in the §22 paragraph above, in
+   `NAVMAP_MODIFIER_BLOCKER_SPEC.md`, in `ARCH_22_NavmapModifierBlockers.md`, and in
+   `ARCH_22_04_PartialLayerBlockerTechnique.md` is stale and has been updated in place at all four
+   locations (plus this file's own topic-table row for the spec, above, and `ARCH.md`'s own §22.4
+   master-index row). One nuance preserved, not overclaimed: the specific stray-1×1-blocker failure
+   mode §22.4's own reasoning describes was never itself deliberately reproduced and observed
+   failing — only the working Technique B alternative was built and confirmed; that failure-mode
+   description remains reasoned from source, not independently reproduced. Still genuinely open,
+   unaffected by this note: promotion of the map-local helper to a shared `common/loading/*.lua`
+   engine helper (the "proven twice" bar is not yet met — Technique B has so far been confirmed
+   live only once), and combining more than two blocker types on one map (never attempted).
+
+2. **The §22.6/§6 "concrete resolved ordering" claim above was wrong and is retracted.** A direct
+   read of the live `Pandemonium Isthmus_data.lua` (not assumed or relayed secondhand) shows the
+   actual order inside the shared `NewThread` is `(a)` host-only `SetPlayableArea` ×2, `(b)`
+   host-only scenario unit spawning (`pcall`'d), `(c)` the air and sea blocker-spawn calls, each
+   independently `pcall`'d, placed LAST specifically so nothing load-bearing follows them — NOT
+   "`(b)` blocker before `(d)` unit-spawn" as the §22 paragraph above and
+   `ARCH_22_06_NewThreadOrderingLaw.md` previously stated. This also means the earlier claim that
+   this order "differs from" `MAP_UNIT_SPAWNING_SPEC.md` §4's illustrative snippet and
+   `MAP_SCENARIO_SPEC.md` §3.1's documented live order was itself wrong — the live file's actual
+   order **matches** both of those specs' existing text; there was no real discrepancy to flag.
+   `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6, `ARCH_22_06_NewThreadOrderingLaw.md`,
+   `MAP_SCENARIO_SPEC.md` §3.1's note, and `MAP_UNIT_SPAWNING_SPEC.md` §4's note have all been
+   corrected in place to retract the wrong claim and state the verified order. Root cause: a
+   stale, mid-fix debugging state relayed secondhand rather than the live file's actual final
+   shape — a reminder that even a same-day "just verified" report should be re-checked against the
+   live file directly before being recorded as ground truth here, exactly as this pack's own
+   sourcing discipline (§15's `SCEN`/`DATA` citations, `NAVMAP_MODIFIER_BLOCKER_SPEC.md`'s own
+   ground-truth table) already requires.
+
+**New `ARCH_14_17_MapAreaFieldLayer.md` §14.17 (2026-08-29) — Map Areas fold into the real
+GPU-composited preview blend pipeline as a `PreviewFieldLayer`, not a seventh overlay domain.**
+Human-approved, verified against the live composite/canvas code before ratification. States a
+**general rule** worth citing beyond Areas: §14's overlay-domain/field-layer separation is a rule
+about `Data::PlacementInstances` (*does this re-decide something a PROC stage already resolved?*),
+**not** about "anything that is not a `Data::FloatField`" — `StratumSplat` and `Water` already
+answer "no" to the latter and are legal, and `MapAreas` joins them as a PARAMS-flattened analytic
+per-pixel color source. Concrete shape: `PreviewLayerKind::MapAreas` appended last (+ generated
+`PREVIEW_LAYER_MAP_AREAS`), `CompositeBinding::kMapAreaRectangles = 12` (binding 7 stays vacant per
+its own documented hole), a 32-byte/8-scalar `PreviewMapAreaRectangle` in **cell space**, **no**
+count field added to `PreviewCompositeConfiguration` (it would break the 80-byte std430 stride
+mirrored by hand in two `.glsl` units — read `.length()`/`.size()` and push a degenerate sentinel
+when empty), an explicit `LayerSourceField` `case … return nullptr;`, and forward-iteration
+**last-match-wins** overlap so the visual and §21.8's body hit-test share one Z rule. Blend,
+picking and the `.sanmap` schema are all untouched. Ownership move: `AreaColorEntry`'s single
+owner becomes `PreviewCompositeSettings::areaColors` (type relocated to a new minimal
+`src/ui/AreaColorTable_UI.h` so the settings header does not depend on a tab header). Defaults:
+new areas Green / blend Overlay, `"PlayableArea"` pinned Green and non-editable, layer seeded
+topmost and enabled via the Areas panel-catalogue row becoming a real
+`PreviewVisibilityTarget::FieldLayer` (retiring one of `Application_Visibility_UI.h`'s six inert
+`[O]` toggles). **Amends `ARCH_21_08_AreaCanvasGesture.md` §21.8's draw-pass ruling in place**: a
+transient `PreviewCompositeSettings::mapAreaSuppressedIndex` omits the dragged area from the
+composite input, so a drag/resize costs exactly **two** recomposites (begin + end) instead of one
+per frame, and the immediate-mode pass draws only that one area — its border only when the layer
+is enabled AND it is suppressed AND it is selected, never at all while the layer is disabled.
+`PREVIEW_COMPOSITING_SPEC.md` gains a matching "Map areas are a field layer, not an overlay
+domain" section plus a correction recording that its own v1 **SSBO 5** (`area bounds/colors`)
+entry is the precedent this restores — SSBO **6**, not 5, was the shadow-sim defect.

@@ -83,8 +83,11 @@ inline constexpr ApplicationPanelEntry applicationPanelEntries[kApplicationPanel
     // same row shape as Props (entity overlay, hidden by default).
     { ApplicationPanel::Decals,       "Decals",        ApplicationPanelGroup::Environment,
       true,  false, PreviewVisibilityTarget::Entities,   PreviewLayerKind::HeightRamp },
+    // ARCH_14_17_MapAreaFieldLayer.md §14.17 item 10 — Areas' `[O]` toggle now drives a real
+    // composite layer instead of being one of Application_Visibility_UI.h's inert rows; visible by
+    // default (the layer is seeded topmost and enabled, Application_PreviewSetup_UI.cpp).
     { ApplicationPanel::Areas,        "Areas",         ApplicationPanelGroup::Environment,
-      true,  false, PreviewVisibilityTarget::None,       PreviewLayerKind::HeightRamp },
+      true,  true,  PreviewVisibilityTarget::FieldLayer, PreviewLayerKind::MapAreas },
     // STEP74: no [O]/[ ] toggle — `recipe.scenarios` feeds no PROC stage, so the composite has
     // nothing this row could drive (see ScenariosTab_UI.h's own previewDriver note).
     { ApplicationPanel::Scenarios,    "Scenarios",     ApplicationPanelGroup::Environment,

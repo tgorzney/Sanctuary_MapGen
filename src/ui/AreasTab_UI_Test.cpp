@@ -113,9 +113,6 @@ void RunSliderAndSelectionChecks() {
     const ColorSwatchOptions options = AreasTabColorSwatchOptions();
     Check(options.bAlphaEnabled && options.bAlphaBarShown,
           "the area swatch is the one caller that turns the picker's alpha bar on");
-
-    const AreasTabState state;
-    Check(state.bAreasLocked, "the tab opens locked, as v1 did");
 }
 
 // STEP21 ruling #4: color has no `_PARAMS` home, so it lives in a UI-only side table keyed by
@@ -124,9 +121,9 @@ void RunAreaColorResolutionChecks() {
     std::vector<AreaColorEntry> areaColors;
     float* const firstResolve = ResolveAreaColor(areaColors, "Base");
     Check(areaColors.size() == 1u, "the first touch of a name appends one entry");
-    Check(firstResolve[0] == 1.0f && firstResolve[1] == 1.0f && firstResolve[2] == 1.0f
+    Check(firstResolve[0] == 0.0f && firstResolve[1] == 1.0f && firstResolve[2] == 0.0f
           && firstResolve[3] == 0.35f,
-          "a fresh entry defaults to the same color MapAreaRectangle used to (white, translucent)");
+          "a fresh entry defaults to Green/0.35 (ARCH_14_17_MapAreaFieldLayer.md §14.17 item 10)");
 
     firstResolve[0] = 0.2f;
     float* const secondResolve = ResolveAreaColor(areaColors, "Base");
@@ -160,6 +157,60 @@ void RunColorRenameRetargetingChecks() {
           "the color value survives the rename - not silently reset to default");
 }
 
+// STEP212: the per-area lock replaces the retired `AreasTabState::bAreasLocked`. `ResolveAreaLocked`
+// mirrors `ResolveAreaColor`'s own lazy-append idiom, but must answer two different questions with
+// two different defaults depending on the call site (an existing area vs. a freshly created one) —
+// its own `bDefaultLocked` parameter is what this function exists to exercise.
+void RunAreaLockResolutionChecks() {
+    std::vector<AreaLockEntry> areaLocks;
+    bool* const firstResolve = ResolveAreaLocked(areaLocks, "Base");
+    Check(areaLocks.size() == 1u, "the first touch of a name appends one entry");
+    Check(*firstResolve, "an ordinary (default-argument) resolve defaults LOCKED - matches the "
+                        "retired global bAreasLocked's own default");
+
+    *firstResolve = false;
+    bool* const secondResolve = ResolveAreaLocked(areaLocks, "Base");
+    Check(areaLocks.size() == 1u, "resolving the same name again appends nothing");
+    Check(!*secondResolve, "and returns the SAME entry, edits intact");
+
+    ResolveAreaLocked(areaLocks, "Other");
+    Check(areaLocks.size() == 2u, "a different name gets its own entry");
+
+    // The human's own explicit rule: a freshly created area starts UNLOCKED. The two creation call
+    // sites (AreasTab_UI.cpp's Add New Area, MapCanvas_AreaDragDispatch_UI.cpp's CreateAreaFromDrag)
+    // both pass bDefaultLocked=false explicitly for a name this table has never seen before.
+    bool* const freshCreationResolve = ResolveAreaLocked(areaLocks, "FreshlyCreated", /*bDefaultLocked=*/false);
+    Check(!*freshCreationResolve, "a name resolved with bDefaultLocked=false starts UNLOCKED");
+    Check(areaLocks.size() == 3u, "and still only appends the one new entry");
+
+    // Once an entry exists, a LATER resolve's own bDefaultLocked argument is irrelevant - the
+    // existing value always wins, never silently re-defaulted.
+    bool* const secondTouchIgnoresDefault = ResolveAreaLocked(areaLocks, "FreshlyCreated", /*bDefaultLocked=*/true);
+    Check(!*secondTouchIgnoresDefault,
+          "a second resolve's own default argument never overwrites an already-existing entry");
+}
+
+// Mirrors RunColorRenameRetargetingChecks exactly, one table over: AreasTab_UI.cpp's
+// DrawAreaSettings now retargets BOTH the color entry and the lock entry on a committed rename.
+void RunLockRenameRetargetingChecks() {
+    std::vector<AreaLockEntry> areaLocks;
+    bool* const originalLock = ResolveAreaLocked(areaLocks, "Base", /*bDefaultLocked=*/false);
+    *originalLock = false;
+
+    const std::string nameBeforeEdit = "Base";
+    const std::string nameAfterEdit  = "Renamed";
+    for (AreaLockEntry& entry : areaLocks)
+        if (entry.name == nameBeforeEdit) { entry.name = nameAfterEdit; break; }
+
+    Check(areaLocks.size() == 1u,
+          "the rename retargets the existing entry in place rather than orphaning it");
+    bool* const resolvedAfterRename = ResolveAreaLocked(areaLocks, nameAfterEdit);
+    Check(areaLocks.size() == 1u,
+          "resolving under the NEW name finds the retargeted entry - it does not create a second");
+    Check(!*resolvedAfterRename,
+          "the unlocked value survives the rename - not silently reset to the LOCKED default");
+}
+
 // STEP21 ruling #7: `Params::MapArea`'s own defaults are 0/0 (correct for "absent from an
 // imported file degrades to nothing"), but a freshly authored row needs a visible, usable size.
 void RunFreshAreaSizeChecks() {
@@ -187,6 +238,8 @@ int main() {
     RunSliderAndSelectionChecks();
     RunAreaColorResolutionChecks();
     RunColorRenameRetargetingChecks();
+    RunAreaLockResolutionChecks();
+    RunLockRenameRetargetingChecks();
     RunFreshAreaSizeChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

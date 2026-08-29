@@ -98,6 +98,19 @@ PreviewColor PreviewComposite::LayerColorAtPixel(const PreviewLayerConfiguration
                                   configuration.bNormalizeSplatWeights,
                                   configuration.splatWeightEpsilon);
     }
+    if (layerKind == PreviewLayerKind::MapAreas) {
+        // ARCH §14.17 items 5/6 — forward iteration, LAST containing match wins (the same Z rule
+        // §21.8's own body hit-test already implements), so click-to-select and what-you-see can
+        // never disagree. The degenerate sentinel fails the first test unconditionally.
+        PreviewColor result;
+        for (const PreviewMapAreaRectangle& rectangle : mapAreaRectangles) {
+            if (sampleX < rectangle.minimumX || sampleX > rectangle.maximumX) continue;
+            if (sampleY < rectangle.minimumZ || sampleY > rectangle.maximumZ) continue;
+            result.red = rectangle.colorRed; result.green = rectangle.colorGreen;
+            result.blue = rectangle.colorBlue; result.alpha = rectangle.colorAlpha;
+        }
+        return result;
+    }
     if (layerKind == PreviewLayerKind::Water) {
         if (configuration.bWaterEnabled == 0) return PreviewColor();
         const float depth = NormalizedWaterDepth(

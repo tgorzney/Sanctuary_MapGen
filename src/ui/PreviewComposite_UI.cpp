@@ -20,10 +20,11 @@ int ClampPreviewResolution(int requested) {
 PreviewComposite::PreviewComposite(const Params::Geometry& geometrySettings,
                                    const Params::Water& waterSettings,
                                    const std::vector<Params::Stratum>& stratumSettings,
+                                   const std::vector<Params::MapArea>& mapAreaSettings,
                                    const Data::MapFields& inputFields,
                                    const Data::PlacementInstances& placedInstances,
                                    Data::EntityIdBuffer& entityIdentifierOutput)
-    : geometry(geometrySettings), water(waterSettings), strata(stratumSettings),
+    : geometry(geometrySettings), water(waterSettings), strata(stratumSettings), areas(mapAreaSettings),
       mapFields(inputFields), instances(placedInstances),
       entityIdentifierBuffer(entityIdentifierOutput) {}
 
@@ -79,6 +80,7 @@ void PreviewComposite::PrepareRun() {
     BuildConfigurationRecord();
     BuildStratumConfigurations();
     BuildLayerConfigurations();
+    BuildMapAreaConfigurations();
     BuildEntityPoints();
     const std::size_t texelCount = static_cast<std::size_t>(configuration.previewResolution)
                                  * configuration.previewResolution;

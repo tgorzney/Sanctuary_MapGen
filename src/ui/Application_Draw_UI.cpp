@@ -5,6 +5,8 @@
 // (Application_PanelTerrain_UI.cpp / Application_PanelEnvironment_UI.cpp /
 // Application_PanelSystem_UI.cpp). It edits no rule, derives no tier and touches no DATA field.
 #include "Application_UI.h"
+#include "RtToggleWidget_UI.h"
+#include "TerrainOverlayTab_UI.h"
 #include <algorithm>
 #include <cfloat>
 #include <imgui.h>
@@ -51,6 +53,28 @@ void Application::DrawCanvasWindow() {
 
     ImGui::Begin("Map Preview");
     if (ImGui::Button("View")) ImGui::OpenPopup("ViewLayersPopup");
+    ImGui::SameLine();
+    // STEP213 — Auto-Level: ports v1's min/max-scan heightmap normalization
+    // (gui/PreviewRenderer.cpp:270-284,500, legacy) onto the SAME `PreviewFieldLayer::
+    // bAutoDomainFromField` mechanism the Slope/Flow/Accumulation layers already expose
+    // (PreviewComposite_Prepare_UI.cpp's FieldRange CPU scan), wired here for the HeightRamp layer
+    // specifically -- the one field layer it was never turned on for. This is composite
+    // PRESENTATION state, not recipe content (PreviewComposite_Settings_UI.h's own header note),
+    // so no stage's parameter hash can see the flip -- the driver derives its own recomposite-only
+    // tier off the SAME NotifyParametersChanged() call every other composite-presentation edit
+    // already uses (Application_PanelTerrain_UI.cpp's DrawHeightRampSection, SlopeTab_UI.cpp's own
+    // "Auto Domain From Field" checkbox). The toolbar button is the ONLY write path for this flag
+    // in this ticket -- see the ticket's own "Explicit out-of-scope" for why no matching control
+    // is added to the View popup's terrain section or to the Heightmap tab.
+    PreviewFieldLayer* const heightRampLayer =
+        PreviewFieldLayerOfKind(composite.Settings(), PreviewLayerKind::HeightRamp);
+    if (heightRampLayer != nullptr) {
+        bool bAutoLevelEnabled = heightRampLayer->bAutoDomainFromField;
+        if (DrawToggleButton("autoLevelToggle", "Auto-Level", bAutoLevelEnabled)) {
+            heightRampLayer->bAutoDomainFromField = bAutoLevelEnabled;
+            previewDriver.NotifyParametersChanged();
+        }
+    }
     // STEP200 — defense-in-depth against the auto-fit-to-content growth feedback loop (an
     // unconstrained item width inside a BeginPopup window feeds back into that same window's next-
     // frame width): every item the popup draws is now itself fixed-width, but a max width here means

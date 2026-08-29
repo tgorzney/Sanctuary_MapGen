@@ -114,7 +114,7 @@ void WireCanvas(MapCanvas& canvas, Sys::GpuResourceManager& manager, const Previ
 void RunMapCanvasActivePanelGateChecks(Sys::GpuResourceManager& manager) {
     PreviewTestScene scene;
     BuildPreviewTestScene(scene);
-    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                scene.instances, scene.entityIdentifiers);
     ConfigurePreviewSettings(composite.Settings());
     composite.Settings().previewResolution = kPreviewResolution;
@@ -186,7 +186,7 @@ void RunMapCanvasClickSelectsManualMarkerChecks(Sys::GpuResourceManager& manager
 
     PreviewTestScene scene;
     BuildPreviewTestScene(scene);
-    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                scene.instances, scene.entityIdentifiers);
     ConfigurePreviewSettings(composite.Settings());
     composite.Settings().previewResolution = kPreviewResolution;

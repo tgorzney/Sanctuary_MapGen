@@ -76,6 +76,10 @@ void ConfigureDefaultPreview(PreviewCompositeSettings& previewSettings, int prev
         MakeAutoDomainLayer(PreviewLayerKind::Flow, flowRampRow, 1.0f));
     previewSettings.fieldLayers.push_back(
         MakeAutoDomainLayer(PreviewLayerKind::Accumulation, accumulationRampRow, 1.0f));
+    // ARCH §14.17 item 10 — topmost, no ramp (gradientRampIndex = -1, the same posture StratumSplat
+    // uses: the color comes from the per-area tint, never a ramp lookup), Overlay blend, full opacity.
+    previewSettings.fieldLayers.push_back(MakeFieldLayer(
+        PreviewLayerKind::MapAreas, PreviewBlendMode::Overlay, -1, 0.0f, 1.0f, 1.0f));
     previewSettings.entityMarkRadiusPixels = 3.0f;
 }
 

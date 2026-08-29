@@ -22,7 +22,7 @@ void check(bool bCondition, const char* label) { Ui::CheckPreviewExpectation(bCo
 void TestVisibilityOffSkipsCompositeButNotBake() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Settings().bEntitiesEnabled = false;

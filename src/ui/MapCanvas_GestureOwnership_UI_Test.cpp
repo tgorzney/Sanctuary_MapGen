@@ -109,7 +109,7 @@ ImVec2 ScreenPositionFor(const ImVec2& regionOrigin, MapCanvas& canvas, const Pr
 void RunMapCanvasGestureOwnershipChecks(Sys::GpuResourceManager& manager) {
     PreviewTestScene scene;
     BuildPreviewTestScene(scene);
-    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                scene.instances, scene.entityIdentifiers);
     ConfigurePreviewSettings(composite.Settings());
     composite.Settings().previewResolution = kPreviewResolution;

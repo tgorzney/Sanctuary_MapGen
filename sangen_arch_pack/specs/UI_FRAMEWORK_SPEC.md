@@ -27,6 +27,9 @@ entities responsively; imgui is used, but bypassed on the hot paths.
 7. **RT (realtime) toggles.** Widgets (e.g. the range slider) carry a per-control
    "RT" flag: while off, dragging updates the value but defers the expensive
    recompute until mouse-release — keeping FPS high during slider scrubbing.
+   (STEP213: the RT button's own draw path is now `DrawToggleButton`, a generic
+   pressable toggle-button primitive the whole widget library shares — see
+   "Universal widget library" below.)
 
 ## Interaction / dirty-flag model
 - Two-tier dirty flags: **`bNeedsMapUpdate`** (full regen: heightmap/erosion/flow/
@@ -67,6 +70,17 @@ files.
   general primitive, not bespoke to that flow: no confirm-dialog widget existed in
   the toolkit before this addition. Follows the existing `ColorSwatch_UI.cpp`
   draw/state split (`WidgetHelpers_UI.h` "THE SPLIT").
+- **`DrawToggleButton`** — the generic pressable toggle-button primitive (`ImGui::Button` + an
+  active-state color push through the shared `WidgetStyle`/`ResolveWidgetColor` mechanism): a real
+  button, not a checkbox. Added (STEP213) by generalizing the toolkit's original RT ("realtime")
+  toggle (item 7 above) into a widget the whole library shares — `DrawRealtimeToggleButton` is now
+  a thin adapter over it, binding the fixed "RT" label/width/tooltip pair; the toolbar's Auto-Level
+  toggle (`Application_Draw_UI.cpp`, over `PreviewFieldLayer::bAutoDomainFromField`) is its first
+  general-purpose, non-RT consumer. Five other toggle-shaped controls surveyed elsewhere in the
+  codebase (`Checkbox_UI`, the `DraggableList` row visibility icon, the Scenarios 3-state cycle
+  button, the Marker bundle header buttons) are each a distinct interaction shape (a checkbox, an
+  icon glyph, a tri-state cycle) and are NOT migrated onto this primitive by this entry — that is
+  separate, unratified future work, not an oversight.
 
 ## v2 guidance
 - Keep the bypass toolkit (1–7); make it the standard, not ad-hoc per tab.

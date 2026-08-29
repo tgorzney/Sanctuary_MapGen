@@ -40,6 +40,7 @@ std::string BuildEnumDefinitions() {
          + IntegerDefinition("PREVIEW_LAYER_ACCUMULATION",  static_cast<int>(PreviewLayerKind::Accumulation))
          + IntegerDefinition("PREVIEW_LAYER_WATER",         static_cast<int>(PreviewLayerKind::Water))
          + IntegerDefinition("PREVIEW_LAYER_SLOPE",         static_cast<int>(PreviewLayerKind::Slope))
+         + IntegerDefinition("PREVIEW_LAYER_MAP_AREAS",     static_cast<int>(PreviewLayerKind::MapAreas))
          + IntegerDefinition("PREVIEW_BLEND_REPLACE",       static_cast<int>(PreviewBlendMode::Replace))
          + IntegerDefinition("PREVIEW_BLEND_ALPHA",         static_cast<int>(PreviewBlendMode::AlphaBlend))
          + IntegerDefinition("PREVIEW_BLEND_ADD",           static_cast<int>(PreviewBlendMode::Add))
@@ -67,7 +68,8 @@ std::string BuildBindingDefinitions() {
          + IntegerDefinition("PREVIEW_IMAGE_COMPOSITE",            static_cast<int>(CompositeImageUnit::kCompositeImage))
          + IntegerDefinition("PREVIEW_BINDING_CONFIGURATION",      static_cast<int>(CompositeBinding::kConfiguration))
          + IntegerDefinition("PREVIEW_BINDING_LAYERS",             static_cast<int>(CompositeBinding::kLayerConfigurations))
-         + IntegerDefinition("PREVIEW_BINDING_STRATA",             static_cast<int>(CompositeBinding::kStratumConfigurations));
+         + IntegerDefinition("PREVIEW_BINDING_STRATA",             static_cast<int>(CompositeBinding::kStratumConfigurations))
+         + IntegerDefinition("PREVIEW_BINDING_MAP_AREAS",          static_cast<int>(CompositeBinding::kMapAreaRectangles));
 }
 
 // main() first, then the prototyped providers: the field sampling/colorization unit and the

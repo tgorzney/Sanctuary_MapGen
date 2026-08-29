@@ -57,8 +57,8 @@ RegionLocalPoint ToRegionLocal(const PreviewComposite& composite, const MapCanva
 
 void RunHitTestChecks() {
     PreviewTestScene scene;
-    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields, scene.instances,
-                               scene.entityIdentifiers);
+    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
+                               scene.instances, scene.entityIdentifiers);
     MapCanvasView view;
     ComposeHitTestScene(scene, composite, view);
 

@@ -152,14 +152,30 @@ public:
         manualDecalDrag.geometry = geometry;
         manualDecalDrag.recipe   = recipeForGlobalSymmetry;
     }
-    // ARCH §21.8 — mirrors SetManualPropDragSource's shape minus Geometry/globalSymmetryRecipe (Areas
-    // carry no symmetry/layer/lock concept of their own, §21.8 correction 1/3). `areas`/`areaColors`/
-    // `selectedAreaIndex` are the only mutable pointers; `areasLocked` is read-only — the canvas never
-    // writes the tab-wide lock.
+    // ARCH §21.8 / STEP212 — mirrors SetManualPropDragSource's shape minus Geometry/
+    // globalSymmetryRecipe (Areas carry no symmetry/layer concept of their own, §21.8 correction
+    // 1/3). `areas`/`areaColors`/`areaLocks`/`selectedAreaIndex` are all mutable: STEP212 replaces
+    // the retired, read-only, tab-wide `const bool* areasLocked` with a per-area lock TABLE the
+    // canvas now legitimately writes into too (CreateAreaFromDrag inserts a freshly created area's
+    // own entry as unlocked; every ordinary lazy resolve elsewhere still defaults locked) — exactly
+    // ResolveAreaColor's own already-established mutable-pointer shape for `areaColors` above.
+    // ARCH §14.17 item 11 — a fifth parameter, `mapAreaSuppressedIndex`, lets the canvas set/clear the
+    // composite's transient drag-suppression slot WITHOUT reaching through the canvas's own `const
+    // PreviewComposite* composite` (deliberately const — the canvas never composites, see below).
+    // STEP212 leaves this fifth parameter and its own plumbing completely untouched.
     void SetManualAreaDragSource(std::vector<Params::MapArea>* areas, std::vector<AreaColorEntry>* areaColors,
-                                  const bool* areasLocked, int* selectedAreaIndex) {
+                                  std::vector<AreaLockEntry>* areaLocks, int* selectedAreaIndex,
+                                  int* mapAreaSuppressedIndex) {
         manualAreaDrag.areas = areas; manualAreaDrag.areaColors = areaColors;
-        manualAreaDrag.bAreasLocked = areasLocked; manualAreaDrag.selectedAreaIndex = selectedAreaIndex;
+        manualAreaDrag.areaLocks = areaLocks; manualAreaDrag.selectedAreaIndex = selectedAreaIndex;
+        manualAreaDrag.mapAreaSuppressedIndex = mapAreaSuppressedIndex;
+    }
+    // ARCH §14.17 item 11 — the drag-suppression recomposite request, mirroring
+    // SetSelectionChangedCallback's own injection shape verbatim (this header's established pattern).
+    // Unset = no refresh, never a crash. Fired exactly twice per drag/resize/move gesture (begin +
+    // end) and once per create-by-drag — never once per ContinueAreaDrag frame.
+    void SetAreaCompositeRefreshCallback(std::function<void()> refreshCallback) {
+        areaCompositeRefreshCallback = std::move(refreshCallback);
     }
 
     // STEP126 — the static selection-highlight source: `selectedInstanceIdentifier` is the SAME
@@ -326,12 +342,23 @@ private:
     // correction 1) — an independent sibling of TryBeginManualInstanceDrag's 3-way dispatcher, not a
     // fourth branch inside it.
     bool AreaGestureEligible() const;                                          // MapCanvas_AreaDragDispatch_UI.cpp
+    // STEP212 — the per-area lock query AreaGestureEligible() no longer performs itself (lock is now
+    // per-area, keyed by name, not a single tab-wide bool) — every canvas-side gate that used to read
+    // the old `manualAreaDrag.bAreasLocked` (both TryBeginAreaDrag and DrawAreaOverlayPass's
+    // cursor-shape section) now calls this instead, at the point it knows WHICH area. Missing
+    // sources or an out-of-range index answer locked (Constitution §6 — refuse, never silently
+    // permit), mirroring AreaGestureEligible's own existing null-refuses posture in the same file.
+    bool IsAreaLocked(int areaIndex) const;                                    // MapCanvas_AreaDragDispatch_UI.cpp
     bool TryBeginAreaDrag(float regionLocalX, float regionLocalY);             // ditto
     void ContinueAreaDrag(float regionLocalX, float regionLocalY, bool bShiftHeld, bool bCtrlHeld); // ditto
     void EndAreaDrag();                                                        // ditto
     void CreateAreaFromDrag(float pressRegionLocalX, float pressRegionLocalY,
                             float releaseRegionLocalX, float releaseRegionLocalY);   // ditto, release-time only
     void DrawAreaOverlayPass(float regionOriginX, float regionOriginY);        // MapCanvas_AreaDraw_UI.cpp
+    // ARCH §14.17 item 11 — writes `*manualAreaDrag.mapAreaSuppressedIndex` null-safely and fires
+    // `areaCompositeRefreshCallback` only when the value actually changed, so TryBeginAreaDrag/
+    // EndAreaDrag never hold two copies of that "did it actually change" condition.
+    void SetMapAreaSuppression(int areaIndex);                                 // MapCanvas_AreaDragDispatch_UI.cpp
 
     MapCanvasView view;
     Sys::GpuResourceManager*        gpuResourceManager = nullptr;
@@ -414,6 +441,8 @@ private:
     // Areas is not a fourth PlacementCollectionKind_UI member).
     ManualAreaDragSources_UI manualAreaDrag;
     bool                     bAreaDragActive = false;
+    // ARCH §14.17 item 11 — the recomposite-request callback (see SetAreaCompositeRefreshCallback).
+    std::function<void()>    areaCompositeRefreshCallback;
 };
 
 } // namespace Ui

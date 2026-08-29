@@ -28,7 +28,7 @@ float ExpectedSpotChannel(float stratumTint, float flowSource) {
 void TestSpotCellColors() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Compose();
@@ -50,7 +50,7 @@ void TestSpotCellColors() {
 void TestEntityIdentifierBuffer() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Compose();
@@ -75,7 +75,7 @@ void TestEntityIdentifierBuffer() {
 void TestPassOrderingAndClear() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     composite.Settings().previewResolution = 4;
     composite.Settings().bEntitiesEnabled = false;
@@ -96,7 +96,7 @@ void TestPassOrderingAndClear() {
 void TestResolutionIsTweakable() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());
     composite.Settings().previewResolution = 16;                // escalate on idle (ARCH §4.4)
@@ -117,7 +117,7 @@ void TestSlopeLayerSamplesTheBakedField() {
     Ui::BuildPreviewTestScene(scene);
     scene.fields.slope.Fill(1.5f);                       // gradient magnitude, the pinned unit
     const Data::FloatField bakedSlope = scene.fields.slope;   // Mask's output, read-only here
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     composite.Settings().previewResolution = 4;
     composite.Settings().bEntitiesEnabled = false;
@@ -142,7 +142,7 @@ void TestSlopeLayerSamplesTheBakedField() {
 void TestWorldPreviewPixelRoundTrip() {
     Ui::PreviewTestScene scene;
     Ui::BuildPreviewTestScene(scene);
-    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     check(composite.PixelsPerPreviewCell() == 0.0f,
           "an un-composed composite has not baked a cell scale yet");

@@ -7,8 +7,9 @@
 // rename churn. Layer: UI. Pure data, no logic of its own.
 #pragma once
 #include <vector>
+#include "AreaColorTable_UI.h"         // AreaColorEntry — ARCH §14.17 item 9's retarget
 #include "AreaDragGesture_UI.h"
-#include "AreasTab_List_UI.h"          // AreaColorEntry
+#include "AreaLockTable_UI.h"          // AreaLockEntry — STEP212's new per-area lock side table
 #include "InstanceDragGesture_UI.h"
 #include "../params/Geometry_PARAMS.h"
 #include "../params/MapArea_PARAMS.h"
@@ -43,8 +44,24 @@ struct ManualAreaDragSources_UI {
     std::vector<AreaColorEntry>*  areaColors         = nullptr;   // mutable: ResolveAreaColor lazily
                                                                     // appends a default entry for a
                                                                     // freshly canvas-created area
-    const bool*                   bAreasLocked       = nullptr;   // read-only: canvas never writes the lock
+    // STEP212 — replaces the retired `const bool* bAreasLocked`: one lock bit PER AREA, the exact
+    // same UI-only name-keyed side-table shape as `areaColors` above (AreaLockTable_UI.h's own
+    // AreaLockEntry/ResolveAreaLocked, mirroring AreaColorTable_UI.h's AreaColorEntry/
+    // ResolveAreaColor). Mutable (not read-only like the field it replaces) because
+    // ResolveAreaLocked lazily appends a default-LOCKED entry on first touch, exactly as
+    // ResolveAreaColor already does for areaColors, AND because CreateAreaFromDrag must insert a
+    // freshly created area's own entry as UNLOCKED (STEP212 Fix 1) — the canvas now legitimately
+    // writes into this table, unlike the plain bool it replaces. Unlike areaColors, this table has
+    // NO composite-side reader at all (lock never affects what the GPU composite draws — only
+    // whether the canvas gesture accepts input) — its single owner stays `AreasTabState::areaLocks`,
+    // never `PreviewCompositeSettings`.
+    std::vector<AreaLockEntry>*   areaLocks          = nullptr;
     int*                          selectedAreaIndex  = nullptr;   // mutable: auto-select-on-touch/deselect
+    // ARCH §14.17 item 11 — mutable: the canvas sets/clears this to omit the dragged area from the
+    // composite input for the duration of a gesture. Points at
+    // `PreviewCompositeSettings::mapAreaSuppressedIndex` — one source of truth, never a second copy.
+    // STEP212 — untouched; this field's own plumbing is STEP211 territory.
+    int*                          mapAreaSuppressedIndex = nullptr;
     AreaDragGestureState           state;
 };
 

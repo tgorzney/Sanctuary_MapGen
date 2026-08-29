@@ -34,7 +34,7 @@ void ComposeClickableScene(PreviewComposite& composite) {
 void RunMapCanvasPickingChecks() {
     PreviewTestScene scene;
     BuildPreviewTestScene(scene);
-    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                scene.instances, scene.entityIdentifiers);
     ComposeClickableScene(composite);
 
@@ -91,7 +91,7 @@ void RunMapCanvasPickingChecks() {
 void RunManualMarkerSelectionChecks() {
     PreviewTestScene scene;
     BuildPreviewTestScene(scene);   // one PROCEDURAL marker at world (2,2)
-    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.fields,
+    PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                scene.instances, scene.entityIdentifiers);
     ComposeClickableScene(composite);
 

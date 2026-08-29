@@ -33,6 +33,7 @@ const Data::FloatField* PreviewComposite::LayerSourceField(PreviewLayerKind kind
         case PreviewLayerKind::Accumulation: return &mapFields.accumulation;
         case PreviewLayerKind::Slope:        return &mapFields.slope;
         case PreviewLayerKind::StratumSplat: return nullptr;
+        case PreviewLayerKind::MapAreas:     return nullptr;
         default:                             return &mapFields.heightfield;
     }
 }
@@ -123,6 +124,38 @@ void PreviewComposite::BuildEntityPoints() {
         entityPoints.push_back(point);
     }
     configuration.entityCount = static_cast<int>(entityPoints.size());
+}
+
+// One rectangle per `recipe.areas` entry (skipping the currently drag-suppressed index, ARCH §14.17
+// item 11), flattened to CELL space with its resolved presentation color — the SAME reciprocal
+// WorldToPreviewPixel already takes, so multiply-never-divide holds (Constitution §3) and there is
+// no second copy of the world->cell arithmetic. An empty (or entirely-suppressed) result still
+// pushes one degenerate sentinel rectangle (`minimumX > maximumX`), so the buffer this binds is
+// never zero bytes and the shader's forward scan costs exactly one rejected iteration.
+void PreviewComposite::BuildMapAreaConfigurations() {
+    mapAreaRectangles.clear();
+    const float cellsPerWorldUnit = ReciprocalOrZero(settings.worldUnitsPerCell);
+    for (int index = 0; index < static_cast<int>(areas.size()); ++index) {
+        if (index == settings.mapAreaSuppressedIndex) continue;
+        const Params::MapArea& area = areas[static_cast<std::size_t>(index)];
+        PreviewMapAreaRectangle record;
+        record.minimumX = area.originX * cellsPerWorldUnit;
+        record.minimumZ = area.originZ * cellsPerWorldUnit;
+        record.maximumX = (area.originX + area.width) * cellsPerWorldUnit;
+        record.maximumZ = (area.originZ + area.length) * cellsPerWorldUnit;
+        float* const color = ResolveAreaColor(settings.areaColors, area.name);
+        record.colorRed   = color[0];
+        record.colorGreen = color[1];
+        record.colorBlue  = color[2];
+        record.colorAlpha = color[3];
+        mapAreaRectangles.push_back(record);
+    }
+    if (mapAreaRectangles.empty()) {
+        PreviewMapAreaRectangle sentinel;
+        sentinel.minimumX = 1.0f;
+        sentinel.maximumX = -1.0f;   // minimumX > maximumX: fails every sample test unconditionally
+        mapAreaRectangles.push_back(sentinel);
+    }
 }
 
 } // namespace Ui

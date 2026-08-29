@@ -225,7 +225,10 @@ draws a filled (via `ResolveAreaColor`, lazily appending a default entry for a b
 rect, EVERY FRAME, regardless of drag state — a deliberate v2 simplification over v1 (which only filled
 during an active drag, bordered-only otherwise, `Widget_AreaEditor.cpp:56` vs `211-215`); the live-drag
 "immediate feedback" v1 needed a special-cased fill for comes for free here since the always-on fill
-already re-reads the same live, being-dragged rect every frame. The 8 handles draw only for
+already re-reads the same live, being-dragged rect every frame. **(This paragraph's fill/border clause is
+AMENDED — see the 2026-08-29 amendment at the end of this file; the fill is now the composite's job in
+the steady state and the border is edit-time-only. The handle and cursor-shape rulings below are
+unchanged.)** The 8 handles draw only for
 `*manualAreaDrag.selectedAreaIndex`'s own area (mirrors the approved design's claim 8 and STEP110's
 "only the selected/expanded row's extra UI ever draws" convention). Cursor-shape feedback
 (`ImGui::SetMouseCursor`, N/S->ResizeNS, E/W->ResizeEW, NE/SW->ResizeNESW, NW/SE->ResizeNWSE,
@@ -318,3 +321,65 @@ declarations, new flag), `MapCanvas_ManualDragSources_UI.h` (new `ManualAreaDrag
 call site), `Application_UI.cpp` (`SetManualAreaDragSource` wiring). None of `AreasTab_UI.h`/`.cpp`/
 `AreasTab_List_UI.h`/`MapArea_PARAMS.h` need to change — this section is additive over their existing,
 already-ratified shape.
+
+---
+
+#### AMENDED 2026-08-29 — the draw pass is re-scoped: the composite owns the steady-state fill (see [§14.17](ARCH_14_17_MapAreaFieldLayer.md))
+
+Everything above shipped as ratified and is confirmed live by direct read (`AreaDragGesture_UI.h`/`.cpp`,
+`MapCanvas_AreaDragDispatch_UI.cpp`, `MapCanvas_AreaDraw_UI.cpp`, `MapCanvas_ManualDragSources_UI.h:41-49`,
+`Application_UI.cpp:146-147`). Its gesture, dispatch, create-by-drag, scope-gate and open-question rulings
+are **unchanged**. What changes is the **draw-pass** ruling, because Map Areas have since been folded into
+the real GPU-composited preview blend pipeline as a `PreviewFieldLayer` of the new kind
+`PreviewLayerKind::MapAreas` (human-approved; full data shape, bindings, defaults and reasoning in
+[§14.17](ARCH_14_17_MapAreaFieldLayer.md)). Four clauses are superseded, in place:
+
+1. **"Fill + bordered rect, EVERY FRAME, regardless of drag state" is retired.** The area FILL is now the
+   composite's job in the steady state — `MapAreas` is a real composited field layer, blended per-pixel
+   from `PreviewCompositeSettings::areaColors` and `recipe.areas` flattened to cell space at `PrepareRun()`
+   (§14.17 items 3-7). This section's own rationale for the always-on immediate-mode fill ("the live-drag
+   immediate feedback comes for free since the always-on fill already re-reads the same live rect every
+   frame") no longer applies to the composite path, because a composited fill of a rectangle being dragged
+   would cost a GPU recomposite per drag frame — a Tier B cost (`ARCH_14_08_DirtyFlagTiers.md`) this
+   section deliberately avoided and which correction 4 above exists to keep avoiding.
+
+2. **Drag performance — exactly two recomposites per gesture, via a suppressed index.**
+   `PreviewCompositeSettings` gains a transient `int mapAreaSuppressedIndex = -1` (presentation state,
+   never serialized). `TryBeginAreaDrag` sets it to the dragged area's index and requests ONE recomposite;
+   every `ContinueAreaDrag` frame writes `recipe.areas` live exactly as correction 4 above already rules
+   and requests **zero** recomposites, with the composite's `BuildMapAreaConfigurations()` omitting the
+   suppressed index's rectangle; `EndAreaDrag` resets it to `-1` and requests one more.
+   `CreateAreaFromDrag` requests one (a brand-new area must appear). **Net: two recomposites per
+   drag/resize gesture, not one per frame** — correction 4's "commit-on-mouse-release is about the
+   expensive recomposite gate, not the field writes" reading is thereby restored in its exact original v1
+   sense, now that a real expensive recomposite exists again. The suppression is an **index**, deliberately
+   not a flip of `fieldLayers[i].bEnabled`, so transient interaction state can never clobber the user's
+   own View-popup / left-column enable toggle. Plumbing — a fifth `int* mapAreaSuppressedIndex` parameter
+   on `SetManualAreaDragSource` (and the matching field on `ManualAreaDragSources_UI`), plus a
+   `SetAreaCompositeRefreshCallback(std::function<void()>)` mirroring `SetSelectionChangedCallback`'s
+   existing injection shape and bound in `Application::WireCallbacks()` to
+   `previewDriver.NotifyParametersChanged()` — is specified in §14.17 item 11. `MapCanvas`'s
+   `const PreviewComposite* composite` stays **const**: this section's "the canvas never composites"
+   posture is preserved, which is exactly why the suppressed index arrives as its own injected pointer
+   rather than through the composite.
+
+3. **`DrawAreaOverlayPass`'s amended contract.** Per frame it draws the **fill** only for the ONE area
+   currently being manipulated (the `mapAreaSuppressedIndex`) — the immediate-mode stand-in for the
+   composite fill suppressed this frame; drawing every area's fill would double-paint on top of the
+   composite's own fill for every non-dragged area. It draws that area's **border** only when all three
+   hold: (a) the `MapAreas` field layer is enabled, (b) that area is the suppressed one, and (c) it is the
+   selected area. **If the MapAreas layer is disabled entirely, the border never draws, regardless of
+   selection** — a disabled layer means "do not show me areas," and a border is showing an area. The 8
+   handles (selected-area-only) and the hover-only cursor-shape feedback keep their rulings above
+   verbatim, as does `DrawMarqueeRectanglePass`'s `|| bAreaDragActive` guard. §14.17 item 12 is the
+   authoritative statement of the border rule.
+
+4. **`AreasTab_List_UI.h` DOES now change**, contrary to this section's closing line — not for any gesture
+   reason, but because `AreaColorEntry`/`ResolveAreaColor` move to a new minimal
+   `src/ui/AreaColorTable_UI.h`, and the color table's single owner becomes
+   `PreviewCompositeSettings::areaColors` rather than `AreasTabState::areaColors` (§14.17 item 9).
+   `MapCanvas_ManualDragSources_UI.h:11`'s `#include "AreasTab_List_UI.h" // AreaColorEntry` retargets to
+   the new header; `ManualAreaDragSources_UI::areaColors` keeps its exact declared type and every
+   `ResolveAreaColor` call site — including `MapCanvas_AreaDraw_UI.cpp`'s — keeps its exact existing form.
+   `MapArea_PARAMS.h` and the `.sanmap` schema remain untouched (§14.17 item 13), as this section
+   originally stated.

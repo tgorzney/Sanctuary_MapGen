@@ -570,6 +570,9 @@ add_sangen_test(PreviewComposite_BlendModes_UI_Test src/ui/PreviewComposite_Blen
 # STEP200 — the View popup's new left-of-name visibility toggle: bEnabled=false skips exactly its
 # own composite pass and never touches the baked field it would have sampled.
 add_sangen_test(PreviewComposite_VisibilityToggle_UI_Test src/ui/PreviewComposite_VisibilityToggle_UI_Test.cpp)
+# ARCH_14_17_MapAreaFieldLayer.md §14.17 — the MapAreas field layer's own colorization/overlap/
+# suppression acceptance, Cpu-only (no GL needed).
+add_sangen_test(PreviewComposite_MapAreas_UI_Test src/ui/PreviewComposite_MapAreas_UI_Test.cpp)
 add_sangen_test(MapCanvas_UI_Test
     src/ui/MapCanvas_UI_Test.cpp
     src/ui/MapCanvas_Render_UI_Test.cpp
@@ -580,7 +583,9 @@ add_sangen_test(MapCanvas_UI_Test
     # ARCH §21.2/§21.5 — end-to-end pointer-state-machine coverage: right-button pans, left-button
     # never pans (drag-a-manual-instance or marquee-select instead), a marquee's lock-gate exclusion,
     # and a live Ctrl-click toggle.
-    src/ui/MapCanvas_GestureOwnership_UI_Test.cpp)
+    src/ui/MapCanvas_GestureOwnership_UI_Test.cpp
+    # ARCH §14.17 item 11 — the Area drag-suppression / exactly-two-recomposites acceptance.
+    src/ui/MapCanvas_AreaDragSuppression_UI_Test.cpp)
 # STEP53 — the screen-space overlay icon draw pass. Culling/LOD, budget/decimation, and the C2
 # cache's invalidation decision are headless (no imgui frame, no GL); bucketing + the bulk vertex
 # write need one live headless imgui frame (no GL, no window backend) — mirrors MapCanvas_UI_Test's

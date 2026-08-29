@@ -25,6 +25,7 @@
 #include "../data/MapFields_DATA.h"
 #include "../data/PlacementInstances_DATA.h"
 #include "../params/Geometry_PARAMS.h"
+#include "../params/MapArea_PARAMS.h"
 #include "../params/Stratum_PARAMS.h"
 #include "../params/Water_PARAMS.h"
 #include "../sys/GpuResource_SYS.h"
@@ -42,6 +43,7 @@ public:
 
     PreviewComposite(const Params::Geometry& geometrySettings, const Params::Water& waterSettings,
                      const std::vector<Params::Stratum>& stratumSettings,
+                     const std::vector<Params::MapArea>& mapAreaSettings,
                      const Data::MapFields& inputFields,
                      const Data::PlacementInstances& placedInstances,
                      Data::EntityIdBuffer& entityIdentifierOutput);
@@ -100,6 +102,7 @@ private:
     void BuildConfigurationRecord();                         // PreviewComposite_UI.cpp
     void BuildStratumConfigurations();                       // PreviewComposite_UI.cpp
     void BuildLayerConfigurations();                         // PreviewComposite_Prepare_UI.cpp
+    void BuildMapAreaConfigurations();                       // PreviewComposite_Prepare_UI.cpp
     void BuildEntityPoints();                                // PreviewComposite_Prepare_UI.cpp
     const Data::FloatField* LayerSourceField(PreviewLayerKind kind) const;
     bool EnsureGpuResources();                               // PreviewComposite_GpuProgram_UI.cpp
@@ -119,6 +122,7 @@ private:
     const Params::Geometry&             geometry;
     const Params::Water&                water;
     const std::vector<Params::Stratum>& strata;
+    const std::vector<Params::MapArea>& areas;
     const Data::MapFields&              mapFields;
     const Data::PlacementInstances&     instances;
     Data::EntityIdBuffer&               entityIdentifierBuffer;
@@ -127,6 +131,7 @@ private:
     PreviewCompositeConfiguration            configuration;
     std::vector<PreviewLayerConfiguration>   layerConfigurations;
     std::vector<PreviewStratumConfiguration> stratumConfigurations;
+    std::vector<PreviewMapAreaRectangle>     mapAreaRectangles;
     std::vector<PreviewEntityPoint>          entityPoints;
     std::vector<float>                       gradientLookupTables;  // every ramp, concatenated
     std::vector<float>                       packedSurfaceWeights;  // the 9 fields, concatenated

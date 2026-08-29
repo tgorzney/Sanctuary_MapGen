@@ -27,7 +27,7 @@ Application::Application(ApplicationSettings applicationSettings)
     : settings(std::move(applicationSettings)),
       recipe(MakeDefaultMapRecipe()),
       assembler(recipe),
-      composite(recipe.geometry, recipe.water, recipe.strata, assembler.Fields(),
+      composite(recipe.geometry, recipe.water, recipe.strata, recipe.areas, assembler.Fields(),
                 assembler.Placements().markers, entityIdentifiers),
       previewDriver(AssemblerWithDefaultStages(assembler)),
       threadPool(settings.workerThreadCount) {
@@ -140,11 +140,15 @@ void Application::WireCallbacks() {
     // SAME vectors the Props/Decals tabs edit — one source of truth, never a second copy.
     canvas.SetManualPropDragSource(&recipe.props, &recipe.propLayers, &recipe.geometry, &recipe);
     canvas.SetManualDecalDragSource(&recipe.decals, &recipe.decalLayers, &recipe.geometry, &recipe);
-    // ARCH §21.8 — the Area canvas gesture's drag source: `recipe.areas`/`tabState.areas.areaColors`/
-    // `tabState.areas.selectedAreaIndex` are the SAME storage the Areas tab itself edits — one source
-    // of truth, never a second copy (this function's own established posture throughout).
-    canvas.SetManualAreaDragSource(&recipe.areas, &tabState.areas.areaColors,
-                                   &tabState.areas.bAreasLocked, &tabState.areas.selectedAreaIndex);
+    // ARCH §21.8 / §14.17 item 9/11 / STEP212 — the Area canvas gesture's drag source: `recipe.areas`,
+    // `composite.Settings().areaColors`, `tabState.areas.areaLocks` and
+    // `composite.Settings().mapAreaSuppressedIndex` are the SAME storage the tab/composite already
+    // own — one source of truth, never a second copy. `areaLocks` replaces the retired
+    // `&tabState.areas.bAreasLocked` (STEP212 — per-area lock); it stays TAB-owned, unlike
+    // `areaColors`, because lock has no composite-side reader (AreaLockTable_UI.h's own ruling).
+    canvas.SetManualAreaDragSource(&recipe.areas, &composite.Settings().areaColors,
+                                   &tabState.areas.areaLocks, &tabState.areas.selectedAreaIndex,
+                                   &composite.Settings().mapAreaSuppressedIndex);
     // STEP126 — the static selection-highlight source; see MapCanvas_UI.h's
     // SetManualMarkerSelectionSource. Points at the SAME MarkersTabState field the Markers tab's own
     // instance-list rows write (tabState.markers.selectedManualInstanceIdentifier) — one source of
@@ -170,6 +174,11 @@ void Application::WireCallbacks() {
     selectProceduralMarkerInstanceCallback = [this](int arrayPosition, bool bCtrlHeld, bool bShiftHeld) {
         canvas.SelectProceduralMarkerInstanceByArrayPosition(arrayPosition, bCtrlHeld, bShiftHeld);
     };
+    // ARCH §14.17 item 11 — the drag-suppression recomposite request: the canvas asks, PIPELINE
+    // decides the tier. Mirrors the left column's own "mutate PreviewCompositeSettings then
+    // NotifyParametersChanged()" precedent (Application_LeftColumn_UI.cpp) for a presentation-only
+    // edit — exactly the derive-the-tier call a presentation-only mutation already makes elsewhere.
+    canvas.SetAreaCompositeRefreshCallback([this] { previewDriver.NotifyParametersChanged(); });
 }
 
 // The whole of the shell's generation duty. WHICH tier this is was derived by the driver from the
