@@ -20,8 +20,14 @@ namespace {
 // list's `selectedManualInstanceIdentifier`: no tab-local field exists for this session-only
 // selection, and the ticket's own Verify section asks only that the click route through the shared
 // setter, not that the list mirror the canvas's own highlight — ARCH §19.27's own out-of-scope note).
+// STEP205 — gains its own `ImGui::GetIO().KeyCtrl`/`KeyShift` read at the click site (mirroring the
+// Manual row's own DrawManualInstanceRow convention, MarkersTab_ManualLayerRowBody_UI.cpp), so a
+// Ctrl/Shift-held click here reaches the canvas's real multi-select too — before this fix Ctrl/Shift
+// were simply inert on a Procedural instance row (this list has no tab-local plural field of its own
+// to clobber, so there was no "clobber" bug here, just an unreachable canvas multi-select).
 void DrawProceduralInstanceRow(const Data::PlacementInstances& placedMarkers, int position,
-                               const std::function<void(int)>& selectProceduralMarkerInstanceCallback) {
+                               const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                   selectProceduralMarkerInstanceCallback) {
     const std::size_t instanceIndex = static_cast<std::size_t>(position);
     char rowLabel[64];
     // %.7s: the tpId is a fixed 8-byte field whose last byte need not be a terminator (mirrors
@@ -29,7 +35,7 @@ void DrawProceduralInstanceRow(const Data::PlacementInstances& placedMarkers, in
     std::snprintf(rowLabel, sizeof(rowLabel), "%d: %.7s", position,
                  placedMarkers.templateIdentifier[instanceIndex].characters);
     if (ImGui::Selectable(rowLabel) && selectProceduralMarkerInstanceCallback)
-        selectProceduralMarkerInstanceCallback(position);
+        selectProceduralMarkerInstanceCallback(position, ImGui::GetIO().KeyCtrl, ImGui::GetIO().KeyShift);
 }
 
 } // namespace
@@ -51,7 +57,7 @@ void DrawRuleInstanceList(const ProceduralInstanceListContext_UI& instanceListCo
         return;
     }
     const Data::PlacementInstances& placedMarkers = *instanceListContext.placedMarkers;
-    const std::function<void(int)>& selectCallback =
+    const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>& selectCallback =
         instanceListContext.selectProceduralMarkerInstanceCallback;
     DrawSymmetryClusterInstanceList<int>(instanceIt->second,
         [&](const int& position) {

@@ -93,7 +93,8 @@ bool DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
                            Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                            const std::string& markerTypeNameFilter,
                            const Data::PlacementInstances* placedMarkers = nullptr,
-                           const std::function<void(int)>& selectProceduralMarkerInstanceCallback = {});
+                           const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                               selectProceduralMarkerInstanceCallback = {});
 
 // MarkersTab_RuleLayerSettings_UI.cpp — the "aspect" file this header also fronts (ARCH §1.5):
 

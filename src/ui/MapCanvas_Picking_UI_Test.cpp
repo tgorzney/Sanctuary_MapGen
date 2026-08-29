@@ -150,6 +150,27 @@ void RunManualMarkerSelectionChecks() {
               && lastReportedKey.collection == PlacementCollectionKind_UI::Markers,
           "the canvas's selectedInstanceKey updates to exactly {Markers, 123, true, true}, as item 5 specifies");
 
+    // STEP205 (ARCH §21.1's own deferred follow-up) — a Ctrl-held list click must JOIN the canvas's
+    // real multi-select instead of the old modifier-blind Replace clobbering it: the ORIGINAL id (123)
+    // stays selected, and the new id becomes primary.
+    selectionChangeCount = 0;
+    canvas.SelectManualMarkerByInstanceIdentifier(456, /*bCtrlHeld=*/true, /*bShiftHeld=*/false);
+    check(SelectionSetContains(canvas.SelectedInstanceKeys(),
+              OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 123, true, /*bManual=*/true}),
+          "a Ctrl-held list click toggles the new id IN without clobbering the original (123) selection");
+    check(canvas.SelectedEntityIdentifier() == 456u, "the Ctrl-toggled id becomes the new primary");
+    check(selectionChangeCount == 1, "the Ctrl-toggle fires exactly one selection-changed notification");
+
+    // A Shift-held list click unions the new id in — same non-clobbering contract, the other modifier.
+    selectionChangeCount = 0;
+    canvas.SelectManualMarkerByInstanceIdentifier(789, /*bCtrlHeld=*/false, /*bShiftHeld=*/true);
+    check(SelectionSetContains(canvas.SelectedInstanceKeys(),
+              OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 123, true, /*bManual=*/true})
+              && SelectionSetContains(canvas.SelectedInstanceKeys(),
+              OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 456, true, /*bManual=*/true}),
+          "a Shift-held list click unions the new id in, keeping every previously-selected id");
+    check(canvas.SelectedEntityIdentifier() == 789u, "the Shift-unioned id becomes the new primary");
+
     // The binding edge case (§19.25): instanceIdentifier < 0 is never a legal manual selection target
     // — a negative id clears the selection instead of claiming a nonsensical manual key, mirroring
     // MarkersTabState::selectedManualInstanceIdentifier's own "-1 = nothing selected" sentinel.
@@ -181,6 +202,26 @@ void RunProceduralMarkerListSelectionChecks() {
     canvas.SelectProceduralMarkerInstanceByArrayPosition(7);
     check(selectionChangeCount == 0,
           "re-selecting the SAME array position is a no-op — SetSelection's own equal-key short-circuit");
+
+    // STEP205 — the procedural sibling of the manual Ctrl/Shift checks above: before this fix
+    // Ctrl/Shift were simply inert on a Procedural instance row (no landing point reached the
+    // canvas's real multi-select at all); now they resolve through the SAME ApplySelectionGesture.
+    selectionChangeCount = 0;
+    canvas.SelectProceduralMarkerInstanceByArrayPosition(8, /*bCtrlHeld=*/true, /*bShiftHeld=*/false);
+    check(SelectionSetContains(canvas.SelectedInstanceKeys(),
+              OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 7, true, /*bManual=*/false}),
+          "a Ctrl-held procedural list click toggles the new position IN without clobbering position 7");
+    check(canvas.SelectedEntityIdentifier() == 8u, "the Ctrl-toggled position becomes the new primary");
+    check(selectionChangeCount == 1, "the Ctrl-toggle fires exactly one selection-changed notification");
+
+    selectionChangeCount = 0;
+    canvas.SelectProceduralMarkerInstanceByArrayPosition(9, /*bCtrlHeld=*/false, /*bShiftHeld=*/true);
+    check(SelectionSetContains(canvas.SelectedInstanceKeys(),
+              OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 7, true, /*bManual=*/false})
+              && SelectionSetContains(canvas.SelectedInstanceKeys(),
+              OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 8, true, /*bManual=*/false}),
+          "a Shift-held procedural list click unions the new position in, keeping every prior one");
+    check(canvas.SelectedEntityIdentifier() == 9u, "the Shift-unioned position becomes the new primary");
 
     // A negative array position is never a legal selection target, mirroring the manual sibling's
     // own "-1 = nothing selected" sentinel handling.

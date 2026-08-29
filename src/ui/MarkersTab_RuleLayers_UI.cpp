@@ -79,7 +79,8 @@ bool DrawRuleLayerListBody(std::vector<Params::MarkerRuleLayer>& markerRuleLayer
                            Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                            const std::string& markerTypeNameFilter,
                            const Data::PlacementInstances* placedMarkers,
-                           const std::function<void(int)>& selectProceduralMarkerInstanceCallback) {
+                           const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                               selectProceduralMarkerInstanceCallback) {
     // STEP132 — built ONCE per call, mirrors ManualInstanceLayerIndex_UI's own build-once posture.
     const ProceduralInstanceRuleIndex_UI ruleIndexLookup(placedMarkers != nullptr
         ? BuildProceduralInstanceRuleIndex(*placedMarkers) : ProceduralInstanceRuleIndex_UI());

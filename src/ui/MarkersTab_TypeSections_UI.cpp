@@ -60,9 +60,11 @@ std::vector<std::string> EnumerateMarkerTypeSectionNames(
 
 void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
                             Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
-                            const std::function<void(int)>& selectManualMarkerInstanceCallback,
+                            const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                selectManualMarkerInstanceCallback,
                             const Data::PlacementInstances* placedMarkers,
-                            const std::function<void(int)>& selectProceduralMarkerInstanceCallback) {
+                            const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                selectProceduralMarkerInstanceCallback) {
     DrawManualMarkerLayerBlockSettings(state.manualLayers);   // (a) — once, tab-wide
 
     const std::vector<std::string> typeNames = EnumerateMarkerTypeSectionNames(

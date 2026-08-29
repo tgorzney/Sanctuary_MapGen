@@ -8,6 +8,7 @@
 #include "MapCanvas_UI.h"
 #include "MarkerTypeVisibility_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include <algorithm>
 #include <cmath>
 #include <imgui.h>
 
@@ -44,6 +45,8 @@ void MapCanvas::Draw(const char* canvasIdentifier, float regionSidePixels) {
     DrawOverlayIconLayerPass(regionOrigin.x, regionOrigin.y, regionSidePixels);
     // STEP94 — Gap 6's minimal stopgap manual-marker draw, on top of the terrain/overlay stack.
     DrawManualMarkerDragPass(regionOrigin.x, regionOrigin.y);
+    // STEP207 — the marquee's own rubber-band rectangle, on top of the normal overlay stack.
+    DrawMarqueeRectanglePass(regionOrigin.x, regionOrigin.y);
     // STEP78 — Scenario Edit Mode's own overlay, on top of the normal overlay stack.
     DrawScenarioEditModeOverlayPass(regionOrigin.x, regionOrigin.y);
 
@@ -103,6 +106,33 @@ void MapCanvas::DrawOverlayIconLayerPass(float regionOriginX, float regionOrigin
         iconLayerInput.selectedInstanceKey = PrimaryOfSelectionSet(selectedInstanceKeys);
     DrawOverlayIconLayers(iconLayerInput, overlayLayerAabbCache, overlayIconLayerFrameCache,
                          *ImGui::GetWindowDrawList());
+}
+
+// STEP207 — the marquee's own visual feedback: press-start to live-cursor rubber-band rectangle.
+// Collection-agnostic (Markers/Props/Decals all share ApplyPointerInput/ApplyMarqueeGesture, ARCH
+// §21.2/§21.6) — drawn once, keyed only on `bPressActive`/no-drag-active, never per collection. The
+// selection LOGIC this feeds is untouched (STEP207's own out-of-scope note); this is visual only.
+void MapCanvas::DrawMarqueeRectanglePass(float regionOriginX, float regionOriginY) {
+    // A manual-instance drag, once active, owns the whole press exclusively (ARCH §21.2) — never
+    // show a marquee box mid-drag.
+    const bool bManualDragActive = bManualMarkerDragActive || bManualPropDragActive || bManualDecalDragActive;
+    if (!bPressActive || bManualDragActive) return;
+
+    const ImGuiIO& io = ImGui::GetIO();
+    const float currentRegionLocalX = io.MousePos.x - regionOriginX;
+    const float currentRegionLocalY = io.MousePos.y - regionOriginY;
+    const ImVec2 pressCorner(regionOriginX + pressStartRegionLocalX, regionOriginY + pressStartRegionLocalY);
+    const ImVec2 currentCorner(regionOriginX + currentRegionLocalX, regionOriginY + currentRegionLocalY);
+    // A press that hasn't moved at all yet has an exactly zero-area box — nothing to draw. This is
+    // NOT the click/drag tolerance threshold (no "pop-in" at that boundary, per the work-order's own
+    // UX note) — it only skips the true zero-pixel case, which is imperceptible regardless.
+    if (pressCorner.x == currentCorner.x && pressCorner.y == currentCorner.y) return;
+
+    const ImVec2 minCorner(std::min(pressCorner.x, currentCorner.x), std::min(pressCorner.y, currentCorner.y));
+    const ImVec2 maxCorner(std::max(pressCorner.x, currentCorner.x), std::max(pressCorner.y, currentCorner.y));
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    drawList->AddRectFilled(minCorner, maxCorner, ImGui::GetColorU32(ImGuiCol_ButtonActive, 0.15f));
+    drawList->AddRect(minCorner, maxCorner, ImGui::GetColorU32(ImGuiCol_ButtonActive));
 }
 
 // Wheel = zoom about the cursor. Left button = click-to-select / drag-a-manual-instance /

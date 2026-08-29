@@ -21,9 +21,14 @@ inline void CheckListWidgetExpectation(bool bCondition, const char* label) {
 }
 
 // The synthetic pointer for one frame. The default position is imgui's "no mouse anywhere".
+// STEP205 — gains `bCtrlHeld`/`bShiftHeld` (default false, every existing caller unaffected) so a
+// test can simulate a modifier-held click, the same real `ImGui::GetIO().KeyCtrl`/`KeyShift` a row's
+// own click handler reads (DrawManualInstanceRow, MarkersTab_ManualLayerRowBody_UI.cpp).
 struct HeadlessMouseState {
     ImVec2 position        = ImVec2(-FLT_MAX, -FLT_MAX);
     bool   bLeftButtonDown = false;
+    bool   bCtrlHeld       = false;
+    bool   bShiftHeld      = false;
 };
 
 // Owns one imgui context for the lifetime of a test.
@@ -58,6 +63,8 @@ void RunHeadlessFrame(const HeadlessMouseState& mouse, const ImVec2& windowSize,
     ImGuiIO& io = ImGui::GetIO();
     io.AddMousePosEvent(mouse.position.x, mouse.position.y);
     io.AddMouseButtonEvent(ImGuiMouseButton_Left, mouse.bLeftButtonDown);
+    io.AddKeyEvent(ImGuiMod_Ctrl, mouse.bCtrlHeld);
+    io.AddKeyEvent(ImGuiMod_Shift, mouse.bShiftHeld);
     ImGui::NewFrame();
     ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
     ImGui::SetNextWindowSize(windowSize);

@@ -15,6 +15,7 @@
 #include "SymmetryClusterInstanceList_UI.h"
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <utility>
 
 using namespace SanmapGen;
@@ -43,12 +44,17 @@ struct FrameResult {
     bool    bReturned   = false;
 };
 
+// STEP205 — gains an optional `selectManualMarkerInstanceCallback` (default `{}`, every pre-existing
+// call site compiles unchanged) so a test can capture what DrawLayerRowBody's own canvas-sync
+// callback was invoked with, threaded straight through to DrawLayerRowBody.
 FrameResult RunRowBodyFrame(HeadlessMouseState mouse, Params::MarkerInstanceLayer& layer,
                             const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                             std::vector<Params::MarkerInstanceGroup>& markers,
                             const ManualInstanceLayerIndex_UI& instanceIndex, ManualMarkerLayersState& state,
                             int& selectedManualInstanceIdentifier,
-                            std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier) {
+                            std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
+                            const std::function<void(int, bool, bool)>&
+                                selectManualMarkerInstanceCallback = {}) {
     FrameResult result;
     const Params::Geometry geometry;
     Params::MarkerSymmetryFixSettings symmetryFixSettings;
@@ -56,7 +62,8 @@ FrameResult RunRowBodyFrame(HeadlessMouseState mouse, Params::MarkerInstanceLaye
         result.bReturned = DrawLayerRowBody(layer, /*layerIndex=*/0, markerLayers, markers, geometry,
                                             Params::SymmetryAxis::None, 3, symmetryFixSettings, state,
                                             instanceIndex, selectedManualInstanceIdentifier,
-                                            selectedManualInstanceIdentifiers, anchorIdentifier);
+                                            selectedManualInstanceIdentifiers, anchorIdentifier,
+                                            selectManualMarkerInstanceCallback);
         result.lastItemMin = ImGui::GetItemRectMin();
         result.lastItemMax = ImGui::GetItemRectMax();
         result.lastItemId  = ImGui::GetItemID();
@@ -64,22 +71,29 @@ FrameResult RunRowBodyFrame(HeadlessMouseState mouse, Params::MarkerInstanceLaye
     return result;
 }
 
+// STEP205 — gains optional `bCtrlHeld`/`bShiftHeld`/`selectManualMarkerInstanceCallback` (every
+// pre-existing call site's three trailing defaults keep it a byte-identical plain click with no
+// callback wired), held across all three synthetic frames (hover/press/release) so whichever frame
+// imgui's own Selectable resolves the click on sees the SAME modifier state.
 FrameResult ClickAt(ImVec2 position, Params::MarkerInstanceLayer& layer,
                     const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                     std::vector<Params::MarkerInstanceGroup>& markers,
                     const ManualInstanceLayerIndex_UI& instanceIndex, ManualMarkerLayersState& state,
                     int& selectedManualInstanceIdentifier,
-                    std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier) {
-    HeadlessMouseState hover;   hover.position = position;
+                    std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
+                    bool bCtrlHeld = false, bool bShiftHeld = false,
+                    const std::function<void(int, bool, bool)>&
+                        selectManualMarkerInstanceCallback = {}) {
+    HeadlessMouseState hover;   hover.position = position; hover.bCtrlHeld = bCtrlHeld; hover.bShiftHeld = bShiftHeld;
     HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
     HeadlessMouseState release = hover; release.bLeftButtonDown = false;
     RunRowBodyFrame(hover, layer, markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
-                   selectedManualInstanceIdentifiers, anchorIdentifier);
+                   selectedManualInstanceIdentifiers, anchorIdentifier, selectManualMarkerInstanceCallback);
     const FrameResult pressResult =
         RunRowBodyFrame(press, layer, markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
-                        selectedManualInstanceIdentifiers, anchorIdentifier);
+                        selectedManualInstanceIdentifiers, anchorIdentifier, selectManualMarkerInstanceCallback);
     RunRowBodyFrame(release, layer, markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
-                    selectedManualInstanceIdentifiers, anchorIdentifier);
+                    selectedManualInstanceIdentifiers, anchorIdentifier, selectManualMarkerInstanceCallback);
     return pressResult;
 }
 
@@ -286,6 +300,77 @@ void RunSymmetryGroupedInstanceRowClickChecks() {
           "clicking the second row inside the SAME cluster still updates to its own id (301), not additive");
 }
 
+// STEP205 (ARCH §21.1's own deferred follow-up) — a Ctrl-held row click must widen BOTH the
+// tab-local multi-select write (ApplyManualInstanceSelectionClick, already inside DrawManualInstanceRow)
+// AND the canvas-sync callback with the SAME real modifier state, so the two agree instead of one
+// clobbering the other within the same click (the root problem this ticket fixes). Reuses the SAME
+// two-row fixture RunInstanceRowClickChecks does.
+void RunCtrlHeldClickSyncsTabLocalAndCanvasCallbackCheck() {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].name = "Resources";
+    Params::MarkerTransform first;  first.name = "A"; first.layerIndex = 0; first.instanceIdentifier = 100;
+    Params::MarkerTransform second; second.name = "B"; second.layerIndex = 0; second.instanceIdentifier = 101;
+    markers[0].transforms.push_back(first);
+    markers[0].transforms.push_back(second);
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+
+    ManualMarkerLayersState state;
+    int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int anchorIdentifier = -1;
+
+    int  reportedIdentifier = -1;
+    bool bReportedCtrl      = false;
+    bool bReportedShift     = false;
+    int  callbackFireCount  = 0;
+    const std::function<void(int, bool, bool)> selectManualMarkerInstanceCallback =
+        [&](int instanceIdentifier, bool bCtrlHeld, bool bShiftHeld) {
+            reportedIdentifier = instanceIdentifier;
+            bReportedCtrl      = bCtrlHeld;
+            bReportedShift     = bShiftHeld;
+            ++callbackFireCount;
+        };
+
+    const FrameResult settle = RunRowBodyFrame(HeadlessMouseState(), markerLayers[0], markerLayers, markers,
+                                               instanceIndex, state, selectedManualInstanceIdentifier,
+                                               selectedManualInstanceIdentifiers, anchorIdentifier,
+                                               selectManualMarkerInstanceCallback);
+    const float rowHeight  = settle.lastItemMax.y - settle.lastItemMin.y;
+    const float rowSpacing = ImGui::GetStyle().ItemSpacing.y;
+    const ImVec2 secondRowCenter((settle.lastItemMin.x + settle.lastItemMax.x) * 0.5f,
+                                 (settle.lastItemMin.y + settle.lastItemMax.y) * 0.5f);
+    const ImVec2 firstRowCenter(secondRowCenter.x, secondRowCenter.y - (rowHeight + rowSpacing));
+
+    // Baseline: a plain click on the FIRST row establishes the tab-local multi-select at {100}, and
+    // fires the canvas-sync callback with (100, false, false) — the pre-STEP205 shape, unchanged.
+    ClickAt(firstRowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state,
+           selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers, anchorIdentifier,
+           /*bCtrlHeld=*/false, /*bShiftHeld=*/false, selectManualMarkerInstanceCallback);
+    Check(selectedManualInstanceIdentifier == 100, "the plain baseline click selects the first row (100)");
+    Check(selectedManualInstanceIdentifiers.size() == 1 && selectedManualInstanceIdentifiers[0] == 100,
+          "the plain baseline click's own tab-local multi-select is exactly {100}");
+    Check(callbackFireCount == 1 && reportedIdentifier == 100 && !bReportedCtrl && !bReportedShift,
+          "the plain baseline click's own canvas-sync callback fires with (100, false, false)");
+
+    // A Ctrl-held click on the SECOND row: the callback must fire with (101, true, false) — proving
+    // the widened signature actually carries the real modifier state through — while the tab-local
+    // multi-select write (ApplyManualInstanceSelectionClick, inside the SAME click) still contains the
+    // FIRST row's id (100): the two writes agree (both Ctrl-toggle 101 in) instead of the canvas-sync
+    // half unconditionally Replacing and clobbering what the tab-local half just wrote.
+    callbackFireCount = 0;
+    ClickAt(secondRowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state,
+           selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers, anchorIdentifier,
+           /*bCtrlHeld=*/true, /*bShiftHeld=*/false, selectManualMarkerInstanceCallback);
+    Check(callbackFireCount == 1 && reportedIdentifier == 101 && bReportedCtrl && !bReportedShift,
+          "a Ctrl-held click on the second row fires the canvas-sync callback with (101, true, false)");
+    Check(selectedManualInstanceIdentifiers.size() == 2
+              && selectedManualInstanceIdentifiers[0] == 100 && selectedManualInstanceIdentifiers[1] == 101,
+          "the tab-local multi-select still contains the FIRST row's id (100) after the Ctrl-held click "
+          "— proving the tab-local write and the canvas-sync write agree instead of racing");
+}
+
 } // namespace
 
 int main() {
@@ -294,6 +379,7 @@ int main() {
     RunColorOverrideBodyCopyRemovedCheck();
     RunManualSymmetryClusterOrderChecks();
     RunSymmetryGroupedInstanceRowClickChecks();
+    RunCtrlHeldClickSyncsTabLocalAndCanvasCallbackCheck();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

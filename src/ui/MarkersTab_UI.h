@@ -191,8 +191,10 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     const IconAtlasManifest* iconManifest = nullptr,
                     const IconAtlasPairingLookup* pairingLookup = nullptr,
                     const Data::PlacementInstances* placedMarkers = nullptr,
-                    const std::function<void(int)>& selectManualMarkerInstanceCallback = {},
-                    const std::function<void(int)>& selectProceduralMarkerInstanceCallback = {});
+                    const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                        selectManualMarkerInstanceCallback = {},
+                    const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                        selectProceduralMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen

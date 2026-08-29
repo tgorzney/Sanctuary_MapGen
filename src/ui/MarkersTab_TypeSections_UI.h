@@ -69,9 +69,11 @@ struct MarkerTypeSectionsState {
 // ride the same chain one leg further, into DrawRuleLayerListBody's own per-Rule instance list.
 void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
                             Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
-                            const std::function<void(int)>& selectManualMarkerInstanceCallback = {},
+                            const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                selectManualMarkerInstanceCallback = {},
                             const Data::PlacementInstances* placedMarkers = nullptr,
-                            const std::function<void(int)>& selectProceduralMarkerInstanceCallback = {});
+                            const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                selectProceduralMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen

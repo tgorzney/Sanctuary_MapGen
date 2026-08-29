@@ -62,6 +62,9 @@ bool DrawAddMarkerRuleLayerButton(std::vector<Params::MarkerRuleLayer>& markerRu
     Params::MarkerRuleLayer layer;
     layer.parentBundleIdentifier = parentBundleIdentifierForNewLayer;   // STEP119 field
     layer.markerTypeName         = markerTypeNameForNewLayer;          // NEW — STEP125
+    // STEP208 — seed one default rule so this layer's settings are immediately reachable (see
+    // MarkersTab_UI.cpp's own bAddProceduralLayerClicked handler for the same fix + rationale).
+    layer.rules.push_back(Params::MarkerRule());
     markerRuleLayers.push_back(layer);
     state.selectedRuleLayerIndex = static_cast<int>(markerRuleLayers.size()) - 1;
     state.selectedRuleIndex      = 0;

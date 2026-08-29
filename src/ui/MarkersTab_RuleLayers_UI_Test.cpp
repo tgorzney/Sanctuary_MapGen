@@ -191,6 +191,10 @@ void RunDrawAddMarkerRuleLayerButtonTypeSeedChecks() {
     Check(seededClick.bReturned, "clicking Add Layer reports the recipe moved");
     Check(!seededLayers.empty() && seededLayers.back().markerTypeName == "Alloy",
           "markerTypeNameForNewLayer = \"Alloy\" lands on the newly pushed layer's own markerTypeName");
+    // STEP208 — a freshly created layer is seeded with exactly one default rule, so its own settings
+    // are immediately reachable instead of the row being stuck at "0 rule(s)" forever.
+    Check(seededLayers.back().rules.size() == 1,
+          "the newly pushed layer is seeded with exactly one default rule");
 
     std::vector<Params::MarkerRuleLayer> defaultLayers;
     MarkersTabState defaultState;

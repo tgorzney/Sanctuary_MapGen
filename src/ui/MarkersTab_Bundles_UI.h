@@ -303,7 +303,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                MarkerLayerBundlesState& state, MarkersTabState& rootState,
                                Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                                const std::string& markerTypeNameFilter,
-                               const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
+                               const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                   selectManualMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen

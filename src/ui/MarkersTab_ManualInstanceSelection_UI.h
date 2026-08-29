@@ -43,7 +43,9 @@ struct ManualInstanceRowInteractionContext_UI {
     std::vector<int>*         selectedIdentifiers = nullptr;   // selectedManualInstanceIdentifiers
     int*                      anchorIdentifier     = nullptr;   // manualInstanceSelectionAnchorIdentifier
     const std::vector<int>*   rowOrder             = nullptr;   // THIS list's own display-order identifiers
-    std::function<void(int)>  selectManualMarkerInstanceCallback;
+    // STEP205 — widened from `void(int)` so the row's own click can forward the SAME bCtrl/bShift it
+    // already read for ApplyManualInstanceSelectionClick, instead of the canvas always Replacing.
+    std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>  selectManualMarkerInstanceCallback;
 };
 
 // Reassigns every Instance transform in `markers` whose `instanceIdentifier` matches one of

@@ -181,12 +181,16 @@ private:
     // (mirroring SetManualMarkerSelectionSource's existing injection pattern) and threaded down
     // through DrawMarkersTab -> DrawMarkerTypeSections -> DrawLayerRowBody's existing call chain
     // (the same chain previewDriver/iconManifest already ride down).
-    std::function<void(int)>     selectManualMarkerInstanceCallback;
+    // STEP205 (ARCH §21.1's own deferred follow-up) — widened from `void(int)` to carry the row
+    // click's real Ctrl/Shift modifier state through to `MapCanvas::ApplySelectionGesture`, so this
+    // shell-mediated path joins/ranges into the canvas's real multi-select instead of always Replace.
+    std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>     selectManualMarkerInstanceCallback;
     // STEP132 (ARCH §19.27) — the procedural sibling: bound in WireCallbacks() to
     // MapCanvas::SelectProceduralMarkerInstanceByArrayPosition, threaded down through
     // DrawMarkersTab -> DrawMarkerTypeSections -> DrawRuleLayerListBody's own call chain (the SAME
     // chain selectManualMarkerInstanceCallback above already rides).
-    std::function<void(int)>     selectProceduralMarkerInstanceCallback;
+    // STEP205 — widened the same way as the manual sibling above.
+    std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>     selectProceduralMarkerInstanceCallback;
     int  frameCount           = 0;
     bool bImguiReady          = false;
 };

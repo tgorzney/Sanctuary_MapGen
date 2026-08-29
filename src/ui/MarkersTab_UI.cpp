@@ -162,7 +162,8 @@ void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>&
                                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                        const std::string& typeName, int& selectedManualInstanceIdentifier,
                                        std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                                       const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+                                       const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                           selectManualMarkerInstanceCallback) {
     std::vector<std::pair<int, int>> baseInstances;
     for (int groupIndex = 0; groupIndex < static_cast<int>(markers.size()); ++groupIndex) {
         Params::MarkerInstanceGroup& group = markers[static_cast<std::size_t>(groupIndex)];
@@ -259,8 +260,10 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                     const IconAtlasPairingLookup* pairingLookup,
                     const Data::PlacementInstances* placedMarkers,
-                    const std::function<void(int)>& selectManualMarkerInstanceCallback,
-                    const std::function<void(int)>& selectProceduralMarkerInstanceCallback) {
+                    const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                        selectManualMarkerInstanceCallback,
+                    const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                        selectProceduralMarkerInstanceCallback) {
     ImGui::PushID("markersTab");
     DrawMarkersTabGlobals(state.globals);
     // Global plus three collapsible Type-sections (Alloy/Plasma/Spawn) — no free-floating Rule stack,
@@ -338,6 +341,11 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                 layer.parentBundleIdentifier = ResolveSelectedParentBundleIdentifier(
                     recipe.markerLayerBundles, state.bundles.selectedBundleIdentifier, typeName);
                 layer.markerTypeName = typeName;
+                // STEP208 — without an initial rule, the newly created layer's row has zero rules and
+                // renders no settings at all (DrawRuleLayerBody's DraggableList<MarkerRule> has nothing
+                // to draw): seed the same plain default-constructed rule DrawMarkerRuleButtons's own
+                // "Add Rule" button already pushes, so the layer is immediately editable.
+                layer.rules.push_back(Params::MarkerRule());
                 recipe.markerRuleLayers.push_back(layer);
                 state.selectedRuleLayerIndex = static_cast<int>(recipe.markerRuleLayers.size()) - 1;
                 state.selectedRuleIndex      = 0;

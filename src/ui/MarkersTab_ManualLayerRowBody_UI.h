@@ -95,7 +95,8 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state,
                       const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier,
                       std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                      const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
+                      const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                          selectManualMarkerInstanceCallback = {});
 
 // STEP123/STEP142: the row header's own compact Color Override control — a "COL" SmallButton toggle
 // (was a checkbox, human's own instruction) + its swatch, drawn on EVERY row's header line via

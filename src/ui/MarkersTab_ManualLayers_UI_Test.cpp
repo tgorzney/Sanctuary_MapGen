@@ -219,7 +219,11 @@ void RunRealtimeDefaultChecks() {
 // (`kMarkerLayerHeaderExtraCombinedWidthPixels`, `RenderCollapsibleRow`'s own SameLine contract,
 // DraggableListWidget_RowLayout_UI.h) and asserts the cluster's own rightmost edge lands AT OR
 // BEFORE the strip's leftmost edge — never past it.
-void RunUngroupedClusterDoesNotOverlapAffordanceStripCheck() {
+// Runs the exact same geometry check `bPushExaggeratedItemSpacing` optionally wraps in a non-default
+// ImGuiStyleVar_ItemSpacing before the frame -- proves the fix (STEP206) reads the LIVE style value
+// rather than a hardcoded gap constant: the invariant must hold at BOTH the default AND an exaggerated
+// spacing, not just whichever spacing the test constants happened to assume.
+void RunUngroupedClusterDoesNotOverlapAffordanceStripCheck(bool bPushExaggeratedItemSpacing = false) {
     HeadlessImguiSession session;
     Params::MarkerInstanceLayer layer;
     ManualMarkerLayersState state;
@@ -229,6 +233,8 @@ void RunUngroupedClusterDoesNotOverlapAffordanceStripCheck() {
 
     ImVec2 clusterMax, stripMin;
     RunHeadlessFrame(HeadlessMouseState(), ImVec2(400.0f, 100.0f), [&] {
+        if (bPushExaggeratedItemSpacing)
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(20.0f, 4.0f));
         ImGui::PushID("row");
         ImGui::CollapsingHeader("Some Fairly Long Manual Layer Name",
             ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow);
@@ -242,11 +248,13 @@ void RunUngroupedClusterDoesNotOverlapAffordanceStripCheck() {
         RowLayoutDetail::DrawRowAffordances(row, 0, signal, 0.0f, rowAvailWidthPixels, false);
         stripMin = ImGui::GetItemRectMin();   // the strip's FIRST item, [o]/[-] visibility
         ImGui::PopID();
+        if (bPushExaggeratedItemSpacing)
+            ImGui::PopStyleVar();
     });
 
     Check(clusterMax.x <= stripMin.x + 0.5f,
          "the [SYM][COL][swatch] cluster's own rightmost edge lands at or before the built-in "
-         "[o]/[L]/[X] strip's leftmost edge -- never past it (STEP145)");
+         "[o]/[L]/[X] strip's leftmost edge -- never past it (STEP145/STEP206)");
 }
 
 } // namespace
@@ -259,6 +267,7 @@ int main() {
     RunDrawLayerListButtonsTypeSeedChecks();
     RunRealtimeDefaultChecks();
     RunUngroupedClusterDoesNotOverlapAffordanceStripCheck();
+    RunUngroupedClusterDoesNotOverlapAffordanceStripCheck(/*bPushExaggeratedItemSpacing=*/true);
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

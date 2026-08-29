@@ -154,14 +154,16 @@ void Application::WireCallbacks() {
     // resolves through this closure into the canvas's own real selection (item 3's SetSelection),
     // mirroring SetManualMarkerSelectionSource's own injection pattern exactly, just in the opposite
     // direction (tab -> canvas instead of canvas -> tab).
-    selectManualMarkerInstanceCallback = [this](int instanceIdentifier) {
-        canvas.SelectManualMarkerByInstanceIdentifier(instanceIdentifier);
+    // STEP205 — forwards the row click's real Ctrl/Shift state into MapCanvas's own modifier-aware
+    // overload instead of always defaulting to Replace.
+    selectManualMarkerInstanceCallback = [this](int instanceIdentifier, bool bCtrlHeld, bool bShiftHeld) {
+        canvas.SelectManualMarkerByInstanceIdentifier(instanceIdentifier, bCtrlHeld, bShiftHeld);
     };
     // STEP132 (ARCH §19.27) — the procedural sibling, same shell-mediated pattern, opposite direction
     // of nothing new: the Rule row's own instance-list click resolves through this into the canvas's
-    // own real selection, exactly like the manual closure above.
-    selectProceduralMarkerInstanceCallback = [this](int arrayPosition) {
-        canvas.SelectProceduralMarkerInstanceByArrayPosition(arrayPosition);
+    // own real selection, exactly like the manual closure above. STEP205 — same modifier forwarding.
+    selectProceduralMarkerInstanceCallback = [this](int arrayPosition, bool bCtrlHeld, bool bShiftHeld) {
+        canvas.SelectProceduralMarkerInstanceByArrayPosition(arrayPosition, bCtrlHeld, bShiftHeld);
     };
 }
 

@@ -33,17 +33,22 @@ void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
         && IsManualInstanceSelected(*interaction.selectedIdentifiers, instanceIdentifier);
     if (ImGui::Selectable(rowLabel.c_str(), bRowSelected)) {
         // STEP141 — Ctrl (toggle)/Shift (range within THIS list)/plain click, "typical expectations".
+        const bool bCtrl  = ImGui::GetIO().KeyCtrl;
+        const bool bShift = ImGui::GetIO().KeyShift;
         if (interaction.selectedIdentifiers != nullptr && interaction.anchorIdentifier != nullptr
             && interaction.rowOrder != nullptr)
-            ApplyManualInstanceSelectionClick(*interaction.rowOrder, instanceIdentifier,
-                                              ImGui::GetIO().KeyCtrl, ImGui::GetIO().KeyShift,
+            ApplyManualInstanceSelectionClick(*interaction.rowOrder, instanceIdentifier, bCtrl, bShift,
                                               *interaction.selectedIdentifiers, *interaction.anchorIdentifier);
         if (interaction.primaryIdentifier != nullptr) *interaction.primaryIdentifier = instanceIdentifier;
         // ARCH §19.25, item 5 — IN ADDITION TO the tab-local write above, not instead of it:
         // drives the canvas's own real selection, so the REAL icon-sprite render path
         // (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) reflects this click too.
+        // STEP205 — reuses the SAME `bCtrl`/`bShift` this row already read above (not a second
+        // `ImGui::GetIO()` read) so the canvas's own `ApplySelectionGesture` resolves to the SAME
+        // Toggle/Union/Replace outcome the tab-local write above just applied, instead of always
+        // Replace clobbering it within the same click.
         if (interaction.selectManualMarkerInstanceCallback)
-            interaction.selectManualMarkerInstanceCallback(instanceIdentifier);
+            interaction.selectManualMarkerInstanceCallback(instanceIdentifier, bCtrl, bShift);
     }
     // STEP141 — drag SOURCE: carries just this row's own instanceIdentifier; the RECEIVER (a Layer's
     // own drop target, DrawManualLayerInstanceDropTarget) decides whether the WHOLE multi-select
@@ -74,7 +79,8 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state,
                       const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier,
                       std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                      const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+                      const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                          selectManualMarkerInstanceCallback) {
     (void)markerLayers; (void)geometry; (void)globalSymmetryMask; (void)globalRadialRepeatCount;
     (void)markerSymmetryFixSettings;
     // STEP142/human's own correction: no Name field here — double-click the header instead

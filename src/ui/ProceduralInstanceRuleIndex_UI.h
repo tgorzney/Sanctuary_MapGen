@@ -51,7 +51,10 @@ struct ProceduralInstanceListContext_UI {
     const Data::PlacementInstances*       placedMarkers   = nullptr;
     const ProceduralInstanceRuleIndex_UI* ruleIndexLookup = nullptr;
     int                                   flatRuleIndex   = -1;
-    std::function<void(int)>              selectProceduralMarkerInstanceCallback;
+    // STEP205 — widened from `void(int)` so DrawProceduralInstanceRow can forward its own new
+    // Ctrl/Shift read through to the canvas's `ApplySelectionGesture`, joining/ranging into the
+    // canvas's real multi-select instead of always Replace.
+    std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>  selectProceduralMarkerInstanceCallback;
 };
 
 } // namespace Ui

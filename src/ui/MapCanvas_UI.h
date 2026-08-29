@@ -189,7 +189,12 @@ public:
     // (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) also lights up for a list click —
     // never a second, parallel highlight mechanism. A negative `instanceIdentifier` clears the
     // selection (mirrors MarkersTabState::selectedManualInstanceIdentifier's own `-1` sentinel).
-    void SelectManualMarkerByInstanceIdentifier(int instanceIdentifier);   // MapCanvas_UI.cpp
+    // STEP205 — gains `bCtrlHeld`/`bShiftHeld` (default false, byte-identical Replace for every
+    // existing caller): resolves through `ApplySelectionGesture` directly, not the modifier-blind
+    // `SetSelection` wrapper, so a Ctrl/Shift-held list click joins/ranges into the canvas's real
+    // multi-select set instead of unconditionally replacing it (the "clobber" bug §21.1 deferred).
+    void SelectManualMarkerByInstanceIdentifier(int instanceIdentifier, bool bCtrlHeld = false,
+                                                bool bShiftHeld = false);   // MapCanvas_UI.cpp
 
     // STEP132 (ARCH §19.27) — the procedural sibling of SelectManualMarkerByInstanceIdentifier above:
     // a Markers-tab PROCEDURAL instance-list click resolves through the SAME canonical SetSelection,
@@ -197,7 +202,9 @@ public:
     // exact representation §19.25 already establishes for canvas click-pick, because it IS the same
     // array. A negative `arrayPosition` clears the selection, mirroring the manual sibling's own
     // sentinel handling. Built once, not a second divergent selection path (§19.27's own instruction).
-    void SelectProceduralMarkerInstanceByArrayPosition(int arrayPosition);   // MapCanvas_UI.cpp
+    // STEP205 — gains `bCtrlHeld`/`bShiftHeld`, same shape/defaults as the manual sibling above.
+    void SelectProceduralMarkerInstanceByArrayPosition(int arrayPosition, bool bCtrlHeld = false,
+                                                       bool bShiftHeld = false);   // MapCanvas_UI.cpp
 
     MapCanvasView& View() { return view; }
     const MapCanvasView& View() const { return view; }
@@ -260,6 +267,13 @@ private:
     // ARCH §20's ResolvePropsManual/ResolveDecalsManual), which re-reads the SAME live `recipe.props`/
     // `recipe.decals` a drag writes into, so a Prop/Decal drag needs no stopgap draw of its own.
     void DrawManualMarkerDragPass(float regionOriginX, float regionOriginY);
+    // STEP207 — the marquee's own visual feedback: MapCanvas::Draw never drew a rubber-band
+    // rectangle for a left-drag box-select, so the (already-correct, ARCH §21.2/§21.6) selection
+    // applied silently at mouse-up. Guard: `bPressActive` true AND none of the three
+    // `b*ManualDragActive` flags (a drag gesture, once active, owns the whole press exclusively —
+    // never show a marquee box mid-drag). Collection-agnostic by construction — keyed only on the
+    // press state, never per Markers/Props/Decals (MapCanvas_Draw_UI.cpp).
+    void DrawMarqueeRectanglePass(float regionOriginX, float regionOriginY);
     // ARCH §21.2/§21.3 — the drag gesture's three lifecycle calls, generalized across Markers/Props/
     // Decals (renamed from TryBeginManualMarkerDrag; MapCanvas_ManualDragDispatch_UI.cpp), tried at
     // press-time before the click/marquee disambiguation (MapCanvas_Draw_UI.cpp). `TryBeginManualInstanceDrag`

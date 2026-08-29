@@ -83,11 +83,17 @@ void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& l
     // right-align-against-the-reserved-zone math as before (V/I and X are NOT part of clusterWidth
     // here — DraggableList's own built-in affordance strip already draws those, see this function's
     // own header comment above).
+    // STEP206 — the bare sum above omitted the FIVE real `SameLine()` gaps this cluster actually
+    // draws (see this ticket's own root-problem writeup), undercounting clusterWidth and pushing the
+    // cursor 5 * ItemSpacing.x too far right — landing the cluster on top of the affordance strip.
+    // Read the LIVE style value, never a hardcoded literal, so a future theme change stays correct.
+    const float itemSpacing = ImGui::GetStyle().ItemSpacing.x;
     const float clusterWidth = kMarkerLayerIconSizeControlWidthPixels
                               + kMarkerLayerGridSizeControlWidthPixels
                               + kMarkerLayerSymmetryButtonWidthPixels
                               + kMarkerLayerColorOverrideButtonWidthPixels
-                              + kMarkerLayerColorOverrideSwatchWidthPixels;
+                              + kMarkerLayerColorOverrideSwatchWidthPixels
+                              + 5.0f * itemSpacing;
     // Right-align within the row's own FIXED header-extra budget, not GetContentRegionAvail(): the
     // live content region reaches all the way to the row's TRUE right edge, which is PAST the
     // built-in [o]/[L]/[X] strip's own reserved kAffordanceStripWidthPixels (DrawRowAffordances,
@@ -125,7 +131,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                   int& selectedManualInstanceIdentifier,
                                   std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                   const std::string& markerTypeNameFilter,
-                                  const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+                                  const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                      selectManualMarkerInstanceCallback) {
     return DraggableList<Params::MarkerInstanceLayer>::Render(
         "manualMarkerLayers", markerLayers,
         [&](int rowIndex) {
@@ -197,7 +204,8 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    const std::string& markerTypeNameFilter,
                                    int& selectedManualInstanceIdentifier,
                                    std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                                   const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+                                   const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                       selectManualMarkerInstanceCallback) {
     // STEP138/human's own correction: no "Add Marker Layer" button here — fully redundant with the
     // Type-section header's own "+ Layer" (MarkersTab_UI.cpp), and drawing both produced the same
     // confusing double-add the header's "+ Group" duplicate did.

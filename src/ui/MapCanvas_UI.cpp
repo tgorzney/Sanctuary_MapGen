@@ -44,16 +44,25 @@ std::uint32_t MapCanvas::ApplyClick(float regionLocalX, float regionLocalY) {
 // `instanceIdentifier` (the tab's own "-1 = nothing selected" sentinel) clears the selection instead
 // of claiming a nonsensical manual key, mirroring the binding edge case §19.25 states for every
 // manual-marker key: `instanceIdentifier < 0` is never a legal selection target.
-void MapCanvas::SelectManualMarkerByInstanceIdentifier(int instanceIdentifier) {
-    SetSelection(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, instanceIdentifier,
-                                       instanceIdentifier >= 0, /*bManual=*/true});
+// STEP205 — calls `ApplySelectionGesture` directly (not the modifier-blind `SetSelection` wrapper)
+// so a Ctrl/Shift-held list click resolves to Toggle/Union instead of an unconditional Replace that
+// clobbers whatever `ApplyManualInstanceSelectionClick` just wrote into the tab-local multi-select
+// set within the same click (the root problem this ticket fixes).
+void MapCanvas::SelectManualMarkerByInstanceIdentifier(int instanceIdentifier, bool bCtrlHeld,
+                                                       bool bShiftHeld) {
+    ApplySelectionGesture(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, instanceIdentifier,
+                                                instanceIdentifier >= 0, /*bManual=*/true},
+                          bCtrlHeld, bShiftHeld);
 }
 
-// STEP132 (ARCH §19.27) — the procedural sibling: routes through the SAME canonical SetSelection
-// above, `bManual=false` (a procedural array position is never a manual instanceIdentifier).
-void MapCanvas::SelectProceduralMarkerInstanceByArrayPosition(int arrayPosition) {
-    SetSelection(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, arrayPosition,
-                                       arrayPosition >= 0, /*bManual=*/false});
+// STEP132 (ARCH §19.27) — the procedural sibling: routes through the SAME canonical
+// ApplySelectionGesture above, `bManual=false` (a procedural array position is never a manual
+// instanceIdentifier). STEP205 — same modifier-aware widening as the manual sibling.
+void MapCanvas::SelectProceduralMarkerInstanceByArrayPosition(int arrayPosition, bool bCtrlHeld,
+                                                              bool bShiftHeld) {
+    ApplySelectionGesture(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, arrayPosition,
+                                                arrayPosition >= 0, /*bManual=*/false},
+                          bCtrlHeld, bShiftHeld);
 }
 
 void MapCanvas::ApplyDrag(float deltaRegionPixelsX, float deltaRegionPixelsY) {

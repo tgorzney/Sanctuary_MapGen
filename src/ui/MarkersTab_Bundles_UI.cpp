@@ -29,7 +29,8 @@ void DrawMarkerGroupLeafBody(const MarkerGroupLeafKey_UI& leaf, std::vector<Para
                              Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                              MarkersTabState& rootState, Pipeline::PreviewDriver* previewDriver,
                              const ManualInstanceLayerIndex_UI& instanceIndex,
-                             const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+                             const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                 selectManualMarkerInstanceCallback) {
     if (leaf.kind == MarkerGroupLeafKey_UI::Kind::Procedural) {
         if (leaf.layerIndex < 0 || leaf.layerIndex >= static_cast<int>(ruleLayers.size())) return;
         DrawRuleLayerSettings(ruleLayers[static_cast<std::size_t>(leaf.layerIndex)], previewDriver);
@@ -106,7 +107,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                MarkerLayerBundlesState& state, MarkersTabState& rootState,
                                Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest*,
                                const std::string& markerTypeNameFilter,
-                               const std::function<void(int)>& selectManualMarkerInstanceCallback) {
+                               const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                   selectManualMarkerInstanceCallback) {
     // STEP138/human's own correction: no "Add Group" button here — the Type-section header's own
     // "+ Group" (MarkersTab_UI.cpp) already owns this job; a second one here duplicated it and the
     // two, both minting via NextMarkerLayerBundleId against the same vector, produced confusing

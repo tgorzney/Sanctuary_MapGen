@@ -135,7 +135,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                   int& selectedManualInstanceIdentifier,
                                   std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                   const std::string& markerTypeNameFilter,
-                                  const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
+                                  const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                      selectManualMarkerInstanceCallback = {});
 
 // The Add Marker Layer button. STEP120: gains an optional Bundle-scoped parent so a Bundle node's
 // own "add a Layer here" (MarkersTab_Bundles_UI.cpp) can reuse it; moved out of the anonymous
@@ -164,7 +165,8 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    const std::string& markerTypeNameFilter,
                                    int& selectedManualInstanceIdentifier,
                                    std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                                   const std::function<void(int)>& selectManualMarkerInstanceCallback = {});
+                                   const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                       selectManualMarkerInstanceCallback = {});
 
 } // namespace Ui
 } // namespace SanmapGen
