@@ -300,3 +300,19 @@ already documents for the composed marker types), so the `.sanmap` JSON shape fo
 change as `MarkerRule`'s own migration above (that one is a genuine breaking
 schema change — a field-tier removal, not a same-tier C++ regrouping). Full
 ruling and touch list: `ARCH_16_11_ScatterRuleSymmetryUnification.md`.
+
+## Future candidate — SanGen-native mask-to-rectangle placement workflow (not designed here)
+
+A related but distinct placement concept, outside this spec's scatter-rule model
+entirely: `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §7 records the **current, ad hoc,
+non-SanGen** manual process (a hand-run Python pipeline) used to decompose a
+hand-authored mask into a list of axis-aligned `NavmapModifierTemplate`
+rectangles for engine pathing-blocker placement — not markers/props/decals/units,
+and not driven by any `MarkerRule`/`PropRule`/`DecalRule`/`UnitRule` gate above.
+That spec's §7.1 flags this rectangle-decomposition step as a strong candidate
+for a future SanGen-native placement feature, naturally scoped alongside this
+spec's own scatter/placement rules. **Not designed here**: no new rule type, no
+PROC stage, and no interaction with `Placement_PROC`/`Placement_Accept_PROC`'s
+existing dart-throw/symmetry-orbit machinery is ruled on by either spec.
+Cross-referenced here only so a reader of this spec's own placement model finds
+the pointer to the unrelated one.

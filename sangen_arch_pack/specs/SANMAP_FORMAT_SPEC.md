@@ -200,6 +200,16 @@ because every official map tested is symmetric. The documented convention
 (`world.z = length - z - 1`) stands; do not "fix" it on the strength of a
 better-looking residual. A decisive test needs an asymmetric map.
 
+**Distinct convention, not this one — do not conflate (2026-08-29).**
+`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §8 reuses this exact `row = z; col = (N-1) - x`
+heightmap-sampling convention, applied in the **inverse** direction (pixel → world
+instead of world → pixel), for a hand-authored `Textures/` blocker mask — the same
+raster-asset family as `heightmap.raw`. That is a genuinely **different** coordinate
+concern from the `world = (x, y, length - z - 1)` entity-position flip documented
+above in "Conversion / import-export logic" — two different conventions for two
+different kinds of coordinates (raster pixel index vs. JSON entity position field).
+A reader must not assume one informs or corrects the other.
+
 ## Validated against an official map (~TEAM-1v1_Tropical_256)
 - Confirms: fileVersion 3, mapVersion 1; width=length=256, height=128;
   `heightmapResolution = 257` (N+1); exactly 9 `stratumLayers`.
@@ -491,7 +501,7 @@ Correction 15 below.** `PropsStack`/`DecalsStack`/`UnitsStack` remain exactly
 the flat rule arrays described in this correction; `MarkersStack` alone gains
 the one-tier Group(`MarkerRuleLayer`)→Rule(`MarkerRule`) wrapper (ARCH §16),
 the first concrete slice of this correction's own long-deferred Group/Layer
-hierarchy, scoped to exactly what layer-scoped marker symmetry needs — not a
+hierarchy, scoped exactly to what layer-scoped marker symmetry needs — not a
 retroactive redesign of the other three Stacks.
 
 **Confirmed cardinality change, new fields required:**

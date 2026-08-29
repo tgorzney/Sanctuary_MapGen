@@ -239,3 +239,17 @@ The `.sanmap` ships 8 masks in 2 TGAs + base stratum 0; on import they loaded in
 There is no general mask-multiply chain today. v2 should add one (a mask can multiply
 another) as a tweakable op. Not required by the current work-orders; when added, it lives
 inside the Mask stage and feeds `surfaceStratumWeights` — never the physical field.
+
+## Future candidate — SanGen-native mask-to-rectangle placement workflow (not designed here)
+A related but distinct mask concept exists outside this stage entirely:
+`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §7 records the **current, ad hoc, non-SanGen** manual
+process (a hand-run Python pipeline) used to turn a hand-authored `Textures/`-folder mask
+into a list of axis-aligned `NavmapModifierTemplate` rectangles for pathing-blocker
+placement — a different consumer than this stage's `surfaceStratumWeights` (which feed
+Placement/Bake, not the engine's navigation layers). That spec's §7.1 flags this as a
+strong candidate for a future SanGen-native masking/placement feature — author a blocker
+mask the same way a stratum mask is authored, decompose it to rectangles automatically —
+but it is **not designed here**: no PARAMS shape, no PROC stage, and no interaction with
+this stage's `surfaceStratumWeights`/`materialProportions` fields is ruled on by either
+spec. Cross-referenced here only so a reader of this stage's own masking concept finds the
+pointer to the unrelated one.

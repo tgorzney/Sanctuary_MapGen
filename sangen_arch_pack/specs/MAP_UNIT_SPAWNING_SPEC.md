@@ -27,7 +27,10 @@ days. Do not let that happen again — see §8.
 deferred into a `NewThread` callback, which fires after step 2.
 
 The client state runs its own `LoadMapData` at `script.lua:189`. It loads map data for local
-needs; it is not authoritative for simulation.
+needs; it is not authoritative for simulation. **⚠️ Note (2026-08-29):** this per-state
+`LoadMapData` call is also what makes a shared per-map `NewThread` body run once per Lua state in a
+solo/listen-server match — a distinct phenomenon from §2's within-a-state cache-miss hazard below,
+not a restatement of it. Full derivation: `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §5.
 
 ## 2. ⚠️ The chunk executes TWICE per host state — design for it
 
@@ -62,6 +65,12 @@ end
 
 The debug loader still imports successfully and still reads any data globals; it simply does not
 trigger match setup. This stays correct if the engine ever normalizes its cache key.
+
+⚠️ **Do not conflate this hazard with the separate per-Lua-state execution nuance** (§1's note
+above; `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §5) — this section is about one **state** re-running the
+chunk twice via an `Import`-cache-key miss; that section is about a solo/listen-server match running
+the chunk once per **state** (host and client), a different axis entirely. Both are real and can
+co-occur. Confirmed misdiagnosed as the same bug, live, twice, before being correctly separated.
 
 ## 2a. Why match logic lives in a data file at all
 
@@ -129,6 +138,18 @@ end)
 Real regressions caused by getting this wrong, both on 2026-08-28: the air blocker placed ahead of
 the unit spawn silently killed every unit when it threw; and placed ahead of `SetPlayableArea` it
 risked its prefabs being culled by the throwaway 1×1 area.
+
+⚠️ **Note (2026-08-29): the snippet above is illustrative, not this map's current shape.**
+`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6 records a session where this exact pattern (ordering, each
+call `pcall`'d) was individually correct at every step and still did not fix a real bug — the
+actual cause was an `Import`-omission elsewhere, not an ordering defect. That spec's §6.1 states
+the corollary this section's own "`pcall` anything that might throw" line already implies but does
+not spell out: ordering only reduces the *chance* an earlier failure cancels a later call; `pcall`
+on the call itself is what removes the *consequence* if that call throws for any reason, ordering
+or not. `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6 also records that Pandemonium Isthmus's own live
+`_data.lua` today places blocker-prefab work **before**, not after, the scenario unit spawn shown
+above — this section's snippet remains valid as an illustration of the general rule, not as a claim
+about that file's current call order.
 
 ## 5. The `CreateUnit` call
 
@@ -206,3 +227,9 @@ was — that omission is why this was re-derived from scratch. Do not repeat it.
 | `uga3201` | Guard T3 Contrail | ⚠️ NOT playable (`BONE_MISSMATCH`) |
 
 Highest validated tier is T4, every faction. No T5 exists in this build.
+
+## 10. Related law
+
+- `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §5/§6/§6.1 — the per-Lua-state execution nuance (distinct from
+  §2 above), the ordering law extension for navmap-modifier blocker work sharing this same
+  `NewThread`, and the pcall-vs-ordering correction recorded live on Pandemonium Isthmus.

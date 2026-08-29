@@ -10,6 +10,8 @@ spec(s) a question needs — never the whole pack.
 | units / props / markers, tpId scheme, factions, asset validation, .san* formats | `specs/UNIT_PROP_MARKER_DATA_SPEC.md` |
 | map scripting & events, lua sandbox, Tags, AI system, modding, validators | `specs/MODDING_SCRIPTING_SPEC.md` |
 | the Map Scenario system — `<MapName>_data.lua`/`<MapName>_Scenarios_Runtime.lua`/`<MapName>_Scenarios_Data.lua` three-file split, module API contract, three-tier scenario matching, `alloyMode` semantics, the mandatory-`spawns` hard requirement, execution/timing law, the ratified export-only IO design (`Params::Scenarios`, overwrite safety, ARCH §15) | `specs/MAP_SCENARIO_SPEC.md` |
+| how to spawn units from a per-map Lua script — the load/execution chain, the `Import()`-cache double-execution hazard, `Import()` semantics, the one-`NewThread`-per-script rule + ordering, the `CreateUnit` call, position validation, diagnostics, known-good `tpId`s (companion to `MAP_SCENARIO_SPEC.md`, not restated there) | `specs/MAP_UNIT_SPAWNING_SPEC.md` |
+| the engine's native per-navigation-layer pathing-block primitive (Navmap Modifiers) — the all-layer blocker technique (confirmed shipped) and the partial/single-layer technique (⚠️ designed, not shipped), the per-Lua-state execution nuance distinct from `MAP_UNIT_SPAWNING_SPEC`'s own double-execution hazard, the shared-`NewThread` ordering law and its `pcall`-per-call corollary, and the current manual mask-to-rectangle authoring workflow (ARCH §22) | `specs/NAVMAP_MODIFIER_BLOCKER_SPEC.md` |
 | data model (GenerationParams), generation pipeline, GPU toggles, enums | `specs/PARAMS_PIPELINE_SPEC.md` |
 | height/material layers, GeoLayers, sim layers, thickness model, baking, stratum masks | `specs/LAYER_SYSTEM_SPEC.md` |
 | erosion (hydraulic droplet), thermal/talus, flow/accumulation, CPU-vs-GPU parity | `specs/SIM_ALGORITHMS_SPEC.md` |
@@ -20,8 +22,8 @@ spec(s) a question needs — never the whole pack.
 | asset loading — single-pass sanpack ingestion, icon atlases, on-disk icon cache | `specs/ASSET_LOADING_SPEC.md` |
 | gamedata layout — folder map (units/props/stratum/icons), sprite pairs, sizes | `specs/GAMEDATA_LAYOUT_SPEC.md` |
 | noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
-| the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights` | `specs/MASKING_SPEC.md` |
-| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the `SymmetrySetting` retrofit onto `PropRule`/`DecalRule`/`UnitRule`, ARCH §16.11; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19; Props/Decals `RuleLayer`/`LayerBundle`/Type-Section authoring parity, ARCH §20), prop SoA, scatter determinism, global marker icon/color/scale defaults | `specs/PLACEMENT_SCATTER_SPEC.md` |
+| the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights`; see also the future-candidate forward-pointer to a SanGen-native mask-to-rectangle workflow (`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §7.1) | `specs/MASKING_SPEC.md` |
+| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the `SymmetrySetting` retrofit onto `PropRule`/`DecalRule`/`UnitRule`, ARCH §16.11; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19; Props/Decals `RuleLayer`/`LayerBundle`/Type-Section authoring parity, ARCH §20), prop SoA, scatter determinism, global marker icon/color/scale defaults; see also the future-candidate forward-pointer to a SanGen-native mask-to-rectangle placement workflow (`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §7.1) | `specs/PLACEMENT_SCATTER_SPEC.md` |
 | pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling; `PropInstanceLayer`/`DecalInstanceLayer` gain full field parity with `MarkerInstanceLayer` under ARCH §20 (not yet reflected in this spec's own field tables — see the §20 narrative below); `PropTransform`/`DecalTransform` gain `instanceIdentifier`/`symmetryGroupIdentifier` under ARCH §21.4 (also not yet reflected — see the §21 narrative below) | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
@@ -748,3 +750,77 @@ the ruling it corrects; `MAP_SCENARIO_SPEC.md` §6.2 was updated in place to mat
 corrected same day," STRING/NUMBERS split spelled out explicitly). This is exactly the
 self-caught-discrepancy-recorded-not-patched-over discipline §21.3's own precedent above
 established for this pack.
+
+**Missing topic-table row backfilled (2026-08-29): `MAP_UNIT_SPAWNING_SPEC.md` existed as a real,
+already-heavily-cited spec file but had never been added to this file's own topic table** — a pure
+documentation gap, not a content defect (every other paragraph above already cites it correctly).
+Fixed as part of adding `NAVMAP_MODIFIER_BLOCKER_SPEC.md` below, since both specs govern the same
+per-map `<MapName>_data.lua`/shared-`NewThread` surface.
+
+**New `ARCH_22_NavmapModifierBlockers.md` §22 (2026-08-29) — formalizes a hand-authoring technique
+proven live, in-game, twice, on Pandemonium Isthmus.** Ratifies `NAVMAP_MODIFIER_BLOCKER_SPEC.md`,
+following the same process §15 used for the Map Scenario system. The engine's native
+`NavmapModifierTemplate` primitive (an axis-aligned, no-rotation, per-layer world-space rectangle,
+with the set of layers a prefab can ever block fixed forever at prefab-template creation time,
+§22.2) has two real native consumers today — a unit template's `skirtSize` field (all layers except
+Air) and the engine's own singleton `PlayableAreaBarrier` prefab (every layer, created once per map
+and cached as `_G.PlayableAreaBarrierPrefabID`/`_G.PlayableAreaBarrierLayers`). **Confirmed shipped,
+twice:** reusing that global prefab is the correct, sole technique for an all-layer blocker (§22.3)
+— `Engine.InstantiatePrefab` + `GetNavmapModifierIDs`/`SetNavmapModifiersSize`/
+`SetNavmapModifiersEnabled`, the exact sequence `playableAreaBarrier.lua`'s own
+`CreateBarrier`/`SetBarrierSize`/`SetBarrierEnabled` already use, with navmap modifiers host-only
+and the client touching only its local grid-modifier preview. **⚠️ Designed, not yet shipped:** a
+partial/single-layer blocker (e.g. Sea-only) cannot reuse that global prefab — its other five
+layers' modifier children sit at real, active `disabled=false`/`size=(1,1)` template defaults and
+would silently drop stray blockers — so it needs its own purpose-built prefab; §22.4 rules this may
+stay a map-local `_data.lua` helper today, recommending (not mandating) promotion to a shared
+`common/loading/*.lua` helper only once a second map needs the same pattern. §22.5 records a
+debugging-load-bearing nuance confirmed by direct read of `script.lua` — a solo/listen-server match
+runs the shared per-map chunk once per **Lua state** (not per `Import`-cache-key, which is the
+**different**, already-documented `MAP_UNIT_SPAWNING_SPEC.md` §2 hazard) — explicitly flagged so
+the two are never conflated again, having been misdiagnosed as one bug twice this session. §22.6
+extends (does not replace) the existing shared-`NewThread` ordering law with two new constraints
+(after `SetPlayableArea`, before any not-yet-proven code) and records the concrete resolved order
+on Pandemonium Isthmus today, explicitly flagged as differing from the illustrative/documented
+order in `MAP_UNIT_SPAWNING_SPEC.md` §4 and `MAP_SCENARIO_SPEC.md` §3.1 (both now cross-reference
+this ruling so neither is silently trusted as still-current on its own). §22.7 records, without
+ratifying as a SanGen feature, the current ad hoc Python mask-to-rectangle authoring pipeline
+(exact rectangle decomposition + tunable-overshoot agglomerative merge + mandatory zero-miss
+verification) used to produce both live tests' rectangle lists, flagging it as a strong future
+SanGen-native masking/placement candidate (`MASKING_SPEC.md`/`PLACEMENT_SCATTER_SPEC.md` each carry
+a forward-pointer, not a restatement). §22.8 records the pixel↔world convention that workflow uses
+— the *same* `SANMAP_FORMAT_SPEC.md` heightmap-sampling convention, applied in the *inverse*
+direction — and explicitly rules it must never be conflated with that spec's *separate*,
+still-axis-unresolved `.sanmap` entity-position convention (`SANMAP_FORMAT_SPEC.md` itself now
+carries a pointer to this ruling immediately after its own heightmap-sampling paragraph, for
+exactly this reason). **§22.9 rules this entire ratification is knowledge-pack law about a
+hand-authored Lua technique, not a SanGen `PARAMS`/`IO`/`UI` construct** — both techniques live in
+the hand-authored `<MapName>_data.lua` orchestrator, the exact file `ARCH_15_04` already forbids
+SanGen from ever writing; a future SanGen-native mask-to-rectangle placement feature is recorded as
+an intended future direction only, not designed or scheduled here (mirroring §15.9's own posture
+for the engine-whitelist migration path).
+
+**CORRECTION (2026-08-29, same day) to §22.6 above — ordering alone did not fix the bug it was
+meant to fix; `pcall` does.** On Pandemonium Isthmus, the all-layer air blocker went through
+multiple rounds of live re-ordering (blocker before/after `SetPlayableArea`; blocker before/after a
+later diagnostic) that were each individually correct against §22.6's own constraints and each
+individually failed to make the blocker appear. The real cause, found only afterward: a scripted
+find-and-replace regenerating the rectangle table silently deleted an adjacent
+`local NavmapModifiers = Import("common/navmapModifiers.lua")` line sitting in the overwritten span,
+leaving `NavmapModifiers` a nil global — every `NavmapModifiers.GetNavmapModifierIDs(...)` call
+then threw, invisibly, for the same reason every other throw in this thread is invisible
+(`threads.lua`'s `ResumeThread` swallows it; `Warn()`/`Log()` reach a non-functional F1 console).
+No re-ordering could have fixed an `Import`-omission bug. **§22.6 is amended, in place, with a new
+binding rule: every blocker-spawning call must be wrapped in its own `pcall`, not merely placed in
+a safe position** — ordering reduces the *chance* something upstream fails first; `pcall` removes
+the *consequence* if the blocker call itself throws, for any reason, ordering-related or not. Once
+every risky call is individually `pcall`-wrapped, the only ordering constraint from §22.6 that
+remains genuinely load-bearing is point 1 (`SetPlayableArea` final before instantiation) — a
+correctness constraint about which world-state the prefab sees, not an error-propagation one, so
+`pcall` cannot substitute for it. This is also recorded as a general cautionary lesson (not specific
+to navmap modifiers): a clean re-derivation of "the ordering checks out" is necessary but not
+sufficient evidence a fix is correct, and any script-driven regeneration of a Lua data table
+(rectangles, scenario tables, anything) should diff the whole function the table lives in, not just
+the table itself, since a wide find-and-replace can silently delete adjacent real code with no
+diagnostic of any kind. Full text: `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6.1 (new);
+`ARCH_22_06_NewThreadOrderingLaw.md` §22.6 carries the corresponding binding amendment.
