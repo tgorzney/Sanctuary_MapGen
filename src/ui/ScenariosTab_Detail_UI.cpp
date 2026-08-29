@@ -1,6 +1,7 @@
-// ScenariosTab_Detail_UI.cpp — Fix §5's core `ScenarioBody` fields: name, area, navy, alloyMode (with
-// its consequence card), the spawns list, and authoringNote. alloys/alloysToAdd/alloysToRemove/
-// navalFleet are ScenariosTab_DetailAlloys_UI.cpp's half (ARCH §1.5 split). Layer: UI.
+// ScenariosTab_Detail_UI.cpp — Fix §5's core `ScenarioBody` fields: name, area, spawnsUnits,
+// alloyMode (with its consequence card), the spawns list, and authoringNote.
+// alloys/alloysToAdd/alloysToRemove are ScenariosTab_DetailAlloys_UI.cpp's half (ARCH §1.5 split).
+// Layer: UI. `spawnsUnits` RENAMED 2026-08-28, was `navy` (STEP204, ARCH_15_05 §15.5 amended).
 //
 // Backend policy N/A (no PROC stage reads `recipe.scenarios`): every scalar here uses a THROWAWAY,
 // function-local `RealtimeToggle` rather than one persisted in `ScenariosTabState` — the value write
@@ -137,7 +138,14 @@ void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params
     DrawScenarioEditModeToggle(body, editModeState, patternSlotPattern, countConditions, maxArmySlotCount);
     ImGui::SeparatorText("Area");
     DrawScenarioAreaFields(body.area);
-    DrawCheckbox("Navy", body.navy);
+    DrawCheckbox("Spawns Units", body.spawnsUnits);
+    // Two-step opt-in, load-bearing to say out loud (ARCH_15_05_ParamsScenariosType.md §15.5,
+    // MAP_SCENARIO_SPEC.md §11): this checkbox alone spawns nothing. A matching name-keyed branch
+    // must ALSO exist in the map's own Lua dispatch. This UI does not, and cannot, validate that
+    // such a branch exists (ARCH §15.5 OPEN item 2 — not this ticket's to resolve).
+    ImGui::TextWrapped("%s", "\xE2\x9A\xA0 Setting this alone spawns nothing. The map's own Lua "
+        "runtime also needs a matching branch, keyed off this scenario's Name, that actually "
+        "spawns units.");
     ImGui::SeparatorText("Alloys");
     DrawScenarioAlloyModeField(body);
     ImGui::SeparatorText("Spawns");

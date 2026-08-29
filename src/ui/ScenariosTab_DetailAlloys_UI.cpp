@@ -1,6 +1,10 @@
-// ScenariosTab_DetailAlloys_UI.cpp — Fix §5's alloys/alloysToAdd/alloysToRemove/navalFleet half of
-// the shared `ScenarioBody` editor (split out of ScenariosTab_Detail_UI.cpp for the ARCH §1.5 file-
-// size ceiling; called only by DrawScenarioBodyFields there). Layer: UI.
+// ScenariosTab_DetailAlloys_UI.cpp — Fix §5's alloys/alloysToAdd/alloysToRemove half of the shared
+// `ScenarioBody` editor (split out of ScenariosTab_Detail_UI.cpp for the ARCH §1.5 file-size
+// ceiling; called only by DrawScenarioBodyFields there). Layer: UI. RETIRED 2026-08-28 (STEP204):
+// this file previously also drew a "Naval Fleet" collapsing section (fleet/pondSideByArmy/
+// sideBiasDistance, ScenariosTab_DetailNaval_UI.cpp) — deleted along with the PARAMS shape it
+// edited (ARCH_15_05_ParamsScenariosType.md §15.5). No replacement is added here (ARCH §15.5 OPEN
+// item 2).
 //
 // alloys/alloysToAdd/alloysToRemove are the honest lower-fidelity fallback (free-text `markerName`,
 // NOT a validated picker against real placed markers — STEP78's job, Fix §5's own note).
@@ -95,15 +99,6 @@ void DrawScenarioBodyExtendedFields(Params::ScenarioBody& body, const std::vecto
 
     ImGui::SeparatorText("Alloys To Remove (Delta)");
     DrawAlloyRemovalList(body.alloysToRemove, armies);
-
-    // Collapsed/de-emphasized rather than disabled: §15.5's "always emitted" rule means the data
-    // still round-trips even while Navy is off, so nothing here is non-interactive — it defaults
-    // CLOSED and dimmer when Navy is off, open when it is on, per Fix §5's own wording.
-    if (!body.navy) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-    const bool bFleetOpen = ImGui::CollapsingHeader("Naval Fleet",
-        body.navy ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None);
-    if (!body.navy) ImGui::PopStyleColor();
-    if (bFleetOpen) DrawScenarioNavalFleetFields(body.navalFleet, armies);
 }
 
 } // namespace Ui

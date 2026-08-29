@@ -48,6 +48,8 @@ making it fast.
   backends. Placement/markers must stay AI-analyzable (`AI_HOSTCLIENT_SPEC`) — that
   invariant now has a documented live consumer path through the Map Scenario system
   (`MAP_SCENARIO_SPEC.md`).
+  Runtime unit spawning from those scripts is governed by `MAP_UNIT_SPAWNING_SPEC.md`
+  — read it before reasoning about anything that places units at map-load time.
 - **Spawn/Alloy markers you seed are subject to post-load mutation.** The game-side
   Map Scenario system (`MAP_SCENARIO_SPEC.md`) rewrites
   `GameInfo.MapData.markers.Spawn.transforms` and `.Alloys.transforms` in memory at

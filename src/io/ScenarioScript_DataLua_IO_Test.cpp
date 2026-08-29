@@ -27,7 +27,7 @@ void PopulateFullScenarioBody(Params::ScenarioBody& body, const std::string& nam
     body.name = name;
     body.area.originX = 1.0f; body.area.originZ = 2.0f;
     body.area.width   = 3.0f; body.area.length  = 4.0f;
-    body.navy = true;
+    body.spawnsUnits = true;
     body.alloyMode = Params::ScenarioAlloyMode::Delta;
 
     Params::ScenarioSpawn spawn;
@@ -49,16 +49,6 @@ void PopulateFullScenarioBody(Params::ScenarioBody& body, const std::string& nam
     body.alloysToRemove.push_back(alloyToRemove);
 
     body.authoringNote = "Deliberately non-empty authoring note for " + name;
-
-    Params::ScenarioNavalFleetEntry fleetEntry;
-    fleetEntry.templateIdentifier = "XSS0201"; fleetEntry.count = 2;
-    body.navalFleet.fleet.push_back(fleetEntry);
-
-    Params::ScenarioNavalPondAssignment pondAssignment;
-    pondAssignment.armyName = "ArmyOne"; pondAssignment.side = Params::ScenarioNavalPondSide::West;
-    body.navalFleet.pondSideByArmy.push_back(pondAssignment);
-
-    body.navalFleet.sideBiasDistance = 90.0f;
 }
 
 // 1. Load-bearing: COUNT_SCENARIOS array order is rendered verbatim (ARCH_15_06 §15.6).
@@ -376,34 +366,19 @@ void TestConditionSpellingsMatchStep69() {
     Check(output.find("comparator = \"LessThan\"") != std::string::npos, "comparator spelling LessThan");
 }
 
-// 7. navalFleet always emitted, even when navy == false.
-void TestNavalFleetAlwaysEmitted() {
-    Params::MapRecipe recipe;
-    recipe.scenarios.defaultScenario.navy = false;   // deliberately false
-    Params::ScenarioNavalFleetEntry fleetEntry;
-    fleetEntry.templateIdentifier = "XSS0201"; fleetEntry.count = 2;
-    recipe.scenarios.defaultScenario.navalFleet.fleet.push_back(fleetEntry);
+// STEP204 §8 item 4: spawnsUnits renders in both states, `navy`/`navalFleet` render in neither.
+void TestSpawnsUnitsRendersBothStates() {
+    for (const bool bSpawnsUnits : { true, false }) {
+        Params::MapRecipe recipe;
+        recipe.scenarios.defaultScenario.spawnsUnits = bSpawnsUnits;
 
-    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+        const std::string output = Io::BuildScenarioDataLuaText(recipe);
 
-    Check(output.find("navy = false") != std::string::npos, "navy renders false");
-    Check(output.find("navalFleet = {") != std::string::npos, "navalFleet block is still emitted");
-    Check(output.find("fleet = {") != std::string::npos, "fleet sub-table is still emitted");
-    Check(output.find("pondSideByArmy = {") != std::string::npos, "pondSideByArmy sub-table is still emitted");
-    Check(output.find("sideBiasDistance =") != std::string::npos, "sideBiasDistance is still emitted");
-}
-
-// 8. ScenarioNavalPondSide renders as a raw signed integer, never a quoted string.
-void TestPondSideRawSignedInteger() {
-    Params::MapRecipe recipe;
-    Params::ScenarioNavalPondAssignment assignment;
-    assignment.armyName = "ArmyOne"; assignment.side = Params::ScenarioNavalPondSide::West;
-    recipe.scenarios.defaultScenario.navalFleet.pondSideByArmy.push_back(assignment);
-
-    const std::string output = Io::BuildScenarioDataLuaText(recipe);
-
-    Check(output.find("side = -1") != std::string::npos, "West renders as raw side = -1");
-    Check(output.find("side = \"West\"") == std::string::npos, "side never renders as a quoted enum spelling");
+        Check(output.find(std::string("spawnsUnits = ") + (bSpawnsUnits ? "true" : "false")) != std::string::npos,
+              bSpawnsUnits ? "spawnsUnits renders true" : "spawnsUnits renders false");
+        Check(output.find("navy = ") == std::string::npos, "the retired `navy` key never renders");
+        Check(output.find("navalFleet") == std::string::npos, "the retired `navalFleet` table never renders");
+    }
 }
 
 // 9. Empty Params::Scenarios{} still renders a complete, non-empty file.
@@ -491,8 +466,7 @@ int main() {
     TestAlloyModeAllFourSpellings();
     TestCoordinateFlipDeterministic();
     TestConditionSpellingsMatchStep69();
-    TestNavalFleetAlwaysEmitted();
-    TestPondSideRawSignedInteger();
+    TestSpawnsUnitsRendersBothStates();
     TestEmptyScenariosRendersCompleteFile();
     TestMaxArmySlotCountBareGlobalBeforeTables();
     TestArmyIdToNameAlphabeticalOrder();

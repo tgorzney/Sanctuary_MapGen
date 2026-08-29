@@ -8,6 +8,52 @@ this ticket ships.** No dependency on STEP63 (`LuaTableWriter_IO`)/STEP64
 (`GameInstallLocation_IO`)/STEP65 (`LuaSyntaxCheck_SYS`) — parallel with all three. No
 dependency on STEP60 or any marker PARAMS work (verified below).
 
+## ⚠️ AMENDED 2026-08-28 — the naval-fleet family is retired; `navy` → `spawnsUnits`
+
+**What this ticket used to specify.** As authored 2026-08-21 it transcribed a ten-field
+`ScenarioBody` whose last two fields were `bool navy` and a `ScenarioNavalFleet navalFleet`
+(itself carrying `fleet` / `pondSideByArmy` / `sideBiasDistance`, built from
+`ScenarioNavalFleetEntry`, `ScenarioNavalPondAssignment`, and the non-contiguous
+`ScenarioNavalPondSide { West=-1, East=1 }` enum). §3's parity table, §4's "do not use
+`ReadJsonEnumerationText` for `Side`" ruling, §6's "`NavalFleet`: always emitted" rule, §7's
+`Side` read, and acceptance test 5's fixture were all shaped around that family.
+
+**Why it changed.** The 2026-08-27 rewrite of the live reference script deleted
+`Scenario.SpawnNavalFleets` and every `NAVAL_*` constant; on 2026-08-28 the vestigial `navy`
+field was removed from the live Lua after being confirmed to have zero readers
+(`Pandemonium Isthmus_Scenarios_Script.lua:182-186` — cited below as `SCEN`, MAP_SCENARIO_SPEC.md's own alias for that file; the removal note is left in place of the field
+on the `4human` entry). `ARCH_15_05_ParamsScenariosType.md`'s "RETIRED 2026-08-28" section
+formally retires `ScenarioNavalFleet`, `ScenarioNavalFleetEntry`, `ScenarioNavalPondSide`,
+`ScenarioNavalPondAssignment`, and both `ScenarioBody::navalFleet` and `ScenarioBody::navy`.
+There is no reader left anywhere for the shape those four types described.
+
+**What replaces it.** A single `bool spawnsUnits = false` on `ScenarioBody` — a generic opt-in,
+read at `SCEN:388` and returned as `ResolveAndApply`'s second value. It carries **no** composition
+or placement data: `spawnsUnits = true` alone spawns nothing, because the runtime also requires a
+matching branch keyed on the scenario's own `name` inside `Scenario.SpawnMatchedScenarioUnits`
+(`SCEN:743-747`), which calls a per-scenario generator that builds a flat
+`{armyIndex, templateIdentifier, x, y, z}` array for the one generic executor
+`Scenario.SpawnUnits(instructions)` (`SCEN:437`). Placement derives an anchor live from each
+army's own `Spawn` marker; there is no pond-side assignment table to persist.
+
+⚠️ **STATUS — this is now a retirement pass over LANDED code, not a fresh build.** This ticket's
+body still reads as "nothing exists yet" (true when authored 2026-08-21); it is no longer.
+`src/params/Scenario_PARAMS.h` exists and carries the full retired family verbatim
+(`ScenarioNavalFleetEntry` :31, `ScenarioNavalPondSide : int8_t` :34,
+`ScenarioNavalPondAssignment` :36, `ScenarioNavalFleet` :42-46, `ScenarioBody::navy` :56,
+`ScenarioBody::navalFleet` :67), as do `src/io/MapExporter_Scenarios_IO.cpp`,
+`src/io/MapImporter_ScenarioRecord_IO.cpp`, and `src/io/MapImporter_Scenarios_IO_Test.cpp`.
+`ReadJsonEnumerationText` is likewise already in `src/io/JsonPrimitives_IO.h:65`, so §4's "add one
+new primitive" is already satisfied. **A coder executing this ticket is deleting and renaming, not
+creating.** Scoping that retirement across the landed IO/UI files is not authored here and needs
+its own work-order.
+
+**Net effect on this ticket's specification:** `ScenarioBody` drops from ten fields to nine, one new shared
+primitive is still needed (`ReadJsonEnumerationText`, §4 — unaffected), and the
+`ScenarioNavalPondSide` special case in §4/§7 disappears entirely. **Do not invent a PARAMS
+replacement for fleet composition or placement** — `ARCH_15_05` OPEN item 1 explicitly leaves
+that undecided.
+
 ## Root problem
 `ARCH_15_05_ParamsScenariosType.md` §15.5 ratifies the `Params::Scenarios` C++ shape and §15.7 assigns its
 `.sanmap` JSON persistence to the Format Expert. **⚠️ Correction 2026-08-22: this ticket originally
@@ -57,9 +103,10 @@ the design doc's terminology is superseded on this one point, not reopened other
 ## 1. `src/params/Scenario_PARAMS.h` (NEW)
 
 `ARCH_15_05_ParamsScenariosType.md` §15.5's block, verbatim, in the `SanmapGen::Params` namespace, with the
-needed includes (`<cstdint>` for `ScenarioNavalPondSide : int8_t`, `<string>`,
-`<vector>`, and `"MapArea_PARAMS.h"` for `ScenarioBody::area`'s `Params::MapArea`
-reuse). Header comment states: source of truth is `ARCH_15_05_ParamsScenariosType.md` §15.5, this file is a
+needed includes (`<string>`, `<vector>`, and `"MapArea_PARAMS.h"` for `ScenarioBody::area`'s
+`Params::MapArea` reuse — the `<cstdint>` this ticket previously required existed solely for
+`ScenarioNavalPondSide : int8_t`, retired 2026-08-28; add it only if some other member needs a
+fixed-width type). Header comment states: source of truth is `ARCH_15_05_ParamsScenariosType.md` §15.5, this file is a
 verbatim transcription, not a reinterpretation — any future shape change is an ARCH
 ratification first, this file second.
 
@@ -100,29 +147,38 @@ member so a future reader doesn't "fix" what looks like an unset field.
 ## 3. Field-for-field parity check — CONFIRMED, no gap
 
 Cross-checked `ARCH_15_05_ParamsScenariosType.md` §15.5's struct block against `SANMAP_FORMAT_SPEC.md`
-Correction 17's JSON shape, member by member:
+Correction 17's JSON shape, member by member (**amended 2026-08-28** — the retired `navy`/
+`navalFleet` rows are shown struck through so the delta is auditable, not silently dropped):
 
 | C++ (`ScenarioBody`) | JSON (`<ScenarioRecord>`) |
 |---|---|
 | `name` | `Name` |
 | `area` (`Params::MapArea`) | `Area` (`{x,y,width,height}`) |
-| `navy` | `Navy` |
+| `spawnsUnits` | `SpawnsUnits` |
 | `alloyMode` | `AlloyMode` |
 | `spawns` | `Spawns` |
 | `alloys` | `Alloys` |
 | `alloysToAdd` | `AlloysToAdd` |
 | `alloysToRemove` | `AlloysToRemove` |
 | `authoringNote` | `AuthoringNote` |
-| `navalFleet` (`fleet`/`pondSideByArmy`/`sideBiasDistance`) | `NavalFleet` (`Fleet`/`PondSideByArmy`/`SideBiasDistance`) |
+| ~~`navy`~~ | ~~`Navy`~~ — RETIRED 2026-08-28, replaced by `spawnsUnits`/`SpawnsUnits` |
+| ~~`navalFleet` (`fleet`/`pondSideByArmy`/`sideBiasDistance`)~~ | ~~`NavalFleet` (`Fleet`/`PondSideByArmy`/`SideBiasDistance`)~~ — RETIRED 2026-08-28, no replacement |
 
-10 fields each side, exact 1:1. Same result for `PatternScenario`+`Pattern`,
+9 fields each side, exact 1:1. Same result for `PatternScenario`+`Pattern`,
 `CountScenario`+`Conditions`, `ScenarioCountCondition`↔`{Field,Comparator,Value}`,
 `ScenarioSpawn`↔`{ArmyName,Position}`, `ScenarioAlloyOverride`↔`{ArmyName,MarkerName,
-Position}`, `ScenarioAlloyRemoval`↔`{ArmyName,MarkerName}`,
-`ScenarioNavalFleetEntry`↔`{TemplateIdentifier,Count}`,
-`ScenarioNavalPondAssignment`↔`{ArmyName,Side}`, `Scenarios`↔`{PatternScenarios,
-CountScenarios,DefaultScenario}`. **No ⚠️ to raise** — the two sides were designed
-together (ARCH_15_07_OwnershipSplit.md §15.7) and it shows.
+Position}`, `ScenarioAlloyRemoval`↔`{ArmyName,MarkerName}`, `Scenarios`↔`{PatternScenarios,
+CountScenarios,DefaultScenario}`. `ScenarioNavalFleetEntry`↔`{TemplateIdentifier,Count}` and
+`ScenarioNavalPondAssignment`↔`{ArmyName,Side}` are retired along with their parent type.
+
+⚠️ **`SpawnsUnits` is this ticket's own mechanical rename, not a quoted spec spelling.** It
+follows `SANMAP_FORMAT_SPEC.md` §1.6's PascalCase casing law applied to the ratified C++ member
+name, exactly as `AuthoringNote`/`AlloysToAdd` already do — no new convention is introduced. It is
+nonetheless a key spelling the Format Expert owns; flag it for confirmation alongside the missing
+Correction 17 (see the 2026-08-22 correction at the top of this file). Do **not** keep reading or
+writing a `Navy` key for backward compatibility: no `.sanmap` has ever shipped with a `Scenarios`
+section at all (the section does not exist in the tree yet), so there is nothing to be compatible
+with.
 
 ## 4. New shared primitive: `ReadJsonEnumerationText` (`JsonPrimitives_IO.h`, EDIT)
 
@@ -159,12 +215,14 @@ Total, idempotent, matches the file's existing style. Callers use the same
 current = static_cast<EnumType>(enumerationValue);` idiom `ReadArmyJson`/
 `ReadMarkerRuleJson` already use for the integer version.
 
-**`ScenarioNavalPondSide` is a separate case — do NOT use this primitive for `Side`.**
-It is a raw signed int (`-1`/`1`), not a 0-based contiguous index (`West=-1,East=1`,
-ARCH_15_05_ParamsScenariosType.md §15.5's deliberate non-enumeration convention, matching the live Lua reference).
-Read it with a small domain-local helper in `MapImporter_Scenarios_IO.cpp`:
-`ReadJsonInteger` the raw value, accept only exactly `-1` or `1`, else leave the field
-at its default (`East`) — never `ReadJsonEnumeration`/`ReadJsonEnumerationText`.
+~~**`ScenarioNavalPondSide` is a separate case — do NOT use this primitive for `Side`.**~~
+**RETIRED 2026-08-28.** This paragraph used to carve out `ScenarioNavalPondSide`'s raw signed
+`-1`/`1` encoding as the one enum that must be read with a domain-local integer helper rather than
+either `ReadJsonEnumeration` primitive. That type no longer exists
+(`ARCH_15_05_ParamsScenariosType.md`, RETIRED section), so **`Scenarios` now has exactly three
+enum reads — `AlloyMode`, `Field`, `Comparator` — all string-spelled, all through
+`ReadJsonEnumerationText`.** No domain-local integer-enum helper is needed; a coder must not add
+one "for symmetry."
 
 ## 5. Enum ↔ JSON string tables (exact spellings, per Correction 17)
 
@@ -200,10 +258,11 @@ three call sites: one per `patternScenarios` entry adding `"Pattern"`, one per
 `countScenarios` entry adding `"Conditions"` as an array, one direct call for
 `defaultScenario`):
 
-- Emit `<ScenarioRecord>` fields in Correction 17's own listed order (`Name`, `Area`,
-  `Navy`, `AlloyMode`, `Spawns`, `Alloys`, `AlloysToAdd`, `AlloysToRemove`,
-  `AuthoringNote`, `NavalFleet`) — `nlohmann::ordered_json` already in use throughout
-  this layer, so insertion order is write order.
+- Emit `<ScenarioRecord>` fields in Correction 17's own listed order, with the retired
+  pair removed and `SpawnsUnits` taking `Navy`'s slot (`Name`, `Area`, `SpawnsUnits`,
+  `AlloyMode`, `Spawns`, `Alloys`, `AlloysToAdd`, `AlloysToRemove`, `AuthoringNote`) —
+  `nlohmann::ordered_json` already in use throughout this layer, so insertion order is
+  write order.
 - `Area`: 4 `float` assigns (`x=area.originX, y=area.originZ, width=area.width,
   height=area.length`) — the exact mapping `BuildAreasJson` already uses; do not
   introduce a shared helper for 4 lines used in two places (matches this codebase's
@@ -212,9 +271,10 @@ three call sites: one per `patternScenarios` entry adding `"Pattern"`, one per
   ⚠️ **coordinate-flip question, see §9.**
 - `Spawns`/`Alloys`/`AlloysToAdd`/`AlloysToRemove`: plain arrays, one object per vector
   element, order preserved (not load-bearing per spec, but free with a `for` loop).
-- `NavalFleet`: always emitted (even when `navy == false` — Correction 17's worked
-  example shows non-navy scenarios still writing
-  `"NavalFleet": {"Fleet": [], "PondSideByArmy": [], "SideBiasDistance": 90.0}`).
+- `SpawnsUnits`: a plain `bool`, always emitted (including `false` — every other scalar in
+  this record is unconditionally emitted, and the importer's absent-key path already defaults
+  it to `false`). **This replaces the retired "`NavalFleet`: always emitted even when
+  `navy == false`" rule** — there is no fleet sub-object to emit at all any more.
 - **`CountScenarios` MUST be built as `nlohmann::ordered_json::array()`, iterated in
   `recipe.scenarios.countScenarios`'s own vector order** — the load-bearing property;
   do not route through any container that could reorder (no `std::map`/
@@ -265,8 +325,11 @@ malformed-array case requires `result.Warn(...)`, matching `ReadPropsJson`/
   `Params::ScenarioAlloyMode::Occupancy` (the struct default) before the read call,
   exactly `ReadArmyJson`'s `int factionValue = static_cast<int>(army.faction);` idiom.
   **No separate "if absent, set occupancy" branch needed.**
-- `Side` (`ScenarioNavalPondAssignment`): per §4, raw-int read validated against
-  `{-1,1}`; unrecognized/missing → `ScenarioNavalPondSide::East` (struct default).
+- `SpawnsUnits` absent from a `<ScenarioRecord>` → `body.spawnsUnits` stays at the struct
+  default `false` (`ReadJsonBoolean` into the pre-loaded current value, the same idiom every
+  other scalar uses). Never a warning — absence is the legal, common case; and never infer it
+  from the presence of any other field.
+  *(This bullet replaces the retired `Side`/`ScenarioNavalPondAssignment` read — see §4.)*
 - Wire into `MapImporter_ParseDocument_IO.cpp`'s `ParseEntityDomainsJson` (already takes
   `MapImportResult& result` — no signature change):
   ```cpp
@@ -376,10 +439,15 @@ check through `MapExporter::BuildSanmapJsonText`/`MapImporter::ParseSanmapJsonTe
    `slotPattern`), one `CountScenario` with 3 AND'd conditions spanning all 3
    `ScenarioCountField` values and ≥3 distinct `ScenarioComparator` values, one
    `DefaultScenario` — each with non-empty `spawns`/`alloys`/`alloysToAdd`/
-   `alloysToRemove`, non-empty `authoringNote`, `navy = true` with a non-empty
-   `navalFleet` (`fleet` 2 entries, `pondSideByArmy` 1 entry incl. a `West` side,
-   non-default `sideBiasDistance`). Build → parse → assert every field equals the
-   fixture exactly (floats via `NearlyEqual`).
+   `alloysToRemove`, non-empty `authoringNote`, and **`spawnsUnits = true` on at least one
+   record and `false` on at least one other** (the retired fixture here built a populated
+   `navalFleet` with a `West` pond side; there is no fleet data to build any more —
+   `spawnsUnits` is a lone bool). Build → parse → assert every field equals the fixture
+   exactly (floats via `NearlyEqual`).
+5b. **`SpawnsUnits` survives `false` round-trip and is emitted, not omitted.** A record with
+   `spawnsUnits = false` still writes the `"SpawnsUnits"` key (`.contains("SpawnsUnits")` on the
+   raw `ordered_json`), and reads back `false` — proving the flag is not confused with absence.
+   Absent `"SpawnsUnits"` also reads back `false`, with zero warnings.
 6. **Empty `countScenarios`/`patternScenarios` still serialize as `[]`**, not omitted or
    `{}` — inspect the raw `ordered_json` (`.is_array() && .empty()`).
 7. **Live-document integration**: `BuildSanmapJsonText` on a fixture recipe with

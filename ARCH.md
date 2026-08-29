@@ -98,13 +98,13 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §15.1 | [ARCH_15_01_LayerClassification.md](ARCH_15_01_LayerClassification.md) | Layer classification | 13 lines |
 | §15.2 | [ARCH_15_02_IoScopeRuling.md](ARCH_15_02_IoScopeRuling.md) | IO scope ruling — corrects an earlier assumption, does not reverse it | 39 lines |
 | §15.3 | [ARCH_15_03_ExportOnlyLuaRatified.md](ARCH_15_03_ExportOnlyLuaRatified.md) | Design ratified: option (c) — export-only, SanGen never parses Lua back (resolves §15.2's open question / `MAP_SCENARIO_SPEC.md` §8); amended with a template-ingestion scope-clarifying sentence, §18 | 38 lines |
-| §15.4 | [ARCH_15_04_ThreeFileOnDiskShape.md](ARCH_15_04_ThreeFileOnDiskShape.md) | Three-file on-disk shape + overwrite safety (ratifies `MAP_SCENARIO_SPEC.md` §2/§2.1/§2.2) | 37 lines |
-| §15.5 | [ARCH_15_05_ParamsScenariosType.md](ARCH_15_05_ParamsScenariosType.md) | `Params::Scenarios` — the new PARAMS type (shape ruling) | 118 lines |
+| §15.4 | [ARCH_15_04_ThreeFileOnDiskShape.md](ARCH_15_04_ThreeFileOnDiskShape.md) | Three-file on-disk shape + overwrite safety (ratifies `MAP_SCENARIO_SPEC.md` §2/§2.1/§2.2); corrected 2026-08-28 re: the retired `SpawnNavalFleets` reference | 42 lines |
+| §15.5 | [ARCH_15_05_ParamsScenariosType.md](ARCH_15_05_ParamsScenariosType.md) | `Params::Scenarios` — the new PARAMS type (shape ruling); naval-fleet types (`ScenarioNavalFleet`/`ScenarioNavalFleetEntry`/`ScenarioNavalPondSide`/`ScenarioNavalPondAssignment`, `ScenarioBody::navy`) RETIRED 2026-08-28, replaced by `spawnsUnits` + name-keyed dispatch; two items left explicitly OPEN, not guessed at | 154 lines |
 | §15.6 | [ARCH_15_06_CountScenariosOrdering.md](ARCH_15_06_CountScenariosOrdering.md) | `COUNT_SCENARIOS` ordering — array order IS the match-priority authoring action | 18 lines |
 | §15.7 | [ARCH_15_07_OwnershipSplit.md](ARCH_15_07_OwnershipSplit.md) | Ownership split — who ratifies what for the new `Params::Scenarios` family | 22 lines |
 | §15.8 | [ARCH_15_08_ThirdPartyDependencyRuling.md](ARCH_15_08_ThirdPartyDependencyRuling.md) | Third-party dependency ruling — ImGuiColorTextEdit + embedded LuaJIT | 54 lines |
 | §15.9 | [ARCH_15_09_EngineWhitelistMigrationPath.md](ARCH_15_09_EngineWhitelistMigrationPath.md) | Engine-whitelist migration path (recorded as intended future simplification, not built) | 19 lines |
-| §15.10 | [ARCH_15_10_SlotPatternConstructionMoves.md](ARCH_15_10_SlotPatternConstructionMoves.md) | Slot-pattern construction moves into the runtime; `maxArmySlotCount` becomes authored data (ratifies the human's construction-code-belongs-in-universal-mod-code decision; amends `MAP_SCENARIO_SPEC.md` §2/§3/§4) | 119 lines |
+| §15.10 | [ARCH_15_10_SlotPatternConstructionMoves.md](ARCH_15_10_SlotPatternConstructionMoves.md) | Slot-pattern construction moves into the runtime; `maxArmySlotCount` becomes authored data (ratifies the human's construction-code-belongs-in-universal-mod-code decision; amends `MAP_SCENARIO_SPEC.md` §2/§3/§4); corrected 2026-08-28 re: the retired `SpawnNavalFleets` citation | 119 lines |
 | **§16** | [ARCH_16_MarkerLayerSymmetry.md](ARCH_16_MarkerLayerSymmetry.md) | Marker layer-scoped symmetry — `MarkerRuleLayer` / `MarkerInstanceLayer` / `SymmetrySetting` (ARCH ruling, ratifies `work_orders/DESIGN_MarkerLayerSymmetry_R1.md` + `_R2.md`) | index → 11 subsection files |
 | §16.1 | [ARCH_16_01_NewParamsShapes.md](ARCH_16_01_NewParamsShapes.md) | New PARAMS shapes — ratified, with §16.5's naming amendment folded in | 68 lines |
 | §16.2 | [ARCH_16_02_MarkerRuleLayersKeepsName.md](ARCH_16_02_MarkerRuleLayersKeepsName.md) | `markerRuleLayers` keeps its full name; does not shorten to `markerLayers` like `propLayers` did | 11 lines |
@@ -159,7 +159,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §20.6 | [ARCH_20_06_TypeSectionReuse.md](ARCH_20_06_TypeSectionReuse.md) | Type Sections — reuse §19.14's mechanism verbatim; field named per domain (`propTypeName`, never `markerTypeName` on a Prop/Decal struct; Decals gets no field at all) | 30 lines |
 | §20.7 | [ARCH_20_07_Housekeeping.md](ARCH_20_07_Housekeeping.md) | Naming / file-size / `MapRecipe` flatness housekeeping | 22 lines |
 | §20.8 | [ARCH_20_08_DecalsTopLevelTab.md](ARCH_20_08_DecalsTopLevelTab.md) | Decals is a standalone top-level tab — ratifies the already-shipped split (STEP159), closes a dangling forward-reference | 27 lines |
-| **§21** | [ARCH_21_CanvasInteractionUnification.md](ARCH_21_CanvasInteractionUnification.md) | Canvas interaction unification — multi-select, drag-gesture genericization, uniform locked-item exclusion, shared picking substrate (ARCH ruling, closes §20.4's gate) | index → 7 subsection files |
+| **§21** | [ARCH_21_CanvasInteractionUnification.md](ARCH_21_CanvasInteractionUnification.md) | Canvas interaction unification — multi-select, drag-gesture genericization, uniform locked-item exclusion, shared picking substrate, Area authoring on the canvas (ARCH ruling, closes §20.4's gate) | index → 8 subsection files |
 | §21.1 | [ARCH_21_01_MultiSelectRepresentation.md](ARCH_21_01_MultiSelectRepresentation.md) | Multi-select representation — `OverlayInstanceKeySet_UI`, the widened `MapCanvas` selection surface, the callback signature | 69 lines |
 | §21.2 | [ARCH_21_02_GestureOwnership.md](ARCH_21_02_GestureOwnership.md) | Gesture ownership — press-time drag-begin-first, release-time click/marquee, the independent right-button pan | 49 lines |
 | §21.3 | [ARCH_21_03_DragGestureGenericization.md](ARCH_21_03_DragGestureGenericization.md) | Drag-gesture genericization — `InstanceDragGestureState`, `Begin/Update/EndInstanceDragGesture<Traits>`, `MarkerDragTraits`/`PropDragTraits`/`DecalDragTraits`, `HitTestManualInstances<GroupT>`/`CollectManualInstancesInWorldRegion<GroupT>` | 122 lines |
@@ -167,6 +167,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §21.5 | [ARCH_21_05_LockedItemExclusionCorrection.md](ARCH_21_05_LockedItemExclusionCorrection.md) | Locked-item exclusion — corrects §19.18; uniform across click/marquee/drag; procedural instances unaffected | 39 lines |
 | §21.6 | [ARCH_21_06_PickingInfrastructure.md](ARCH_21_06_PickingInfrastructure.md) | Picking infrastructure — `Data::SpatialGridSet`, `BuildSpatialGridSet`, three new `SpatialGrid` accessors, `PickInstancesInRegion` (renamed from the design's `PickMarkersInRegion`) | 64 lines |
 | §21.7 | [ARCH_21_07_FileSizeCeilingFlag.md](ARCH_21_07_FileSizeCeilingFlag.md) | File-size ceiling flag — `MapCanvas_UI.h` | 15 lines |
+| §21.8 | [ARCH_21_08_AreaCanvasGesture.md](ARCH_21_08_AreaCanvasGesture.md) | Area canvas gesture — create-by-drag, 8-handle resize + body-move for `Params::MapArea`, its own hand-written (non-`Traits`) substrate; independently dispatchable, not part of §21.1-§21.7's interlocking mechanism | 320 lines |
 
 ### Oversized files — known, accepted
 
@@ -179,7 +180,13 @@ rather than forking that established non-split pattern for a single new subsecti
 eighth, `ARCH_21_03_DragGestureGenericization.md`, is one interlocking ruling (the
 `Traits` contract, the state-struct de-templating refinement, and the name-field
 refinement all depend on each other for context) — splitting it would scatter a single
-coherent correction across files with no citation gain.
+coherent correction across files with no citation gain. The ninth, `ARCH_21_08_AreaCanvasGesture.md`,
+is by far the largest: a whole new, self-contained canvas-authoring subsystem (its own
+gesture substrate, injected-pointer setter, press/release dispatch wiring, draw pass, and
+a full page of explicit open-question rulings a coder work-order needs with no ambiguity
+left) that the human's own request scoped as ONE new subsection file, not a further
+`§21.8.N` breakdown this pack's numbering scheme does not otherwise use — kept whole
+rather than invent a nesting depth no other section has.
 
 | File | Lines | Why it stays whole |
 |------|-------|--------------------|
@@ -187,10 +194,11 @@ coherent correction across files with no citation gain.
 | `ARCH_07_02_MaterialProportionVsSurfaceWeight.md` | 162 | One ratified ruling on the two-field distinction |
 | `ARCH_14_13_OpenItems.md` | 137 | A flat numbered list of open items from the §14 ratification |
 | `ARCH_15_10_SlotPatternConstructionMoves.md` | 119 | One ruling: slot-pattern construction moves into the runtime |
-| `ARCH_15_05_ParamsScenariosType.md` | 118 | One ruling: the full `Params::Scenarios` shape |
+| `ARCH_15_05_ParamsScenariosType.md` | 154 | One ruling: the full `Params::Scenarios` shape, plus the 2026-08-28 naval-fleet retirement note and two explicitly-flagged OPEN items — kept in one file since all three depend on the same shape for context |
 | `ARCH_14_16_PerArmyUnitsOverlayRows.md` | 114 | One ruling: per-army row seeding + procedural-unit routing + tint source + default-palette prerequisite, deliberately kept together as one shippable unit |
 | `ARCH_21_03_DragGestureGenericization.md` | 122 | One ruling: the `Traits` contract plus its two load-bearing refinements (state de-templating, the missing-`name`-field fix) |
 | `ARCH_14_15_ManualCullStableIdMigration.md` | 106 | One ruling: the cull-path stable-id migration |
+| `ARCH_21_08_AreaCanvasGesture.md` | 320 | One whole, self-contained canvas-authoring subsystem — substrate, setter, dispatch wiring, draw pass, and every open-question ruling a coder needs, deliberately kept together as one shippable unit rather than forking a new `§N.M.K` nesting depth |
 
 ---
 

@@ -14,6 +14,47 @@ provisional `Scenario`/`ScenarioSettings`/`ScenarioSpawnsPolicy` types are retir
 `ARCH_15_05_ParamsScenariosType.md` §15.5's `ScenarioBody`/`PatternScenario`/`CountScenario`/`Scenarios` and §15.10's
 `maxArmySlotCount` verbatim — no new PARAMS type is introduced by this ticket.
 
+## ⚠️ AMENDED 2026-08-28 — `navy` checkbox → `spawnsUnits`; the fleet editor is BLOCKED
+
+**What this ticket used to specify.** §5's shared `ScenarioBody` field editor drew a `navy`
+`Checkbox_UI`, and — shown when `navy == true`, collapsed/de-emphasized otherwise — a `navalFleet`
+editor section: a flat list of `{templateIdentifier, count}` rows, a flat list of
+`{armyName, side}` rows with a two-option `"West"`/`"East"` Combo, and one float field for
+`sideBiasDistance`.
+
+**Why it changed.** The 2026-08-27 rewrite of the live reference script deleted
+`Scenario.SpawnNavalFleets` and every `NAVAL_*` constant; the vestigial `navy` field was removed
+from the live Lua on 2026-08-28 after being confirmed to have zero readers
+(`Pandemonium Isthmus_Scenarios_Script.lua:182-186`).
+`ARCH_15_05_ParamsScenariosType.md`'s "RETIRED 2026-08-28" section retires `ScenarioNavalFleet`,
+`ScenarioNavalFleetEntry`, `ScenarioNavalPondSide`, `ScenarioNavalPondAssignment`, and both
+`ScenarioBody::navalFleet` and `ScenarioBody::navy`. **Those PARAMS members no longer exist, so
+the fleet editor has nothing to bind to and would not compile.**
+
+**Resolution, in two parts:**
+1. The checkbox becomes `spawnsUnits` (§5), with a mandatory consequence caption — the flag is
+   only half of a two-step opt-in and does nothing on its own.
+2. ⚠️ **The `navalFleet` editor section is BLOCKED and must not be built or replaced.** Whether
+   per-scenario unit spawning has *any* declarative PARAMS form is
+   `ARCH_15_05_ParamsScenariosType.md` **OPEN item 1**, explicitly undecided: the live generator
+   is hand-authored placement code (live terrain samples, a deepest-water spiral search, a
+   rectangular grid layout), not a short list of tunable numbers. This ticket must not invent a
+   `ScenarioUnitSpawn` struct, an instruction-list field, or a reuse of the existing
+   `Params::UnitGroup`/`UnitTransform` family to keep the section alive. **A UI surface for
+   per-scenario unit-spawn content is blocked pending ARCH §15.5 OPEN item 1.**
+
+Everything else in this ticket is unaffected: the three-tier lists, match-rule editors,
+reachability badges, spawns-acknowledgment warning, composition matrix, and `maxArmySlotCount`
+settings never touched the naval family.
+
+⚠️ **STATUS — this is a retirement pass over LANDED code, not a fresh build.** The ticket body
+below still reads as "no scenario-authoring UI exists" (true when authored); it is no longer.
+`src/ui/ScenariosTab_UI.h`, `ScenariosTab_Detail_UI.cpp`, and a dedicated
+**`src/ui/ScenariosTab_DetailNaval_UI.cpp` (87 lines)** all exist and bind the retired members,
+against `src/params/Scenario_PARAMS.h`'s still-present naval family. **The fleet-editor
+translation unit is the thing to delete** — not a section to leave unbuilt. Scoping that deletion
+across the landed PARAMS/IO/UI files is not authored here and needs its own work-order.
+
 ## Root problem
 No scenario-authoring UI exists anywhere in `src/ui/` (confirmed: no `Scenario` match under
 `src/ui/`). `Params::Scenarios` (STEP69) is otherwise reachable only by hand-editing a `.sanmap`'s
@@ -226,7 +267,15 @@ called by whichever tier's detail panel is open:
 - `area` — four float fields (`originX`/`originZ`/`width`/`length`), same per-field pattern
   `AreasTab_UI` uses. **`area.name` is never shown or edited** (STEP69 §1: no JSON counterpart,
   must stay empty).
-- `navy` — `Checkbox_UI`.
+- `spawnsUnits` — `Checkbox_UI` (amended 2026-08-28; was `navy`). **Requires an always-visible
+  consequence caption directly beneath it** (Constitution §8 — a checkbox whose true state does
+  nothing on its own is exactly the case that rule exists for):
+  *"⚠ Two-step opt-in. Ticking this alone spawns nothing. The map's runtime script must also
+  contain a branch matching this scenario's `name` — see MAP_SCENARIO_SPEC.md §11."*
+  The caption must reference the scenario's **`name`** field specifically, since `name` is the
+  dispatch key, not a cosmetic label. Do **not** attempt to validate that a matching branch
+  exists: the branch lives in Lua text this ticket cannot see, and the file it lives in is itself
+  unresolved (`ARCH_15_05` OPEN item 2). A caption, never a checked precondition.
 - `alloyMode` — `Combo_UI` over four labels, **paired with an always-visible consequence card**
   (Constitution §8 label table):
   - `explicit` — "You list every army's alloys below. Any army NOT listed loses its alloy markers entirely."
@@ -242,10 +291,19 @@ called by whichever tier's detail panel is open:
   fallback that keeps authoring possible without it.
 - `alloysToRemove` — `armyName` + `markerName` only (no position, matches the struct).
 - `authoringNote` — `ImGui::InputTextMultiline`.
-- `navalFleet` — shown only when `navy == true` (still editable regardless, per §15.5's
-  "always emitted" rule, but collapsed/de-emphasized when false): flat list of
-  `{templateIdentifier, count}`; flat list of `{armyName, side}` (two-option Combo "West"/"East");
-  one float for `sideBiasDistance`.
+- ~~`navalFleet` — flat list of `{templateIdentifier, count}`; flat list of `{armyName, side}`
+  (two-option Combo "West"/"East"); one float for `sideBiasDistance`.~~
+  ⚠️ **BLOCKED — do not build, do not replace. 2026-08-28.** The bound members
+  (`ScenarioBody::navalFleet` and its `ScenarioNavalFleet`/`ScenarioNavalFleetEntry`/
+  `ScenarioNavalPondSide`/`ScenarioNavalPondAssignment` types) are retired by
+  `ARCH_15_05_ParamsScenariosType.md`'s RETIRED section and no longer exist in `Params`.
+  **Blocking item: `ARCH_15_05` OPEN item 1** — whether per-scenario unit spawning should have
+  any declarative PARAMS form at all is an open design question, deliberately not decided; the
+  live model is hand-authored Lua placement code plus inlined per-generator constants. **This UI
+  section is blocked pending that ruling.** The coder implements the rest of `DrawScenarioBodyFields`
+  with this bullet simply absent — no placeholder panel, no "coming soon" affordance, no
+  re-shaped substitute editor. The `spawnsUnits` checkbox above is the entire unit-spawning
+  surface this ticket ships.
 
 ### 6. `ScenariosTab_Matrix_UI.cpp` (NEW) — live composition preview
 
@@ -292,7 +350,9 @@ N/A — pure imgui-frame CPU work; `recipe.scenarios` edits never touch `Data::M
 - **Runtime Lua editor, `ExportScenarioScript`, `gameInstallRoot` UI, result surfacing** — STEP77.
 - **Interactive canvas marker editing** — STEP78, gated on STEP47/50-53.
 - **Any new PARAMS field**, including a resurrected `ScenarioSpawnsPolicy` — Correction 1 is the
-  ruling implemented instead.
+  ruling implemented instead. Equally: **no resurrection of the retired `ScenarioNavalFleet`
+  family under a renamed shape**, and no substitute per-scenario unit-spawn content editor —
+  blocked on `ARCH_15_05` OPEN item 1 (see the 2026-08-28 amendment).
 - **A real baseline-spawn seed for [Set Explicit Spawns]** — flagged gap, needs STEP78.
 - **OR-of-clause-groups for Tier 2** — named future extension.
 

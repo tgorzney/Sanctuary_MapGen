@@ -8,6 +8,44 @@ ticket renders FROM). Optional test-only dependency on **STEP65** (`Sys::CheckLu
 self-check of this ticket's own output). Unblocks **STEP71** (`ScenarioScript_Export_IO`, WO7),
 which composes `BuildScenarioDataLuaText` as one of its three inputs.
 
+## ⚠️ AMENDED 2026-08-28 — renders `spawnsUnits`, not `navy`/`navalFleet`
+
+**What this ticket used to specify.** As authored it rendered a ten-field `ScenarioBody`, whose
+last two Lua keys were `navy` (a bare boolean) and `navalFleet` — a nested table carrying `fleet`
+(an array of `{templateIdentifier, count}`), `pondSideByArmy` (an array of `{armyName, side}` with
+`side` emitted as a raw `-1`/`1`), and a `sideBiasDistance` float — **always emitted, even when
+`navy == false`**. Acceptance tests 7 and 8 existed solely to protect that always-emitted block and
+the raw-integer `side` spelling.
+
+**Why it changed.** The 2026-08-27 rewrite of the live reference script deleted
+`Scenario.SpawnNavalFleets` and every `NAVAL_*` constant; the vestigial `navy` field was removed
+from the live Lua on 2026-08-28 after being confirmed to have zero readers
+(`Pandemonium Isthmus_Scenarios_Script.lua:182-186` — cited below as `SCEN`, MAP_SCENARIO_SPEC.md's own alias for that file). `ARCH_15_05_ParamsScenariosType.md`'s
+"RETIRED 2026-08-28" section retires `ScenarioNavalFleet`, `ScenarioNavalFleetEntry`,
+`ScenarioNavalPondSide`, `ScenarioNavalPondAssignment`, and both `ScenarioBody::navalFleet` and
+`ScenarioBody::navy`. Rendering any of them would emit Lua keys the runtime has no reader for.
+
+**What replaces it.** One boolean Lua key, `spawnsUnits`, mirroring
+`ScenarioBody::spawnsUnits` — read live at `SCEN:388` and returned as `ResolveAndApply`'s second
+value. **There is nothing else to render:** fleet composition and placement are no longer
+scenario-level data at all. The runtime dispatches on the scenario's own `name` into a
+per-scenario, hand-authored generator (`SCEN:743-747`), which feeds one generic executor
+`Scenario.SpawnUnits(instructions)` (`SCEN:437`). `spawnsUnits = true` alone spawns nothing —
+that second half is Lua code, not data, and this ticket does not render it (see the blocked note
+in the table below).
+
+**Net effect:** `AppendScenarioBodyFields` renders 9 fields instead of 10; the `navalFleet`
+sub-builder is deleted, not ported; acceptance tests 7 and 8 are replaced.
+
+⚠️ **STATUS — this is a retirement pass over LANDED code, not a fresh build.** The ticket body
+below still reads as "no renderer exists" (true when authored); it is no longer.
+`src/io/ScenarioScript_DataLua_IO.cpp` and `src/io/ScenarioScript_DataLua_IO_Test.cpp` exist and
+render/assert the retired `navy`/`navalFleet` keys today, against
+`src/params/Scenario_PARAMS.h`'s still-present naval family. **A coder executing this amendment is
+deleting the `navalFleet` sub-builder and renaming one key, not writing the file from scratch.**
+Scoping the retirement across the landed PARAMS/IO/UI files is not authored here and needs its own
+work-order.
+
 ## ⚠️ Naming correction — this ticket supersedes two stale names, follow the ratified spec verbatim
 
 `DESIGN_MapScenarioIO_R1.md` §1/§2 (authored before `MAP_SCENARIO_SPEC.md` §2 was ratified) names
@@ -19,7 +57,16 @@ them:
 | Ratified name | Owner | Role |
 |---|---|---|
 | `<MapName>_Scenarios_Data.lua` | **this ticket** | Declares `PATTERN_SCENARIOS`/`COUNT_SCENARIOS`/`DEFAULT_SCENARIO` as **globals**. Nothing else. |
-| `<MapName>_Scenarios_Runtime.lua` | WO6 (not this ticket) | The generic algorithm. **Declares the global `Scenario` table** (`ResolveAndApply`/`SpawnNavalFleets`) and internally `Import()`s this ticket's `_Scenarios_Data.lua` to obtain the three tables above (`MAP_SCENARIO_SPEC.md` §2, "Link mechanism, extended"). Map-name-prefixed after all — the DESIGN doc's non-prefix exception did not survive ratification; its own flagged "must land in an ARCH/spec amendment" open item is retired by this: there is no exception to land. |
+| `<MapName>_Scenarios_Runtime.lua` | WO6 (not this ticket) | The generic algorithm. **Declares the global `Scenario` table** (`ResolveAndApply` plus the generic unit-spawn executor `Scenario.SpawnUnits(instructions)` — **amended 2026-08-28**, this cell used to say `SpawnNavalFleets`, which no longer exists) and internally `Import()`s this ticket's `_Scenarios_Data.lua` to obtain the three tables above (`MAP_SCENARIO_SPEC.md` §2, "Link mechanism, extended"). Map-name-prefixed after all — the DESIGN doc's non-prefix exception did not survive ratification; its own flagged "must land in an ARCH/spec amendment" open item is retired by this: there is no exception to land. |
+
+⚠️ **BLOCKED, and not this ticket's problem to solve: where `Scenario.SpawnMatchedScenarioUnits`
+and its per-scenario generators live.** They are per-map, per-scenario, AND procedural Lua — a
+category the ratified three-file split has no named home for (the Runtime file is defined as
+*generic and byte-identical across every map*; the Data file as *pure tables, never algorithm
+code*). This is `ARCH_15_05_ParamsScenariosType.md` **OPEN item 2**, explicitly unresolved and
+flagged for a future ARCH ruling. **Nothing in this ticket depends on it** — this ticket renders
+the `spawnsUnits` flag only, which is ordinary table data. Do not resolve the gap by inventing a
+home for generator code inside `_Scenarios_Data.lua`.
 
 **Correction applied rather than silently followed:** the instruction "the generated file must
 expose global `Scenario`" is true of the *live-debugging lesson* (global, not `local`, or `Import()`
@@ -91,11 +138,11 @@ std::string BuildScenarioDataLuaText(const Params::MapRecipe& recipe);
 Anonymous-namespace private helpers, composing `LuaTableWriter_IO.h`'s primitives exclusively:
 
 - `AppendScenarioBodyFields(std::string& out, int indentLevel, const Params::ScenarioBody& body,
-  int mapSize)` — appends the 10 `ScenarioBody` fields as key=value/nested-table lines **inside an
+  int mapSize)` — appends the 9 `ScenarioBody` fields as key=value/nested-table lines **inside an
   already-opened table** (the caller opens/closes the outer `{ ... }`; this only fills it). Field
   order mirrors STEP69 §6's JSON emission order for direct cross-reference. Lua keys are
-  **lowerCamelCase mirroring the C++ member names** (`name`, `area`, `navy`, `alloyMode`, `spawns`,
-  `alloys`, `alloysToAdd`, `alloysToRemove`, `authoringNote`, `navalFleet`) — **not** the JSON's
+  **lowerCamelCase mirroring the C++ member names** (`name`, `area`, `spawnsUnits`, `alloyMode`,
+  `spawns`, `alloys`, `alloysToAdd`, `alloysToRemove`, `authoringNote`) — **not** the JSON's
   PascalCase spellings. Deliberate, IO-Architecture-owned call: `MAP_SCENARIO_SPEC.md` §2 leaves
   "exact Lua-rendering syntax... internal variable names" as coder/IO-tier, and Lua carries none of
   `SANMAP_FORMAT_SPEC.md` §1.6's JSON-casing law.
@@ -104,7 +151,12 @@ Anonymous-namespace private helpers, composing `LuaTableWriter_IO.h`'s primitive
     (`x=area.originX, y=area.originZ, width=area.width, height=area.length` — **the exact same
     field mapping `BuildAreasJson`/STEP69 §6 already use**, do not invent a different one);
     `CloseTable(out, indentLevel, true)`.
-  - `navy` → `AppendKeyValueLine(..., RenderLuaBoolean(body.navy))`.
+  - `spawnsUnits` → `AppendKeyValueLine(..., RenderLuaBoolean(body.spawnsUnits))`. **Lua key is
+    exactly `spawnsUnits`** — the live runtime reads that identifier by name
+    (`Pandemonium Isthmus_Scenarios_Script.lua:388`, `matchedScenario.spawnsUnits`), so unlike the
+    other keys in this list its spelling is not a free IO-tier choice. Always emitted, including
+    `false` (absent ⇒ nil ⇒ falsy in the runtime, so omission would be *behaviourally* equivalent
+    — but emit it anyway, so a designer reading the generated file sees the flag's real state).
   - `alloyMode` → `AppendKeyValueLine(..., QuotedLuaString(kScenarioAlloyModeSpellings[
     static_cast<int>(body.alloyMode)]))` — reuses **STEP69's own `kScenarioAlloyModeSpellings`
     array verbatim** (`explicit`/`occupancy`/`keepAll`/`delta`), duplicated as a domain-local
@@ -119,16 +171,17 @@ Anonymous-namespace private helpers, composing `LuaTableWriter_IO.h`'s primitive
   - `authoringNote` → `AppendKeyValueLine(..., QuotedLuaString(body.authoringNote))` — real string
     data, never rendered as a `--` Lua comment (ARCH_15_05_ParamsScenariosType.md §15.5: "as real data now that this is no
     longer hand-authored Lua text").
-  - `navalFleet` → `OpenTable(out, indentLevel, "navalFleet")`; inside: `fleet` via
-    `AppendArrayOfTables` (row = `templateIdentifier = "<id>", count = <RenderLuaNumber(int)>`),
-    `pondSideByArmy` via `AppendArrayOfTables` (row = `armyName = "<name>", side =
-    <RenderLuaNumber(static_cast<int>(side))>` — **raw `-1`/`1`, never `QuotedLuaString`/
-    enum-spelling lookup** — mirrors STEP69 §4's "do NOT use `ReadJsonEnumerationText` for `Side`"
-    ruling, applied symmetrically on the write side), `sideBiasDistance` via
-    `AppendKeyValueLine(..., RenderLuaNumber(body.navalFleet.sideBiasDistance))` (a `float`, so the
-    `RenderLuaNumber(float)` overload); `CloseTable(..., indentLevel, true)`. **Always emitted, even
-    when `navy == false`** — matches STEP69 §6's "NavalFleet: always emitted" rule; do not
-    special-case it away.
+  - ~~`navalFleet` → nested table of `fleet`/`pondSideByArmy`/`sideBiasDistance`, always
+    emitted.~~ **DELETED 2026-08-28.** `ScenarioNavalFleet` and its three sub-types are retired
+    (`ARCH_15_05_ParamsScenariosType.md`, RETIRED section); there is no member left to render and
+    no runtime reader for the key. **Do not port this sub-builder to a renamed key.** Fleet
+    composition is now hand-authored Lua constants sitting beside the one live generator —
+    `BATTLESHIP_TPID` (`SCEN:461`), `FIGHTER_TPID` (`:467`), `BATTLESHIPS_PER_PLAYER_PER_POND`
+    (`:470`), `FIGHTERS_PER_PLAYER` (`:471`), read by `BuildSlots5to8Instructions` at `:710`/`:729`
+    — file-local values, never scenario-record data. Whether per-scenario unit spawning should
+    *ever* have a
+    declarative PARAMS form is **`ARCH_15_05` OPEN item 1 — explicitly undecided.** A coder must
+    not invent one to fill the hole.
 
 - `BuildPatternScenariosTable(const std::vector<Params::PatternScenario>&, int mapSize) ->
   std::string` — `OpenTable(out, 0, "PATTERN_SCENARIOS")`; per element: open an anonymous nested
@@ -137,7 +190,7 @@ Anonymous-namespace private helpers, composing `LuaTableWriter_IO.h`'s primitive
   `scenario.pattern`, **not** `slotPattern`), `AppendScenarioBodyFields(out, 1, entry.body,
   mapSize)`, `CloseTable(out, 1, true)`; `CloseTable(out, 0, false)`.
   **`AppendArrayOfTables` (STEP63) is NOT used here** — it assumes a flat, single-line row body;
-  `ScenarioBody` is multi-field/nested (sub-table `area`, several sub-arrays, nested `navalFleet`),
+  `ScenarioBody` is multi-field/nested (sub-table `area`, several sub-arrays),
   so each element is opened/closed manually with `OpenTable`/`CloseTable`, still composing nothing
   but STEP63's primitives.
 
@@ -268,8 +321,13 @@ dispatch, no SIMD, no GPU handle; does not touch `Dispatch_SYS`.
 - **`<MapName>_Scenarios_Runtime.lua`'s content, the bundled resource, or its own banner line** —
   WO6, not yet authored. This ticket only *defines* the shared banner constant that WO6's bundled
   resource text must also open with.
-- **The `Scenario` global table, `ResolveAndApply`/`SpawnNavalFleets` wiring** — WO6's file, per the
-  naming correction; this ticket's output never declares `Scenario`.
+- **The `Scenario` global table, `ResolveAndApply`/`SpawnUnits` wiring** — WO6's file, per the
+  naming correction; this ticket's output never declares `Scenario`. (Amended 2026-08-28: this
+  bullet named `SpawnNavalFleets`, retired.)
+- **`Scenario.SpawnMatchedScenarioUnits`, its `name`-keyed dispatch branches, and any per-scenario
+  generator function** — not rendered by this ticket in any form, and **blocked** for every ticket
+  until `ARCH_15_05_ParamsScenariosType.md` OPEN item 2 rules on where per-map procedural scenario
+  Lua lives under the three-file split.
 - **A Lua parser / round-trip read path** — `ARCH_15_03_ExportOnlyLuaRatified.md` §15.3 rules this out permanently, not deferred.
 - **`GameInstallLocation_IO`, `LuaSyntaxCheck_SYS`** — STEP64/STEP65, already-authored tickets this
   one only optionally consumes (test-only, for STEP65).
@@ -295,10 +353,14 @@ New `src/io/ScenarioScript_DataLua_IO_Test.cpp` (registered in `CMakeLists.txt`)
 6. **`conditions` spellings match STEP69's tables.** A `CountScenario` with 3 conditions spanning
    all 3 `ScenarioCountField` values and ≥3 distinct `ScenarioComparator` values renders the exact
    spelling strings (`"Total"`/`"HumanCount"`/`"AiCount"`, `"GreaterOrEqual"`, etc.).
-7. **`navalFleet` always emitted.** A `navy == false` scenario still renders a `navalFleet = {`
-   block with `fleet = {`/`pondSideByArmy = {`/`sideBiasDistance =` all present.
-8. **`ScenarioNavalPondSide` renders as a raw signed integer, never a quoted string.** A `West`
-   (`-1`) entry renders `"side = -1"`, not `"side = \"West\""`.
+7. **`spawnsUnits` renders both states, always, under that exact key.** A `spawnsUnits = true`
+   fixture renders the substring `"spawnsUnits = true"`; a `spawnsUnits = false` fixture renders
+   `"spawnsUnits = false"` (present, not omitted). *(Replaces the retired "`navalFleet` always
+   emitted" test — 2026-08-28.)*
+8. **No retired naval key is ever rendered.** The full-coverage fixture's output contains **none**
+   of `"navy"`, `"navalFleet"`, `"pondSideByArmy"`, `"sideBiasDistance"`, or `"side ="` — a
+   grep-shaped regression guard so a future refactor cannot quietly reintroduce the retired shape.
+   *(Replaces the retired `ScenarioNavalPondSide` raw-integer test — 2026-08-28.)*
 9. **Empty `Params::Scenarios{}` still renders a complete, non-empty file.** `PATTERN_SCENARIOS =
    {\n}` / `COUNT_SCENARIOS = {\n}` (empty tables, never omitted keys), `DEFAULT_SCENARIO = {` with
    struct defaults (`alloyMode == Occupancy` → `"occupancy"`), and `MAX_ARMY_SLOT_COUNT = 16`

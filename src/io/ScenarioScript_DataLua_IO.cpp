@@ -82,35 +82,7 @@ std::vector<std::string> BuildAlloyRemovalRowBodies(const std::vector<Params::Sc
     return rows;
 }
 
-// navalFleet -- ALWAYS emitted, even when navy == false (matches STEP69 §6's rule). Fully
-// self-contained: opens/closes its own "navalFleet" table at indentLevel.
-void AppendNavalFleetTable(std::string& out, int indentLevel, const Params::ScenarioNavalFleet& navalFleet) {
-    OpenTable(out, indentLevel, "navalFleet");
-
-    std::vector<std::string> fleetRows;
-    fleetRows.reserve(navalFleet.fleet.size());
-    for (const Params::ScenarioNavalFleetEntry& entry : navalFleet.fleet) {
-        fleetRows.push_back("templateIdentifier = " + QuotedLuaString(entry.templateIdentifier)
-                            + ", count = " + RenderLuaNumber(entry.count));
-    }
-    AppendArrayOfTables(out, indentLevel + 1, "fleet", fleetRows);
-
-    // Raw signed integer (-1/1), NEVER QuotedLuaString/an enum-spelling lookup -- mirrors STEP69
-    // §4's "do NOT use ReadJsonEnumerationText for Side" ruling, applied symmetrically on write.
-    std::vector<std::string> pondSideRows;
-    pondSideRows.reserve(navalFleet.pondSideByArmy.size());
-    for (const Params::ScenarioNavalPondAssignment& assignment : navalFleet.pondSideByArmy) {
-        pondSideRows.push_back("armyName = " + QuotedLuaString(assignment.armyName) + ", side = "
-                               + RenderLuaNumber(static_cast<int>(assignment.side)));
-    }
-    AppendArrayOfTables(out, indentLevel + 1, "pondSideByArmy", pondSideRows);
-
-    AppendKeyValueLine(out, indentLevel + 1, "sideBiasDistance", RenderLuaNumber(navalFleet.sideBiasDistance));
-
-    CloseTable(out, indentLevel, true);
-}
-
-// Appends the 10 ScenarioBody fields as key=value/nested-table lines INSIDE an already-opened
+// Appends the 9 ScenarioBody fields as key=value/nested-table lines INSIDE an already-opened
 // table (the caller opens/closes the outer `{ ... }`; this only fills it). Field order mirrors
 // STEP69 §6's JSON emission order for direct cross-reference. Lua keys are lowerCamelCase mirroring
 // the C++ member names -- NOT the JSON's PascalCase spellings.
@@ -124,7 +96,10 @@ void AppendScenarioBodyFields(std::string& out, int indentLevel, const Params::S
     AppendKeyValueLine(out, indentLevel + 1, "height", RenderLuaNumber(body.area.length));
     CloseTable(out, indentLevel, true);
 
-    AppendKeyValueLine(out, indentLevel, "navy", RenderLuaBoolean(body.navy));
+    // RETIRED 2026-08-28 (STEP204): "navy"/"navalFleet" are gone. The Lua key spelling
+    // "spawnsUnits" is fixed by the runtime (`matchedScenario.spawnsUnits`), not a free IO-tier
+    // naming choice.
+    AppendKeyValueLine(out, indentLevel, "spawnsUnits", RenderLuaBoolean(body.spawnsUnits));
     AppendKeyValueLine(out, indentLevel, "alloyMode",
                        QuotedLuaString(kScenarioAlloyModeSpellings[static_cast<int>(body.alloyMode)]));
 
@@ -136,14 +111,12 @@ void AppendScenarioBodyFields(std::string& out, int indentLevel, const Params::S
     // Real string data, never rendered as a `--` Lua comment (ARCH_15_05_ParamsScenariosType.md
     // §15.5: "as real data now that this is no longer hand-authored Lua text").
     AppendKeyValueLine(out, indentLevel, "authoringNote", QuotedLuaString(body.authoringNote));
-
-    AppendNavalFleetTable(out, indentLevel, body.navalFleet);
 }
 
 // AppendArrayOfTables (STEP63) is NOT used for the three tier tables below -- it assumes a flat,
-// single-line row body; ScenarioBody is multi-field/nested (sub-table area, several sub-arrays,
-// nested navalFleet), so each element is opened/closed manually with OpenTable/CloseTable, still
-// composing nothing but STEP63's primitives.
+// single-line row body; ScenarioBody is multi-field/nested (sub-table area, several sub-arrays), so
+// each element is opened/closed manually with OpenTable/CloseTable, still composing nothing but
+// STEP63's primitives.
 
 std::string BuildPatternScenariosTable(const std::vector<Params::PatternScenario>& patternScenarios, int mapSize) {
     std::string out;

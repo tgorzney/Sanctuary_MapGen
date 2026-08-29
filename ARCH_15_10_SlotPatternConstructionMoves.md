@@ -13,9 +13,12 @@ match: a length mismatch with zero diagnostic.
 
 **Decision (ratified 2026-08-21, human's own framing):** slot-pattern construction is universal,
 never-varies-per-map algorithm — exactly the same kind of content
-`FindMatchingScenario`/`Scenario.ResolveAndApply`/`Scenario.SpawnNavalFleets` already are
-(§15.4) — so it moves out of the hand-authored orchestrator and into
-`<MapName>_Scenarios_Runtime.lua`, alongside them.
+`FindMatchingScenario`/`Scenario.ResolveAndApply` already are (§15.4) — so it moves out of the
+hand-authored orchestrator and into `<MapName>_Scenarios_Runtime.lua`, alongside them.
+*(Corrected 2026-08-28: this bullet originally also cited `Scenario.SpawnNavalFleets` as a peer
+example — that function no longer exists in the live reference; see `ARCH_15_05`'s "RETIRED
+2026-08-28" note. The argument itself — slot-pattern construction belongs beside the other
+generic, per-map-invariant runtime functions — is unaffected by that function's removal.)*
 
 **1. New module API contract** (amends `MAP_SCENARIO_SPEC.md` §3, and its §2.2 migration steps):
 - `Scenario.ResolveAndApply(total, humanCount, aiCount, playersInformation)` — the fourth

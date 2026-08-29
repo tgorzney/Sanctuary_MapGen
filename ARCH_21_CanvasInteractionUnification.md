@@ -1,13 +1,16 @@
 [← ARCH index](ARCH.md) · SanGen ARCH §21. **Only the ARCH Expert writes this file.**
 
-## §21 Canvas interaction unification — multi-select, drag-gesture genericization, uniform locked-item exclusion, and the shared picking substrate
+## §21 Canvas interaction unification — multi-select, drag-gesture genericization, uniform locked-item exclusion, the shared picking substrate, and Area authoring on the canvas
 
 Ratifies the UI Expert's design-round consult routed by `ARCH_20_04_DragGestureSubstrateRouting.md`
 §20.4 (the Props/Decals drag-reposition substrate, unified with the separately-paused canvas
 click/box-select initiative, per that section's own explicit instruction to treat both as one
 consult). **Closes §20.4's gate** — a coder work-order may now build against §21 directly; §20.4
 itself is left standing as the historical routing record, with a closing cross-reference appended
-in place.
+in place. §21.8 later extends the canvas to `Params::MapArea` authoring (track A of a separate,
+human-approved plan; a second track about Scenario data is ratified elsewhere) — independent of
+§21.1-§21.7's Marker/Prop/Decal mechanism, not an eighth interlocking piece of it (see §21.8's own
+severability note below).
 
 Independently verified against the live code before ruling, not taken on the design's word alone:
 `MapCanvas_UI.h`/`.cpp`, `MapCanvas_Draw_UI.cpp`, `MapCanvas_IconLayer_UI.h`,
@@ -25,24 +28,33 @@ the design's `Traits` hook points cannot be implemented as literally described f
 are ruled inert-by-construction instead; §21.3 also finds the drag-gesture STATE struct itself needs
 no template parameter (only the four functions operating on it do); §21.6 corrects the proposed
 region-query function's name (`PickMarkersInRegion` → `PickInstancesInRegion`, since its own stated
-contract is fully domain-generic).
+contract is fully domain-generic); §21.8 finds `recipe.areas` is a flat vector with no group/transform
+shape at all, so the generic `Traits`/`InstanceDragGestureState` substrate is not merely unreused
+(as the relayed design already concluded) but structurally cannot apply, and rules a wholly separate,
+standalone, non-template gesture module instead.
 
 | § | Ruling |
 |---|--------|
 | §21.1 | Multi-select representation — `OverlayInstanceKeySet_UI`, the widened `MapCanvas` selection surface, the callback signature |
 | §21.2 | Gesture ownership — press-time drag-begin-first, release-time click/marquee, the independent right-button pan |
-| §21.3 | Drag-gesture genericization — `InstanceDragGestureState`, `BeginInstanceDragGesture<Traits>`/etc., `MarkerDragTraits`/`PropDragTraits`/`DecalDragTraits`, `HitTestManualInstances<GroupT>`/`CollectManualInstancesInWorldRegion<GroupT>` |
+| §21.3 | Drag-gesture genericization — `InstanceDragGestureState`, `Begin/Update/EndInstanceDragGesture<Traits>`/etc., `MarkerDragTraits`/`PropDragTraits`/`DecalDragTraits`, `HitTestManualInstances<GroupT>`/`CollectManualInstancesInWorldRegion<GroupT>` |
 | §21.4 | `PropTransform`/`DecalTransform` gain `instanceIdentifier`/`symmetryGroupIdentifier` — mirrors `MarkerTransform` verbatim |
 | §21.5 | Locked-item exclusion — corrects §19.18; uniform across click/marquee/drag; procedural instances unaffected |
 | §21.6 | Picking infrastructure — `Data::SpatialGridSet`, `BuildSpatialGridSet`, three new `SpatialGrid` accessors, `PickInstancesInRegion` |
 | §21.7 | File-size ceiling flag — `MapCanvas_UI.h` |
+| §21.8 | Area canvas gesture — create-by-drag, 8-handle resize + body-move for `Params::MapArea`, its own hand-written (non-`Traits`) substrate, `AreaDragGesture_UI.h`/`.cpp` |
 
-**Interlocking, not independently dispatchable — except §21.4.** §21.1–§21.3, §21.5, and §21.6 are
-one mechanism (a marquee release alone needs §21.1's set representation, §21.2's release-time
-resolution, §21.3's generic collect, §21.5's lock gate, and §21.6's region query, all at once); no
-coder work-order should build one in isolation from the rest. §21.4 is the one severable exception —
-pure PARAMS+IO, buildable and shippable standalone, exactly as §20.1–§20.3/§20.6 already shipped
-ahead of their own gated consumer (§20.4's own closing sentence, restated for §21.4 in that section).
+**§21.1-§21.7 are interlocking, not independently dispatchable — except §21.4.** §21.1-§21.3, §21.5,
+and §21.6 are one mechanism (a marquee release alone needs §21.1's set representation, §21.2's
+release-time resolution, §21.3's generic collect, §21.5's lock gate, and §21.6's region query, all at
+once); no coder work-order should build one in isolation from the rest. §21.4 is the one severable
+exception — pure PARAMS+IO, buildable and shippable standalone, exactly as §20.1-§20.3/§20.6 already
+shipped ahead of their own gated consumer (§20.4's own closing sentence, restated for §21.4 in that
+section). **§21.8 is independently dispatchable** — it introduces its own standalone gesture
+substrate touching no `Traits`, no `InstanceDragGestureState`, and no `PlacementCollectionKind_UI`
+entry; its only real dependency on §21.1-§21.7 is §21.2's already-shipped press/release dispatch
+skeleton in `ApplyPointerInput` (extended, not restructured) and §21.2's `pressStartRegionLocalX/Y`/
+`DrawMarqueeRectanglePass` fields it reuses rather than duplicates.
 
 **Units are out of scope for the selection/drag work this ratifies.** §21.6's picking infrastructure
 is built 4-way (mirroring `RuleBucketIndexSet`'s own precedent of shipping full-width infrastructure

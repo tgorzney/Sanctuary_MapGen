@@ -270,7 +270,11 @@ verified zero matches for `Scenario`/`LuaTableWriter`/`resources/lua` in that ch
 
 **G.14 — CONFIRMED LIVE: the exact working method for spawning units from a per-map script.**
 Proven in-game this session (BigBots visibly appeared), and the same pattern the live map's
-naval-fleet feature already uses successfully:
+per-scenario unit-spawn feature already uses successfully (⚠️ **terminology corrected
+2026-08-28** — this read "naval-fleet feature"; `Scenario.SpawnNavalFleets` and every `NAVAL_*`
+constant were deleted by the 2026-08-27 rewrite, replaced by the `spawnsUnits` →
+`SpawnMatchedScenarioUnits` → `SpawnUnits` chain,
+`ARCH_15_05_ParamsScenariosType.md` RETIRED section):
 ```lua
 -- inside the single NewThread callback (Armies is NOT populated during LoadMapData)
 for armyIndex, army in pairs(Armies) do
@@ -297,8 +301,9 @@ end
   playable area (set before the spawn call, never touches `lobbyOptions`) and correct alloy
   handling (`ApplyScenario`'s occupancy branch keys off `slotPattern`) — but **zero units**.
   **Latent for a long time:** the old `SpawnNavalFleets` used the identical unguarded check, but
-  `navy`/`spawnsUnits` was only ever true on the all-human `4human` scenario, so no AI army
-  reached it until `slots5to8AnyFilled` shipped.
+  its opt-in flag (then `navy`, now `spawnsUnits` — the retired field is named here only because
+  it is what the historical code read) was only ever true on the all-human `4human` scenario, so
+  no AI army reached it until `slots5to8AnyFilled` shipped.
   **Fix (applied to the live file AND STEP72):**
   `local bIsEmptySlot = army.lobbyOptions and army.lobbyOptions.isEmptySlot`
   nil `lobbyOptions` ⇒ treat as **OCCUPIED** (an AI slot IS filled). Never treat a missing options

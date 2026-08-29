@@ -152,6 +152,15 @@ public:
         manualDecalDrag.geometry = geometry;
         manualDecalDrag.recipe   = recipeForGlobalSymmetry;
     }
+    // ARCH §21.8 — mirrors SetManualPropDragSource's shape minus Geometry/globalSymmetryRecipe (Areas
+    // carry no symmetry/layer/lock concept of their own, §21.8 correction 1/3). `areas`/`areaColors`/
+    // `selectedAreaIndex` are the only mutable pointers; `areasLocked` is read-only — the canvas never
+    // writes the tab-wide lock.
+    void SetManualAreaDragSource(std::vector<Params::MapArea>* areas, std::vector<AreaColorEntry>* areaColors,
+                                  const bool* areasLocked, int* selectedAreaIndex) {
+        manualAreaDrag.areas = areas; manualAreaDrag.areaColors = areaColors;
+        manualAreaDrag.bAreasLocked = areasLocked; manualAreaDrag.selectedAreaIndex = selectedAreaIndex;
+    }
 
     // STEP126 — the static selection-highlight source: `selectedInstanceIdentifier` is the SAME
     // address as MarkersTabState::selectedManualInstanceIdentifier (Application_UI.cpp) — one source
@@ -312,6 +321,17 @@ private:
     // ordered list and resolved through `ApplySelectionGesture`'s batch overload.
     void ApplyMarqueeGesture(float pressRegionLocalX, float pressRegionLocalY, float releaseRegionLocalX,
                              float releaseRegionLocalY, bool bCtrlHeld, bool bShiftHeld);
+    // ARCH §21.8 — the Area canvas gesture: create-by-drag, 8-handle resize + body-move. Standalone,
+    // not a fourth PlacementCollectionKind_UI (Areas has no group/transform/lock shape, §21.8
+    // correction 1) — an independent sibling of TryBeginManualInstanceDrag's 3-way dispatcher, not a
+    // fourth branch inside it.
+    bool AreaGestureEligible() const;                                          // MapCanvas_AreaDragDispatch_UI.cpp
+    bool TryBeginAreaDrag(float regionLocalX, float regionLocalY);             // ditto
+    void ContinueAreaDrag(float regionLocalX, float regionLocalY, bool bShiftHeld, bool bCtrlHeld); // ditto
+    void EndAreaDrag();                                                        // ditto
+    void CreateAreaFromDrag(float pressRegionLocalX, float pressRegionLocalY,
+                            float releaseRegionLocalX, float releaseRegionLocalY);   // ditto, release-time only
+    void DrawAreaOverlayPass(float regionOriginX, float regionOriginY);        // MapCanvas_AreaDraw_UI.cpp
 
     MapCanvasView view;
     Sys::GpuResourceManager*        gpuResourceManager = nullptr;
@@ -387,6 +407,13 @@ private:
     ManualDecalDragSources_UI manualDecalDrag;
     bool                       bManualPropDragActive  = false;
     bool                       bManualDecalDragActive = false;
+
+    // ARCH §21.8 — the Area gesture's own drag source + live state (mirrors manualPropDrag/
+    // manualDecalDrag's shape one struct type over). Independent of bManualMarkerDragActive/
+    // bManualPropDragActive/bManualDecalDragActive's OR-chain on purpose (§21.8's own instruction —
+    // Areas is not a fourth PlacementCollectionKind_UI member).
+    ManualAreaDragSources_UI manualAreaDrag;
+    bool                     bAreaDragActive = false;
 };
 
 } // namespace Ui

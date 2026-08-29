@@ -1,0 +1,749 @@
+-- SANGEN scenario code -- Pandemonium Isthmus. Lobby-composition scenario
+-- definitions (playable area, spawn positions, per-army mex/alloy visibility) and
+-- naval fleet spawning. Held here, not in Pandemonium Isthmus_data.lua, per the
+-- ratified scenario-script file split (sangen_arch_pack/specs/MODDING_SCRIPTING_SPEC.md,
+-- "Scenario-script file split"): _data.lua is an orchestrator only (reads the lobby,
+-- builds the slot pattern, wires the result into the map), this file holds every
+-- scenario definition and all the spawning logic behind it.
+--
+-- SCRIPT-TREE file. Lives at LJ/lua/maps/Pandemonium Isthmus/, BESIDE _data.lua --
+-- NOT in the map's asset folder (Sanctuary_Data/Maps/<MapName>/, where the
+-- .sanmap/Props/Textures live).
+--
+-- Why colocated, 2026-08-20: putting this file in the map asset folder was tried and
+-- PROVEN IMPOSSIBLE. Import() cannot address anything outside the LJ/lua root -- a
+-- "../../Sanctuary_Data/..." path fails Engine.FileExists() outright (verified live
+-- in-game: the exact libPath.."/"..path string import.lua builds internally resolves
+-- false), so Import() raises its "File doesn't exist" error and aborts the entire
+-- calling chunk. This settles Sanctuary_Map_System_Rework.md Sec12 open question 6 in
+-- the NEGATIVE. The pair must stay in the same tree; if _data.lua ever relocates to
+-- the map folder, this file moves with it.
+--
+-- Loaded via Import("maps/Pandemonium Isthmus/Pandemonium Isthmus_Scenarios_Script.lua")
+-- -- a libPath-root-relative path, the same convention every other Import() call site
+-- uses (Import("common/gameUtils.lua"), etc.).
+
+-- NOT local: Import() (common/systems/import.lua) does not use this file's `return`
+-- statement at all -- it only captures GLOBAL variables a file writes into its own
+-- environment table. `Scenario` must be global for `Import(path).Scenario` to work
+-- from _data.lua. Confirmed from Import()'s own doc comment, 2026-08-20.
+Scenario = {}
+
+-- ============================================================================
+-- ROLE PROBE, 2026-08-28. TEMPORARY -- delete once the doubling question is settled.
+--
+-- Answers exactly one question: how many times, and in which Lua state, does this map
+-- script actually execute? script.lua's init() sets IsHost XOR IsClient -- never both in
+-- one state -- but InitLobby calls LoadMapData twice (script.lua:156 under `if IsHost`,
+-- :189 in the `else`), so a solo match runs TWO states, each loading _data.lua once.
+-- Whether both reach unit creation is the open question.
+--
+-- One BigBot, x stamped by role, all at z = 1024 near map center:
+--   x = 1000   spawned from the HOST state
+--   x = 1040   spawned from the CLIENT state
+--   x = 1080   neither flag set (should be impossible; proves an assumption wrong)
+--
+-- How to read the result:
+--   one bot at 1000 only ......... single execution. No doubling. My inference was wrong.
+--   one at 1000 AND one at 1040 .. both states create units. Doubling confirmed + located.
+--   TWO bots at 1000 ............. the host state itself runs twice. Different problem.
+--
+-- ⚠️ Caveat, stated up front: if the client state cannot create units at all, an empty
+-- x = 1040 is NOT proof the client state never ran -- only that it created nothing. That
+-- case is indistinguishable here and would need a different instrument.
+--
+-- Army index is brute-forced, never assumed: a previous probe hardcoded army 1 and
+-- silently failed in every slots-5-to-8 lobby, which is the exact scenario under test.
+-- ============================================================================
+
+-- Candidate areas. Rectangles are in world x/z, matching the .sanmap's "areas"
+-- format: {x, y = world z, width, height}.
+local AREA_356 = { x = 846, y = 846, width = 356, height = 356 }               -- the map's own baked default
+local AREA_169 = { x = 668.4444444444445, y = 824, width = 711.1111111111111, height = 400 } -- 400 height, 16:9
+local AREA_1024 = { x = 537, y = 472, width = 974, height = 1104 }             -- 6-player, centered on map center, height +200-50-70 / width -200+150 per the user 2026-08-20
+local AREA_FULL = { x = 0, y = 0, width = 2048, height = 2048 }
+
+-- Identity rotation/scale, reused for any alloy marker this file creates fresh
+-- (matches every marker already in the .sanmap -- none of them use anything else).
+local IDENTITY_ROTATION = { w = 1.0, x = 0.0, y = 0.0, z = 0.0 }
+local IDENTITY_SCALE = { x = 1.0, y = 1.0, z = 1.0 }
+
+-- Every alloy marker name any scenario below ever uses, grouped by army. In
+-- "explicit" alloyMode, any army in this list that the matched scenario does
+-- NOT mention gets its markers deleted (the scenario is authoritative -- if it
+-- doesn't list an army's mex, that army isn't part of this layout). In
+-- "occupancy" alloyMode, this is instead the deletion list for whichever of
+-- these armies has no player in it per slotPattern (the .sanmap's own baked
+-- positions are trusted for the rest).
+local KNOWN_ALLOY_MARKERS = {
+    ARMY_01 = { "AlloyMarker_219", "AlloyMarker_237", "AlloyMarker_97" },
+    ARMY_02 = { "AlloyMarker_220", "AlloyMarker_240", "AlloyMarker_99" },
+    ARMY_03 = { "AlloyMarker_282", "AlloyMarker_283", "AlloyMarker_284" },
+    ARMY_04 = { "AlloyMarker_285", "AlloyMarker_286", "AlloyMarker_287" },
+}
+local ARMY_ID_TO_NAME = { [1] = "ARMY_01", [2] = "ARMY_02", [3] = "ARMY_03", [4] = "ARMY_04" }
+
+-- ============================================================================
+-- SCENARIOS -- 2026-08-20, per the user: a tiered matching system, checked most
+-- specific first:
+--   TIER 1 (PATTERN_SCENARIOS) -- exact slotPattern string match. For when WHICH
+--     slots are filled matters, not just how many (e.g. 4 humans in slots 1-4
+--     vs. slots 5-8 -- identical counts, very different actual spawn geography
+--     on this map). Empty for now -- nothing has needed this yet -- but the
+--     matching path is real and ready.
+--   TIER 2 (COUNT_SCENARIOS) -- aggregate total/human/AI count predicates,
+--     checked in order, first match wins. This is every composition rule that
+--     used to live in a separate "legacy" if/elseif block outside the scenario
+--     system entirely -- that duplication is gone now; every composition goes
+--     through the exact same ApplyScenario() path.
+--   TIER 3 (DEFAULT_SCENARIO) -- always matches, used only if nothing above did.
+--
+-- Each scenario carries an explicit alloyMode:
+--   "explicit" -- the scenario fully lists every army's spawn+alloys; anything
+--     in KNOWN_ALLOY_MARKERS it doesn't mention gets deleted. Fully self-
+--     contained and immune to any other scenario's data (the fix for a real
+--     regression: ARMY_01's position used to be a single static value in the
+--     .sanmap shared by every composition -- SpawnInitialUnits,
+--     common/gameUtils.lua:356-371, reads
+--     GameInfo.MapData.markers.Spawn.transforms[army.name] with no per-
+--     composition branching of its own -- so editing it to test the 6-player
+--     case silently broke 1v1, which read that exact same value. Confirmed
+--     again days later: the same collision hit the 4-human and 1-human-3-AI
+--     compositions too, since neither had been migrated into its own entry
+--     yet while the 6-player work kept moving the shared baseline).
+--   "occupancy" -- no explicit spawns; trust the .sanmap's own baked positions
+--     for KNOWN_ALLOY_MARKERS armies that have a player, delete the rest.
+--   "keepAll" -- no deletion at all (the 2-human-1-AI case: the one empty
+--     slot's mex stay too, extra resources for the lone AI).
+--   "delta" -- NOT YET USED by any scenario below; wired in now (2026-08-20,
+--     per the user, "so we don't lose the thought") for once a real baseline
+--     exists to diff against. Unlike "explicit", silence is NOT a delete
+--     instruction -- only scenario.alloys.add / .remove are touched, everything
+--     else stays whatever the baseline (or an earlier-applied layer) already
+--     set it to. Shape: scenario.alloys = { add = { ARMY_XX = { {name=...,
+--     x=..., y=..., z=...}, ... } }, remove = { ARMY_XX = { "MarkerName", ... } } }.
+--     A future scenario converts from "explicit" to "delta" by trimming its
+--     alloys table down to only what differs from the baseline, once that
+--     baseline/diff pass happens.
+-- ============================================================================
+
+local PATTERN_SCENARIOS = {
+    -- Future exact-slot-pattern scenarios go here, e.g.:
+    -- { name="4human-slots5-8", pattern="----hhhh--------", area=..., navy=..., alloyMode=..., spawns=..., alloys=... },
+}
+
+local COUNT_SCENARIOS = {
+    {
+        -- Added 2026-08-27, per the user: checked FIRST (before 1v1/2h1ai/4human/1h3ai) so that
+        -- occupying any of slots 5-8 always wins on slot IDENTITY, regardless of aggregate
+        -- total/human/AI counts -- e.g. 2 players scattered into slots 5 and 7 would otherwise
+        -- match "1v1" and get the tiny AREA_356 before ever reaching this rule.
+        name = "slots5to8AnyFilled",
+        match = function(t, h, a, pattern) return pattern:sub(5, 8):find("[^-]") ~= nil end,
+        area = AREA_FULL,
+        spawnsUnits = true,
+        alloyMode = "occupancy",
+    },
+    {
+        name = "1v1",
+        match = function(t, h, a, pattern) return t == 2 end,
+        area = AREA_356,
+        spawnsUnits = false,
+        alloyMode = "explicit",
+        -- Confirmed good in-game by the user, 2026-08-20.
+        spawns = {
+            ARMY_01 = { x = 855, y = 79.12979888916016, z = 920 },
+            ARMY_02 = { x = 1193, y = 79.12979888916016, z = 1128 },
+        },
+        alloys = {
+            ARMY_01 = {
+                { name = "AlloyMarker_219", x = 857, y = 78.72360229492188, z = 911 },
+                { name = "AlloyMarker_237", x = 869, y = 78.72360229492188, z = 919 },
+                { name = "AlloyMarker_97",  x = 873, y = 78.72360229492188, z = 923 },
+            },
+            ARMY_02 = {
+                { name = "AlloyMarker_220", x = 1191, y = 78.72360229492188, z = 1137 },
+                { name = "AlloyMarker_240", x = 1179, y = 78.72360229492188, z = 1129 },
+                { name = "AlloyMarker_99",  x = 1175, y = 78.72360229492188, z = 1125 },
+            },
+        },
+    },
+    {
+        name = "2h1ai",
+        match = function(t, h, a, pattern) return h == 2 and a == 1 and t == 3 end,
+        area = AREA_169,
+        spawnsUnits = false,
+        alloyMode = "keepAll", -- extra alloys for the lone AI, per the user
+    },
+    {
+        name = "4human",
+        match = function(t, h, a, pattern) return t == 4 and h == 4 end,
+        area = AREA_169,
+        -- Removed 2026-08-28: this entry used to carry `navy = true`. That field had ZERO
+        -- readers after the 2026-08-27 rewrite replaced SpawnNavalFleets with the
+        -- spawnsUnits -> SpawnMatchedScenarioUnits dispatch. A scenario opts into unit
+        -- spawning with `spawnsUnits = true` AND a matching branch in
+        -- Scenario.SpawnMatchedScenarioUnits -- the flag alone does nothing.
+        alloyMode = "explicit",
+        -- ARMY_01/02 use the exact 1v1 positions per the user. ARMY_03/04 use the
+        -- positions finalized for ">2 players" before the 6-player work started.
+        spawns = {
+            ARMY_01 = { x = 855, y = 79.12979888916016, z = 920 },
+            ARMY_02 = { x = 1193, y = 79.12979888916016, z = 1128 },
+            ARMY_03 = { x = 833, y = 80.794922, z = 857 },
+            ARMY_04 = { x = 1215, y = 80.759766, z = 1191 },
+        },
+        alloys = {
+            ARMY_01 = {
+                { name = "AlloyMarker_219", x = 857, y = 78.72360229492188, z = 911 },
+                { name = "AlloyMarker_237", x = 869, y = 78.72360229492188, z = 919 },
+                { name = "AlloyMarker_97",  x = 873, y = 78.72360229492188, z = 923 },
+            },
+            ARMY_02 = {
+                { name = "AlloyMarker_220", x = 1191, y = 78.72360229492188, z = 1137 },
+                { name = "AlloyMarker_240", x = 1179, y = 78.72360229492188, z = 1129 },
+                { name = "AlloyMarker_99",  x = 1175, y = 78.72360229492188, z = 1125 },
+            },
+            ARMY_03 = {
+                { name = "AlloyMarker_282", x = 823, y = 80.744141, z = 848 },
+                { name = "AlloyMarker_283", x = 833, y = 80.759766, z = 856 },
+                { name = "AlloyMarker_284", x = 835, y = 80.681641, z = 860 },
+            },
+            ARMY_04 = {
+                { name = "AlloyMarker_285", x = 1225, y = 80.712891, z = 1200 },
+                { name = "AlloyMarker_286", x = 1215, y = 80.771484, z = 1192 },
+                { name = "AlloyMarker_287", x = 1213, y = 80.712891, z = 1188 },
+            },
+        },
+    },
+    {
+        name = "1h3ai",
+        match = function(t, h, a, pattern) return t == 4 and h == 1 and a == 3 end,
+        area = AREA_169,
+        alloyMode = "explicit",
+        -- Same spawn/alloy data as "4human" -- same underlying regression, navy off.
+        spawns = {
+            ARMY_01 = { x = 855, y = 79.12979888916016, z = 920 },
+            ARMY_02 = { x = 1193, y = 79.12979888916016, z = 1128 },
+            ARMY_03 = { x = 833, y = 80.794922, z = 857 },
+            ARMY_04 = { x = 1215, y = 80.759766, z = 1191 },
+        },
+        alloys = {
+            ARMY_01 = {
+                { name = "AlloyMarker_219", x = 857, y = 78.72360229492188, z = 911 },
+                { name = "AlloyMarker_237", x = 869, y = 78.72360229492188, z = 919 },
+                { name = "AlloyMarker_97",  x = 873, y = 78.72360229492188, z = 923 },
+            },
+            ARMY_02 = {
+                { name = "AlloyMarker_220", x = 1191, y = 78.72360229492188, z = 1137 },
+                { name = "AlloyMarker_240", x = 1179, y = 78.72360229492188, z = 1129 },
+                { name = "AlloyMarker_99",  x = 1175, y = 78.72360229492188, z = 1125 },
+            },
+            ARMY_03 = {
+                { name = "AlloyMarker_282", x = 823, y = 80.744141, z = 848 },
+                { name = "AlloyMarker_283", x = 833, y = 80.759766, z = 856 },
+                { name = "AlloyMarker_284", x = 835, y = 80.681641, z = 860 },
+            },
+            ARMY_04 = {
+                { name = "AlloyMarker_285", x = 1225, y = 80.712891, z = 1200 },
+                { name = "AlloyMarker_286", x = 1215, y = 80.771484, z = 1192 },
+                { name = "AlloyMarker_287", x = 1213, y = 80.712891, z = 1188 },
+            },
+        },
+    },
+    {
+        name = "6total",
+        match = function(t, h, a, pattern) return t == 6 end,
+        area = AREA_1024,
+        alloyMode = "occupancy", -- 6-player team layout still in progress, no explicit data yet
+    },
+    {
+        name = "2hRestAI",
+        match = function(t, h, a, pattern) return h == 2 and a >= 2 and t >= 4 end,
+        area = AREA_FULL,
+        alloyMode = "occupancy",
+    },
+    {
+        name = "floor169",
+        match = function(t, h, a, pattern) return t > 2 end,
+        area = AREA_169,
+        alloyMode = "occupancy",
+    },
+    -- More compositions get added here as full entries once confirmed in-game.
+}
+
+local DEFAULT_SCENARIO = { name = "default", area = AREA_356, alloyMode = "occupancy" }
+local function FindMatchingScenario(total, humanCount, aiCount, slotPattern)
+    for _, scenario in ipairs(PATTERN_SCENARIOS) do
+        if scenario.pattern == slotPattern then
+            return scenario
+        end
+    end
+    for _, scenario in ipairs(COUNT_SCENARIOS) do
+        local matchOk, matched = pcall(scenario.match, total, humanCount, aiCount, slotPattern)
+        if matchOk and matched then
+            return scenario
+        end
+    end
+    return DEFAULT_SCENARIO
+end
+
+-- Writes every army's position/alloys from a matched scenario (alloyMode ==
+-- "explicit"), or falls back to occupancy-based deletion only ("occupancy"), or
+-- leaves every known marker untouched ("keepAll"). Must run before RunMapSetup
+-- (common/mapUtils.lua:112-146), which reads GameInfo.MapData.markers.Alloys
+-- .transforms directly and unconditionally creates a real resource-spot object
+-- for every surviving entry -- and before CreateArmies() (common/gameUtils.lua:
+-- 209), whose SpawnInitialUnits step reads GameInfo.MapData.markers.Spawn
+-- .transforms directly. This whole function runs synchronously, before either,
+-- so mutating those tables here is guaranteed to be what both later steps see.
+local function ApplyScenario(scenario, total, slotPattern)
+    if scenario.spawns then
+        local spawnTransforms = GameInfo.MapData.markers and GameInfo.MapData.markers.Spawn
+            and GameInfo.MapData.markers.Spawn.transforms
+        if spawnTransforms then
+            for armyName, pos in pairs(scenario.spawns) do
+                if spawnTransforms[armyName] then
+                    spawnTransforms[armyName].position.x = pos.x
+                    spawnTransforms[armyName].position.y = pos.y
+                    spawnTransforms[armyName].position.z = pos.z
+                end
+            end
+        end
+    end
+
+    local alloyTransforms = GameInfo.MapData.markers and GameInfo.MapData.markers.Alloys
+        and GameInfo.MapData.markers.Alloys.transforms
+    if alloyTransforms then
+        if scenario.alloyMode == "explicit" then
+            local mentionedArmies = {}
+            for armyName, points in pairs(scenario.alloys or {}) do
+                mentionedArmies[armyName] = true
+                for _, p in ipairs(points) do
+                    if not alloyTransforms[p.name] then
+                        alloyTransforms[p.name] = { rotation = IDENTITY_ROTATION, scale = IDENTITY_SCALE, position = {} }
+                    end
+                    alloyTransforms[p.name].position.x = p.x
+                    alloyTransforms[p.name].position.y = p.y
+                    alloyTransforms[p.name].position.z = p.z
+                end
+            end
+            for armyName, markerNames in pairs(KNOWN_ALLOY_MARKERS) do
+                if not mentionedArmies[armyName] then
+                    for _, markerName in ipairs(markerNames) do
+                        alloyTransforms[markerName] = nil
+                    end
+                end
+            end
+        elseif scenario.alloyMode == "occupancy" then
+            for armyId = 1, 4 do
+                if slotPattern:sub(armyId, armyId) == "-" then
+                    local armyName = ARMY_ID_TO_NAME[armyId]
+                    for _, markerName in ipairs(KNOWN_ALLOY_MARKERS[armyName]) do
+                        alloyTransforms[markerName] = nil
+                    end
+                    Log("SANGEN: "..armyName.." has no player -- its 3 mex removed before RunMapSetup.")
+                end
+            end
+        elseif scenario.alloyMode == "delta" then
+            -- Everything NOT mentioned below is left exactly as the baseline (or
+            -- whatever an earlier-applied layer already set it to) -- unlike
+            -- "explicit", silence here is NOT a delete instruction. Only used once
+            -- a real baseline exists to diff against; see scenario.alloys.add /
+            -- .remove shape below.
+            for _, points in pairs((scenario.alloys and scenario.alloys.add) or {}) do
+                for _, p in ipairs(points) do
+                    if not alloyTransforms[p.name] then
+                        alloyTransforms[p.name] = { rotation = IDENTITY_ROTATION, scale = IDENTITY_SCALE, position = {} }
+                    end
+                    alloyTransforms[p.name].position.x = p.x
+                    alloyTransforms[p.name].position.y = p.y
+                    alloyTransforms[p.name].position.z = p.z
+                end
+            end
+            for _, markerNames in pairs((scenario.alloys and scenario.alloys.remove) or {}) do
+                for _, markerName in ipairs(markerNames) do
+                    alloyTransforms[markerName] = nil
+                end
+            end
+        end
+        -- "keepAll": no deletion, every known marker stays as the .sanmap has it.
+    end
+
+    Log("SANGEN: scenario '"..scenario.name.."' applied ("..total.." occupied slot(s)).")
+end
+
+-- Set inside ResolveAndApply, read by Scenario.SpawnMatchedScenarioUnits (defined further
+-- below) -- declared here, ahead of both, so they close over the same upvalue.
+local currentMatchedScenarioName = nil
+
+-- Finds the matching scenario for this lobby composition, applies it (mutating
+-- GameInfo.MapData's spawn/alloy markers before RunMapSetup/CreateArmies read them),
+-- logs the outcome, and returns the resolved playable area + whether this
+-- composition spawns extra units (battleships/fighters/etc, per-scenario -- see
+-- Scenario.SpawnMatchedScenarioUnits). Called once, synchronously, from _data.lua's
+-- LoadMapData-time pcall.
+function Scenario.ResolveAndApply(total, humanCount, aiCount, slotPattern)
+    local matchedScenario = FindMatchingScenario(total, humanCount, aiCount, slotPattern)
+    local chosenArea, spawnsUnitsEnabled = matchedScenario.area, matchedScenario.spawnsUnits
+    -- Bridges into Scenario.SpawnMatchedScenarioUnits, called separately (deferred, post-
+    -- RunMapSetup) by _data.lua's NewThread -- that call site only gets `area` back from here,
+    -- so this module-local is how it learns WHICH scenario matched. Same bridging pattern the
+    -- removed naval code didn't need (it had exactly one navy=true scenario); real now that
+    -- SpawnMatchedScenarioUnits dispatches on scenario name.
+    currentMatchedScenarioName = matchedScenario.name
+    ApplyScenario(matchedScenario, total, slotPattern)
+
+    Log(string.format(
+        "SANGEN: %d occupied slot(s) (%d human, %d AI, pattern=%s) -> scenario=%s spawnsUnits=%s, playable area x=%d y=%d w=%d h=%d",
+        total, humanCount, aiCount, slotPattern, matchedScenario.name,
+        tostring(spawnsUnitsEnabled), chosenArea.x, chosenArea.y, chosenArea.width, chosenArea.height))
+
+    return chosenArea, spawnsUnitsEnabled
+end
+
+-- ============================================================================
+-- Generic unit spawning, 2026-08-27 rewrite per the user: replaces the naval-only
+-- SpawnNavalFleets/NAVAL_FLEET/spiral-search machinery entirely. Deliberately split
+-- into two pieces that don't know about each other's concerns:
+--   EXECUTOR (Scenario.SpawnUnits)  -- input: a flat, already-resolved array of
+--     {armyIndex, templateIdentifier, x, y, z}. Output: those units exist. Knows
+--     NOTHING about water, terrain, navmesh, or unit type -- pure input -> output.
+--   GENERATOR (BuildSlots5to8Instructions) -- decides WHERE things spawn for one
+--     specific scenario. This is scenario-specific, hand-authored placement, not a
+--     general procedural placement system -- that's explicitly a separate, not-yet-
+--     designed concern (SanGen will own procedural placement; this is a one-off
+--     prototype generator for this one scenario, done directly in Lua for now).
+-- ============================================================================
+
+-- Batches CreateUnit calls so a big spawn (150 fighters/army) doesn't hitch a tick.
+local UNIT_SPAWN_BATCH_SIZE = 100
+
+-- Executor. Never call CreateUnit directly outside this function -- every unit-spawn
+-- path (this scenario or a future one) should produce instructions and hand them here.
+--
+-- ⚠️ CORRECTED 2026-08-28, per the confirmed-working reference `Pandemonium Isthmus_
+-- SpawnArmies.lua.bak` (spawns both ucn1001 Frigates and ucn3001 Battleships into this
+-- same map's ponds -- the "T1 frigates + T3 battleships in left/right ponds" the human
+-- specifically recalled working): position is `EngineClasses.float3(x, y, z)`, matching
+-- that file's own `CreateUnit(ARMY, e.tpId, pos)` call exactly.
+--
+-- Also per that same file's own explicit fix note: "CreateUnit's actual return value is
+-- now checked (not just whether pcall raised an error), so silent failures are counted
+-- instead of assumed to have worked." `pcall` only catches a THROWN error -- CreateUnit
+-- can return normally with a falsy result (e.g. an invalid/occupied/unreachable spot) and
+-- pcall alone reports that as success. Both `ok` (didn't throw) AND `unit` (actually got a
+-- real object back) are required below.
+function Scenario.SpawnUnits(instructions)
+    local sinceYield = 0
+    local placed, failed = 0, 0
+    for _, instr in ipairs(instructions) do
+        local ok, unit = pcall(CreateUnit, instr.armyIndex, instr.templateIdentifier,
+            EngineClasses.float3(instr.x, instr.y, instr.z))
+        if ok and unit then placed = placed + 1 else failed = failed + 1 end
+
+        sinceYield = sinceYield + 1
+        if sinceYield >= UNIT_SPAWN_BATCH_SIZE then
+            sinceYield = 0
+            WaitTicks(1)
+        end
+    end
+    Log(string.format("SANGEN: SpawnUnits placed %d, failed %d (of %d requested).",
+        placed, failed, #instructions))
+end
+
+-- ============================================================================
+-- "slots5to8AnyFilled" generator. PROTOTYPE -- exact spacing/radius constants below
+-- are provisional, not yet confirmed in-game (this file's usual convention for a
+-- confirmed-good value is a dated comment naming the human who verified it; these
+-- have none yet).
+-- ============================================================================
+local BATTLESHIP_TPID = "ucn3001"  -- Chosen T3 "Dreadnought" Battleship
+local FIGHTER_TPID_T3 = "uga3201"  -- Guard T3 "Contrail" Air Superiority Fighter --
+                                    -- NOT playable today per sanunit_strategist_pack
+                                    -- (UNITS_STATUS.md: BONE_MISSMATCH). Swap
+                                    -- FIGHTER_TPID below to this once it's fixed --
+                                    -- nothing else in this generator needs to change.
+local FIGHTER_TPID = "uga1201"     -- Guard T1 "Aerofoil" Anti-Air Fighter -- confirmed
+                                    -- playable (OK); used until FIGHTER_TPID_T3 works.
+
+local BATTLESHIPS_PER_PLAYER_PER_POND = 10
+local FIGHTERS_PER_PLAYER = 150
+
+-- The two symmetric deep-water ponds, found 2026-08-27 by directly analyzing
+-- Textures/heightmap.raw (connected-component flood fill of cells below
+-- waterLevel=78): the two largest components are near-identical size (1,262,948 /
+-- 1,262,197 map-units^2, next largest under 800) and confirmed 180-degree-rotational
+-- mirrors of each other about the map center (1024,1024) -- rotating either pond's
+-- deepest point lands inside the other pond within ~16 units. These are almost
+-- certainly the two ponds this file's earlier naval code always called "flanking
+-- both sides."
+local BATTLESHIP_SPAWN_Y = 78.0  -- waterLevel -- ships float at the surface, not the
+                                  -- seabed (matches the removed naval code's own
+                                  -- NavalFindSpot, which always returned waterLevel)
+
+-- ============================================================================
+-- 2026-08-28, per the human: hardcoded pond coordinates are GONE. Every fleet
+-- position is now derived live from that army's own Spawn marker, exactly the way
+-- the naval spawner that actually SHIPPED in this map did it
+-- (`Pandemonium Isthmus_data.lua.backup-2026-08-20-presplit`, SpawnNavalFleets:
+-- read GameInfo.MapData.markers.Spawn.transforms[army.name], offset sideways to
+-- reach the flanking water, spiral-search from there). That file is the real
+-- reference for this map -- NOT `SpawnArmies.lua.bak`, which is an unrun backup
+-- whose "confirmed working" status comes only from its own comments.
+--
+-- Why the old approach failed: BATTLESHIP_POSITIONS was 8 literal points derived
+-- OFFLINE from Textures/heightmap.raw, then "corrected" at runtime by a spiral probe
+-- that returned `idealX, idealZ` when it found nothing -- i.e. a DRY point. CreateUnit
+-- then returned falsy, the miss was counted into a Log() line, and Log() goes to the
+-- F1 console, which does not work in this build. Total failure and total success
+-- looked identical. Nothing hardcoded, and nothing that fails silently, survives here.
+-- ============================================================================
+
+-- How far sideways from an army's Spawn marker to begin looking for its water body.
+-- The shipped SpawnNavalFleets used 90 with an explicit per-army west/east bias; this
+-- map's playable strip has water flanking BOTH sides, so both directions are probed and
+-- whichever yields deeper water wins -- no hand-authored side table to keep in sync.
+local WATER_SEARCH_SIDE_OFFSET = 90
+
+-- Deepest-water search. Unlike a first-hit spiral, this scans its WHOLE budget and keeps
+-- the deepest cell found, so a fleet anchors in open water rather than in the first
+-- puddle encountered on the way out -- "deepest water closest to spawn", per the human.
+-- Ties broken by distance to the search origin (earlier spiral index = closer).
+local DEEP_WATER_SCAN_STEP = 3.0
+local DEEP_WATER_SCAN_TRIES = 900
+local DEEP_WATER_MINIMUM_DEPTH = 4.0   -- world units below waterLevel; shallower cells are
+                                        -- rejected outright so a fleet never anchors on a
+                                        -- beach shelf a hull cannot actually float on
+
+local SLOT_ANGLE_DEGREES = { [5] = 0, [6] = 90, [7] = 180, [8] = 270 }
+local FIGHTER_SPREAD_RADIUS = 700      -- world units from map center for the fighter
+                                        -- squadron's anchor -- large enough to keep 4
+                                        -- players' 150-unit blocks apart
+local FIGHTER_ALTITUDE_ABOVE_GROUND = 60  -- height ABOVE sampled terrain, not an absolute
+                                           -- world Y -- terrain near map center sits around
+                                           -- Y 78-83 (heightmap calibration, 2026-08-27), so
+                                           -- a bare absolute 60 would spawn fighters
+                                           -- underground almost everywhere on this map
+
+local function DegreesToRadians(d) return d * math.pi / 180.0 end
+
+-- Spiral coordinate generator, same algorithm as `Pandemonium Isthmus_SpawnArmies.lua.bak`'s
+-- GetSpiralGridXZ (itself copied there from host/testUtils.lua's SpawnUnits) -- copied here
+-- rather than Import()'d, matching this file's existing no-extra-Import convention.
+local WATER_SPIRAL_STEP = 3.0
+local WATER_SPIRAL_MAX_TRIES = 200
+local function GetSpiralGridXZ(n)
+    local k = math.ceil((math.sqrt(n) - 1) / 2)
+    local t = 2 * k + 1
+    local m = t ^ 2
+    t = t - 1
+    if n >= m - t then return k - (m - n), -k else m = m - t end
+    if n >= m - t then return -k, -k + (m - n) else m = m - t end
+    if n >= m - t then return -k + (m - n), k else return k, k - (m - n - t) end
+end
+
+-- Nudges (idealX, idealZ) to the nearest spot that's genuinely underwater right now, sampled
+-- live against the running engine's own terrain (Engine.SampleTerrainHeightFromCell) --
+-- exactly the technique SpawnArmies.lua.bak's CheckSpot/FindValidSpot uses, scoped down to
+-- just the water check (no prop/occupied-grid dedup -- ships are sparse enough at this scale
+-- not to need it). This is what makes battleship placement robust against any residual error
+-- in the offline heightmap analysis BATTLESHIP_POSITIONS came from: it's corrected live, not
+-- just trusted. Falls back to the original point if nothing valid turns up in budget --
+-- SpawnUnits' own CreateUnit-return-value check is the final safety net either way.
+local function FindNearbyWaterSpot(idealX, idealZ, waterLevel)
+    for n = 1, WATER_SPIRAL_MAX_TRIES do
+        local gx, gz = GetSpiralGridXZ(n)
+        local x = idealX + gx * WATER_SPIRAL_STEP
+        local z = idealZ + gz * WATER_SPIRAL_STEP
+        local errorCode, h = Engine.SampleTerrainHeightFromCell(EngineClasses.int2(math.floor(x), math.floor(z)))
+        if errorCode == EngineErrorCode.Success and h < waterLevel then
+            return x, z
+        end
+    end
+    -- ⚠️ 2026-08-28: returns nil, NOT `idealX, idealZ`. The old fallback handed the caller a
+    -- point it had just PROVEN was not water; CreateUnit then failed silently and the ship
+    -- vanished with no visible trace. The shipped SpawnNavalFleets got this right --
+    -- its NavalFindSpot ends in a bare `return nil` and the caller counts the miss.
+    -- Never substitute a known-bad position for a failure.
+    return nil
+end
+
+-- Finds the DEEPEST water within budget of (originX, originZ), not merely the first water.
+-- Returns x, z, depth -- or nil when the whole budget yields nothing at or past
+-- DEEP_WATER_MINIMUM_DEPTH. Cost is one Engine.SampleTerrainHeightFromCell per probe,
+-- DEEP_WATER_SCAN_TRIES times per army, once per match at load -- not a per-tick path.
+local function FindDeepestWaterNear(originX, originZ, waterLevel)
+    local bestX, bestZ, bestDepth = nil, nil, DEEP_WATER_MINIMUM_DEPTH
+    for n = 1, DEEP_WATER_SCAN_TRIES do
+        local gx, gz = GetSpiralGridXZ(n)
+        local x = originX + gx * DEEP_WATER_SCAN_STEP
+        local z = originZ + gz * DEEP_WATER_SCAN_STEP
+        local errorCode, h = Engine.SampleTerrainHeightFromCell(EngineClasses.int2(math.floor(x), math.floor(z)))
+        if errorCode == EngineErrorCode.Success then
+            local depth = waterLevel - h
+            -- Strict `>` keeps the FIRST cell at a given depth, and the spiral visits
+            -- nearer cells first, so ties resolve toward the spawn marker automatically.
+            if depth > bestDepth then
+                bestX, bestZ, bestDepth = x, z, depth
+            end
+        end
+    end
+    if not bestX then return nil end
+    return bestX, bestZ, bestDepth
+end
+
+-- Resolves one army's fleet anchor: probe BOTH flanks of its Spawn marker and take the
+-- deeper result. Returns nil (and the caller counts every ship as missed) when neither
+-- flank has water -- there is no "just put them somewhere" branch by design.
+local function FindFleetAnchorForArmy(armyName, waterLevel, fallbackX, fallbackZ)
+    local spawnMarker = GameInfo.MapData.markers
+        and GameInfo.MapData.markers.Spawn
+        and GameInfo.MapData.markers.Spawn.transforms
+        and GameInfo.MapData.markers.Spawn.transforms[armyName]
+
+    -- Reading markers.Spawn.transforms[army.name] directly (rather than GetMarker/
+    -- MarkerToPosition) is the pattern confirmed live 2026-08-17 -- see
+    -- session_findings_2026-08-17_unit_spawning.md §5, which chose it specifically to
+    -- avoid an unverified global-reachability dependency.
+    local originX = (spawnMarker and spawnMarker.position.x) or fallbackX
+    local originZ = (spawnMarker and spawnMarker.position.z) or fallbackZ
+
+    local bestX, bestZ, bestDepth = nil, nil, 0
+    for _, side in ipairs({ -1, 1 }) do
+        local x, z, depth = FindDeepestWaterNear(
+            originX + side * WATER_SEARCH_SIDE_OFFSET, originZ, waterLevel)
+        if x and depth > bestDepth then
+            bestX, bestZ, bestDepth = x, z, depth
+        end
+    end
+    return bestX, bestZ, bestDepth
+end
+
+-- Appends a compact grid of `count` units (roughly square, `spacing` apart) centered
+-- on (centerX, centerZ) at height y, owned by armyIndex, into outInstructions. When
+-- `requiresWater` is true, EVERY grid point is individually nudged via FindNearbyWaterSpot
+-- before being appended -- not just the formation's own anchor.
+local function AppendUnitGrid(outInstructions, armyIndex, templateIdentifier, centerX, y, centerZ, count, spacing, requiresWater)
+    local columns = math.ceil(math.sqrt(count))
+    local rows = math.ceil(count / columns)
+    local startX = centerX - (columns - 1) * spacing * 0.5
+    local startZ = centerZ - (rows - 1) * spacing * 0.5
+    local placed = 0
+    for row = 0, rows - 1 do
+        for col = 0, columns - 1 do
+            if placed >= count then break end
+            local x = startX + col * spacing
+            local z = startZ + row * spacing
+            local bAppend = true
+            if requiresWater then
+                -- FindNearbyWaterSpot now returns nil on failure. A grid point that cannot be
+                -- resolved to real water is DROPPED and counted, never appended at its dry
+                -- coordinate -- the caller turns the shortfall into visible deficit markers.
+                local wx, wz = FindNearbyWaterSpot(x, z, y)  -- y is waterLevel here
+                if wx then x, z = wx, wz else bAppend = false end
+            end
+            if bAppend then
+                outInstructions[#outInstructions + 1] = {
+                    armyIndex = armyIndex,
+                    templateIdentifier = templateIdentifier,
+                    x = x,
+                    y = y,
+                    z = z,
+                }
+            end
+            placed = placed + 1
+        end
+    end
+end
+
+-- Builds the flat UnitSpawnInstruction array for every occupied army in slots 5-8:
+-- 10 battleships in EACH pond plus a 150-fighter squadron, all offset by a fixed
+-- per-slot angle. Reads the real, populated `Armies` table (not slotPattern position
+-- math) for armyIndex/army.name, matching this file's existing occupancy-check idiom
+-- in ApplyScenario/the old SpawnNavalFleets.
+local function BuildSlots5to8Instructions(area)
+    local instructions = {}
+    local _, waterLevel = Engine.GetWaterLevel()
+    for armyIndex, army in pairs(Armies) do
+        -- ⚠️ FIXED 2026-08-28: this was `if not army.lobbyOptions.isEmptySlot then` -- an
+        -- UNGUARDED dereference. `lobbyOptions` is nil on at least some army entries (an AI
+        -- army is the confirmed case), so that line THREW, and because _data.lua wraps this
+        -- whole call in pcall (and Warn() goes to the F1 console, which is unreliable in this
+        -- build) the throw was swallowed and NOTHING spawned, with no visible error anywhere.
+        --
+        -- Confirmed live by the human: a 1v1 with a HUMAN in slot 5 and an AI in slot 6 got the
+        -- correct AREA_FULL playable area (set before this call, and never touches lobbyOptions)
+        -- and correct alloy handling (ApplyScenario's occupancy branch keys off slotPattern, not
+        -- lobbyOptions) -- but zero units. This line was the only lobbyOptions reader in the file.
+        --
+        -- Latent, not new: the removed SpawnNavalFleets used the identical unguarded check, but
+        -- navy/spawnsUnits was only ever true on the all-human "4human" scenario, so no AI army
+        -- ever reached it until slots5to8AnyFilled shipped.
+        --
+        -- nil lobbyOptions => treat as OCCUPIED (correct: an AI slot is filled). Never assume a
+        -- missing options table means an empty slot -- that would silently skip real players.
+        local bIsEmptySlot = army.lobbyOptions and army.lobbyOptions.isEmptySlot
+        if not bIsEmptySlot then
+            local slotNumber = tonumber(army.name:match("^ARMY_0?(%d+)$"))
+            if slotNumber and SLOT_ANGLE_DEGREES[slotNumber] then
+                local angle = DegreesToRadians(SLOT_ANGLE_DEGREES[slotNumber])
+                -- Anchor resolved LIVE from this army's Spawn marker (both flanks probed,
+                -- deeper wins). No hardcoded pond table any more.
+                local anchorX, anchorZ = FindFleetAnchorForArmy(
+                    army.name, waterLevel, area and (area.x + area.width * 0.5) or 1024,
+                    area and (area.y + area.height * 0.5) or 1024)
+
+                -- Grid spacing 8 (not the original 12): verified via
+                -- scratchpad/verify_full_grids.py against the real depth mask that spacing 12
+                -- put 8/80 ships on dry land (multiple points per formation, not just the
+                -- anchor); spacing 8 reduces that to 1/80 (slot 8's pondB formation, one
+                -- corner cell). Each unit is already spawned via its own pcall (SpawnUnits),
+                -- so one ship failing to create is a minor, self-contained miss, not a
+                -- formation-wide failure -- accepted rather than hand-authoring all 80 exact
+                -- points, which the rectangular-grid approach exists to avoid.
+                if anchorX then
+                    -- Both of this army's former "ponds" collapse into one fleet at the single
+                    -- deepest anchor found near its own spawn. Splitting a fleet across two
+                    -- hand-picked ponds was an artifact of the hardcoded table, not a
+                    -- requirement. y is waterLevel: hulls float at the surface.
+                    AppendUnitGrid(instructions, armyIndex, BATTLESHIP_TPID,
+                        anchorX, waterLevel, anchorZ,
+                        BATTLESHIPS_PER_PLAYER_PER_POND * 2, 8, true)
+                end
+
+                local fighterOffsetX = math.cos(angle) * FIGHTER_SPREAD_RADIUS
+                local fighterOffsetZ = math.sin(angle) * FIGHTER_SPREAD_RADIUS
+                local fighterX, fighterZ = 1024 + fighterOffsetX, 1024 + fighterOffsetZ
+                -- Sample REAL terrain height at the squadron's anchor point, same Engine API
+                -- the removed naval code used for its own position validation
+                -- (Engine.SampleTerrainHeightFromCell) -- one sample per squadron, not per
+                -- unit, since a 150-unit block is compact enough that one ground reading is a
+                -- reasonable approximation. Falls back to waterLevel-ish 78 (not FIGHTER_
+                -- ALTITUDE_ABOVE_GROUND alone) only if the sample itself fails, so a failed
+                -- sample still lands near the map's typical terrain height, not underground.
+                local sampleOk, groundHeight = Engine.SampleTerrainHeightFromCell(
+                    EngineClasses.int2(math.floor(fighterX), math.floor(fighterZ)))
+                local fighterY = (sampleOk == EngineErrorCode.Success and groundHeight or 78)
+                    + FIGHTER_ALTITUDE_ABOVE_GROUND
+                AppendUnitGrid(instructions, armyIndex, FIGHTER_TPID,
+                    fighterX, fighterY, fighterZ,
+                    FIGHTERS_PER_PLAYER, 6)
+            end
+        end
+    end
+    return instructions
+end
+
+-- Dispatch: which scenario needs which generator. Only "slots5to8AnyFilled" builds
+-- anything today -- extend this if/elseif as more scenarios get their own unit spawns
+-- (a per-scenario builder-function table once there are more than ~2-3 of these, not
+-- before -- no abstraction for a single case). Must run after RunMapSetup (see
+-- _data.lua's NewThread comment for the ordering proof) so Armies is populated.
+function Scenario.SpawnMatchedScenarioUnits(area)
+    if currentMatchedScenarioName == "slots5to8AnyFilled" then
+        Scenario.SpawnUnits(BuildSlots5to8Instructions(area))
+    end
+end
+
+return Scenario

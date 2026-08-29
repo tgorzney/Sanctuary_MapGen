@@ -19,6 +19,15 @@ ORIGINAL design — §15.3–§15.9 ratify a three-file successor. This paragrap
 (the historical record of what was first promoted to law) rather than edited in place; §15.4 is
 the current binding file-shape law.**
 
+**Note (2026-08-28): the module API named in this paragraph (`SpawnNavalFleets`) is also stale —
+same "historical record, left as written" treatment as the file-shape note above.** The live
+reference script replaced it 2026-08-27 with a generic `spawnsUnits`-gated, name-keyed dispatch
+(`Scenario.SpawnMatchedScenarioUnits`/`Scenario.SpawnUnits`); the naval-specific
+`Params::ScenarioNavalFleet` family this pack shaped from the old `SpawnNavalFleets` body is
+retired. Full correction, replacement design, and an explicitly flagged open gap (where
+per-scenario unit-spawn dispatch code lives under the three-file split): `ARCH_15_05`'s "RETIRED
+2026-08-28" and "OPEN" notes.
+
 
 ---
 
@@ -30,7 +39,7 @@ the current binding file-shape law.**
 | §15.2 | [ARCH_15_02_IoScopeRuling.md](ARCH_15_02_IoScopeRuling.md) | IO scope ruling — corrects an earlier assumption, does not reverse it |
 | §15.3 | [ARCH_15_03_ExportOnlyLuaRatified.md](ARCH_15_03_ExportOnlyLuaRatified.md) | Design ratified: option (c) — export-only, SanGen never parses Lua back (resolves §15.2's open question / `MAP_SCENARIO_SPEC.md` §8) |
 | §15.4 | [ARCH_15_04_ThreeFileOnDiskShape.md](ARCH_15_04_ThreeFileOnDiskShape.md) | Three-file on-disk shape + overwrite safety (ratifies `MAP_SCENARIO_SPEC.md` §2/§2.1/§2.2) |
-| §15.5 | [ARCH_15_05_ParamsScenariosType.md](ARCH_15_05_ParamsScenariosType.md) | `Params::Scenarios` — the new PARAMS type (shape ruling) |
+| §15.5 | [ARCH_15_05_ParamsScenariosType.md](ARCH_15_05_ParamsScenariosType.md) | `Params::Scenarios` — the new PARAMS type (shape ruling); naval-fleet types retired 2026-08-28; `ScenarioBody::areaName` (named-`Area` reference, additive wire key `AreaName`) added 2026-08-28 |
 | §15.6 | [ARCH_15_06_CountScenariosOrdering.md](ARCH_15_06_CountScenariosOrdering.md) | `COUNT_SCENARIOS` ordering — array order IS the match-priority authoring action |
 | §15.7 | [ARCH_15_07_OwnershipSplit.md](ARCH_15_07_OwnershipSplit.md) | Ownership split — who ratifies what for the new `Params::Scenarios` family |
 | §15.8 | [ARCH_15_08_ThirdPartyDependencyRuling.md](ARCH_15_08_ThirdPartyDependencyRuling.md) | Third-party dependency ruling — ImGuiColorTextEdit + embedded LuaJIT |

@@ -1,0 +1,515 @@
+-- SANGEN: lobby-composition-driven playable area, spawn positions, per-army mex
+-- (alloy) visibility, and (4 human players only) a per-army naval fleet.
+--
+-- Loaded automatically by the game's own STOCK, UNMODIFIED map-data mechanism:
+-- common/mapUtils.lua's LoadMapData() checks for "maps/<mapName>/<mapName>_data.lua"
+-- next to every map's .sanmap and Import()s it if present. Not a custom hook -- it's
+-- vanilla game code, so it survives a game patch.
+--
+-- Map-folder file only. Lives at LJ/lua/maps/Pandemonium Isthmus/ (NOT the
+-- Sanctuary_Data/Maps folder -- that's where the .sanmap/Props/Textures live; libPath,
+-- which this path is built from, points at LJ/lua instead).
+--
+-- ORCHESTRATOR ONLY, 2026-08-20: per the scenario-script file split
+-- (sangen_arch_pack/specs/MODDING_SCRIPTING_SPEC.md, "Scenario-script file split"),
+-- this file holds no scenario content of its own -- every scenario definition, the
+-- area/alloy/spawn resolution, and the naval fleet spawner live in the sibling
+-- Pandemonium Isthmus_Scenarios_Script.lua. This file's job is strictly: read the
+-- lobby, determine the slot pattern, hand both to the scenario module, then wire the
+-- result into the map's playable area / naval spawn.
+--
+-- The two files are COLOCATED here in LJ/lua/maps/<MapName>/, and must stay that way.
+-- Putting the scenario file in the map's asset folder was tried on 2026-08-20 and
+-- PROVEN IMPOSSIBLE: Import() cannot address anything outside the LJ/lua root -- a
+-- "../../Sanctuary_Data/..." path fails Engine.FileExists() outright (verified live
+-- in-game against the exact libPath.."/"..path string import.lua builds internally),
+-- so Import() raises "File doesn't exist" and aborts this whole chunk. That settles
+-- Sanctuary_Map_System_Rework.md Sec12 open question 6 in the NEGATIVE. If this file
+-- ever relocates to the map folder, the scenario file moves with it.
+--
+-- Import() (common/systems/import.lua) does NOT use a module's `return` statement; it
+-- only captures GLOBAL variables the file writes into its own environment table.
+-- Scenarios_Script.lua exposes its API as a global `Scenario` table, so this file
+-- pulls `.Scenario` off the Import() result below -- `local S = Import(path)` alone
+-- silently yields a table with none of our fields and no error.
+--
+-- IMPORTANT -- everything below runs inside LoadMapData(), which nothing up the call
+-- chain protects with pcall (Import()'s own xpcall catches internal errors but
+-- RE-RAISES after logging). An uncaught error here aborts LoadMapData entirely, which
+-- means CreateArmies() and RunMapSetup() never run afterward: no armies, no units, no
+-- props, no markers, no resource spots -- confirmed by a live crash on 2026-08-16.
+-- The whole body is wrapped in pcall with a safe fallback (map loads at its normal
+-- defaults) so this file can never take the rest of map load down with it again.
+
+
+-- ============================================================================
+-- LOAD-SCOPE GATE -- required. Do not remove.
+--
+-- This file has TWO callers, and only ONE of them is asking to start a match:
+--
+--   common/mapUtils.lua:47   LoadMapData()          Import("maps/X/X_data.lua")
+--       The real thing. Runs during InitLobby, before CreateArmies. Owns gameplay setup.
+--
+--   host/testUtils.lua:364   LoadDebugUnitGroups()  Import("/maps/X/X_data.lua")
+--       Called unconditionally from host/hostMain.lua:23. Wants ONE thing: the `MapData`
+--       global's .groups table, to populate the debug unit-group UI. It is not starting a
+--       match and has no business running playable-area, alloy, or unit-spawn logic.
+--
+-- Import() caches on the LITERAL string it is given (common/systems/import.lua:128), and
+-- "maps/..." != "/maps/...", so the second call misses the cache and RE-EXECUTES this whole
+-- chunk in the same Lua state. Measured 2026-08-28: 300 fighters and 40 ships against the 150
+-- and 20 configured, and two NewThread registrations. Commanders were never doubled because
+-- CreateArmies is not in this chunk -- which is what made the symptom look selective.
+--
+-- The gate below is NOT a "run once" counter. It is this file correctly scoping its side
+-- effects to the caller that owns them, using the path Import itself recorded
+-- (ImportedFileInfo.FileName, set at import.lua:177). The debug loader still gets a fully
+-- successful import and still reads whatever data globals it wants -- it simply does not
+-- trigger match setup. That is the correct division of responsibility, and it stays correct
+-- if the engine ever normalizes its cache key.
+--
+-- BACKGROUND -- why gameplay logic lives in a data file at all: this engine no longer has a
+-- per-map script hook. `<map>_script.lua` (referenced by Pandemonium Isthmus_SpawnArmies.lua.bak
+-- as its caller) does not exist any more, and the only surviving per-map script,
+-- maps/showcase_script.lua, is invoked by hand from a debug command (host/testUtils.lua:544),
+-- not automatically. `<map>_data.lua` is the ONLY automatic per-map Lua entry point left, so
+-- match logic has nowhere else to go.
+--
+-- ⚠️ RELATED HAZARD, not solved here: host/testUtils.lua:353 does
+--     table.save(DebugUnitGroups, DebugUnitGroupsFilePath, "MapData = ")
+-- i.e. the engine can OVERWRITE this file with machine-generated data if the debug
+-- unit-group UI is used. Everything in this file would be destroyed. Keep a backup.
+local sangenLoadPath = ImportedFileInfo and ImportedFileInfo.FileName or ""
+if sangenLoadPath ~= string.format("maps/%s/%s_data.lua",
+        GameInfo.MapInfo.dataName, GameInfo.MapInfo.dataName) then
+    return {}
+end
+-- ============================================================================
+
+local ok, err = pcall(function()
+
+    local Scenario = Import("maps/Pandemonium Isthmus/Pandemonium Isthmus_Scenarios_Script.lua").Scenario
+
+    -- SANGEN, 2026-08-27: air/land/sea/amphib/hover/sub navmesh blocker over the two spire
+    -- footprints near map center. Reuses the existing PlayableAreaBarrier prefab (common/
+    -- systems/templateLoader.lua creates it once per map, on both host and client, for every
+    -- map, well before this file runs) rather than defining a new prefab -- it already carries
+    -- one NavmapModifierTemplate child per navigation layer, for EVERY layer including Air
+    -- (common/loading/playableAreaBarrierLoader.lua:19-26, Layers.GetAllNavigationLayerNames()).
+    -- A plain structure's skirtSize modifiers explicitly exclude Air
+    -- (common/layers.lua:144-146, GetStructureNavigationLayerNames), so reusing THIS prefab
+    -- specifically -- not a unit template's skirtSize -- is what makes Air blocking possible
+    -- here at all, with zero engine/mapUtils.lua changes.
+    --
+    -- The map's real heightmap is flat under both spires (the visual spires are props, not
+    -- terrain) -- irrelevant here: a NavmapModifier blocks its footprint independent of local
+    -- terrain height/slope (common/navigationLayers.lua's per-layer height/slope bands only
+    -- gate the terrain-driven bake, not an explicit modifier), and the barrier prefab's own Y
+    -- is always 0 regardless of terrain (common/playableAreaBarrier.lua's GetBarrierSlabs).
+    --
+    -- Rectangles decomposed from Textures/heightmap_AirBlocker.png (2049x2049, matches this
+    -- map's heightmapResolution). History: human edited this mask three times (2026-08-27) --
+    -- first pass covered only the 2 spires nearest map center (93-94% coverage, few boxes);
+    -- second pass covered all 32 real white regions across the whole map at a tight 16px
+    -- merge-overshoot cap (815 rectangles, 0 missed white, ~3.5-15% overshoot per component);
+    -- this THIRD pass re-scans the human's latest mask edit and re-runs the same pipeline at a
+    -- much looser 512px merge-overshoot cap, per the human's explicit ask this time: prefer
+    -- covering extra black area over adding more rectangles.
+    --
+    -- Full scan: thresholded at raw16 > 32768, connected-component-labeled across the whole
+    -- mask. 32 real components survive a size>=20px cutoff (16 unique features, each mirrored
+    -- once -- this map is point-symmetric); sub-20px specks are antialiasing dust, dropped.
+    --
+    -- Per component: an EXACT (zero-overshoot) greedy largest-rectangle decomposition first
+    -- (100% coverage by construction), then the same greedy agglomerative merge pass as before --
+    -- repeatedly replace the two rectangles whose union bounding box adds the fewest net-new
+    -- black pixels (integral image over that component's true mask, overlap-safe) with that one
+    -- bounding box -- but stopping only once the cheapest remaining merge would add more than
+    -- 512 black px (vs. 16 previously). Merging only ever grows coverage, so zero-missed-white
+    -- still holds for all 32 components (confirmed via full union-vs-mask rasterization).
+    --
+    -- Totals at this setting: 139 rectangles across all 32 components (vs. 815 at the 16px cap --
+    -- an 83% cut), total overshoot 30901/74482 white px = 41.5% (vs. ~5% at the 16px cap) -- the
+    -- explicit trade the human asked for. Reference curve computed before picking 512: 256px cap
+    -- -> 206 rects/29.3% overshoot; 1024px cap -> 88 rects/58.8% overshoot (already more black
+    -- than white in the average box -- judged too aggressive). No rotation:
+    -- NavmapModifierTemplate's `size` is an axis-aligned float2, so every diagonal blob is
+    -- staircase-approximated, now with noticeably blockier, over-sized steps at this cap.
+    --
+    -- Pixel -> world: x = 2048 - col, z = row (heightmapResolution-1 = 2048 = width = length).
+    -- This is the SANMAP_FORMAT_SPEC-documented, empirically-validated (median error 0.0105
+    -- world units over 63k instances) heightmap-sampling convention -- chosen over the format's
+    -- separate general-entity-position flip convention because this mask is a Textures/ raster
+    -- asset in the same family as heightmap.raw, not a `.sanmap` JSON entity field. Cross-checked
+    -- 2026-08-27 against this map's own 164 real Spire_01/CliffSpireCap_0[1-3] prop positions for
+    -- the two center components only (the map's only "spire"-named props): 158/164 (96%) fell
+    -- within a 20px-dilated first-pass mask under this convention, confirmed live in-game the
+    -- same day. Not re-validated against this mask edit or the other 30 components.
+    local AIR_BLOCKER_RECTS = {
+        { x =   1729.5, z =     74.5, sizeX =   8, sizeZ =  14 },
+        { x =   1706.5, z =     83.5, sizeX =  46, sizeZ =  20 },
+        { x =   1684.0, z =    127.5, sizeX =  27, sizeZ =  20 },
+        { x =   1704.0, z =    100.5, sizeX =  37, sizeZ =  54 },
+        { x =   1554.0, z =    141.5, sizeX =  13, sizeZ =  32 },
+        { x =   1564.0, z =    148.5, sizeX =  39, sizeZ =  20 },
+        { x =   1571.5, z =    174.5, sizeX =  40, sizeZ =  44 },
+        { x =   1568.0, z =    184.0, sizeX =  27, sizeZ =  97 },
+        { x =   1571.0, z =    220.5, sizeX =  37, sizeZ =  38 },
+        { x =   1807.0, z =    221.5, sizeX =  17, sizeZ =  42 },
+        { x =   1815.0, z =    196.0, sizeX =  19, sizeZ =  51 },
+        { x =   1814.5, z =    201.0, sizeX =  12, sizeZ =  99 },
+        { x =   1942.5, z =    285.0, sizeX =  12, sizeZ =  29 },
+        { x =   1921.5, z =    263.0, sizeX =  16, sizeZ =  67 },
+        { x =   1939.0, z =    281.0, sizeX =  63, sizeZ =  21 },
+        { x =   1968.0, z =    280.5, sizeX =  15, sizeZ =  34 },
+        { x =   1925.0, z =    267.5, sizeX =  39, sizeZ =  50 },
+        { x =   1720.5, z =    278.5, sizeX =  10, sizeZ =  26 },
+        { x =   1689.0, z =    288.5, sizeX =  11, sizeZ =  22 },
+        { x =   1699.0, z =    260.5, sizeX =  19, sizeZ =  54 },
+        { x =   1699.5, z =    266.0, sizeX =  42, sizeZ =  43 },
+        { x =   1855.5, z =    393.0, sizeX =  34, sizeZ =  35 },
+        { x =   1877.5, z =    391.5, sizeX = 120, sizeZ =  16 },
+        { x =   1890.5, z =    385.5, sizeX =  78, sizeZ =  30 },
+        { x =   1837.5, z =    406.5, sizeX =  42, sizeZ =  42 },
+        { x =   1938.0, z =    401.5, sizeX =  29, sizeZ =  30 },
+        { x =   1584.5, z =    397.0, sizeX =  34, sizeZ =  15 },
+        { x =   1588.0, z =    396.5, sizeX =  21, sizeZ =  46 },
+        { x =   2041.0, z =    455.5, sizeX =  15, sizeZ = 144 },
+        { x =   2023.0, z =    469.5, sizeX =  23, sizeZ =  54 },
+        { x =   2029.0, z =    457.5, sizeX =  11, sizeZ = 106 },
+        { x =   1748.5, z =    487.0, sizeX =   8, sizeZ =  21 },
+        { x =   1672.5, z =    484.5, sizeX =  20, sizeZ =  48 },
+        { x =   1713.0, z =    486.5, sizeX = 109, sizeZ =  16 },
+        { x =   1704.0, z =    474.0, sizeX =  65, sizeZ =  39 },
+        { x =   1631.0, z =    522.5, sizeX =  31, sizeZ =  24 },
+        { x =   1701.5, z =    431.5, sizeX =  26, sizeZ =  64 },
+        { x =   1697.5, z =    462.0, sizeX =  38, sizeZ =  73 },
+        { x =   1659.0, z =    504.0, sizeX =  43, sizeZ =  29 },
+        { x =   1496.5, z =    514.0, sizeX =  64, sizeZ =  19 },
+        { x =   1499.0, z =    512.5, sizeX =  45, sizeZ =  38 },
+        { x =   1511.0, z =    504.5, sizeX =  45, sizeZ =  36 },
+        { x =   1858.5, z =    530.0, sizeX =  10, sizeZ =  27 },
+        { x =   1872.5, z =    547.0, sizeX =  12, sizeZ =  51 },
+        { x =   1890.0, z =    541.0, sizeX =  13, sizeZ =  61 },
+        { x =   1880.0, z =    548.0, sizeX =  43, sizeZ =  41 },
+        { x =   1714.0, z =    599.5, sizeX =  29, sizeZ =  28 },
+        { x =   1740.0, z =    588.5, sizeX =  55, sizeZ =  26 },
+        { x =   1504.5, z =    651.0, sizeX =  16, sizeZ =  11 },
+        { x =   1520.5, z =    620.0, sizeX =  40, sizeZ =  31 },
+        { x =   1518.5, z =    625.0, sizeX =  32, sizeZ =  47 },
+        { x =   1541.0, z =    603.0, sizeX =  39, sizeZ =  29 },
+        { x =   1959.0, z =    664.5, sizeX =  19, sizeZ =  62 },
+        { x =   1983.5, z =    617.0, sizeX =  30, sizeZ =  33 },
+        { x =   1964.0, z =    648.0, sizeX =  31, sizeZ =  39 },
+        { x =   1978.0, z =    622.0, sizeX =  19, sizeZ =  59 },
+        { x =   1956.0, z =    662.5, sizeX =  39, sizeZ =  34 },
+        { x =   1359.5, z =    672.5, sizeX =  18, sizeZ =  22 },
+        { x =   1386.5, z =    628.0, sizeX =  40, sizeZ =  35 },
+        { x =   1375.0, z =    655.0, sizeX =  31, sizeZ =  37 },
+        { x =   1382.0, z =    636.0, sizeX =  29, sizeZ =  63 },
+        { x =   1010.5, z =    997.0, sizeX =  38, sizeZ =  31 },
+        { x =    965.0, z =    978.0, sizeX =  99, sizeZ =  21 },
+        { x =    981.5, z =    989.0, sizeX =  72, sizeZ =  41 },
+        { x =    959.5, z =    974.5, sizeX =  80, sizeZ =  32 },
+        { x =    962.0, z =    981.5, sizeX =  45, sizeZ =  52 },
+        { x =    986.0, z =    993.5, sizeX =  95, sizeZ =  28 },
+        { x =   1067.5, z =   1063.0, sizeX =  70, sizeZ =  39 },
+        { x =   1072.0, z =   1065.5, sizeX = 107, sizeZ =  22 },
+        { x =   1089.0, z =   1073.5, sizeX =  87, sizeZ =  30 },
+        { x =   1083.5, z =   1066.5, sizeX =  54, sizeZ =  52 },
+        { x =   1053.5, z =   1055.5, sizeX =  78, sizeZ =  40 },
+        { x =     68.5, z =   1427.0, sizeX =  14, sizeZ =  57 },
+        { x =     89.0, z =   1386.0, sizeX =  19, sizeZ =  67 },
+        { x =     64.5, z =   1431.5, sizeX =  30, sizeZ =  34 },
+        { x =     85.5, z =   1401.0, sizeX =  38, sizeZ =  33 },
+        { x =     92.0, z =   1385.5, sizeX =  39, sizeZ =  34 },
+        { x =    659.0, z =   1417.5, sizeX =  15, sizeZ =  52 },
+        { x =    688.5, z =   1375.0, sizeX =  18, sizeZ =  21 },
+        { x =    677.5, z =   1393.0, sizeX =  24, sizeZ =  37 },
+        { x =    660.5, z =   1419.0, sizeX =  38, sizeZ =  37 },
+        { x =    671.0, z =   1408.0, sizeX =  29, sizeZ =  55 },
+        { x =    544.5, z =   1397.0, sizeX =  14, sizeZ =  11 },
+        { x =    493.5, z =   1451.0, sizeX =  12, sizeZ =  17 },
+        { x =    512.0, z =   1441.0, sizeX =  31, sizeZ =  25 },
+        { x =    526.0, z =   1431.0, sizeX =  43, sizeZ =  25 },
+        { x =    529.5, z =   1422.5, sizeX =  32, sizeZ =  50 },
+        { x =    333.5, z =   1448.0, sizeX =  30, sizeZ =  27 },
+        { x =    309.5, z =   1459.5, sizeX =  58, sizeZ =  26 },
+        { x =    189.5, z =   1518.0, sizeX =  10, sizeZ =  27 },
+        { x =    167.5, z =   1496.0, sizeX =  42, sizeZ =  21 },
+        { x =    158.0, z =   1507.0, sizeX =  13, sizeZ =  61 },
+        { x =    171.5, z =   1501.0, sizeX =  36, sizeZ =  51 },
+        { x =    299.5, z =   1561.0, sizeX =   8, sizeZ =  21 },
+        { x =    371.0, z =   1564.5, sizeX =  13, sizeZ =  50 },
+        { x =    422.0, z =   1521.5, sizeX =  21, sizeZ =  16 },
+        { x =    345.0, z =   1570.0, sizeX =  67, sizeZ =  31 },
+        { x =    349.0, z =   1578.5, sizeX =  47, sizeZ =  48 },
+        { x =    335.0, z =   1561.5, sizeX = 109, sizeZ =  16 },
+        { x =    350.5, z =   1588.5, sizeX =  30, sizeZ =  78 },
+        { x =    404.0, z =   1535.5, sizeX =  35, sizeZ =  24 },
+        { x =    346.5, z =   1616.5, sizeX =  26, sizeZ =  64 },
+        { x =    384.5, z =   1552.0, sizeX =  32, sizeZ =  39 },
+        { x =    551.5, z =   1534.5, sizeX =  64, sizeZ =  18 },
+        { x =    548.5, z =   1535.5, sizeX =  48, sizeZ =  38 },
+        { x =    537.0, z =   1543.5, sizeX =  45, sizeZ =  36 },
+        { x =     19.0, z =   1586.5, sizeX =  11, sizeZ =  86 },
+        { x =     25.0, z =   1578.5, sizeX =  23, sizeZ =  54 },
+        { x =      8.0, z =   1592.5, sizeX =  17, sizeZ = 144 },
+        { x =    196.5, z =   1655.0, sizeX =  68, sizeZ =  19 },
+        { x =    192.0, z =   1656.0, sizeX =  35, sizeZ =  37 },
+        { x =    165.5, z =   1659.0, sizeX = 110, sizeZ =  21 },
+        { x =    167.5, z =   1662.5, sizeX =  78, sizeZ =  30 },
+        { x =    210.5, z =   1639.5, sizeX =  42, sizeZ =  38 },
+        { x =    110.0, z =   1645.5, sizeX =  29, sizeZ =  28 },
+        { x =    463.5, z =   1651.0, sizeX =  34, sizeZ =  15 },
+        { x =    460.0, z =   1651.5, sizeX =  21, sizeZ =  46 },
+        { x =    327.0, z =   1769.5, sizeX =   9, sizeZ =  26 },
+        { x =    360.0, z =   1759.5, sizeX =   9, sizeZ =  22 },
+        { x =    348.5, z =   1784.5, sizeX =  42, sizeZ =  34 },
+        { x =    348.0, z =   1787.5, sizeX =  31, sizeZ =  54 },
+        { x =    106.0, z =   1763.0, sizeX =  11, sizeZ =  29 },
+        { x =    109.0, z =   1766.5, sizeX =  63, sizeZ =  22 },
+        { x =    123.0, z =   1777.0, sizeX =  39, sizeZ =  41 },
+        { x =     80.0, z =   1767.5, sizeX =  15, sizeZ =  34 },
+        { x =    128.0, z =   1785.0, sizeX =  21, sizeZ =  67 },
+        { x =    242.0, z =   1828.5, sizeX =  15, sizeZ =  38 },
+        { x =    233.0, z =   1866.5, sizeX =  11, sizeZ =  60 },
+        { x =    239.0, z =   1839.5, sizeX =   7, sizeZ =  84 },
+        { x =    233.0, z =   1851.0, sizeX =  19, sizeZ =  49 },
+        { x =    481.0, z =   1864.5, sizeX =  25, sizeZ =  82 },
+        { x =    472.0, z =   1827.5, sizeX =  27, sizeZ =  38 },
+        { x =    494.0, z =   1906.0, sizeX =  19, sizeZ =  33 },
+        { x =    478.0, z =   1851.5, sizeX =  37, sizeZ =  36 },
+        { x =    479.5, z =   1882.5, sizeX =  46, sizeZ =  36 },
+        { x =    319.5, z =   1973.0, sizeX =  10, sizeZ =  15 },
+        { x =    341.5, z =   1964.0, sizeX =  46, sizeZ =  19 },
+        { x =    365.5, z =   1919.0, sizeX =  24, sizeZ =  17 },
+        { x =    344.5, z =   1947.5, sizeX =  38, sizeZ =  54 },
+    }
+    -- Host sets the actual navmap modifiers (simulation-authoritative pathing block) plus the
+    -- global placement grid; client sets only its local placement grid (mirrors
+    -- common/playableAreaBarrier.lua's CreateBarrier/SetBarrierSize/SetBarrierEnabled exactly --
+    -- navmap modifiers are never touched client-side there either).
+    -- ⚠️ THE BUG, found 2026-08-28. This Import was MISSING, and its absence is why
+    -- navmesh blocking has never worked since it broke.
+    --
+    -- SpawnAirBlockerNavmapModifiers below calls NavmapModifiers.GetNavmapModifierIDs(...).
+    -- `NavmapModifiers` is NOT an engine global -- every real consumer imports it
+    -- (common/playableAreaBarrier.lua:1, host/units/unitsClasses/unitsBaseClass.lua:14).
+    -- Without this line the bare identifier resolved to _G.NavmapModifiers = nil, so indexing
+    -- it threw "attempt to index a nil value" EVERY time, on the host `else` branch -- the one
+    -- that does the actual navmesh work. The client branch uses Engine.SetLocalGridModifier*
+    -- and never touches NavmapModifiers, which is why only host-side blocking died.
+    --
+    -- The throw was invisible: it happens inside a NewThread callback, where
+    -- common/systems/threads.lua's ResumeThread swallows errors, and Warn() goes to the F1
+    -- console, which does not work in this build.
+    local NavmapModifiers = Import("common/navmapModifiers.lua")
+
+    local function SpawnAirBlockerNavmapModifiers()
+        for _, rect in ipairs(AIR_BLOCKER_RECTS) do
+            local size = EngineClasses.float2(rect.sizeX, rect.sizeZ)
+            local errorCode, id = Engine.InstantiatePrefab(
+                _G.PlayableAreaBarrierPrefabID,
+                EngineClasses.float3(rect.x, 0, rect.z),
+                EngineClasses.float3(1, 1, 1),
+                EngineClasses.quaternion()
+            )
+
+            if errorCode ~= EngineErrorCode.Success then
+                Warn("SANGEN: air-blocker prefab instantiate failed, errorCode="..tostring(errorCode))
+            elseif IsClient then
+                Engine.SetLocalGridModifierSize(id, size)
+                Engine.SetLocalGridModifierEnabled(id, true)
+            else
+                local modifierIDs = NavmapModifiers.GetNavmapModifierIDs(id, _G.PlayableAreaBarrierLayers)
+                NavmapModifiers.SetNavmapModifiersSize(modifierIDs, size)
+                NavmapModifiers.SetNavmapModifiersEnabled(modifierIDs, true)
+                Engine.SetGlobalGridModifierSize(id, size)
+                Engine.SetGlobalGridModifierEnabled(id, true)
+            end
+        end
+    end
+
+    -- ⚠️ 2026-08-28: the NewThread that used to sit here is GONE -- folded into the single
+    -- one near the end of this file. The comment it carried was wrong, and the bug it caused
+    -- is the one that hid every scenario unit spawn:
+    --
+    -- It asserted "IsHost is false here", i.e. that host and client are mutually exclusive.
+    -- They are NOT. A solo or listen-server match against AI is host AND client in the same
+    -- process, so BOTH NewThread calls in this file fired -- and only ONE NewThread per script
+    -- is honored (session_findings_2026-08-17_unit_spawning.md §3, discovered the hard way).
+    -- This one ran first, claimed the single slot, and the HOST thread below -- which sets the
+    -- playable area AND spawns every scenario unit -- was silently dropped. No error, no log,
+    -- nothing on screen. Exactly the "units did not spawn" symptom, and it would only ever
+    -- reproduce in a lobby where the tester is also the host, which is every local test.
+
+    -- Reads the lobby directly rather than GameInfo.MapData.armies (static per-map
+    -- data, same regardless of lobby size). Returns total/human/AI counts AND a
+    -- per-armyID occupancy map ({ [1] = "human", [2] = "human", [3] = "ai" } for a
+    -- 2-human-1-AI lobby, armyID 4 simply absent = unoccupied). playerInfo[i].armyID
+    -- is the same field common/gameUtils.lua's CreateArmies() correlates against
+    -- mapStartSlotIndex (1 = ARMY_01, 2 = ARMY_02, ... alphabetically sorted army
+    -- names), and playerType is compared against PlayerType.AI the same way
+    -- CreateArmies() decides whether to attach aiSettings -- both confirmed real
+    -- fields read directly from common/gameUtils.lua:221-258. This all runs BEFORE
+    -- RunMapSetup (see below), so Armies isn't populated yet -- reading the raw lobby
+    -- table directly is the only option here.
+    -- 2026-08-20, per the user: stop transforming this into our own invented shape
+    -- and just keep the OFFICIAL array Engine.GetLobbyInformation() returns
+    -- (lobbyInfo.playersInformation, one entry per filled slot with real fields
+    -- .armyID and .playerType) as the stored reference. Anything else we need
+    -- (counts, the slot-pattern string) gets derived from this same array on
+    -- demand rather than living as a separate parallel structure.
+    local function ReadLobby()
+        local infoOk, lobbyInfo = pcall(Engine.GetLobbyInformation)
+        if not infoOk or not lobbyInfo or not lobbyInfo.playersInformation then
+            return nil
+        end
+
+        local total, humanCount, aiCount = 0, 0, 0
+        for _, player in ipairs(lobbyInfo.playersInformation) do
+            total = total + 1
+            if player.playerType == PlayerType.AI then
+                aiCount = aiCount + 1
+            else
+                humanCount = humanCount + 1
+            end
+        end
+        return total, humanCount, aiCount, lobbyInfo.playersInformation
+    end
+
+    local total, humanCount, aiCount, playersInformation = ReadLobby()
+    if not total then
+        Log("SANGEN: could not read lobby information during LoadMapData -- leaving playable area/resource spots at map defaults.")
+        return
+    end
+
+    -- 2026-08-20, per the user: a per-slot pattern string ("h"=human, "A"=AI,
+    -- "-"=empty), one character per army slot 1-16 (this map's own max, ARMY_01
+    -- through ARMY_16 -- the current lobby UI reportedly only exposes 8 of them,
+    -- but the map itself supports all 16, so this covers the full range rather than
+    -- assuming the UI's current limit is permanent). This exists because aggregate
+    -- counts alone are ambiguous: "1 human + 3 AI" is identical whether the human
+    -- is in slot 1 or slot 4 under total/humanCount/aiCount, but WHICH slots are
+    -- filled matters -- e.g. 4 humans in slots 1-4 (near this map's compact center
+    -- cluster) vs. slots 5-8 (this map's original, far-scattered vanilla positions)
+    -- plausibly need different areas even though every count is identical. Built
+    -- directly from playersInformation (the official array) -- no separate stored map.
+    local function BuildSlotPattern(players)
+        local chars = {}
+        for i = 1, 16 do
+            chars[i] = "-"
+        end
+        for _, player in ipairs(players) do
+            if player.armyID and player.armyID >= 1 and player.armyID <= 16 then
+                chars[player.armyID] = (player.playerType == PlayerType.AI) and "A" or "h"
+            end
+        end
+        return table.concat(chars)
+    end
+    local slotPattern = BuildSlotPattern(playersInformation)
+
+    -- Resolves the matching scenario, mutates GameInfo.MapData's spawn/alloy markers
+    -- accordingly (must happen before RunMapSetup / CreateArmies read them -- see
+    -- Scenarios_Script.lua's ApplyScenario for why), and returns the chosen playable
+    -- area + whether this composition spawns extra units (battleships/fighters/etc,
+    -- 2026-08-27 rewrite -- was naval-fleet-only, renamed navyEnabled->spawnsUnitsEnabled).
+    -- Declared before NewThread because the thread closes over them; assigned after it, by
+    -- the pcall'd ResolveAndApply call below.
+    local chosenArea, spawnsUnitsEnabled
+
+    -- Only the host resizes the area / toggles resource spots / spawns fleets --
+    -- it's authoritative and broadcasts results to clients automatically
+    -- (host/managers/playableArea/hostPlayableAreaManager.lua; CreateUnit likewise
+    -- broadcasts a create command per unit). RunMapSetup() (which creates every
+    -- surviving alloy resource spot) hasn't run yet at this point during
+    -- LoadMapData -- NewThread defers this to the end of the same tick, after
+    -- RunMapSetup has run (host/hostMain.lua's OnSimulationTickUpdate: RunMapSetup
+    -- at line 67, thread dispatch at line 105, both same tick-0 pass). Errors inside
+    -- a NewThread callback are already caught safely by the threading system itself
+    -- (common/systems/threads.lua's ResumeThread) -- only the synchronous code above
+    -- needed the explicit pcall.
+    -- The ONE NewThread this file is allowed. Registered unconditionally so it exists in every
+    -- role; the host-only and client-only work are guarded INSIDE it rather than by wrapping
+    -- separate NewThread calls, which is what broke.
+    NewThread(function()
+        -- Stage 1: the thread started at all. First statement on purpose -- pcall-wrapped
+        -- inside, so it cannot throw and cannot starve anything below it.
+        -- Reports how far the SYNCHRONOUS code got, not how far this thread got.
+        -- COUNT THE ROW AT MAP CENTRE. Each mark below adds one unit to it.
+        --   1 unit  -> thread ran, but Scenario.ResolveAndApply THREW
+        -- No area means ResolveAndApply threw; bail rather than raising a second, misleading
+        -- error on a nil dereference that would mask the real one.
+        if not chosenArea then return end
+
+        -- ⚠️ ORDER IS LOAD-BEARING, 2026-08-28. Errors inside a NewThread callback are
+        -- swallowed by common/systems/threads.lua's ResumeThread, and Log()/Warn() go to the
+        -- F1 console, which does not work in this build -- so anything that throws here
+        -- silently cancels everything after it, with no trace anywhere. Two ordering
+        -- constraints, learned from breaking each of them:
+        --
+        --   1. The playable area must be set BEFORE the air blocker instantiates its prefabs.
+        --      SetPlayableArea is called twice (a throwaway 1x1 nudge, then the real area) to
+        --      force the resource-spot pass to run. Prefabs created ahead of that risk being
+        --      culled by the 1x1 area. This was the original order and it is restored here.
+        --   2. The air blocker must come BEFORE any diagnostic. It used to be the entire body
+        --      of the client state's own NewThread, so nothing could precede it; once the two
+        --      NewThreads in this file were merged it landed last, behind a probe, and a throw
+        --      in that probe took it down. New work goes at the BOTTOM of this function.
+        if IsHost then
+            local Area = Import("common/area.lua").Area
+            local PlayableAreaManager = Import("host/managers/playableArea/hostPlayableAreaManager.lua")
+
+            -- SetPlayableArea() only runs the resource-spot enable/disable pass when the area
+            -- actually changes from what's already active. Nudge it to a throwaway area first
+            -- so the real call below is guaranteed to differ and always runs that pass, even
+            -- if chosenArea happens to match the map's baked default.
+            PlayableAreaManager.SetPlayableArea(Area.FromMapArea({ x = -1000, y = -1000, width = 1, height = 1 }))
+            PlayableAreaManager.SetPlayableArea(Area.FromMapArea(chosenArea))
+        end
+
+        -- Runs in BOTH states, once each, and each does the work appropriate to its own role
+        -- (the IsClient/else branch inside it) -- the same per-state pattern
+        -- common/playableAreaBarrier.lua's CreateBarrier uses. On the host it is now correctly
+        -- after the area is final; on the client there is no area call to wait for.
+        -- Stage 2: the IsHost block completed without throwing.
+
+        if IsHost and spawnsUnitsEnabled then
+            local unitsOk, unitsErr = pcall(Scenario.SpawnMatchedScenarioUnits, chosenArea)
+            if not unitsOk then
+                Warn("SANGEN: scenario unit spawn failed, rest of map load unaffected: "..tostring(unitsErr))
+            end
+        end
+
+        -- LAST, and pcall'd. Ordering lesson paid for twice today: this used to sit AHEAD of
+        -- the unit spawn, so when it threw (see the missing Import above) it silently killed
+        -- every scenario unit as collateral damage. Nothing load-bearing goes after it, and
+        -- its errors can no longer cascade into anything else.
+        local blockerOk, blockerErr = pcall(SpawnAirBlockerNavmapModifiers)
+        if not blockerOk then
+            Warn("SANGEN: SpawnAirBlockerNavmapModifiers threw: "..tostring(blockerErr))
+        end
+
+    end)
+
+    -- Deliberately AFTER NewThread, and pcall'd separately from the file's outer pcall so a
+    -- throw here is attributable to THIS call rather than to the whole chunk.
+    local resolveOk, resolvedArea, resolvedSpawnsUnits =
+        pcall(Scenario.ResolveAndApply, total, humanCount, aiCount, slotPattern)
+    if resolveOk then
+        chosenArea, spawnsUnitsEnabled = resolvedArea, resolvedSpawnsUnits
+    else
+        Warn("SANGEN: Scenario.ResolveAndApply threw: "..tostring(resolvedArea))
+    end
+
+end)
+
+if not ok then
+    Warn("SANGEN: Pandemonium Isthmus_data.lua failed, map loads with defaults instead: "..tostring(err))
+end
+
+-- No MapData override returned: LoadMapData's merge is upsert-only and can't hide
+-- markers by omission (mex deletion above mutates GameInfo.MapData directly instead,
+-- before RunMapSetup reads it).
+return {}

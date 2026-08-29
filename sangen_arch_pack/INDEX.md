@@ -76,7 +76,8 @@ a new generic, reusable OK/Cancel confirm-modal widget with no prior equivalent 
 `MAP_SCENARIO_SPEC.md` was added later still, formalizing the now-deployed (confirmed live
 in-game 2026-08-20) SanGen Map Scenario system as first-class law: the original
 `<MapName>_data.lua`/`<MapName>_Scenarios_Script.lua` two-file split, the `Scenario.
-ResolveAndApply`/`Scenario.SpawnNavalFleets` module contract, the three-tier
+ResolveAndApply`/`Scenario.SpawnMatchedScenarioUnits` module contract (⚠️ corrected
+2026-08-28 — was `Scenario.SpawnNavalFleets`, which no longer exists; see below), the three-tier
 (`PATTERN_SCENARIOS`/`COUNT_SCENARIOS`/`DEFAULT_SCENARIO`) matching system, the four
 `alloyMode` values, the hard requirement that every scenario needing deterministic spawns
 declares an explicit `spawns` table (the `.sanmap`'s one-spawn-transform-per-army shared-state
@@ -201,15 +202,26 @@ Scenario authoring/export ratification described above) — the gap that flag na
   `DecalTransform::instanceIdentifier` fields landing first (ruled, not yet built); full fix shape
   is in §21.4 itself.
 
-**Fixed since the §15.5 ratification (2026-08-21):** the naval-fleet composition gap flagged
-below the first time this note was written is closed. The live reference
-`SpawnNavalFleets(area)`'s fleet-composition parameters were read directly
-(`Pandemonium Isthmus_Scenarios_Script.lua`) and shaped as `Params::ScenarioNavalFleet`
-(`ARCH_15_05_ParamsScenariosType.md` §15.5, `MAP_SCENARIO_SPEC.md` §5.1) — per-scenario `fleet`/`pondSideByArmy`/
-`sideBiasDistance`, with the algorithm's seven tuning constants (spiral search, grid-cell
-bucketing, batch/give-up cadence) explicitly excluded as runtime-owned, never per-map PARAMS.
-The same session also promoted `alloyMode`'s `Occupancy` default from placeholder to ratified
-law (`ARCH_15_05_ParamsScenariosType.md` §15.5).
+⚠️ **RETIRED 2026-08-28 — the naval-fleet paragraph that stood here is obsolete.** It recorded
+the 2026-08-21 shaping of `Params::ScenarioNavalFleet` / `ScenarioNavalPondSide` /
+`ScenarioNavalPondAssignment` / `ScenarioBody::navy` from the body of
+`Scenario.SpawnNavalFleets(area)`. **That function no longer exists.** The 2026-08-27 rewrite
+replaced the naval-only machinery with a generic path: a scenario opts in with
+`spawnsUnits = true` **and** a matching branch in `Scenario.SpawnMatchedScenarioUnits`, which
+dispatches to a per-scenario generator feeding one executor, `Scenario.SpawnUnits`. Every
+`NAVAL_*` tuning constant is gone, and placement now derives an anchor live from each army's own
+Spawn marker rather than from a pond-side assignment table. The vestigial `navy` field was removed
+from the live Lua on 2026-08-28 after being confirmed to have zero readers.
+
+Those four types are formally retired in `ARCH_15_05_ParamsScenariosType.md` §15.5, which also
+records two questions deliberately left OPEN rather than guessed: where per-scenario generator and
+dispatch code belongs under the ratified three-file split, and whether the placement algorithm has
+any declarative PARAMS form at all. Current truth for the runtime mechanism is
+`MAP_UNIT_SPAWNING_SPEC.md`; current truth for the scenario system is `MAP_SCENARIO_SPEC.md`,
+whose §2 carries an as-built vs ratified-target divergence table.
+
+Still standing from that 2026-08-21 session: `alloyMode`'s `Occupancy` default was promoted from
+placeholder to ratified law (`ARCH_15_05_ParamsScenariosType.md` §15.5).
 
 `ARCH_16_MarkerLayerSymmetry.md` §16 ratifies the UI Expert's two-round Markers Tab + layer-scoped symmetry consult
 (`work_orders/DESIGN_MarkerLayerSymmetry_R1.md` + `_R2.md`): the new `Params::SymmetrySetting`
@@ -670,3 +682,69 @@ consequence for the coder work-order to re-measure, per §8.4's scope law, rathe
 split shape. `PLACEMENT_SCATTER_SPEC.md`, `UI_FRAMEWORK_SPEC.md`, and `ENTITY_AUTHORING_PARAMS_SPEC.md`
 all still need fuller narrative updates naming §21's new types once the gated §21.3 Prop/Decal
 `Traits` land and the shape settles further — not done this session, flagged here so it is not lost.
+
+**`ARCH_15_05_ParamsScenariosType.md` §15.5 amended again (2026-08-28, same-day follow-on to the
+naval-fleet retirement above) — `ScenarioBody::areaName`, a named-`Area` reference.** Human-approved
+design consult, independently re-verified against the real code before ratification (not
+rubber-stamped): `Scenario_PARAMS.h`, `MapExporter_Scenarios_IO.cpp`,
+`MapImporter_ScenarioRecord_IO.cpp`, `ScenarioScript_DataLua_IO.cpp`,
+`resources/lua/SanGenScenarioRuntime.lua`, `ScenariosTab_Detail_UI.cpp`, `MapArea_PARAMS.h`,
+`AreasTab_List_UI.h`, `UniqueNameList_UI.h`, `AreasTab_UI.cpp`. One new field, `ScenarioBody::areaName`
+(default empty ⇒ today's exact disconnected-rectangle behavior, fully backward compatible),
+resolved against `recipe.areas` by name **at export time only** into the existing flat `Area`/`area`
+key every scenario record already carries — zero footprint on the Lua-rendering leg or
+`SanGenScenarioRuntime.lua`, confirmed by direct read (`ResolveAndApply` returns the matched
+scenario's `area` field verbatim, with no name-lookup capability of its own to feed). **Ruled: the
+reference round-trips** — a new additive wire key, `AreaName`, sibling of `Area`, no `SanGenVersion`
+bump (same posture as Corrections 12/14/17) — rejecting the alternative (export-only bake, no wire
+key) because it silently degrades the feature to the "copy values in once" design the human
+explicitly chose against. **Ruled: the four rectangle sliders go read-only** (`ImGui::BeginDisabled`,
+already an established codebase idiom) whenever a reference is active, rejecting
+silent-clear-on-edit as a worse authoring-safety hazard (an accidental slider nudge should not
+silently detach a scenario from its named Area). Stale/duplicate-reference handling: first-name-match
+resolution (mirrors `ResolveAreaColor`/`NameIsTakenBefore`'s existing idiom), a stale reference falls
+back to the last live-preview `body.area` rect with a loud non-blocking export-time warning (mirrors
+`ARCH_15_10` point 2's own idiom for `maxArmySlotCount`), and the Combo needs one new sentinel entry
+`DrawArmyNameField` does not have (an explicit "no reference" choice, since empty `areaName` is a
+real authored state here, not a transient one). Full ruling: `ARCH_15_05_ParamsScenariosType.md`
+§15.5's "AMENDED 2026-08-28 — `ScenarioBody::areaName`" note (a second, later amendment than the
+naval-fleet retirement recorded earlier the same day in that same file). `MAP_SCENARIO_SPEC.md`
+gains a new §6.2 cross-reference note (this field has no Lua-side counterpart, so it is
+deliberately NOT added as a row to §6's Lua-ground-truth table); `ARCH_15_MapScenarioSystem.md`'s
+§15.5 index row is updated to mention it. **Note, not fixed by this pass:** the true `.sanmap` JSON
+wire-format authority for this field is `SANMAP_FORMAT_SPEC.md`'s "Correction 17," which — per this
+file's own already-recorded flag two paragraphs above — does not currently exist as written text;
+whoever eventually writes it must include `AreaName` alongside `Name`/`Area`/etc. Not a work order —
+the ARCH Expert does not write code or work orders; this ratifies the shape for the Format/IO
+Architecture Experts' next dispatch.
+
+**CORRECTION (2026-08-28, same day, second pass) to the `ScenarioBody::areaName` amendment
+directly above — caught by the Format Expert while drafting
+`work_orders/STEP209_ScenarioAreaNameReference_PARAMS_IO_UI.md`, re-verified independently before
+being recorded here (not rubber-stamped).** The amendment's original "Zero changes anywhere else"
+claim was right for the STRING (`areaName`/`AreaName` genuinely never needs to reach Lua — still
+true) but WRONG for the NUMBERS. Direct re-read shows `ScenarioScript_DataLua_IO.cpp`'s
+`AppendScenarioBodyFields` (the `<MapName>_Scenarios_Data.lua` leg — **the file the game actually
+loads**, `MAP_SCENARIO_SPEC.md` §14) reads `body.area.originX/originZ/width/length` **directly and
+independently** of `MapExporter_Scenarios_IO.cpp`'s `BuildScenarioRecordJson` (the `.sanmap` JSON
+leg) — the two builders are never called from a shared parent, and
+(`ScenarioScript_Export_IO.h`'s own header comment) are triggered by two entirely separate UI
+actions with two entirely separate result types, "never merged." Left as originally ruled, the
+JSON leg would re-resolve `areaName` fresh on every export while the Lua leg silently kept
+rendering stale numbers whenever a referenced Area was resized without the scenario being
+reselected — the two SanGen-authored artifacts would diverge, and the one that matters for
+gameplay would be wrong, exactly the class of silent-wrong-result failure Constitution §6 forbids.
+**Fixed by extending the ratified algorithm (never redesigning it) to the second call site**: the
+identical resolved-rect-with-fallback logic is now also threaded into
+`ScenarioScript_DataLua_IO.cpp`'s `AppendScenarioBodyFields` (a second, duplicated resolver,
+matching this exact file family's own established per-leg-duplication precedent — it already
+duplicates its alloy-mode/count-field spelling tables rather than sharing them with the JSON leg),
+and the same stale-reference warning is wired into `ScenarioScript_Export_IO.cpp` via one new
+shared validator header used by both legs (already specified in full by the Format Expert,
+STEP209 §5 — not re-designed here). Full corrected text: `ARCH_15_05_ParamsScenariosType.md`
+§15.5's own "CORRECTED 2026-08-28 (same day, second pass)" paragraph, added directly inside the
+"AMENDED 2026-08-28" section (not a separate note) so a future reader sees the correction beside
+the ruling it corrects; `MAP_SCENARIO_SPEC.md` §6.2 was updated in place to match (retitled "…
+corrected same day," STRING/NUMBERS split spelled out explicitly). This is exactly the
+self-caught-discrepancy-recorded-not-patched-over discipline §21.3's own precedent above
+established for this pack.

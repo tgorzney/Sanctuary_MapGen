@@ -13,14 +13,20 @@ Grounded in `MAP_SCENARIO_SPEC.md`, `Scenario_PARAMS.h`, `ScenarioScript_DataLua
 
 ## 1. How the Scenario system works today
 
-A map's playable area (and per-army spawns/alloys/navy) is resolved once, at map load, by
+*⚠️ Terminology corrected 2026-08-28: this document was authored 2026-08-27 and used `navy`
+throughout for the scenario record's unit-spawn opt-in. That field is retired — the live field is
+`spawnsUnits` (`ARCH_15_05_ParamsScenariosType.md`, RETIRED section;
+`Pandemonium Isthmus_Scenarios_Script.lua:182-186`). Terms are corrected in place; no analysis,
+path, or recommendation below is changed by the rename, since none of them turn on the flag.*
+
+A map's playable area (and per-army spawns/alloys/unit spawns) is resolved once, at map load, by
 `Scenario.ResolveAndApply(total, humanCount, aiCount, playersInformation)` — three files per map,
 colocated in the game's script tree (`LJ/lua/maps/<MapName>/`), **not** inside the `.sanmap`
 asset package:
 
 | File | Content | Owner |
 |---|---|---|
-| `<MapName>_data.lua` | Orchestrator: reads the lobby, calls `Scenario.ResolveAndApply`, wires the returned area/navy flag into the map. | Hand-authored, never touched by SanGen. |
+| `<MapName>_data.lua` | Orchestrator: reads the lobby, calls `Scenario.ResolveAndApply`, wires the returned area/`spawnsUnits` flag into the map. | Hand-authored, never touched by SanGen. |
 | `<MapName>_Scenarios_Runtime.lua` | Generic algorithm — byte-identical across every map, copied from `resources/lua/SanGenScenarioRuntime.lua` on every SanGen export. | SanGen-owned, regenerated every export. |
 | `<MapName>_Scenarios_Data.lua` | Per-map scenario tables (`PATTERN_SCENARIOS`/`COUNT_SCENARIOS`/`DEFAULT_SCENARIO`/`MAX_ARMY_SLOT_COUNT`), rendered from `Params::Scenarios`. | SanGen-owned, regenerated every export. |
 
@@ -33,7 +39,7 @@ Resolution is a **three-tier** match, first-hit-wins across tiers, checked in th
    (`Params::ScenarioCountCondition`, `Scenario_PARAMS.h:74-88`).
 3. **TIER 3 — `DEFAULT_SCENARIO`.** Always matches, mandatory singleton fallback.
 
-Each matched record carries `area` (world-space rect — this is the "play area"), `navy`,
+Each matched record carries `area` (world-space rect — this is the "play area"), `spawnsUnits`,
 `alloyMode`, and (per §6's hard requirement) should carry explicit `spawns` for any composition
 that needs deterministic spawn points.
 
@@ -105,7 +111,8 @@ SanGen's data-only contract and is exempt from it). A new entry could be added d
         return slotPattern:sub(5, 8):find("[^-]") ~= nil
     end,
     area = { x = 0, y = 0, width = 2048, height = 2048 },  -- full map, matches width/length above
-    navy = false,        -- or whatever's appropriate
+    spawnsUnits = false, -- or whatever's appropriate; true ALSO needs a matching name-keyed
+                         -- branch in Scenario.SpawnMatchedScenarioUnits, or it spawns nothing
     alloyMode = "occupancy",
     -- spawns = { ... }  -- §6 hard requirement: must be supplied explicitly, or the rule must
                           -- explicitly document that it intends to inherit the .sanmap baseline
@@ -167,7 +174,7 @@ code — they're ordinary lines in that override, editable like anything else in
 
 ### Path C — SanGen-native override (uses only shipped, ratified mechanisms — no ARCH amendment)
 1. In the Scenarios tab, author a scenario record (any tier — its `pattern`/`conditions` never
-   need to literally match) carrying the target data: `area` = full map, `alloyMode`, `navy`,
+   need to literally match) carrying the target data: `area` = full map, `alloyMode`, `spawnsUnits`,
    explicit `spawns` per §6. Give it a distinctive `name`, e.g. `"Slots5to8AnyFilled_FullMap"`.
 2. Open "Runtime Script (advanced)", toggle "Use a custom Runtime Script", and add ~4 lines to the
    generated `FindMatchingScenario` (or just above its normal three-tier body):
@@ -213,6 +220,12 @@ is genuinely empty, with a placeholder comment anticipating exactly this shape:
 ```lua
 -- { name="4human-slots5-8", pattern="----hhhh--------", area=..., navy=..., alloyMode=..., spawns=..., alloys=... },
 ```
+⚠️ **Quoted verbatim, and still literally present in the live file
+(`Pandemonium Isthmus_Scenarios_Script.lua:132`) as of 2026-08-28 — but its `navy=...` is now
+stale text inside a commented-out placeholder.** The real field is `spawnsUnits`; `navy` was
+removed from the file's one live entry that carried it (`:182-186`) and has no reader anywhere.
+Do not copy this comment as a template.
+
 This is an **exact**-pattern example (Tier 1) — "exactly 4 humans, precisely slots 5-8, nothing
 else filled" — not "any of slots 5-8 filled" (which admits AI in those slots, other slots also
 filled, partial occupancy of 5-8, etc.). `FindMatchingScenario` (line 239 of the live file) still

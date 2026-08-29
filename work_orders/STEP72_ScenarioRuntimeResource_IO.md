@@ -1,858 +1,308 @@
 # STEP72 — `ScenarioScript_RuntimeResource_IO`: the bundled Map Scenario runtime — resource, resolver, staging
 
-**Layer:** IO (+ one new top-level shipped-resource tree, no ARCH layer — settled, see below).
-**Domain:** Map Scenario Lua-rendering leg, the generic runtime algorithm (`ARCH_15_04_ThreeFileOnDiskShape.md` §15.4 point 2).
-**Sequence:** Map Scenario IO track, WO6 — **the last IO-side ticket in the track** (WO8 is UI
-Expert's). **STEP71 is already authored and explicitly blocked on this ticket**: its §0 states the
-exact contract it assumes and says a coder must not begin STEP71 until WO6 exists with a matching
-(or trivially adaptable) signature. This ticket ships that contract (with one amendment, §0 below)
-and unblocks STEP71's compile. **No dependency on STEP63** (`LuaTableWriter_IO`) — the bundled
-runtime is **hand-authored Lua text**, not machine-rendered, so those primitives are never composed
-here. Test-only dependency on STEP65 (`Sys::CheckLuaSyntax`) and STEP70
-(`kScenarioGeneratedFileBannerLine`).
+> **⚠️ CORRECTION NOTE, 2026-08-28 (SanGen IO Architecture Expert).** This ticket originally specified
+> a from-scratch build of three parts (Part 1: `resources/lua/SanGenScenarioRuntime.lua`, Part 2:
+> `src/io/ScenarioScript_RuntimeResource_IO.h/.cpp`, Part 3: CMake staging). **All three have since
+> been implemented and merged, verbatim as originally specified** — confirmed present on disk
+> 2026-08-28 (dated 2026-08-22). This rewrite does not restart that work; it corrects what shipped,
+> because the design Part 1's Lua content was ported from stopped being true on 2026-08-27: the live
+> reference script (`Pandemonium Isthmus_Scenarios_Script.lua`) was rewritten that day and **deleted
+> `Scenario.SpawnNavalFleets` and every `NAVAL_*` constant**, replacing them with a generic
+> `spawnsUnits`-gated, name-keyed dispatch (`Scenario.SpawnMatchedScenarioUnits` /
+> `Scenario.SpawnUnits`). `ARCH_15_05_ParamsScenariosType.md` §15.5 was amended 2026-08-28 to match —
+> it retires `ScenarioNavalFleet`/`ScenarioNavalFleetEntry`/`ScenarioNavalPondSide`/
+> `ScenarioNavalPondAssignment`/`ScenarioBody::navy` and records two OPEN questions this rewrite does
+> not resolve (see "Blocking issue" below).
+>
+> **Net effect: Parts 2 and 3 need no change at all** — they are agnostic to the Lua content they
+> stage/resolve. Only Part 1's Lua text, and one assertion block in its own test, are corrected here —
+> and correction of Part 1 cannot reach a fully-working system, because the per-scenario dispatch half
+> of the 2026-08-27 replacement has no ratified home under the three-file split. That half is stated
+> as a blocker, not guessed at.
+>
+> **This ticket should NOT be retired.** It still owns real, bounded, actionable work (removing dead
+> naval code, renaming `navy`→`spawnsUnits`, adding the generic executor, fixing a test that currently
+> pins the dead function name). Retiring it would either lose that correction or force it into another
+> ticket with a different declared scope. It stays open, now as a **correction** ticket against
+> already-shipped code rather than a **build** ticket.
+
+**Layer:** IO (+ the existing shipped-resource tree `resources/lua/`, already staged).
+**Domain:** Map Scenario Lua-rendering leg, the generic runtime algorithm
+(`ARCH_15_04_ThreeFileOnDiskShape.md` §15.4 point 2).
+**Sequence:** Map Scenario IO track, WO6, **status: shipped, now under correction.** Not blocking
+STEP71 for compilation (`ScenarioScript_Export_IO` is also already built and is Lua-content-agnostic —
+confirmed: zero occurrences of `navy`/`spawnsUnits`/`navalFleet`/`SpawnNavalFleets` in
+`ScenarioScript_Export_IO.cpp`). The correction below **is** blocking for any map that sets
+`spawnsUnits = true` and expects units to actually spawn.
 
 ## 0. Ruling on the one open question — how the runtime locates its own map's data file
 
-**Ruling: `MapUtils.GetMapName()` self-discovery — not a new `_data.lua` argument.**
+**Unaffected by this correction — still binding.**
 
-`MODDING_SCRIPTING_SPEC.md`'s "Scripting API seen" list already names `MapUtils.GetMapName()` as a
-confirmed engine API. The runtime file (a byte-identical copy of
-`resources/lua/SanGenScenarioRuntime.lua`) calls it at its own top level — during `_data.lua`'s
-`Import(...)` call — then builds
+**Ruling: `MapUtils.GetMapName()` self-discovery — not a new `_data.lua` argument.** The runtime file
+(a byte-identical copy of `resources/lua/SanGenScenarioRuntime.lua`) calls it at its own top level —
+during `_data.lua`'s `Import(...)` call — then builds
 `Import("maps/" .. mapName .. "/" .. mapName .. "_Scenarios_Data.lua")` from it.
+`Scenario.ResolveAndApply`'s signature is `ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 ratified
+law, and `MAP_SCENARIO_SPEC.md` §2.2's three-step `_data.lua` hand-edit adds no fifth argument.
+Self-discovery needs zero further hand-edits and no new ratification.
 
-**Why not thread the map name through as an argument:** `Scenario.ResolveAndApply`'s signature is
-`ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 **ratified law**, and `MAP_SCENARIO_SPEC.md` §2.2's three-step `_data.lua`
-hand-edit adds no fifth argument and no `Scenario.Initialize(mapName)` call. Self-discovery needs
-**zero further hand-edits to the already-itemized migration** and no new ratification.
+⚠️ **Still not independently live-verified.** First place to look if a real map load throws
+"File doesn't exist" on the sibling `Import()`. This correction does not touch that code path.
 
-⚠️ **Not independently live-verified for this exact call site** — whether `GetMapName()` is safe to
-call this early (during another script's top-level `Import()`), and whether its return spelling
-matches the `<MapName>` folder-name convention exactly (e.g. `"Pandemonium Isthmus"`, with the
-space). Flagged in the resource's own comment, same posture STEP70 used for its unconfirmed z-flip
-— first place to look if the sibling `Import()` throws "File doesn't exist" in a real map load.
+## 1. Root problem
 
-## ⚠️ Amendment to STEP71 §0's assumed contract — `errorMessage` semantics
+The shipped `resources/lua/SanGenScenarioRuntime.lua` still contains, verbatim, the retired naval-fleet
+machinery ported from the live reference **as it existed 2026-08-21** — before the 2026-08-27 rewrite
+deleted it from the actual game file:
 
-STEP71 §0 reads `errorMessage; // populated only when bSucceeded == false`. **This ticket amends
-that.** Constitution §6's "override set but unreadable degrades to bundled, logged loudly, never a
-silent swap" has nowhere else to surface — `sourceDescription` says only *which* source won, not
-*why* a requested override was skipped. `errorMessage` is therefore a **diagnostic/advisory
-string**: empty only on a fully clean resolution; non-empty on a successful degrade-to-bundled
-(`bSucceeded == true`) **as well as** a hard failure. STEP71's step 7 must log
-`runtimeResult.errorMessage` whenever it is non-empty, not only when `!bSucceeded`. One-line
-addition to STEP71, not a structural change.
+- `local currentNavalFleet = nil` and its bridging comment.
+- The entire "Naval fleet spawning" section: `NAVAL_BATCH_SIZE`, `NAVAL_SPIRAL_STEP`,
+  `NAVAL_SPIRAL_MAX_TRIES`, `NAVAL_GAP`, `NAVAL_DEFAULT_FOOTPRINT`, `NAVAL_GRID_CELL`,
+  `NAVAL_GIVE_UP_AFTER_MISSES`, `NavalSpiralXZ`, `NavalNewGrid`/`NavalGridKey`/`NavalGridAdd`/
+  `NavalGridHasNearby`, `NavalIsInsideArea`, `NavalFindSpot`, `NavalPlaceDeficitMarkers`, and
+  `function Scenario.SpawnNavalFleets(area)` itself.
+- `Scenario.ResolveAndApply` reads `matchedScenario.navy` (not `.spawnsUnits`), assigns
+  `currentNavalFleet = matchedScenario.navalFleet`, and logs `navy=%s`.
+- ⚠️ `Scenario.SpawnNavalFleets`'s own `army.lobbyOptions.isEmptySlot` check is **unguarded** — the
+  exact live-confirmed bug `MAP_UNIT_SPAWNING_SPEC.md` §5 and `MAP_SCENARIO_SPEC.md` §11 document as
+  having silently killed every unit spawn for an AI army (nil `lobbyOptions` throws, `pcall` swallows
+  it, nothing spawns, no log reaches the console). **This bundled copy carries the bug forward.**
 
-## Root problem
-No renderer/resolver exists for the bundled runtime anywhere in `src/` or `resources/` today
-(confirmed absent). STEP71's orchestrator cannot compile without `LoadScenarioRuntimeText`, and
-`<MapName>_Scenarios_Runtime.lua`'s entire algorithmic content — the generic,
-tier-table-parameterized port of the live reference's
-`FindMatchingScenario`/`ApplyScenario`/`SpawnNavalFleets`/`BuildSlotPattern` — has never been
-written down anywhere in this pack.
+None of `ScenarioNavalFleet`/`navalFleet`/`navy`/`SpawnNavalFleets` has a reader left in the live,
+in-game-confirmed reference. Continuing to bundle this is not neutral — it is dead code carrying a
+known live bug, and it means the bundled runtime has **no** implementation of the executor half of the
+replacement (`Scenario.SpawnUnits`), which any scenario following `MAP_SCENARIO_SPEC.md` §12's worked
+example needs.
 
-## Fix — three parts
+The runtime's own acceptance test additionally **pins the dead function name as a requirement**:
+`ScenarioScript_RuntimeResource_IO_Test.cpp:149` asserts
+`text.find("function Scenario.SpawnNavalFleets") != std::string::npos` — a currently-passing assertion
+that would fail correction unless updated in the same change.
 
-### Part 1 — `resources/lua/SanGenScenarioRuntime.lua` (the bundled runtime content)
+## 2. Fix — Part 1 only
 
-New top-level file. **Location needs no ARCH layer sign-off — settled by direct precedent**:
-`shaders/*.glsl` is already a top-level, non-`src/` shipped-resource tree, staged beside the
-executable via `CMakeLists.txt`'s `SANGEN_V2_SHADER_DIRECTORY`/`configure_file`/`POST_BUILD` pattern
-(lines 211–234). `resources/lua/` is the same category, staged the same way (Part 3).
+### Confirmed unaffected, no action
+
+- **Part 2**, `src/io/ScenarioScript_RuntimeResource_IO.h`/`.cpp` — pure bundled/override text
+  resolution, zero Lua-content awareness. Re-read 2026-08-28: no reference to
+  `navy`/`navalFleet`/`SpawnNavalFleets`. **No change.**
+- **Part 3**, the CMake staging block (`CMakeLists.txt:378-399`, test registered at `:1005`) — stages
+  whatever `resources/lua/*.lua` contains; content-agnostic. **No change.**
+
+### Part 1 correction — `resources/lua/SanGenScenarioRuntime.lua`
+
+**Keep exactly as shipped:** the banner comment block, `Scenario = {}`, the `MapUtils.GetMapName()`
+self-discovery block and its ⚠️ comment (§0), the `PATTERN_SCENARIOS`/`COUNT_SCENARIOS`/
+`DEFAULT_SCENARIO`/`MAX_ARMY_SLOT_COUNT` locals, the `ARMY_ID_TO_NAME`/`KNOWN_ALLOY_MARKERS` block and
+its fail-loud `bAlloyRosterAvailable` guard, `IDENTITY_ROTATION`/`IDENTITY_SCALE`, `BuildSlotPattern`,
+`EvaluateScenarioCondition`/`EvaluateScenarioConditions`, `FindMatchingScenario`, and `ApplyScenario`
+in full — none of these read `navy` or `navalFleet`.
+
+**DELETE in full:** the `local currentNavalFleet = nil` declaration and its comment, and the entire
+block from the `-- Naval fleet spawning` section comment through the closing `end` of
+`function Scenario.SpawnNavalFleets(area)` — every `NAVAL_*` constant, every `Naval*` helper, and the
+function itself. Nothing after it depends on it except the final `return Scenario`, which is kept.
+
+**REPLACE `Scenario.ResolveAndApply` with:**
 
 ```lua
--- GENERATED BY SANGEN -- DO NOT HAND-EDIT (regenerated on every export)
--- ^ kScenarioGeneratedFileBannerLine (ScenarioScript_DataLua_IO.h, STEP70), duplicated here as
--- plain text since this is a non-C++ resource file -- kept in lockstep MANUALLY with the C++
--- constant; the acceptance test below is the only thing that catches drift.
---
--- SanGenScenarioRuntime.lua -- SANGEN-OWNED, BUNDLED RESOURCE (`ARCH_15_04_ThreeFileOnDiskShape.md` §15.4,
--- MAP_SCENARIO_SPEC.md §2). This file's CONTENT is byte-identical across every map that uses the
--- Map Scenario system -- it carries the generic matching/apply/naval-spawn algorithm only, NEVER
--- any per-map data. SanGen copies this exact text, verbatim, into each map's own
--- <MapName>_Scenarios_Runtime.lua inside LJ/lua/maps/<MapName>/ on every export
--- (ScenarioScript_Export_IO, STEP71) -- the ONLY thing that ever varies between maps is the
--- copy's OWN FILENAME (map-prefixed), never a byte of this text.
---
--- Ported and generalized from the live, in-game-confirmed reference
--- (Pandemonium Isthmus_Scenarios_Script.lua + _data.lua's BuildSlotPattern) so ZERO map-specific
--- data remains: every per-map value below arrives from the generated sibling
--- <MapName>_Scenarios_Data.lua, Import()'d below.
---
--- MUST stay a GLOBAL table (`Scenario = {}`, never `local`) -- Import() (common/systems/import.lua)
--- captures only a file's GLOBAL variables, never its `return` value; a `local`-scoped module
--- silently yields none of its fields through Import(), with no error (MAP_SCENARIO_SPEC.md §3 --
--- this cost a full live debugging session, do not regress it).
-Scenario = {}
-
--- ============================================================================
--- Locate and Import() the sibling per-map data file. RULING (STEP72 §0): MapUtils.GetMapName()
--- self-discovery, NOT a new _data.lua argument -- Scenario.ResolveAndApply's signature is
--- `ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 ratified law with no room for a fifth argument.
---
--- ⚠️ ATTENTION -- UNCONFIRMED LIVE BEHAVIOR. MapUtils.GetMapName() is a confirmed engine API
--- (MODDING_SCRIPTING_SPEC.md's "Scripting API seen" list), but its exact return value at THIS
--- point in the load sequence (during _data.lua's own top-level Import() of this file, itself
--- during LoadMapData()) -- and whether its spelling matches the "<MapName>" folder-name
--- convention exactly, including spaces (e.g. "Pandemonium Isthmus") -- has not been independently
--- live-verified for this call site. IF THE Import() BELOW FAILS ("File doesn't exist") IN A REAL
--- MAP LOAD, THIS IS THE FIRST PLACE TO LOOK.
-local currentMapName = MapUtils.GetMapName()
-local ScenarioData = Import("maps/" .. currentMapName .. "/" .. currentMapName .. "_Scenarios_Data.lua")
-
-local PATTERN_SCENARIOS   = ScenarioData.PATTERN_SCENARIOS
-local COUNT_SCENARIOS     = ScenarioData.COUNT_SCENARIOS
-local DEFAULT_SCENARIO    = ScenarioData.DEFAULT_SCENARIO
-local MAX_ARMY_SLOT_COUNT = ScenarioData.MAX_ARMY_SLOT_COUNT
-
--- ⚠️ GAP, FLAGGED NOT INVENTED (`ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 point 3): no ratified renderer anywhere in the pack
--- emits ARMY_ID_TO_NAME/KNOWN_ALLOY_MARKERS into <MapName>_Scenarios_Data.lua yet. This runtime
--- reads them here because the "occupancy"/"explicit" alloyMode branches below NEED them. Until the
--- follow-up ticket adds their rendering, both are nil on every real map.
---
--- FAIL LOUD, NEVER SILENTLY. A missing roster must be an obvious, logged failure -- NOT an `or {}`
--- fallback. With an empty-table fallback the alloy-deletion loops iterate nothing and quietly do
--- nothing: every alloy marker on the map survives for every composition, with no error anywhere.
--- That is indistinguishable in-game from "the scenario system isn't running at all," and it is a
--- REAL OBSERVED SYMPTOM from live testing ("all alloy spawns entire map") -- exactly the class of
--- silent-wrong-result Constitution §6 forbids. The guard below states the problem in the log and
--- refuses to pretend the roster is empty.
-local ARMY_ID_TO_NAME     = ScenarioData.ARMY_ID_TO_NAME
-local KNOWN_ALLOY_MARKERS = ScenarioData.KNOWN_ALLOY_MARKERS
-
--- True only when BOTH rosters are present. Read once here; every alloy branch below consults it
--- rather than re-testing, so the warning is emitted exactly once per apply, not once per army.
-local bAlloyRosterAvailable = (ARMY_ID_TO_NAME ~= nil) and (KNOWN_ALLOY_MARKERS ~= nil)
-
--- Identity rotation/scale for any alloy marker this file creates fresh -- matches every marker
--- already in the .sanmap (none use anything else), ported verbatim from the live reference.
-local IDENTITY_ROTATION = { w = 1.0, x = 0.0, y = 0.0, z = 0.0 }
-local IDENTITY_SCALE = { x = 1.0, y = 1.0, z = 1.0 }
-
--- ============================================================================
--- Slot-pattern construction (`ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 -- moved here from _data.lua). Ported verbatim from
--- the reference _data.lua's own BuildSlotPattern, hardcoded 16 replaced by MAX_ARMY_SLOT_COUNT.
--- ============================================================================
-local function BuildSlotPattern(players, maxArmySlotCount)
-    local chars = {}
-    for i = 1, maxArmySlotCount do
-        chars[i] = "-"
-    end
-    for _, player in ipairs(players) do
-        if player.armyID and player.armyID >= 1 and player.armyID <= maxArmySlotCount then
-            chars[player.armyID] = (player.playerType == PlayerType.AI) and "A" or "h"
-        end
-    end
-    return table.concat(chars)
-end
-
--- ============================================================================
--- Declarative condition evaluator -- NEW code, no equivalent in the live reference. The live
--- reference's COUNT_SCENARIOS carried Lua closures (match = function(t,h,a,pattern) ... end); the
--- ratified SanGen-rendered contract is DATA instead (STEP69/STEP70): an array of
--- {field, comparator, value} triples, AND'd. field/comparator spellings are keyed off VERBATIM
--- against Params::ScenarioCountField/Params::ScenarioComparator's own rendered JSON spellings.
--- ============================================================================
-local function EvaluateScenarioCondition(condition, total, humanCount, aiCount)
-    local fieldValue
-    if condition.field == "Total" then
-        fieldValue = total
-    elseif condition.field == "HumanCount" then
-        fieldValue = humanCount
-    elseif condition.field == "AiCount" then
-        fieldValue = aiCount
-    else
-        Warn("SANGEN: scenario condition named unknown field '"..tostring(condition.field).."' -- treated as non-matching.")
-        return false -- unknown field -- fail CLOSED, never matches, never a crash
-    end
-
-    if condition.comparator == "Equal" then
-        return fieldValue == condition.value
-    elseif condition.comparator == "NotEqual" then
-        return fieldValue ~= condition.value
-    elseif condition.comparator == "GreaterThan" then
-        return fieldValue > condition.value
-    elseif condition.comparator == "GreaterOrEqual" then
-        return fieldValue >= condition.value
-    elseif condition.comparator == "LessThan" then
-        return fieldValue < condition.value
-    elseif condition.comparator == "LessOrEqual" then
-        return fieldValue <= condition.value
-    else
-        Warn("SANGEN: scenario condition named unknown comparator '"..tostring(condition.comparator).."' -- treated as non-matching.")
-        return false -- unknown comparator -- fail CLOSED
-    end
-end
-
--- Conjunction only (AND) -- `ARCH_15_05_ParamsScenariosType.md` §15.5's ruling. An empty conditions list is vacuously true,
--- matching Params::CountScenario::conditions' flat std::vector carrying no OR/grouping structure.
-local function EvaluateScenarioConditions(conditions, total, humanCount, aiCount)
-    for _, condition in ipairs(conditions) do
-        if not EvaluateScenarioCondition(condition, total, humanCount, aiCount) then
-            return false
-        end
-    end
-    return true
-end
-
--- ============================================================================
--- Three-tier matching (MAP_SCENARIO_SPEC.md §4). Ported verbatim in STRUCTURE from the live
--- reference's FindMatchingScenario -- the TIER 2 body now calls EvaluateScenarioConditions instead
--- of a per-scenario closure; that is the only change.
--- ============================================================================
-local function FindMatchingScenario(total, humanCount, aiCount, slotPattern)
-    for _, scenario in ipairs(PATTERN_SCENARIOS) do
-        if scenario.pattern == slotPattern then
-            return scenario
-        end
-    end
-    for _, scenario in ipairs(COUNT_SCENARIOS) do
-        -- pcall-wrapped per MAP_SCENARIO_SPEC.md §4: a throwing evaluation is swallowed (falls
-        -- through to the next candidate), not fatal -- preserved from the reference's own
-        -- per-closure pcall, now wrapping the shared evaluator instead.
-        local evalOk, matched = pcall(EvaluateScenarioConditions, scenario.conditions, total, humanCount, aiCount)
-        if evalOk and matched then
-            return scenario
-        end
-    end
-    return DEFAULT_SCENARIO
-end
-
--- ============================================================================
--- Applies a matched scenario's spawn/alloy data (MAP_SCENARIO_SPEC.md §5, all four alloyMode
--- branches). Must run before RunMapSetup/CreateArmies read the same tables.
---
--- ⚠️ STRUCTURAL PORT, not a byte-for-byte copy of the reference's loop bodies: the reference's
--- scenario.spawns/scenario.alloys were tables KEYED BY ARMY NAME ({ ARMY_01 = {...}, ... }). The
--- SanGen-rendered contract (ScenarioScript_DataLua_IO, STEP70) instead emits
--- Params::ScenarioSpawn/Params::ScenarioAlloyOverride as FLAT ARRAYS OF ROWS, each row carrying
--- its own armyName field -- a real shape difference, not cosmetic. Every loop below ipairs() the
--- flat array and reads armyName/markerName off each row.
--- ============================================================================
-local function ApplyScenario(scenario, total, slotPattern)
-    if scenario.spawns then
-        local spawnTransforms = GameInfo.MapData.markers and GameInfo.MapData.markers.Spawn
-            and GameInfo.MapData.markers.Spawn.transforms
-        if spawnTransforms then
-            for _, spawnRow in ipairs(scenario.spawns) do
-                if spawnTransforms[spawnRow.armyName] then
-                    spawnTransforms[spawnRow.armyName].position.x = spawnRow.x
-                    spawnTransforms[spawnRow.armyName].position.y = spawnRow.y
-                    spawnTransforms[spawnRow.armyName].position.z = spawnRow.z
-                end
-            end
-        end
-    end
-
-    local alloyTransforms = GameInfo.MapData.markers and GameInfo.MapData.markers.Alloys
-        and GameInfo.MapData.markers.Alloys.transforms
-    if alloyTransforms then
-        -- FAIL LOUD on a missing roster (see the bAlloyRosterAvailable comment above). "explicit"
-        -- and "occupancy" BOTH delete markers via the roster; without it they would silently
-        -- delete nothing and leave every alloy on the map. "keepAll" and "delta" never touch the
-        -- roster, so they are unaffected and must NOT be blocked by this guard.
-        local bModeNeedsRoster = (scenario.alloyMode == "explicit") or (scenario.alloyMode == "occupancy")
-        if bModeNeedsRoster and not bAlloyRosterAvailable then
-            Warn("SANGEN: scenario '"..tostring(scenario.name).."' uses alloyMode '"..
-                 tostring(scenario.alloyMode).."', which needs the per-army alloy roster "..
-                 "(ARMY_ID_TO_NAME / KNOWN_ALLOY_MARKERS) -- but the generated "..
-                 "<MapName>_Scenarios_Data.lua did not supply it. NO ALLOY MARKERS WILL BE "..
-                 "REMOVED: every alloy on the map will remain visible for every composition. "..
-                 "This is a MISSING-DATA bug in the export, not a map-authoring choice.")
-        end
-
-        if scenario.alloyMode == "explicit" and bAlloyRosterAvailable then
-            local mentionedArmies = {}
-            for _, alloyRow in ipairs(scenario.alloys or {}) do
-                mentionedArmies[alloyRow.armyName] = true
-                if not alloyTransforms[alloyRow.markerName] then
-                    alloyTransforms[alloyRow.markerName] = { rotation = IDENTITY_ROTATION, scale = IDENTITY_SCALE, position = {} }
-                end
-                alloyTransforms[alloyRow.markerName].position.x = alloyRow.x
-                alloyTransforms[alloyRow.markerName].position.y = alloyRow.y
-                alloyTransforms[alloyRow.markerName].position.z = alloyRow.z
-            end
-            for armyName, markerNames in pairs(KNOWN_ALLOY_MARKERS) do
-                if not mentionedArmies[armyName] then
-                    for _, markerName in ipairs(markerNames) do
-                        alloyTransforms[markerName] = nil
-                    end
-                end
-            end
-        elseif scenario.alloyMode == "occupancy" and bAlloyRosterAvailable then
-            -- `ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 point 3 fix: iterate the AUTHORED ROSTER directly, never a hardcoded
-            -- numeric range (the reference's own "for armyId = 1, 4" was one of the three
-            -- independent hardcodes this whole ticket family exists to remove).
-            for armyId, armyName in pairs(ARMY_ID_TO_NAME) do
-                if slotPattern:sub(armyId, armyId) == "-" then
-                    for _, markerName in ipairs(KNOWN_ALLOY_MARKERS[armyName] or {}) do
-                        alloyTransforms[markerName] = nil
-                    end
-                    Log("SANGEN: "..tostring(armyName).." has no player -- its alloy markers removed before RunMapSetup.")
-                end
-            end
-        elseif scenario.alloyMode == "delta" then
-            -- Unlike "explicit", silence here is NOT a delete instruction -- only alloysToAdd/
-            -- alloysToRemove are applied (MAP_SCENARIO_SPEC.md §5).
-            for _, addRow in ipairs(scenario.alloysToAdd or {}) do
-                if not alloyTransforms[addRow.markerName] then
-                    alloyTransforms[addRow.markerName] = { rotation = IDENTITY_ROTATION, scale = IDENTITY_SCALE, position = {} }
-                end
-                alloyTransforms[addRow.markerName].position.x = addRow.x
-                alloyTransforms[addRow.markerName].position.y = addRow.y
-                alloyTransforms[addRow.markerName].position.z = addRow.z
-            end
-            for _, removeRow in ipairs(scenario.alloysToRemove or {}) do
-                alloyTransforms[removeRow.markerName] = nil
-            end
-        end
-        -- "keepAll": no deletion -- every known marker stays exactly as the .sanmap has it baked.
-    end
-
-    Log("SANGEN: scenario '"..tostring(scenario.name).."' applied ("..total.." occupied slot(s)).")
-end
-
--- Bridges ResolveAndApply -> SpawnNavalFleets: the matched scenario's OWN navalFleet table
--- (`ARCH_15_05_ParamsScenariosType.md` §15.5 -- navalFleet is per-scenario, not a file-scoped constant the way the live
--- reference's NAVAL_FLEET/NAVAL_POND_SIDE_BY_ARMY/NAVAL_SIDE_BIAS_DISTANCE were). Module-local
--- state is required because Scenario.SpawnNavalFleets(area)'s signature (MAP_SCENARIO_SPEC.md §3,
--- unchanged by `ARCH_15_10_SlotPatternConstructionMoves.md` §15.10) carries only `area` -- this is how the later, NewThread-deferred
--- call learns which scenario matched.
-local currentNavalFleet = nil
+-- Set inside ResolveAndApply, read by a future Scenario.SpawnMatchedScenarioUnits (NOT defined in
+-- this file -- see the Blocking issue in STEP72; forward-compatible plumbing only, harmless with no
+-- consumer, and does not itself decide where that consumer lives).
+local currentMatchedScenarioName = nil
 
 function Scenario.ResolveAndApply(total, humanCount, aiCount, playersInformation)
     local slotPattern = BuildSlotPattern(playersInformation, MAX_ARMY_SLOT_COUNT)
     local matchedScenario = FindMatchingScenario(total, humanCount, aiCount, slotPattern)
-    local chosenArea, navyEnabled = matchedScenario.area, matchedScenario.navy
-    currentNavalFleet = matchedScenario.navalFleet
+    local chosenArea, spawnsUnitsEnabled = matchedScenario.area, matchedScenario.spawnsUnits
+    currentMatchedScenarioName = matchedScenario.name
     ApplyScenario(matchedScenario, total, slotPattern)
 
     Log(string.format(
-        "SANGEN: %d occupied slot(s) (%d human, %d AI, pattern=%s) -> scenario=%s navy=%s, playable area x=%d y=%d w=%d h=%d",
+        "SANGEN: %d occupied slot(s) (%d human, %d AI, pattern=%s) -> scenario=%s spawnsUnits=%s, playable area x=%d y=%d w=%d h=%d",
         total, humanCount, aiCount, slotPattern, tostring(matchedScenario.name),
-        tostring(navyEnabled), chosenArea.x, chosenArea.y, chosenArea.width, chosenArea.height))
+        tostring(spawnsUnitsEnabled), chosenArea.x, chosenArea.y, chosenArea.width, chosenArea.height))
 
-    return chosenArea, navyEnabled
+    return chosenArea, spawnsUnitsEnabled
 end
+```
 
+The `matchedScenario.navy` → `matchedScenario.spawnsUnits` rename and the log-line rename are ported
+verbatim from the live reference and `ARCH_15_05` §15.5's ratified rename. `currentMatchedScenarioName`
+is ported verbatim as inert bridging state.
+
+**ADD immediately before the final `return Scenario`** — the generic executor half of the replacement.
+This part IS generic, IS identical across every map, and has no per-scenario knowledge, so it belongs
+in this file with no open question attached:
+
+```lua
 -- ============================================================================
--- Naval fleet spawning (MAP_SCENARIO_SPEC.md §5.1). Spiral/grid helpers and the tuning constants
--- below are ALGORITHM TUNING CONSTANTS, ported byte-for-byte from the reference and NEVER exposed
--- as Params::Scenarios fields (`ARCH_15_05_ParamsScenariosType.md` §15.5) -- they never vary per map, unlike
--- NAVAL_FLEET/NAVAL_POND_SIDE_BY_ARMY/NAVAL_SIDE_BIAS_DISTANCE, now read per-scenario off
--- currentNavalFleet instead of as file-scoped globals.
+-- Generic unit-spawn executor (MAP_SCENARIO_SPEC.md §11). Replaces the retired naval-only
+-- SpawnNavalFleets. Input: a flat array of {armyIndex, templateIdentifier, x, y, z}. Output: those
+-- units exist. Knows NOTHING about water, terrain, navmesh, or unit type -- pure input -> output.
+-- Never call CreateUnit outside this function.
+--
+-- Checks BOTH `ok` and `unit` -- pcall alone reports a falsy-but-non-throwing CreateUnit result as
+-- success (MAP_UNIT_SPAWNING_SPEC.md §5).
 -- ============================================================================
-local NAVAL_BATCH_SIZE = 100
-local NAVAL_SPIRAL_STEP = 2.5
-local NAVAL_SPIRAL_MAX_TRIES = 400
-local NAVAL_GAP = 1.5
-local NAVAL_DEFAULT_FOOTPRINT = { x = 6, y = 6 }
-local NAVAL_GRID_CELL = 16
-local NAVAL_GIVE_UP_AFTER_MISSES = 15
+local UNIT_SPAWN_BATCH_SIZE = 100
 
-local function NavalSpiralXZ(n)
-    local k = math.ceil((math.sqrt(n) - 1) / 2)
-    local t = 2 * k + 1
-    local m = t ^ 2
-    t = t - 1
-    if n >= m - t then
-        return k - (m - n), -k
-    else
-        m = m - t
-    end
-    if n >= m - t then
-        return -k, -k + (m - n)
-    else
-        m = m - t
-    end
-    if n >= m - t then
-        return -k + (m - n), k
-    else
-        return k, k - (m - n - t)
-    end
-end
-
-local function NavalNewGrid() return { cells = {} } end
-local function NavalGridKey(x, z) return math.floor(x / NAVAL_GRID_CELL) * 100000 + math.floor(z / NAVAL_GRID_CELL) end
-local function NavalGridAdd(grid, x, z, r)
-    local key = NavalGridKey(x, z)
-    local bucket = grid.cells[key]
-    if not bucket then
-        bucket = {}
-        grid.cells[key] = bucket
-    end
-    bucket[#bucket + 1] = { x = x, z = z, r = r }
-end
-local function NavalGridHasNearby(grid, x, z, extraRadius)
-    local span = math.ceil((6 + extraRadius) / NAVAL_GRID_CELL) + 1
-    local cx, cz = math.floor(x / NAVAL_GRID_CELL), math.floor(z / NAVAL_GRID_CELL)
-    for dx = -span, span do
-        for dz = -span, span do
-            local bucket = grid.cells[(cx + dx) * 100000 + (cz + dz)]
-            if bucket then
-                for _, e in ipairs(bucket) do
-                    local ddx, ddz = x - e.x, z - e.z
-                    local minDist = e.r + extraRadius
-                    if (ddx * ddx + ddz * ddz) < (minDist * minDist) then
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    return false
-end
-
-local function NavalIsInsideArea(x, z, area)
-    return x >= area.x and x <= area.x + area.width and z >= area.y and z <= area.y + area.height
-end
-
-local function NavalFindSpot(occupiedGrid, area, idealX, idealZ, radius, waterLevel)
-    for n = 1, NAVAL_SPIRAL_MAX_TRIES do
-        local gx, gz = NavalSpiralXZ(n)
-        local x = idealX + gx * NAVAL_SPIRAL_STEP
-        local z = idealZ + gz * NAVAL_SPIRAL_STEP
-
-        if NavalIsInsideArea(x, z, area) and not NavalGridHasNearby(occupiedGrid, x, z, radius) then
-            local errorCode, height = Engine.SampleTerrainHeightFromCell(EngineClasses.int2(math.floor(x), math.floor(z)))
-            if errorCode == EngineErrorCode.Success and height < waterLevel then
-                return x, z, waterLevel
-            end
-        end
-    end
-    return nil
-end
-
-local function NavalPlaceDeficitMarkers(armyIndex, originX, originZ, missedCount)
-    local count = math.min(missedCount, 10)
-    for i = 1, count do
-        local col = (i - 1) % 5
-        local row = math.floor((i - 1) / 5)
-        local x = originX + 3 + col * 2
-        local z = originZ + 3 + row * 2
-        local errorCode, height = Engine.SampleTerrainHeightFromCell(EngineClasses.int2(math.floor(x), math.floor(z)))
-        if errorCode == EngineErrorCode.Success then
-            pcall(CreateUnit, armyIndex, "uel1001", EngineClasses.float3(x, height, z))
-        end
-    end
-end
-
--- Only called for a matched scenario with navy == true. Must run after RunMapSetup (Armies must be
--- populated) -- the orchestrator's single NewThread callback owns this ordering
--- (MAP_SCENARIO_SPEC.md §7); this file never creates its own NewThread (only one is honored per
--- script).
-function Scenario.SpawnNavalFleets(area)
-    local navalFleet = currentNavalFleet or { fleet = {}, pondSideByArmy = {}, sideBiasDistance = 0 }
-
-    local pondSideByArmyLookup = {}
-    for _, sideRow in ipairs(navalFleet.pondSideByArmy or {}) do
-        pondSideByArmyLookup[sideRow.armyName] = sideRow.side
-    end
-
-    local _, hasWaterResult = Engine.HasWater()
-    if not hasWaterResult then
-        Log("SANGEN: map reports no water -- skipping naval fleet spawn.")
-        return
-    end
-    local _, waterLevel = Engine.GetWaterLevel()
-
-    local occupied = NavalNewGrid()
+function Scenario.SpawnUnits(instructions)
     local sinceYield = 0
-    local totalPlaced, totalMissed = 0, 0
+    local placed, failed = 0, 0
+    for _, instr in ipairs(instructions) do
+        local ok, unit = pcall(CreateUnit, instr.armyIndex, instr.templateIdentifier,
+            EngineClasses.float3(instr.x, instr.y, instr.z))
+        if ok and unit then placed = placed + 1 else failed = failed + 1 end
 
-    for armyIndex, army in pairs(Armies) do
-        -- ⚠️ GUARDED, NOT `army.lobbyOptions.isEmptySlot` -- CONFIRMED LIVE BUG 2026-08-28.
-        -- The unguarded form THROWS when lobbyOptions is nil (an AI army is the confirmed case).
-        -- Because the caller wraps this in pcall and Warn() goes to the F1 console (unreliable in
-        -- this build), the throw is swallowed and ZERO units spawn with no visible error.
-        -- Reproduced live: human in slot 5 + AI in slot 6 -> correct playable area, correct alloy
-        -- handling, zero units. Latent for a long time because the old naval path was only ever
-        -- exercised by an all-human composition.
-        -- nil lobbyOptions => treat as OCCUPIED (an AI slot IS filled). Never treat a missing
-        -- options table as an empty slot -- that silently skips real players.
-        local bIsEmptySlot = army.lobbyOptions and army.lobbyOptions.isEmptySlot
-        if not bIsEmptySlot then
-            local armyOk, armyErr = pcall(function()
-                local spawnMarker = GameInfo.MapData.markers.Spawn
-                    and GameInfo.MapData.markers.Spawn.transforms
-                    and GameInfo.MapData.markers.Spawn.transforms[army.name]
-
-                local startX = (spawnMarker and spawnMarker.position.x) or (area.x + area.width * 0.5)
-                local startZ = (spawnMarker and spawnMarker.position.z) or (area.y + area.height * 0.5)
-
-                local primarySide = pondSideByArmyLookup[army.name] or 1
-                local searchOriginX = startX + primarySide * navalFleet.sideBiasDistance
-
-                local armyPlaced, armyMissed = 0, 0
-
-                for _, fleetEntry in ipairs(navalFleet.fleet or {}) do
-                    local template = __Templates.Units[fleetEntry.templateIdentifier]
-                    local footprint = (template and (template.skirtSize or template.footprint)) or NAVAL_DEFAULT_FOOTPRINT
-                    local radius = math.max(footprint.x, footprint.y) * 0.5 + NAVAL_GAP
-
-                    local consecutiveMisses = 0
-                    for i = 1, fleetEntry.count do
-                        if consecutiveMisses >= NAVAL_GIVE_UP_AFTER_MISSES then
-                            local remaining = fleetEntry.count - i + 1
-                            armyMissed = armyMissed + remaining
-                            break
-                        end
-
-                        local x, z, h = NavalFindSpot(occupied, area, searchOriginX, startZ, radius, waterLevel)
-                        if x then
-                            local createOk, unit = pcall(CreateUnit, armyIndex, fleetEntry.templateIdentifier, EngineClasses.float3(x, h, z))
-                            if createOk and unit then
-                                NavalGridAdd(occupied, x, z, radius)
-                                armyPlaced = armyPlaced + 1
-                                consecutiveMisses = 0
-                            else
-                                armyMissed = armyMissed + 1
-                                consecutiveMisses = consecutiveMisses + 1
-                            end
-                        else
-                            armyMissed = armyMissed + 1
-                            consecutiveMisses = consecutiveMisses + 1
-                        end
-
-                        sinceYield = sinceYield + 1
-                        if sinceYield >= NAVAL_BATCH_SIZE then
-                            sinceYield = 0
-                            WaitTicks(1)
-                        end
-                    end
-                end
-
-                totalPlaced = totalPlaced + armyPlaced
-                totalMissed = totalMissed + armyMissed
-
-                Log(string.format("SANGEN: army %s naval spawn -- placed %d, missed %d.", tostring(army.name), armyPlaced, armyMissed))
-
-                if armyMissed > 0 then
-                    NavalPlaceDeficitMarkers(armyIndex, startX, startZ, armyMissed)
-                end
-            end)
-
-            if not armyOk then
-                Warn("SANGEN: naval fleet spawn failed for army "..tostring(army.name)..", other armies unaffected: "..tostring(armyErr))
-            end
+        sinceYield = sinceYield + 1
+        if sinceYield >= UNIT_SPAWN_BATCH_SIZE then
+            sinceYield = 0
+            WaitTicks(1)
         end
     end
-
-    Log(string.format("SANGEN: naval fleet spawn done -- placed %d, missed %d total.", totalPlaced, totalMissed))
+    Log(string.format("SANGEN: SpawnUnits placed %d, failed %d (of %d requested).",
+        placed, failed, #instructions))
 end
-
-return Scenario -- inert (Import() ignores a module's `return`, MAP_SCENARIO_SPEC.md §3) -- kept
-                -- only for parity with the live reference's own final line.
 ```
 
-### Part 2 — `src/io/ScenarioScript_RuntimeResource_IO.h`
+**`Scenario.SpawnMatchedScenarioUnits(area)` — the dispatcher that would call this — is deliberately
+NOT added.** See below.
 
-```cpp
-// ScenarioScript_RuntimeResource_IO.h — resolves and reads the bundled Map Scenario runtime Lua
-// text (`ARCH_15_04_ThreeFileOnDiskShape.md` §15.4 point 2, DESIGN_MapScenarioIO_R1.md §3): a designer-chosen override path, if
-// set and readable, else the bundled default staged beside the executable
-// (resources/lua/SanGenScenarioRuntime.lua at build time — CMakeLists.txt, mirrors the .glsl
-// shader-staging pattern verbatim). Layer: IO. Pure resolve+read only — no rendering (that is
-// ScenarioScript_DataLua_IO, STEP70), no write, no overwrite-safety (that is
-// ScenarioScript_Export_IO, STEP71, the sole caller).
-#pragma once
-#include <string>
+## 3. ⚠️ Blocking issue — `Scenario.SpawnMatchedScenarioUnits` has no ratified home
 
-namespace SanmapGen {
-namespace Io {
+`ARCH_15_05_ParamsScenariosType.md`'s OPEN section (amended 2026-08-28), item 2:
+`Scenario.SpawnMatchedScenarioUnits` and its per-scenario generator functions (e.g.
+`BuildSlots5to8Instructions`) are **per-map, per-scenario, AND procedural Lua** — a category neither
+ratified file role covers. `<MapName>_Scenarios_Runtime.lua` is defined as generic and byte-identical
+across every map; `<MapName>_Scenarios_Data.lua` is defined as pure per-map data tables, never
+algorithm code. A hand-authored per-scenario placement generator (deepest-water search, terrain
+sampling, squadron layout) fits neither.
 
-// ⚠️ AMENDS STEP71 §0's assumed doc comment on errorMessage ("populated only when bSucceeded ==
-// false") — see this ticket's §0/"Amendment" section. errorMessage is a DIAGNOSTIC/ADVISORY
-// string: EMPTY only on a fully clean resolution (override used cleanly, or bundled used with no
-// override given); NON-EMPTY whenever there is something the human should see — including a
-// successful degrade-to-bundled (bSucceeded == true) as well as a hard failure (bSucceeded ==
-// false). ScenarioScript_Export_IO (STEP71) must log errorMessage whenever non-empty, never gated
-// on bSucceeded alone — a silent degrade is exactly what Constitution §6 forbids.
-struct ScenarioRuntimeResourceResult {
-    bool        bSucceeded = false;
-    std::string runtimeLuaText;      // full resolved text, INCLUDING its own
-                                     // kScenarioGeneratedFileBannerLine first line — the bundled
-                                     // resources/lua/SanGenScenarioRuntime.lua opens with it
-                                     // verbatim (STEP70's banner literal, duplicated as plain text
-                                     // in a non-C++ resource file, kept in lockstep manually).
-    std::string sourceDescription;   // "bundled" or "override", for the caller's debugLog
-    std::string errorMessage;        // see the amended contract note above
-};
+**Concrete consequence:** `_data.lua`'s orchestrator calls
+`pcall(Scenario.SpawnMatchedScenarioUnits, chosenArea)` whenever `spawnsUnitsEnabled` is true. With
+this correction applied, the bundled runtime defines `Scenario.SpawnUnits` but **not**
+`Scenario.SpawnMatchedScenarioUnits` — that `pcall` calls a nil value, throws, and is **silently
+swallowed** (errors inside the `NewThread` callback are dropped, and `Log`/`Warn` do not function in
+this build). That is exactly the silent-wrong-result class Constitution §6 forbids, and it is a real
+live-breakage risk for any exported map with a `spawnsUnits = true` scenario.
 
-// runtimeResourceDirectory: the directory the bundled default is staged into (the staged
-// `sangen_lua_resources` folder beside the executable, or the CMake-provided directory in tests)
-// — never an absolute path baked into source. runtimeOverridePathOrEmpty:
-// Io::AppSettings::scenarioRuntimeOverridePath (STEP64) verbatim, empty meaning "use the bundled
-// default."
-//
-// Resolution order (DESIGN_MapScenarioIO_R1.md §3):
-//   1. runtimeOverridePathOrEmpty non-empty and readable -> that text, sourceDescription="override".
-//   2. Else <runtimeResourceDirectory>/SanGenScenarioRuntime.lua -> sourceDescription="bundled".
-//   3. Override was given but unreadable -> DEGRADE to bundled (never a silent swap, never a hard
-//      failure over an override problem alone) -- errorMessage carries the loud diagnostic even
-//      though bSucceeded ends up true.
-//   4. Neither readable -> bSucceeded = false, errorMessage names both attempted paths.
-// Total: never throws.
-ScenarioRuntimeResourceResult LoadScenarioRuntimeText(const std::string& runtimeResourceDirectory,
-                                                      const std::string& runtimeOverridePathOrEmpty);
+**This ticket stops here rather than inventing a home.** Candidates, none evaluated or chosen — do not
+pick one without an ARCH ruling:
 
-} // namespace Io
-} // namespace SanmapGen
-```
+1. A fourth file, outside the ratified three-file split, for per-map procedural dispatch.
+2. Loosening the Data file's "pure tables, never algorithm code" rule to allow bounded per-scenario Lua.
+3. Keeping per-scenario dispatch/generator code permanently hand-authored beside `_data.lua`, i.e.
+   accepting that this part stays outside SanGen's export surface entirely.
 
-### `src/io/ScenarioScript_RuntimeResource_IO.cpp`
+Each has different consequences for `ARCH_15_04`'s overwrite-safety mechanism and for whether
+`Params::Scenarios` ever needs a declarative shape for unit-spawn placement (`ARCH_15_05` OPEN item 1,
+also unresolved). **Action required: the ARCH Expert rules before any coder work-order adds
+`Scenario.SpawnMatchedScenarioUnits` to the bundled runtime or renders per-scenario generators.**
 
-```cpp
-#include "ScenarioScript_RuntimeResource_IO.h"
-#include "FilesystemPrimitives_IO.h"
+## 4. ⚠️ Second cross-cutting dependency — the Data.lua renderer and PARAMS shape are also stale
 
-namespace SanmapGen {
-namespace Io {
+Confirmed by reading the real files 2026-08-28: `src/params/Scenario_PARAMS.h` still declares
+`bool navy = false;` and `ScenarioNavalFleet navalFleet;` on `ScenarioBody`, and
+`src/io/ScenarioScript_DataLua_IO.cpp` (STEP70) still renders both — `AppendKeyValueLine(out,
+indentLevel, "navy", RenderLuaBoolean(body.navy));` (line 127) and `AppendNavalFleetTable(out,
+indentLevel, body.navalFleet);` (line 140), unconditionally, into every exported
+`<MapName>_Scenarios_Data.lua`.
 
-namespace {
-constexpr const char* kBundledRuntimeFileName = "SanGenScenarioRuntime.lua";
-}
+**The corrected runtime and the currently-shipping data renderer would then speak different
+vocabularies**, independent of the blocker above: corrected `ResolveAndApply` reads
+`matchedScenario.spawnsUnits`, but a real export sets `navy`/`navalFleet` and never `spawnsUnits` — so
+every matched scenario resolves `spawnsUnitsEnabled = nil` (falsy), **silently disabling unit spawning
+for every scenario**, including ones authored with intent to spawn.
 
-ScenarioRuntimeResourceResult LoadScenarioRuntimeText(const std::string& runtimeResourceDirectory,
-                                                      const std::string& runtimeOverridePathOrEmpty) {
-    ScenarioRuntimeResourceResult result;
+`Scenario_PARAMS.h` and `ScenarioScript_DataLua_IO.cpp` need their own correction (retire
+`navy`/`ScenarioNavalFleet` family, add `spawnsUnits`, per `ARCH_15_05`'s ratified shape), **landed
+together with this one** — not by this ticket, which is scoped to the Runtime resource only.
 
-    if (!runtimeOverridePathOrEmpty.empty()) {
-        std::string overrideText;
-        if (ReadTextFileBytes(runtimeOverridePathOrEmpty, overrideText)) {
-            result.bSucceeded = true;
-            result.runtimeLuaText = std::move(overrideText);
-            result.sourceDescription = "override";
-            return result;
-        }
-        result.errorMessage = "scenario runtime override path '" + runtimeOverridePathOrEmpty +
-            "' could not be read -- degrading to the bundled default runtime.";
-        // fall through -- never a silent swap, never a hard failure over the override alone
-    }
+## 5. Files touched
 
-    const std::string bundledPath = JoinExportPath(runtimeResourceDirectory, kBundledRuntimeFileName);
-    std::string bundledText;
-    if (ReadTextFileBytes(bundledPath, bundledText)) {
-        result.bSucceeded = true;
-        result.runtimeLuaText = std::move(bundledText);
-        result.sourceDescription = "bundled";
-        return result; // errorMessage, if set above, is PRESERVED -- the loud degrade advisory
-    }
+- **EDIT** `resources/lua/SanGenScenarioRuntime.lua` — per §2. Was authored as NEW by the original
+  ticket; already exists, so this is now an edit.
+- **EDIT** `src/io/ScenarioScript_RuntimeResource_IO_Test.cpp` — the self-check
+  (`TestRealBundledResourceSelfCheck`, ~lines 147-150) currently asserts
+  `text.find("function Scenario.SpawnNavalFleets") != std::string::npos`. See §7.
+- **No change** to `src/io/ScenarioScript_RuntimeResource_IO.h`/`.cpp` or `CMakeLists.txt`.
+- **NOT touched here, flagged as required siblings:** `src/params/Scenario_PARAMS.h`,
+  `src/io/ScenarioScript_DataLua_IO.cpp` (§4).
 
-    result.bSucceeded = false;
-    if (!result.errorMessage.empty()) {
-        result.errorMessage += " Bundled default at '" + bundledPath + "' was also unreadable.";
-    } else {
-        result.errorMessage = "bundled scenario runtime resource at '" + bundledPath +
-            "' could not be read, and no override path was given.";
-    }
-    return result;
-}
+## 6. Backend policy
 
-} // namespace Io
-} // namespace SanmapGen
-```
+Unchanged — N/A. A handful of `ifstream` reads, at most once per export attempt.
 
-### New primitive this ticket adds — `ReadTextFileBytes` (`src/io/FilesystemPrimitives_IO.h`/`.cpp`)
+## 7. Acceptance test (delta from the shipped test)
 
-**⚠️ Ordering note for the coder / STEP71:** STEP71 §2 also specs adding `ReadTextFileBytes` to this
-same file. Since WO6 (this ticket) precedes WO7 (STEP71) in build order, **this ticket adds it
-first**. If STEP71 is implemented after this ticket lands, its own §2 is already satisfied — the
-STEP71 coder must check for the primitive's existence before re-adding it, not duplicate the
-declaration.
+Items 1-5, 7, 8 are pure C++ resolver behaviour, none Lua-content-dependent — unchanged. Item 6 needs:
 
-```cpp
-// Reads filePath's entire contents as text. false + outText left EMPTY if the file does not exist
-// or cannot be opened for read -- never throws, never partial-fills outText on failure. The read
-// counterpart to WriteBinaryFileBytes, first needed by ScenarioScript_RuntimeResource_IO's
-// (STEP72) bundled/override resolution and later reused by ScenarioScript_Export_IO's (STEP71)
-// overwrite-safety banner check.
-bool ReadTextFileBytes(const std::string& filePath, std::string& outText);
-```
+1. Replace the `function Scenario.SpawnNavalFleets` positive assertion with
+   `function Scenario.SpawnUnits`; keep `function Scenario.ResolveAndApply`.
+2. Add negative assertions `text.find("SpawnNavalFleets") == std::string::npos` and
+   `text.find("NAVAL_") == std::string::npos` — proves the dead code was removed, not merely supplemented.
+3. Add positive `text.find("spawnsUnits") != std::string::npos` and negative
+   `text.find("matchedScenario.navy") == std::string::npos` — pins the rename.
+4. Item 7b (alloy-roster fail-loud guard) unaffected — keep verbatim.
+5. Full solo rebuild + `ctest -C Debug`. No other test in the suite references naval content
+   (confirmed by grep across `src/io/*_Test.cpp`).
 
-`.cpp`: `std::ifstream inputStream(filePath, std::ios::binary); if (!inputStream) return false;
-outText.assign(std::istreambuf_iterator<char>(inputStream), std::istreambuf_iterator<char>());
-return true;` — the same idiom `AppSettings_IO.cpp:49-55`/`MapExporter_IO_Test.cpp:33-37` already
-use inline.
+## 8. Verify
 
-### Part 3 — CMake staging (mirrors the shader pattern verbatim)
+- Corrected test passes with new positive and negative assertions.
+- Full solo rebuild + `ctest -C Debug`: 100% pass.
+- Grep confirms `resources/lua/SanGenScenarioRuntime.lua` has zero occurrences of
+  `Naval`/`NAVAL_`/`navalFleet`/`navy` and exactly one `function Scenario.SpawnUnits`.
+- ⚠️ **This correction alone does NOT make unit-spawning scenarios work end-to-end.** That needs the
+  sibling `Scenario_PARAMS.h`/`ScenarioScript_DataLua_IO.cpp` correction (§4) in the same batch, and
+  the ARCH ruling on `Scenario.SpawnMatchedScenarioUnits`'s home (§3).
 
-Insert immediately after the existing shader `POST_BUILD` block (`CMakeLists.txt:231-234`), before
-the `add_sangen_test` function definition (`:236`):
+## 9. ARCH rules invoked
 
-```cmake
-# The bundled Map Scenario runtime Lua text ships BESIDE the executable, mirroring the .glsl
-# kernel staging above verbatim (`ARCH_15_04_ThreeFileOnDiskShape.md` §15.4, DESIGN_MapScenarioIO_R1.md §3, STEP72) —
-# ScenarioScript_RuntimeResource_IO::LoadScenarioRuntimeText resolves
-# `<exeDir>/sangen_lua_resources/SanGenScenarioRuntime.lua` when no override path is set.
-# resources/lua/ is a shipped-resource top-level tree, the SAME category shaders/ already is —
-# ARCH_02_LayerDirectoryMap.md §2's layer map governs src/ subdirectories only, so this needs no new ARCH layer.
-file(GLOB SANGEN_V2_LUA_RESOURCES CONFIGURE_DEPENDS "resources/lua/*.lua")
-set_source_files_properties(${SANGEN_V2_LUA_RESOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
-set(SANGEN_V2_LUA_RESOURCE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/sangen_lua_resources")
-foreach(luaResourceFile ${SANGEN_V2_LUA_RESOURCES})
-    get_filename_component(luaResourceName "${luaResourceFile}" NAME)
-    configure_file("${luaResourceFile}" "${SANGEN_V2_LUA_RESOURCE_DIRECTORY}/${luaResourceName}" COPYONLY)
-endforeach()
+- `ARCH_15_03_ExportOnlyLuaRatified.md` §15.3 — export-only; unaffected.
+- `ARCH_15_04_ThreeFileOnDiskShape.md` §15.4 point 2 — the Runtime file role; its "generic, identical
+  across every map" clause is exactly what §3's gap sits against.
+- `ARCH_15_05_ParamsScenariosType.md` §15.5 — **the amended version**: the `spawnsUnits` rename, the
+  RETIRED section, and the OPEN section (items 1 and 2) cited as the blocker.
+- `ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 — `BuildSlotPattern`'s ratified location and
+  `MAX_ARMY_SLOT_COUNT`; unaffected.
+- `MAP_SCENARIO_SPEC.md` §3/§3.1/§4/§5/§10/§11/§11.1 — execution/timing law, module API contract,
+  `alloyMode` semantics, and the primary source for what replaced the naval machinery.
+- `MAP_UNIT_SPAWNING_SPEC.md` §5 — the `ok`/`unit` double-check and the never-hardcode-an-army-index
+  rule, both present in the executor being added.
+- Constitution §6 — fail-closed on unknown condition field/comparator; §3 above applies the same
+  loud-not-silent rule to a gap this ticket refuses to paper over.
 
-add_custom_command(TARGET SanGenV3App POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${SANGEN_V2_LUA_RESOURCE_DIRECTORY}" "$<TARGET_FILE_DIR:SanGenV3App>/sangen_lua_resources"
-    COMMENT "Staging SanGen v2 bundled Map Scenario Lua resources beside the application")
-```
+## 10. Explicit out-of-scope
 
-Widen `add_sangen_test` (`:236-244`) so every test can reach the new directory the same way every
-test already reaches the shader directory:
+- **Adding `Scenario.SpawnMatchedScenarioUnits` or any per-scenario generator, in any form, including
+  a no-op stub.** Blocked (§3). A no-op stub was considered and rejected: it still invents a home
+  (silence over throw) and masks the gap instead of surfacing it.
+- **`Scenario_PARAMS.h`'s shape** — ARCH Expert's call, already made in `ARCH_15_05`.
+- **`ScenarioScript_DataLua_IO.cpp`'s renderer (STEP70)** — required sibling correction, not performed
+  here.
+- **`ScenarioScript_Export_IO` (STEP71)** — confirmed unaffected, already shipped.
+- **Rendering `ARMY_ID_TO_NAME`/`KNOWN_ALLOY_MARKERS`** — separate open gap, STEP70's domain.
+- **`GameInstallLocation_IO`, `Io::AppSettings`, `Sys::CheckLuaSyntax`** — STEP64/65, unaffected.
+- **`LuaCodeEditor_UI` and any UI wiring** — WO8, UI Expert.
 
-```cmake
-# add_sangen_test(<name> <source>...) — one acceptance-test executable, registered
-# with CTest and handed the shader directory as argv[1] (ignored by tests that do
-# not need a GL context) and the bundled Map Scenario Lua resource directory as
-# argv[2] (ignored by tests that do not need it — STEP72, same "handed to every
-# test, most ignore it" precedent as argv[1]).
-function(add_sangen_test testName)
-    add_executable(${testName} ${ARGN})
-    target_link_libraries(${testName} PRIVATE SanGenV2)
-    add_test(NAME ${testName} COMMAND ${testName} "${SANGEN_V2_SHADER_DIRECTORY}" "${SANGEN_V2_LUA_RESOURCE_DIRECTORY}")
-    set_property(TARGET ${testName} PROPERTY FOLDER "SanGenV2 Tests")
-endfunction()
-```
+## 11. ❓ Open questions
 
-Register: `add_sangen_test(ScenarioScript_RuntimeResource_IO_Test src/io/ScenarioScript_RuntimeResource_IO_Test.cpp)`
-near the other Map-Scenario-track tests.
+1. `MapUtils.GetMapName()`'s exact return spelling / early-call-site safety — unaffected, still open.
+2. **Where `Scenario.SpawnMatchedScenarioUnits` and per-scenario generator code live under the
+   three-file split** — `ARCH_15_05` OPEN item 2. Blocking; needs an ARCH ruling.
+3. Whether per-scenario unit-spawn placement should ever become author-able `Params::Scenarios` data
+   at all — `ARCH_15_05` OPEN item 1, unresolved.
 
-**Optional, coder's call:** the shader precedent also adds `${SANGEN_V2_SHADERS}` to
-`add_library(SanGenV2 STATIC ...)` (`:165`) for IDE visibility. `SANGEN_V2_LUA_RESOURCES` is
-computed later in the file; hoisting the `file(GLOB)` earlier for the same parity is optional
-cosmetic follow-up, not load-bearing (COPYONLY staging is independent of library source membership).
+## 12. ⚠️ Problems / gaps flagged, not solved here
 
-## Files touched
-- NEW `resources/lua/SanGenScenarioRuntime.lua` — Part 1, verbatim.
-- NEW `src/io/ScenarioScript_RuntimeResource_IO.h`/`.cpp` — Part 2.
-- NEW `src/io/ScenarioScript_RuntimeResource_IO_Test.cpp`.
-- EDIT `src/io/FilesystemPrimitives_IO.h`/`.cpp` — `ReadTextFileBytes` (this ticket adds it first).
-- EDIT `CMakeLists.txt` — Part 3: staging block, widened `add_sangen_test`, one new registration.
-
-## Backend policy
-N/A — a handful of `ifstream` reads, at most once per export attempt. No compute dispatch, no
-SIMD, no GPU handle. (The test suite's `Sys::CheckLuaSyntax` cross-check is deferred per the
-2026-08-22 correction to acceptance-test item 6 above until STEP65 has actually landed — this
-ticket's own runtime code never calls it.)
-
-## ARCH rules invoked
-- `ARCH_15_03_ExportOnlyLuaRatified.md` §15.3 — export-only; this file is never read back by a Lua parser inside SanGen.
-- `ARCH_15_04_ThreeFileOnDiskShape.md` §15.4 point 2 — the bundled/copied Runtime file role and the banner-marker contract.
-- `ARCH_15_05_ParamsScenariosType.md` §15.5 — `navalFleet` per-scenario placement (the `currentNavalFleet` bridge) and the
-  tuning-constants-stay-hardcoded ruling.
-- `ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 — `BuildSlotPattern`'s move into the runtime, `MAX_ARMY_SLOT_COUNT`, and the
-  `ARMY_ID_TO_NAME` roster-iteration fix, all implemented verbatim.
-- `MAP_SCENARIO_SPEC.md` §2/§3/§4/§5/§5.1/§7 — file-role split, module API, matching tiers,
-  `alloyMode` semantics, execution/timing law.
-- Constitution §6 — fail-closed on unknown condition field/comparator; loud, non-silent degrade on a
-  bad override path; total/never-throwing `LoadScenarioRuntimeText`.
-
-## Explicit out-of-scope
-- **`ScenarioScript_DataLua_IO`'s rendering logic, `kScenarioGeneratedFileBannerLine`'s C++
-  definition** — STEP70; this ticket duplicates the literal as text and depends on it not changing
-  without a matching edit here.
-- **`ScenarioScript_Export_IO`'s write/overwrite-safety logic** — STEP71.
-- **Rendering `ARMY_ID_TO_NAME`/`KNOWN_ALLOY_MARKERS`** — flagged gap, STEP70's domain, not done
-  anywhere yet.
-- **`GameInstallLocation_IO`, `Io::AppSettings` fields, `Sys::CheckLuaSyntax`'s implementation** —
-  STEP64/STEP65, consumed test-only here.
-- **`LuaCodeEditor_UI`, any UI wiring, the override-path picker** — WO8, UI Expert.
-
-## Acceptance test
-New `src/io/ScenarioScript_RuntimeResource_IO_Test.cpp`, scratch-directory pattern per
-`MapExporter_IO_Test.cpp:25-31`:
-
-1. Override path set and readable → `bSucceeded == true`, `sourceDescription == "override"`,
-   `errorMessage.empty()`, `runtimeLuaText` matches the seeded content exactly.
-2. Override empty, valid `runtimeResourceDirectory` containing `SanGenScenarioRuntime.lua` →
-   `sourceDescription == "bundled"`.
-3. **Loud degrade proof.** Override set to a nonexistent path, bundled directory valid →
-   `bSucceeded == true`, `sourceDescription == "bundled"`, **`errorMessage` non-empty and names the
-   override path** — proves the degrade is never silent even though the call still "succeeds."
-4. Neither readable → `bSucceeded == false`, `errorMessage` names the bundled path attempted,
-   `runtimeLuaText.empty()`.
-5. Override readable → the bundled directory is never required to exist (pass a garbage
-   `runtimeResourceDirectory` alongside a valid override) — proves the early return short-circuits.
-6. **Real bundled resource self-check**, using the CMake-staged `SANGEN_V2_LUA_RESOURCE_DIRECTORY`
-   (argv[2]): read `SanGenScenarioRuntime.lua` from the real staged path, then assert (b) contains
-   `"Scenario = {}"` and **not** `"local Scenario"`; (c) contains `"function Scenario.ResolveAndApply"`
-   and `"function Scenario.SpawnNavalFleets"`.
-
-   **⚠️ Correction 2026-08-22 — items (a) and (d) deferred, dependency not yet landed.** This
-   ticket carries a stated test-only dependency on STEP65 (`Sys::CheckLuaSyntax`) and STEP70
-   (`Io::kScenarioGeneratedFileBannerLine`) — **neither exists in `src/` at this ticket's dispatch
-   time**, and (per the parallel-execution plan this ticket was dispatched under) neither will be
-   reachable from this ticket's own isolated worktree even though STEP65 is being built
-   concurrently elsewhere. Do NOT `#include "ScenarioScript_DataLua_IO.h"` or
-   `"../sys/LuaSyntaxCheck_SYS.h"` — those headers do not exist yet and the build will fail.
-   Instead:
-   - (a) Replace the banner-lockstep assertion with a **hardcoded literal string comparison**:
-     assert the first line equals `"-- GENERATED BY SANGEN -- DO NOT HAND-EDIT (regenerated on "
-     "every export)"` verbatim (the exact text Part 1's `.lua` file already opens with). Add a
-     `// TODO(after STEP65+STEP70 land): replace this literal with Io::kScenarioGeneratedFileBannerLine`
-     comment so the sequential integration pass upgrades it to the real cross-check.
-   - (d) Skip the `Sys::CheckLuaSyntax` assertion entirely for now; add a
-     `// TODO(after STEP65 lands): add Sys::CheckLuaSyntax(runtimeLuaText).bSucceeded == true`
-     comment in its place. This does not weaken the resource itself — the Lua file's syntax is
-     still hand-verified in Part 1's authoring — it only defers the automated cross-check until
-     the syntax-checker exists to run it.
-   Both TODOs must be picked up as follow-up work once STEP65/STEP70 land (part of this batch's
-   post-merge integration pass, not a new ticket).
-7. Empty `runtimeResourceDirectory` and empty override → `bSucceeded == false` with a non-empty,
-   actionable `errorMessage` — no crash on an empty string.
-7b. **Missing-alloy-roster guard is present and loud (text assertions on the bundled resource).**
-   The staged `SanGenScenarioRuntime.lua` text contains `"bAlloyRosterAvailable"`, and contains
-   **none** of the silent-fallback forms `"pairs(ARMY_ID_TO_NAME or {})"` or
-   `"KNOWN_ALLOY_MARKERS or {}"` — proving the fail-loud guard was not regressed back to an `or {}`
-   default. Also assert the warning text contains the substring `"NO ALLOY MARKERS WILL BE REMOVED"`
-   so the diagnostic itself cannot be quietly softened. (A behavioral test needs a live Lua VM with
-   the engine's globals stubbed, which is out of scope here — these text assertions are the
-   practical guard, and the reason the warning string is worth pinning exactly.)
-8. `ReadTextFileBytes` coverage in whichever suite hosts `FilesystemPrimitives_IO`'s tests: missing
-   file → `false`/`outText` unchanged; existing file → `true`/exact byte match, including embedded
-   `\0` bytes.
-9. Full solo rebuild + `ctest -C Debug`: previously-passing suite stays green; the new target passes.
-
-## Verify
-- New test passes (all 9 items), including the loud-degrade proof (3) and the real-resource
-  self-check (6).
-- Full solo rebuild + `ctest -C Debug`: 100% pass, zero pre-existing test files edited or broken.
-- Confirm STEP71 now compiles against this ticket's shipped header with zero adapter needed.
-
-## ❓ Open questions
-1. `MapUtils.GetMapName()`'s exact return spelling and its safety when called this early in the load
-   sequence — ruled on with reasoning (§0), not independently live-verified. First thing to check if
-   a real map load throws "File doesn't exist" on the sibling `Import()`.
-2. Whether to hoist `file(GLOB SANGEN_V2_LUA_RESOURCES ...)` earlier for IDE-visibility parity with
-   the shader precedent — optional, not load-bearing, coder's call.
-
-## ⚠️ Problems / gaps flagged, not solved here
-1. **`ARMY_ID_TO_NAME`/`KNOWN_ALLOY_MARKERS` have no ratified renderer anywhere in the pack.** The
-   runtime correctly *reads* them (per `ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 point 3), but nothing writes them into
-   `<MapName>_Scenarios_Data.lua`, so every real map has them `nil`. **This blocks live
-   functionality even after WO6+STEP71 both ship** — needs a scheduled follow-up ticket
-   (`ScenarioScript_DataLua_IO`/STEP70 is the natural home, alongside `MAX_ARMY_SLOT_COUNT`).
-
-   **Behavior while the gap is open, corrected 2026-08-21:** an earlier draft of this ticket used
-   `or {}` fallbacks, which would have made the alloy-deletion loops iterate nothing and **silently
-   leave every alloy marker on the map visible for every composition** — no error, no log, and
-   in-game indistinguishable from "the scenario system isn't running at all." That is a real
-   observed symptom from live testing ("all alloy spawns entire map"), so shipping it as the
-   quiet default was unacceptable. The runtime now **fails loud**: `bAlloyRosterAvailable` is
-   computed once, `explicit`/`occupancy` are skipped outright when the roster is absent, and a
-   `Warn()` states plainly that no markers will be removed and that this is a missing-data bug in
-   the export rather than an authoring choice. `keepAll`/`delta` never consult the roster and are
-   deliberately unaffected by the guard.
-2. **STEP71's `errorMessage` doc comment is stale the moment this ticket lands** (§0 amendment) — a
-   one-line addition to its step 7.
-3. **`ReadTextFileBytes` is specified in both this ticket and STEP71** — this one lands first; the
-   STEP71 implementer must check for existence before re-adding.
-4. **`.claude/agents/sangen-coder.md` briefing staleness** — zero matches for
-   `Scenario`/`LuaTableWriter`/`ReadTextFileBytes`/`resources/lua`. Worth applying
-   `DESIGN_MapScenarioIO_R1.md`'s closing bullet now the IO-side track is fully specified, plus a
-   line noting `resources/lua/` (mirroring `shaders/`) is the precedent for future shipped-resource
-   trees.
+1. **`ARMY_ID_TO_NAME`/`KNOWN_ALLOY_MARKERS` still have no ratified renderer.** Predates and is
+   independent of the naval retirement; still blocks live `explicit`/`occupancy` alloyMode on a real map.
+2. **`Scenario_PARAMS.h` / `ScenarioScript_DataLua_IO.cpp` are stale relative to `ARCH_15_05`'s
+   amendment** (§4) — needs its own correction ticket, must land alongside this one.
+3. **The blocking issue itself** (§3) — the biggest open item in this ticket.
+4. **`.claude/agents/sangen-coder.md` briefing check, 2026-08-28:** re-read; its
+   `MAP_UNIT_SPAWNING_SPEC.md` bullet is current and needs no edit — it does not mention
+   `navy`/`navalFleet`/`SpawnNavalFleets`. No briefing change required.

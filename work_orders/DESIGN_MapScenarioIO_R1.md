@@ -6,6 +6,29 @@ Grounded against `MAP_SCENARIO_SPEC.md` (full), `ARCH_15_MapScenarioSystem.md` �
 `AppSettings_IO.h`, `AppSettingsLocation_IO.h`, `FilesystemPrimitives_IO.h`,
 `CMakeLists.txt`. No `Params::*Scenario*` type exists in `src/params/` yet — confirmed.*
 
+> **⚠️ AMENDED 2026-08-28 — the naval-fleet worked examples are corrected in place.**
+> As authored, §2's link-mechanism example wired `Scenario.SpawnNavalFleets` alongside
+> `Scenario.ResolveAndApply`, and §6's WO6 bullet described porting the live
+> `FindMatchingScenario`/`ApplyScenario`/`SpawnNavalFleets` trio into generic form. **Both named a
+> function that no longer exists.** The 2026-08-27 rewrite of the live reference script deleted
+> `Scenario.SpawnNavalFleets` and every `NAVAL_*` constant, and on 2026-08-28 the vestigial `navy`
+> scenario field was removed from the live Lua after being confirmed to have zero readers
+> (`Pandemonium Isthmus_Scenarios_Script.lua:182-186`).
+> `ARCH_15_05_ParamsScenariosType.md`'s "RETIRED 2026-08-28" section retires the whole
+> `ScenarioNavalFleet` family plus `ScenarioBody::navalFleet`/`navy`; the replacement opt-in is a
+> plain `ScenarioBody::spawnsUnits` bool. The two examples below are updated; **nothing else in
+> this design changes** — the two-IO-surface split (§0), the file set (§1), the overwrite-safety
+> rule (§2), the runtime-resource resolution (§3), the Lua syntax check (§4), the export result
+> contract (§5), and the WO ordering (§6) are all independent of which spawn function the runtime
+> exposes.
+>
+> Two pre-existing staleness notes still stand and are **not** re-litigated here: the type is
+> ratified as `Params::Scenarios`, not `Params::MapScenario` (STEP69's own correction), and the
+> ratified on-disk shape is the map-prefixed `<MapName>_Scenarios_Runtime.lua` /
+> `<MapName>_Scenarios_Data.lua` pair, not `SanGenScenarioRuntime.lua` +
+> `<MapName>_Scenarios_Script.lua` (STEP70's own naming correction, which also retires §2's
+> non-prefix exception and the matching ❓ open item below).
+
 ## 0. Load-bearing clarification — there are TWO IO surfaces, only one is new
 
 1. **`Params::MapScenario` round-tripped inside the `.sanmap`** — an ordinary domain.
@@ -60,7 +83,11 @@ The generated data file keeps the pre-existing filename and exposes the global
 `Scenario` table itself; internally it does
 `Import("maps/<MapName>/SanGenScenarioRuntime.lua").SanGenScenarioRuntime` and wires
 `Scenario.ResolveAndApply = function(...) return SanGenScenarioRuntime.ResolveAndApply(PATTERN_SCENARIOS, COUNT_SCENARIOS, DEFAULT_SCENARIO, ...) end`
-(similarly `SpawnNavalFleets`). This is why the runtime can be a byte-identical,
+(similarly `SpawnUnits`, the generic instruction executor — **amended 2026-08-28**, this example
+named `SpawnNavalFleets`, retired; ⚠️ the `SpawnMatchedScenarioUnits` dispatch and its
+per-scenario generators are deliberately **not** wired here, because where per-map procedural
+scenario Lua lives under the ratified split is unresolved — `ARCH_15_05_ParamsScenariosType.md`
+OPEN item 2). This is why the runtime can be a byte-identical,
 non-map-prefixed, verbatim copy: it never needs to know which map it is in — the
 map-specific data file calls into it, not the reverse.
 
@@ -158,9 +185,16 @@ satisfying "must never block the `.sanmap`/asset export."
 5. **`ScenarioScript_DataLua_IO`** — depends on WO1 (PARAMS shape) and WO2 (primitives);
    optionally WO4 for a self-check of its own output.
 6. **`ScenarioScript_RuntimeResource_IO` + the bundled `resources/lua/SanGenScenarioRuntime.lua`
-   content** (a coder-tier port of the live `FindMatchingScenario`/`ApplyScenario`/
-   `SpawnNavalFleets` into generic, tier-table-parameterized form) + CMake staging —
-   depends on WO3; **needs ARCH sign-off on the `resources/` location first**.
+   content** (a coder-tier port of the live `FindMatchingScenario`/`ApplyScenario`/`SpawnUnits`
+   into generic, tier-table-parameterized form — **amended 2026-08-28**, this bullet named
+   `SpawnNavalFleets`, retired; `SpawnUnits` is already generic in the live file and needs no
+   parameterization, only relocation) + CMake staging — depends on WO3; **needs ARCH sign-off on
+   the `resources/` location first**.
+   ⚠️ **Explicitly out of WO6's scope, and blocked:** `Scenario.SpawnMatchedScenarioUnits` and the
+   per-scenario generator functions it dispatches to are per-map, per-scenario, AND procedural —
+   a category the ratified three-file split has no home for
+   (`ARCH_15_05_ParamsScenariosType.md` OPEN item 2). They cannot go in a byte-identical runtime
+   resource. Do not port them into this file to make the port "complete."
 7. **`ScenarioScript_Export_IO`** — orchestrator; depends on WO3, WO5, WO6.
 8. **UI wiring** (Files tab second export call, result surfacing, `gameInstallRoot`
    prompt, ImGuiColorTextEdit editor calling WO4) — UI Expert's work-order, depends on

@@ -863,6 +863,7 @@ add_sangen_test(DecalsTab_Bundles_UI_Test src/ui/DecalsTab_Bundles_UI_Test.cpp)
 add_sangen_test(DecalsTab_UI_Test          src/ui/DecalsTab_UI_Test.cpp)
 add_sangen_test(DecalsTab_Manual_UI_Test  src/ui/DecalsTab_Manual_UI_Test.cpp)
 add_sangen_test(AreasTab_UI_Test          src/ui/AreasTab_UI_Test.cpp)
+add_sangen_test(AreaDragGesture_UI_Test   src/ui/AreaDragGesture_UI_Test.cpp)
 add_sangen_test(PlacementRuleSections_UI_Test src/ui/PlacementRuleSections_UI_Test.cpp)
 
 # STEP74 — the Scenarios tab: three-tier list management, match-rule authoring, live composition

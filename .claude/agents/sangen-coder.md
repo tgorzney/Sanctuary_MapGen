@@ -43,6 +43,17 @@ inside the ARCH.
 - **Boundaries (§3):** downward-only deps; GPU handles only in SYS; UI never simulates;
   no layer knows the pipeline shape but PIPELINE.
 - **Dispatch (§4):** read the `DispatchPolicy`; never add a rival toggle.
+- **Game-side unit spawning (`sangen_arch_pack/specs/MAP_UNIT_SPAWNING_SPEC.md`):** the
+  authoritative mechanism for spawning units from a per-map Lua script. Read it BEFORE writing or
+  reviewing any per-map `_data.lua` / `_Scenarios_Script.lua` code. Non-obvious rules it encodes,
+  every one of which has already cost real debugging time:
+  `Armies` is empty during `LoadMapData` so spawning must be deferred into `NewThread`; only ONE
+  `NewThread` per script is honoured; errors inside that callback are swallowed and `Log()`/`Warn()`
+  go to a non-functional F1 console, so ordering inside the thread is load-bearing; `<map>_data.lua`
+  is loaded TWICE per host state because two callers spell the path differently and `Import` caches
+  on the literal string, so side effects must be scoped via `ImportedFileInfo.FileName`; `CreateUnit`
+  must be checked for BOTH `ok` and a returned unit; an army index must never be hardcoded; and a
+  failed position search must return nil rather than a known-bad coordinate.
 - **IO-layer conventions (`IO_MIGRATION_SPEC.md`):** one file pair per `.sanmap`
   domain — `MapExporter_<Domain>_IO`/`MapImporter_<Domain>_IO` — never a file
   spanning multiple top-level sections. A version migration is

@@ -9,9 +9,16 @@ Full detail: `MAP_SCENARIO_SPEC.md` §2–§2.2. Binding summary:
   1. `<MapName>_data.lua` — hand-authored orchestrator. **Never written by SanGen, under any
      code path.**
   2. `<MapName>_Scenarios_Runtime.lua` — the generic runtime algorithm
-     (`FindMatchingScenario`/`ResolveAndApply`/`SpawnNavalFleets`). SanGen-owned: a bundled
+     (`FindMatchingScenario`/`ResolveAndApply`/the unit-spawn executor). SanGen-owned: a bundled
      resource, **copied** per map on every export (a settings-level override path may substitute
      a designer-chosen file for the bundled default — UI-layer design, not fixed here).
+     **Corrected 2026-08-28:** the live reference's naval-only `SpawnNavalFleets` this bullet
+     originally cited no longer exists — replaced by the generic `SpawnMatchedScenarioUnits`/
+     `SpawnUnits` pair (`ARCH_15_05` "RETIRED 2026-08-28" note). That same note also flags an open
+     gap this bullet's "generic, identical across every map" framing does not yet resolve:
+     `SpawnMatchedScenarioUnits`'s per-scenario dispatch branches and generator functions are
+     per-map content, not generic runtime content — where they belong under this three-file split
+     is unresolved, not decided here.
   3. `<MapName>_Scenarios_Data.lua` — the per-map scenario tables, **rendered** from
      `Params::Scenarios` (§15.5) on every export. SanGen-owned, never hand-edited, never read
      back.

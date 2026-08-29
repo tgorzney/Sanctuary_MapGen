@@ -68,38 +68,15 @@ void ReadAlloyRemovalsJson(const nlohmann::json& parent, const char* key,
     }
 }
 
-void ReadNavalFleetJson(const nlohmann::json& parent, Params::ScenarioNavalFleet& navalFleet) {
-    if (!parent.contains("NavalFleet") || !parent["NavalFleet"].is_object()) return;
-    const nlohmann::json& json = parent["NavalFleet"];
-    if (json.contains("Fleet") && json["Fleet"].is_array()) {
-        navalFleet.fleet.clear();
-        for (const nlohmann::json& entryJson : json["Fleet"]) {
-            if (!entryJson.is_object()) continue;
-            Params::ScenarioNavalFleetEntry entry;
-            ReadJsonText(entryJson, "TemplateIdentifier", entry.templateIdentifier);
-            ReadJsonInteger(entryJson, "Count", entry.count);
-            navalFleet.fleet.push_back(entry);
-        }
-    }
-    if (json.contains("PondSideByArmy") && json["PondSideByArmy"].is_array()) {
-        navalFleet.pondSideByArmy.clear();
-        for (const nlohmann::json& assignmentJson : json["PondSideByArmy"]) {
-            if (!assignmentJson.is_object()) continue;
-            Params::ScenarioNavalPondAssignment assignment;
-            ReadJsonText(assignmentJson, "ArmyName", assignment.armyName);
-            // §4: raw signed int (-1/1), NOT a 0-based contiguous index — never
-            // ReadJsonEnumeration/ReadJsonEnumerationText. Unrecognized/missing -> East (default).
-            int sideValue = 0;
-            if (ReadJsonInteger(assignmentJson, "Side", sideValue) && (sideValue == -1 || sideValue == 1))
-                assignment.side = static_cast<Params::ScenarioNavalPondSide>(sideValue);
-            navalFleet.pondSideByArmy.push_back(assignment);
-        }
-    }
-    ReadJsonFloat(json, "SideBiasDistance", navalFleet.sideBiasDistance);
-}
-
 } // namespace
 
+// RETIRED 2026-08-28 (STEP204, human ruling): a pre-STEP204 `.sanmap`'s "Navy"/"NavalFleet" (and
+// any "PondSide"/"PondAssignment" nested keys) are deprecated data — SILENTLY DROPPED here, never
+// migrated, never warned, never an error. This function simply never reads them: `ReadJsonBoolean`/
+// `ReadJson*` only ever look up the keys named below, so an old file's now-unread keys fall through
+// exactly like any other unrecognized field at this nesting level (there is no strict/reject-
+// unknown-key mode here to work around — confirmed by reading this function; see MapImporter_
+// ScenariosRecord_IO_Test.cpp's legacy-fixture coverage).
 void ReadScenarioBodyJson(const nlohmann::json& json, Params::ScenarioBody& body, int mapSize) {
     ReadJsonText(json, "Name", body.name);
     if (json.contains("Area") && json["Area"].is_object()) {
@@ -109,7 +86,8 @@ void ReadScenarioBodyJson(const nlohmann::json& json, Params::ScenarioBody& body
         ReadJsonFloat(area, "width", body.area.width);
         ReadJsonFloat(area, "height", body.area.length);
     }
-    ReadJsonBoolean(json, "Navy", body.navy);
+    // Absent key (every pre-STEP204 .sanmap) -> stays at the struct default, false. Never an error.
+    ReadJsonBoolean(json, "SpawnsUnits", body.spawnsUnits);
     // `body` is pre-loaded (default-constructed = Occupancy) before this call — an absent/
     // unrecognized AlloyMode leaves it untouched, exactly ReadArmyJson's `faction` idiom (§7).
     int alloyModeValue = static_cast<int>(body.alloyMode);
@@ -120,7 +98,6 @@ void ReadScenarioBodyJson(const nlohmann::json& json, Params::ScenarioBody& body
     ReadAlloyOverridesJson(json, "AlloysToAdd", body.alloysToAdd, mapSize);
     ReadAlloyRemovalsJson(json, "AlloysToRemove", body.alloysToRemove);
     ReadJsonText(json, "AuthoringNote", body.authoringNote);
-    ReadNavalFleetJson(json, body.navalFleet);
 }
 
 } // namespace Io

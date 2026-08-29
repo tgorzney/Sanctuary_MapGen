@@ -5,8 +5,8 @@
 --
 -- SanGenScenarioRuntime.lua -- SANGEN-OWNED, BUNDLED RESOURCE (`ARCH_15_04_ThreeFileOnDiskShape.md` §15.4,
 -- MAP_SCENARIO_SPEC.md §2). This file's CONTENT is byte-identical across every map that uses the
--- Map Scenario system -- it carries the generic matching/apply/naval-spawn algorithm only, NEVER
--- any per-map data. SanGen copies this exact text, verbatim, into each map's own
+-- Map Scenario system -- it carries the generic matching/apply/unit-spawn-executor algorithm only,
+-- NEVER any per-map data. SanGen copies this exact text, verbatim, into each map's own
 -- <MapName>_Scenarios_Runtime.lua inside LJ/lua/maps/<MapName>/ on every export
 -- (ScenarioScript_Export_IO, STEP71) -- the ONLY thing that ever varies between maps is the
 -- copy's OWN FILENAME (map-prefixed), never a byte of this text.
@@ -249,224 +249,61 @@ local function ApplyScenario(scenario, total, slotPattern)
     Log("SANGEN: scenario '"..tostring(scenario.name).."' applied ("..total.." occupied slot(s)).")
 end
 
--- Bridges ResolveAndApply -> SpawnNavalFleets: the matched scenario's OWN navalFleet table
--- (`ARCH_15_05_ParamsScenariosType.md` §15.5 -- navalFleet is per-scenario, not a file-scoped constant the way the live
--- reference's NAVAL_FLEET/NAVAL_POND_SIDE_BY_ARMY/NAVAL_SIDE_BIAS_DISTANCE were). Module-local
--- state is required because Scenario.SpawnNavalFleets(area)'s signature (MAP_SCENARIO_SPEC.md §3,
--- unchanged by `ARCH_15_10_SlotPatternConstructionMoves.md` §15.10) carries only `area` -- this is how the later, NewThread-deferred
--- call learns which scenario matched.
-local currentNavalFleet = nil
+-- Set inside ResolveAndApply, read by a future Scenario.SpawnMatchedScenarioUnits (NOT defined in
+-- this file -- see ARCH_15_05_ParamsScenariosType.md §15.5's OPEN item 2; forward-compatible
+-- plumbing only, harmless with no consumer, and does not itself decide where that consumer lives).
+local currentMatchedScenarioName = nil
 
 function Scenario.ResolveAndApply(total, humanCount, aiCount, playersInformation)
     local slotPattern = BuildSlotPattern(playersInformation, MAX_ARMY_SLOT_COUNT)
     local matchedScenario = FindMatchingScenario(total, humanCount, aiCount, slotPattern)
-    local chosenArea, navyEnabled = matchedScenario.area, matchedScenario.navy
-    currentNavalFleet = matchedScenario.navalFleet
+    local chosenArea, spawnsUnitsEnabled = matchedScenario.area, matchedScenario.spawnsUnits
+    currentMatchedScenarioName = matchedScenario.name
     ApplyScenario(matchedScenario, total, slotPattern)
 
     Log(string.format(
-        "SANGEN: %d occupied slot(s) (%d human, %d AI, pattern=%s) -> scenario=%s navy=%s, playable area x=%d y=%d w=%d h=%d",
+        "SANGEN: %d occupied slot(s) (%d human, %d AI, pattern=%s) -> scenario=%s spawnsUnits=%s, playable area x=%d y=%d w=%d h=%d",
         total, humanCount, aiCount, slotPattern, tostring(matchedScenario.name),
-        tostring(navyEnabled), chosenArea.x, chosenArea.y, chosenArea.width, chosenArea.height))
+        tostring(spawnsUnitsEnabled), chosenArea.x, chosenArea.y, chosenArea.width, chosenArea.height))
 
-    return chosenArea, navyEnabled
+    return chosenArea, spawnsUnitsEnabled
 end
 
 -- ============================================================================
--- Naval fleet spawning (MAP_SCENARIO_SPEC.md §5.1). Spiral/grid helpers and the tuning constants
--- below are ALGORITHM TUNING CONSTANTS, ported byte-for-byte from the reference and NEVER exposed
--- as Params::Scenarios fields (`ARCH_15_05_ParamsScenariosType.md` §15.5) -- they never vary per map, unlike
--- NAVAL_FLEET/NAVAL_POND_SIDE_BY_ARMY/NAVAL_SIDE_BIAS_DISTANCE, now read per-scenario off
--- currentNavalFleet instead of as file-scoped globals.
+-- Generic unit-spawn executor (MAP_SCENARIO_SPEC.md §11). Replaces the retired naval-only fleet
+-- spawner (RETIRED 2026-08-28, STEP204 -- the live reference script deleted it 2026-08-27,
+-- ARCH_15_05_ParamsScenariosType.md §15.5). Input: a flat array of {armyIndex, templateIdentifier,
+-- x, y, z}. Output: those units exist. Knows NOTHING about water, terrain, navmesh, or unit type --
+-- pure input -> output. Never call CreateUnit outside this function.
+--
+-- Checks BOTH `ok` and `unit` -- pcall alone reports a falsy-but-non-throwing CreateUnit result as
+-- success (MAP_UNIT_SPAWNING_SPEC.md §5).
 -- ============================================================================
-local NAVAL_BATCH_SIZE = 100
-local NAVAL_SPIRAL_STEP = 2.5
-local NAVAL_SPIRAL_MAX_TRIES = 400
-local NAVAL_GAP = 1.5
-local NAVAL_DEFAULT_FOOTPRINT = { x = 6, y = 6 }
-local NAVAL_GRID_CELL = 16
-local NAVAL_GIVE_UP_AFTER_MISSES = 15
+local UNIT_SPAWN_BATCH_SIZE = 100
 
-local function NavalSpiralXZ(n)
-    local k = math.ceil((math.sqrt(n) - 1) / 2)
-    local t = 2 * k + 1
-    local m = t ^ 2
-    t = t - 1
-    if n >= m - t then
-        return k - (m - n), -k
-    else
-        m = m - t
-    end
-    if n >= m - t then
-        return -k, -k + (m - n)
-    else
-        m = m - t
-    end
-    if n >= m - t then
-        return -k + (m - n), k
-    else
-        return k, k - (m - n - t)
-    end
-end
-
-local function NavalNewGrid() return { cells = {} } end
-local function NavalGridKey(x, z) return math.floor(x / NAVAL_GRID_CELL) * 100000 + math.floor(z / NAVAL_GRID_CELL) end
-local function NavalGridAdd(grid, x, z, r)
-    local key = NavalGridKey(x, z)
-    local bucket = grid.cells[key]
-    if not bucket then
-        bucket = {}
-        grid.cells[key] = bucket
-    end
-    bucket[#bucket + 1] = { x = x, z = z, r = r }
-end
-local function NavalGridHasNearby(grid, x, z, extraRadius)
-    local span = math.ceil((6 + extraRadius) / NAVAL_GRID_CELL) + 1
-    local cx, cz = math.floor(x / NAVAL_GRID_CELL), math.floor(z / NAVAL_GRID_CELL)
-    for dx = -span, span do
-        for dz = -span, span do
-            local bucket = grid.cells[(cx + dx) * 100000 + (cz + dz)]
-            if bucket then
-                for _, e in ipairs(bucket) do
-                    local ddx, ddz = x - e.x, z - e.z
-                    local minDist = e.r + extraRadius
-                    if (ddx * ddx + ddz * ddz) < (minDist * minDist) then
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    return false
-end
-
-local function NavalIsInsideArea(x, z, area)
-    return x >= area.x and x <= area.x + area.width and z >= area.y and z <= area.y + area.height
-end
-
-local function NavalFindSpot(occupiedGrid, area, idealX, idealZ, radius, waterLevel)
-    for n = 1, NAVAL_SPIRAL_MAX_TRIES do
-        local gx, gz = NavalSpiralXZ(n)
-        local x = idealX + gx * NAVAL_SPIRAL_STEP
-        local z = idealZ + gz * NAVAL_SPIRAL_STEP
-
-        if NavalIsInsideArea(x, z, area) and not NavalGridHasNearby(occupiedGrid, x, z, radius) then
-            local errorCode, height = Engine.SampleTerrainHeightFromCell(EngineClasses.int2(math.floor(x), math.floor(z)))
-            if errorCode == EngineErrorCode.Success and height < waterLevel then
-                return x, z, waterLevel
-            end
-        end
-    end
-    return nil
-end
-
-local function NavalPlaceDeficitMarkers(armyIndex, originX, originZ, missedCount)
-    local count = math.min(missedCount, 10)
-    for i = 1, count do
-        local col = (i - 1) % 5
-        local row = math.floor((i - 1) / 5)
-        local x = originX + 3 + col * 2
-        local z = originZ + 3 + row * 2
-        local errorCode, height = Engine.SampleTerrainHeightFromCell(EngineClasses.int2(math.floor(x), math.floor(z)))
-        if errorCode == EngineErrorCode.Success then
-            pcall(CreateUnit, armyIndex, "uel1001", EngineClasses.float3(x, height, z))
-        end
-    end
-end
-
--- Only called for a matched scenario with navy == true. Must run after RunMapSetup (Armies must be
--- populated) -- the orchestrator's single NewThread callback owns this ordering
--- (MAP_SCENARIO_SPEC.md §7); this file never creates its own NewThread (only one is honored per
--- script).
-function Scenario.SpawnNavalFleets(area)
-    local navalFleet = currentNavalFleet or { fleet = {}, pondSideByArmy = {}, sideBiasDistance = 0 }
-
-    local pondSideByArmyLookup = {}
-    for _, sideRow in ipairs(navalFleet.pondSideByArmy or {}) do
-        pondSideByArmyLookup[sideRow.armyName] = sideRow.side
-    end
-
-    local _, hasWaterResult = Engine.HasWater()
-    if not hasWaterResult then
-        Log("SANGEN: map reports no water -- skipping naval fleet spawn.")
-        return
-    end
-    local _, waterLevel = Engine.GetWaterLevel()
-
-    local occupied = NavalNewGrid()
+function Scenario.SpawnUnits(instructions)
     local sinceYield = 0
-    local totalPlaced, totalMissed = 0, 0
+    local placed, failed = 0, 0
+    for _, instr in ipairs(instructions) do
+        local ok, unit = pcall(CreateUnit, instr.armyIndex, instr.templateIdentifier,
+            EngineClasses.float3(instr.x, instr.y, instr.z))
+        if ok and unit then placed = placed + 1 else failed = failed + 1 end
 
-    for armyIndex, army in pairs(Armies) do
-        if not army.lobbyOptions.isEmptySlot then
-            local armyOk, armyErr = pcall(function()
-                local spawnMarker = GameInfo.MapData.markers.Spawn
-                    and GameInfo.MapData.markers.Spawn.transforms
-                    and GameInfo.MapData.markers.Spawn.transforms[army.name]
-
-                local startX = (spawnMarker and spawnMarker.position.x) or (area.x + area.width * 0.5)
-                local startZ = (spawnMarker and spawnMarker.position.z) or (area.y + area.height * 0.5)
-
-                local primarySide = pondSideByArmyLookup[army.name] or 1
-                local searchOriginX = startX + primarySide * navalFleet.sideBiasDistance
-
-                local armyPlaced, armyMissed = 0, 0
-
-                for _, fleetEntry in ipairs(navalFleet.fleet or {}) do
-                    local template = __Templates.Units[fleetEntry.templateIdentifier]
-                    local footprint = (template and (template.skirtSize or template.footprint)) or NAVAL_DEFAULT_FOOTPRINT
-                    local radius = math.max(footprint.x, footprint.y) * 0.5 + NAVAL_GAP
-
-                    local consecutiveMisses = 0
-                    for i = 1, fleetEntry.count do
-                        if consecutiveMisses >= NAVAL_GIVE_UP_AFTER_MISSES then
-                            local remaining = fleetEntry.count - i + 1
-                            armyMissed = armyMissed + remaining
-                            break
-                        end
-
-                        local x, z, h = NavalFindSpot(occupied, area, searchOriginX, startZ, radius, waterLevel)
-                        if x then
-                            local createOk, unit = pcall(CreateUnit, armyIndex, fleetEntry.templateIdentifier, EngineClasses.float3(x, h, z))
-                            if createOk and unit then
-                                NavalGridAdd(occupied, x, z, radius)
-                                armyPlaced = armyPlaced + 1
-                                consecutiveMisses = 0
-                            else
-                                armyMissed = armyMissed + 1
-                                consecutiveMisses = consecutiveMisses + 1
-                            end
-                        else
-                            armyMissed = armyMissed + 1
-                            consecutiveMisses = consecutiveMisses + 1
-                        end
-
-                        sinceYield = sinceYield + 1
-                        if sinceYield >= NAVAL_BATCH_SIZE then
-                            sinceYield = 0
-                            WaitTicks(1)
-                        end
-                    end
-                end
-
-                totalPlaced = totalPlaced + armyPlaced
-                totalMissed = totalMissed + armyMissed
-
-                Log(string.format("SANGEN: army %s naval spawn -- placed %d, missed %d.", tostring(army.name), armyPlaced, armyMissed))
-
-                if armyMissed > 0 then
-                    NavalPlaceDeficitMarkers(armyIndex, startX, startZ, armyMissed)
-                end
-            end)
-
-            if not armyOk then
-                Warn("SANGEN: naval fleet spawn failed for army "..tostring(army.name)..", other armies unaffected: "..tostring(armyErr))
-            end
+        sinceYield = sinceYield + 1
+        if sinceYield >= UNIT_SPAWN_BATCH_SIZE then
+            sinceYield = 0
+            WaitTicks(1)
         end
     end
-
-    Log(string.format("SANGEN: naval fleet spawn done -- placed %d, missed %d total.", totalPlaced, totalMissed))
+    Log(string.format("SANGEN: SpawnUnits placed %d, failed %d (of %d requested).",
+        placed, failed, #instructions))
 end
+
+-- `Scenario.SpawnMatchedScenarioUnits(area)` -- the per-scenario dispatcher that would call
+-- Scenario.SpawnUnits above -- is deliberately NOT added here. ARCH_15_05_ParamsScenariosType.md
+-- §15.5 OPEN item 2: where per-scenario dispatch/generator code lives under the ratified
+-- three-file split is an unresolved ARCH question. Adding it (even as a no-op stub) would invent an
+-- answer this ticket is not authorized to give.
 
 return Scenario -- inert (Import() ignores a module's `return`, MAP_SCENARIO_SPEC.md §3) -- kept
                 -- only for parity with the live reference's own final line.

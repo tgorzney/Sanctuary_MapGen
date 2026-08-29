@@ -710,18 +710,13 @@
                 "width": 0.0,
                 "height": 0.0
             },
-            "Navy": false,
+            "SpawnsUnits": false,
             "AlloyMode": "occupancy",
             "Spawns": [],
             "Alloys": [],
             "AlloysToAdd": [],
             "AlloysToRemove": [],
-            "AuthoringNote": "",
-            "NavalFleet": {
-                "Fleet": [],
-                "PondSideByArmy": [],
-                "SideBiasDistance": 90.0
-            }
+            "AuthoringNote": ""
         },
         "MaxArmySlotCount": 16
     },

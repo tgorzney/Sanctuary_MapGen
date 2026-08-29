@@ -146,8 +146,18 @@ static void TestRealBundledResourceSelfCheck(const std::string& luaResourceDirec
           "and is never accidentally localized (Import() would silently yield nothing)");
     Check(text.find("function Scenario.ResolveAndApply") != std::string::npos,
           "ResolveAndApply is defined");
-    Check(text.find("function Scenario.SpawnNavalFleets") != std::string::npos,
-          "SpawnNavalFleets is defined");
+    Check(text.find("function Scenario.SpawnUnits") != std::string::npos,
+          "SpawnUnits (the generic executor replacing SpawnNavalFleets) is defined");
+    // STEP204 (naval retirement correction): negative assertions prove the dead naval machinery
+    // was actually removed, not merely supplemented.
+    Check(text.find("SpawnNavalFleets") == std::string::npos,
+          "the retired SpawnNavalFleets function name is gone");
+    Check(text.find("NAVAL_") == std::string::npos,
+          "no NAVAL_* tuning constant survives");
+    Check(text.find("spawnsUnits") != std::string::npos,
+          "the renamed spawnsUnits field is read by ResolveAndApply");
+    Check(text.find("matchedScenario.navy") == std::string::npos,
+          "the retired matchedScenario.navy read is gone");
 
     // (d) TODO(after STEP65 lands): add Sys::CheckLuaSyntax(runtimeLuaText).bSucceeded == true
 

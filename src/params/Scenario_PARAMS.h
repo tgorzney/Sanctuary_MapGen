@@ -24,36 +24,22 @@ struct ScenarioSpawn         { std::string armyName; float positionX = 0.0f, pos
 struct ScenarioAlloyOverride { std::string armyName; std::string markerName; float positionX = 0.0f, positionY = 0.0f, positionZ = 0.0f; };
 struct ScenarioAlloyRemoval  { std::string armyName; std::string markerName; };
 
-// Naval fleet composition, shaped 2026-08-21 from a live read of the reference `SpawnNavalFleets`
-// Lua body (`Pandemonium Isthmus_Scenarios_Script.lua`) — per-scenario, not per-map (§15.5's own
-// ratification bullet). Algorithm tuning constants (NAVAL_BATCH_SIZE etc.) are deliberately NOT
-// here — they belong to the bundled runtime resource, not per-map authored PARAMS.
-struct ScenarioNavalFleetEntry { std::string templateIdentifier; int count = 0; };  // ordered
-                                                        // spawn-batch list, NAVAL_FLEET —
-                                                        // §1.8 tpId->templateIdentifier exception
-enum class ScenarioNavalPondSide : int8_t { West = -1, East = 1 };    // matches the live
-                                                        // reference's own signed convention
-struct ScenarioNavalPondAssignment { std::string armyName; ScenarioNavalPondSide side = ScenarioNavalPondSide::East; };
-                                                        // sparse — an army absent from this list
-                                                        // defaults to East, mirroring the live
-                                                        // reference's own
-                                                        // `NAVAL_POND_SIDE_BY_ARMY[army.name]
-                                                        // or 1` fallback
-struct ScenarioNavalFleet {
-    std::vector<ScenarioNavalFleetEntry>     fleet;              // NAVAL_FLEET
-    std::vector<ScenarioNavalPondAssignment> pondSideByArmy;     // NAVAL_POND_SIDE_BY_ARMY
-    float                                    sideBiasDistance = 90.0f;  // world units,
-                                                                          // NAVAL_SIDE_BIAS_DISTANCE
-};
-
 struct ScenarioBody {
-    std::string name;                                    // log/debug identifier, §5
+    std::string name;                                    // log/debug identifier AND the dispatch
+                                                            // key for unit spawning — see the ARCH
+                                                            // §15.5 OPEN item, MAP_SCENARIO_SPEC §11
     // Reuses Params::MapArea wholesale (§15.5) — but the wire `Area` JSON object is `{x,y,width,
     // height}` only, no nested `name` key (the record's own `Name` is a sibling, not nested).
     // `area.name` is left empty/unused by the importer/exporter; do not "fix" this by populating
     // it from ScenarioBody::name — that would not round-trip (nothing on the wire reads it back).
     Params::MapArea area;
-    bool navy = false;
+    bool spawnsUnits = false;                              // RETIRED 2026-08-28: was `navy` /
+                                                            // `ScenarioNavalFleet navalFleet`
+                                                            // (STEP204, ARCH_15_05 §15.5 amended).
+                                                            // Generic opt-in only: true alone spawns
+                                                            // nothing — a matching name-keyed branch
+                                                            // must also exist in the runtime dispatch
+                                                            // (ARCH_15_05 §15.5 OPEN item 2)
     ScenarioAlloyMode alloyMode = ScenarioAlloyMode::Occupancy;   // RATIFIED default, see below
     std::vector<ScenarioSpawn> spawns;                     // §6 HARD REQUIREMENT — empty is only
                                                             // legal with documented intent
@@ -64,8 +50,6 @@ struct ScenarioBody {
                                                             // intent in the entry's own comment" as
                                                             // real data now that this is no longer
                                                             // hand-authored Lua text
-    ScenarioNavalFleet navalFleet;                          // meaningful only when navy == true;
-                                                            // per-scenario, not per-map
 };
 
 struct PatternScenario { ScenarioBody body; std::string slotPattern; };            // TIER 1

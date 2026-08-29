@@ -46,9 +46,9 @@ inline std::string RenderLuaNumber(int value) { return std::to_string(value); }
 // Shortest round-trip decimal text, chars_format::fixed -- NEVER scientific notation (the world-
 // space coordinates and counts this toolkit renders never need it, and an "e" exponent is not
 // guaranteed to parse identically across Lua 5.1-family dialects). A whole-number value renders
-// with NO decimal point ("90", not "90.0") -- matches the live reference's own literal style
-// (MAP_SCENARIO_SPEC.md §5.1: NAVAL_SIDE_BIAS_DISTANCE = 90). std::to_chars still computes the
-// shortest digit sequence that round-trips to this exact float even in fixed format.
+// with NO decimal point ("90", not "90.0") -- matches the live reference's own numeric-literal
+// style throughout. std::to_chars still computes the shortest digit sequence that round-trips to
+// this exact float even in fixed format.
 inline std::string RenderLuaNumber(float value) {
     char buffer[64];
     const auto result = std::to_chars(buffer, buffer + sizeof(buffer), value, std::chars_format::fixed);

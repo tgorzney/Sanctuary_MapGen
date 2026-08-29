@@ -49,6 +49,9 @@ the platform seam (ARCH §3.3 / §5).
    Load-bearing consequence for format truth: the `.sanmap` stores exactly ONE
    spawn transform per army, shared across every lobby composition, which is why
    `MAP_SCENARIO_SPEC` makes an explicit per-scenario `spawns` table mandatory.
+   `MAP_UNIT_SPAWNING_SPEC` is the companion law for how that script actually spawns
+   units at runtime (deferred `NewThread`, the double-load of `<map>_data.lua`, the
+   `CreateUnit` contract). Read it before answering anything about game-side spawning.
    Design of SanGen's own Import/Export for the scenario `.lua` file is the IO
    Architecture Expert's surface, not yours. **You DO own the follow-up
    `SANMAP_FORMAT_SPEC` Correction for the new `Scenarios` `.sanmap` section**

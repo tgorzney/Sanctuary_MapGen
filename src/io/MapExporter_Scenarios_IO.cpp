@@ -55,24 +55,7 @@ nlohmann::ordered_json BuildAlloyRemovalsJson(const std::vector<Params::Scenario
     return array;
 }
 
-// Always emitted, even when navy == false (empty Fleet/PondSideByArmy arrays, never omitted).
-nlohmann::ordered_json BuildNavalFleetJson(const Params::ScenarioNavalFleet& navalFleet) {
-    nlohmann::ordered_json fleet = nlohmann::ordered_json::array();
-    for (const Params::ScenarioNavalFleetEntry& entry : navalFleet.fleet)
-        fleet.push_back({ { "TemplateIdentifier", entry.templateIdentifier }, { "Count", entry.count } });
-    nlohmann::ordered_json pondSideByArmy = nlohmann::ordered_json::array();
-    for (const Params::ScenarioNavalPondAssignment& assignment : navalFleet.pondSideByArmy) {
-        // Raw signed int (-1/1), NOT a 0-based contiguous index (ticket §4).
-        pondSideByArmy.push_back({ { "ArmyName", assignment.armyName },
-                                   { "Side", static_cast<int>(assignment.side) } });
-    }
-    nlohmann::ordered_json json;
-    json["Fleet"] = fleet; json["PondSideByArmy"] = pondSideByArmy;
-    json["SideBiasDistance"] = navalFleet.sideBiasDistance;
-    return json;
-}
-
-// The shared 10-field `<ScenarioRecord>` body, in the wire's own listed field order — composed by
+// The shared 9-field `<ScenarioRecord>` body, in the wire's own listed field order — composed by
 // all three of PatternScenarios/CountScenarios/DefaultScenario below (mirrors BuildArmiesJson).
 nlohmann::ordered_json BuildScenarioRecordJson(const Params::ScenarioBody& body, int mapSize) {
     nlohmann::ordered_json json;
@@ -81,14 +64,15 @@ nlohmann::ordered_json BuildScenarioRecordJson(const Params::ScenarioBody& body,
     // counterpart here (never emitted — see Scenario_PARAMS.h's own comment on that member).
     json["Area"] = { { "x", body.area.originX }, { "y", body.area.originZ },
                      { "width", body.area.width }, { "height", body.area.length } };
-    json["Navy"]      = body.navy;
-    json["AlloyMode"] = kAlloyModeSpellings[static_cast<int>(body.alloyMode)];
+    // RETIRED 2026-08-28 (STEP204): "Navy" + "NavalFleet" are gone. "SpawnsUnits" is always
+    // present, even when false — matches how every other scalar scenario field is emitted.
+    json["SpawnsUnits"] = body.spawnsUnits;
+    json["AlloyMode"]   = kAlloyModeSpellings[static_cast<int>(body.alloyMode)];
     json["Spawns"]         = BuildSpawnsJson(body.spawns, mapSize);
     json["Alloys"]         = BuildAlloyOverridesJson(body.alloys, mapSize);
     json["AlloysToAdd"]    = BuildAlloyOverridesJson(body.alloysToAdd, mapSize);
     json["AlloysToRemove"] = BuildAlloyRemovalsJson(body.alloysToRemove);
     json["AuthoringNote"]  = body.authoringNote;
-    json["NavalFleet"]     = BuildNavalFleetJson(body.navalFleet);
     return json;
 }
 

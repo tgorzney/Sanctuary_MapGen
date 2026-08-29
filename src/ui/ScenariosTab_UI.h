@@ -14,6 +14,13 @@
 // one of those file boundaries — the only reason this header exists rather than several tiny ones —
 // is declared once, here.
 //
+// RETIRED 2026-08-28 (STEP204): ScenariosTab_DetailNaval_UI.cpp and its
+// DrawScenarioNavalFleetFields entry point are gone — the naval-fleet editor edited a PARAMS shape
+// (`ScenarioNavalFleet`) that no longer exists (ARCH_15_05_ParamsScenariosType.md §15.5). No
+// replacement editor is added here; where the fleet editor used to sit,
+// ScenariosTab_DetailAlloys_UI.cpp now draws nothing (ARCH §15.5 OPEN item 2, not this ticket's to
+// resolve).
+//
 // `previewDriver` is accepted by DrawScenariosTab for interface parity with every other tab but is
 // NEVER called: `recipe.scenarios` feeds no PROC stage, so no edit here trips a dirty flag or
 // requests a regen (Backend policy: N/A).
@@ -139,13 +146,10 @@ void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params
                             ScenarioEditModeState* editModeState, const std::string* patternSlotPattern,
                             const std::vector<Params::ScenarioCountCondition>* countConditions,
                             int maxArmySlotCount);                                   // Detail_UI.cpp
-// alloys/alloysToAdd/alloysToRemove/navalFleet — split out of DrawScenarioBodyFields for the ARCH
-// §1.5 file-size ceiling (called by it, never directly by Lists.cpp).
+// alloys/alloysToAdd/alloysToRemove — split out of DrawScenarioBodyFields for the ARCH §1.5
+// file-size ceiling (called by it, never directly by Lists.cpp).
 void DrawScenarioBodyExtendedFields(Params::ScenarioBody& body,
                                     const std::vector<Params::Army>& armies);         // DetailAlloys.cpp
-// fleet / pondSideByArmy / sideBiasDistance — split out of DetailAlloys.cpp for the same ceiling.
-void DrawScenarioNavalFleetFields(Params::ScenarioNavalFleet& navalFleet,
-                                  const std::vector<Params::Army>& armies);           // DetailNaval.cpp
 
 void DrawScenarioSpawnsWarningBanner(Params::ScenarioBody& body,
                                      const std::vector<Params::Army>& armies);        // SpawnsWarning.cpp

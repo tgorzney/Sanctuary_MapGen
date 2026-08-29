@@ -140,6 +140,11 @@ void Application::WireCallbacks() {
     // SAME vectors the Props/Decals tabs edit — one source of truth, never a second copy.
     canvas.SetManualPropDragSource(&recipe.props, &recipe.propLayers, &recipe.geometry, &recipe);
     canvas.SetManualDecalDragSource(&recipe.decals, &recipe.decalLayers, &recipe.geometry, &recipe);
+    // ARCH §21.8 — the Area canvas gesture's drag source: `recipe.areas`/`tabState.areas.areaColors`/
+    // `tabState.areas.selectedAreaIndex` are the SAME storage the Areas tab itself edits — one source
+    // of truth, never a second copy (this function's own established posture throughout).
+    canvas.SetManualAreaDragSource(&recipe.areas, &tabState.areas.areaColors,
+                                   &tabState.areas.bAreasLocked, &tabState.areas.selectedAreaIndex);
     // STEP126 — the static selection-highlight source; see MapCanvas_UI.h's
     // SetManualMarkerSelectionSource. Points at the SAME MarkersTabState field the Markers tab's own
     // instance-list rows write (tabState.markers.selectedManualInstanceIdentifier) — one source of

@@ -47,6 +47,8 @@ void MapCanvas::Draw(const char* canvasIdentifier, float regionSidePixels) {
     DrawManualMarkerDragPass(regionOrigin.x, regionOrigin.y);
     // STEP207 — the marquee's own rubber-band rectangle, on top of the normal overlay stack.
     DrawMarqueeRectanglePass(regionOrigin.x, regionOrigin.y);
+    // ARCH §21.8 — every Area's fill+border every frame, handles for the selected one only.
+    DrawAreaOverlayPass(regionOrigin.x, regionOrigin.y);
     // STEP78 — Scenario Edit Mode's own overlay, on top of the normal overlay stack.
     DrawScenarioEditModeOverlayPass(regionOrigin.x, regionOrigin.y);
 
@@ -116,7 +118,7 @@ void MapCanvas::DrawMarqueeRectanglePass(float regionOriginX, float regionOrigin
     // A manual-instance drag, once active, owns the whole press exclusively (ARCH §21.2) — never
     // show a marquee box mid-drag.
     const bool bManualDragActive = bManualMarkerDragActive || bManualPropDragActive || bManualDecalDragActive;
-    if (!bPressActive || bManualDragActive) return;
+    if (!bPressActive || bManualDragActive || bAreaDragActive) return;
 
     const ImGuiIO& io = ImGui::GetIO();
     const float currentRegionLocalX = io.MousePos.x - regionOriginX;
@@ -170,7 +172,8 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
     if (ImGui::IsItemActivated()) {
         bPressActive = true; pressTravelPixels = 0.0f;
         pressStartRegionLocalX = regionLocalX; pressStartRegionLocalY = regionLocalY;
-        TryBeginManualInstanceDrag(regionLocalX, regionLocalY);
+        if (!TryBeginManualInstanceDrag(regionLocalX, regionLocalY))
+            TryBeginAreaDrag(regionLocalX, regionLocalY);
     }
     const bool bManualDragActive = bManualMarkerDragActive || bManualPropDragActive || bManualDecalDragActive;
     if (bPressActive && ImGui::IsItemActive()) {
@@ -180,6 +183,7 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
         // then treat every drag, however large, as a zero-travel click.
         pressTravelPixels += std::fabs(io.MouseDelta.x) + std::fabs(io.MouseDelta.y);
         if (bManualDragActive) ContinueManualInstanceDrag(regionLocalX, regionLocalY);
+        else if (bAreaDragActive) ContinueAreaDrag(regionLocalX, regionLocalY, io.KeyShift, io.KeyCtrl);
     }
     if (bPressActive && ImGui::IsItemDeactivated()) {
         bPressActive = false;
@@ -192,6 +196,21 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
             // that never actually moved is a click in disguise (human's own bug report, predates
             // §21.2) — still resolves through the real click path, with live modifier state.
             if (bClick) ApplyClickGesture(regionLocalX, regionLocalY, io.KeyCtrl, io.KeyShift);
+        } else if (bAreaDragActive) {
+            // ARCH §21.8 — a live Area resize/move settles here; it never falls through to
+            // click/marquee resolution (Areas pre-empt that path entirely while its own panel is
+            // active, ruling 5).
+            EndAreaDrag();
+        } else if (AreaGestureEligible()) {
+            // ARCH §21.8 — the Areas panel is active and unlocked, but this press hit neither a
+            // manual instance nor an existing area's handle/body: a real drag creates a new area; a
+            // zero-travel click deselects. Neither ever falls through to ApplyClickGesture/
+            // ApplyMarqueeGesture (ruling 5 — Areas replaces marquee-select for that panel entirely).
+            if (bClick) {
+                if (manualAreaDrag.selectedAreaIndex != nullptr) *manualAreaDrag.selectedAreaIndex = -1;
+            } else {
+                CreateAreaFromDrag(pressStartRegionLocalX, pressStartRegionLocalY, regionLocalX, regionLocalY);
+            }
         } else if (bClick) {
             ApplyClickGesture(regionLocalX, regionLocalY, io.KeyCtrl, io.KeyShift);
         } else {

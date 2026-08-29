@@ -31,7 +31,7 @@ void PopulateFullScenarioBody(Params::ScenarioBody& body, const std::string& nam
     body.name = name;
     body.area.originX = 1.0f; body.area.originZ = 2.0f;
     body.area.width   = 3.0f; body.area.length  = 4.0f;
-    body.navy = true;
+    body.spawnsUnits = true;
     body.alloyMode = Params::ScenarioAlloyMode::Delta;
 
     Params::ScenarioSpawn spawn;
@@ -53,19 +53,6 @@ void PopulateFullScenarioBody(Params::ScenarioBody& body, const std::string& nam
     body.alloysToRemove.push_back(alloyToRemove);
 
     body.authoringNote = "Deliberately non-empty authoring note for " + name;
-
-    Params::ScenarioNavalFleetEntry fleetEntryOne;
-    fleetEntryOne.templateIdentifier = "XSS0201"; fleetEntryOne.count = 2;
-    Params::ScenarioNavalFleetEntry fleetEntryTwo;
-    fleetEntryTwo.templateIdentifier = "XSS0103"; fleetEntryTwo.count = 1;
-    body.navalFleet.fleet.push_back(fleetEntryOne);
-    body.navalFleet.fleet.push_back(fleetEntryTwo);
-
-    Params::ScenarioNavalPondAssignment pondAssignment;
-    pondAssignment.armyName = "ArmyOne"; pondAssignment.side = Params::ScenarioNavalPondSide::West;
-    body.navalFleet.pondSideByArmy.push_back(pondAssignment);
-
-    body.navalFleet.sideBiasDistance = 123.5f;
 }
 
 void CheckScenarioBodyEquals(const Params::ScenarioBody& original, const Params::ScenarioBody& loaded,
@@ -76,7 +63,7 @@ void CheckScenarioBodyEquals(const Params::ScenarioBody& original, const Params:
           && NearlyEqual(loaded.area.width, original.area.width)
           && NearlyEqual(loaded.area.length, original.area.length),
           (label + " area {x,y,width,height} survives").c_str());
-    Check(loaded.navy == original.navy, (label + " navy survives").c_str());
+    Check(loaded.spawnsUnits == original.spawnsUnits, (label + " spawnsUnits survives").c_str());
     Check(loaded.alloyMode == original.alloyMode, (label + " alloyMode survives").c_str());
 
     Check(loaded.spawns.size() == original.spawns.size() && loaded.spawns.size() == 1,
@@ -102,13 +89,6 @@ void CheckScenarioBodyEquals(const Params::ScenarioBody& original, const Params:
           (label + " one alloysToRemove entry survives").c_str());
 
     Check(loaded.authoringNote == original.authoringNote, (label + " authoringNote survives").c_str());
-
-    Check(loaded.navalFleet.fleet.size() == 2, (label + " navalFleet.fleet keeps both entries").c_str());
-    Check(loaded.navalFleet.pondSideByArmy.size() == 1
-          && loaded.navalFleet.pondSideByArmy[0].side == Params::ScenarioNavalPondSide::West,
-          (label + " navalFleet.pondSideByArmy keeps its West entry").c_str());
-    Check(NearlyEqual(loaded.navalFleet.sideBiasDistance, original.navalFleet.sideBiasDistance),
-          (label + " navalFleet.sideBiasDistance survives (non-default)").c_str());
 }
 
 Params::MapRecipe BuildFixtureRecipe() {
@@ -250,6 +230,76 @@ void RunAlloyModeAbsentDefaultsTest() {
     Check(result.warningCount == 0, "absent AlloyMode alone logs no warning");
 }
 
+// STEP204 §8 item 1: spawnsUnits round-trips true AND false through .sanmap export->import.
+void RunSpawnsUnitsRoundTripBothStatesTest() {
+    for (const bool bSpawnsUnits : { true, false }) {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        recipe.scenarios.defaultScenario.name = "SpawnsUnitsCase";
+        recipe.scenarios.defaultScenario.spawnsUnits = bSpawnsUnits;
+
+        const std::string documentText = Io::MapExporter::BuildSanmapJsonText(recipe);
+        Params::MapRecipe loaded;
+        Io::MapImportOptions options;
+        Io::MapImportResult result;
+        const bool bParsed = Io::MapImporter::ParseSanmapJsonText(documentText, loaded, options, result);
+        Check(bParsed, "spawnsUnits round trip: document parses");
+        Check(loaded.scenarios.defaultScenario.spawnsUnits == bSpawnsUnits,
+              bSpawnsUnits ? "spawnsUnits = true round trips" : "spawnsUnits = false round trips");
+    }
+}
+
+// STEP204 §8 item 2 -- THE HUMAN'S RULING, PINNED. A legacy .sanmap authored before STEP204,
+// carrying the retired "Navy"/"NavalFleet" (+ nested "PondSideByArmy"/"Side") keys, imports
+// cleanly, silently drops that content (no error, no warning, no translation), and yields
+// spawnsUnits == false (the struct default -- "SpawnsUnits" is simply absent from this fixture,
+// exactly like every pre-STEP204 export).
+void RunLegacyNavalFleetFixtureDroppedTest() {
+    nlohmann::ordered_json document;
+    nlohmann::ordered_json legacyDefaultScenario;
+    legacyDefaultScenario["Name"] = "LegacyScenario";
+    legacyDefaultScenario["Area"] = { { "x", 0.0 }, { "y", 0.0 }, { "width", 0.0 }, { "height", 0.0 } };
+    legacyDefaultScenario["Navy"] = true;   // retired flag -- must NOT set spawnsUnits
+    legacyDefaultScenario["AlloyMode"] = "occupancy";
+    legacyDefaultScenario["Spawns"] = nlohmann::json::array();
+    legacyDefaultScenario["Alloys"] = nlohmann::json::array();
+    legacyDefaultScenario["AlloysToAdd"] = nlohmann::json::array();
+    legacyDefaultScenario["AlloysToRemove"] = nlohmann::json::array();
+    legacyDefaultScenario["AuthoringNote"] = "";
+    nlohmann::ordered_json legacyNavalFleet;
+    legacyNavalFleet["Fleet"] = { { { "TemplateIdentifier", "XSS0201" }, { "Count", 3 } } };
+    legacyNavalFleet["PondSideByArmy"] = { { { "ArmyName", "ArmyOne" }, { "Side", -1 } } };
+    legacyNavalFleet["SideBiasDistance"] = 90.0;
+    legacyDefaultScenario["NavalFleet"] = legacyNavalFleet;
+    document["Scenarios"]["PatternScenarios"] = nlohmann::json::array();
+    document["Scenarios"]["CountScenarios"]   = nlohmann::json::array();
+    document["Scenarios"]["DefaultScenario"]  = legacyDefaultScenario;
+
+    Params::MapRecipe loaded;
+    loaded.geometry.mapSize = 512;
+    Io::MapImportResult result;
+    Io::ReadScenariosJson(document, loaded, result);
+
+    Check(loaded.scenarios.defaultScenario.name == "LegacyScenario",
+          "legacy fixture: ordinary fields still import normally");
+    Check(loaded.scenarios.defaultScenario.spawnsUnits == false,
+          "legacy fixture: spawnsUnits defaults to false -- legacy Navy=true is dropped, not translated");
+    Check(result.warningCount == 0,
+          "legacy fixture: the retired Navy/NavalFleet keys are dropped silently -- zero warnings");
+}
+
+// STEP204 §8 item 3: negative assertions -- exported output never contains retired naval spellings.
+void RunNoNavalSpellingsInOutputTest() {
+    Params::MapRecipe recipe = BuildFixtureRecipe();
+    const std::string documentText = Io::MapExporter::BuildSanmapJsonText(recipe);
+
+    Check(documentText.find("NavalFleet") == std::string::npos, "export: no \"NavalFleet\" key anywhere");
+    Check(documentText.find("\"Navy\"") == std::string::npos, "export: no \"Navy\" key anywhere");
+    Check(documentText.find("PondSideByArmy") == std::string::npos, "export: no \"PondSideByArmy\" key anywhere");
+    Check(documentText.find("SpawnsUnits") != std::string::npos,
+          "export: \"SpawnsUnits\" IS present (the replacement field)");
+}
+
 // 7. Live-document integration: BuildSanmapJsonText then ParseSanmapJsonText.
 void RunLiveDocumentIntegrationTest() {
     const Params::MapRecipe original = BuildFixtureRecipe();
@@ -284,6 +334,9 @@ int main() {
     RunAbsentKeyDefaultsTest();
     RunMalformedArrayWarningTest();
     RunAlloyModeAbsentDefaultsTest();
+    RunSpawnsUnitsRoundTripBothStatesTest();
+    RunLegacyNavalFleetFixtureDroppedTest();
+    RunNoNavalSpellingsInOutputTest();
     RunLiveDocumentIntegrationTest();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

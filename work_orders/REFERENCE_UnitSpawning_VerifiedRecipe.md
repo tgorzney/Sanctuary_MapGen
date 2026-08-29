@@ -1,5 +1,40 @@
 # REFERENCE — unit-spawning recipe (Sanctuary engine, per-map Lua)
 
+> # 🕮 HISTORICAL — SUPERSEDED 2026-08-28 by `sangen_arch_pack/specs/MAP_UNIT_SPAWNING_SPEC.md`
+>
+> **Do not use this file as the recipe. Use `MAP_UNIT_SPAWNING_SPEC.md`.** That spec is the
+> authoritative, source-cited mechanism (load/execution chain, the double-execution hazard,
+> `Import()` semantics, the one-`NewThread` rule, the `CreateUnit` contract, position validation,
+> diagnostics, known-good `tpId`s), and `MAP_SCENARIO_SPEC.md` §15 names it as such.
+>
+> **This file is kept as the investigation record** — the evidence-tiering discipline below
+> ([OBSERVED]/[CLAIMED]/[UNVERIFIED]) is the part still worth reading, and §7's diff table records
+> what the `.bak` did that current code does not. It is **not** being edited to track the spec;
+> where the two disagree, the spec wins.
+>
+> **Known contradictions with the spec, so nobody acts on the stale version:**
+> - **§2 / §2a / §7's "army index from `pairs(Armies)` is the prime suspect" is resolved and the
+>   stated mechanism was wrong.** `MAP_UNIT_SPAWNING_SPEC.md` §5: `CreateArmies` builds an army for
+>   **every** map slot, not only filled ones — so `Armies[1]` *does* exist in a slots-5-and-6
+>   lobby, and a hardcoded `CreateUnit(1, ...)` does not fail; it hands the units to an **unowned,
+>   empty-slot army**. The rule (never hardcode an index; use `pairs(Armies)` keys and skip empty
+>   slots) survives; §2a's explanation of *why* does not, and §7's "⚠️ unproven — prime suspect"
+>   row is retracted.
+> - **§4/§7's "only ONE `NewThread` per script is honored" is downgraded.** Spec §4: no mechanism
+>   in `threads.lua` drops a second registration; treat it as a safe convention with an
+>   unidentified cause, not an explained rule.
+> - **§2a item 4's unexplained doubled BigBots is explained.** Spec §2: `<map>_data.lua` executes
+>   **twice per host state** (two callers spell the `Import` path differently, so the cache misses)
+>   — confirmed live with a run-counter probe.
+> - **§1's `ok AND unit` check stands, but its rationale is corrected.** Spec §5: there is no path
+>   in `unitsUtilities.lua` that returns a falsy value — the function throws or returns a unit.
+>   Keep the check; drop the "silent falsy return is a known failure mode" claim.
+> - **The naval vocabulary throughout (§3, §4, §6, §7) is historical.**
+>   `Scenario.SpawnNavalFleets` and every `NAVAL_*` constant were deleted by the 2026-08-27
+>   rewrite; `ARCH_15_05_ParamsScenariosType.md` retires the matching PARAMS family. Where this
+>   file discusses naval-vs-land placement it is describing the `.bak`'s algorithm, not any
+>   current code path.
+
 > ## ⚠️ READ THIS FIRST — CORRECTED 2026-08-28. The evidence base is much weaker than the first
 > ## draft of this file claimed.
 >
@@ -207,4 +242,5 @@ Current `slots5to8AnyFilled` spawner vs. the verified recipe:
 5. **Always emit a visible on-map failure signal.** `Log()` is not a diagnostic in this build.
 6. **One `NewThread` per script**, and spawn inside the active playable area.
 7. **Test with an AI player present**, not only all-human — the `lobbyOptions` bug hid for a long
-   time precisely because `navy` was only ever true on an all-human composition.
+   time precisely because the unit-spawn opt-in (`spawnsUnits`; the retired `navy` at the time)
+   was only ever true on an all-human composition.
