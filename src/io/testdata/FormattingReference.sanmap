@@ -710,6 +710,7 @@
                 "width": 0.0,
                 "height": 0.0
             },
+            "AreaName": "",
             "SpawnsUnits": false,
             "AlloyMode": "occupancy",
             "Spawns": [],

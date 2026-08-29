@@ -33,6 +33,13 @@ struct ScenarioBody {
     // `area.name` is left empty/unused by the importer/exporter; do not "fix" this by populating
     // it from ScenarioBody::name — that would not round-trip (nothing on the wire reads it back).
     Params::MapArea area;
+    std::string areaName;                                  // empty (default) = "use area directly" --
+                                                            // today's exact behavior, fully backward
+                                                            // compatible. Non-empty names a live
+                                                            // Params::MapArea::name in recipe.areas,
+                                                            // resolved into the wire Area/area rect AT
+                                                            // EXPORT TIME ONLY (ARCH_15_05_ParamsScenariosType.md
+                                                            // §15.5, "AMENDED 2026-08-28").
     bool spawnsUnits = false;                              // RETIRED 2026-08-28: was `navy` /
                                                             // `ScenarioNavalFleet navalFleet`
                                                             // (STEP204, ARCH_15_05 §15.5 amended).

@@ -38,6 +38,18 @@ float FlipPositionZ(float positionZ, int mapSize) {
     return static_cast<float>(mapSize) - positionZ - 1.0f;
 }
 
+// Duplicate of MapExporter_Scenarios_IO.cpp's own ResolveScenarioAreaRect (STEP209) -- this file
+// never #includes that one (established precedent, see this file's own top-of-file note on
+// kScenarioAlloyModeSpellings). Resolves body.areaName against `areas` (first-match by .name);
+// empty or stale falls back to body.area unchanged.
+Params::MapArea ResolveScenarioAreaRect(const Params::ScenarioBody& body,
+                                        const std::vector<Params::MapArea>& areas) {
+    if (body.areaName.empty()) return body.area;
+    for (const Params::MapArea& area : areas)
+        if (area.name == body.areaName) return area;
+    return body.area;
+}
+
 // One flat `armyName = "...", x = ..., y = ..., z = ...` row for a spawns/alloys/alloysToAdd entry.
 // `markerName` is only appended when non-null (spawns carry no marker; alloys/alloysToAdd do).
 std::string BuildPositionedRowBody(const std::string& armyName, const std::string* markerName,
@@ -86,14 +98,19 @@ std::vector<std::string> BuildAlloyRemovalRowBodies(const std::vector<Params::Sc
 // table (the caller opens/closes the outer `{ ... }`; this only fills it). Field order mirrors
 // STEP69 §6's JSON emission order for direct cross-reference. Lua keys are lowerCamelCase mirroring
 // the C++ member names -- NOT the JSON's PascalCase spellings.
-void AppendScenarioBodyFields(std::string& out, int indentLevel, const Params::ScenarioBody& body, int mapSize) {
+void AppendScenarioBodyFields(std::string& out, int indentLevel, const Params::ScenarioBody& body,
+                              int mapSize, const std::vector<Params::MapArea>& areas) {
     AppendKeyValueLine(out, indentLevel, "name", QuotedLuaString(body.name));
 
+    // Resolved against recipe.areas when body.areaName names a live entry (STEP209 §5); falls back
+    // to body.area otherwise. No `areaName`/`AreaName` key is ever rendered here -- only the four
+    // rectangle numbers change source (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-08-28).
+    const Params::MapArea resolvedArea = ResolveScenarioAreaRect(body, areas);
     OpenTable(out, indentLevel, "area");
-    AppendKeyValueLine(out, indentLevel + 1, "x", RenderLuaNumber(body.area.originX));
-    AppendKeyValueLine(out, indentLevel + 1, "y", RenderLuaNumber(body.area.originZ));
-    AppendKeyValueLine(out, indentLevel + 1, "width", RenderLuaNumber(body.area.width));
-    AppendKeyValueLine(out, indentLevel + 1, "height", RenderLuaNumber(body.area.length));
+    AppendKeyValueLine(out, indentLevel + 1, "x", RenderLuaNumber(resolvedArea.originX));
+    AppendKeyValueLine(out, indentLevel + 1, "y", RenderLuaNumber(resolvedArea.originZ));
+    AppendKeyValueLine(out, indentLevel + 1, "width", RenderLuaNumber(resolvedArea.width));
+    AppendKeyValueLine(out, indentLevel + 1, "height", RenderLuaNumber(resolvedArea.length));
     CloseTable(out, indentLevel, true);
 
     // RETIRED 2026-08-28 (STEP204): "navy"/"navalFleet" are gone. The Lua key spelling
@@ -118,14 +135,15 @@ void AppendScenarioBodyFields(std::string& out, int indentLevel, const Params::S
 // each element is opened/closed manually with OpenTable/CloseTable, still composing nothing but
 // STEP63's primitives.
 
-std::string BuildPatternScenariosTable(const std::vector<Params::PatternScenario>& patternScenarios, int mapSize) {
+std::string BuildPatternScenariosTable(const std::vector<Params::PatternScenario>& patternScenarios,
+                                       int mapSize, const std::vector<Params::MapArea>& areas) {
     std::string out;
     OpenTable(out, 0, "PATTERN_SCENARIOS");
     for (const Params::PatternScenario& entry : patternScenarios) {
         OpenTable(out, 1, "");
         // Lua key "pattern" -- matches MAP_SCENARIO_SPEC.md §4's scenario.pattern, NOT slotPattern.
         AppendKeyValueLine(out, 1, "pattern", QuotedLuaString(entry.slotPattern));
-        AppendScenarioBodyFields(out, 1, entry.body, mapSize);
+        AppendScenarioBodyFields(out, 1, entry.body, mapSize, areas);
         CloseTable(out, 1, true);
     }
     CloseTable(out, 0, false);
@@ -134,7 +152,8 @@ std::string BuildPatternScenariosTable(const std::vector<Params::PatternScenario
 
 // ⚠️ Load-bearing: iterates countScenarios in the std::vector's own order, one for loop, no
 // staging/sorting container of any kind (ARCH_15_06_CountScenariosOrdering.md §15.6).
-std::string BuildCountScenariosTable(const std::vector<Params::CountScenario>& countScenarios, int mapSize) {
+std::string BuildCountScenariosTable(const std::vector<Params::CountScenario>& countScenarios, int mapSize,
+                                     const std::vector<Params::MapArea>& areas) {
     std::string out;
     OpenTable(out, 0, "COUNT_SCENARIOS");
     for (const Params::CountScenario& entry : countScenarios) {
@@ -153,7 +172,7 @@ std::string BuildCountScenariosTable(const std::vector<Params::CountScenario>& c
         }
         AppendArrayOfTables(out, 2, "conditions", conditionRows);
 
-        AppendScenarioBodyFields(out, 1, entry.body, mapSize);
+        AppendScenarioBodyFields(out, 1, entry.body, mapSize, areas);
         CloseTable(out, 1, true);
     }
     CloseTable(out, 0, false);
@@ -162,10 +181,11 @@ std::string BuildCountScenariosTable(const std::vector<Params::CountScenario>& c
 
 // DEFAULT_SCENARIO is one record, not a list (ARCH_15_06_CountScenariosOrdering.md §15.6: only
 // countScenarios carries an ordering requirement).
-std::string BuildDefaultScenarioTable(const Params::ScenarioBody& body, int mapSize) {
+std::string BuildDefaultScenarioTable(const Params::ScenarioBody& body, int mapSize,
+                                      const std::vector<Params::MapArea>& areas) {
     std::string out;
     OpenTable(out, 0, "DEFAULT_SCENARIO");
-    AppendScenarioBodyFields(out, 1, body, mapSize);
+    AppendScenarioBodyFields(out, 1, body, mapSize, areas);
     CloseTable(out, 0, false);
     return out;
 }
@@ -273,11 +293,11 @@ std::string BuildScenarioDataLuaText(const Params::MapRecipe& recipe) {
     out += BuildArmyIdToNameTable(recipe.armies) + "\n";
     out += BuildKnownAlloyMarkersTable(scenarios) + "\n";
 
-    out += BuildPatternScenariosTable(scenarios.patternScenarios, mapSize);
+    out += BuildPatternScenariosTable(scenarios.patternScenarios, mapSize, recipe.areas);
     out += "\n";
-    out += BuildCountScenariosTable(scenarios.countScenarios, mapSize);
+    out += BuildCountScenariosTable(scenarios.countScenarios, mapSize, recipe.areas);
     out += "\n";
-    out += BuildDefaultScenarioTable(scenarios.defaultScenario, mapSize);
+    out += BuildDefaultScenarioTable(scenarios.defaultScenario, mapSize, recipe.areas);
 
     return out;
 }

@@ -5,6 +5,7 @@
 #include "FilesystemPrimitives_IO.h"
 #include "MapExporter_ArmySpawnMarkerValidation_IO.h"
 #include "MapExporter_BlueprintValidation_IO.h"
+#include "MapExporter_ScenarioAreaNameValidation_IO.h"
 #include "MapExporter_Recipe_IO.h"
 #include "UnknownImportBag_IO.h"
 #include "../data/MapFields_DATA.h"
@@ -13,6 +14,17 @@
 namespace SanmapGen {
 namespace Io {
 namespace {
+
+// STEP209 -- warn, never block. A stale ScenarioBody::areaName is a legal, tolerated state (the named
+// Area was renamed/deleted after the scenario picked it) -- ARCH_15_05_ParamsScenariosType.md §15.5
+// AMENDED 2026-08-28 rules "never crash, never emit garbage", exporting the scenario's own last-known
+// rectangle instead. This function only reports. Defined ahead of WriteSanmapDocument (its one caller
+// inside this translation unit) since it is called from there.
+void ReportScenarioAreaNameReferences(const Params::MapRecipe& recipe, MapExportResult& result) {
+    const ScenarioAreaNameValidationReport report = ValidateScenarioAreaNameReferences(recipe);
+    if (report.AllReferencesResolve()) return;
+    result.Warn(report.SummaryText());
+}
 
 bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe& recipe,
                          const MapExportOptions& options, MapExportResult& result,
@@ -23,6 +35,7 @@ bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe&
     // before the document is even assembled, and `result` is already the sink the Files tab's log
     // panel reads.
     CheckArmyIdentitiesWellFormed(recipe.armies, result);
+    ReportScenarioAreaNameReferences(recipe, result);
 
     // The output file name matches the document's own `mapName` (STEP25_MapNameCredits_IO moved
     // this off `MapExportOptions` onto the recipe — it is real, importable document content, not an

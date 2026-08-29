@@ -11,6 +11,7 @@
 //
 // Constitution §8: alloyMode's four labels each carry a real consequence card, per Fix §5.
 #include "ScenariosTab_UI.h"
+#include "AreasTab_List_UI.h"
 #include "ArmiesTab_UI.h"
 #include "Checkbox_UI.h"
 #include "Combo_UI.h"
@@ -57,15 +58,51 @@ void DrawArmyNameField(const char* label, std::string& armyNameKey, const std::v
         armyNameKey = armies[static_cast<std::size_t>(selectedIndex)].name;
 }
 
-// `area.name` is never shown/edited (STEP69 §1: no JSON counterpart, must stay empty) — only the
-// four rectangle scalars are drawn, same per-field pattern AreasTab_UI uses.
-void DrawScenarioAreaFields(Params::MapArea& area) {
+// The Combo is NOT DrawArmyNameField's exact shape: empty areaName is a real, permanent, authored
+// state here ("this scenario owns its own private rectangle"), unlike DrawArmyNameField's transient
+// "not chosen yet" -- so this needs one extra leading sentinel entry DrawArmyNameField does not have
+// (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-08-28).
+void DrawScenarioAreaFields(Params::ScenarioBody& body, const std::vector<Params::MapArea>& areas) {
+    std::vector<const char*> labels;
+    labels.reserve(areas.size() + 1u);
+    labels.push_back("-- Custom (no Area reference) --");
+    int selectedIndex = body.areaName.empty() ? 0 : -1;   // -1 = stale reference, matches
+                                                          // DrawArmyNameField's own no-match idiom
+    for (std::size_t index = 0u; index < areas.size(); ++index) {
+        labels.push_back(AreaRowLabel(areas[index]));
+        if (!body.areaName.empty() && areas[index].name == body.areaName)
+            selectedIndex = static_cast<int>(index) + 1;
+    }
+    ComboOptions options; options.labels = labels.data(); options.count = static_cast<int>(labels.size());
+    if (DrawCombo("Reference Area", selectedIndex, options).bCommitted) {
+        if (selectedIndex == 0) {
+            body.areaName.clear();
+        } else if (selectedIndex > 0) {
+            const Params::MapArea& picked = areas[static_cast<std::size_t>(selectedIndex - 1)];
+            body.areaName = picked.name;
+            // Live-preview copy: the four rect scalars only -- NEVER picked.name (Scenario_PARAMS.h's
+            // own comment: area.name is never populated/read anywhere on the wire; leaving it alone
+            // keeps that invariant true after a Combo pick, not just at default-construction).
+            body.area.originX = picked.originX;
+            body.area.originZ = picked.originZ;
+            body.area.width   = picked.width;
+            body.area.length  = picked.length;
+        }
+    }
+
+    // Read-only while referenced (ARCH ruling: rejected alternative was editable-with-silent-clear-
+    // on-edit -- a slider nudge silently detaching a scenario from its named Area is worse than a
+    // slider that visibly refuses input). Sliders stay VISIBLE (never hidden) so resolved numbers are
+    // never a black box -- only interaction is disabled.
+    const bool bReferenced = !body.areaName.empty();
+    ImGui::BeginDisabled(bReferenced);
     const ScalarSliderRange range = ScenarioWorldPositionRange();
     RealtimeToggle originXToggle, originZToggle, widthToggle, lengthToggle;
-    DrawSliderScalar("Area Origin X", area.originX, range, originXToggle, WidgetStyle(), "%.1f");
-    DrawSliderScalar("Area Origin Z", area.originZ, range, originZToggle, WidgetStyle(), "%.1f");
-    DrawSliderScalar("Area Width", area.width, range, widthToggle, WidgetStyle(), "%.1f");
-    DrawSliderScalar("Area Length", area.length, range, lengthToggle, WidgetStyle(), "%.1f");
+    DrawSliderScalar("Area Origin X", body.area.originX, range, originXToggle, WidgetStyle(), "%.1f");
+    DrawSliderScalar("Area Origin Z", body.area.originZ, range, originZToggle, WidgetStyle(), "%.1f");
+    DrawSliderScalar("Area Width", body.area.width, range, widthToggle, WidgetStyle(), "%.1f");
+    DrawSliderScalar("Area Length", body.area.length, range, lengthToggle, WidgetStyle(), "%.1f");
+    ImGui::EndDisabled();
 }
 
 void DrawScenarioAlloyModeField(Params::ScenarioBody& body) {
@@ -130,6 +167,7 @@ void DrawScenarioEditModeToggle(Params::ScenarioBody& body, ScenarioEditModeStat
 } // namespace
 
 void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params::Army>& armies,
+                            const std::vector<Params::MapArea>& areas,
                             ScenarioEditModeState* editModeState, const std::string* patternSlotPattern,
                             const std::vector<Params::ScenarioCountCondition>* countConditions,
                             int maxArmySlotCount) {
@@ -137,7 +175,7 @@ void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params
     DrawTextInput("Name", body.name, nameRules);
     DrawScenarioEditModeToggle(body, editModeState, patternSlotPattern, countConditions, maxArmySlotCount);
     ImGui::SeparatorText("Area");
-    DrawScenarioAreaFields(body.area);
+    DrawScenarioAreaFields(body, areas);
     DrawCheckbox("Spawns Units", body.spawnsUnits);
     // Two-step opt-in, load-bearing to say out loud (ARCH_15_05_ParamsScenariosType.md §15.5,
     // MAP_SCENARIO_SPEC.md §11): this checkbox alone spawns nothing. A matching name-keyed branch

@@ -143,6 +143,7 @@ void DrawScenarioCountConditionsEditor(std::vector<Params::ScenarioCountConditio
 // pattern seeds "Preview As" verbatim), else Tier 2's `countConditions` (nullptr = Tier 3, "always
 // matches") drives synthesis instead — see ScenarioEditModeState::Activate's own comment.
 void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params::Army>& armies,
+                            const std::vector<Params::MapArea>& areas,
                             ScenarioEditModeState* editModeState, const std::string* patternSlotPattern,
                             const std::vector<Params::ScenarioCountCondition>* countConditions,
                             int maxArmySlotCount);                                   // Detail_UI.cpp

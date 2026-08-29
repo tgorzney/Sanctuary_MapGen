@@ -86,6 +86,9 @@ void ReadScenarioBodyJson(const nlohmann::json& json, Params::ScenarioBody& body
         ReadJsonFloat(area, "width", body.area.width);
         ReadJsonFloat(area, "height", body.area.length);
     }
+    // Absent key (every pre-STEP209 .sanmap) -> stays at the struct default, empty. Never an error --
+    // same idiom as every other plain string field in this function (e.g. AuthoringNote, below).
+    ReadJsonText(json, "AreaName", body.areaName);
     // Absent key (every pre-STEP204 .sanmap) -> stays at the struct default, false. Never an error.
     ReadJsonBoolean(json, "SpawnsUnits", body.spawnsUnits);
     // `body` is pre-loaded (default-constructed = Occupancy) before this call — an absent/

@@ -279,6 +279,25 @@ static void TestFolderAutoCreation() {
     Check(FileExists(mapScriptDirectory), "auto-creation: the folder now exists");
 }
 
+// STEP209 item 16 -- wiring: a stale ScenarioBody::areaName logs via result.Log (this type has no
+// Warn/warningCount, only Log/debugLog, per its own struct shape).
+static void TestStaleAreaNameLogsViaResultLog() {
+    const std::string root = ScratchFolderPath("StaleAreaName_Root");
+    MakeValidGameInstallRoot(root);
+    const std::string bundledDirectory = MakeValidBundledRuntimeDirectory("StaleAreaName_Bundled");
+    Params::MapRecipe recipe = MakeRecipe("TestMap10");
+    recipe.scenarios.defaultScenario.name = "StaleAreaNameScenario";
+    recipe.scenarios.defaultScenario.areaName = "GhostArea";
+
+    const Io::ScenarioExportResult result = Io::ExportMapScenario(root, recipe, bundledDirectory, "");
+
+    Check(result.bDataLuaWritten, "stale areaName: Data.lua still writes cleanly (warn, never block)");
+    Check(result.debugLog.find("StaleAreaNameScenario") != std::string::npos,
+          "stale areaName: debugLog names the scenario");
+    Check(result.debugLog.find("GhostArea") != std::string::npos,
+          "stale areaName: debugLog names the missing areaName");
+}
+
 int main() {
     TestInvalidRootReturnsAllDefaultsAndTouchesNothing();
     TestCleanExportFreshFolder();
@@ -289,6 +308,7 @@ int main() {
     TestRuntimeSyntaxCheckRefusalDoesNotBlockDataLua();
     TestRuntimeResolutionFailureDoesNotBlockDataLua();
     TestFolderAutoCreation();
+    TestStaleAreaNameLogsViaResultLog();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

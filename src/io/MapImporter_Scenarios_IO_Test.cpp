@@ -325,6 +325,131 @@ void RunLiveDocumentIntegrationTest() {
     CheckScenarioBodyEquals(original.scenarios.defaultScenario, loaded.scenarios.defaultScenario,
                             "live document DefaultScenario");
     Check(loaded.scenarios.maxArmySlotCount == 20, "live document: MaxArmySlotCount round trips");
+
+    // STEP209 item 7 -- full round trip via the live document path: a scenario carrying a resolved
+    // areaName survives end to end (ScenarioBody::areaName itself, not just the resolved numbers,
+    // which items 1-4 below already cover via the pure BuildScenariosJson/ReadScenariosJson path).
+    Params::MapRecipe areaNameRecipe;
+    areaNameRecipe.geometry.mapSize = 512;
+    Params::MapArea namedArea; namedArea.name = "Foo";
+    namedArea.originX = 5.0f; namedArea.originZ = 6.0f; namedArea.width = 7.0f; namedArea.length = 8.0f;
+    areaNameRecipe.areas.push_back(namedArea);
+    areaNameRecipe.scenarios.defaultScenario.name = "AreaNameCase";
+    areaNameRecipe.scenarios.defaultScenario.areaName = "Foo";
+
+    const std::string areaNameDocumentText = Io::MapExporter::BuildSanmapJsonText(areaNameRecipe);
+    Params::MapRecipe areaNameLoaded;
+    Io::MapImportOptions areaNameOptions;
+    Io::MapImportResult areaNameResult;
+    const bool bAreaNameParsed = Io::MapImporter::ParseSanmapJsonText(areaNameDocumentText, areaNameLoaded,
+                                                                      areaNameOptions, areaNameResult);
+    Check(bAreaNameParsed, "live document (areaName): document parses");
+    Check(areaNameLoaded.scenarios.defaultScenario.areaName == "Foo",
+          "live document (areaName): ScenarioBody::areaName survives end to end");
+}
+
+// STEP209 -- ScenarioBody::areaName's export-time resolution, fallback, and round trip.
+void RunScenarioAreaNameTests() {
+    // Item 1: hit resolves correctly, NOT the stale area values.
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        Params::MapArea foo; foo.name = "Foo";
+        foo.originX = 5.0f; foo.originZ = 6.0f; foo.width = 7.0f; foo.length = 8.0f;
+        recipe.areas.push_back(foo);
+        recipe.scenarios.defaultScenario.areaName = "Foo";
+        recipe.scenarios.defaultScenario.area.originX = 0.0f; recipe.scenarios.defaultScenario.area.originZ = 0.0f;
+        recipe.scenarios.defaultScenario.area.width   = 0.0f; recipe.scenarios.defaultScenario.area.length  = 0.0f;
+
+        const nlohmann::ordered_json json = Io::BuildScenariosJson(recipe);
+        const nlohmann::ordered_json& area = json["DefaultScenario"]["Area"];
+        Check(NearlyEqual(area["x"].get<float>(), 5.0f) && NearlyEqual(area["y"].get<float>(), 6.0f)
+              && NearlyEqual(area["width"].get<float>(), 7.0f) && NearlyEqual(area["height"].get<float>(), 8.0f),
+              "areaName hit: exported Area resolves to the named Area's values, not the stale zeros");
+        Check(json["DefaultScenario"]["AreaName"].get<std::string>() == "Foo",
+              "areaName hit: AreaName is emitted verbatim");
+    }
+
+    // Item 2: empty areaName behaves identically to today.
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        recipe.scenarios.defaultScenario.area.originX = 1.0f; recipe.scenarios.defaultScenario.area.originZ = 2.0f;
+        recipe.scenarios.defaultScenario.area.width   = 3.0f; recipe.scenarios.defaultScenario.area.length  = 4.0f;
+
+        const nlohmann::ordered_json json = Io::BuildScenariosJson(recipe);
+        const nlohmann::ordered_json& area = json["DefaultScenario"]["Area"];
+        Check(NearlyEqual(area["x"].get<float>(), 1.0f) && NearlyEqual(area["y"].get<float>(), 2.0f)
+              && NearlyEqual(area["width"].get<float>(), 3.0f) && NearlyEqual(area["height"].get<float>(), 4.0f),
+              "empty areaName: exported Area == body.area verbatim");
+        Check(json["DefaultScenario"]["AreaName"].get<std::string>().empty(),
+              "empty areaName: AreaName is emitted as an empty string");
+    }
+
+    // Item 3: unresolvable/stale falls back to body.area, and the name is kept (never cleared).
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        recipe.scenarios.defaultScenario.areaName = "DoesNotExist";
+        recipe.scenarios.defaultScenario.area.originX = 9.0f; recipe.scenarios.defaultScenario.area.originZ = 10.0f;
+        recipe.scenarios.defaultScenario.area.width   = 11.0f; recipe.scenarios.defaultScenario.area.length = 12.0f;
+
+        const nlohmann::ordered_json json = Io::BuildScenariosJson(recipe);
+        const nlohmann::ordered_json& area = json["DefaultScenario"]["Area"];
+        Check(NearlyEqual(area["x"].get<float>(), 9.0f) && NearlyEqual(area["y"].get<float>(), 10.0f)
+              && NearlyEqual(area["width"].get<float>(), 11.0f) && NearlyEqual(area["height"].get<float>(), 12.0f),
+              "stale areaName: exported Area falls back to body.area's own values verbatim");
+        Check(json["DefaultScenario"]["AreaName"].get<std::string>() == "DoesNotExist",
+              "stale areaName: AreaName is kept as-authored, never silently cleared");
+    }
+
+    // Item 4: duplicate names resolve first-match, never last-wins.
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        Params::MapArea dupFirst; dupFirst.name = "Dup";
+        dupFirst.originX = 1.0f; dupFirst.originZ = 1.0f; dupFirst.width = 1.0f; dupFirst.length = 1.0f;
+        Params::MapArea dupSecond; dupSecond.name = "Dup";
+        dupSecond.originX = 99.0f; dupSecond.originZ = 99.0f; dupSecond.width = 99.0f; dupSecond.length = 99.0f;
+        recipe.areas.push_back(dupFirst);
+        recipe.areas.push_back(dupSecond);
+        recipe.scenarios.defaultScenario.areaName = "Dup";
+
+        const nlohmann::ordered_json json = Io::BuildScenariosJson(recipe);
+        Check(NearlyEqual(json["DefaultScenario"]["Area"]["x"].get<float>(), 1.0f),
+              "duplicate areaName: resolves to the FIRST matching entry, not the last");
+    }
+
+    // Item 5: import round trip -- AreaName present on DefaultScenario reads back onto areaName.
+    {
+        nlohmann::ordered_json document;
+        nlohmann::ordered_json defaultScenario;
+        defaultScenario["Name"] = "ImportedAreaName";
+        defaultScenario["Area"] = { { "x", 0.0 }, { "y", 0.0 }, { "width", 0.0 }, { "height", 0.0 } };
+        defaultScenario["AreaName"] = "Foo";
+        document["Scenarios"]["DefaultScenario"] = defaultScenario;
+
+        Params::MapRecipe loaded;
+        Io::MapImportResult result;
+        Io::ReadScenariosJson(document, loaded, result);
+        Check(loaded.scenarios.defaultScenario.areaName == "Foo",
+              "import: AreaName reads back onto ScenarioBody::areaName");
+    }
+
+    // Item 6: absent AreaName key (a pre-STEP209 .sanmap) -> stays empty, zero warnings.
+    {
+        nlohmann::ordered_json document;
+        nlohmann::ordered_json defaultScenario;
+        defaultScenario["Name"] = "LegacyNoAreaName";   // deliberately no "AreaName" key
+        document["Scenarios"]["DefaultScenario"] = defaultScenario;
+
+        Params::MapRecipe loaded;
+        Io::MapImportResult result;
+        Io::ReadScenariosJson(document, loaded, result);
+        Check(loaded.scenarios.defaultScenario.areaName.empty(),
+              "absent AreaName key: ScenarioBody::areaName stays empty");
+        Check(result.warningCount == 0, "absent AreaName key: zero warnings");
+    }
 }
 
 } // namespace
@@ -338,6 +463,7 @@ int main() {
     RunLegacyNavalFleetFixtureDroppedTest();
     RunNoNavalSpellingsInOutputTest();
     RunLiveDocumentIntegrationTest();
+    RunScenarioAreaNameTests();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

@@ -83,6 +83,7 @@ inline std::string ScenarioCountRowLabel(const Params::Scenarios& scenarios, int
 inline DraggableListSignal DrawScenarioPatternList(std::vector<Params::PatternScenario>& scenarios,
                                                     ScenariosTabState& state,
                                                     const std::vector<Params::Army>& armies,
+                                                    const std::vector<Params::MapArea>& areas,
                                                     int maxArmySlotCount, int selectedIndex) {
     std::string labelBuffer;
     return DraggableList<Params::PatternScenario>::Render(
@@ -96,7 +97,7 @@ inline DraggableListSignal DrawScenarioPatternList(std::vector<Params::PatternSc
             Params::PatternScenario& scenario = scenarios[static_cast<std::size_t>(rowIndex)];
             DrawSlotPatternToggleRow(scenario.slotPattern, armies, maxArmySlotCount);
             DrawScenarioSpawnsWarningBanner(scenario.body, armies);
-            DrawScenarioBodyFields(scenario.body, armies, state.scenarioEditModeState,
+            DrawScenarioBodyFields(scenario.body, armies, areas, state.scenarioEditModeState,
                                    &scenario.slotPattern, nullptr, maxArmySlotCount);
         },
         selectedIndex);
@@ -104,6 +105,7 @@ inline DraggableListSignal DrawScenarioPatternList(std::vector<Params::PatternSc
 
 inline DraggableListSignal DrawScenarioCountList(Params::Scenarios& scenarios, ScenariosTabState& state,
                                                   const std::vector<Params::Army>& armies,
+                                                  const std::vector<Params::MapArea>& areas,
                                                   int selectedIndex) {
     std::string labelBuffer;
     return DraggableList<Params::CountScenario>::Render(
@@ -117,7 +119,7 @@ inline DraggableListSignal DrawScenarioCountList(Params::Scenarios& scenarios, S
             Params::CountScenario& scenario = scenarios.countScenarios[static_cast<std::size_t>(rowIndex)];
             DrawScenarioCountConditionsEditor(scenario.conditions);
             DrawScenarioSpawnsWarningBanner(scenario.body, armies);
-            DrawScenarioBodyFields(scenario.body, armies, state.scenarioEditModeState, nullptr,
+            DrawScenarioBodyFields(scenario.body, armies, areas, state.scenarioEditModeState, nullptr,
                                    &scenario.conditions, scenarios.maxArmySlotCount);
         },
         selectedIndex);

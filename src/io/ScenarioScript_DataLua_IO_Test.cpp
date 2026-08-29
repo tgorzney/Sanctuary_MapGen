@@ -457,6 +457,71 @@ void TestSelfCheckViaLuaSyntaxCheck() {
     }
 }
 
+// STEP209 item 12: hit case -- a resolved areaName renders the NAMED Area's numbers, not the stale
+// body.area ones. Proves this Lua leg resolves independently of the JSON leg (§1's discrepancy fix).
+void TestAreaNameHitRendersResolvedNumbers() {
+    Params::MapRecipe recipe;
+    recipe.geometry.mapSize = 512;
+    Params::MapArea foo; foo.name = "Foo";
+    foo.originX = 5.0f; foo.originZ = 6.0f; foo.width = 7.0f; foo.length = 8.0f;
+    recipe.areas.push_back(foo);
+
+    recipe.scenarios.defaultScenario.name = "AreaNameHit";
+    recipe.scenarios.defaultScenario.areaName = "Foo";
+    recipe.scenarios.defaultScenario.area.originX = 0.0f; recipe.scenarios.defaultScenario.area.originZ = 0.0f;
+    recipe.scenarios.defaultScenario.area.width   = 0.0f; recipe.scenarios.defaultScenario.area.length  = 0.0f;
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+    // The area rect renders x/y/width/height (originX/originZ/width/length) with NO z-flip -- unlike
+    // spawn/alloy Position fields, Area is a 2D rectangle, not an InstancedTransform position.
+    Check(output.find("x = 5") != std::string::npos, "resolved x renders");
+    Check(output.find("y = 6") != std::string::npos, "resolved y (== originZ, unflipped) renders");
+    Check(output.find("width = 7") != std::string::npos, "resolved width renders");
+    Check(output.find("height = 8") != std::string::npos, "resolved height renders");
+}
+
+// STEP209 item 13: empty areaName renders body.area verbatim -- regression guard against the
+// resolver accidentally engaging when it shouldn't.
+void TestAreaNameEmptyRendersBodyAreaVerbatim() {
+    Params::MapRecipe recipe;
+    recipe.geometry.mapSize = 512;
+    recipe.scenarios.defaultScenario.area.originX = 1.0f; recipe.scenarios.defaultScenario.area.originZ = 2.0f;
+    recipe.scenarios.defaultScenario.area.width   = 3.0f; recipe.scenarios.defaultScenario.area.length  = 4.0f;
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+    Check(output.find("x = 1") != std::string::npos, "unresolved x renders body.area verbatim");
+    Check(output.find("width = 3") != std::string::npos, "unresolved width renders body.area verbatim");
+    Check(output.find("height = 4") != std::string::npos, "unresolved height renders body.area verbatim");
+}
+
+// STEP209 item 14: stale areaName falls back to body.area, matching the JSON leg's own fallback.
+void TestAreaNameStaleFallsBackToBodyArea() {
+    Params::MapRecipe recipe;
+    recipe.geometry.mapSize = 512;
+    recipe.scenarios.defaultScenario.areaName = "DoesNotExist";
+    recipe.scenarios.defaultScenario.area.originX = 9.0f; recipe.scenarios.defaultScenario.area.originZ = 10.0f;
+    recipe.scenarios.defaultScenario.area.width   = 11.0f; recipe.scenarios.defaultScenario.area.length = 12.0f;
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+    Check(output.find("x = 9") != std::string::npos, "stale areaName: x falls back to body.area");
+    Check(output.find("y = 10") != std::string::npos, "stale areaName: y falls back to body.area");
+    Check(output.find("width = 11") != std::string::npos, "stale areaName: width falls back to body.area");
+    Check(output.find("height = 12") != std::string::npos, "stale areaName: height falls back to body.area");
+}
+
+// STEP209 item 15: negative assertion -- the Lua output never contains "areaName"/"AreaName" anywhere,
+// confirming the correctly-zero-Lua-field part of ARCH_15_05 stays true even after this ticket's real
+// changes to the *numbers* (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-08-28).
+void TestAreaNameNeverRenderedAsAKey() {
+    Params::MapRecipe recipe;
+    recipe.areas.push_back(Params::MapArea());
+    recipe.scenarios.defaultScenario.areaName = "Foo";
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    Check(output.find("areaName") == std::string::npos, "no lowerCamelCase \"areaName\" substring anywhere");
+    Check(output.find("AreaName") == std::string::npos, "no PascalCase \"AreaName\" substring anywhere");
+}
+
 } // namespace
 
 int main() {
@@ -478,6 +543,10 @@ int main() {
     TestLiveReferenceParitySelfCheck();
     TestArmyRosterPositionInFile();
     TestSelfCheckViaLuaSyntaxCheck();
+    TestAreaNameHitRendersResolvedNumbers();
+    TestAreaNameEmptyRendersBodyAreaVerbatim();
+    TestAreaNameStaleFallsBackToBodyArea();
+    TestAreaNameNeverRenderedAsAKey();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

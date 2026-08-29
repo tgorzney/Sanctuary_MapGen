@@ -7,6 +7,7 @@
 #include "ScenarioScript_Export_IO.h"
 #include "FilesystemPrimitives_IO.h"
 #include "GameInstallLocation_IO.h"
+#include "MapExporter_ScenarioAreaNameValidation_IO.h"
 #include "ScenarioScript_DataLua_IO.h"
 #include "ScenarioScript_RuntimeResource_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -80,6 +81,12 @@ ScenarioExportResult ExportMapScenario(const std::string& gameInstallRoot,
 
     // 4. Render the Data.lua text (STEP70).
     const std::string dataLuaText = BuildScenarioDataLuaText(recipe);
+
+    // STEP209 -- warn, never block, on the same tier as the JSON leg's ReportScenarioAreaNameReferences.
+    // ScenarioExportResult has no Warn/warningCount (only Log/debugLog) -- use Log here, matching this
+    // type's own existing convention (every other finding in this file uses result.Log).
+    const ScenarioAreaNameValidationReport areaNameReport = ValidateScenarioAreaNameReferences(recipe);
+    if (!areaNameReport.AllReferencesResolve()) result.Log(areaNameReport.SummaryText());
 
     // 5. Syntax pre-check on SanGen's own render -- refuse rather than write known-broken Lua.
     const Sys::LuaSyntaxCheckResult dataSyntax = Sys::CheckLuaSyntax(dataLuaText);

@@ -886,6 +886,11 @@ add_sangen_test(MapExporter_IO_Test       src/io/MapExporter_IO_Test.cpp)
 target_link_libraries(MapExporter_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 add_sangen_test(MapExporter_ArmySpawnMarkerValidation_IO_Test
     src/io/MapExporter_ArmySpawnMarkerValidation_IO_Test.cpp)
+# STEP209_ScenarioAreaNameReference_PARAMS_IO_UI: the export-time, warn-only
+# ScenarioBody::areaName -> recipe.areas membership scan. Same posture as the ArmySpawnMarkerValidation
+# target immediately above.
+add_sangen_test(MapExporter_ScenarioAreaNameValidation_IO_Test
+    src/io/MapExporter_ScenarioAreaNameValidation_IO_Test.cpp)
 add_sangen_test(MapImporter_IO_Test
     src/io/MapImporter_IO_Test.cpp
     src/io/MapImporter_Validation_IO_Test.cpp

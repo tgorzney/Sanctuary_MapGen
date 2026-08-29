@@ -55,15 +55,34 @@ nlohmann::ordered_json BuildAlloyRemovalsJson(const std::vector<Params::Scenario
     return array;
 }
 
+// Resolves body.areaName against `areas` (first-match by .name, mirroring this exact file family's
+// own established idiom -- AreasTab_List_UI.h's ResolveAreaColor, UniqueNameList_UI.h's
+// NameIsTakenBefore -- both resolve by first/earliest match, never last-wins). Empty areaName or an
+// unresolvable (stale) name both fall back to body.area unchanged -- never crash, never emit garbage
+// (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-08-28).
+Params::MapArea ResolveScenarioAreaRect(const Params::ScenarioBody& body,
+                                        const std::vector<Params::MapArea>& areas) {
+    if (body.areaName.empty()) return body.area;
+    for (const Params::MapArea& area : areas)
+        if (area.name == body.areaName) return area;
+    return body.area;
+}
+
 // The shared 9-field `<ScenarioRecord>` body, in the wire's own listed field order — composed by
 // all three of PatternScenarios/CountScenarios/DefaultScenario below (mirrors BuildArmiesJson).
-nlohmann::ordered_json BuildScenarioRecordJson(const Params::ScenarioBody& body, int mapSize) {
+nlohmann::ordered_json BuildScenarioRecordJson(const Params::ScenarioBody& body, int mapSize,
+                                               const std::vector<Params::MapArea>& areas) {
     nlohmann::ordered_json json;
     json["Name"] = body.name;
-    // {x,y,width,height} — the exact mapping BuildAreasJson already uses. `area.name` has no
-    // counterpart here (never emitted — see Scenario_PARAMS.h's own comment on that member).
-    json["Area"] = { { "x", body.area.originX }, { "y", body.area.originZ },
-                     { "width", body.area.width }, { "height", body.area.length } };
+    // Resolved against recipe.areas when body.areaName names a live entry; falls back to body.area
+    // otherwise (empty areaName, or a stale/renamed/deleted reference). See ResolveScenarioAreaRect.
+    const Params::MapArea resolvedArea = ResolveScenarioAreaRect(body, areas);
+    json["Area"] = { { "x", resolvedArea.originX }, { "y", resolvedArea.originZ },
+                     { "width", resolvedArea.width }, { "height", resolvedArea.length } };
+    // Sibling of Area, always emitted even when empty -- matches SpawnsUnits/AuthoringNote's own
+    // "every scalar field always present" convention (ARCH_15_05_ParamsScenariosType.md §15.5
+    // AMENDED 2026-08-28: round-trip the reference, never export-only bake).
+    json["AreaName"] = body.areaName;
     // RETIRED 2026-08-28 (STEP204): "Navy" + "NavalFleet" are gone. "SpawnsUnits" is always
     // present, even when false — matches how every other scalar scenario field is emitted.
     json["SpawnsUnits"] = body.spawnsUnits;
@@ -84,7 +103,7 @@ nlohmann::ordered_json BuildScenariosJson(const Params::MapRecipe& recipe) {
 
     nlohmann::ordered_json patternScenarios = nlohmann::ordered_json::array();
     for (const Params::PatternScenario& pattern : scenarios.patternScenarios) {
-        nlohmann::ordered_json json = BuildScenarioRecordJson(pattern.body, mapSize);
+        nlohmann::ordered_json json = BuildScenarioRecordJson(pattern.body, mapSize, recipe.areas);
         json["Pattern"] = pattern.slotPattern;
         patternScenarios.push_back(json);
     }
@@ -93,7 +112,7 @@ nlohmann::ordered_json BuildScenariosJson(const Params::MapRecipe& recipe) {
     // order — never routed through a std::map/std::unordered_map that could reorder (§15.6).
     nlohmann::ordered_json countScenarios = nlohmann::ordered_json::array();
     for (const Params::CountScenario& countScenario : scenarios.countScenarios) {
-        nlohmann::ordered_json json = BuildScenarioRecordJson(countScenario.body, mapSize);
+        nlohmann::ordered_json json = BuildScenarioRecordJson(countScenario.body, mapSize, recipe.areas);
         nlohmann::ordered_json conditions = nlohmann::ordered_json::array();
         for (const Params::ScenarioCountCondition& condition : countScenario.conditions) {
             conditions.push_back({ { "Field", kCountFieldSpellings[static_cast<int>(condition.field)] },
@@ -107,7 +126,7 @@ nlohmann::ordered_json BuildScenariosJson(const Params::MapRecipe& recipe) {
     nlohmann::ordered_json document;
     document["PatternScenarios"] = patternScenarios;
     document["CountScenarios"]   = countScenarios;
-    document["DefaultScenario"]  = BuildScenarioRecordJson(scenarios.defaultScenario, mapSize);
+    document["DefaultScenario"]  = BuildScenarioRecordJson(scenarios.defaultScenario, mapSize, recipe.areas);
     // §15.10 amendment — top-level, map-wide slotPattern length; a sibling of the three above.
     document["MaxArmySlotCount"] = scenarios.maxArmySlotCount;
     return document;
