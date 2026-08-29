@@ -27,7 +27,7 @@ spec(s) a question needs — never the whole pack.
 | pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling; `PropInstanceLayer`/`DecalInstanceLayer` gain full field parity with `MarkerInstanceLayer` under ARCH §20 (not yet reflected in this spec's own field tables — see the §20 narrative below); `PropTransform`/`DecalTransform` gain `instanceIdentifier`/`symmetryGroupIdentifier` under ARCH §21.4 (also not yet reflected — see the §21 narrative below) | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
-| preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix; the ratified v2 screen-space overlay-layering design (six domains — Alloy/SpawnsArmies/Units/Props/Reclaim/Decals; LOD icon rendering; four dirty-flag tiers A/B/C/C2; the View toolbar's two-section popup; ARCH §14); map areas as a composited FIELD layer, not an overlay domain (`PreviewLayerKind::MapAreas`, ARCH §14.17) | `specs/PREVIEW_COMPOSITING_SPEC.md` |
+| preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix; the ratified v2 screen-space overlay-layering design (six domains — Alloy/SpawnsArmies/Units/Props/Reclaim/Decals; LOD icon rendering; **five** dirty-flag tiers A/B/B2/C/C2; the View toolbar's two-section popup; ARCH §14); map areas as a composited FIELD layer, not an overlay domain (`PreviewLayerKind::MapAreas`, ARCH §14.17), and the ONE-fill / live-blend-fidelity + tier-gated-baked-input-upload + 16-color-palette follow-up (ARCH §14.18, whose Part 3 closes its own Tier-B2 benchmark gate and adds the mandatory recomposite-cost watchdog) | `specs/PREVIEW_COMPOSITING_SPEC.md` |
 | core math library — SIMD/fast-math/Morton/spatial internals (stub reality + v2 target) | `specs/MATH_SIMD_SPEC.md` |
 | future sim passes — fluvial/glacial/snow-melt design on the shared sim framework | `specs/FUTURE_SIM_TYPES_SPEC.md` |
 | map AI-analyzability invariants + host/client shared-generation protocol | `specs/AI_HOSTCLIENT_SPEC.md` |
@@ -117,7 +117,7 @@ the six-domain (Alloy/SpawnsArmies/Units/Props/Reclaim/Decals) screen-space over
 stack (`OverlayLayer_UI`/`OverlayDomainKind_UI`/`OverlaySubLayerRef_UI`), the two-mode
 (thumbnail/strategic-icon) LOD rendering rule, the four-tier dirty-flag model (adding C —
 screen-space redraw, and C2 — interaction-scoped redraw — on top of the existing two-tier A/B
-GPU-recomposite model), the mandatory first-work-order performance requirements (bulk vertex
+GPU-recomposite model; **a fifth tier, B2, was added 2026-08-29 by ARCH §14.18**), the mandatory first-work-order performance requirements (bulk vertex
 writes, cross-layer visible-vertex budget + decimation, atlas page bucketing), the View
 toolbar's two-section/no-crossing popup replacing "Regenerate," and a separately-recorded GPU
 color-texture readback defect. Full ruling text: `ARCH_14_PreviewOverlayLayering.md` §14. Several items are explicitly
@@ -154,7 +154,14 @@ Scenario authoring/export ratification described above) — the gap that flag na
   color texture even when nothing downstream consumes it on the GPU-resident hot path — up to
   256MB wasted PCIe transfer + blocking wait at the 8192² cap, every recompose. Narrow, already
   diagnosed, independent of the ARCH §14 overlay redesign; should land before it. See
-  `PREVIEW_COMPOSITING_SPEC.md` / `ARCH_14_10_GpuColorReadbackBug.md` §14.10.
+  `PREVIEW_COMPOSITING_SPEC.md` / `ARCH_14_10_GpuColorReadbackBug.md` §14.10. **Partly addressed:
+  `Compose(bNeedsTexelReadback)` now lets the production hot path skip the COLOR readback
+  (`Application_UI.cpp:75`). The `WaitForCompletion` fence spin and the unconditional entity-id
+  buffer readback remain. ARCH §14.18 item 7 named them as the next lever if that ruling's
+  Tier-B2 benchmark missed its frame budget; the benchmark has since run and PASSED (§14.18
+  item 17), so they stay recorded here as an ordinary optimization opportunity rather than a
+  blocking one — measured at ~1.0 ms of entity-id readback plus ~0.5-0.75 ms of fence wait per
+  gated compose (MEASURED, Debug, one machine — see §14.18 item 17's table).**
 - **`layerId` → `layerIdentifier` rename (ARCH §1.9, 2026-08-25).** `PropInstanceLayer::layerId`,
   `DecalInstanceLayer::layerId`, `MarkerInstanceLayer::layerId` (all shipped, confirmed live —
   STEP56/STEP60/STEP111/STEP116), `Resolve{Prop,Decal}InstanceLayerId`, and the wire key `"Id"` on
@@ -203,6 +210,15 @@ Scenario authoring/export ratification described above) — the gap that flag na
   Blocked on `ARCH_21_04_PropDecalInstanceIdentityFields.md` §21.4's new `PropTransform`/
   `DecalTransform::instanceIdentifier` fields landing first (ruled, not yet built); full fix shape
   is in §21.4 itself.
+- ~~**`BindComposeBuffers` re-uploads every baked field on every compose (ARCH §14.18 item 6,
+  2026-08-29, ruled not yet built).**~~ **SHIPPED 2026-08-29 as `STEP216_TierGatedBakedInputUploads_UI.md`
+  (§14.18 Piece A).** `PreviewComposite_GpuBuffers_UI.cpp` used to re-pack the nine surface-weight
+  fields and re-upload them plus the four scalar fields unconditionally, whether or not a generation
+  stage ran (~3.4 MB per compose at the default `mapSize = 256`, ~55 MB at 1024, ~3.5 GB at the 8192
+  cap — ROUGH-ESTIMATE, arithmetic on real array sizes). They are now gated off
+  `RefreshTier::PreviewRender` through `PreviewComposite::ComposeRequest::bBakedInputsChanged`,
+  self-defended by `EnsureBuffer`'s own "(re)allocation happened" return, exactly as §14.18 item 6
+  ruled — which unblocked §14.18's per-frame area-drag recomposite (Piece C).
 
 ⚠️ **RETIRED 2026-08-28 — the naval-fleet paragraph that stood here is obsolete.** It recorded
 the 2026-08-21 shaping of `Params::ScenarioNavalFleet` / `ScenarioNavalPondSide` /
@@ -897,3 +913,171 @@ is enabled AND it is suppressed AND it is selected, never at all while the layer
 `PREVIEW_COMPOSITING_SPEC.md` gains a matching "Map areas are a field layer, not an overlay
 domain" section plus a correction recording that its own v1 **SSBO 5** (`area bounds/colors`)
 entry is the precedent this restores — SSBO **6**, not 5, was the shadow-sim defect.
+**⚠️ Shipped as STEP211/STEP212, then partly SUPERSEDED the same day — see the §14.18 entry
+immediately below. The "two recomposites per gesture" sentence and the "new areas Green" sentence
+in this paragraph are no longer current law.**
+
+**New `ARCH_14_18_AreaLiveBlendFidelityAndPalette.md` §14.18 (2026-08-29, later same day) — two
+human-flagged follow-ups on the just-shipped §14.17 work, ruled together because the first cannot be
+fixed without changing the cost model the second lives in.** Verified against the live
+composite/canvas/driver code before ratification, not taken on the proposal's word.
+
+1. **ONE FILL, in every state, including mid-gesture — the new general law.** §14.17 item 11's
+   "exactly two recomposites per gesture" optimization bought its cheapness by omitting the dragged
+   area from the composite (`mapAreaSuppressedIndex`) and drawing it instead with
+   `ImDrawList::AddRectFilled`, which uses ImGui's ONE fixed-function alpha-over equation. The
+   layer's real blend mode is `Overlay`, whose formula (`PreviewComposite_Color_UI.h:53-85`) is a
+   function of the DESTINATION pixel — as are `SoftLight`/`HardLight`/`Multiply`/`Screen`/the two
+   `Color*` modes. A destination-blind draw call cannot reproduce a destination-dependent formula,
+   so an area visibly "turned solid" the instant it was touched. Ruled: **a map area's fill has
+   exactly one renderer, the composite; a second renderer is forbidden**, this being the same class
+   of defect as §3.2's shadow-sim, applied to blending rather than to placement. Blend math has
+   exactly two implementations in this program (the CPU twin and the GLSL twin, parity by
+   expression-for-expression mirroring); a third is banned. The **`ImDrawList` shader-callback
+   alternative is explicitly rejected and named** so it cannot be re-proposed: it is that forbidden
+   third implementation, it blends in SCREEN space against a zoomed/filtered sample rather than in
+   the composite's own CELL space (so it would *snap* at gesture end — an intermittent error traded
+   for a constant one), and it needs GL state outside `Sys::GpuResourceManager`'s ownership.
+   `mapAreaSuppressedIndex` and all its plumbing are retired; `ContinueAreaDrag` requests one
+   recomposite per frame the rectangle actually MOVED (four float compares, the
+   `SetAreaToMapSize` "reports whether it moved, so a no-op costs no recomposite" idiom already in
+   `AreasTab_List_UI.h`); the immediate-mode pass keeps chrome only (border + 8 handles + cursor),
+   and §14.17 item 12's clause (b) is deleted with the index. `areaCompositeRefreshCallback` /
+   `SetAreaCompositeRefreshCallback` survive unchanged and become the per-frame request path.
+2. **`ARCH_14_08_DirtyFlagTiers.md` §14.8 gains Tier B2 — five tiers, not four.** B2 is
+   interaction-scoped *recomposite*, deliberately NOT collapsed into C2 (interaction-scoped
+   screen-space *redraw*): C2 replays cached vertex bytes and is nearly free; B2 must actually
+   recomposite because the dragged quantity is painted into the image by a destination-dependent
+   blend. **The gate is where the pixels come from, not how the gesture feels.**
+3. **The enabling prerequisite, ruled in the same file: the composite's BAKED-INPUT uploads become
+   tier-gated.** Per-frame recomposite is unacceptable on today's path for an *accidental* reason —
+   `BindComposeBuffers` re-packs and re-uploads every baked field on every compose regardless of
+   whether a stage ran (~3.4 MB at the default `mapSize = 256`, ~55 MB at 1024, ~3.5 GB at the 8192
+   cap; ROUGH-ESTIMATE from real array sizes). **No new dirty state is invented**: `PreviewDriver`
+   already owns the only question that matters, and its own header states the invariant
+   (`RefreshTier::PreviewRender` ⇒ *"no stage runs, so nothing re-simulates"*). So
+   `previewCompositeCallback` becomes `std::function<void(RefreshTier)>`, `Compose` takes a
+   `ComposeRequest { bNeedsTexelReadback, bBakedInputsChanged }` options struct (defaults reproduce
+   today's behavior exactly — every existing caller and test unchanged), and `EnsureAndBind`
+   **self-defends** by also uploading whenever `Sys::GpuResourceManager::EnsureBuffer` reports it
+   just (re)allocated. Gated: `PackSurfaceStratumWeights()` plus the five baked-input uploads.
+   **Explicitly NOT gated, each named as a trap**: `BuildEntityPoints()` (it reads the
+   `bEntitiesEnabled` presentation toggle — gating it would break that checkbox),
+   `BuildLayerConfigurations()`/the ramp LUT bakes (presentation), `BuildMapAreaConfigurations()`
+   (the whole point), and the seven small record uploads. The fence spin and the entity-id readback
+   are left alone and named as the NEXT lever, since skipping the readback needs a
+   picking-correctness argument this ruling does not make.
+4. **One frame of fill latency is ACCEPTED and stated, not hidden.** The frame order is fixed —
+   `ServiceDirtyTier()` at step 7, the canvas (where the gesture is dispatched) at step 8 — so the
+   fill trails the pointer by one frame while it is moving and is exact the frame after it stops.
+   ~~The immediate-mode border correspondingly leads the fill by one frame during fast motion.~~
+   **That second clause was WRONG and is retracted by Part 3 item 22** (`DrawAreaOverlayPass` runs
+   BEFORE the same frame's `ContinueAreaDrag`, `MapCanvas_Draw_UI.cpp:51` vs `:199`, so chrome and
+   fill are in exact lockstep). The
+   sanctioned future fix, if the human objects to the one-frame lag, is to move the canvas's gesture
+   dispatch ahead of `ServiceDirtyTier` — **never a second fill**.
+5. **Benchmark gate, with basis tags (Constitution §7).** Owned by the **Compute Optimization
+   Expert**, reviewed by the **UI Optimization Expert**: wall-clock of one gated Tier-B2 recomposite
+   at `previewResolution = 512` for `mapSize ∈ {256, 1024}`, fence-wait and entity-id readback broken
+   out, at 0 and 100k instances. The ARCH Expert's own pre-implementation figure (~0.5–2 ms,
+   dominated by the stall rather than the dispatches) is tagged **ROUGH-ESTIMATE** and explicitly
+   stated as *not confident enough to ship as a number* — it is a gate, not a result. On a miss the
+   ONLY sanctioned degradation is throttling the recomposite interval (trading update *rate*, never
+   *correctness*). **CLOSED — PASS. See Part 3 items 17-18 below.**
+6. **The 16-entry new-area color palette, with the values ruled as concrete data.** Sixteen hues at
+   18.75° steps spanning the 300° arc that EXCLUDES the ±30° neighbourhood of pure green (reserved
+   for the pinned `PlayableArea`), every entry carrying at least one channel at exactly `0.00` and
+   one at exactly `1.00` — because under `Overlay` a source channel of `0.5` is the *identity*, so a
+   mid-gray area would be literally invisible. Stored in spectrum order (human-auditable) and
+   consumed with a **stride of 7 masked by 15** (`gcd(7,16) == 1`, so all 16 are visited before any
+   repeat), which puts a **minimum of 112.5° of hue between two consecutively created areas** versus
+   the 18.75° a naive in-order walk gives. 16-and-mask rather than 12-and-modulo: no division on
+   this path (Constitution §3), four more distinct areas before a repeat.
+7. **The assignment lives inside `ResolveAreaColor`'s lazy append — a correction to the proposal's
+   "assign at the two creation call sites."** Areas arriving from an imported `.sanmap` never pass
+   through either creation site, so a creation-site rule would leave every imported map's areas flat
+   green — the exact defect being fixed. `ResolveAreaColor` is the one funnel every area reaches
+   (tab swatch, canvas, and `BuildMapAreaConfigurations`), so the ordinal (= count of existing
+   non-`PlayableArea` entries) is derived there, never stored, and **neither creation call site
+   changes at all**. `kPlayableAreaName` moves down into `AreaColorTable_UI.h` (a plain `const char*`,
+   no new include — §14.17 item 9's `<string>`/`<vector>`-only rule is preserved) so the pin has one
+   home; `AreasTab_List_UI.h` re-exports it, the same mechanism it already documents for
+   `AreaColorEntry`/`AreaLockEntry`. `kDefaultAreaColor` splits into `kPlayableAreaColor` +
+   `kDefaultAreaFillAlpha`. **Blend mode stays a LAYER property, orthogonal to per-area color, and a
+   per-area blend mode is FORBIDDEN** — it would break the record's ruled 32-byte std430 stride AND
+   is architecturally impossible in the current pass shape, since `mapAreaColorAtCell` returns ONE
+   color that the pass blends ONCE.
+
+**§14.18 PART 3 (items 17-24, appended 2026-08-29 later the same day) — the benchmark gate closes
+and Piece C is ruled to implementation detail.** Pieces A and B shipped (STEP216 / STEP217) and the
+measurement harness with them (STEP218). Part 3 is deliberately an amendment to §14.18 rather than a
+new §14.19: it closes §14.18's own item 10, retracts part of its item 8, narrows its item 4, and
+specifies the implementation of items 1-5/8-9 — every one an edit to that ruling, not a new one.
+
+1. **Item 10's gate is CLOSED — PASS (item 17).** MEASURED (STEP218 binary; **Debug**, one machine,
+   one run, `previewResolution = 512`, 50 iterations, `{bNeedsTexelReadback=false,
+   bBakedInputsChanged=false}`): worst representative case (`mapSize=256`, 100k instances) sums to
+   **3.88 ms** against a 16.7 ms budget — 23% consumed, ~12.8 ms headroom; the one 5.83 ms row is a
+   single-sample Debug/scheduler spike. The Compute Optimization Expert's PASS verdict is accepted.
+   **Recorded as part of the pass, not omitted from it: STEP218's first timing window opens AFTER
+   `PrepareRun()`**, so the published totals exclude `BuildEntityPoints()` (O(instances), ungated,
+   with a per-instance non-hoisted division inside `WorldToPreviewPixel`) and the
+   `compositeTexels.assign(resolution², 0u)` 1 MB fill. The published sum is therefore a **lower
+   bound**, worst exactly in the 100k row — which is why item 18's watchdog is mandatory and why it
+   brackets `Compose()` whole rather than summing item 10's three phases.
+2. **A Tier-B2 cost watchdog is MANDATORY law (item 18)** — item 10's "Miss" clause promoted from a
+   contingency to an always-armed floor: `kAreaRecompositeCostBudgetMillis = 8.0` (≈2× the measured
+   worst case, ≈48% of budget), `kAreaRecompositeBreachFrameCount = 5` (the smallest count that
+   cannot fire on the one-frame outlier this dataset already showed), `kAreaRecompositeThrottleIntervalMillis
+   = 33.0` (~30 Hz). Compile-time law, **not** Constitution §8 tunables — a safety floor, not a
+   creative value. The guaranteed final full recomposite at `EndAreaDrag` is exempt from the interval.
+3. **Ownership ruled (item 19): `PreviewComposite` measures, `MapCanvas` decides, and
+   `SetAreaCompositeRefreshCallback`'s signature does NOT change.** A callback bound to
+   `NotifyParametersChanged()` only sets a dirty flag — the compose it requests runs at step 7 of the
+   *next* frame, so it cannot return that compose's cost; returning the *previous* one would be a
+   lie-shaped API. `PreviewDriver` ownership is likewise rejected: it would throttle every
+   `PreviewRender` refresh (a slider, a checkbox) on a condition created by an area drag. Ruled
+   instead: `PreviewComposite::Compose()` brackets itself with one `steady_clock` pair into a new
+   `LastComposeMillis()` — the only place that measures BOTH backends (including `ComposeOnGpu`'s two
+   silent Cpu-twin fallbacks) and the only bracket that includes `PrepareRun()`, closing item 17's
+   blind spot — and `MapCanvas` reads it through the `const PreviewComposite*` it already holds, so
+   the watchdog needs **zero** new plumbing. `ComposeGpuTiming`/`outTiming` (STEP218) are untouched
+   and are not duplicated: different bracket, different lifetime, different consumer.
+4. **The decision is a pure free function in a new `AreaRecompositeThrottle_UI.h` (item 20)** —
+   `ShouldRequestAreaRecomposite(state, bRectangleMoved, lastComposeMillis, nowMillis)` — so it is
+   unit-testable headless with fabricated costs and times, no GL and no imgui. A single consecutive-
+   breach **counter**, not a rolling window (the condition IS a consecutive count). `nowMillis` is
+   `ImGui::GetTime() * 1000.0` — deterministic in tests, which already drive `io.DeltaTime = 1/60`.
+   **Recovery ruled (closing the implementation-level call the Compute expert left open): clear
+   mid-gesture, immediately, symmetric** — any at-or-under-budget sample resets the counter, and
+   `TryBeginAreaDrag` resets the whole state; no re-arm latch, no hysteresis band, because entry
+   already carries 5 frames of it and flapping costs update rate only.
+5. **`bDeferredMove` is load-bearing (item 21)**: without it, a move that the throttle eats followed
+   by a motionless held pointer would strand the fill at the pre-move rectangle until release —
+   falsifying item 8's "exact the frame after it stops" in exactly the mode nobody watches.
+6. **Item 8's latency characterization is CONFIRMED unchanged by per-moved-frame recomposition, and
+   its second bullet is CORRECTED and VOID (item 22).** The one-frame lag comes solely from
+   `ServiceDirtyTier()` (step 7) sitting before canvas gesture dispatch (step 8); recompose
+   *frequency* does not enter that argument. And `DrawAreaOverlayPass` runs BEFORE the same frame's
+   `ContinueAreaDrag` (`MapCanvas_Draw_UI.cpp:51` vs `:199`), so border, handles and fill are in
+   **exact lockstep**, all one frame behind — there is no border-leads-fill divergence to accept.
+   (It does appear in degraded mode, where chrome stays 1 frame behind while the fill may be ~33 ms
+   behind; stated so it is diagnosed, not re-reported as a bug.)
+7. **Item 23 is the concrete file-by-file delta** a work-order transcribes rather than re-derives —
+   including the one substantive narrowing of item 4: **`TryBeginAreaDrag` now fires NO refresh
+   request**, because with the suppression index gone a begin changes no composite input (selection
+   is not a composite input; `BuildMapAreaConfigurations` reads none), so it would produce a
+   byte-identical image. The single condition that reinstates it is named. `EndAreaDrag`'s request
+   becomes unconditional. `MapCanvas_AreaDragSuppression_UI_Test.cpp` is retired and replaced;
+   `PreviewComposite_MapAreas_UI_Test.cpp`'s two suppression assertions are deleted outright.
+8. **Item 24 fences the scope**: no change to STEP218's benchmark or `ComposeGpuTiming`; the fence
+   spin and entity-id readback stay (item 7); and the two levers item 17 newly identified —
+   hoisting `WorldToPreviewPixel`'s loop-invariant division out of `BuildEntityPoints`, and skipping
+   the `compositeTexels` zero-fill when no texel readback is requested — are a **separate** ticket,
+   gated on a Release-build STEP218 re-run with the timing window widened to include `PrepareRun()`,
+   and must not be attempted opportunistically inside Piece C.
+
+`PREVIEW_COMPOSITING_SPEC.md`'s "Map areas are a field layer" section and its dirty-tier text need
+the matching narrative update (five tiers, the one-fill law, the palette, the Part 3 watchdog) —
+**not made in this session, flagged here so it is not lost.** `.sanmap` schema, `Params::MapArea`,
+picking and `SanGenVersion` remain untouched by §14.18, exactly as by §14.17.

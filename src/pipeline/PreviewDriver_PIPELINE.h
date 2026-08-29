@@ -32,7 +32,13 @@ class PreviewDriver {
 public:
     explicit PreviewDriver(GenerationAssembler& generationAssembler);
 
-    void SetPreviewCompositeCallback(std::function<void()> composePreview) {
+    // ARCH §14.18 item 6 — the callback now receives the tier it is servicing, so a UI-side
+    // composite can gate its own baked-input uploads on it. `RefreshTier::PreviewRender` means "no
+    // stage ran, so nothing re-simulates" (this file's own header comment, above) — the invariant
+    // this whole wiring rests on: every `MapUpdate` refresh composites immediately after the stages
+    // run, so a SUBSEQUENT `PreviewRender` compose is provably looking at byte-identical baked
+    // fields.
+    void SetPreviewCompositeCallback(std::function<void(RefreshTier)> composePreview) {
         previewCompositeCallback = std::move(composePreview);
     }
 
@@ -55,13 +61,13 @@ public:
 
 private:
     void CacheStageParameterHashes();
-    void RunPreviewComposite();
+    void RunPreviewComposite(RefreshTier tier);
 
-    GenerationAssembler&     assembler;
-    std::function<void()>    previewCompositeCallback;
-    std::vector<std::size_t> cachedStageParameterHashes;
-    std::vector<std::string> stagesThatRanLastRefresh;
-    std::string              owningStageName;
+    GenerationAssembler&              assembler;
+    std::function<void(RefreshTier)>  previewCompositeCallback;
+    std::vector<std::size_t>          cachedStageParameterHashes;
+    std::vector<std::string>          stagesThatRanLastRefresh;
+    std::string                       owningStageName;
 
     bool bNeedsMapUpdate      = true;    // nothing is generated yet
     bool bNeedsPreviewRender  = false;

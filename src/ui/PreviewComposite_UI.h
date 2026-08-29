@@ -41,6 +41,37 @@ public:
     // A point in preview-pixel space (the composited image's own pixel grid).
     struct PreviewPixelPoint  { float pixelX = 0.0f; float pixelY = 0.0f; };
 
+    // What one Compose() call must actually do — replaces the old lone `bNeedsTexelReadback` bool
+    // (ARCH §14.18 items 6-7). A named struct, not a second positional bool: "two bools in a row at
+    // a call site is a legibility trap this ARCH does not accept." Defaults reproduce EVERY existing
+    // caller's observed behavior exactly — a full re-upload, texels read back — so this struct alone
+    // changes zero observable behavior.
+    struct ComposeRequest {
+        // When false, skips only the Gpu texture->CPU CompositeTexels() readback (unchanged from the
+        // retired `bNeedsTexelReadback` parameter — see Compose()'s own contract note below).
+        bool bNeedsTexelReadback = true;
+        // ARCH §14.18 item 6 — when false, the composite trusts that PackSurfaceStratumWeights() and
+        // the five baked-input uploads (heightfield, flow, accumulation, slope, surface-stratum
+        // weights) are BYTE-IDENTICAL to the last compose, and skips re-packing/re-uploading them.
+        // Only `Pipeline::PreviewDriver`'s own callback wiring may set this false, and only when it
+        // is servicing `RefreshTier::PreviewRender` (no stage ran, so the bake cannot have moved) —
+        // see `PreviewDriver_PIPELINE.h`'s own invariant this rests on.
+        bool bBakedInputsChanged = true;
+    };
+
+    // Gpu-path-specific observability (ARCH §14.18 item 10's benchmark prerequisite; STEP218). Not a
+    // second implementation of anything — a pure timing side-channel `ComposeOnGpu` fills in ONLY
+    // when a caller hands it a non-null pointer (see `ComposeOnGpu` below). Nested beside
+    // `ComposeRequest` for the same reason that struct is nested: this exists only to be
+    // `ComposeOnGpu()`'s own vocabulary, not a general-purpose type (STEP216's own nesting
+    // precedent, `PreviewComposite_UI.h`'s "Interpretation calls made" §1).
+    struct ComposeGpuTiming {
+        double bindAndDispatchMillis  = 0.0;  // buffer binds/uploads + all pass dispatches, issue-side
+        double fenceWaitMillis        = 0.0;  // WaitForCompletion's spin, isolated
+        double texelReadbackMillis    = 0.0;  // only non-zero when request.bNeedsTexelReadback
+        double entityIdReadbackMillis = 0.0;  // the unconditional entity-id readback, isolated
+    };
+
     PreviewComposite(const Params::Geometry& geometrySettings, const Params::Water& waterSettings,
                      const std::vector<Params::Stratum>& stratumSettings,
                      const std::vector<Params::MapArea>& mapAreaSettings,
@@ -71,14 +102,16 @@ public:
 
     // Runs the pass sequence on the Gpu when a resource manager with a live context is
     // available, else on the Cpu twin. Reports which one it used, rather than silently
-    // producing nothing.
-    // `bNeedsTexelReadback`: when false, skips only the Gpu texture->CPU `CompositeTexels()`
-    // readback (the entity-id readback used for click-picking is unaffected either way).
-    // Production leaves it true unless it knows nothing reads `CompositeTexels()` this run,
-    // since the canvas draws `CompositeTexture()` (the GL handle) directly on the Gpu path.
-    void Compose(bool bNeedsTexelReadback = true);
+    // producing nothing. See ComposeRequest above for what `request` controls; the Cpu twin never
+    // uploads a buffer of any kind, so it takes no request of its own.
+    void Compose(ComposeRequest request = ComposeRequest());
     void ComposeOnCpu();   // PreviewComposite_Cpu_UI.cpp -- texels ARE the primary output, always needed.
-    void ComposeOnGpu(bool bNeedsTexelReadback = true);   // PreviewComposite_Gpu_UI.cpp
+    // `outTiming` (ARCH §14.18 item 10; STEP218) — Gpu-path-specific observability, same spirit as
+    // LastRunUsedGpu()/ExecutedPassCount() already being Gpu-path-only accessors on this class. Null
+    // by default: every existing call site (including Compose()'s own forwarding call, unchanged
+    // below) pays no cost beyond a handful of `!= nullptr` branch checks — no clock read, no write,
+    // no behavior change of any kind when omitted.
+    void ComposeOnGpu(ComposeRequest request = ComposeRequest(), ComposeGpuTiming* outTiming = nullptr);   // PreviewComposite_Gpu_UI.cpp
 
     // The composited image: `Resolution()` squared packed RGBA8 texels, row-major.
     const std::vector<unsigned int>& CompositeTexels() const { return compositeTexels; }
@@ -87,6 +120,16 @@ public:
     Sys::GpuTextureHandle CompositeTexture() const { return compositeTexture; }
     int Resolution() const { return configuration.previewResolution; }
     bool LastRunUsedGpu() const { return bLastRunUsedGpu; }
+    // ARCH §14.18 item 19 — the ONE place that measures BOTH backends, including the two silent
+    // fallbacks to the Cpu twin inside ComposeOnGpu (no GL program, no texture) — those fallbacks
+    // are invisible to ComposeGpuTiming by construction, and are exactly the catastrophic per-frame
+    // case the Tier-B2 watchdog (AreaRecompositeThrottle_UI.h) exists to catch. Brackets the WHOLE
+    // Compose() call, including PrepareRun() — deliberately wider than ComposeGpuTiming's own
+    // three phases, closing STEP218's own measured blind spot (item 17). Always-on (two clock reads
+    // per compose, ROUGH-ESTIMATE ~40-60ns against a >=1ms compose): a gate here would make the
+    // safety floor's own input conditional, which is the exact class of bug item 7 already warns
+    // against on a hot path.
+    double LastComposeMillis() const { return lastComposeMillis; }
     // Passes executed in the last run: clear + one per enabled layer + overlay + entity id.
     // Counted identically on both backends, so a parity check compares the same sequence.
     int ExecutedPassCount() const { return executedPassCount; }
@@ -108,7 +151,9 @@ private:
     bool EnsureGpuResources();                               // PreviewComposite_GpuProgram_UI.cpp
     void PackSurfaceStratumWeights();                        // PreviewComposite_GpuBuffers_UI.cpp
     bool EnsureCompositeTexture(Sys::GpuResourceManager& manager);  // PreviewComposite_GpuBuffers_UI.cpp
-    void BindComposeBuffers(Sys::GpuResourceManager& manager);      // PreviewComposite_GpuBuffers_UI.cpp
+    // `bBakedInputsChanged` (ARCH §14.18 item 6) — gates PackSurfaceStratumWeights() and the five
+    // baked-input uploads only; every other upload in this function stays unconditional.
+    void BindComposeBuffers(Sys::GpuResourceManager& manager, bool bBakedInputsChanged);   // PreviewComposite_GpuBuffers_UI.cpp
 
     // The four passes of the Cpu twin (PreviewComposite_Cpu_UI.cpp).
     void ClearPassCpu();
@@ -140,6 +185,7 @@ private:
     Sys::GpuResourceManager* gpuResourceManager = nullptr;
     Sys::GpuTextureHandle    compositeTexture;
     bool bLastRunUsedGpu  = false;
+    double lastComposeMillis = 0.0;   // ARCH §14.18 item 19 — see LastComposeMillis() above.
     bool bGpuProgramReady = false;
     int  gpuProgramIndex  = -1;
     int  executedPassCount = 0;

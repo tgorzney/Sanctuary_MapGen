@@ -115,15 +115,19 @@ void RunSliderAndSelectionChecks() {
           "the area swatch is the one caller that turns the picker's alpha bar on");
 }
 
-// STEP21 ruling #4: color has no `_PARAMS` home, so it lives in a UI-only side table keyed by
-// area NAME. `ResolveAreaColor` finds an existing entry or appends a default one.
+// STEP21 ruling #4 / ARCH §14.18 items 11-13: color has no `_PARAMS` home, so it lives in a
+// UI-only side table keyed by area NAME. `ResolveAreaColor` finds an existing entry or appends a
+// fresh one, now drawing from the 16-entry distinct-color palette (by ordinal, stride 7) instead
+// of the retired flat Green default.
 void RunAreaColorResolutionChecks() {
     std::vector<AreaColorEntry> areaColors;
     float* const firstResolve = ResolveAreaColor(areaColors, "Base");
     Check(areaColors.size() == 1u, "the first touch of a name appends one entry");
-    Check(firstResolve[0] == 0.0f && firstResolve[1] == 1.0f && firstResolve[2] == 0.0f
-          && firstResolve[3] == 0.35f,
-          "a fresh entry defaults to Green/0.35 (ARCH_14_17_MapAreaFieldLayer.md §14.17 item 10)");
+    // ordinal 0 -> kAreaPaletteColors[0] (Spring Aqua), alpha kDefaultAreaFillAlpha.
+    Check(firstResolve[0] == kAreaPaletteColors[0][0] && firstResolve[1] == kAreaPaletteColors[0][1]
+          && firstResolve[2] == kAreaPaletteColors[0][2] && firstResolve[3] == kDefaultAreaFillAlpha,
+          "a fresh entry's first ordinal defaults to the palette's own entry 0, Spring Aqua "
+          "(ARCH_14_18_AreaLiveBlendFidelityAndPalette.md items 11/13)");
 
     firstResolve[0] = 0.2f;
     float* const secondResolve = ResolveAreaColor(areaColors, "Base");
@@ -132,6 +136,45 @@ void RunAreaColorResolutionChecks() {
 
     ResolveAreaColor(areaColors, "Other");
     Check(areaColors.size() == 2u, "a different name gets its own entry");
+}
+
+// ARCH §14.18 item 13 — the stride-7 assignment cycle, verified against the ruling's own worked
+// sequence (ordinals 0..3 -> table indices 0, 7, 14, 5: Spring Aqua, Purple, Yellow, Indigo), and
+// the "PlayableArea consumes no ordinal" correction that is the whole reason assignment lives
+// inside ResolveAreaColor rather than at either creation call site.
+void RunAreaPaletteAssignmentChecks() {
+    std::vector<AreaColorEntry> areaColors;
+    // Reserved up front: ResolveAreaColor returns a pointer INTO the vector's own backing store
+    // (by design — the caller hands it straight to DrawColorSwatch), so holding four such pointers
+    // alive across the four resolves below would otherwise be invalidated by std::vector's own
+    // reallocation on a later push_back — a dangling-pointer bug in the TEST, not in
+    // ResolveAreaColor's ordinal/stride logic itself (independently confirmed correct).
+    areaColors.reserve(4);
+    float* const first  = ResolveAreaColor(areaColors, "AreaOne");
+    float* const second = ResolveAreaColor(areaColors, "AreaTwo");
+    float* const third  = ResolveAreaColor(areaColors, "AreaThree");
+    float* const fourth = ResolveAreaColor(areaColors, "AreaFour");
+    Check(first[0] == kAreaPaletteColors[0][0] && first[1] == kAreaPaletteColors[0][1]
+          && first[2] == kAreaPaletteColors[0][2], "ordinal 0 -> palette entry 0, Spring Aqua");
+    Check(second[0] == kAreaPaletteColors[7][0] && second[1] == kAreaPaletteColors[7][1]
+          && second[2] == kAreaPaletteColors[7][2], "ordinal 1 -> palette entry 7, Purple");
+    Check(third[0] == kAreaPaletteColors[14][0] && third[1] == kAreaPaletteColors[14][1]
+          && third[2] == kAreaPaletteColors[14][2], "ordinal 2 -> palette entry 14, Yellow");
+    Check(fourth[0] == kAreaPaletteColors[5][0] && fourth[1] == kAreaPaletteColors[5][1]
+          && fourth[2] == kAreaPaletteColors[5][2], "ordinal 3 -> palette entry 5, Indigo");
+
+    // PlayableArea is pinned and consumes NO ordinal: resolving it between two ordinary areas must
+    // not shift the next ordinary area's own assignment.
+    std::vector<AreaColorEntry> withPlayable;
+    ResolveAreaColor(withPlayable, "AreaOne");                 // ordinal 0 -> Spring Aqua
+    float* const playable = ResolveAreaColor(withPlayable, kPlayableAreaName);
+    Check(playable[0] == kPlayableAreaColor[0] && playable[1] == kPlayableAreaColor[1]
+          && playable[2] == kPlayableAreaColor[2] && playable[3] == kPlayableAreaColor[3],
+          "PlayableArea always resolves to the pinned reserved color, not a palette entry");
+    float* const areaTwo = ResolveAreaColor(withPlayable, "AreaTwo");
+    Check(areaTwo[0] == kAreaPaletteColors[7][0] && areaTwo[1] == kAreaPaletteColors[7][1]
+          && areaTwo[2] == kAreaPaletteColors[7][2],
+          "PlayableArea consumed no ordinal — the next ordinary area still lands on ordinal 1, Purple");
 }
 
 // STEP21 ruling #5: a real regression this ticket must fix, not preserve. Mirrors
@@ -237,6 +280,7 @@ int main() {
     RunUniqueNameChecks();
     RunSliderAndSelectionChecks();
     RunAreaColorResolutionChecks();
+    RunAreaPaletteAssignmentChecks();
     RunColorRenameRetargetingChecks();
     RunAreaLockResolutionChecks();
     RunLockRenameRetargetingChecks();

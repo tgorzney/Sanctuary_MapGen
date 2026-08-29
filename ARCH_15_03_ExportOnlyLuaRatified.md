@@ -35,3 +35,15 @@ extend to reading a different corpus in a different direction, such as game-ship
 `LuaTableEvaluate_SYS` primitive (§18.1). That is read-only ingestion of external game data with no
 round-trip back into a `.sanmap` or scenario file, not scenario content, and is not barred by this
 section.
+
+**Second scope note — AMENDED 2026-08-29 by [`ARCH_15_11_ForeignScenarioAreaImport.md`](ARCH_15_11_ForeignScenarioAreaImport.md)
+§15.11. Do not read the "never … read this file, or any scenario content, back" sentence above in
+isolation and conclude "never" without qualification.** §15.11 grants exactly one narrow,
+permanently bounded carve-out: a human-triggered, one-shot, **non-executing** extraction of **area
+rectangles only** (`Params::MapArea`) from a **foreign** scenario `.lua` — a hand-authored file
+SanGen never writes (the legacy `<MapName>_Scenarios_Script.lua`, `<MapName>_data.lua`) —
+mechanically enforced by refusing any input carrying `kScenarioGeneratedFileBannerLine` or either
+SanGen-owned filename. This section's rule stands **absolutely** for everything else: every
+SanGen-generated `.lua`, and every other kind of scenario content (scenario records, `match`,
+`pattern`, `spawns`, `alloyMode`, unit spawns, `COUNT_SCENARIOS` ordering) from any `.lua`
+whatsoever. Read §15.11's eleven boundary items before acting on this note.

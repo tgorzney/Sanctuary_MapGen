@@ -31,7 +31,10 @@ struct PreviewIntegrationScene {
           driver(assembler) {
         AssemblerTest::ConfigureStages(assembler);
         ConfigureCompositeSettings();
-        driver.SetPreviewCompositeCallback([this] { composite.Compose(); });
+        // Test scaffolding: always a full-fidelity compose regardless of tier — this fixture tests
+        // pipeline<->composite WIRING, not the upload gate (that is PreviewComposite_Gpu_UI_Test.cpp's
+        // job, §9 below).
+        driver.SetPreviewCompositeCallback([this](Pipeline::RefreshTier) { composite.Compose(); });
     }
 
     // ONE colorized layer (height through a black->white ramp, Replace) so every pixel the marks

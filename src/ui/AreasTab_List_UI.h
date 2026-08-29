@@ -19,6 +19,11 @@
 // single OWNER is now `PreviewCompositeSettings::areaColors` (see that header) — not
 // `AreasTabState`, which no longer carries a color field of its own.
 //
+// ARCH_14_18_AreaLiveBlendFidelityAndPalette.md item 12 — `kPlayableAreaName` (formerly defined
+// directly below) has ALSO moved into `AreaColorTable_UI.h`, for the same "one funnel, no upward
+// dependency on a tab header" reason as the color table itself. It is re-exported here by the same
+// inclusion, so `IsPlayableArea`/`EnsurePlayableArea`/every existing call site is unaffected.
+//
 // STEP212 — `AreaLockEntry`/`ResolveAreaLocked` (the per-area lock, replacing the retired global
 // `AreasTabState::bAreasLocked`) live in the equally minimal sibling `AreaLockTable_UI.h`, included
 // and re-exported here for the identical reason: every existing `#include "AreasTab_List_UI.h"`
@@ -41,9 +46,8 @@ static_assert(kAreaColorChannelCount == kColorSwatchChannelCount,
              "AreaColorEntry's channel count must match the swatch widget's own, or DrawColorSwatch "
              "would read/write past the array ResolveAreaColor hands it.");
 
-// The one area the engine requires. v1 keyed "cannot be removed" off the NAME, and so does v2:
-// the name is what the exported map file carries, so the name is the identity.
-inline constexpr const char* kPlayableAreaName = "PlayableArea";
+// `kPlayableAreaName` itself now lives in AreaColorTable_UI.h (ARCH §14.18 item 12), re-exported
+// here by the #include above — nothing below needs its own copy.
 
 inline bool IsPlayableArea(const Params::MapArea& area) { return area.name == kPlayableAreaName; }
 inline bool IsAreaRemovable(const Params::MapArea& area) { return !IsPlayableArea(area); }

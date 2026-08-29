@@ -54,13 +54,15 @@ bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize,
                                   WidgetStyle(), "%.0f").bCommitted || bCommitted;
     bCommitted = DrawSliderScalar("Length", area.length, extentRange, state.lengthToggle,
                                   WidgetStyle(), "%.0f").bCommitted || bCommitted;
-    // ARCH §14.17 item 10 — PlayableArea is always Green and non-editable: re-pin its color before
-    // drawing (the swatch below is the only OTHER path that could ever set a PlayableArea color) and
-    // disable the control so a designer cannot pick a different one.
+    // ARCH §14.17 item 10 / §14.18 item 16 — PlayableArea is always Green and non-editable: re-pin
+    // its color before drawing (the swatch below is the only OTHER path that could ever set a
+    // PlayableArea color) and disable the control so a designer cannot pick a different one.
+    // `kDefaultAreaColor` is retired — `kPlayableAreaColor` is the pinned reserved color now that
+    // ordinary areas draw from the 16-entry palette instead.
     float* const color = ResolveAreaColor(areaColors, area.name);
     if (IsPlayableArea(area)) {
-        color[0] = kDefaultAreaColor[0]; color[1] = kDefaultAreaColor[1];
-        color[2] = kDefaultAreaColor[2]; color[3] = kDefaultAreaColor[3];
+        color[0] = kPlayableAreaColor[0]; color[1] = kPlayableAreaColor[1];
+        color[2] = kPlayableAreaColor[2]; color[3] = kPlayableAreaColor[3];
         ImGui::BeginDisabled();
         DrawColorSwatch("Color", color, state.colorOptions, state.colorToggle);
         ImGui::EndDisabled();

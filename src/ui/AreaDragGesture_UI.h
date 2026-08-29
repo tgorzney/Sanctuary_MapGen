@@ -62,11 +62,20 @@ bool IsWorldPointInsideArea(const Params::MapArea& area, float worldX, float wor
 bool BeginAreaDragGesture(AreaDragGestureState& state, const std::vector<Params::MapArea>& areas,
                           int areaIndex, AreaHandle_UI handle, float worldX, float worldZ);
 
-// One drag frame. Center: pure translate. Any of the 8 resize handles: Ctrl doubles the extent
-// delta and resizes from the rect's own center; Shift locks the opposite axis to aspectLockRatio,
-// the larger-magnitude delta deciding which axis leads on a corner handle. Each axis floors to
-// kAreaMinimumExtentWorldUnits. No-op if `state` is not active or `state.areaIndex` is out of range
-// (in which case state.bActive is also cleared, defensively).
+// One drag frame. Center: pure translate. Any of the 8 resize handles: `bCtrlHeld` doubles the
+// extent delta and resizes from the rect's own center; Shift locks the opposite axis to
+// aspectLockRatio, the larger-magnitude delta deciding which axis leads on a corner handle. Each
+// axis floors to kAreaMinimumExtentWorldUnits. No-op if `state` is not active or `state.areaIndex`
+// is out of range (in which case state.bActive is also cleared, defensively).
+// STEP214 — `bCtrlHeld` is a boolean gesture flag, not literally "the physical Ctrl key is down":
+// its one caller, MapCanvas_AreaDragDispatch_UI.cpp's ContinueAreaDrag, is itself fed by
+// MapCanvas_Draw_UI.cpp's own `io.KeyCtrl || io.KeyAlt` (the ONE translation unit in this canvas
+// that reads imgui's `io` at all) — Alt is an ADDITIONAL trigger for this exact same center-resize
+// path, not a second, different modifier semantic. This function's own math and signature are
+// completely unchanged by that widening; it still only ever sees one opaque bool, matching this
+// codebase's own established `bCtrlHeld`/`bShiftHeld` literal-modifier-name convention elsewhere —
+// the name is not changed to something like `bCenterResizeModifierHeld` at this layer or any layer
+// below MapCanvas_Draw_UI.cpp (see STEP214's own ticket text for why).
 void UpdateAreaDragGesture(AreaDragGestureState& state, std::vector<Params::MapArea>& areas,
                            float worldX, float worldZ, bool bShiftHeld, bool bCtrlHeld);
 

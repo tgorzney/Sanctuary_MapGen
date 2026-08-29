@@ -2,6 +2,14 @@
 
 ### 14.17 Map areas are a composited FIELD LAYER — `PreviewLayerKind::MapAreas`, analytic rectangles flattened from PARAMS at `PrepareRun()` (ARCH ruling, human-approved; amends §21.8's draw-pass ruling)
 
+> **AMENDED 2026-08-29 by [§14.18](ARCH_14_18_AreaLiveBlendFidelityAndPalette.md).** Items **1–9** and
+> **13–14** stand unchanged and are the law. Items **10, 11 and 12 are partly superseded** — each
+> carries an inline marker below. In one line: the drag-time immediate-mode FILL is abolished (it
+> used ImGui's fixed alpha-over instead of the layer's real `PreviewBlendMode`, so a dragged area
+> visibly turned solid), `mapAreaSuppressedIndex` is retired with it, the composite refreshes once per
+> moving drag frame instead of twice per gesture, and new areas draw from a 16-entry distinct-color
+> palette instead of a flat green. **Do not cite items 10/11/12 without reading §14.18.**
+
 Human-approved ruling, verified against the live code before being written down (not taken on the
 proposal's word): `PreviewComposite_Settings_UI.h`, `PreviewComposite_Kernel_UI.h`,
 `PreviewComposite_UI.h`, `PreviewComposite_Prepare_UI.cpp`, `PreviewComposite_Cpu_UI.cpp`,
@@ -202,12 +210,17 @@ its own category already dictates:
   below it (`DrawAreaDetail`'s `ResolveAreaColor(state.areaColors, …)`, the rename fix-up at
   `AreasTab_UI.cpp:40-41`) rebinds to that reference; no logic changes.
 
-**10. Defaults.**
+**10. Defaults.** *(PARTLY SUPERSEDED by [§14.18](ARCH_14_18_AreaLiveBlendFidelityAndPalette.md)
+items 11-16: the flat-Green default for NEW areas is replaced by the 16-entry palette assigned inside
+`ResolveAreaColor`'s lazy append, and `kDefaultAreaColor` is split into `kPlayableAreaColor` +
+`kDefaultAreaFillAlpha`. The `PlayableArea`-is-pinned-Green rule and the whole third and fourth
+bullets below are UNCHANGED and still law.)*
 - **New areas default to Green, blend mode Overlay.** `kDefaultAreaColor` in `AreaColorTable_UI.h` is
   `{ 0.0f, 1.0f, 0.0f, 0.35f }` — RGB green, and the pre-existing `0.35` fill alpha preserved
   verbatim (that alpha is v1 parity, `AreasTab_List_UI.h:76-80`; only the RGB changes). It is a
   named constant, not a literal in the struct's member initializer (Constitution §8), and
-  `AreaColorEntry::color` initializes from it.
+  `AreaColorEntry::color` initializes from it. — **the "New areas default to Green" half is
+  superseded; the Overlay blend mode, the `0.35` alpha and the named-constant discipline stand.**
 - **`Params::MapArea` named `"PlayableArea"` is always Green and non-editable.** The default IS
   green, so a freshly-resolved PlayableArea entry is already correct with no special case; the only
   thing that could change it is the tab's own swatch. Ruled: the Areas tab draws that swatch inside
@@ -217,7 +230,9 @@ its own category already dictates:
   (`IsAreaRemovable() == false`), and `BeginDisabled` is already an established codebase idiom
   (§15.5's own read-only-slider ruling). No other path can mint a PlayableArea color: the canvas
   create path names areas via `NextAreaName` (`MapCanvas_AreaDragDispatch_UI.cpp:87`) and the table
-  never serializes.
+  never serializes. — **still law; §14.18 only renames the constant it pins to
+  (`kPlayableAreaColor`) and adds a matching pin at the resolve site so the color is right even when
+  the tab row was never expanded.**
 - **The layer is seeded topmost and enabled.** `ConfigureDefaultPreview`
   (`Application_PreviewSetup_UI.cpp:60-80`) pushes it LAST, after Accumulation:
   `MakeFieldLayer(PreviewLayerKind::MapAreas, PreviewBlendMode::Overlay, -1, 0.0f, 1.0f, 1.0f)` —
@@ -238,7 +253,16 @@ its own category already dictates:
   `!mapFields.IsSized()` (`PreviewComposite_Prepare_UI.cpp:48`), so areas do not paint before the
   first bake. Correct and unchanged — there is no image to paint onto.
 
-**11. Drag-performance rule — exactly two recomposites per gesture (amends §21.8).** A GPU
+**11. Drag-performance rule — exactly two recomposites per gesture (amends §21.8).**
+*(**SUPERSEDED** by [§14.18](ARCH_14_18_AreaLiveBlendFidelityAndPalette.md) items 3-8. The
+"exactly two recomposites per gesture" optimization bought its cheapness by drawing the dragged area
+with a rival immediate-mode fill that could not reproduce the layer's `Overlay` blend, so an area
+turned solid the moment it was touched. `mapAreaSuppressedIndex` and every piece of plumbing named
+below are RETIRED; the composite refreshes once per moving drag frame (new Tier B2), enabled by
+tier-gating the baked-input uploads. Kept here in full because §14.18's ruling is only legible
+against what it replaces — but nothing in this item is current law except the last sentence of the
+"An index, not a `bEnabled` toggle" bullet, whose reasoning §14.18 explicitly endorses.)*
+A GPU
 recomposite per drag frame would violate the Tier B cost model (`ARCH_14_08_DirtyFlagTiers.md`) for
 an interaction §21.8 deliberately placed in the cheap tier. Ruled:
 - **New transient field** `int mapAreaSuppressedIndex = -1;` on `PreviewCompositeSettings`.
@@ -271,9 +295,16 @@ an interaction §21.8 deliberately placed in the cheap tier. Ruled:
   (`Application_LeftColumn_UI.cpp:57-60`). Unset callback = no refresh, never a crash. One small
   private helper, `void MapCanvas::SetMapAreaSuppression(int areaIndex)`, writes the pointer
   null-safely and fires the callback only when the value actually changed, so the three call sites
-  above never hold two copies of that condition.
+  above never hold two copies of that condition. — **`areaCompositeRefreshCallback` /
+  `SetAreaCompositeRefreshCallback` SURVIVE §14.18 unchanged and become the per-frame request path;
+  everything else in this bullet is retired.**
 
-**12. Border rule (amends §21.8's "fill+border every area every frame").** With the fill now the
+**12. Border rule (amends §21.8's "fill+border every area every frame").**
+*(PARTLY SUPERSEDED by [§14.18](ARCH_14_18_AreaLiveBlendFidelityAndPalette.md) item 9: clause **(b)**
+is deleted with the suppression index, and the immediate-mode **fill** paragraph at the end is
+deleted outright — the pass draws chrome only. Clause (a), the layer-disabled rule, clause (c), the
+handles, the cursor shape, and the `const PreviewComposite*` read path all stand unchanged.)*
+With the fill now the
 composite's job in the steady state, the immediate-mode border is edit-time-only feedback. Ruled:
 `MapCanvas_AreaDraw_UI.cpp` draws an area's border **only when all three hold** — (a) the MapAreas
 field layer is enabled (`bEnabled` on the `PreviewFieldLayer` of kind `MapAreas` in
@@ -296,7 +327,8 @@ wire key, no `SanGenVersion` bump, no importer/exporter change. Everything this 
 presentation state in the same category as `PreviewCompositeSettings` and the pre-existing
 `AreaColorEntry` table — which STEP21 ruling #4 already decided has no `_PARAMS` home
 (`AreasTab_List_UI.h:16-20`). That decision stands; this ruling only moves where the non-serialized
-table lives inside UI, never whether it serializes.
+table lives inside UI, never whether it serializes. **§14.18 does not disturb this: the palette is
+also presentation-only and also never serializes.**
 
 **14. Documentation defect to fix in the same change.** `PreviewComposite_Settings_UI.h:16-22`'s
 comment states "Which BAKED field a layer colorizes. Every entry names a field `Data::MapFields`
@@ -315,4 +347,5 @@ them): **(A)** the `AreaColorTable_UI.h` extraction + the `areaColors` ownership
 itself — enum, define, binding, record, both twins, builder, `LayerSourceField` case, catalogue row,
 defaults, comment fix; **(C)** the drag-suppression + border rules, which are inert until (B) lands.
 (C) must not land before (B): without the composite fill, suppressing the dragged area's fill would
-make it vanish mid-drag.
+make it vanish mid-drag. **All three shipped (STEP211/212); (C) is now superseded by §14.18's own
+three-piece dispatch.**

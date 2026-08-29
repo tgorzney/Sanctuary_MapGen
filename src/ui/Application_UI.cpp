@@ -72,7 +72,15 @@ Application::~Application() { Shutdown(); }
 // know a composite exists, and the canvas may not know a pipeline exists, so the shell — which
 // legally sees both — hands each of them a closure over the other.
 void Application::WireCallbacks() {
-    previewDriver.SetPreviewCompositeCallback([this] { composite.Compose(/*bNeedsTexelReadback=*/false); });
+    // ARCH §14.18 item 6 — the production hot path never needs the texel readback (the canvas
+    // samples CompositeTexture() directly), and now also gates the baked-input uploads: a
+    // PreviewRender-tier refresh provably left the bake untouched (PreviewDriver_PIPELINE.h's own
+    // invariant), so it skips re-packing/re-uploading heightfield/flow/accumulation/slope/
+    // surface-stratum-weights. A MapUpdate-tier refresh always re-uploads (the bake just changed).
+    previewDriver.SetPreviewCompositeCallback([this](Pipeline::RefreshTier tier) {
+        composite.Compose({ /*bNeedsTexelReadback=*/false,
+                            /*bBakedInputsChanged=*/tier == Pipeline::RefreshTier::MapUpdate });
+    });
     // ARCH §19.25, item 4 — widened to the full key: a procedural change (bManual == false) updates
     // lastSelectedEntityIdentifier exactly as before; a manual change updates the Markers tab's own
     // selectedManualInstanceIdentifier instead, keeping the list's highlight in sync when the CANVAS
@@ -140,15 +148,16 @@ void Application::WireCallbacks() {
     // SAME vectors the Props/Decals tabs edit — one source of truth, never a second copy.
     canvas.SetManualPropDragSource(&recipe.props, &recipe.propLayers, &recipe.geometry, &recipe);
     canvas.SetManualDecalDragSource(&recipe.decals, &recipe.decalLayers, &recipe.geometry, &recipe);
-    // ARCH §21.8 / §14.17 item 9/11 / STEP212 — the Area canvas gesture's drag source: `recipe.areas`,
-    // `composite.Settings().areaColors`, `tabState.areas.areaLocks` and
-    // `composite.Settings().mapAreaSuppressedIndex` are the SAME storage the tab/composite already
-    // own — one source of truth, never a second copy. `areaLocks` replaces the retired
-    // `&tabState.areas.bAreasLocked` (STEP212 — per-area lock); it stays TAB-owned, unlike
-    // `areaColors`, because lock has no composite-side reader (AreaLockTable_UI.h's own ruling).
+    // ARCH §21.8 / §14.17 item 9 / STEP212 — the Area canvas gesture's drag source: `recipe.areas`,
+    // `composite.Settings().areaColors` and `tabState.areas.areaLocks` are the SAME storage the
+    // tab/composite already own — one source of truth, never a second copy. `areaLocks` replaces
+    // the retired `&tabState.areas.bAreasLocked` (STEP212 — per-area lock); it stays TAB-owned,
+    // unlike `areaColors`, because lock has no composite-side reader (AreaLockTable_UI.h's own
+    // ruling). ARCH §14.18 item 23-D/G — the drag-suppression mechanism's old fifth argument (a
+    // composite-side transient index) is retired along with the composite-side field and setter
+    // parameter it fed.
     canvas.SetManualAreaDragSource(&recipe.areas, &composite.Settings().areaColors,
-                                   &tabState.areas.areaLocks, &tabState.areas.selectedAreaIndex,
-                                   &composite.Settings().mapAreaSuppressedIndex);
+                                   &tabState.areas.areaLocks, &tabState.areas.selectedAreaIndex);
     // STEP126 — the static selection-highlight source; see MapCanvas_UI.h's
     // SetManualMarkerSelectionSource. Points at the SAME MarkersTabState field the Markers tab's own
     // instance-list rows write (tabState.markers.selectedManualInstanceIdentifier) — one source of

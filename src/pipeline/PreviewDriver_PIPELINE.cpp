@@ -44,23 +44,24 @@ RefreshTier PreviewDriver::Refresh() {
         CacheStageParameterHashes();
         bNeedsMapUpdate = false;
         bNeedsPreviewRender = false;
-        RunPreviewComposite();
+        RunPreviewComposite(RefreshTier::MapUpdate);
         return RefreshTier::MapUpdate;
     }
     if (bNeedsPreviewRender) {
         stagesThatRanLastRefresh.clear();   // no stage ran: the bake is reused as-is
         bNeedsPreviewRender = false;
-        RunPreviewComposite();
+        RunPreviewComposite(RefreshTier::PreviewRender);
         return RefreshTier::PreviewRender;
     }
     return RefreshTier::Nothing;
 }
 
 // A headless caller (no composite bound) still resolves its flags correctly — it just has no
-// image to show, rather than a driver that refuses to run (Constitution §6).
-void PreviewDriver::RunPreviewComposite() {
+// image to show, rather than a driver that refuses to run (Constitution §6). `tier` is exactly
+// the tier this Refresh() call is servicing (ARCH §14.18 item 6) — never re-derived here.
+void PreviewDriver::RunPreviewComposite(RefreshTier tier) {
     if (!previewCompositeCallback) return;
-    previewCompositeCallback();
+    previewCompositeCallback(tier);
     ++previewCompositeCount;
 }
 

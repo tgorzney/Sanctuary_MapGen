@@ -101,12 +101,6 @@ struct PreviewCompositeSettings {
     // mutable table, and this is the category `gradientRamps`/`clearColor` already occupy —
     // presentation state that never serializes into `mapGeneratorData`.
     std::vector<AreaColorEntry> areaColors;
-
-    // ARCH §14.17 item 11 — the ONE area currently mid-drag/resize/move on the canvas, omitted from
-    // this frame's composited input so a live drag costs exactly two recomposites (begin+end), never
-    // one per frame. Transient interaction state: NEVER serialized, and an out-of-range value
-    // suppresses nothing (the safe degradation if a list reorder ever races a gesture).
-    int mapAreaSuppressedIndex = -1;
 };
 
 } // namespace Ui

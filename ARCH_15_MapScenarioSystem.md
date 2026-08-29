@@ -28,6 +28,11 @@ retired. Full correction, replacement design, and an explicitly flagged open gap
 per-scenario unit-spawn dispatch code lives under the three-file split): `ARCH_15_05`'s "RETIRED
 2026-08-28" and "OPEN" notes.
 
+**Note (2026-08-29): §15.3's "never read scenario content back" sentence is NARROWED — not
+reversed — by §15.11.** One carve-out exists: a human-triggered, one-shot, non-executing import of
+**area rectangles only** from a **foreign** (SanGen-never-writes-it) scenario `.lua`. §15.3 still
+binds absolutely for every SanGen-generated `.lua` and for every other kind of scenario content.
+
 
 ---
 
@@ -37,7 +42,7 @@ per-scenario unit-spawn dispatch code lives under the three-file split): `ARCH_1
 |---|---|---|
 | §15.1 | [ARCH_15_01_LayerClassification.md](ARCH_15_01_LayerClassification.md) | Layer classification |
 | §15.2 | [ARCH_15_02_IoScopeRuling.md](ARCH_15_02_IoScopeRuling.md) | IO scope ruling — corrects an earlier assumption, does not reverse it |
-| §15.3 | [ARCH_15_03_ExportOnlyLuaRatified.md](ARCH_15_03_ExportOnlyLuaRatified.md) | Design ratified: option (c) — export-only, SanGen never parses Lua back (resolves §15.2's open question / `MAP_SCENARIO_SPEC.md` §8) |
+| §15.3 | [ARCH_15_03_ExportOnlyLuaRatified.md](ARCH_15_03_ExportOnlyLuaRatified.md) | Design ratified: option (c) — export-only, SanGen never parses Lua back (resolves §15.2's open question / `MAP_SCENARIO_SPEC.md` §8); **narrowed 2026-08-29 by §15.11** |
 | §15.4 | [ARCH_15_04_ThreeFileOnDiskShape.md](ARCH_15_04_ThreeFileOnDiskShape.md) | Three-file on-disk shape + overwrite safety (ratifies `MAP_SCENARIO_SPEC.md` §2/§2.1/§2.2) |
 | §15.5 | [ARCH_15_05_ParamsScenariosType.md](ARCH_15_05_ParamsScenariosType.md) | `Params::Scenarios` — the new PARAMS type (shape ruling); naval-fleet types retired 2026-08-28; `ScenarioBody::areaName` (named-`Area` reference, additive wire key `AreaName`) added 2026-08-28 |
 | §15.6 | [ARCH_15_06_CountScenariosOrdering.md](ARCH_15_06_CountScenariosOrdering.md) | `COUNT_SCENARIOS` ordering — array order IS the match-priority authoring action |
@@ -45,3 +50,4 @@ per-scenario unit-spawn dispatch code lives under the three-file split): `ARCH_1
 | §15.8 | [ARCH_15_08_ThirdPartyDependencyRuling.md](ARCH_15_08_ThirdPartyDependencyRuling.md) | Third-party dependency ruling — ImGuiColorTextEdit + embedded LuaJIT |
 | §15.9 | [ARCH_15_09_EngineWhitelistMigrationPath.md](ARCH_15_09_EngineWhitelistMigrationPath.md) | Engine-whitelist migration path (recorded as intended future simplification, not built) |
 | §15.10 | [ARCH_15_10_SlotPatternConstructionMoves.md](ARCH_15_10_SlotPatternConstructionMoves.md) | Slot-pattern construction moves into the runtime; `maxArmySlotCount` becomes authored data (ratifies the human's construction-code-belongs-in-universal-mod-code decision; amends `MAP_SCENARIO_SPEC.md` §2/§3/§4) |
+| §15.11 | [ARCH_15_11_ForeignScenarioAreaImport.md](ARCH_15_11_ForeignScenarioAreaImport.md) | Narrow, permanently-bounded carve-out from §15.3 — one-shot import of AREA RECTANGLES ONLY from a FOREIGN scenario `.lua` (2026-08-29) |

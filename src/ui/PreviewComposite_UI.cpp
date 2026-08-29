@@ -3,6 +3,7 @@
 // (PreviewComposite_Cpu_UI.cpp and its .glsl twin); the layer/entity flattening that needs the
 // baked fields is in PreviewComposite_Prepare_UI.cpp.
 #include "PreviewComposite_UI.h"
+#include <chrono>
 #include <cstddef>
 
 namespace SanmapGen {
@@ -30,10 +31,15 @@ PreviewComposite::PreviewComposite(const Params::Geometry& geometrySettings,
 
 // Gpu is the composite's backend (ARCH §4.2 "preview color = Gpu / Visual"); the Cpu twin runs
 // when no resource manager was handed in, so a headless caller still gets a correct image
-// instead of nothing.
-void PreviewComposite::Compose(bool bNeedsTexelReadback) {
-    if (gpuResourceManager != nullptr) { ComposeOnGpu(bNeedsTexelReadback); return; }
-    ComposeOnCpu();
+// instead of nothing. ARCH §14.18 items 6-7 — `request` replaces the old lone `bNeedsTexelReadback`
+// bool; its default reproduces every existing caller's behavior exactly (both flags true: a full
+// re-upload, texels read back).
+void PreviewComposite::Compose(ComposeRequest request) {
+    const std::chrono::steady_clock::time_point composeStart = std::chrono::steady_clock::now();
+    if (gpuResourceManager != nullptr) ComposeOnGpu(request);
+    else ComposeOnCpu();
+    lastComposeMillis = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - composeStart).count();
 }
 
 // Everything the kernels need that is not per-layer: sizes, the water window, the marks, the

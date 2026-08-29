@@ -182,6 +182,31 @@ void CheckAllBlendModesParity(Sys::GpuResourceManager& manager) {
     }
 }
 
+// ARCH §14.18 items 6-7 — the ONE thing this ticket must prove: a gated recompose over UNCHANGED
+// baked fields is byte-identical to a full re-upload. The gate is a pure efficiency change; this
+// is its own dedicated acceptance test, exactly as the ruling's own dispatch note calls for
+// ("Piece A ... testable on its own by asserting the composite's texels are identical with and
+// without the flag").
+void CheckGatedUploadParity(Sys::GpuResourceManager& manager) {
+    Ui::PreviewTestScene scene;
+    BuildVariedScene(scene);
+    Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas,
+                                   scene.fields, scene.instances, scene.entityIdentifiers);
+    ConfigureVariedSettings(composite.Settings());
+    composite.SetGpuResourceManager(&manager);
+
+    composite.Compose();   // default request: full upload, full readback — establishes the baseline
+    const std::vector<unsigned int> fullUploadTexels = composite.CompositeTexels();
+
+    // Same composite, same unchanged baked fields, uploads gated OFF: must reproduce the exact
+    // same image, never an approximation of it (§14.18 item 1's "no second implementation" law
+    // applies just as much to a skipped upload as to a rival draw call).
+    composite.Compose({ /*bNeedsTexelReadback=*/true, /*bBakedInputsChanged=*/false });
+    check(fullUploadTexels == composite.CompositeTexels(),
+          "a gated recompose (bBakedInputsChanged=false) over unchanged baked fields reproduces the "
+          "exact same image as a full re-upload — the gate changes zero observable behavior");
+}
+
 } // namespace
 
 int main(int argumentCount, char** argumentValues) {
@@ -195,6 +220,7 @@ int main(int argumentCount, char** argumentValues) {
     check(manager.Initialize(), "the Gpu resource manager initializes");
     CheckGpuPathAndParity(manager);
     CheckAllBlendModesParity(manager);
+    CheckGatedUploadParity(manager);
     wglMakeCurrent(nullptr, nullptr);
     wglDeleteContext(glContext);
     ReleaseDC(window, deviceContext);

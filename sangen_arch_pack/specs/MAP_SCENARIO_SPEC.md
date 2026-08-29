@@ -92,19 +92,22 @@ Only **one** `NewThread` per script is honored (`MAP_UNIT_SPAWNING_SPEC` §4, em
 4. Prefab/navmesh work **last**, `pcall`'d (`DATA:489-492`). It once sat ahead of the unit spawn and
    silently killed every unit when it threw.
 
-⚠️ **Note (2026-08-29), read before trusting point 4 above as still-current:**
-`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6 records that Pandemonium Isthmus's own `_data.lua`, as of a
-later session, places blocker-prefab work directly **after** step 2 (`SetPlayableArea`) rather than
-last, after step 3 — the opposite relative position from what point 4 states above. This section's
-point 4 is left as written (the record of what `DATA:436-494` showed at the time this spec was
-last re-derived, per its own "AS-BUILT" discipline, §2); `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6 is the
-current word on blocker-prefab ordering specifically, and its §6.1 carries a further, more
-important correction: on this same file, several rounds of live re-ordering — each individually
-correct against the ordering law here — did not fix a real regression, because the actual cause was
-an `Import`-omission bug elsewhere in the thread, not an ordering defect. Re-ordering is necessary
-but never sufficient evidence a fix is correct; every call in this thread that can throw should be
-independently `pcall`'d regardless of its position, exactly as `MAP_UNIT_SPAWNING_SPEC` §4 already
-says and `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6.1 restates with a concrete failure story.
+⚠️ **Note (2026-08-29, corrected same day — see below):** an earlier version of this note claimed
+Pandemonium Isthmus's own `_data.lua` placed blocker-prefab work directly after step 2
+(`SetPlayableArea`) rather than last, after step 3 — the opposite relative position from what point
+4 states above. **That claim was wrong**, based on an intermediate mid-fix state relayed
+secondhand rather than the live file's actual final shape, and is retracted. A direct read of the
+live file confirms point 4 above is correct and current: blocker-prefab work (both the air and sea
+blockers) runs LAST, after step 3's scenario unit spawning, each independently `pcall`'d.
+`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6 is still the fuller, blocker-specific word on this ordering —
+not merely that it is last, but why (nothing load-bearing follows it, so a blocker throw can no
+longer cascade into anything else); its §6.1 carries a separate, more important lesson from the
+same session: several rounds of live re-ordering — each individually correct against the ordering
+law here — did not fix a real regression, because the actual cause was an `Import`-omission bug
+elsewhere in the thread, not an ordering defect. Re-ordering is necessary but never sufficient
+evidence a fix is correct; every call in this thread that can throw should be independently
+`pcall`'d regardless of its position, exactly as `MAP_UNIT_SPAWNING_SPEC` §4 already says and
+`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6.1 restates with a concrete failure story.
 
 ⚠️ `common/systems/threads.lua:86-105` appends each `NewThread` into a per-tick **list**, so the
 single-honored-thread rule is not visible in that source. Treat it as an empirical rule, not a
@@ -636,7 +639,9 @@ playable area and will not be culled.
 ## 14. SanGen ownership and on-disk shape (ratified law — not yet built)
 
 Per `ARCH_15_03`/`ARCH_15_04`/`ARCH_15_10`. SanGen owns scenario **data**, rendered to Lua on
-export; it never parses Lua back (option (c) — no Lua parser in the import direction).
+export; it never parses Lua back (option (c) — no Lua parser in the import direction), with exactly
+one narrow carve-out ratified 2026-08-29: `ARCH_15_11` permits a human-triggered, non-executing
+extraction of **area rectangles only** from a foreign scenario `.lua` SanGen never writes.
 
 | File | Role | Written by SanGen? |
 |---|---|---|
@@ -675,9 +680,9 @@ export; it never parses Lua back (option (c) — no Lua parser in the import dir
 - `MODDING_SCRIPTING_SPEC.md` — the historical investigation trail (the disproven cross-tree
   `Import()` hypothesis) and the F1-console reliability caveat.
 - `NAVMAP_MODIFIER_BLOCKER_SPEC.md` — a separate hand-authoring technique sharing this system's
-  exact `<MapName>_data.lua`/single-`NewThread` surface; §6/§6.1's ordering-law extension and
-  pcall-vs-ordering correction directly amend how §3.1's own live order should be read today.
-- `ARCH_15_MapScenarioSystem.md` §15 and subsections §15.1-§15.10 — the binding law. §15.5 needs
+  exact `<MapName>_data.lua`/single-`NewThread` surface; §6/§6.1's ordering-law extension confirms,
+  not corrects, how §3.1's own live order above should be read.
+- `ARCH_15_MapScenarioSystem.md` §15 and subsections §15.1-§15.11 — the binding law. §15.5 needs
   review against §11.1 of this spec.
 - `IO_MIGRATION_SPEC.md` §1 — the per-domain `.sanmap` JSON IO convention the new `Scenarios`
   section may extend; the companion-`.lua` surface explicitly does **not** reuse it.

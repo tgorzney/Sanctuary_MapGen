@@ -27,6 +27,7 @@
 #include <functional>
 #include <vector>
 #include "Application_Panels_UI.h"
+#include "AreaRecompositeThrottle_UI.h"
 #include "DecalDragGesture_UI.h"
 #include "ManualInstanceHitTest_UI.h"
 #include "MapCanvasView_UI.h"
@@ -154,26 +155,24 @@ public:
     }
     // ARCH §21.8 / STEP212 — mirrors SetManualPropDragSource's shape minus Geometry/
     // globalSymmetryRecipe (Areas carry no symmetry/layer concept of their own, §21.8 correction
-    // 1/3). `areas`/`areaColors`/`areaLocks`/`selectedAreaIndex` are all mutable: STEP212 replaces
+    // 1/3). `areas`/`areaColors`/`areaLocks`/`selectedAreaIndex` are all mutable: STEP212 replaced
     // the retired, read-only, tab-wide `const bool* areasLocked` with a per-area lock TABLE the
-    // canvas now legitimately writes into too (CreateAreaFromDrag inserts a freshly created area's
-    // own entry as unlocked; every ordinary lazy resolve elsewhere still defaults locked) — exactly
-    // ResolveAreaColor's own already-established mutable-pointer shape for `areaColors` above.
-    // ARCH §14.17 item 11 — a fifth parameter, `mapAreaSuppressedIndex`, lets the canvas set/clear the
-    // composite's transient drag-suppression slot WITHOUT reaching through the canvas's own `const
-    // PreviewComposite* composite` (deliberately const — the canvas never composites, see below).
-    // STEP212 leaves this fifth parameter and its own plumbing completely untouched.
+    // canvas legitimately writes into too (CreateAreaFromDrag inserts a freshly created area's own
+    // entry as unlocked). ARCH §14.18 item 23-D — the FIFTH parameter (the old composite-side
+    // drag-suppression index) is RETIRED along with the composite-side field it pointed at: with
+    // the suppression mechanism gone, this setter's own signature shrinks back to four pointers.
     void SetManualAreaDragSource(std::vector<Params::MapArea>* areas, std::vector<AreaColorEntry>* areaColors,
-                                  std::vector<AreaLockEntry>* areaLocks, int* selectedAreaIndex,
-                                  int* mapAreaSuppressedIndex) {
+                                  std::vector<AreaLockEntry>* areaLocks, int* selectedAreaIndex) {
         manualAreaDrag.areas = areas; manualAreaDrag.areaColors = areaColors;
         manualAreaDrag.areaLocks = areaLocks; manualAreaDrag.selectedAreaIndex = selectedAreaIndex;
-        manualAreaDrag.mapAreaSuppressedIndex = mapAreaSuppressedIndex;
     }
-    // ARCH §14.17 item 11 — the drag-suppression recomposite request, mirroring
-    // SetSelectionChangedCallback's own injection shape verbatim (this header's established pattern).
-    // Unset = no refresh, never a crash. Fired exactly twice per drag/resize/move gesture (begin +
-    // end) and once per create-by-drag — never once per ContinueAreaDrag frame.
+    // ARCH §14.18 items 4/18/20 — the recomposite-request callback. Mirrors
+    // SetSelectionChangedCallback's own injection shape verbatim. Unset = no refresh, never a
+    // crash. Fired: never at TryBeginAreaDrag (a begin changes no composite input); once per frame
+    // ContinueAreaDrag's own dragged rectangle actually MOVED, subject to the Tier-B2 cost watchdog
+    // (AreaRecompositeThrottle_UI.h) throttling to at most one per kAreaRecompositeThrottleIntervalMillis
+    // after kAreaRecompositeBreachFrameCount consecutive over-budget composes; unconditionally,
+    // exempt from the throttle, at EndAreaDrag; and once, unthrottled, at CreateAreaFromDrag.
     void SetAreaCompositeRefreshCallback(std::function<void()> refreshCallback) {
         areaCompositeRefreshCallback = std::move(refreshCallback);
     }
@@ -355,10 +354,6 @@ private:
     void CreateAreaFromDrag(float pressRegionLocalX, float pressRegionLocalY,
                             float releaseRegionLocalX, float releaseRegionLocalY);   // ditto, release-time only
     void DrawAreaOverlayPass(float regionOriginX, float regionOriginY);        // MapCanvas_AreaDraw_UI.cpp
-    // ARCH §14.17 item 11 — writes `*manualAreaDrag.mapAreaSuppressedIndex` null-safely and fires
-    // `areaCompositeRefreshCallback` only when the value actually changed, so TryBeginAreaDrag/
-    // EndAreaDrag never hold two copies of that "did it actually change" condition.
-    void SetMapAreaSuppression(int areaIndex);                                 // MapCanvas_AreaDragDispatch_UI.cpp
 
     MapCanvasView view;
     Sys::GpuResourceManager*        gpuResourceManager = nullptr;
@@ -441,6 +436,10 @@ private:
     // Areas is not a fourth PlacementCollectionKind_UI member).
     ManualAreaDragSources_UI manualAreaDrag;
     bool                     bAreaDragActive = false;
+    // ARCH §14.18 items 18/20 — the Tier-B2 cost watchdog's own per-gesture bookkeeping. Reset to a
+    // fresh instance on every successful TryBeginAreaDrag and again at EndAreaDrag — no cross-
+    // gesture memory of any kind.
+    AreaRecompositeThrottleState areaRecompositeThrottle;
     // ARCH §14.17 item 11 — the recomposite-request callback (see SetAreaCompositeRefreshCallback).
     std::function<void()>    areaCompositeRefreshCallback;
 };

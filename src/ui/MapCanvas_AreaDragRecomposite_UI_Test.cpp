@@ -1,10 +1,19 @@
-// MapCanvas_AreaDragSuppression_UI_Test.cpp — ARCH §14.17 item 11 acceptance: the Area canvas
-// gesture's drag-performance rule — exactly two recomposite requests per drag/resize/move gesture
-// (begin + end), never one per ContinueAreaDrag frame, driven through SetAreaCompositeRefreshCallback
-// and the transient mapAreaSuppressedIndex slot SetManualAreaDragSource's fifth parameter injects.
-// GL-backed (mirrors MapCanvas_ActivePanelGate_UI_Test.cpp's own technique exactly) because
-// TryBeginAreaDrag/ContinueAreaDrag/EndAreaDrag/CreateAreaFromDrag are MapCanvas-private — the only
-// way to exercise them from a test is through a real MapCanvas::Draw() press/drag/release sequence.
+// MapCanvas_AreaDragRecomposite_UI_Test.cpp — ARCH §14.18 Piece C acceptance (supersedes the
+// retired MapCanvas_AreaDragSuppression_UI_Test.cpp — its entire premise, "exactly two
+// recomposites per gesture," is now the opposite of law): TryBeginAreaDrag fires ZERO refresh
+// requests (a begin changes no composite input — selection is not a composite input);
+// ContinueAreaDrag fires exactly one refresh per frame the dragged rectangle actually moved and
+// ZERO on a held-but-motionless frame; EndAreaDrag's refresh is unconditional, always fires
+// exactly once, regardless of throttle state or whether the final frame moved; CreateAreaFromDrag's
+// single request is unchanged. GL-backed (mirrors the retired test's own technique exactly)
+// because TryBeginAreaDrag/ContinueAreaDrag/EndAreaDrag/CreateAreaFromDrag are MapCanvas-private —
+// the only way to exercise them is through a real MapCanvas::Draw() press/drag/release sequence.
+// The composite's own real Compose() cost, measured on this test's tiny fixture scene, stays well
+// under kAreaRecompositeCostBudgetMillis for the two-move sequence this file drives, so the
+// watchdog never engages here regardless of the exact (machine-dependent) measured value — see the
+// per-frame walkthrough in this ticket's own text for why that is true independent of the number.
+// AreaRecompositeThrottle_UI_Test.cpp is the throttle's own dedicated, fully-deterministic,
+// GPU-free coverage of the watchdog's arithmetic in isolation.
 #include "MapCanvas_UI.h"
 #include "PreviewComposite_TestScene_UI.h"
 #include <imgui.h>
@@ -31,7 +40,7 @@ void BeginHeadlessFrame() {
 ImVec2 DrawOneFrame(MapCanvas& canvas) {
     ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
     ImGui::SetNextWindowSize(ImVec2(600.0f, 600.0f));
-    ImGui::Begin("AreaDragSuppressionTestWindow");
+    ImGui::Begin("AreaDragRecompositeTestWindow");
     const ImVec2 regionOrigin = ImGui::GetCursorScreenPos();
     canvas.Draw("mapCanvas", kRegionSidePixels);
     ImGui::End();
@@ -54,7 +63,7 @@ ImVec2 ScreenPositionForWorld(MapCanvas& canvas, const PreviewComposite& composi
 
 } // namespace
 
-void RunMapCanvasAreaDragSuppressionChecks(Sys::GpuResourceManager& manager) {
+void RunMapCanvasAreaDragRecompositeChecks(Sys::GpuResourceManager& manager) {
     PreviewTestScene scene;
     BuildPreviewTestScene(scene);
     PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
@@ -71,14 +80,11 @@ void RunMapCanvasAreaDragSuppressionChecks(Sys::GpuResourceManager& manager) {
     existingArea.width = 1.0f;   existingArea.length = 1.0f;
     areas.push_back(existingArea);
     std::vector<AreaColorEntry> areaColors;
-    // STEP212 — the retired tab-wide `bool bAreasLocked` is now a per-area lock table; the
-    // pre-existing "Existing" area must be resolved UNLOCKED explicitly here (mirroring the two real
-    // creation call sites' own `/*bDefaultLocked=*/false`) or this test's own body-move case (below)
-    // would be silently refused by the new per-area gate.
-    std::vector<AreaLockEntry> areaLocks;
+    std::vector<AreaLockEntry>  areaLocks;
+    // STEP212's per-area lock table defaults a first-touch name to LOCKED — pre-seed "Existing"
+    // UNLOCKED explicitly, mirroring the retired test's own established precedent.
     ResolveAreaLocked(areaLocks, existingArea.name, /*bDefaultLocked=*/false);
     int  selectedAreaIndex = -1;
-    int  mapAreaSuppressedIndex = -1;
     int  refreshCount = 0;
 
     ImGui::CreateContext();
@@ -92,11 +98,10 @@ void RunMapCanvasAreaDragSuppressionChecks(Sys::GpuResourceManager& manager) {
     canvas.View().SetRegionSide(kRegionSidePixels);
     ApplicationPanel activePanel = ApplicationPanel::Areas;
     canvas.SetActivePanelSource(&activePanel);
-    canvas.SetManualAreaDragSource(&areas, &areaColors, &areaLocks, &selectedAreaIndex,
-                                   &mapAreaSuppressedIndex);
+    canvas.SetManualAreaDragSource(&areas, &areaColors, &areaLocks, &selectedAreaIndex);
     canvas.SetAreaCompositeRefreshCallback([&] { ++refreshCount; });
 
-    // --- Case 1: create-by-drag on empty canvas space fires exactly ONE refresh, no suppression ---
+    // --- Case 1: create-by-drag on empty canvas space fires exactly ONE refresh (unchanged) ---
     const ImVec2 emptyPressPosition = ScreenPositionForWorld(canvas, composite, 3.2f, 3.2f);
     io.AddMousePosEvent(emptyPressPosition.x, emptyPressPosition.y);
     io.AddMouseButtonEvent(0, false);
@@ -110,10 +115,10 @@ void RunMapCanvasAreaDragSuppressionChecks(Sys::GpuResourceManager& manager) {
 
     check(areas.size() == 2u, "a press-drag-release on empty canvas space creates a new area");
     check(refreshCount == 1, "create-by-drag requests exactly one recomposite");
-    check(mapAreaSuppressedIndex == -1, "create-by-drag never touches the suppression slot");
 
-    // --- Case 2: a body-move on the pre-existing area fires exactly TWO refreshes (begin + end),
-    // suppressing that area's index for the WHOLE gesture, with ZERO extra refreshes while held ---
+    // --- Case 2: a body-move on the pre-existing area fires ZERO refreshes at begin, ONE per
+    // moved frame, ZERO on a held-but-motionless frame, and exactly ONE unconditional refresh at
+    // release ---
     selectedAreaIndex = 0;   // the pre-existing "Existing" area, index 0
     const int refreshCountBeforeMove = refreshCount;
     // Dead center of the 1x1 world rect — ~32 screen px from every 8px handle circle at this zoom,
@@ -124,22 +129,31 @@ void RunMapCanvasAreaDragSuppressionChecks(Sys::GpuResourceManager& manager) {
     BeginHeadlessFrame(); DrawOneFrame(canvas);
     io.AddMouseButtonEvent(0, true);
     BeginHeadlessFrame(); DrawOneFrame(canvas);
-    check(mapAreaSuppressedIndex == 0, "TryBeginAreaDrag suppresses the dragged area immediately");
-    check(refreshCount == refreshCountBeforeMove + 1, "the FIRST of exactly two recomposites fires at press");
+    check(refreshCount == refreshCountBeforeMove,
+          "TryBeginAreaDrag fires NO refresh request — a begin changes no composite input");
 
+    // A moving frame: the rectangle actually changes (originX/originZ), so exactly one refresh
+    // fires.
     io.AddMousePosEvent(bodyPressPosition.x + 20.0f, bodyPressPosition.y);
     BeginHeadlessFrame(); DrawOneFrame(canvas);
+    check(refreshCount == refreshCountBeforeMove + 1,
+          "ContinueAreaDrag requests exactly one recomposite on a frame the rectangle moved");
+
+    // A held-but-motionless frame (mouse position unchanged since the last frame): zero refreshes.
+    BeginHeadlessFrame(); DrawOneFrame(canvas);
+    check(refreshCount == refreshCountBeforeMove + 1,
+          "ContinueAreaDrag requests ZERO recomposites on a held-but-motionless frame");
+
+    // Another moving frame: one more refresh.
     io.AddMousePosEvent(bodyPressPosition.x + 30.0f, bodyPressPosition.y);
     BeginHeadlessFrame(); DrawOneFrame(canvas);
-    check(mapAreaSuppressedIndex == 0, "the suppression stays set for the whole held drag");
-    check(refreshCount == refreshCountBeforeMove + 1,
-          "ContinueAreaDrag requests zero recomposites, no matter how many held frames run");
+    check(refreshCount == refreshCountBeforeMove + 2,
+          "a second moved frame requests a second recomposite");
 
     io.AddMouseButtonEvent(0, false);
     BeginHeadlessFrame(); DrawOneFrame(canvas);
-    check(mapAreaSuppressedIndex == -1, "EndAreaDrag clears the suppression slot");
-    check(refreshCount == refreshCountBeforeMove + 2,
-          "the SECOND of exactly two recomposites fires at release — net two per gesture, not one per frame");
+    check(refreshCount == refreshCountBeforeMove + 3,
+          "EndAreaDrag's refresh is unconditional and always fires, exactly once, at release");
 
     ImGui::DestroyContext();
 }

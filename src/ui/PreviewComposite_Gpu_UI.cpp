@@ -6,8 +6,13 @@
 // in PreviewComposite_GpuBuffers_UI.cpp, behind the same header.
 // With no GL context/manager the composite falls back to its Cpu twin and reports Cpu, rather
 // than silently producing nothing.
+// STEP218 (ARCH §14.18 item 10) — `outTiming`, when non-null, records four isolated phase
+// durations into `ComposeGpuTiming` (see PreviewComposite_UI.h). Every clock read below is gated
+// behind `outTiming != nullptr`, so an ordinary production/test call (which never passes it) costs
+// nothing beyond the branch itself — zero behavior change, zero new allocation, zero new syscall.
 #include "PreviewComposite_UI.h"
 #include "../sys/GpuResource_SYS.h"
+#include <chrono>
 #include <thread>
 
 namespace SanmapGen {
@@ -29,9 +34,21 @@ void WaitForCompletion(Sys::GpuResourceManager& manager) {
     manager.DeleteFence(fence);
 }
 
+// `outTiming != nullptr` is checked once per call site rather than hoisted into a helper, so the
+// four measurement windows below stay visually paired with the exact GL call each one brackets —
+// legible at the call site, not hidden behind an indirection.
+std::chrono::steady_clock::time_point NowIfTimed(const PreviewComposite::ComposeGpuTiming* outTiming) {
+    return outTiming != nullptr ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point();
+}
+
+double ElapsedMillisSince(std::chrono::steady_clock::time_point start) {
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+}
+
 } // namespace
 
-void PreviewComposite::ComposeOnGpu(bool bNeedsTexelReadback) {
+void PreviewComposite::ComposeOnGpu(ComposeRequest request, ComposeGpuTiming* outTiming) {
+    if (outTiming != nullptr) *outTiming = ComposeGpuTiming();
     PrepareRun();
     const int resolution = configuration.previewResolution;
     if (resolution <= 0) return;
@@ -40,7 +57,12 @@ void PreviewComposite::ComposeOnGpu(bool bNeedsTexelReadback) {
     Sys::GpuResourceManager& manager = *gpuResourceManager;
     const Sys::GpuProgramHandle program{ gpuProgramIndex };
     if (!EnsureCompositeTexture(manager)) { ComposeOnCpu(); return; }   // no image -> the Cpu twin
-    BindComposeBuffers(manager);
+
+    // bindAndDispatchMillis: buffer binds/uploads (BindComposeBuffers) through the last dispatch
+    // call, issue-side only — this does NOT wait for the GPU to finish (that's fenceWaitMillis,
+    // measured separately below).
+    const std::chrono::steady_clock::time_point bindAndDispatchStart = NowIfTimed(outTiming);
+    BindComposeBuffers(manager, request.bBakedInputsChanged);
 
     const unsigned pixelGroupsX = TileGroupCount(resolution, Sys::WorkgroupSize::kFieldTileWidth);
     const unsigned pixelGroupsY = TileGroupCount(resolution, Sys::WorkgroupSize::kFieldTileHeight);
@@ -70,21 +92,34 @@ void PreviewComposite::ComposeOnGpu(bool bNeedsTexelReadback) {
         }
         ++executedPassCount;
     }
+    if (outTiming != nullptr) outTiming->bindAndDispatchMillis = ElapsedMillisSince(bindAndDispatchStart);
 
+    // fenceWaitMillis: WaitForCompletion's own spin, isolated from the issue-side cost above.
+    const std::chrono::steady_clock::time_point fenceWaitStart = NowIfTimed(outTiming);
     WaitForCompletion(manager);
+    if (outTiming != nullptr) outTiming->fenceWaitMillis = ElapsedMillisSince(fenceWaitStart);
+
     // The canvas draws the texture itself; this readback exists so the Cpu twin stays the parity
     // reference and a headless caller still gets bytes. RGBA8 texels come back R,G,B,A per pixel,
     // which is exactly the byte order `Ui::PackRgba8` packs into one unsigned int. Skipped when
     // the caller knows nothing will read `CompositeTexels()` this run (e.g. the production
-    // hot path, where the canvas samples `CompositeTexture()` directly).
-    if (bNeedsTexelReadback) {
+    // hot path, where the canvas samples `CompositeTexture()` directly). texelReadbackMillis stays
+    // at its ComposeGpuTiming() default (0.0) whenever this branch does not run — the benchmark's
+    // own request shape (`bNeedsTexelReadback=false`) always takes this path.
+    if (request.bNeedsTexelReadback) {
+        const std::chrono::steady_clock::time_point texelReadbackStart = NowIfTimed(outTiming);
         manager.ReadbackTexture(compositeTexture, compositeTexels.data(),
                                 compositeTexels.size() * sizeof(unsigned int));
+        if (outTiming != nullptr) outTiming->texelReadbackMillis = ElapsedMillisSince(texelReadbackStart);
     }
-    // Unaffected by `bNeedsTexelReadback`: `MapCanvas::ApplyClick` reads this unconditionally on
-    // both backends for click-picking, on every recomposite.
+    // Unaffected by EITHER `request` flag: `MapCanvas::ApplyClick` reads this unconditionally on
+    // both backends for click-picking, on every recomposite (ARCH §14.18 item 7's own note —
+    // skipping this readback is a picking-correctness argument this ruling explicitly does NOT
+    // make; it is named there as the next lever if the item-10 benchmark misses, not in scope here).
+    const std::chrono::steady_clock::time_point entityIdReadbackStart = NowIfTimed(outTiming);
     manager.ReadbackBuffer(CompositeBufferName::kEntityIdentifiers, entityIdentifierBuffer.Data(),
                            entityIdentifierBuffer.CellCount() * sizeof(unsigned int));
+    if (outTiming != nullptr) outTiming->entityIdReadbackMillis = ElapsedMillisSince(entityIdReadbackStart);
     bLastRunUsedGpu = true;
 }
 

@@ -28,8 +28,10 @@ void RunMapCanvasActivePanelGateChecks(Sys::GpuResourceManager& manager);
 void RunMapCanvasClickSelectsManualMarkerChecks(Sys::GpuResourceManager& manager);
 // ARCH §21.2/§21.5 — MapCanvas_GestureOwnership_UI_Test.cpp.
 void RunMapCanvasGestureOwnershipChecks(Sys::GpuResourceManager& manager);
-// ARCH §14.17 item 11 — MapCanvas_AreaDragSuppression_UI_Test.cpp.
-void RunMapCanvasAreaDragSuppressionChecks(Sys::GpuResourceManager& manager);
+// ARCH §14.18 Piece C — MapCanvas_AreaDragRecomposite_UI_Test.cpp.
+void RunMapCanvasAreaDragRecompositeChecks(Sys::GpuResourceManager& manager);
+// STEP214 — MapCanvas_AreaAltCenterResizeModifier_UI_Test.cpp.
+void RunMapCanvasAreaAltCenterResizeModifierChecks(Sys::GpuResourceManager& manager);
 } // namespace Ui
 } // namespace SanmapGen
 
@@ -54,7 +56,8 @@ int main(int argumentCount, char** argumentValues) {
     Ui::RunMapCanvasActivePanelGateChecks(manager);
     Ui::RunMapCanvasClickSelectsManualMarkerChecks(manager);
     Ui::RunMapCanvasGestureOwnershipChecks(manager);
-    Ui::RunMapCanvasAreaDragSuppressionChecks(manager);
+    Ui::RunMapCanvasAreaDragRecompositeChecks(manager);
+    Ui::RunMapCanvasAreaAltCenterResizeModifierChecks(manager);
     wglMakeCurrent(nullptr, nullptr);
     wglDeleteContext(glContext);
     ReleaseDC(window, deviceContext);

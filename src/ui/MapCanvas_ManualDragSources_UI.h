@@ -57,11 +57,6 @@ struct ManualAreaDragSources_UI {
     // never `PreviewCompositeSettings`.
     std::vector<AreaLockEntry>*   areaLocks          = nullptr;
     int*                          selectedAreaIndex  = nullptr;   // mutable: auto-select-on-touch/deselect
-    // ARCH §14.17 item 11 — mutable: the canvas sets/clears this to omit the dragged area from the
-    // composite input for the duration of a gesture. Points at
-    // `PreviewCompositeSettings::mapAreaSuppressedIndex` — one source of truth, never a second copy.
-    // STEP212 — untouched; this field's own plumbing is STEP211 territory.
-    int*                          mapAreaSuppressedIndex = nullptr;
     AreaDragGestureState           state;
 };
 

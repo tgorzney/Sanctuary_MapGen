@@ -126,17 +126,15 @@ void PreviewComposite::BuildEntityPoints() {
     configuration.entityCount = static_cast<int>(entityPoints.size());
 }
 
-// One rectangle per `recipe.areas` entry (skipping the currently drag-suppressed index, ARCH §14.17
-// item 11), flattened to CELL space with its resolved presentation color — the SAME reciprocal
-// WorldToPreviewPixel already takes, so multiply-never-divide holds (Constitution §3) and there is
-// no second copy of the world->cell arithmetic. An empty (or entirely-suppressed) result still
-// pushes one degenerate sentinel rectangle (`minimumX > maximumX`), so the buffer this binds is
-// never zero bytes and the shader's forward scan costs exactly one rejected iteration.
+// One rectangle per `recipe.areas` entry, flattened to CELL space with its resolved presentation
+// color — the SAME reciprocal WorldToPreviewPixel already takes, so multiply-never-divide holds
+// (Constitution §3) and there is no second copy of the world->cell arithmetic. An empty result
+// still pushes one degenerate sentinel rectangle (`minimumX > maximumX`), so the buffer this binds
+// is never zero bytes and the shader's forward scan costs exactly one rejected iteration.
 void PreviewComposite::BuildMapAreaConfigurations() {
     mapAreaRectangles.clear();
     const float cellsPerWorldUnit = ReciprocalOrZero(settings.worldUnitsPerCell);
     for (int index = 0; index < static_cast<int>(areas.size()); ++index) {
-        if (index == settings.mapAreaSuppressedIndex) continue;
         const Params::MapArea& area = areas[static_cast<std::size_t>(index)];
         PreviewMapAreaRectangle record;
         record.minimumX = area.originX * cellsPerWorldUnit;

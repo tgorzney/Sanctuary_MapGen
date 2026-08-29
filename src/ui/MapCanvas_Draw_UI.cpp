@@ -183,7 +183,20 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
         // then treat every drag, however large, as a zero-travel click.
         pressTravelPixels += std::fabs(io.MouseDelta.x) + std::fabs(io.MouseDelta.y);
         if (bManualDragActive) ContinueManualInstanceDrag(regionLocalX, regionLocalY);
-        else if (bAreaDragActive) ContinueAreaDrag(regionLocalX, regionLocalY, io.KeyShift, io.KeyCtrl);
+        // STEP214 — Alt is an ADDITIONAL trigger for the exact same Ctrl center-resize behavior ARCH
+        // §21.8 already ratified (UpdateAreaDragGesture's own `bCtrlHeld` parameter — name and math
+        // both unchanged by this ticket); the human's own request was to ADD a key, not replace one.
+        // This is the ONLY line in this whole ticket that changes runtime behavior — every other
+        // file this ticket touches is either a doc-comment clarification or new test coverage. Ctrl
+        // is also already the modifier ApplyClickGesture/ApplySelectionGesture/ApplyMarqueeGesture
+        // use for multi-select elsewhere in this file (MapCanvas_SelectionGesture_UI.cpp) — verified
+        // no collision: those are only ever reached from branches that are mutually exclusive with
+        // bAreaDragActive/AreaGestureEligible() in this function's own release handler below, and
+        // MapCanvas_ManualDragDispatch_UI.cpp reads no modifier keys at all — Areas already owns
+        // Ctrl's meaning exclusively while its own gesture is live, so there is no reason to reserve
+        // Ctrl and Alt for different things here; both simply mean the same thing for this gesture.
+        else if (bAreaDragActive)
+            ContinueAreaDrag(regionLocalX, regionLocalY, io.KeyShift, io.KeyCtrl || io.KeyAlt);
     }
     if (bPressActive && ImGui::IsItemDeactivated()) {
         bPressActive = false;

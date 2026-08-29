@@ -562,6 +562,11 @@ add_sangen_test(Picking_UI_Test                   src/ui/Picking_UI_Test.cpp)
 add_sangen_test(PreviewComposite_UI_Test          src/ui/PreviewComposite_UI_Test.cpp)
 add_sangen_test(PreviewComposite_Wysiwyg_UI_Test  src/ui/PreviewComposite_Wysiwyg_UI_Test.cpp)
 add_sangen_test(PreviewComposite_Gpu_UI_Test      src/ui/PreviewComposite_Gpu_UI_Test.cpp)
+# STEP218 — ARCH_14_18 item 10's GPU benchmark harness: per-phase (bind+dispatch issue-side /
+# fence-wait / entity-id-readback) min/avg/max timing across {256,1024} mapSize x {0,100000}
+# instanceCount, via ComposeOnGpu's new optional ComposeGpuTiming* parameter. A measurement tool —
+# it prints numbers for review, it does not assert a threshold (none is ratified).
+add_sangen_test(PreviewComposite_GpuBenchmark_UI_Test src/ui/PreviewComposite_GpuBenchmark_UI_Test.cpp)
 # STEP200 — the six v1-parity PreviewBlendMode enumerators (Subtract..HardLight): Cpu CombineChannel
 # exact values, own binary per this file's own "each composite acceptance test declares its own
 # main()" convention above. The Gpu/Cpu parity across all 12 modes is inside PreviewComposite_Gpu_UI_Test
@@ -584,8 +589,12 @@ add_sangen_test(MapCanvas_UI_Test
     # never pans (drag-a-manual-instance or marquee-select instead), a marquee's lock-gate exclusion,
     # and a live Ctrl-click toggle.
     src/ui/MapCanvas_GestureOwnership_UI_Test.cpp
-    # ARCH §14.17 item 11 — the Area drag-suppression / exactly-two-recomposites acceptance.
-    src/ui/MapCanvas_AreaDragSuppression_UI_Test.cpp)
+    # ARCH §14.18 Piece C — zero refresh at begin, one per moved frame, zero on a held-but-
+    # motionless frame, and an unconditional refresh at release (supersedes the retired
+    # "exactly two recomposites per gesture" suppression-index design).
+    src/ui/MapCanvas_AreaDragRecomposite_UI_Test.cpp
+    # STEP214 — Alt is an additional trigger for the identical Ctrl center-resize behavior.
+    src/ui/MapCanvas_AreaAltCenterResizeModifier_UI_Test.cpp)
 # STEP53 — the screen-space overlay icon draw pass. Culling/LOD, budget/decimation, and the C2
 # cache's invalidation decision are headless (no imgui frame, no GL); bucketing + the bulk vertex
 # write need one live headless imgui frame (no GL, no window backend) — mirrors MapCanvas_UI_Test's
@@ -869,6 +878,9 @@ add_sangen_test(DecalsTab_UI_Test          src/ui/DecalsTab_UI_Test.cpp)
 add_sangen_test(DecalsTab_Manual_UI_Test  src/ui/DecalsTab_Manual_UI_Test.cpp)
 add_sangen_test(AreasTab_UI_Test          src/ui/AreasTab_UI_Test.cpp)
 add_sangen_test(AreaDragGesture_UI_Test   src/ui/AreaDragGesture_UI_Test.cpp)
+# ARCH §14.18 items 18/20 — the Tier-B2 cost watchdog's pure decision function: headless, no GL,
+# no imgui, fabricated costs/times only.
+add_sangen_test(AreaRecompositeThrottle_UI_Test src/ui/AreaRecompositeThrottle_UI_Test.cpp)
 add_sangen_test(PlacementRuleSections_UI_Test src/ui/PlacementRuleSections_UI_Test.cpp)
 
 # STEP74 — the Scenarios tab: three-tier list management, match-rule authoring, live composition
@@ -1021,6 +1033,20 @@ add_sangen_test(ScenarioScript_RuntimeResource_IO_Test src/io/ScenarioScript_Run
 # (STEP65) pre-write safety net on both rendered texts. Pure string-building + std::filesystem, no
 # JSON type in sight — no nlohmann link needed, same posture as ScenarioScript_DataLua_IO_Test.
 add_sangen_test(ScenarioScript_Export_IO_Test src/io/ScenarioScript_Export_IO_Test.cpp)
+
+# STEP215_ScenarioScriptAreaRectangleExtract_IO: the pure, disk-free closed literal-only grammar for
+# extracting Params::MapArea rectangles from a FOREIGN scenario .lua's text
+# (`ARCH_15_11_ForeignScenarioAreaImport.md` §15.11 items 2-7,10). No filesystem, no Lua execution of
+# any kind -- a hand-rolled tokenizer/grammar, not JSON, not LuaTableEvaluate_SYS.
+add_sangen_test(ScenarioScript_AreaRectangleExtract_IO_Test src/io/ScenarioScript_AreaRectangleExtract_IO_Test.cpp)
+
+# STEP215_ScenarioScriptAreaImport_IO: the disk-touching, human-triggered ONE entry point --
+# filename + banner-line refusal guard (item 1, including the required acceptance test: a REAL
+# BuildScenarioDataLuaText export fed back in must be refused), byte-size cap via a filesystem stat
+# before any read (item 10), then additive-never-destructive reconciliation into recipe.areas
+# (item 9). Links SanGenV2 for ScenarioScript_DataLua_IO's real BuildScenarioDataLuaText -- no
+# hand-typed banner string anywhere in this test, same discipline as ScenarioScript_Export_IO_Test.
+add_sangen_test(ScenarioScript_AreaImport_IO_Test src/io/ScenarioScript_AreaImport_IO_Test.cpp)
 
 # Tab-rebuild batch E — the host shell. One binary over four translation units (main() lives in
 # ApplicationShell_Layout_UI_Test.cpp): the left column's catalogue is pure data, so the v1 layout is
