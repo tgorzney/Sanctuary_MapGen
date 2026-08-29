@@ -322,14 +322,15 @@ For anything beyond a single rectangle, the practical way to author the blocked 
 - *Exact pass:* a greedy largest-rectangle-in-a-binary-matrix decomposition (repeatedly find the single largest all-true axis-aligned rectangle, mark it covered, remove it, repeat until nothing white remains). This guarantees **100% coverage of every white pixel by construction** — nothing is missed, ever, no matter how jagged the blob's edge is. It usually produces far more rectangles than you want (a jagged diagonal edge fragments into dozens of tiny slivers).
 - *Merge pass:* repeatedly find the two rectangles whose combined bounding box would add the **fewest new black pixels** (compute this with a 2D integral/summed-area image over the true mask so you get an exact count, not an estimate), and merge them into that one bounding box — as long as the cost is under a threshold you pick. Merging can only ever grow coverage, so the zero-missed-white guarantee from the exact pass survives no matter how far you merge.
 
-**The merge threshold is your one real dial**, trading rectangle count against how much extra black area gets swept in:
+**The merge threshold is your one real dial**, trading rectangle count against how much extra black area gets swept in. Three data points below are one directly comparable sweep (same 32-component mask, ~74k white px total, each re-run from the same exact-decomposition baseline):
 
-| Threshold (black px per merge) | Effect (measured, 32-component mask, ~74k white px total) |
+| Threshold (black px per merge) | Effect |
 |---|---|
-| 16 | 815 rectangles, ~5% total overshoot — favors accuracy |
-| 256 | 206 rectangles, ~29% overshoot |
-| 512 | 139 rectangles, ~42% overshoot — favors fewer rectangles |
-| 1024 | 88 rectangles, ~59% overshoot — already more black than white per box on average |
+| 256 | 206 rectangles, 29.3% total overshoot |
+| 512 | 139 rectangles, 41.5% overshoot — favors fewer rectangles |
+| 1024 | 88 rectangles, 58.8% overshoot — already more black than white per box on average |
+
+A separate, earlier pass at a tighter 16px cap — on a slightly different edit of the same mask (also 32 components, near-identical sizes) — produced 815 rectangles at 3.5%–15.3% overshoot **per individual component** (no combined aggregate was computed for that run, so don't treat that range as directly comparable to the single aggregate percentages above; it's cited here to show the low end of the tradeoff, not as a fourth row in the same sweep).
 
 There's no universally correct value — it depends entirely on whether you (or whoever's reviewing the result) care more about a tight, accurate outline or a small, manageable rectangle count. Push it too far and you're effectively just taking each blob's bounding box, which for an irregular or diagonal shape can mean blocking a lot of terrain that was never meant to be blocked.
 
@@ -569,8 +570,10 @@ Confirmed live, in-game, this session: the all-layer blocker pattern (§3), the 
 
 ⚠️ **§6.1 is worth re-reading on its own.** The all-layer blocker on `Pandemonium Isthmus` went through several rounds of live debugging that each fixed a real ordering problem without fixing the actual failure, because the actual failure (a dropped `Import` line) was unrelated to ordering entirely and produced an identical-looking silent throw. Every ordering fix in §6 is genuine and worth keeping — they just weren't sufficient on their own, and no amount of further ordering analysis would have found the real bug. If a blocker you've built stops working and the timing all checks out, look at what else changed before you re-derive a new timing theory.
 
-⚠️ Not yet independently confirmed in-game as of this writing:
+**Update: the single/partial-layer pattern is now also confirmed.** The `SeaBlocker` prefab built exactly as described in §4/§9 shipped on `Pandemonium Isthmus` and was confirmed working in-game by the human after this tutorial was first drafted — naval pathing blocked on the strips it covers, other mobility types unaffected. The stray-1×1-blocker failure mode it avoids (§4) was reasoned from reading the engine source directly, not observed as a live bug — that specific failure mode itself was never deliberately reproduced and confirmed broken, only the working alternative was shipped.
 
-- **The single/partial-layer prefab pattern in §4/§9** — designed and reasoned through carefully (the stray-modifier failure mode it avoids is real and verified by reading the engine source directly), but not yet tested against a running match.
-- **Promoting the single-layer helper to a shared `common/loading/*.lua` file** — noted as a reasonable future step in §4, not attempted.
-- **This technique's interaction with more than two or three simultaneous blocker types on one map** — everything shipped so far is one all-layer blocker plus, separately, one single-layer blocker on the same map; no map has yet combined many distinct partial-layer prefabs at once.
+⚠️ Still not independently confirmed in-game as of this writing:
+
+- **Promoting the single-layer helper to a shared `common/loading/*.lua` file** — noted as a reasonable future step in §4, not attempted. Both blockers on `Pandemonium Isthmus` remain map-local.
+- **This technique's interaction with more than two or three simultaneous blocker types on one map** — `Pandemonium Isthmus` ships exactly two: one all-layer blocker and one single-layer (`Sea`) blocker, each with its own `pcall` in the shared thread. No map has yet combined more than two, or more than one distinct partial-layer prefab.
+- **Deliberately reproducing the stray-1×1-blocker failure mode described in §4** to confirm it manifests exactly as reasoned (the reasoning is solid and source-verified, but nobody has intentionally triggered it and watched it happen).

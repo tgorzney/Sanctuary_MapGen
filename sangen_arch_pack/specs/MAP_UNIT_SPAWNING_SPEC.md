@@ -139,17 +139,19 @@ Real regressions caused by getting this wrong, both on 2026-08-28: the air block
 the unit spawn silently killed every unit when it threw; and placed ahead of `SetPlayableArea` it
 risked its prefabs being culled by the throwaway 1×1 area.
 
-⚠️ **Note (2026-08-29): the snippet above is illustrative, not this map's current shape.**
-`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6 records a session where this exact pattern (ordering, each
-call `pcall`'d) was individually correct at every step and still did not fix a real bug — the
-actual cause was an `Import`-omission elsewhere, not an ordering defect. That spec's §6.1 states
-the corollary this section's own "`pcall` anything that might throw" line already implies but does
-not spell out: ordering only reduces the *chance* an earlier failure cancels a later call; `pcall`
-on the call itself is what removes the *consequence* if that call throws for any reason, ordering
-or not. `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6 also records that Pandemonium Isthmus's own live
-`_data.lua` today places blocker-prefab work **before**, not after, the scenario unit spawn shown
-above — this section's snippet remains valid as an illustration of the general rule, not as a claim
-about that file's current call order.
+⚠️ **Note (2026-08-29, corrected same day — see below): the snippet above matches this map's
+current shape, not merely an illustration of it.** An earlier version of this note claimed
+Pandemonium Isthmus's live `_data.lua` placed blocker-prefab work **before**, rather than after, the
+scenario unit spawn — that claim was based on a stale, secondhand mid-fix report and is **wrong,
+retracted**. A direct read of the live file confirms blocker-prefab work (both the air and sea
+blockers) runs LAST, each independently `pcall`'d, after unit spawning — exactly as shown above.
+What remains true and worth restating: `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6.1 records a session
+where this exact pattern (ordering, each call `pcall`'d) was individually correct at every step and
+still did not fix a real bug — the actual cause was an `Import`-omission elsewhere, not an ordering
+defect. That spec's §6.1 states the corollary this section's own "`pcall` anything that might
+throw" line already implies but does not spell out: ordering only reduces the *chance* an earlier
+failure cancels a later call; `pcall` on the call itself is what removes the *consequence* if that
+call throws for any reason, ordering or not.
 
 ## 5. The `CreateUnit` call
 

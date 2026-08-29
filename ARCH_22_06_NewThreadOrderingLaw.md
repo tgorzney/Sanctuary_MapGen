@@ -12,31 +12,32 @@ regression this session. Full detail and the concrete resolved order:
    area) — never before; a prefab instantiated against the throwaway rectangle is a plausible
    culling target. This one is a correctness constraint, not an error-propagation one — `pcall`
    (below) does not substitute for it.
-2. **Should run early relative to any other diagnostic/experimental code added later** — before
-   anything not yet proven safe, because `NewThread` callback errors are silently swallowed and
-   `Log`/`Warn` do not function in this build, so an earlier throw cancels everything after it with
-   zero trace.
+2. **Must run LAST, after scenario unit spawning — not early.** Blocker work once sat AHEAD of the
+   unit spawn; when it threw, the throw silently cancelled the unit spawn as collateral damage
+   (`NewThread` callback errors are swallowed and `Log`/`Warn` do not function in this build).
+   Placing it last means nothing load-bearing follows it, so a blocker throw can no longer cascade
+   into anything else — a second, independent layer of protection on top of point 3's `pcall`
+   coverage below.
 
 **Ruled: the concrete order that satisfies both** — `(a)` host-only `SetPlayableArea` ×2, `(b)`
-the blocker-spawn call (runs in both Lua states, §22.5), `(c)` any other diagnostic/experimental
-work, `(d)` host-only scenario unit spawning.
+host-only scenario unit spawning (`pcall`'d), `(c)` the blocker-spawn calls, each independently
+`pcall`'d, LAST on purpose (runs in both Lua states, §22.5, each taking its own
+`IsHost`/`IsClient` branch).
 
-⚠️ **This corrects the relative position implied by `MAP_UNIT_SPAWNING_SPEC.md` §4's own
-illustrative snippet and `MAP_SCENARIO_SPEC.md` §3.1's documented live order**, both of which show
-prefab/navmesh work running **last**, after unit spawning. `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6
-records this explicitly as this session's current, reported state of Pandemonium Isthmus's own
-`_data.lua` — not independently re-read line-by-line by the ARCH Expert this pass — and is
-cross-referenced from both of those sections so neither is silently trusted as still-current by a
-future reader.
+**This matches, rather than differs from, `MAP_UNIT_SPAWNING_SPEC.md` §4's own illustrative
+snippet and `MAP_SCENARIO_SPEC.md` §3.1's documented live order** (area → units → prefab/navmesh
+work last) — confirmed by a direct read of the live `<MapName>_data.lua` this pass, not assumed
+from an intermediate debugging report. A prior version of this ruling claimed a discrepancy here;
+that claim was based on a stale mid-fix state relayed secondhand and is retracted.
 
 **Ruled, binding — ordering alone is not sufficient, and got proven insufficient live
-(`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6.1):** every blocker-spawning call in `(b)`/`(c)`/`(d)` that
-can throw must be independently `pcall`'d, not merely placed in a safe position. Ordering only
-reduces the *chance* something upstream fails first; `pcall` removes the *consequence* if the
-blocker call itself throws for any reason — including a bug unrelated to ordering. On Pandemonium
-Isthmus, multiple rounds of live re-ordering each fixed a real ordering problem without fixing the
-actual failure, because the real cause was a scripted table-rewrite that silently deleted an
-adjacent `Import("common/navmapModifiers.lua")` line, leaving `NavmapModifiers` a nil global — an
+(`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §6.1):** every blocker-spawning call in `(c)` that can throw
+must be independently `pcall`'d, not merely placed in a safe position. Ordering only reduces the
+*chance* something upstream fails first; `pcall` removes the *consequence* if the blocker call
+itself throws for any reason — including a bug unrelated to ordering. On Pandemonium Isthmus,
+multiple rounds of live re-ordering each fixed a real ordering problem without fixing the actual
+failure, because the real cause was a scripted table-rewrite that silently deleted an adjacent
+`Import("common/navmapModifiers.lua")` line, leaving `NavmapModifiers` a nil global — an
 `Import`-omission bug, not an ordering bug. **Once every risky call is individually `pcall`-wrapped,
 the only ordering constraint from this subsection that remains genuinely load-bearing is point 1
 above** (playable area must be final before instantiation) — that one governs which world-state the
