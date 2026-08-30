@@ -38,6 +38,16 @@ vcpkg_installed/
 .DS_Store
 Thumbs.db
 
+# Scratch fixtures written into the repo root by test binaries run directly from here
+# (GpuResource_ShaderPath_SYS_Test, GpuResource_SYS_Test, GpuResource_Texture_SYS_Test,
+# SanpackReader_IO_Test) — regenerated on every run, never source.
+/DoubleBuffer_Test.glsl
+/ImageWrite_Test.glsl
+/sangen_shell_test.sanpack
+/GpuResourceSearchPathFirst/
+/GpuResourceSearchPathSecond/
+/assetPipelineTest/
+
 # Excluded Directories
 /Sanctuary-Map-Generation-develop/
 /Sanctuary_MapGen-master (Broken)/
