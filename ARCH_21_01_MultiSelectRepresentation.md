@@ -25,6 +25,19 @@ void ReplaceSelectionSet(OverlayInstanceKeySet_UI& set, const std::vector<Overla
 // becomes the new back(), or the set empties); absent -> append (becomes primary).
 void ToggleInSelectionSet(OverlayInstanceKeySet_UI& set, const OverlayInstanceKey_UI& key);
 
+// Ctrl-marquee (batch counterpart to the single-key `ToggleInSelectionSet` above, never called with
+// a single key): each key in `keys`, in turn, in order — present -> erase, absent -> append (becomes
+// primary in turn, so the LAST key from `keys` that ends up present is the final primary; if the
+// last key's own toggle erases it, the primary falls back to the set's new back(), same as
+// `ToggleInSelectionSet`'s erase case). This is Toggle applied per element, NOT a hybrid of
+// Toggle+Union. Duplicate-key caveat: if `keys` itself contains the same key more than once (a
+// marquee region query is not expected to, but this function does not assume it and performs no
+// de-duplication), each repeat re-toggles that key's presence in place — two repeats net to a
+// no-op for that key, an odd count of repeats nets to the same single toggle a lone occurrence
+// would. Callers passing an already-deduplicated `keys` never observe this; it is documented so a
+// coder who feeds a raw/undeduplicated hit list is not surprised by it.
+void ToggleEachInSelectionSet(OverlayInstanceKeySet_UI& set, const std::vector<OverlayInstanceKey_UI>& keys);
+
 // Shift-click / Shift-marquee: every key in `keys`, in order, not already present is appended
 // (becomes primary in turn — the LAST newly-appended key is the final primary). An already-present
 // key keeps its existing position, never re-touched/reordered by a union. If every key in `keys`
@@ -50,11 +63,19 @@ void SetSelectionChangedCallback(
 void ApplySelectionGesture(const OverlayInstanceKey_UI& touchedKey, bool bCtrlHeld, bool bShiftHeld);
 void ApplySelectionGesture(const std::vector<OverlayInstanceKey_UI>& touchedKeys, bool bCtrlHeld, bool bShiftHeld);
 ```
-Both resolve to exactly one of Replace/Toggle/Union (Ctrl wins if both are somehow held — an
-arbitrary but necessary tie-break, recorded so it is not left to a coder's guess), update
-`selectedInstanceKeys`, and fire the widened callback with `(PrimaryOfSelectionSet(selectedInstanceKeys),
-selectedInstanceKeys)` — but ONLY when the set actually changed (mirroring today's `SetSelection`'s
-own no-op-on-unchanged guard). Every existing single-target call site (`ApplyClick`'s
+Each overload resolves its own modifier state to exactly one mutator: neither held -> Replace
+(`ReplaceSelectionSet`); Shift held (Ctrl not) -> Union (`UnionIntoSelectionSet`, the single-key
+overload passes its one key as a one-element list); Ctrl held -> Toggle —
+`ToggleInSelectionSet` for the single-key overload, `ToggleEachInSelectionSet` for the batch
+overload (Ctrl-marquee toggles each touched key exactly as Ctrl-click does for one, per
+`ToggleEachInSelectionSet` above — it is NOT collapsed into Union). Ctrl wins if both are somehow
+held: for the single-key overload this was always a live tie-break (Toggle and Union genuinely
+differ); for the batch overload it is equally live now that `ToggleEachInSelectionSet` exists to
+differ from Union — still an arbitrary but necessary tie-break, recorded so it is not left to a
+coder's guess. Both overloads then update `selectedInstanceKeys`, and fire the widened callback with
+`(PrimaryOfSelectionSet(selectedInstanceKeys), selectedInstanceKeys)` — but ONLY when the set
+actually changed (mirroring today's `SetSelection`'s own no-op-on-unchanged guard). Every existing
+single-target call site (`ApplyClick`'s
 procedural/manual branches, `SelectManualMarkerByInstanceIdentifier`,
 `SelectProceduralMarkerInstanceByArrayPosition`) calls the single-key overload with
 `bCtrlHeld=false, bShiftHeld=false` — an unconditional Replace, byte-identical to today's behavior.

@@ -37,6 +37,19 @@ void ReplaceSelectionSet(OverlayInstanceKeySet_UI& set, const std::vector<Overla
 // becomes the new back(), or the set empties); absent -> append (becomes primary).
 void ToggleInSelectionSet(OverlayInstanceKeySet_UI& set, const OverlayInstanceKey_UI& key);
 
+// Ctrl-marquee (batch counterpart to the single-key `ToggleInSelectionSet` above, never called with
+// a single key): each key in `keys`, in turn, in order — present -> erase, absent -> append (becomes
+// primary in turn, so the LAST key from `keys` that ends up present is the final primary; if the
+// last key's own toggle erases it, the primary falls back to the set's new back(), same as
+// `ToggleInSelectionSet`'s erase case). This is Toggle applied per element, NOT a hybrid of
+// Toggle+Union. Duplicate-key caveat: if `keys` itself contains the same key more than once (a
+// marquee region query is not expected to, but this function does not assume it and performs no
+// de-duplication), each repeat re-toggles that key's presence in place — two repeats net to a
+// no-op for that key, an odd count of repeats nets to the same single toggle a lone occurrence
+// would. Callers passing an already-deduplicated `keys` never observe this; it is documented so a
+// coder who feeds a raw/undeduplicated hit list is not surprised by it.
+void ToggleEachInSelectionSet(OverlayInstanceKeySet_UI& set, const std::vector<OverlayInstanceKey_UI>& keys);
+
 // Shift-click / Shift-marquee: every key in `keys`, in order, not already present is appended
 // (becomes primary in turn — the LAST newly-appended key is the final primary). An already-present
 // key keeps its existing position, never re-touched/reordered by a union. If every key in `keys`

@@ -25,6 +25,15 @@ void SplitSelected(const std::vector<OverlayVisibleInstance>& budgeted,
         (instance.bSelected ? outSelected : outNonSelected).push_back(instance);
 }
 
+// STEP229 — selectedInstanceKeys is a push-in pointer (DrawOverlayIconLayersInput's established
+// convention: null = no selection source wired). Every consumer of "the selection" in this file wants
+// a plain reference to iterate/compare against, so this collapses null to a static empty set exactly
+// once, here, rather than each call site re-deriving its own null-check.
+const OverlayInstanceKeySet_UI& ResolveSelectionSetOrEmpty(const DrawOverlayIconLayersInput& input) {
+    static const OverlayInstanceKeySet_UI kEmptySelection;
+    return input.selectedInstanceKeys != nullptr ? *input.selectedInstanceKeys : kEmptySelection;
+}
+
 // Cache-invalid frame: run steps 1-3 excluding the selected instance(s), cache those bytes, and
 // flush the (typically tiny) selected set live and uncached (§4's "Build" step).
 void RebuildAndCache(const DrawOverlayIconLayersInput& input, IconLayerAabbCache_UI& aabbCache,
@@ -39,7 +48,8 @@ void RebuildAndCache(const DrawOverlayIconLayersInput& input, IconLayerAabbCache
         ApplyVisibleInstanceBudget(std::move(candidates), *input.renderingSettings, budgetDiagnostics);
     std::vector<OverlayVisibleInstance> nonSelected, selected;
     SplitSelected(budgeted, nonSelected, selected);
-    BeginIconLayerCacheBuild(frameCache, viewCenterX, viewCenterY, zoomScale, input.selectedInstanceKey, revision);
+    BeginIconLayerCacheBuild(frameCache, viewCenterX, viewCenterY, zoomScale,
+                             ResolveSelectionSetOrEmpty(input), revision);
     CaptureAndCacheBuckets(drawList, frameCache, BucketByAtlasPage(nonSelected));
     FlushBuckets(drawList, BucketByAtlasPage(selected));
 }
@@ -119,7 +129,7 @@ void DrawOverlayIconLayers(const DrawOverlayIconLayersInput& input, IconLayerAab
     const std::uint64_t revision = input.overlayLayerSettings->layerSettingsRevision
         + input.markerTypeVisibilityRevision * kMarkerTypeVisibilityRevisionSpreadMultiplier;
     if (ShouldInvalidateIconLayerCache(frameCache, viewCenterX, viewCenterY, zoomScale,
-                                       input.selectedInstanceKey, revision)) {
+                                       ResolveSelectionSetOrEmpty(input), revision)) {
         RebuildAndCache(input, aabbCache, frameCache, drawList, cullDiagnostics, budgetDiagnostics,
                         generationDiagnostics, viewCenterX, viewCenterY, zoomScale, revision);
         return;

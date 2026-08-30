@@ -109,22 +109,30 @@ void ResolveVisibleCandidates(const DrawOverlayIconLayersInput& input, IconLayer
 
 namespace {
 
-// ARCH §19.25 — the manual-marker half of ResolveSelectedInstanceCandidate: `input.selectedInstanceKey.
-// instanceIndex` is a MarkerTransform::instanceIdentifier here, NOT a Data::PlacementInstances array
-// position (the procedural branch below's own assumption), so it cannot walk `input.placements->
-// markers` — it must re-run the same manual-marker resolution ResolveMarkersManual already performs
-// for a full cull pass, scoped to the ONE selected instanceIdentifier. The viewRect passed is
-// deliberately unrestricted (not `ComputeViewWorldRect`, which this replay-frame path never
-// recomputes): the selected instance keeps rendering even if the view moved without invalidating the
-// cache, mirroring the procedural branch's own "no view-membership re-test" behavior below.
+// ARCH §19.25 — the manual-marker half of ResolveSelectedInstanceCandidate: `key.instanceIndex` is a
+// MarkerTransform::instanceIdentifier here, NOT a Data::PlacementInstances array position (the
+// procedural helper's own assumption below), so it cannot walk `input.placements->markers` — it must
+// re-run the same manual-marker resolution ResolveMarkersManual already performs for a full cull
+// pass, scoped to the ONE instanceIdentifier `key` names. The viewRect passed is deliberately
+// unrestricted (not `ComputeViewWorldRect`, which this replay-frame path never recomputes): the
+// selected instance keeps rendering even if the view moved without invalidating the cache, mirroring
+// the procedural helper's own "no view-membership re-test" behavior below.
+// STEP229 — scoped to an explicit `key` parameter (was `input.selectedInstanceKey` read directly) so
+// the widened multi-select loop below can call this once per manual key in the selected set. The
+// "did THIS call find a match" test switched from `!outCandidates.empty()` to a before/after size
+// delta — with the loop now accumulating across multiple keys into the SAME outCandidates vector, the
+// old empty-check would spuriously report "found" on the second and later keys regardless of whether
+// this particular call actually appended anything.
 bool ResolveSelectedManualMarkerCandidate(const DrawOverlayIconLayersInput& input,
+                                          const OverlayInstanceKey_UI& key,
                                           std::vector<OverlayVisibleInstance>& outCandidates) {
     if (input.overlayLayerSettings == nullptr || input.recipe == nullptr) return false;
-    const int targetInstanceIdentifier = input.selectedInstanceKey.instanceIndex;
+    const int targetInstanceIdentifier = key.instanceIndex;
     const ViewWorldRect_UI unrestrictedRect{
         std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(),
         std::numeric_limits<float>::max(),    std::numeric_limits<float>::max() };
     const std::vector<OverlayLayer_UI>& layers = input.overlayLayerSettings->overlayLayers;
+    const std::size_t candidateCountBefore = outCandidates.size();
     for (std::size_t layerIndex = 0; layerIndex < layers.size(); ++layerIndex) {
         const OverlayLayer_UI& layer = layers[layerIndex];
         if (!layer.bEnabled || (layer.domainKind != OverlayDomainKind_UI::Alloy
@@ -136,24 +144,22 @@ bool ResolveSelectedManualMarkerCandidate(const DrawOverlayIconLayersInput& inpu
             ResolveMarkersManual(input, layer, static_cast<int>(layerIndex), subLayerRef.index,
                                  &stableOrderCounter, nullptr, &unrestrictedRect, nullptr, outCandidates,
                                  &targetInstanceIdentifier);
-            if (!outCandidates.empty()) return true;
+            if (outCandidates.size() > candidateCountBefore) return true;
         }
     }
     return false;
 }
 
-} // namespace
-
-bool ResolveSelectedInstanceCandidate(const DrawOverlayIconLayersInput& input,
-                                      std::vector<OverlayVisibleInstance>& outCandidates) {
-    if (!input.selectedInstanceKey.bValid || input.overlayLayerSettings == nullptr || input.placements == nullptr)
-        return false;
-    if (input.selectedInstanceKey.collection != PlacementCollectionKind_UI::Markers)
-        return false;   // no other domain has a working picker yet (STEP48)
-    if (input.selectedInstanceKey.bManual)
-        return ResolveSelectedManualMarkerCandidate(input, outCandidates);   // ARCH §19.25
+// The procedural half of ResolveSelectedInstanceCandidate, extracted unchanged in behavior (STEP229)
+// so the widened multi-select loop below can call it once per procedural key in the selected set.
+// `key` must already be known bValid/collection==Markers/bManual==false by the caller. Same
+// before/after size-delta reasoning as the manual helper above for the multi-key accumulation case.
+bool ResolveSelectedProceduralMarkerCandidate(const DrawOverlayIconLayersInput& input,
+                                              const OverlayInstanceKey_UI& key,
+                                              std::vector<OverlayVisibleInstance>& outCandidates) {
+    if (input.placements == nullptr) return false;
     const Data::PlacementInstances& markers = input.placements->markers;
-    const std::int32_t instanceIndex = input.selectedInstanceKey.instanceIndex;
+    const std::int32_t instanceIndex = key.instanceIndex;
     if (instanceIndex < 0 || static_cast<std::size_t>(instanceIndex) >= markers.Count()) return false;
     const int ruleIndex = markers.ruleIndex[static_cast<std::size_t>(instanceIndex)];
     const std::vector<OverlayLayer_UI>& layers = input.overlayLayerSettings->overlayLayers;
@@ -175,14 +181,40 @@ bool ResolveSelectedInstanceCandidate(const DrawOverlayIconLayersInput& input,
                 ResolveMarkerCategoryTintColor(category, input.recipe->globalMarkerSettings, tintRed, tintGreen, tintBlue);
             }
             int stableOrderCounter = 0;
+            const std::size_t candidateCountBefore = outCandidates.size();
             EmitCandidateIfVisible(input, layer, static_cast<int>(layerIndex), templateIdentifier,
                                    markers.positionX[index], markers.positionZ[index], markers.scaleX[index],
                                    PlacementCollectionKind_UI::Markers, instanceIndex, tintRed, tintGreen, tintBlue,
                                    &stableOrderCounter, nullptr, outCandidates);
-            return !outCandidates.empty();
+            return outCandidates.size() > candidateCountBefore;
         }
     }
     return false;
+}
+
+} // namespace
+
+// STEP229 — widened from "resolve the one primary selected instance" to "resolve every selected
+// instance in the whole ordered set" (ARCH §21.1's own deferred "multi-instance canvas highlighting"
+// ticket). Still Markers-only (`no other domain has a working picker yet, STEP48` — unchanged,
+// pre-existing restriction, not this ticket's job to lift): a Props/Decals key in the set is simply
+// skipped here exactly as a Props/Decals PRIMARY was already silently skipped before this ticket —
+// see this ticket's own "Explicit out-of-scope" for why that pre-existing, adjacent gap is not fixed.
+bool ResolveSelectedInstanceCandidate(const DrawOverlayIconLayersInput& input,
+                                      std::vector<OverlayVisibleInstance>& outCandidates) {
+    if (input.selectedInstanceKeys == nullptr || input.overlayLayerSettings == nullptr
+        || input.placements == nullptr)
+        return false;
+    bool bResolvedAny = false;
+    for (const OverlayInstanceKey_UI& key : input.selectedInstanceKeys->keys) {
+        if (!key.bValid || key.collection != PlacementCollectionKind_UI::Markers)
+            continue;   // no other domain has a working picker yet (STEP48) — unchanged restriction
+        const bool bResolved = key.bManual
+            ? ResolveSelectedManualMarkerCandidate(input, key, outCandidates)
+            : ResolveSelectedProceduralMarkerCandidate(input, key, outCandidates);
+        bResolvedAny = bResolvedAny || bResolved;
+    }
+    return bResolvedAny;
 }
 
 } // namespace Ui

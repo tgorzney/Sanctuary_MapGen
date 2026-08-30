@@ -458,7 +458,9 @@ void CheckSelectedInstanceCandidateResolvesMarkerColor() {
     fixture.overlaySettings.overlayLayers.push_back(layer);
 
     DrawOverlayIconLayersInput input = fixture.Input();
-    input.selectedInstanceKey = OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 0, true};
+    OverlayInstanceKeySet_UI selectionSet;
+    selectionSet.keys.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 0, true});
+    input.selectedInstanceKeys = &selectionSet;
 
     std::vector<OverlayVisibleInstance> candidates;
     const bool bResolved = ResolveSelectedInstanceCandidate(input, candidates);
@@ -958,8 +960,12 @@ void CheckIndexSpaceCollisionRegressionClosed() {
     fixture.overlaySettings.overlayLayers.push_back(layer);
 
     DrawOverlayIconLayersInput input = fixture.Input();
+    // STEP229 — selectedInstanceKeys is now a pointer to the whole ordered multi-select set;
+    // `selectionSet` is reassigned (reused) for the reverse-direction check further below.
+    OverlayInstanceKeySet_UI selectionSet;
     // Select the PROCEDURAL instance at array position 0.
-    input.selectedInstanceKey = OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 0, true, /*bManual=*/false};
+    selectionSet.keys = {OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 0, true, /*bManual=*/false}};
+    input.selectedInstanceKeys = &selectionSet;
 
     std::vector<OverlayVisibleInstance> candidates;
     ResolveVisibleCandidates(input, fixture.aabbCache, nullptr, candidates);
@@ -981,7 +987,7 @@ void CheckIndexSpaceCollisionRegressionClosed() {
 
     // The reverse direction: selecting the manual instanceIdentifier (55) selects ONLY the manual
     // candidate, never the procedural one — proves the fix holds both ways, not just one.
-    input.selectedInstanceKey = OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 55, true, /*bManual=*/true};
+    selectionSet.keys = {OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 55, true, /*bManual=*/true}};
     candidates.clear();
     ResolveVisibleCandidates(input, fixture.aabbCache, nullptr, candidates);
     check(candidates.size() == 2, "both candidates still resolve");
@@ -1026,7 +1032,9 @@ void CheckSelectedInstanceCandidateResolvesManualMarker() {
     fixture.overlaySettings.overlayLayers.push_back(layer);
 
     DrawOverlayIconLayersInput input = fixture.Input();
-    input.selectedInstanceKey = OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 77, true, /*bManual=*/true};
+    OverlayInstanceKeySet_UI selectionSet;
+    selectionSet.keys.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 77, true, /*bManual=*/true});
+    input.selectedInstanceKeys = &selectionSet;
 
     std::vector<OverlayVisibleInstance> candidates;
     const bool bResolved = ResolveSelectedInstanceCandidate(input, candidates);
@@ -1039,6 +1047,53 @@ void CheckSelectedInstanceCandidateResolvesManualMarker() {
         check(candidates[0].tintColorRed == 0.1f && candidates[0].tintColorGreen == 0.2f
                   && candidates[0].tintColorBlue == 0.3f,
               "the manual replay resolves the same Alloys tint the full cull path would");
+    }
+}
+
+// STEP229 — the actual bug fix: bSelected must be true for EVERY member of the multi-select set, not
+// just the primary (formerly the sole comparison target via OverlayInstanceKeysEqual). Builds the set
+// via ReplaceSelectionSet — the SAME canonical mutator MapCanvas::ApplySelectionGesture calls on a
+// plain (no-Ctrl/Shift) marquee release (MapCanvas_SelectionGesture_UI.cpp's ApplyMarqueeGesture ->
+// ApplySelectionGesture -> ReplaceSelectionSet, ARCH §21.1) — not hand-rolled `.keys.push_back`, so
+// this exercises the precise set shape a real box-select produces.
+// MapCanvas_GestureOwnership_UI_Test.cpp already exhaustively proves the real imgui pointer-state
+// machine correctly drives ApplyMarqueeGesture to build a set of this exact shape (unaffected by this
+// ticket); ResolveVisibleCandidates/AppendCandidate cannot distinguish a key built this way from one
+// built any other way, so this is the precise proof that the two halves compose correctly, without a
+// second GL-backed harness that (per this ticket's own investigation) would have no legal way to
+// observe bSelected from outside this module's own restricted CullInternal header anyway.
+void CheckMarqueeStyleMultiSelectHighlightsAllMembers() {
+    IconLayerTestFixture fixture;
+    AppendMarkerInstance(fixture.placements, 1.0f, 1.0f, 0, Params::MarkerCategory::Alloys, "markerA");
+    AppendMarkerInstance(fixture.placements, 2.0f, 1.0f, 0, Params::MarkerCategory::Alloys, "markerA");
+    AppendMarkerInstance(fixture.placements, 3.0f, 3.0f, 0, Params::MarkerCategory::Alloys, "markerA");
+    fixture.ruleBucketIndex.markers.Build(fixture.placements.markers.ruleIndex.data(), 3, 1);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest, "markerA", 0);
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::Alloy;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    // Array positions 0 and 1 — mirroring a real drag-box covering the markers at world (1,1) and
+    // (2,1) but not the one at (3,3).
+    OverlayInstanceKeySet_UI selectionSet;
+    ReplaceSelectionSet(selectionSet, {
+        OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 0, true},
+        OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 1, true}});
+
+    DrawOverlayIconLayersInput input = fixture.Input();
+    input.selectedInstanceKeys = &selectionSet;
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(input, fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 3, "all three procedural markers resolve as candidates");
+    for (const OverlayVisibleInstance& candidate : candidates) {
+        const bool bExpectedSelected =
+            candidate.instanceKey.instanceIndex == 0 || candidate.instanceKey.instanceIndex == 1;
+        check(candidate.bSelected == bExpectedSelected,
+              "STEP229 - the exact ReplaceSelectionSet call shape a real marquee release makes (ARCH "
+              "Sec21.1) lights up bSelected for BOTH members, not just the MRU primary (array "
+              "position 1)");
     }
 }
 
@@ -1074,6 +1129,7 @@ void RunMapCanvasIconLayerCullChecks() {
     CheckProceduralMarkerScaleComposesEndToEnd();
     CheckIndexSpaceCollisionRegressionClosed();
     CheckSelectedInstanceCandidateResolvesManualMarker();
+    CheckMarqueeStyleMultiSelectHighlightsAllMembers();
 }
 
 } // namespace Ui

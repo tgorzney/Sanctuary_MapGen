@@ -97,6 +97,45 @@ void RunUnionChecks() {
           "if every key in the union list was already present, the primary (and set) is unchanged");
 }
 
+// ARCH §21.1 (STEP230) — ToggleEachInSelectionSet is Toggle applied per element, in order, NOT a
+// hybrid of Toggle+Union: each key present->erase, absent->append, exactly as a loop of
+// ToggleInSelectionSet calls would produce (which is in fact its real implementation).
+void RunToggleEachChecks() {
+    // Fresh batch, all absent: every key appended in order, last becomes primary.
+    OverlayInstanceKeySet_UI freshSet;
+    ToggleEachInSelectionSet(freshSet, {MakeKey(1), MakeKey(2), MakeKey(3)});
+    Check(freshSet.keys.size() == 3, "toggling a fresh batch in appends every key");
+    Check(OverlayInstanceKeysEqual(PrimaryOfSelectionSet(freshSet), MakeKey(3)),
+          "the LAST key in a fresh all-absent batch becomes primary");
+
+    // Mixed batch, last operation is an append: present key(s) erased, absent key(s) appended, the
+    // appended (present) key is the final primary — the ordinary case.
+    OverlayInstanceKeySet_UI mixedAppendLast;
+    mixedAppendLast.keys.push_back(MakeKey(5));
+    ToggleEachInSelectionSet(mixedAppendLast, {MakeKey(5), MakeKey(6)});
+    Check(mixedAppendLast.keys.size() == 1 && OverlayInstanceKeysEqual(mixedAppendLast.keys[0], MakeKey(6)),
+          "a mixed batch erases the present key and appends the absent one, ending with just the appended key");
+    Check(OverlayInstanceKeysEqual(PrimaryOfSelectionSet(mixedAppendLast), MakeKey(6)),
+          "the last key that ENDS UP present (the appended one) is the final primary");
+
+    // Mixed batch, last operation is an ERASE: the last key's own toggle removes it from the set, so
+    // primary must fall back to the set's new back() — NOT to the just-erased key, and NOT left
+    // pointing at a key no longer in the set.
+    OverlayInstanceKeySet_UI mixedEraseLast;
+    mixedEraseLast.keys.push_back(MakeKey(1));
+    mixedEraseLast.keys.push_back(MakeKey(2));   // primary starts as 2
+    ToggleEachInSelectionSet(mixedEraseLast, {MakeKey(2), MakeKey(3), MakeKey(1)});
+    // Step by step: 2 present->erase (set={1}); 3 absent->append (set={1,3}, primary 3);
+    // 1 present->erase (set={3}) — the LAST key's own toggle (key 1) erased it, so primary falls
+    // back to the set's new back(), which is 3.
+    Check(mixedEraseLast.keys.size() == 1 && OverlayInstanceKeysEqual(mixedEraseLast.keys[0], MakeKey(3)),
+          "erase-fallback case: the final set is exactly {3} after the 3-step mixed toggle sequence");
+    Check(OverlayInstanceKeysEqual(PrimaryOfSelectionSet(mixedEraseLast), MakeKey(3)),
+          "erase-fallback case: when the LAST key's own toggle erases it, primary falls back to the "
+          "set's new back() (3), matching ToggleInSelectionSet's own erase-case contract, not the "
+          "erased key (1) and not the batch's own last-listed key blindly");
+}
+
 } // namespace
 
 int main() {
@@ -105,6 +144,7 @@ int main() {
     RunReplaceChecks();
     RunToggleChecks();
     RunUnionChecks();
+    RunToggleEachChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

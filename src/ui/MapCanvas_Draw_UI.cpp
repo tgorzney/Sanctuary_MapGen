@@ -100,12 +100,14 @@ void MapCanvas::DrawOverlayIconLayerPass(float regionOriginX, float regionOrigin
     iconLayerInput.markerTypeVisibility = markerTypeVisibilitySource;
     iconLayerInput.markerTypeVisibilityRevision =
         markerTypeVisibilitySource != nullptr ? markerTypeVisibilitySource->revision : 0;
-    // ARCH §19.25 — `selectedInstanceKey` IS the canonical key now (procedural or manual, correctly
-    // tagged `bManual`); no longer reconstructed from a bare entity id, which could only ever
-    // represent the procedural case. ARCH §21.1 — the draw pass still highlights only the PRIMARY;
-    // widening it to the whole multi-select set is a visual-language ticket of its own, not this one.
-    if (HasSelection())
-        iconLayerInput.selectedInstanceKey = PrimaryOfSelectionSet(selectedInstanceKeys);
+    // ARCH §19.25 — the canonical key shape (procedural or manual, correctly tagged `bManual`).
+    // STEP229 — ARCH §21.1's "multi-instance canvas highlighting is a separate ticket" deferral is
+    // now implemented: the WHOLE ordered multi-select set is threaded through (a pointer into
+    // MapCanvas's own `selectedInstanceKeys`, MapCanvas_UI.h:377) — always, empty set included, so the
+    // icon-layer module never needs its own null-vs-empty special case. Replaces the old
+    // `if (HasSelection()) ... PrimaryOfSelectionSet(...)` guard, which narrowed the whole set down to
+    // one key before it ever reached the cull/emit code — the actual bug this ticket fixes.
+    iconLayerInput.selectedInstanceKeys = &selectedInstanceKeys;
     DrawOverlayIconLayers(iconLayerInput, overlayLayerAabbCache, overlayIconLayerFrameCache,
                          *ImGui::GetWindowDrawList());
 }

@@ -5,6 +5,11 @@
 // stays imgui-free so MapCanvas_UI.h, which includes it for the setters, never sees imgui.h.
 #pragma once
 #include "MapCanvas_IconLayer_UI.h"
+// STEP229 — OverlayInstanceKeySet_UI, for the widened selectedInstanceKeys field below. No cycle:
+// MapCanvas_UI.h already includes both this header and MapCanvas_SelectionSet_UI.h directly and
+// side-by-side (MapCanvas_UI.h:34,37), and MapCanvas_SelectionSet_UI.h itself never includes this
+// header's own module (MapCanvas_IconLayer_Ops_UI.h) — confirmed by reading both files fresh.
+#include "MapCanvas_SelectionSet_UI.h"
 
 struct ImDrawList;
 
@@ -56,7 +61,12 @@ struct DrawOverlayIconLayersInput {
     const PreviewComposite*             composite              = nullptr;
     const MapCanvasView*                view                   = nullptr;
     float regionOriginX = 0.0f, regionOriginY = 0.0f, regionSidePixels = 0.0f;
-    OverlayInstanceKey_UI selectedInstanceKey;
+    // STEP229 — ARCH §21.1's own deferred "multi-instance canvas highlighting" ticket, now
+    // implemented: a push-in pointer to the WHOLE ordered multi-select set (mirrors this struct's own
+    // every-other-source convention — null = no selection source wired, never a crash), not a single
+    // primary key. MapCanvas_Draw_UI.cpp points this at its own `selectedInstanceKeys` member
+    // (MapCanvas_UI.h:377) unconditionally, empty set included.
+    const OverlayInstanceKeySet_UI*     selectedInstanceKeys   = nullptr;
     // STEP133 — the Markers tab's per-Type Hide/Unhide preview filter (null = no shell has wired the
     // source, i.e. today's exact unfiltered behavior). `markerTypeVisibilityRevision` is threaded
     // separately (0 when the pointer is null) so the C2 cache's own invalidation key
@@ -78,9 +88,9 @@ std::vector<OverlayVisibleInstance> ApplyVisibleInstanceBudget(
 // ImDrawVert's layout) is what interprets/produces the bytes these two Append* calls accumulate.
 bool ShouldInvalidateIconLayerCache(const IconLayerFrameCache& cache, float viewCenterPixelX,
                                     float viewCenterPixelY, float zoomScale,
-                                    const OverlayInstanceKey_UI& selection, std::uint64_t layerSettingsRevision);
+                                    const OverlayInstanceKeySet_UI& selection, std::uint64_t layerSettingsRevision);
 void BeginIconLayerCacheBuild(IconLayerFrameCache& cache, float viewCenterPixelX, float viewCenterPixelY,
-                              float zoomScale, const OverlayInstanceKey_UI& selection,
+                              float zoomScale, const OverlayInstanceKeySet_UI& selection,
                               std::uint64_t layerSettingsRevision);
 void AppendCachedVertexBytes(IconLayerFrameCache& cache, const void* data, std::size_t byteCount);
 void AppendCachedIndexBytes(IconLayerFrameCache& cache, const void* data, std::size_t byteCount);

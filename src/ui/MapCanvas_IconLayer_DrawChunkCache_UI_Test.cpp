@@ -23,7 +23,7 @@ void CheckCachePathRoundTrip() {
     ImGui::SetNextWindowSize(ImVec2(256.0f, 256.0f));
     ImGui::Begin("IconLayerDrawChunkCacheBuildWindow");
     IconLayerFrameCache frameCache;
-    BeginIconLayerCacheBuild(frameCache, 0.0f, 0.0f, 1.0f, OverlayInstanceKey_UI{}, 1);
+    BeginIconLayerCacheBuild(frameCache, 0.0f, 0.0f, 1.0f, OverlayInstanceKeySet_UI{}, 1);
     CaptureAndCacheBuckets(*ImGui::GetWindowDrawList(), frameCache, buckets);
     ImGui::End();
 

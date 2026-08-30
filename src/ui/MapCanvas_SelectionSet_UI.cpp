@@ -36,6 +36,10 @@ void ToggleInSelectionSet(OverlayInstanceKeySet_UI& set, const OverlayInstanceKe
     set.keys.push_back(key);
 }
 
+void ToggleEachInSelectionSet(OverlayInstanceKeySet_UI& set, const std::vector<OverlayInstanceKey_UI>& keys) {
+    for (const OverlayInstanceKey_UI& key : keys) ToggleInSelectionSet(set, key);
+}
+
 void UnionIntoSelectionSet(OverlayInstanceKeySet_UI& set, const std::vector<OverlayInstanceKey_UI>& keys) {
     for (const OverlayInstanceKey_UI& key : keys)
         if (!SelectionSetContains(set, key)) set.keys.push_back(key);

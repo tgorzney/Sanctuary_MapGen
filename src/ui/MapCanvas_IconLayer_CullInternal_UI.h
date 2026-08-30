@@ -32,8 +32,11 @@ void ResolveVisibleCandidates(const DrawOverlayIconLayersInput& input, IconLayer
 
 // §4's "run steps 1-3 fresh for only the selected instance(s)" replay-frame path — a cheap,
 // picker-scoped lookup (today: Markers only, STEP48), never an O(N) re-walk of every candidate.
-// Appends at most one instance; returns false (appends nothing) if there is no valid selection, the
-// selected instance's owning layer/sub-layer is disabled, or its collection has no picker yet.
+// STEP229 — widened from "at most one" (the old single-primary-key contract) to "one per
+// Markers-collection key in the whole `selectedInstanceKeys` set" (ARCH §21.1): appends zero, one, or
+// many instances. A Props/Decals key in the set is still skipped (no picker yet, STEP48, unchanged
+// restriction) exactly as a Props/Decals PRIMARY already was, silently, before this ticket. Returns
+// true iff at least one key resolved.
 bool ResolveSelectedInstanceCandidate(const DrawOverlayIconLayersInput& input,
                                        std::vector<OverlayVisibleInstance>& outCandidates);
 

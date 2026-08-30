@@ -96,7 +96,14 @@ struct IconLayerFrameCache {
     std::vector<CachedIconLayerBucketLayout_UI> cachedBucketLayout;   // for replay
     bool bValid = false;
     float cachedViewCenterPixelX = 0.0f, cachedViewCenterPixelY = 0.0f, cachedZoomScale = 0.0f;
-    OverlayInstanceKey_UI cachedSelectionKey;
+    // STEP229 — order-sensitive snapshot of the WHOLE selected set, not just the primary. A raw
+    // vector, deliberately NOT the OverlayInstanceKeySet_UI wrapper type: this header is the
+    // icon-layer module's own shared leaf value-types header (see this file's own top comment) and
+    // stays free of MapCanvas_SelectionSet_UI.h's own include, which itself includes THIS header —
+    // pulling it in here would be a genuine circular structural dependency. MapCanvas_IconLayer_Cache_UI.cpp
+    // (a .cpp, free to include anything) wraps this in a temporary OverlayInstanceKeySet_UI at its own
+    // two call sites and compares it via the canonical SelectionSetsEqual.
+    std::vector<OverlayInstanceKey_UI> cachedSelectionKeys;
     std::uint64_t cachedLayerSettingsRevision = 0;
 };
 

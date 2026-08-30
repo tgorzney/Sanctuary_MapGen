@@ -11,23 +11,24 @@ namespace {
 // A brand-new cache (bValid == false) always invalidates.
 void CheckFreshCacheAlwaysInvalidates() {
     IconLayerFrameCache cache;
-    check(ShouldInvalidateIconLayerCache(cache, 0.0f, 0.0f, 1.0f, OverlayInstanceKey_UI{}, 0),
+    check(ShouldInvalidateIconLayerCache(cache, 0.0f, 0.0f, 1.0f, OverlayInstanceKeySet_UI{}, 0),
           "a fresh, never-built cache always invalidates");
 }
 
 // Once built, replaying the identical keys never invalidates.
 void CheckUnchangedKeysDoNotInvalidate() {
     IconLayerFrameCache cache;
-    BeginIconLayerCacheBuild(cache, 10.0f, 20.0f, 2.0f, OverlayInstanceKey_UI{}, 5);
-    check(!ShouldInvalidateIconLayerCache(cache, 10.0f, 20.0f, 2.0f, OverlayInstanceKey_UI{}, 5),
+    BeginIconLayerCacheBuild(cache, 10.0f, 20.0f, 2.0f, OverlayInstanceKeySet_UI{}, 5);
+    check(!ShouldInvalidateIconLayerCache(cache, 10.0f, 20.0f, 2.0f, OverlayInstanceKeySet_UI{}, 5),
           "identical view/selection/revision keys never force a rebuild");
 }
 
 // Each of pan / zoom / selection-change / layer-setting-change independently forces a rebuild.
 void CheckEachTriggerIndependentlyInvalidates() {
     IconLayerFrameCache cache;
-    const OverlayInstanceKey_UI noSelection;
-    const OverlayInstanceKey_UI markerSelection{PlacementCollectionKind_UI::Markers, 3, true};
+    const OverlayInstanceKeySet_UI noSelection;
+    OverlayInstanceKeySet_UI markerSelection;
+    markerSelection.keys.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 3, true});
 
     BeginIconLayerCacheBuild(cache, 10.0f, 20.0f, 2.0f, noSelection, 5);
     check(ShouldInvalidateIconLayerCache(cache, 99.0f, 20.0f, 2.0f, noSelection, 5), "pan invalidates");
@@ -47,7 +48,7 @@ void CheckEachTriggerIndependentlyInvalidates() {
 // Begin clears and re-stamps every key; the accumulated bytes are exactly what was appended.
 void CheckBuildAccumulatesRawBytes() {
     IconLayerFrameCache cache;
-    BeginIconLayerCacheBuild(cache, 1.0f, 2.0f, 3.0f, OverlayInstanceKey_UI{}, 7);
+    BeginIconLayerCacheBuild(cache, 1.0f, 2.0f, 3.0f, OverlayInstanceKeySet_UI{}, 7);
     check(cache.bValid && cache.cachedVertexBytes.empty() && cache.cachedIndexBytes.empty(),
           "Begin leaves a valid, empty cache ready to accumulate");
     const unsigned char vertexBytes[4] = {1, 2, 3, 4};
@@ -60,6 +61,23 @@ void CheckBuildAccumulatesRawBytes() {
           "appended bytes are copied verbatim");
 }
 
+// STEP229 — a set-changing edit that doesn't touch the primary (e.g. Ctrl-click removing a
+// non-primary member) must still invalidate; the old single-key OverlayInstanceKeysEqual comparison
+// this replaced could not see this kind of change at all.
+void CheckNonPrimarySelectionMemberRemovalInvalidates() {
+    IconLayerFrameCache cache;
+    OverlayInstanceKeySet_UI twoKeys;
+    twoKeys.keys.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 1, true});
+    twoKeys.keys.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 2, true});   // primary
+    OverlayInstanceKeySet_UI primaryOnly;
+    primaryOnly.keys.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 2, true});
+
+    BeginIconLayerCacheBuild(cache, 10.0f, 20.0f, 2.0f, twoKeys, 5);
+    check(ShouldInvalidateIconLayerCache(cache, 10.0f, 20.0f, 2.0f, primaryOnly, 5),
+          "STEP229 - removing a NON-PRIMARY selected member still invalidates the cache, even though "
+          "the primary (last element) is unchanged");
+}
+
 } // namespace
 
 void RunMapCanvasIconLayerCacheChecks() {
@@ -67,6 +85,7 @@ void RunMapCanvasIconLayerCacheChecks() {
     CheckUnchangedKeysDoNotInvalidate();
     CheckEachTriggerIndependentlyInvalidates();
     CheckBuildAccumulatesRawBytes();
+    CheckNonPrimarySelectionMemberRemovalInvalidates();
 }
 
 } // namespace Ui

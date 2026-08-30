@@ -96,14 +96,17 @@ void MapCanvas::ApplySelectionGesture(const OverlayInstanceKey_UI& touchedKey, b
         selectionChangedCallback(PrimaryOfSelectionSet(selectedInstanceKeys), selectedInstanceKeys);
 }
 
-// The marquee/list-batch counterpart. `ToggleInSelectionSet` takes a single key only (never a legal
-// operation for a batch, per its own header comment), so a batch gesture only ever resolves to
-// Replace (no modifier) or Union (Ctrl OR Shift held) — the same "no per-batch toggle mechanism
-// exists" reading `ManualInstanceHitTest_UI.h`'s own release-time consumer (ARCH §21.2) depends on.
+// The marquee/list-batch counterpart. STEP230 (ARCH §21.1, ToggleEachInSelectionSet) — Ctrl held
+// resolves to a real per-element TOGGLE (`ToggleEachInSelectionSet`), not Union: pre-STEP230, Ctrl
+// and Shift were treated identically here (both unioned), so a Ctrl-marquee over an
+// already-selected box was a silent no-op instead of deselecting. Ctrl wins if both are somehow
+// held, matching the single-key overload's own tie-break two functions above.
 void MapCanvas::ApplySelectionGesture(const std::vector<OverlayInstanceKey_UI>& touchedKeys, bool bCtrlHeld,
                                       bool bShiftHeld) {
     const OverlayInstanceKeySet_UI previous = selectedInstanceKeys;
-    if (bCtrlHeld || bShiftHeld) {
+    if (bCtrlHeld) {
+        ToggleEachInSelectionSet(selectedInstanceKeys, touchedKeys);
+    } else if (bShiftHeld) {
         UnionIntoSelectionSet(selectedInstanceKeys, touchedKeys);
     } else {
         ReplaceSelectionSet(selectedInstanceKeys, touchedKeys);

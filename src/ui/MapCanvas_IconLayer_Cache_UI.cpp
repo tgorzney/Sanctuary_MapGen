@@ -8,6 +8,7 @@
 // from; MapCanvas_IconLayer_Draw_UI.cpp calls it every time ShouldInvalidateIconLayerCache says so,
 // which today only fires on pan/zoom/selection/layer-setting change (§14.8), never mid-gesture.
 #include "MapCanvas_IconLayer_Ops_UI.h"
+#include "MapCanvas_SelectionSet_UI.h"   // STEP229 — SelectionSetsEqual
 #include <cstring>
 
 namespace SanmapGen {
@@ -23,18 +24,23 @@ bool NearlyEqual(float a, float b) { const float d = a - b; return d < 0.0001f &
 // invalidates unconditionally.
 bool ShouldInvalidateIconLayerCache(const IconLayerFrameCache& cache, float viewCenterPixelX,
                                     float viewCenterPixelY, float zoomScale,
-                                    const OverlayInstanceKey_UI& selection, std::uint64_t layerSettingsRevision) {
+                                    const OverlayInstanceKeySet_UI& selection, std::uint64_t layerSettingsRevision) {
     if (!cache.bValid) return true;
     if (!NearlyEqual(cache.cachedViewCenterPixelX, viewCenterPixelX)
         || !NearlyEqual(cache.cachedViewCenterPixelY, viewCenterPixelY)
         || !NearlyEqual(cache.cachedZoomScale, zoomScale))
         return true;
-    if (!OverlayInstanceKeysEqual(cache.cachedSelectionKey, selection)) return true;
+    // STEP229 — order-sensitive WHOLE-SET comparison (SelectionSetsEqual, MapCanvas_SelectionSet_UI.h)
+    // replaces the old single-key OverlayInstanceKeysEqual check: a set that gained, lost, or
+    // reordered ANY member (not just the primary) must invalidate — otherwise a Ctrl-click that
+    // removes a non-primary member would leave that member's now-stale bytes sitting untouched in a
+    // cache that still believes nothing changed.
+    if (!SelectionSetsEqual(OverlayInstanceKeySet_UI{cache.cachedSelectionKeys}, selection)) return true;
     return cache.cachedLayerSettingsRevision != layerSettingsRevision;
 }
 
 void BeginIconLayerCacheBuild(IconLayerFrameCache& cache, float viewCenterPixelX, float viewCenterPixelY,
-                              float zoomScale, const OverlayInstanceKey_UI& selection,
+                              float zoomScale, const OverlayInstanceKeySet_UI& selection,
                               std::uint64_t layerSettingsRevision) {
     cache.cachedVertexBytes.clear();
     cache.cachedIndexBytes.clear();
@@ -42,7 +48,7 @@ void BeginIconLayerCacheBuild(IconLayerFrameCache& cache, float viewCenterPixelX
     cache.cachedViewCenterPixelX = viewCenterPixelX;
     cache.cachedViewCenterPixelY = viewCenterPixelY;
     cache.cachedZoomScale = zoomScale;
-    cache.cachedSelectionKey = selection;
+    cache.cachedSelectionKeys = selection.keys;
     cache.cachedLayerSettingsRevision = layerSettingsRevision;
     cache.bValid = true;
 }

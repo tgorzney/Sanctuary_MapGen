@@ -7,6 +7,7 @@
 #include "IconAtlasPairing_UI.h"
 #include "IconGridWidget_UI.h"
 #include "MapCanvasView_UI.h"
+#include "MapCanvas_SelectionSet_UI.h"   // STEP229 — SelectionSetContains
 #include "PreviewComposite_UI.h"
 #include "../io/WorldFootprintSizeTable_IO.h"
 
@@ -66,8 +67,12 @@ void AppendCandidate(const DrawOverlayIconLayersInput& input, const OverlayLayer
     instance.layerIndex = layerIndex;
     instance.stableOrder = stableOrderCounter != nullptr ? (*stableOrderCounter)++ : 0;
     instance.instanceKey = OverlayInstanceKey_UI{collection, instanceIndex, true, bManual};   // ARCH §19.25
-    instance.bSelected = input.selectedInstanceKey.bValid
-                       && OverlayInstanceKeysEqual(instance.instanceKey, input.selectedInstanceKey);
+    // STEP229 — ARCH §21.1's deferred "multi-instance canvas highlighting" ticket: membership in the
+    // WHOLE ordered multi-select set, not equality against one primary key. `selectedInstanceKeys` is
+    // a push-in pointer (this struct's own established convention) — null means no selection source
+    // was wired (mirrors every other null-safe pointer in DrawOverlayIconLayersInput), never a crash.
+    instance.bSelected = input.selectedInstanceKeys != nullptr
+                       && SelectionSetContains(*input.selectedInstanceKeys, instance.instanceKey);
     outCandidates.push_back(instance);
 }
 

@@ -254,6 +254,35 @@ void RunMapCanvasGestureOwnershipChecks(Sys::GpuResourceManager& manager) {
           "ARCH §21.1 — a Ctrl-click on an already-selected marker toggles it OFF through the live "
           "pointer state machine, not just the underlying OverlayInstanceKeySet_UI mutator directly");
 
+    // --- ARCH §21.1 (STEP230): a Ctrl-held marquee TOGGLES each touched key, not Union. Pre-fix,
+    // Ctrl and Shift were resolved identically in the batch overload (both called
+    // UnionIntoSelectionSet), so a Ctrl-marquee over an already-selected box was a silent no-op
+    // instead of deselecting — this is the exact bug this ticket exists to prove fixed. ---
+    lastReportedSet.keys.clear();
+    SimulatePressDragRelease(canvas, boxPressPosition, boxReleasePosition, /*button=*/0);   // baseline: plain marquee selects {A, B}
+    check(lastReportedSet.keys.size() == 2,
+          "baseline: a plain marquee over the box re-selects both unlocked markers");
+
+    SimulatePressDragRelease(canvas, boxPressPosition, boxReleasePosition, /*button=*/0, /*bCtrl=*/true);
+    check(lastReportedSet.keys.empty(),
+          "STEP230 — a Ctrl-held marquee over an ALREADY-selected box TOGGLES every touched key OFF; "
+          "pre-fix this stayed at {A, B} (Union-with-itself is a no-op), which this check would have "
+          "caught as a FAILure");
+
+    SimulatePressDragRelease(canvas, boxPressPosition, boxReleasePosition, /*button=*/0, /*bCtrl=*/true);
+    check(lastReportedSet.keys.size() == 2,
+          "STEP230 — Ctrl-marquee toggles absent keys back ON symmetrically (present->erase, "
+          "absent->append, applied per element)");
+
+    // --- ARCH §21.1: a Shift-held marquee still UNIONS (adds, never removes) — distinct from Ctrl's
+    // toggle proven above; the set is already {A, B} here, so a union over the same box is a no-op
+    // that stays at 2, not empty. ---
+    SimulatePressDragRelease(canvas, boxPressPosition, boxReleasePosition, /*button=*/0, /*bCtrl=*/false,
+                             /*bShift=*/true);
+    check(lastReportedSet.keys.size() == 2,
+          "ARCH §21.1 — a Shift-held marquee over an already-selected box UNIONS (never removes), "
+          "staying at 2 — distinct from Ctrl's toggle-off behavior proven above");
+
     ImGui::DestroyContext();
 }
 
