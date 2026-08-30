@@ -90,23 +90,59 @@ void Application::WireCallbacks() {
     // primary: `selectedManualInstanceIdentifiers` (STEP141's already-shipped plural field) now
     // sources from the real multi-select set instead of a synthesized single-element list — nothing
     // else about it changes. Props/Decals: no-op, unchanged (no tab-level plural field exists yet).
+    // STEP232/STEP233 — this closure's third parameter is Application's own consumer of
+    // MapCanvas_UI.h's `bSuppressTabStateResync` (renamed/generalized from STEP232's narrower
+    // `bWasShiftGesture` — see that setter's own header comment for the full "why"). Gating BOTH writes
+    // below on it fixes THREE independent same-click clobbers total, across STEP232 and STEP233 together
+    // (all three share the identical mechanism: a synchronous same-click echo from the canvas
+    // overwriting a value the LIST side had already correctly computed one call earlier):
+    //  1. (STEP232) selectedManualInstanceIdentifiers (plural) used to resync UNCONDITIONALLY from the
+    //     canvas's own key set on every change — clobbering a Shift-click's own richer list-computed
+    //     range.
+    //  2. (STEP232) manualInstanceSelectionAnchorIdentifier — a Shift-click's own PRESERVED anchor
+    //     getting overwritten.
+    //  3. (STEP233) manualInstanceSelectionAnchorIdentifier AGAIN, for a Ctrl-DESELECT specifically:
+    //     ApplyManualInstanceSelectionClick's own Ctrl branch sets the anchor to the clicked id
+    //     UNCONDITIONALLY (even when deselecting it), but this closure's old `!bWasShiftGesture` gate
+    //     only protected Shift, so a Ctrl-deselect's own correct anchor write still got clobbered by
+    //     whatever the canvas's own (differently-computed, necessarily-different-since-the-clicked-id-
+    //     is-no-longer-selected) fallback primary happened to be. `bSuppressTabStateResync` generalizes
+    //     the same protection to EVERY list-driven change, not just a Shift one: MapCanvas::
+    //     SyncManualMarkerSelection (the new production landing point for a list click, MapCanvas_UI.h)
+    //     always fires this callback with it `true`, since the list has ALREADY correctly written both
+    //     fields for EVERY modifier kind (ApplyManualInstanceSelectionClick), one call earlier in the
+    //     SAME click — there is no modifier kind for which THIS closure's own re-derivation from the
+    //     canvas's echo is ever the right thing to do on that path.
+    // A canvas-NATIVE gesture (ApplySelectionGesture, no list involved) still passes its own literal
+    // bShiftHeld here — STEP232's own documented trade-off (a Shift-held canvas MARQUEE no longer syncs
+    // into selectedManualInstanceIdentifiers either) is UNCHANGED by STEP233: SyncManualMarkerSelection
+    // is reached ONLY from a list click, never from ApplyMarqueeGesture/ApplyClickGesture, so it neither
+    // fixes nor worsens that documented gap — see STEP233's own Explicit out-of-scope for the explicit
+    // confirmation.
     canvas.SetSelectionChangedCallback([this](const OverlayInstanceKey_UI& primary,
-                                              const OverlayInstanceKeySet_UI& selectedKeys) {
-        tabState.markers.selectedManualInstanceIdentifiers.clear();
-        for (const OverlayInstanceKey_UI& key : selectedKeys.keys)
-            if (key.bValid && key.collection == PlacementCollectionKind_UI::Markers && key.bManual)
-                tabState.markers.selectedManualInstanceIdentifiers.push_back(key.instanceIndex);
+                                              const OverlayInstanceKeySet_UI& selectedKeys,
+                                              bool bSuppressTabStateResync) {
+        if (!bSuppressTabStateResync) {
+            tabState.markers.selectedManualInstanceIdentifiers.clear();
+            for (const OverlayInstanceKey_UI& key : selectedKeys.keys)
+                if (key.bValid && key.collection == PlacementCollectionKind_UI::Markers && key.bManual)
+                    tabState.markers.selectedManualInstanceIdentifiers.push_back(key.instanceIndex);
+        }
 
         // STEP143 (human's own bug report) — an empty-space click's own synthetic miss-key always
         // constructs with bManual == false, so gating purely on bManual could never route a miss back
         // to the Markers tab's own manual selection — the row stayed highlighted after clicking empty
         // space. Re-derived from the SET's primary here (not the lone callback argument §19.25 read),
         // for exactly the same reason: an invalid primary (miss or explicit clear) always resolves
-        // both fields to "nothing selected" together.
+        // both fields to "nothing selected" together. UNCHANGED by STEP232/STEP233 — always runs,
+        // regardless of bSuppressTabStateResync, since it is not the field either ticket's bug lives in.
         const bool bPrimaryIsManualMarker = primary.bValid
             && primary.collection == PlacementCollectionKind_UI::Markers && primary.bManual;
-        tabState.markers.selectedManualInstanceIdentifier        = bPrimaryIsManualMarker ? primary.instanceIndex : -1;
-        tabState.markers.manualInstanceSelectionAnchorIdentifier = bPrimaryIsManualMarker ? primary.instanceIndex : -1;
+        tabState.markers.selectedManualInstanceIdentifier = bPrimaryIsManualMarker ? primary.instanceIndex : -1;
+        // STEP232 fix #2 / STEP233 fix #3, the anchor — see this closure's own header comment above for
+        // the full mechanism (both are the SAME clobber class, now both closed by the SAME general gate).
+        if (!bSuppressTabStateResync)
+            tabState.markers.manualInstanceSelectionAnchorIdentifier = bPrimaryIsManualMarker ? primary.instanceIndex : -1;
 
         if (!primary.bValid) {
             lastSelectedEntityIdentifier = Data::EntityIdBuffer::emptySentinel;
@@ -158,11 +194,11 @@ void Application::WireCallbacks() {
     // parameter it fed.
     canvas.SetManualAreaDragSource(&recipe.areas, &composite.Settings().areaColors,
                                    &tabState.areas.areaLocks, &tabState.areas.selectedAreaIndex);
-    // STEP126 — the static selection-highlight source; see MapCanvas_UI.h's
-    // SetManualMarkerSelectionSource. Points at the SAME MarkersTabState field the Markers tab's own
-    // instance-list rows write (tabState.markers.selectedManualInstanceIdentifier) — one source of
-    // truth, never a second copy.
-    canvas.SetManualMarkerSelectionSource(&tabState.markers.selectedManualInstanceIdentifier);
+    // STEP231 — SetManualMarkerSelectionSource is retired; MapCanvas now reads its own
+    // selectedInstanceKeys directly for the roster/dot pass's highlight (see MapCanvas_MarkerDrag_UI.cpp
+    // and MapCanvas_UI.h's own retirement comments). tabState.markers.selectedManualInstanceIdentifier
+    // itself is UNCHANGED and still live — it still drives the Markers-tab LIST's own row highlight
+    // (DrawManualInstanceRow), which is a separate concern this ticket does not touch.
     // STEP133 — the per-Type Hide/Unhide preview filter source; see MapCanvas_UI.h's
     // SetMarkerTypeVisibilitySource. Points at the SAME MarkersTabState field the Markers tab's own
     // Type-section Hide/Unhide buttons write (tabState.markers.markerTypeVisibility) — one source of
@@ -174,8 +210,14 @@ void Application::WireCallbacks() {
     // direction (tab -> canvas instead of canvas -> tab).
     // STEP205 — forwards the row click's real Ctrl/Shift state into MapCanvas's own modifier-aware
     // overload instead of always defaulting to Replace.
-    selectManualMarkerInstanceCallback = [this](int instanceIdentifier, bool bCtrlHeld, bool bShiftHeld) {
-        canvas.SelectManualMarkerByInstanceIdentifier(instanceIdentifier, bCtrlHeld, bShiftHeld);
+    // STEP233 — retargeted from SelectManualMarkerByInstanceIdentifier (which re-derived Toggle/Union/
+    // Replace against the canvas's OWN, independently-touched copy of the set — the root cause) to
+    // SyncManualMarkerSelection (which instead REPLACES the canvas's own manual-marker subset with the
+    // list's own already-resolved full selection, verbatim). See MapCanvas_UI.h's own header comment on
+    // SyncManualMarkerSelection for the full contract.
+    selectManualMarkerInstanceCallback = [this](int clickedInstanceIdentifier,
+                                                const std::vector<int>& selectedInstanceIdentifiers) {
+        canvas.SyncManualMarkerSelection(selectedInstanceIdentifiers, clickedInstanceIdentifier);
     };
     // STEP132 (ARCH §19.27) — the procedural sibling, same shell-mediated pattern, opposite direction
     // of nothing new: the Rule row's own instance-list click resolves through this into the canvas's

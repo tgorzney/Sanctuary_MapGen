@@ -162,7 +162,8 @@ void DrawBaseSectionManualInstanceList(std::vector<Params::MarkerInstanceGroup>&
                                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                        const std::string& typeName, int& selectedManualInstanceIdentifier,
                                        std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                                       const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                       const std::function<void(int clickedInstanceIdentifier,
+                                                                const std::vector<int>& selectedInstanceIdentifiers)>&
                                            selectManualMarkerInstanceCallback) {
     std::vector<std::pair<int, int>> baseInstances;
     for (int groupIndex = 0; groupIndex < static_cast<int>(markers.size()); ++groupIndex) {
@@ -260,7 +261,8 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                     const IconAtlasPairingLookup* pairingLookup,
                     const Data::PlacementInstances* placedMarkers,
-                    const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                    const std::function<void(int clickedInstanceIdentifier,
+                                             const std::vector<int>& selectedInstanceIdentifiers)>&
                         selectManualMarkerInstanceCallback,
                     const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
                         selectProceduralMarkerInstanceCallback) {

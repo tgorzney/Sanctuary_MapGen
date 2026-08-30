@@ -181,10 +181,15 @@ private:
     // (mirroring SetManualMarkerSelectionSource's existing injection pattern) and threaded down
     // through DrawMarkersTab -> DrawMarkerTypeSections -> DrawLayerRowBody's existing call chain
     // (the same chain previewDriver/iconManifest already ride down).
-    // STEP205 (ARCH §21.1's own deferred follow-up) — widened from `void(int)` to carry the row
-    // click's real Ctrl/Shift modifier state through to `MapCanvas::ApplySelectionGesture`, so this
-    // shell-mediated path joins/ranges into the canvas's real multi-select instead of always Replace.
-    std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>     selectManualMarkerInstanceCallback;
+    // STEP205 (ARCH §21.1's own deferred follow-up, historical) — widened from `void(int)` to carry
+    // the row click's real Ctrl/Shift modifier state through to `MapCanvas::ApplySelectionGesture`.
+    // STEP233 — widened AGAIN and SIMPLIFIED: carries the clicked identifier plus the list's own
+    // already-resolved full selection instead of raw bCtrl/bShift — bound to
+    // `MapCanvas::SyncManualMarkerSelection` now, not `ApplySelectionGesture`/
+    // `SelectManualMarkerByInstanceIdentifier` — see that method's own header comment
+    // (MapCanvas_UI.h) for why re-deriving Toggle/Union/Replace here was the bug.
+    std::function<void(int clickedInstanceIdentifier, const std::vector<int>& selectedInstanceIdentifiers)>
+        selectManualMarkerInstanceCallback;
     // STEP132 (ARCH §19.27) — the procedural sibling: bound in WireCallbacks() to
     // MapCanvas::SelectProceduralMarkerInstanceByArrayPosition, threaded down through
     // DrawMarkersTab -> DrawMarkerTypeSections -> DrawRuleLayerListBody's own call chain (the SAME

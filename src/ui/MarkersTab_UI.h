@@ -191,7 +191,8 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     const IconAtlasManifest* iconManifest = nullptr,
                     const IconAtlasPairingLookup* pairingLookup = nullptr,
                     const Data::PlacementInstances* placedMarkers = nullptr,
-                    const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                    const std::function<void(int clickedInstanceIdentifier,
+                                             const std::vector<int>& selectedInstanceIdentifiers)>&
                         selectManualMarkerInstanceCallback = {},
                     const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
                         selectProceduralMarkerInstanceCallback = {});

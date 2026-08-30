@@ -53,7 +53,7 @@ FrameResult RunRowBodyFrame(HeadlessMouseState mouse, Params::MarkerInstanceLaye
                             const ManualInstanceLayerIndex_UI& instanceIndex, ManualMarkerLayersState& state,
                             int& selectedManualInstanceIdentifier,
                             std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                            const std::function<void(int, bool, bool)>&
+                            const std::function<void(int, const std::vector<int>&)>&
                                 selectManualMarkerInstanceCallback = {}) {
     FrameResult result;
     const Params::Geometry geometry;
@@ -82,7 +82,7 @@ FrameResult ClickAt(ImVec2 position, Params::MarkerInstanceLayer& layer,
                     int& selectedManualInstanceIdentifier,
                     std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                     bool bCtrlHeld = false, bool bShiftHeld = false,
-                    const std::function<void(int, bool, bool)>&
+                    const std::function<void(int, const std::vector<int>&)>&
                         selectManualMarkerInstanceCallback = {}) {
     HeadlessMouseState hover;   hover.position = position; hover.bCtrlHeld = bCtrlHeld; hover.bShiftHeld = bShiftHeld;
     HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
@@ -300,11 +300,13 @@ void RunSymmetryGroupedInstanceRowClickChecks() {
           "clicking the second row inside the SAME cluster still updates to its own id (301), not additive");
 }
 
-// STEP205 (ARCH §21.1's own deferred follow-up) — a Ctrl-held row click must widen BOTH the
-// tab-local multi-select write (ApplyManualInstanceSelectionClick, already inside DrawManualInstanceRow)
-// AND the canvas-sync callback with the SAME real modifier state, so the two agree instead of one
-// clobbering the other within the same click (the root problem this ticket fixes). Reuses the SAME
-// two-row fixture RunInstanceRowClickChecks does.
+// STEP205 (historical)/STEP233 — a Ctrl-held row click must widen BOTH the tab-local multi-select write
+// (ApplyManualInstanceSelectionClick, already inside DrawManualInstanceRow) AND the canvas-sync callback
+// with the SAME resolved result, so the two agree instead of one clobbering the other within the same
+// click (STEP233's own root-cause: the OLD (id, bCtrl, bShift) shape let the canvas re-derive a
+// DIFFERENT, narrower result from its own copy of the set — this test now proves the callback instead
+// reports the list's OWN already-resolved full selection verbatim). Reuses the SAME two-row fixture
+// RunInstanceRowClickChecks does.
 void RunCtrlHeldClickSyncsTabLocalAndCanvasCallbackCheck() {
     HeadlessImguiSession session;
     std::vector<Params::MarkerInstanceLayer> markerLayers(1);
@@ -322,14 +324,12 @@ void RunCtrlHeldClickSyncsTabLocalAndCanvasCallbackCheck() {
     int anchorIdentifier = -1;
 
     int  reportedIdentifier = -1;
-    bool bReportedCtrl      = false;
-    bool bReportedShift     = false;
+    std::vector<int> reportedSelectedIdentifiers;
     int  callbackFireCount  = 0;
-    const std::function<void(int, bool, bool)> selectManualMarkerInstanceCallback =
-        [&](int instanceIdentifier, bool bCtrlHeld, bool bShiftHeld) {
+    const std::function<void(int, const std::vector<int>&)> selectManualMarkerInstanceCallback =
+        [&](int instanceIdentifier, const std::vector<int>& selectedIdentifiers) {
             reportedIdentifier = instanceIdentifier;
-            bReportedCtrl      = bCtrlHeld;
-            bReportedShift     = bShiftHeld;
+            reportedSelectedIdentifiers = selectedIdentifiers;
             ++callbackFireCount;
         };
 
@@ -344,27 +344,32 @@ void RunCtrlHeldClickSyncsTabLocalAndCanvasCallbackCheck() {
     const ImVec2 firstRowCenter(secondRowCenter.x, secondRowCenter.y - (rowHeight + rowSpacing));
 
     // Baseline: a plain click on the FIRST row establishes the tab-local multi-select at {100}, and
-    // fires the canvas-sync callback with (100, false, false) — the pre-STEP205 shape, unchanged.
+    // fires the canvas-sync callback with (100, {100}).
     ClickAt(firstRowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state,
            selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers, anchorIdentifier,
            /*bCtrlHeld=*/false, /*bShiftHeld=*/false, selectManualMarkerInstanceCallback);
     Check(selectedManualInstanceIdentifier == 100, "the plain baseline click selects the first row (100)");
     Check(selectedManualInstanceIdentifiers.size() == 1 && selectedManualInstanceIdentifiers[0] == 100,
           "the plain baseline click's own tab-local multi-select is exactly {100}");
-    Check(callbackFireCount == 1 && reportedIdentifier == 100 && !bReportedCtrl && !bReportedShift,
-          "the plain baseline click's own canvas-sync callback fires with (100, false, false)");
+    Check(callbackFireCount == 1 && reportedIdentifier == 100
+              && reportedSelectedIdentifiers.size() == 1 && reportedSelectedIdentifiers[0] == 100,
+          "STEP233 - the plain baseline click's own canvas-sync callback fires with (100, {100}) - the "
+          "list's OWN already-resolved full selection, not a bare (id, bCtrl, bShift) triple the canvas "
+          "would otherwise have to re-resolve itself");
 
-    // A Ctrl-held click on the SECOND row: the callback must fire with (101, true, false) — proving
-    // the widened signature actually carries the real modifier state through — while the tab-local
-    // multi-select write (ApplyManualInstanceSelectionClick, inside the SAME click) still contains the
-    // FIRST row's id (100): the two writes agree (both Ctrl-toggle 101 in) instead of the canvas-sync
-    // half unconditionally Replacing and clobbering what the tab-local half just wrote.
+    // A Ctrl-held click on the SECOND row: ADDS. The callback must report the FULL resolved set
+    // ({100, 101}), matching selectedManualInstanceIdentifiers exactly — proving the two writes agree
+    // instead of the canvas-sync half carrying a narrower/different result the canvas would have to
+    // reconstruct on its own.
     callbackFireCount = 0;
     ClickAt(secondRowCenter, markerLayers[0], markerLayers, markers, instanceIndex, state,
            selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers, anchorIdentifier,
            /*bCtrlHeld=*/true, /*bShiftHeld=*/false, selectManualMarkerInstanceCallback);
-    Check(callbackFireCount == 1 && reportedIdentifier == 101 && bReportedCtrl && !bReportedShift,
-          "a Ctrl-held click on the second row fires the canvas-sync callback with (101, true, false)");
+    Check(callbackFireCount == 1 && reportedIdentifier == 101
+              && reportedSelectedIdentifiers.size() == 2
+              && reportedSelectedIdentifiers[0] == 100 && reportedSelectedIdentifiers[1] == 101,
+          "STEP233 - a Ctrl-held click on the second row fires the canvas-sync callback with "
+          "(101, {100, 101}) - the FULL resolved set");
     Check(selectedManualInstanceIdentifiers.size() == 2
               && selectedManualInstanceIdentifiers[0] == 100 && selectedManualInstanceIdentifiers[1] == 101,
           "the tab-local multi-select still contains the FIRST row's id (100) after the Ctrl-held click "

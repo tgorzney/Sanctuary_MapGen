@@ -83,7 +83,7 @@ inline constexpr float kMarkerLayerHeaderExtraCombinedWidthPixels =
 // list Selectable click below, IN ADDITION TO the existing `selectedManualInstanceIdentifier`
 // tab-local write, not instead of it: the tab-local write keeps the list's own highlight in sync
 // with itself, and the callback additionally drives the canvas's REAL selection (the actual fix —
-// see MapCanvas_UI.h's SelectManualMarkerByInstanceIdentifier).
+// see MapCanvas_UI.h's SyncManualMarkerSelection, STEP233).
 // STEP141: `selectedManualInstanceIdentifiers`/`anchorIdentifier` are the Ctrl/Shift multi-select
 // set (MarkersTabState's own new fields) — threaded through so this row's own click can update both
 // the multi-select AND the pre-existing single "primary" selection together
@@ -95,7 +95,8 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state,
                       const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier,
                       std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                      const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                      const std::function<void(int clickedInstanceIdentifier,
+                                               const std::vector<int>& selectedInstanceIdentifiers)>&
                           selectManualMarkerInstanceCallback = {});
 
 // STEP123/STEP142: the row header's own compact Color Override control — a "COL" SmallButton toggle

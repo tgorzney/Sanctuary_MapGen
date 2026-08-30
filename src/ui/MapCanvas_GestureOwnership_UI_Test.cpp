@@ -142,7 +142,7 @@ void RunMapCanvasGestureOwnershipChecks(Sys::GpuResourceManager& manager) {
     canvas.SetManualMarkerDragSource(&markers, &markerLayers, &scene.geometry, &recipe);
 
     OverlayInstanceKeySet_UI lastReportedSet;
-    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI&, const OverlayInstanceKeySet_UI& selectedKeys) {
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI&, const OverlayInstanceKeySet_UI& selectedKeys, bool) {
         lastReportedSet = selectedKeys;
     });
 

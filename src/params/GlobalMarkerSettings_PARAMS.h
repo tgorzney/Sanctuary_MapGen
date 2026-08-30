@@ -25,7 +25,21 @@ struct GlobalMarkerSettings {
     // ARCH §19.17 — selection-highlight tint. selectColorAlloy/Plasma/Spawn strictly mirror
     // colorAlloy/Plasma/Spawn's shape/placement; selectColorDefault is the one signed-off 4th-field
     // deviation from that mirror (see ResolveMarkerGroupSelectTintColor below for why).
-    float selectColorAlloy[4]   = {1.0f, 1.0f, 0.0f, 1.0f};
+    // STEP231 — human's own bug report: the default selection tint (identical to every OTHER
+    // selectColor* default — see the three lines below, all still {1,1,0,1}) was a plain yellow, not
+    // visually distinct enough from a legitimate in-map color to read clearly as "selected." Changed
+    // to a bright/lime green — a color no existing GlobalMarkerSettings field defaults to
+    // (colorAlloy/Plasma/Spawn are yellow/teal/red, lines 18-20 above, confirmed by direct read), so
+    // "selected" reads unambiguously against every one of them, and matches the SAME lime-green
+    // literal the icon-atlas pass's own kIconLayerSelectedTint now uses
+    // (MapCanvas_IconLayer_DrawInternal_UI.h) for a consistent cross-pass visual language.
+    // selectColorPlasma/Spawn/Default are DELIBERATELY UNCHANGED (still yellow): the human's own
+    // report named Alloy specifically; there is no confirmed bug against the other three, so changing
+    // them too would be unrequested scope creep (see this ticket's own Interpretation calls) — the
+    // underlying ResolveMarkerGroupSelectTintColor mechanism itself already works correctly for all
+    // four (GlobalMarkerSettings_PARAMS_Test.cpp already exercises every one with distinct non-default
+    // values), so this is purely a default-VALUE change, not a mechanism fix.
+    float selectColorAlloy[4]   = {0.2f, 1.0f, 0.2f, 1.0f};
     float selectColorPlasma[4]  = {1.0f, 1.0f, 0.0f, 1.0f};
     float selectColorSpawn[4]   = {1.0f, 1.0f, 0.0f, 1.0f};
     float selectColorDefault[4] = {1.0f, 1.0f, 0.0f, 1.0f};

@@ -56,7 +56,7 @@ void RunMapCanvasPickingChecks() {
     // ARCH §19.25 — the callback now carries the full OverlayInstanceKey_UI; this test only cares
     // about the procedural entity id it reports, so it reads `.instanceIndex` back the same way
     // MapCanvas::SelectedEntityIdentifier() itself does (a thin cast, `bValid == false` -> emptySentinel).
-    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&) {
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&, bool) {
         reportedSelection = static_cast<std::uint32_t>(key.instanceIndex);
         ++selectionChangeCount;
     });
@@ -84,10 +84,13 @@ void RunMapCanvasPickingChecks() {
 }
 
 // ARCH_19_25_SelectionRepresentationUnification.md items 3-5: the linear manual-marker hit-test
-// fallback (a canvas click at a manual marker's screen position, with no procedural hit) and the
-// shell-mediated list-click landing point (SelectManualMarkerByInstanceIdentifier) — both drive
-// MapCanvas's own widened selectedInstanceKey through the SAME canonical SetSelection the
-// procedural checks above already exercise, never a second, divergent setter.
+// fallback (a canvas click at a manual marker's screen position, with no procedural hit) and
+// SelectManualMarkerByInstanceIdentifier (its own general-purpose Ctrl/Shift-aware single-key setter,
+// STEP233 — no longer the production list-click landing point, see that method's own updated header
+// comment, MapCanvas_UI.h; the list now syncs through MapCanvas::SyncManualMarkerSelection instead,
+// MarkersTab_ListCanvasSelectionSync_UI_Test.cpp's own newer coverage) — both drive MapCanvas's own
+// widened selectedInstanceKey through the SAME canonical SetSelection the procedural checks above
+// already exercise, never a second, divergent setter.
 void RunManualMarkerSelectionChecks() {
     PreviewTestScene scene;
     BuildPreviewTestScene(scene);   // one PROCEDURAL marker at world (2,2)
@@ -120,7 +123,7 @@ void RunManualMarkerSelectionChecks() {
 
     OverlayInstanceKey_UI lastReportedKey;
     int selectionChangeCount = 0;
-    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&) {
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&, bool) {
         lastReportedKey = key; ++selectionChangeCount;
     });
 
@@ -186,7 +189,7 @@ void RunProceduralMarkerListSelectionChecks() {
     MapCanvas canvas;
     OverlayInstanceKey_UI lastReportedKey;
     int selectionChangeCount = 0;
-    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&) {
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&, bool) {
         lastReportedKey = key; ++selectionChangeCount;
     });
 

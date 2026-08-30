@@ -60,7 +60,8 @@ std::vector<std::string> EnumerateMarkerTypeSectionNames(
 
 void DrawMarkerTypeSections(Params::MapRecipe& recipe, MarkersTabState& state,
                             Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
-                            const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                            const std::function<void(int clickedInstanceIdentifier,
+                                                     const std::vector<int>& selectedInstanceIdentifiers)>&
                                 selectManualMarkerInstanceCallback,
                             const Data::PlacementInstances* placedMarkers,
                             const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&

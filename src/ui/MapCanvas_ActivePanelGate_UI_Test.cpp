@@ -225,7 +225,7 @@ void RunMapCanvasClickSelectsManualMarkerChecks(Sys::GpuResourceManager& manager
 
     OverlayInstanceKey_UI lastKey;
     int selectionChangeCount = 0;
-    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&) {
+    canvas.SetSelectionChangedCallback([&](const OverlayInstanceKey_UI& key, const OverlayInstanceKeySet_UI&, bool) {
         lastKey = key; ++selectionChangeCount;
     });
 

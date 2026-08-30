@@ -28,5 +28,18 @@ std::vector<int> ComputeManualMarkerSelectionHighlight(
     const Params::Geometry& geometry, int globalSymmetryMask, int globalRadialRepeatCount,
     float distanceTolerance, int selectedInstanceIdentifier);
 
+// STEP231 — the multi-select counterpart: unions ComputeManualMarkerSelectionHighlight's own
+// single-instance result (the selected instance plus its own orbit siblings) across every id in
+// `selectedInstanceIdentifiers`, de-duplicated (a later id's own orbit can legitimately re-discover an
+// EARLIER id's own siblings — e.g. two siblings of the same symmetric pair both individually
+// selected). Delegates entirely to the existing single-instance primitive, per id, in order, exactly
+// once each — no duplicated matching/orbit logic (mirrors STEP230's own
+// "loop over the existing single-key primitive" precedent, ToggleEachInSelectionSet).
+std::vector<int> ComputeManualMarkerMultiSelectionHighlight(
+    const std::vector<Params::MarkerInstanceGroup>& markers,
+    const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+    const Params::Geometry& geometry, int globalSymmetryMask, int globalRadialRepeatCount,
+    float distanceTolerance, const std::vector<int>& selectedInstanceIdentifiers);
+
 } // namespace Ui
 } // namespace SanmapGen

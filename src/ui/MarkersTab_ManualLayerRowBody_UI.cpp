@@ -40,15 +40,26 @@ void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
             ApplyManualInstanceSelectionClick(*interaction.rowOrder, instanceIdentifier, bCtrl, bShift,
                                               *interaction.selectedIdentifiers, *interaction.anchorIdentifier);
         if (interaction.primaryIdentifier != nullptr) *interaction.primaryIdentifier = instanceIdentifier;
-        // ARCH §19.25, item 5 — IN ADDITION TO the tab-local write above, not instead of it:
-        // drives the canvas's own real selection, so the REAL icon-sprite render path
+        // ARCH §19.25, item 5 — IN ADDITION TO the tab-local write above, not instead of it: drives the
+        // canvas's own real selection, so the REAL icon-sprite render path
         // (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) reflects this click too.
-        // STEP205 — reuses the SAME `bCtrl`/`bShift` this row already read above (not a second
-        // `ImGui::GetIO()` read) so the canvas's own `ApplySelectionGesture` resolves to the SAME
-        // Toggle/Union/Replace outcome the tab-local write above just applied, instead of always
-        // Replace clobbering it within the same click.
-        if (interaction.selectManualMarkerInstanceCallback)
-            interaction.selectManualMarkerInstanceCallback(instanceIdentifier, bCtrl, bShift);
+        // STEP233 — widened from (instanceIdentifier, bCtrl, bShift) to (clickedInstanceIdentifier,
+        // *interaction.selectedIdentifiers): the canvas now SYNCS its own manual-marker subset to match
+        // this list-side resolution exactly (MapCanvas::SyncManualMarkerSelection) instead of
+        // independently re-deriving Toggle/Union/Replace from bCtrl/bShift against its OWN narrower,
+        // single-key-touched copy of the set — the exact redundant-computation trap STEP233 fixes (see
+        // this callback's own type comment, MarkersTab_ManualInstanceSelection_UI.h). Neither bCtrl nor
+        // bShift is forwarded any more — see that same comment for why both are now fully vestigial on
+        // this path. `interaction.selectedIdentifiers` is guaranteed non-null whenever this row's own
+        // click branch above ran (the same null-check gates both), but a static empty fallback is used
+        // regardless — Constitution §6, never assume a caller-owned pointer stays valid past a null-check
+        // written for a DIFFERENT purpose two lines up.
+        if (interaction.selectManualMarkerInstanceCallback) {
+            static const std::vector<int> kNoSelectedIdentifiers;
+            interaction.selectManualMarkerInstanceCallback(instanceIdentifier,
+                interaction.selectedIdentifiers != nullptr ? *interaction.selectedIdentifiers
+                                                            : kNoSelectedIdentifiers);
+        }
     }
     // STEP141 — drag SOURCE: carries just this row's own instanceIdentifier; the RECEIVER (a Layer's
     // own drop target, DrawManualLayerInstanceDropTarget) decides whether the WHOLE multi-select
@@ -79,7 +90,8 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
                       Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state,
                       const ManualInstanceLayerIndex_UI& instanceIndex, int& selectedManualInstanceIdentifier,
                       std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                      const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                      const std::function<void(int clickedInstanceIdentifier,
+                                               const std::vector<int>& selectedInstanceIdentifiers)>&
                           selectManualMarkerInstanceCallback) {
     (void)markerLayers; (void)geometry; (void)globalSymmetryMask; (void)globalRadialRepeatCount;
     (void)markerSymmetryFixSettings;

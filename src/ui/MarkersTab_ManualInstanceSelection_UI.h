@@ -43,9 +43,20 @@ struct ManualInstanceRowInteractionContext_UI {
     std::vector<int>*         selectedIdentifiers = nullptr;   // selectedManualInstanceIdentifiers
     int*                      anchorIdentifier     = nullptr;   // manualInstanceSelectionAnchorIdentifier
     const std::vector<int>*   rowOrder             = nullptr;   // THIS list's own display-order identifiers
-    // STEP205 — widened from `void(int)` so the row's own click can forward the SAME bCtrl/bShift it
+    // STEP205 — widened from `void(int)` so the row's own click could forward the SAME bCtrl/bShift it
     // already read for ApplyManualInstanceSelectionClick, instead of the canvas always Replacing.
-    std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>  selectManualMarkerInstanceCallback;
+    // STEP233 — widened AGAIN, and simplified: carries this row's own clicked identifier plus the
+    // list's OWN already-resolved full selection (*interaction.selectedIdentifiers, written by
+    // ApplyManualInstanceSelectionClick one call earlier in the SAME click) instead of raw bCtrl/bShift
+    // — the canvas syncs its own manual-marker subset to match this resolution directly
+    // (MapCanvas::SyncManualMarkerSelection) rather than re-deriving Toggle/Union/Replace against its
+    // OWN, independently-touched copy of the set — the redundant-computation trap that caused STEP233's
+    // own bug. Neither bCtrl nor bShift is forwarded any more: the canvas performs no modifier-driven
+    // resolution of its own for a list-originated click, and Application::WireCallbacks()'s own tabState
+    // resync is unconditionally suppressed for this path regardless of which modifier was held (see
+    // MapCanvas_UI.h's SyncManualMarkerSelection and Application_UI.cpp's own bSuppressTabStateResync).
+    std::function<void(int clickedInstanceIdentifier, const std::vector<int>& selectedInstanceIdentifiers)>
+        selectManualMarkerInstanceCallback;
 };
 
 // Reassigns every Instance transform in `markers` whose `instanceIdentifier` matches one of

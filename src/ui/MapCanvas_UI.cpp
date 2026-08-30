@@ -92,8 +92,15 @@ void MapCanvas::ApplySelectionGesture(const OverlayInstanceKey_UI& touchedKey, b
         ReplaceSelectionSet(selectedInstanceKeys, {touchedKey});
     }
     if (SelectionSetsEqual(previous, selectedInstanceKeys)) return;
+    // STEP232/STEP233 — bShiftHeld, already this function's own parameter, threaded through unchanged
+    // into the callback's now-renamed, generalized `bSuppressTabStateResync` slot (SetSelectionChangedCallback's
+    // own header comment, MapCanvas_UI.h) — a canvas-NATIVE gesture (this function's only caller class)
+    // has no list to have already synced tabState correctly, so its own consumer (Application::
+    // WireCallbacks()) must still resync from THIS gesture's own result whenever Shift wasn't held,
+    // exactly as STEP232 established; SyncManualMarkerSelection below (list-driven, never reaches this
+    // function) always passes `true` instead, unconditionally.
     if (selectionChangedCallback)
-        selectionChangedCallback(PrimaryOfSelectionSet(selectedInstanceKeys), selectedInstanceKeys);
+        selectionChangedCallback(PrimaryOfSelectionSet(selectedInstanceKeys), selectedInstanceKeys, bShiftHeld);
 }
 
 // The marquee/list-batch counterpart. STEP230 (ARCH §21.1, ToggleEachInSelectionSet) — Ctrl held
@@ -112,8 +119,52 @@ void MapCanvas::ApplySelectionGesture(const std::vector<OverlayInstanceKey_UI>& 
         ReplaceSelectionSet(selectedInstanceKeys, touchedKeys);
     }
     if (SelectionSetsEqual(previous, selectedInstanceKeys)) return;
+    // STEP232 — same widening as the single-key overload above, for the marquee/list-batch path.
     if (selectionChangedCallback)
-        selectionChangedCallback(PrimaryOfSelectionSet(selectedInstanceKeys), selectedInstanceKeys);
+        selectionChangedCallback(PrimaryOfSelectionSet(selectedInstanceKeys), selectedInstanceKeys, bShiftHeld);
+}
+
+// ARCH §21.1 — STEP233. See MapCanvas_UI.h's own doc comment for the full contract.
+void MapCanvas::SyncManualMarkerSelection(const std::vector<int>& selectedInstanceIdentifiers,
+                                          int clickedInstanceIdentifier) {
+    const OverlayInstanceKeySet_UI previous = selectedInstanceKeys;
+    OverlayInstanceKeySet_UI next;
+    next.keys.reserve(selectedInstanceKeys.keys.size());
+    // Every OTHER domain/kind survives untouched, in its existing relative order, ahead of the
+    // freshly-synced manual-marker subset below — see this method's own header comment for why "ahead
+    // of" matters: it keeps this sync's own primary as the WHOLE set's PrimaryOfSelectionSet.
+    for (const OverlayInstanceKey_UI& key : selectedInstanceKeys.keys)
+        if (!(key.collection == PlacementCollectionKind_UI::Markers && key.bManual))
+            next.keys.push_back(key);
+
+    bool bClickedIsSelected = false;
+    for (const int identifier : selectedInstanceIdentifiers) {
+        if (identifier == clickedInstanceIdentifier) { bClickedIsSelected = true; continue; }
+        next.keys.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, identifier,
+                                                   /*bValid=*/true, /*bManual=*/true});
+    }
+    // The clicked row becomes the new primary whenever it's actually still selected — held back and
+    // appended LAST regardless of where it sat in `selectedInstanceIdentifiers` (a Shift-range's own
+    // clicked endpoint can be at either end of the span). A Ctrl-click that just deselected ITSELF falls
+    // through with no special case: `selectedInstanceIdentifiers`'s own trailing order stands, so its
+    // own last element becomes the fallback primary (ToggleInSelectionSet's own documented "present ->
+    // erase (primary becomes the new back())" rule).
+    if (bClickedIsSelected)
+        next.keys.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers,
+                                                   clickedInstanceIdentifier, /*bValid=*/true,
+                                                   /*bManual=*/true});
+
+    selectedInstanceKeys = next;
+    if (SelectionSetsEqual(previous, selectedInstanceKeys)) return;
+    // Always suppresses Application::WireCallbacks()'s own tabState resync (bSuppressTabStateResync,
+    // SetSelectionChangedCallback's own header comment) — a list click, of ANY modifier kind, has
+    // ALREADY had its own tabState.markers.selected*/anchor fields correctly written by
+    // ApplyManualInstanceSelectionClick one call earlier, so any re-derivation of that from THIS
+    // callback would be redundant at best and, for a Ctrl-deselect specifically, was actively wrong
+    // before this ticket (STEP233's own root-cause writeup, Part 2).
+    if (selectionChangedCallback)
+        selectionChangedCallback(PrimaryOfSelectionSet(selectedInstanceKeys), selectedInstanceKeys,
+                                 /*bSuppressTabStateResync=*/true);
 }
 
 } // namespace Ui

@@ -21,16 +21,26 @@ void MapCanvas::DrawManualMarkerDragPass(float regionOriginX, float regionOrigin
     static const std::vector<Params::Army> kNoArmies;
     static const Params::GlobalMarkerSettings kDefaultGlobalMarkerSettings;
     static const Params::MarkerSymmetryFixSettings kDefaultMarkerSymmetryFixSettings;
-    // STEP126 — recomputed fresh every frame (ARCH §19.19), discarded after this draw call. Null-safe:
-    // no selection source wired -> -1 -> ComputeManualMarkerSelectionHighlight returns empty.
+    // STEP231 — sourced directly from THIS class's own canonical multi-select set
+    // (selectedInstanceKeys, ARCH §21.1, MapCanvas_UI.h:377), not the retired injected single-scalar
+    // pointer (SetManualMarkerSelectionSource/manualMarkerSelectedInstanceIdentifier — see this
+    // ticket's own Interpretation calls for why: that mechanism predates §21.1's ordered set and had
+    // become a stale second copy of data this class already owns as ground truth, the exact "one
+    // source of truth, never a second copy" principle every OTHER canvas.Set*Source call already
+    // follows). Every manually-selected marker's own symmetry orbit is unioned
+    // (ComputeManualMarkerMultiSelectionHighlight), not just the MRU primary's.
+    std::vector<int> selectedManualInstanceIdentifiers;
+    for (const OverlayInstanceKey_UI& key : selectedInstanceKeys.keys)
+        if (key.bValid && key.collection == PlacementCollectionKind_UI::Markers && key.bManual)
+            selectedManualInstanceIdentifiers.push_back(key.instanceIndex);
     const std::vector<int> selectedHighlight = (manualMarkerDragGeometry != nullptr)
-        ? ComputeManualMarkerSelectionHighlight(*manualMarkerDragMarkers,
+        ? ComputeManualMarkerMultiSelectionHighlight(*manualMarkerDragMarkers,
               manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoLayers, *manualMarkerDragGeometry,
               manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->globalSymmetryMask : 0,
               manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->radialSymmetryRepeatCount : 0,
               manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->markerSymmetryFixSettings.distanceTolerance
                                                  : kDefaultMarkerSymmetryFixSettings.distanceTolerance,
-              manualMarkerSelectedInstanceIdentifier != nullptr ? *manualMarkerSelectedInstanceIdentifier : -1)
+              selectedManualInstanceIdentifiers)
         : std::vector<int>{};
     DrawManualMarkerRoster(*manualMarkerDragMarkers, manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoLayers,
                           manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->armies : kNoArmies,

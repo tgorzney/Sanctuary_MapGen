@@ -93,8 +93,17 @@ void FlushIconLayerBucket(ImDrawList& drawList, const AtlasPageBucket& bucket) {
         for (int i = 0; i < chunk.quadCount; ++i) {
             const OverlayVisibleInstance& instance = bucket.quads[chunk.quadStart + i];
             const float half = instance.screenSize * 0.5f;
-            const ImU32 tint = ImGui::ColorConvertFloat4ToU32(
-                ImVec4(instance.tintColorRed, instance.tintColorGreen, instance.tintColorBlue, instance.tintAlpha));
+            // STEP231 — the actual fix: bSelected previously had ZERO visual effect anywhere in this
+            // pass (it only ever routed an instance into the C2 cache's selected/non-selected bucket
+            // split, MapCanvas_IconLayer_Draw_UI.cpp's own SplitSelected). ARCH §19.18's own "selected
+            // replaces fill, full opacity" visual language (ratified for the roster/dot pass) is
+            // applied here too — kIconLayerSelectedTint is already full alpha (255), so a selected
+            // instance in a low-opacity layer is not left faint the way multiplying instance.tintAlpha
+            // in would leave it.
+            const ImU32 tint = instance.bSelected
+                ? kIconLayerSelectedTint
+                : ImGui::ColorConvertFloat4ToU32(
+                      ImVec4(instance.tintColorRed, instance.tintColorGreen, instance.tintColorBlue, instance.tintAlpha));
             const ImDrawIdx base = static_cast<ImDrawIdx>(drawList._VtxCurrentIdx);
             drawList.PrimWriteIdx(base);     drawList.PrimWriteIdx(base + 1); drawList.PrimWriteIdx(base + 2);
             drawList.PrimWriteIdx(base);     drawList.PrimWriteIdx(base + 2); drawList.PrimWriteIdx(base + 3);

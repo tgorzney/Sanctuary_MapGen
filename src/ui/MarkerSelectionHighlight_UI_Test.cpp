@@ -143,6 +143,49 @@ void RunToleranceBoundaryChecks() {
     }
 }
 
+// STEP231 — ComputeManualMarkerMultiSelectionHighlight: empty input, disjoint union, de-duplication
+// when two mutual mirror-siblings are BOTH individually selected, and stale-id tolerance.
+void RunMultiSelectionUnionChecks() {
+    const Params::Geometry geometry = MakeTestGeometry();
+
+    {
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].transforms.push_back(MakeTransform(1, 2.0f, 2.0f));
+        const std::vector<int> result = ComputeManualMarkerMultiSelectionHighlight(
+            markers, kNoLayers, geometry, Params::SymmetryAxis::None, 3, 0.5f, std::vector<int>{});
+        Check(result.empty(), "an empty selected-identifier list returns an empty highlight set");
+    }
+    {
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].transforms.push_back(MakeTransform(40, 1.0f, 1.0f));
+        markers[0].transforms.push_back(MakeTransform(41, 9.0f, 9.0f));
+        const std::vector<int> result = ComputeManualMarkerMultiSelectionHighlight(
+            markers, kNoLayers, geometry, Params::SymmetryAxis::None, 3, 0.5f, std::vector<int>{40, 41});
+        Check(Contains(result, 40) && Contains(result, 41) && static_cast<int>(result.size()) == 2,
+              "two independently-selected instances with no siblings union to exactly both, no loss");
+    }
+    // Selecting BOTH sides of a mirrored pair must not double-count: instance 50's own orbit already
+    // discovers sibling 51, and instance 51's own orbit (run independently) rediscovers 50 — the
+    // union must de-duplicate down to exactly {50, 51}.
+    {
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].transforms.push_back(MakeTransform(50, 3.0f, 5.0f));
+        markers[0].transforms.push_back(MakeTransform(51, 7.0f, 5.0f));   // exact mirror of 50
+        const std::vector<int> result = ComputeManualMarkerMultiSelectionHighlight(
+            markers, kNoLayers, geometry, Params::SymmetryAxis::MirrorAcrossX, 3, 0.5f, std::vector<int>{50, 51});
+        Check(Contains(result, 50) && Contains(result, 51) && static_cast<int>(result.size()) == 2,
+              "selecting BOTH mirror siblings de-duplicates to exactly {50, 51}, not a 4-element list");
+    }
+    {
+        std::vector<Params::MarkerInstanceGroup> markers(1);
+        markers[0].transforms.push_back(MakeTransform(60, 2.0f, 2.0f));
+        const std::vector<int> result = ComputeManualMarkerMultiSelectionHighlight(
+            markers, kNoLayers, geometry, Params::SymmetryAxis::None, 3, 0.5f, std::vector<int>{999, 60});
+        Check(Contains(result, 60) && static_cast<int>(result.size()) == 1,
+              "a stale id contributes nothing (Constitution Sec6, never a crash); the valid id still resolves");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -152,6 +195,7 @@ int main() {
     RunNeverDraggedSiblingMatchChecks();
     RunDifferentGroupNotMatchedChecks();
     RunToleranceBoundaryChecks();
+    RunMultiSelectionUnionChecks();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

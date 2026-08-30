@@ -56,5 +56,24 @@ std::vector<int> ComputeManualMarkerSelectionHighlight(
     return result;
 }
 
+std::vector<int> ComputeManualMarkerMultiSelectionHighlight(
+        const std::vector<Params::MarkerInstanceGroup>& markers,
+        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+        const Params::Geometry& geometry, int globalSymmetryMask, int globalRadialRepeatCount,
+        float distanceTolerance, const std::vector<int>& selectedInstanceIdentifiers) {
+    std::vector<int> result;
+    for (int selectedInstanceIdentifier : selectedInstanceIdentifiers) {
+        const std::vector<int> perInstance = ComputeManualMarkerSelectionHighlight(
+            markers, markerLayers, geometry, globalSymmetryMask, globalRadialRepeatCount,
+            distanceTolerance, selectedInstanceIdentifier);
+        for (int identifier : perInstance) {
+            bool bAlreadyPresent = false;
+            for (int existing : result) if (existing == identifier) { bAlreadyPresent = true; break; }
+            if (!bAlreadyPresent) result.push_back(identifier);
+        }
+    }
+    return result;
+}
+
 } // namespace Ui
 } // namespace SanmapGen

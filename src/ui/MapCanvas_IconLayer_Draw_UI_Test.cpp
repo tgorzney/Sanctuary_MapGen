@@ -100,10 +100,67 @@ void CheckFullPipelineEmitsADrawCommand() {
     ImGui::DestroyContext();
 }
 
+// STEP231 — the actual bug fix: FlushIconLayerBucket must override a bSelected instance's tint to
+// kIconLayerSelectedTint regardless of its own resolved tintColorRed/Green/Blue, and must leave an
+// UNSELECTED instance's own resolved tint completely alone. Inspects drawList.VtxBuffer directly
+// (no ImGui::Render()/GetDrawData() round-trip needed — FlushIconLayerBucket writes straight into the
+// passed-in ImDrawList via PrimWriteVtx) for the exact per-vertex color each of the two quads produced.
+void CheckFlushIconLayerBucketAppliesSelectedTintOverride() {
+    ImGui::CreateContext();
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(256.0f, 256.0f));
+    ImGui::Begin("IconLayerSelectedTintTestWindow");
+    ImDrawList& drawList = *ImGui::GetWindowDrawList();
+    // STEP231 fix-during-verify — ImGui::Begin() already writes the window's own background-fill
+    // quad into this SAME window draw list before returning control here (confirmed by direct build/
+    // run: an absolute VtxBuffer.Size == 8 / indices-from-0 assumption failed against the real vendored
+    // imgui). Every OTHER test in this file family that inspects drawList.VtxBuffer directly
+    // (MapCanvas_MarkerDrag_UI_Test.cpp, MapCanvas_ScenarioEditMode_DrawMarkers_UI_Test.cpp,
+    // MapCanvas_IconLayer_MicrobenchmarkFrameOps_UI_Test.cpp) already established the fix: capture a
+    // "before" baseline and compare/index off the DELTA, never an absolute count from index 0.
+    const int beforeVertexCount = drawList.VtxBuffer.Size;
+
+    OverlayVisibleInstance unselected = MakeQuad(0, 555ull);
+    unselected.tintColorRed = 1.0f; unselected.tintColorGreen = 0.0f; unselected.tintColorBlue = 0.0f;
+    unselected.tintAlpha = 1.0f; unselected.bSelected = false;
+    OverlayVisibleInstance selected = unselected;
+    selected.bSelected = true;   // deliberately keeps the SAME (red) resolved tint as unselected above —
+                                 // proves the override is driven by bSelected, not by a coincidentally
+                                 // different tintColorRed/Green/Blue value.
+
+    AtlasPageBucket bucket;
+    bucket.atlasPage = 0; bucket.textureIdentifier = 555ull;
+    bucket.quads.push_back(unselected);
+    bucket.quads.push_back(selected);
+
+    FlushIconLayerBucket(drawList, bucket);
+    check(drawList.VtxBuffer.Size - beforeVertexCount == 8,
+          "two quads write exactly 8 vertices (4 each), no more, no less");
+
+    const ImU32 expectedUnselectedTint = ImGui::ColorConvertFloat4ToU32(ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+    bool bUnselectedCorrect = true, bSelectedCorrect = true;
+    for (int i = beforeVertexCount; i < beforeVertexCount + 4; ++i)
+        if (drawList.VtxBuffer[i].col != expectedUnselectedTint) bUnselectedCorrect = false;
+    for (int i = beforeVertexCount + 4; i < beforeVertexCount + 8; ++i)
+        if (drawList.VtxBuffer[i].col != kIconLayerSelectedTint) bSelectedCorrect = false;
+    check(bUnselectedCorrect, "an UNSELECTED instance keeps its own resolved per-instance tint, unchanged");
+    check(bSelectedCorrect,
+          "STEP231 - a SELECTED instance's quad is overridden to kIconLayerSelectedTint (bright lime "
+          "green) regardless of its own resolved tintColorRed/Green/Blue - this is the actual fix: "
+          "bSelected previously had ZERO visual effect anywhere in this pass, which meant procedural "
+          "(rule-placed) markers never showed any highlight at all, no matter the selection");
+
+    ImGui::End();
+    ImGui::Render();
+    ImGui::DestroyContext();
+}
+
 } // namespace
 
 void RunMapCanvasIconLayerDrawChecks() {
     CheckBucketingProducesOnePageOneCommand();
+    CheckFlushIconLayerBucketAppliesSelectedTintOverride();
     CheckFullPipelineEmitsADrawCommand();
 }
 

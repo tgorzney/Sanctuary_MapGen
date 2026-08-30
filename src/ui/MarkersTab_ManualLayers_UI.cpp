@@ -131,7 +131,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                   int& selectedManualInstanceIdentifier,
                                   std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                   const std::string& markerTypeNameFilter,
-                                  const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                  const std::function<void(int clickedInstanceIdentifier,
+                                                           const std::vector<int>& selectedInstanceIdentifiers)>&
                                       selectManualMarkerInstanceCallback) {
     return DraggableList<Params::MarkerInstanceLayer>::Render(
         "manualMarkerLayers", markerLayers,
@@ -204,7 +205,8 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    const std::string& markerTypeNameFilter,
                                    int& selectedManualInstanceIdentifier,
                                    std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
-                                   const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
+                                   const std::function<void(int clickedInstanceIdentifier,
+                                                            const std::vector<int>& selectedInstanceIdentifiers)>&
                                        selectManualMarkerInstanceCallback) {
     // STEP138/human's own correction: no "Add Marker Layer" button here — fully redundant with the
     // Type-section header's own "+ Layer" (MarkersTab_UI.cpp), and drawing both produced the same

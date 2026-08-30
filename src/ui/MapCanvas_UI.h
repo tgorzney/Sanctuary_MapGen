@@ -84,8 +84,31 @@ public:
     // `PrimaryOfSelectionSet(selectedKeys)`, restated as its own argument so every existing
     // primary-only caller (every one before this ticket) keeps compiling by simply ignoring the
     // second parameter, never re-deriving the primary itself.
+    // STEP232 — widened again to also carry whether the gesture that produced this change was
+    // Shift-modified, sourced from ApplySelectionGesture's own bShiftHeld argument at the exact point
+    // it fires this callback (MapCanvas_UI.cpp, both overloads). Every existing caller (there is
+    // exactly one production wiring site, Application::WireCallbacks()) must add the third parameter;
+    // it is NOT optional/defaulted, deliberately — a caller silently ignoring it would reproduce
+    // exactly the bug this ticket exists to fix if it ever needed the anchor-preservation rule and
+    // forgot to read the new parameter.
+    // STEP233 — the third parameter is RENAMED from STEP232's own `bWasShiftGesture` to
+    // `bSuppressTabStateResync` and its own MEANING is generalized: STEP232 introduced it narrowly (a
+    // gesture-level "was Shift held" signal) to protect ONE clobber it found (a Shift-list-click's own
+    // anchor/plural-field writes getting overwritten by this same-click echo). STEP233 found a SECOND
+    // instance of the identical clobber class for a Ctrl-deselect (see this ticket's own root-cause
+    // writeup, Part 2) that "was Shift held" cannot express — the real, general condition a consumer
+    // needs is "did the caller that changed this set already fully and correctly own every field my own
+    // resync would otherwise touch." `ApplySelectionGesture` (below — canvas-NATIVE gestures, which have
+    // no list to defer to) still passes its own literal `bShiftHeld` here, UNCHANGED, preserving STEP232's
+    // own already-correct, already-tested canvas-native behavior byte-for-byte. `SyncManualMarkerSelection`
+    // (STEP233, below — LIST-driven syncs) always passes `true`: a list click, of ANY modifier kind, has
+    // ALREADY had its own tabState.markers.selected*/anchor fields correctly written by
+    // ApplyManualInstanceSelectionClick one call earlier in the SAME click, so its caller
+    // (Application::WireCallbacks()) must suppress its OWN resync unconditionally for that path, not only
+    // when Shift happened to be held.
     void SetSelectionChangedCallback(
-        std::function<void(const OverlayInstanceKey_UI& primary, const OverlayInstanceKeySet_UI& selectedKeys)>
+        std::function<void(const OverlayInstanceKey_UI& primary, const OverlayInstanceKeySet_UI& selectedKeys,
+                           bool bSuppressTabStateResync)>
             selectionChanged) {
         selectionChangedCallback = std::move(selectionChanged);
     }
@@ -177,20 +200,19 @@ public:
         areaCompositeRefreshCallback = std::move(refreshCallback);
     }
 
-    // STEP126 — the static selection-highlight source: `selectedInstanceIdentifier` is the SAME
-    // address as MarkersTabState::selectedManualInstanceIdentifier (Application_UI.cpp) — one source
-    // of truth, never a second copy. A single scalar pointer, the simplest form of this file's own
-    // established null-safe-injection shape (ARCH §19.19 — closer to SetActivePanelSource's
-    // one-pointer form than SetManualMarkerDragSource's bundle). Null (no shell has wired a selection
-    // source) refuses — the highlight computation treats null identically to "-1: nothing selected,"
-    // never defaulting to "everything selected."
-    void SetManualMarkerSelectionSource(const int* selectedInstanceIdentifier) {
-        manualMarkerSelectedInstanceIdentifier = selectedInstanceIdentifier;
-    }
-
+    // STEP231 — SetManualMarkerSelectionSource (STEP126's original single-scalar injection) is
+    // RETIRED: DrawManualMarkerDragPass now reads this class's OWN canonical selectedInstanceKeys
+    // (ARCH §21.1) directly instead — see MapCanvas_MarkerDrag_UI.cpp's own comment for why. This
+    // predates §21.1's ordered multi-select set (STEP126 shipped before it existed), and had become a
+    // stale second copy of data this class already owns as ground truth. ARCH_19_19_
+    // StaticHighlightComputationAndWiring.md's own text, which explicitly ratified this exact
+    // single-scalar mechanism, goes stale by this retirement — flagged for the ARCH Expert's own
+    // documentation-sync pass, not authored here (see this ticket's own Explicit out-of-scope,
+    // mirroring STEP214's identical precedent for ARCH_21_08's own stale example line).
     // STEP133 — the Markers tab's per-Type Hide/Unhide preview filter source. Mirrors
-    // SetManualMarkerSelectionSource's exact injected-pointer shape (this header's own established
-    // pattern): a single, caller-owned, read-every-frame pointer, null-safe (null = no filtering,
+    // this file's own established push-in-pointer convention (STEP231 — formerly described by
+    // analogy to the now-retired SetManualMarkerSelectionSource): a single, caller-owned,
+    // read-every-frame pointer, null-safe (null = no filtering,
     // today's exact behavior). Points at the SAME MarkersTabState field the Markers tab's own
     // Hide/Unhide buttons write (tabState.markers.markerTypeVisibility) — one source of truth, never
     // a second copy.
@@ -206,11 +228,18 @@ public:
     void ApplyDrag(float deltaRegionPixelsX, float deltaRegionPixelsY);
     void ApplyScroll(float regionLocalX, float regionLocalY, float wheelSteps);
 
-    // ARCH §19.25, item 5 — the shell-mediated list-click-to-canvas path: a Markers-tab instance-list
-    // Selectable click resolves through Application's own `selectManualMarkerInstanceCallback` (bound
-    // to this method in WireCallbacks(), mirroring SetManualMarkerSelectionSource's existing
-    // injection pattern) so the SAME real icon-sprite render path a canvas click drives
-    // (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) also lights up for a list click —
+    // STEP233 — NO LONGER the production list-click landing point: Application's own
+    // `selectManualMarkerInstanceCallback` (WireCallbacks()) now calls SyncManualMarkerSelection
+    // instead (below), which syncs against the list's own already-resolved full selection rather than
+    // re-deriving Toggle/Union/Replace from raw modifier keys against this method's own single-key
+    // resolution (the redundant-computation trap that caused STEP233's own bug — see that ticket's own
+    // root-cause writeup). This method itself is UNCHANGED and remains correct: it is still exercised by
+    // MapCanvas_Picking_UI_Test.cpp's own canvas-native-selection coverage and remains available as a
+    // general-purpose Ctrl/Shift-aware single-key setter for any future NON-list-driven caller.
+    // ARCH §19.25, item 5 (historical) — originally the shell-mediated list-click-to-canvas path: a
+    // Markers-tab instance-list Selectable click resolved through Application's own
+    // `selectManualMarkerInstanceCallback` so the SAME real icon-sprite render path a canvas click
+    // drives (MapCanvas_IconLayer_CullEmit_UI.cpp's `instance.bSelected`) also lit up for a list click —
     // never a second, parallel highlight mechanism. A negative `instanceIdentifier` clears the
     // selection (mirrors MarkersTabState::selectedManualInstanceIdentifier's own `-1` sentinel).
     // STEP205 — gains `bCtrlHeld`/`bShiftHeld` (default false, byte-identical Replace for every
@@ -219,6 +248,44 @@ public:
     // multi-select set instead of unconditionally replacing it (the "clobber" bug §21.1 deferred).
     void SelectManualMarkerByInstanceIdentifier(int instanceIdentifier, bool bCtrlHeld = false,
                                                 bool bShiftHeld = false);   // MapCanvas_UI.cpp
+
+    // ARCH §21.1 — STEP233: the list-driven sync entry point, and the production replacement for
+    // SelectManualMarkerByInstanceIdentifier's own former role (see that method's own updated comment
+    // above). A Markers-tab manual-instance-list click (plain/Ctrl/Shift) is ALREADY fully resolved,
+    // list-side, by ApplyManualInstanceSelectionClick (MarkersTab_ManualInstanceSelection_UI.cpp) one
+    // call before this is ever reached — this method makes the canvas's own real selectedInstanceKeys
+    // subset for {collection==Markers, bManual==true} match that list-side resolution EXACTLY, a
+    // REPLACE-THIS-SUBSET operation. It performs NO Toggle/Union/Replace resolution of its own from raw
+    // modifier keys — doing that against the canvas's OWN, independently-touched copy of the set is
+    // exactly the redundant-computation trap that caused STEP233's own bug (both the reported
+    // selection-set desync AND a second, closely-related anchor clobber found while designing this fix
+    // — see that ticket's own root-cause writeup). Every OTHER key already in the set — procedural
+    // Markers (bManual==false), and every Props/Decals key regardless of bManual — survives byte-for-
+    // byte, in its existing relative order, positioned BEFORE the freshly-synced manual-marker keys (so
+    // this sync's own primary, below, always wins PrimaryOfSelectionSet's own last-element rule whenever
+    // `selectedInstanceIdentifiers` is non-empty).
+    //
+    // `selectedInstanceIdentifiers`: the list's own just-resolved full selection (e.g.
+    // `*interaction.selectedIdentifiers`, already written one call earlier by
+    // ApplyManualInstanceSelectionClick) — becomes, in that exact order, the new manual-marker key
+    // subset.
+    // `clickedInstanceIdentifier`: the row the list itself just says is "current" (the plain/Ctrl/
+    // Shift-clicked identifier). If present in `selectedInstanceIdentifiers`, it is moved to the END of
+    // the synced subset — becomes the new overall PrimaryOfSelectionSet — REGARDLESS of its own position
+    // within `selectedInstanceIdentifiers` (a Shift-range's own clicked endpoint can sit at EITHER end of
+    // the [anchor..clicked] span depending on drag direction, so "whatever the vector's own last element
+    // is" is NOT a safe substitute for this explicit argument — this method's own acceptance test proves
+    // the distinction concretely). If it is NOT present (a Ctrl-click that just toggled ITSELF off), the
+    // synced subset keeps `selectedInstanceIdentifiers`'s own trailing order and its own last element
+    // becomes the fallback primary — mirroring ToggleInSelectionSet's own documented "present -> erase
+    // (primary becomes the new back())" rule.
+    //
+    // Fires SetSelectionChangedCallback exactly like ApplySelectionGesture does — once, only if the
+    // resulting set actually differs from the set going in (SelectionSetsEqual) — with
+    // bSuppressTabStateResync ALWAYS true (never `bShiftHeld`-conditional the way ApplySelectionGesture's
+    // own literal pass-through is): see SetSelectionChangedCallback's own updated header comment for why.
+    void SyncManualMarkerSelection(const std::vector<int>& selectedInstanceIdentifiers,
+                                   int clickedInstanceIdentifier);   // MapCanvas_UI.cpp
 
     // STEP132 (ARCH §19.27) — the procedural sibling of SelectManualMarkerByInstanceIdentifier above:
     // a Markers-tab PROCEDURAL instance-list click resolves through the SAME canonical SetSelection,
@@ -366,7 +433,8 @@ private:
     const Data::SpatialGridSet*     pickSpatialGridSet = nullptr;
     float                           pickRadiusScreenPixels = 8.0f;   // Constitution §8; wired from
                                                                        // ApplicationSettings::markerIconRadiusPixels
-    std::function<void(const OverlayInstanceKey_UI& primary, const OverlayInstanceKeySet_UI& selectedKeys)>
+    std::function<void(const OverlayInstanceKey_UI& primary, const OverlayInstanceKeySet_UI& selectedKeys,
+                       bool bSuppressTabStateResync)>
         selectionChangedCallback;
     PreviewPixelCoordinate lastPickedPixel;
     // ARCH §19.25 — replaces the old bare `std::uint32_t selectedEntityIdentifier`; default-
@@ -413,8 +481,8 @@ private:
     const std::vector<Params::MarkerInstanceLayer>* manualMarkerDragLayers   = nullptr;
     const Params::Geometry*                         manualMarkerDragGeometry = nullptr;
     const Params::MapRecipe*                        manualMarkerDragRecipe   = nullptr;
-    // STEP126 — the static selection-highlight source (injected, see SetManualMarkerSelectionSource).
-    const int*                                      manualMarkerSelectedInstanceIdentifier = nullptr;
+    // STEP231 — the STEP126 single-scalar selection-highlight source (manualMarkerSelectedInstanceIdentifier)
+    // is retired; DrawManualMarkerDragPass now reads this class's own selectedInstanceKeys directly.
     // STEP133 — the per-Type Hide/Unhide preview filter source (injected, see
     // SetMarkerTypeVisibilitySource).
     const MarkerTypeVisibility_UI*                  markerTypeVisibilitySource = nullptr;

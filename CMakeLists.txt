@@ -831,6 +831,10 @@ add_sangen_test(MarkersTab_ManualInstanceListRows_UI_Test
 # ReassignManualInstanceLayers) — pure, no imgui frame needed.
 add_sangen_test(MarkersTab_ManualInstanceSelection_UI_Test
     src/ui/MarkersTab_ManualInstanceSelection_UI_Test.cpp)
+# STEP232 — a real ApplyManualInstanceSelectionClick + MapCanvas::ApplySelectionGesture click-chain
+# acceptance, no imgui/GL (MapCanvas's own gesture methods are imgui-free).
+add_sangen_test(MarkersTab_ListCanvasSelectionSync_UI_Test
+    src/ui/MarkersTab_ListCanvasSelectionSync_UI_Test.cpp)
 # STEP144: MarkerLayerEnabledVisibilityToggle_UI.h's own pure E/D + V/I coupled toggle rules — pure,
 # no imgui frame needed.
 add_sangen_test(MarkerLayerEnabledVisibilityToggle_UI_Test

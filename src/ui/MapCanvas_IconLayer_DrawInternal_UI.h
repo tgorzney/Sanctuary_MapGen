@@ -25,6 +25,22 @@ std::vector<AtlasPageBucket> BucketByAtlasPage(const std::vector<OverlayVisibleI
 // (Constitution §6: exposing it would let a designer reintroduce 16-bit index wraparound).
 constexpr int kIconLayerBucketChunkQuadCap = 16000;   // 16,000 quads = 64,000 vertices < 65,536
 
+// STEP231 — the icon-atlas pass's own "selected" indicator. A LITERAL, matching
+// GlobalMarkerSettings::selectColorAlloy's own new lime-green default (GlobalMarkerSettings_PARAMS.h)
+// for a consistent "selected = green" visual language against the roster/dot pass's own select tint
+// (Params::ResolveMarkerGroupSelectTintColor) — but NOT read from Params here: FlushIconLayerBucket
+// is this module's one deliberately domain-agnostic choke point (serves Markers/Props/Decals/Units
+// uniformly, confirmed by direct read of every call site in MapCanvas_IconLayer_Cull*_UI.cpp), and
+// threading a per-marker-category selectColor* resolution all the way through
+// EmitCandidateIfVisible/AppendCandidate would mean giving this function marker-domain knowledge it
+// does not otherwise have. This mirrors the SAME file-family's own established precedent for a fixed,
+// non-parameter-driven state-indicator color: MapCanvas_MarkerRosterDraw_UI.cpp's own
+// refusedTint/ghostTint (two IM_COL32 literals for drag-refused-red/drag-ghost-grey, neither threaded
+// through GlobalMarkerSettings either). A category-correct selectColor* threaded all the way through
+// the cull/emit pipeline is a real, larger, separate follow-up (see this ticket's own Interpretation
+// calls) — not invented here.
+constexpr ImU32 kIconLayerSelectedTint = IM_COL32(51, 255, 51, 255);   // matches {0.2, 1.0, 0.2, 1.0}
+
 // One contiguous sub-range of a bucket's quad list, sized to stay under
 // kIconLayerBucketChunkQuadCap. Pure/deterministic given totalQuadCount — build (FlushIconLayerBucket,
 // CaptureAndCacheBuckets' BuildLocalIndexPattern) and replay (ReplayCachedBuckets) call
