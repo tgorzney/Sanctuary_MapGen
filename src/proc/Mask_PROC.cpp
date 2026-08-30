@@ -71,16 +71,23 @@ std::size_t HashSlopeDefaults(std::size_t seed, const Params::SlopeDefaults& slo
     return HashFloat(seed, slopeDefaults.slopeGateStrength);
 }
 
-// The stored art is a loaded input (Data::StratumArt), so its CONTENT is hashed — otherwise
-// re-importing different art under the same settings would silently reuse the cached weights.
+// STEP220 — the stored art is a loaded input (Data::StratumArt), so ITS ARRIVAL/CHANGE must move
+// the hash — otherwise re-importing different art under the same settings would silently reuse
+// the cached weights. Hashing `importedMaskVersion` (bumped by the ONE production writer,
+// MapImporter_Fields_IO.cpp's LoadStratumMaskTga, on every successful load) achieves that
+// WITHOUT walking the field's own content: this used to loop every texel
+// (`art.importedMask.CellCount()` HashFloat calls), which for a real imported mask at its
+// source file's native resolution meant hundreds of thousands to millions of hash calls per
+// call to ComputeParameterHash() — paid synchronously on the UI thread every time
+// NotifyParametersChanged() ran, which is now every frame during any live-drag gesture
+// (Map Areas, STEP219) that has nothing to do with the Mask stage at all. Mirrors
+// Bake_PROC.cpp's own HashStratumArt, which already does exactly this for the sibling
+// albedoWidth/albedoHeight/albedoVersion fields on this same struct.
 std::size_t HashStoredArt(std::size_t seed, const Data::StratumArt& art) {
     if (!art.HasImportedMask()) return HashInteger(seed, 0);
     seed = HashInteger(seed, art.importedMask.Width());
     seed = HashInteger(seed, art.importedMask.Height());
-    const float* values = art.importedMask.Data();
-    for (std::size_t index = 0; index < art.importedMask.CellCount(); ++index)
-        seed = HashFloat(seed, values[index]);
-    return seed;
+    return HashInteger(seed, art.importedMaskVersion);
 }
 
 } // namespace

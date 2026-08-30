@@ -6,6 +6,7 @@
 #include "MapImporter_IO.h"
 #include "MapExporter_IO.h"
 #include "../data/MapFields_DATA.h"
+#include "../data/StratumArt_DATA.h"
 
 namespace SanmapGen {
 namespace MapFormatTest {
@@ -77,6 +78,54 @@ void CheckTheFieldDestinationIsOptional(const std::string& folderPath) {
           "and asking not to load them leaves the caller's fields alone");
 }
 
+// STEP220 — the ONE thing this ticket's whole fix depends on: LoadStratumMaskTga must stamp a
+// FRESH, DIFFERENT importedMaskVersion on every successful load, never the same value twice (a
+// naive "read my own current value and increment it" bump would fail this, since every import
+// path hands the loader a brand-new, default-constructed Data::StratumArt each time — see this
+// ticket's own MapImporter_Fields_IO.cpp comment for why). Loads the SAME fixture map twice
+// (re-importing identical content is still a distinct load EVENT) and confirms the two resulting
+// versions differ — a relative check, never an absolute literal: nextImportedMaskVersion is a
+// process-lifetime counter shared by every test in this binary, not reset per test case.
+//
+// DEVIATION FROM THE TICKET'S OWN CALL SHAPE (verified live against MapImporter_IO.h, not
+// assumed): the ticket's proposed call passed `nullptr` for `outFields` while still expecting
+// `outStratumArt` to come back populated. `MapImporter::LoadSanmap`'s own body gates its ENTIRE
+// `LoadBakedFields` call (which is the only thing that ever populates `outStratumArt`) on
+// `options.bLoadBakedFields && outFields != nullptr` — so a null `outFields` means
+// `outStratumArt` is never touched at all, leaving every version at the 0 sentinel and failing
+// this test's own first assertion. A real (non-null) `Data::MapFields` destination is supplied
+// below instead, preserving the test's actual intent (load twice through the real production
+// path, compare `importedMaskVersion`) without changing what it proves. The full 8-argument call
+// also threads explicit `nullptr`s through `outUnknownData`/`currentTemplateIngestReport`/
+// `outBakedLayerImages` — three nullable parameters the ticket's assumed signature didn't
+// account for sitting between `options` and `outStratumArt`.
+void CheckImportedMaskVersionAdvancesOnEveryLoad(const std::string& folderPath) {
+    Params::MapRecipe firstRecipe;
+    Data::MapFields firstFields;
+    std::vector<Data::StratumArt> firstStratumArt;
+    const Io::MapImportResult firstResult =
+        Io::MapImporter::LoadSanmap(folderPath, firstRecipe, &firstFields, Io::MapImportOptions(),
+                                    nullptr, nullptr, nullptr, &firstStratumArt);
+    Check(firstResult.bSucceeded, "the first load succeeds");
+    Check(firstStratumArt[0].importedMaskVersion > 0 && firstStratumArt[5].importedMaskVersion > 0,
+          "a successfully loaded stratum's version is stamped (never left at the 0 sentinel)");
+
+    Params::MapRecipe secondRecipe;
+    Data::MapFields secondFields;
+    std::vector<Data::StratumArt> secondStratumArt;
+    const Io::MapImportResult secondResult =
+        Io::MapImporter::LoadSanmap(folderPath, secondRecipe, &secondFields, Io::MapImportOptions(),
+                                    nullptr, nullptr, nullptr, &secondStratumArt);
+    Check(secondResult.bSucceeded, "the second load succeeds");
+    Check(secondStratumArt[0].importedMaskVersion != firstStratumArt[0].importedMaskVersion,
+          "re-loading the SAME file still draws a NEW version — every load is its own event, "
+          "never derived from content equality");
+    Check(secondStratumArt[0].importedMaskVersion != secondStratumArt[4].importedMaskVersion
+          || secondStratumArt[0].importedMaskVersion == secondStratumArt[1].importedMaskVersion,
+          "strata sharing one TGA call (0-3, the low slice) share one stamp; a stratum from the "
+          "OTHER TGA call (4, the high slice) draws its own separate stamp");
+}
+
 } // namespace
 
 void RunBakedFieldTests() {
@@ -85,6 +134,7 @@ void RunBakedFieldTests() {
     CheckPathResolution(folderPath);
     CheckBakedFieldsComeBack(folderPath, written);
     CheckTheFieldDestinationIsOptional(folderPath);
+    CheckImportedMaskVersionAdvancesOnEveryLoad(folderPath);
 }
 
 } // namespace MapFormatTest

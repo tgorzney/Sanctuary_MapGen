@@ -24,6 +24,20 @@ namespace {
 constexpr std::size_t tgaHeaderByteSize = 18u;
 constexpr int bgraWeightOrder[4] = { 2, 1, 0, 3 };   // matches the exporter's swizzle
 
+// STEP220 (IO Architecture Expert ruling) — a process-lifetime "epoch" stamped onto every
+// stratum slot a successful LoadStratumMaskTga call touches, so Mask_PROC.cpp's HashStoredArt
+// can compare this against its own last-seen value instead of re-walking texel content on every
+// dirty-check (mirrors Data::StratumArt::albedoVersion's own contract). Deliberately NOT derived
+// from the scratch Data::StratumArt being written — every import path builds a fresh, default-
+// constructed std::vector<Data::StratumArt> and move-assigns it wholesale over the live vector
+// (FilesTab_Actions_UI.cpp, MapImporter_IO.cpp's own LoadSanmap), so a struct-local "read my own
+// value and increment it" bump would produce the SAME value (0->1) on every single import,
+// making two different re-imports of different content collide and silently look identical to
+// the dirty-hash. IO is this field's sole production writer (ARCH §3.4 single-writer rule), so
+// the counter's storage stays local to this translation unit — never threaded up through the UI
+// call sites that invoke LoadSanmap/LoadBakedFields.
+int nextImportedMaskVersion = 1;
+
 bool ReadWholeFile(const std::string& filePath, std::uint64_t maximumByteSize,
                    std::vector<unsigned char>& outBytes) {
     std::error_code sizeError;
@@ -64,12 +78,21 @@ bool LoadStratumMaskTga(const std::string& filePath, int firstWeightIndex, int s
     }
     if (outStratumArt.size() < static_cast<std::size_t>(Data::MapFields::stratumCount))
         outStratumArt.resize(static_cast<std::size_t>(Data::MapFields::stratumCount));
+    // STEP220 — one successful load of ONE file is one content-change event: every stratum slot
+    // THIS call touches shares the SAME stamped version (drawn once, not once per channel), so a
+    // hash comparing versions can't spuriously see them as different when the source pixels are
+    // identical (they came from the same TGA read). The sibling call for the OTHER TGA slice
+    // (low vs. high, both invoked from LoadBakedFields below) draws its own separate stamp, since
+    // those two files change independently.
+    const int stampedVersion = nextImportedMaskVersion++;
     // Size each of this call's four destination fields once, before the pixel loop below (the loop
     // only ever calls Set(), never Resize()).
     for (int channel = 0; channel < 4; ++channel) {
         const int weightIndex = firstWeightIndex + bgraWeightOrder[channel];
-        if (weightIndex < Data::MapFields::stratumCount)
+        if (weightIndex < Data::MapFields::stratumCount) {
             outStratumArt[weightIndex].importedMask.Resize(fileWidth, fileHeight, 0.0f);
+            outStratumArt[weightIndex].importedMaskVersion = stampedVersion;
+        }
     }
     // Widened to the TGA's own fileWidth/fileHeight (not sampleSize) so the native-resolution write
     // below is never cropped; the existing vertexSize-clipped materialProportions write stays gated

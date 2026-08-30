@@ -50,11 +50,22 @@ inline std::vector<Data::StratumArt> NoStratumArt() {
     return std::vector<Data::StratumArt>(Data::MapFields::stratumCount);
 }
 
+// STEP220 — a test-local mirror of the production counter LoadStratumMaskTga now owns
+// (MapImporter_Fields_IO.cpp), so this helper's own "supply new imported art" contract stays
+// truthful under the version-based hash: every call is treated as a fresh content-change event,
+// exactly as one real TGA load is. Test-binary-lifetime scope is sufficient here (unlike
+// production, nothing outside this process ever needs these values to mean anything).
+inline int& NextTestImportedMaskVersion() {
+    static int nextVersion = 1;
+    return nextVersion;
+}
+
 // One stratum's imported art as a Data::FloatField (loaded pixels are DATA, ARCH §7.1).
 inline void SetImportedMask(Data::StratumArt& art, const float* values, int width, int height) {
     art.importedMask.Resize(width, height, 0.0f);
     for (int y = 0; y < height; ++y)
         for (int x = 0; x < width; ++x) art.importedMask.Set(x, y, values[y * width + x]);
+    art.importedMaskVersion = NextTestImportedMaskVersion()++;
 }
 
 inline bool FieldsAreByteIdentical(const Data::FloatField& first, const Data::FloatField& second) {

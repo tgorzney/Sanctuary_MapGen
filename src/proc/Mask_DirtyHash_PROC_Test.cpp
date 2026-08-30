@@ -83,7 +83,16 @@ void CheckSettingsDirtying(DirtyHashHarness& harness) {
           "changing maskRemapMinimum/Maximum does not re-run the mask stage");
 }
 
-// Stored art is an input like any other: both its arrival and its pixels are part of the hash.
+// STEP220 — stored art is an input like any other: both its arrival and a fresh load of it are
+// part of the hash. The hash itself no longer walks pixel content (an O(cell-count) loop that
+// was the confirmed root cause of a "dragging a Map Area is tremendously slow" report — Mask
+// stage hashing runs on every drag frame via NotifyParametersChanged) — it hashes
+// importedMaskVersion instead, stamped by the ONE production writer (MapImporter_Fields_IO.cpp's
+// LoadStratumMaskTga) on every successful load. This test simulates a SECOND load event (as a
+// real re-import would produce) by re-calling SetImportedMask, which now stamps its own fresh
+// version on every call (Mask_TestSupport_PROC.h) — a direct `.Set()` on the field's own content
+// with no accompanying version bump would no longer move the hash, correctly: that bypasses the
+// only path production content ever arrives through.
 void CheckStoredArtDirtying(DirtyHashHarness& harness) {
     const float artPixels[4] = { 0.0f, 0.25f, 0.5f, 0.75f };
     harness.strata[1].importedMaskMode = Params::ImportedMaskMode::StaticOverride;
@@ -91,11 +100,13 @@ void CheckStoredArtDirtying(DirtyHashHarness& harness) {
     std::vector<std::string> ran = harness.pipeline.Run();
     Check(ran.size() == 1 && harness.maskRunCount == 5, "importing stored art re-runs the mask stage");
 
-    const std::size_t hashBeforeEdit = harness.stage.ComputeParameterHash();
-    harness.stratumArt[1].importedMask.Set(0, 1, 0.6f);
-    Check(harness.stage.ComputeParameterHash() != hashBeforeEdit, "stored-art CONTENT is part of the hash");
+    const std::size_t hashBeforeReload = harness.stage.ComputeParameterHash();
+    const float reloadedPixels[4] = { 0.6f, 0.25f, 0.5f, 0.75f };
+    SetImportedMask(harness.stratumArt[1], reloadedPixels, 2, 2);
+    Check(harness.stage.ComputeParameterHash() != hashBeforeReload,
+          "a fresh load of stored art (a new importedMaskVersion) moves the hash");
     ran = harness.pipeline.Run();
-    Check(ran.size() == 1 && harness.maskRunCount == 6, "editing stored-art pixels re-runs the mask stage");
+    Check(ran.size() == 1 && harness.maskRunCount == 6, "reloading stored art re-runs the mask stage");
 
     ran = harness.pipeline.Run();
     Check(ran.empty() && harness.maskRunCount == 6, "the stage settles again once nothing changes");
