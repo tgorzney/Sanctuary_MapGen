@@ -73,6 +73,22 @@ inline bool SetAreaToMapSize(Params::MapArea& area, int mapSize) {
     return bMoved;
 }
 
+// STEP223 — centers the area's own geometric rectangle on the map's center, preserving its
+// width/length exactly (never a resize). No lock gate: the tab's own sliders and "Set to Map
+// Size" already ignore lock entirely (lock only gates the CANVAS gesture — see
+// AreaLockTable_UI.h's own header) — Center follows the same precedent, unconditionally available
+// on any row including PlayableArea. Reports whether the rectangle moved, so a press that changes
+// nothing (an area already centered) costs no recomposite.
+inline bool CenterAreaInMap(Params::MapArea& area, int mapSize) {
+    const float half = static_cast<float>(ResolvedAreaMapSize(mapSize)) * 0.5f;
+    const float newOriginX = half - area.width  * 0.5f;
+    const float newOriginZ = half - area.length * 0.5f;
+    const bool bMoved = area.originX != newOriginX || area.originZ != newOriginZ;
+    area.originX = newOriginX;
+    area.originZ = newOriginZ;
+    return bMoved;
+}
+
 // The name v1's Add New Area button coined, kept so an imported v1 project reads the same. Thin
 // domain wrapper over the shared cross-entity template (UniqueNameList_UI.h, STEP20 ARCH ruling).
 inline std::string NextAreaName(int areaCount) { return NextUniqueLabel("NewArea", areaCount); }

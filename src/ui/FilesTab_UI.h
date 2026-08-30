@@ -42,11 +42,11 @@ using SupComLuaImportFunction = bool (*)(void* userData, const char* luaFilePath
 
 // Every button on the tab, in the order the plan lists them.
 enum class FilesTabAction {
-    OpenSanmap, ImportSupComLua, ExportSanmapOnly, ExportAll,
+    OpenSanmap, ImportSupComLua, ImportScenarioAreas, ExportSanmapOnly, ExportAll,
     ExportHeightmapRaw, ExportSlopeImage, ExportFlowImage, ExportStratumMasks,
     ExportScenarioScript,       // STEP77 — Io::ExportMapScenario (STEP71), machine-local settings
 };
-inline constexpr int filesTabActionCount = 9;
+inline constexpr int filesTabActionCount = 10;
 
 // The button caption. Never a literal at the draw site (Constitution §8).
 const char* FilesTabActionLabel(FilesTabAction action);
@@ -69,6 +69,7 @@ struct FilesTabState {
 
     std::string sanmapPath;         // the .sanmap file OR the map folder the user picked
     std::string supComLuaPath;      // a Supreme Commander `_save.lua`
+    std::string scenarioAreaImportPath;   // STEP224: a FOREIGN scenario `.lua` (ARCH §15.11)
     std::string exportFolderPath;   // the destination map folder
 
     Io::MapImportOptions importOptions;

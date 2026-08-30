@@ -58,6 +58,14 @@ void DrawOpenSection(FilesTabState& state, Params::MapRecipe& recipe, Data::MapF
     DrawActionButton(FilesTabAction::ImportSupComLua, state, recipe, fields, previewDriver);
     if (state.ImportSupComLua == nullptr)
         ImGui::TextUnformatted("No SupCom Lua importer is bound to this build.");
+    ImGui::Separator();
+    DrawFilesTabPathRow("Scenario Area Import Lua", FilesTabBrowseKind::ScenarioAreaImportLua,
+                        state.scenarioAreaImportPath);
+    if (ImGui::Button(FilesTabActionLabel(FilesTabAction::ImportScenarioAreas))) {
+        const bool bSucceeded = RunFilesTabAction(FilesTabAction::ImportScenarioAreas, state, recipe,
+                                                  fields);
+        if (bSucceeded && previewDriver != nullptr) previewDriver->RequestMapUpdate();
+    }
     DrawSectionEnd();
 }
 

@@ -21,6 +21,7 @@ enum class FilesTabBrowseKind {
     ExportFolder,        // the destination map FOLDER — "a map on disk is a folder"
     GameInstallRoot,     // STEP77: the game install FOLDER (GameInstallLocation_IO validates it)
     ScenarioRuntimeOverrideLua,   // STEP77: an EXISTING Runtime Script override `.lua`
+    ScenarioAreaImportLua,   // STEP224: a FOREIGN scenario `_data`/`_script` `.lua` (ARCH §15.11)
 };
 
 // Draws one labelled picker row and runs the native dialog when its Browse button is pressed.

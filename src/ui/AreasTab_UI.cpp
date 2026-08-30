@@ -22,17 +22,19 @@ namespace {
 // the bottom for whatever was "selected". Every scalar is whole-cell; color has no `_PARAMS` home
 // (STEP21 ruling #4) and is resolved from the UI-only side table, keyed by name.
 bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize,
-                      std::vector<AreaColorEntry>& areaColors) {
+                      std::vector<AreaColorEntry>& areaColors,
+                      std::vector<AreaVisibilityEntry>& areaVisibility) {
     const ScalarSliderRange originRange = AreaOriginSliderRange(mapSize);
     const ScalarSliderRange extentRange = AreaExtentSliderRange(mapSize);
     bool bCommitted = false;
     if (IsPlayableArea(area)) {
         ImGui::TextDisabled("PlayableArea is required by the engine: it cannot be renamed or removed.");
     } else {
-        // Captured BEFORE the edit: if the name commits to something new, the color AND lock entries
-        // keyed on the OLD name must both be retargeted, or a rename silently reverts the area's
-        // color to default and its lock to LOCKED next frame (STEP21 ruling #5 for color; STEP212
-        // extends the same repair to the new per-area lock table for the identical reason).
+        // Captured BEFORE the edit: if the name commits to something new, the color, lock, AND
+        // visibility entries keyed on the OLD name must all be retargeted, or a rename silently
+        // reverts the area's color to default, its lock to LOCKED, and its visibility to VISIBLE
+        // next frame (STEP21 ruling #5 for color; STEP212 extends the same repair to the per-area
+        // lock table; STEP223 extends it a third time, to the visibility table).
         const std::string nameBeforeEdit = area.name;
         TextInputRules nameRules;
         nameRules.maximumLength = 48;
@@ -44,16 +46,39 @@ bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize,
                 if (entry.name == nameBeforeEdit) { entry.name = area.name; break; }
             for (AreaLockEntry& entry : state.areaLocks)
                 if (entry.name == nameBeforeEdit) { entry.name = area.name; break; }
+            // STEP223 — the same repair extended to STEP222's visibility table: without this, a
+            // rename silently resets a hidden area back to default-visible on the next resolve.
+            for (AreaVisibilityEntry& entry : areaVisibility)
+                if (entry.name == nameBeforeEdit) { entry.name = area.name; break; }
         }
     }
-    bCommitted = DrawSliderScalar("X Position", area.originX, originRange, state.originXToggle,
-                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
-    bCommitted = DrawSliderScalar("Z Position", area.originZ, originRange, state.originZToggle,
-                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
-    bCommitted = DrawSliderScalar("Width", area.width, extentRange, state.widthToggle,
-                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
-    bCommitted = DrawSliderScalar("Length", area.length, extentRange, state.lengthToggle,
-                                  WidgetStyle(), "%.0f").bCommitted || bCommitted;
+    ImGui::TextUnformatted("X");
+    ImGui::SameLine();
+    bCommitted = DrawSliderScalarCompact("X Position", area.originX, originRange, state.originXToggle,
+                                         kAreaScalarCompactTrackWidthPixels,
+                                         kAreaScalarCompactFieldWidthPixels, WidgetStyle(), "%.0f",
+                                         /*bShowRealtimeToggle=*/false).bCommitted || bCommitted;
+    ImGui::SameLine();
+    ImGui::TextUnformatted("Z");
+    ImGui::SameLine();
+    bCommitted = DrawSliderScalarCompact("Z Position", area.originZ, originRange, state.originZToggle,
+                                         kAreaScalarCompactTrackWidthPixels,
+                                         kAreaScalarCompactFieldWidthPixels, WidgetStyle(), "%.0f",
+                                         /*bShowRealtimeToggle=*/false).bCommitted || bCommitted;
+
+    ImGui::TextUnformatted("W");
+    ImGui::SameLine();
+    bCommitted = DrawSliderScalarCompact("Width", area.width, extentRange, state.widthToggle,
+                                         kAreaScalarCompactTrackWidthPixels,
+                                         kAreaScalarCompactFieldWidthPixels, WidgetStyle(), "%.0f",
+                                         /*bShowRealtimeToggle=*/false).bCommitted || bCommitted;
+    ImGui::SameLine();
+    ImGui::TextUnformatted("L");
+    ImGui::SameLine();
+    bCommitted = DrawSliderScalarCompact("Length", area.length, extentRange, state.lengthToggle,
+                                         kAreaScalarCompactTrackWidthPixels,
+                                         kAreaScalarCompactFieldWidthPixels, WidgetStyle(), "%.0f",
+                                         /*bShowRealtimeToggle=*/false).bCommitted || bCommitted;
     // ARCH §14.17 item 10 / §14.18 item 16 — PlayableArea is always Green and non-editable: re-pin
     // its color before drawing (the swatch below is the only OTHER path that could ever set a
     // PlayableArea color) and disable the control so a designer cannot pick a different one.
@@ -79,7 +104,8 @@ bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize,
 // each row's own settings now draw inside that row's own body, gated on the row's own expand state
 // — never on `state.selectedAreaIndex` — so an expanded row can never show another row's settings.
 DraggableListSignal DrawAreaList(std::vector<Params::MapArea>& areas, AreasTabState& state,
-                                 int mapSize, std::vector<AreaColorEntry>& areaColors, bool& bAreasMoved) {
+                                 int mapSize, std::vector<AreaColorEntry>& areaColors,
+                                 std::vector<AreaVisibilityEntry>& areaVisibility, bool& bAreasMoved) {
     return DraggableList<Params::MapArea>::Render(
         "areas", areas,
         [&](int rowIndex) {
@@ -94,16 +120,30 @@ DraggableListSignal DrawAreaList(std::vector<Params::MapArea>& areas, AreasTabSt
             // ApplyAreaListSignal below); only its LOCK display/toggle now comes from this table,
             // defaulting locked on first resolve exactly like any other pre-existing area.
             row.bLocked = *ResolveAreaLocked(state.areaLocks, area.name);
+            // STEP222 — activates the previously-stubbed [o]/[-] icon: a real per-area bit now,
+            // not the DraggableListRow default.
+            row.bVisible = *ResolveAreaVisible(areaVisibility, area.name);
             return row;
         },
         [&](int rowIndex) {
             Params::MapArea& area = areas[static_cast<std::size_t>(rowIndex)];
-            bAreasMoved = DrawAreaSettings(area, state, mapSize, areaColors) || bAreasMoved;
+            bAreasMoved = DrawAreaSettings(area, state, mapSize, areaColors, areaVisibility) || bAreasMoved;
         },
+        // STEP223 — the header-extra slot: a fixed-width "Center" button drawn on the row's own
+        // header line, to the LEFT of the [o]/[U]/X strip (DraggableListWidget_RowLayout_UI.h's
+        // existing headerExtraWidthPixels/drawRowHeaderExtra mechanism, STEP123).
+        [&](int rowIndex) {
+            Params::MapArea& area = areas[static_cast<std::size_t>(rowIndex)];
+            if (ImGui::SmallButton("Center"))
+                bAreasMoved = CenterAreaInMap(area, mapSize) || bAreasMoved;
+        },
+        kAreaCenterButtonWidthPixels,
         state.selectedAreaIndex);
 }
 
-// AFFORDANCE SCOPE: an area owns no visibility bit, so ToggleVisibility is still ignored (ARCH §4).
+// STEP222 — ToggleVisibility is no longer ignored: it flips the per-area AreaVisibilityEntry the
+// row's own [o]/[-] icon now displays, and (unlike ToggleLock) trips the composite recompose since
+// a hidden area actually changes what BuildMapAreaConfigurations draws.
 // STEP212 — ToggleLock is NO LONGER ignored: it flips the per-area lock entry the row's own [U]/[L]
 // icon now displays (DrawAreaList above). Delete is refused on the engine-required PlayableArea,
 // exactly as v1 refused it. Reports whether the list actually moved (a lock flip is presentation
@@ -111,6 +151,7 @@ DraggableListSignal DrawAreaList(std::vector<Params::MapArea>& areas, AreasTabSt
 // NOT folded into the `true` this function can return for other signals; it trips no recompose and
 // needs no PreviewDriver notify).
 bool ApplyAreaListSignal(std::vector<Params::MapArea>& areas, AreasTabState& state,
+                         std::vector<AreaVisibilityEntry>& areaVisibility,
                          const DraggableListSignal& signal) {
     const int rowIndex = signal.sourceRowIndex;
     const bool bRowValid = rowIndex >= 0 && rowIndex < static_cast<int>(areas.size());
@@ -125,7 +166,16 @@ bool ApplyAreaListSignal(std::vector<Params::MapArea>& areas, AreasTabState& sta
         }
         return false;
     }
-    if (signal.kind == DraggableListSignalKind::ToggleVisibility) return false;
+    // STEP222 — no longer a stub: UNLIKE lock, visibility DOES have a composite-side reader
+    // (BuildMapAreaConfigurations), so this must return true to trip NotifyPlacementChange's
+    // recomposite — a hidden/shown area actually changes what the composite draws.
+    if (signal.kind == DraggableListSignalKind::ToggleVisibility) {
+        if (bRowValid) {
+            bool* const bVisible = ResolveAreaVisible(areaVisibility, areas[static_cast<std::size_t>(rowIndex)].name);
+            *bVisible = !*bVisible;
+        }
+        return true;
+    }
     if (signal.kind == DraggableListSignalKind::Delete
         && (!bRowValid || !IsAreaRemovable(areas[static_cast<std::size_t>(rowIndex)])))
         return false;
@@ -168,14 +218,17 @@ bool DrawAreasGlobals(std::vector<Params::MapArea>& areas, AreasTabState& state)
 } // namespace
 
 void DrawAreasTab(Params::MapRecipe& recipe, AreasTabState& state,
-                  Pipeline::PreviewDriver* previewDriver, std::vector<AreaColorEntry>& areaColors) {
+                  Pipeline::PreviewDriver* previewDriver, std::vector<AreaColorEntry>& areaColors,
+                  std::vector<AreaVisibilityEntry>& areaVisibility) {
     ImGui::PushID("areasTab");
     const int mapSize = recipe.geometry.mapSize;
     bool bAreasMoved = EnsurePlayableArea(recipe.areas, mapSize);
     bAreasMoved = DrawAreasGlobals(recipe.areas, state) || bAreasMoved;
     if (DrawSectionBegin("Area Stack", state.areaSection)) {
-        const DraggableListSignal signal = DrawAreaList(recipe.areas, state, mapSize, areaColors, bAreasMoved);
-        if (signal.bHasSignal()) bAreasMoved = ApplyAreaListSignal(recipe.areas, state, signal) || bAreasMoved;
+        const DraggableListSignal signal =
+            DrawAreaList(recipe.areas, state, mapSize, areaColors, areaVisibility, bAreasMoved);
+        if (signal.bHasSignal())
+            bAreasMoved = ApplyAreaListSignal(recipe.areas, state, areaVisibility, signal) || bAreasMoved;
         DrawSectionEnd();
     }
     // The export keys areas by NAME, so the duplicate repair runs on the frames a name settled —

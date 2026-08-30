@@ -27,6 +27,7 @@ void RunTabStateTests();      // FilesTab_UI_Test.cpp — labels, the log budget
 void RunRoundTripTests();     // FilesTab_Roundtrip_UI_Test.cpp — the injected seam + export/open
 void RunScenarioExportTests();   // FilesTab_ScenarioExport_UI_Test.cpp — STEP77
 void RunResetOnOpenTests();      // FilesTab_ResetOnOpen_UI_Test.cpp — STEP103
+void RunScenarioAreaImportTests();   // FilesTab_ScenarioAreaImport_UI_Test.cpp — STEP224
 
 } // namespace FilesTabTest
 } // namespace SanmapGen

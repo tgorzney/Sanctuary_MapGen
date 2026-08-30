@@ -1011,7 +1011,8 @@ add_sangen_test(FilesTab_UI_Test
     src/ui/FilesTab_UI_Test.cpp
     src/ui/FilesTab_Roundtrip_UI_Test.cpp
     src/ui/FilesTab_ScenarioExport_UI_Test.cpp
-    src/ui/FilesTab_ResetOnOpen_UI_Test.cpp)
+    src/ui/FilesTab_ResetOnOpen_UI_Test.cpp
+    src/ui/FilesTab_ScenarioAreaImport_UI_Test.cpp)
 
 # STEP19_AppSettings_IO: the app's first persistent file outside `.sanmap` and the asset atlas
 # cache — a scratch-folder Save/Load round trip plus the missing-directory/missing-file/corrupt-JSON

@@ -3,10 +3,18 @@
 // engine-required PlayableArea, the unique-name repair the export depends on, Set to Map Size, the
 // color-rename-retargeting fix (STEP21 ruling #5), and a fresh area's visible-size seed (STEP21
 // ruling #7). v1 ran the name repair as a loop tacked onto the end of the tab draw, so it could
-// only ever run while the tab was open — and was never tested. No imgui frame, no window, no GL
-// context.
+// only ever run while the tab was open — and was never tested. Every check above this file's own
+// STEP222 section runs pure — no imgui frame, no window, no GL context.
+// STEP222's own acceptance check IS a headless imgui frame (no GL) driven through the real, public
+// `DrawAreasTab` — `DrawAreaList`/`ApplyAreaListSignal` are anonymous-namespace-private to
+// AreasTab_UI.cpp and stay that way (not part of this ticket's diff), so the click is driven at the
+// one public entry point and observed through its own side effects (ResolveAreaVisible/
+// ResolveAreaLocked, and a rigged duplicate-name pair that only STEP222's own `true` return for
+// ToggleVisibility can deduplicate — see RunAreaVisibilityClickAcceptanceChecks below for why).
 // NOT YET REGISTERED IN CMake — WO C4 does not own CMakeLists.txt (gate CD-int registers it).
 #include "AreasTab_UI.h"
+#include "ListWidget_TestFrame_UI.h"
+#include "../params/MapRecipe_PARAMS.h"
 #include <cstdio>
 #include <string>
 
@@ -65,6 +73,39 @@ void RunSetToMapSizeChecks() {
     SetAreaToMapSize(degenerate, 0);
     Check(degenerate.width >= 1.0f && degenerate.length >= 1.0f,
           "a nonsense map size is repaired, never obeyed: an area is never zero-sized");
+}
+
+// STEP223: the "Center" button's own pure rule, exercised beside RunSetToMapSizeChecks the same
+// way CenterAreaInMap sits beside SetAreaToMapSize in AreasTab_List_UI.h.
+void RunCenterAreaInMapChecks() {
+    Params::MapArea area = MakeArea("Redoubt");
+    area.width = 80.0f; area.length = 40.0f;
+    area.originX = 5.0f; area.originZ = -3.0f;
+    Check(CenterAreaInMap(area, 512), "an off-center area reports the rectangle moved");
+    Check(area.originX == 216.0f && area.originZ == 236.0f,
+          "the rectangle centers on the map's own center - (512/2) - (extent/2) on each axis");
+    Check(area.width == 80.0f && area.length == 40.0f,
+          "Center never resizes - only the origin moves");
+    Check(!CenterAreaInMap(area, 512),
+          "pressing it again on an already-centered area reports no movement");
+
+    // An odd map size: half the map is fractional (256.5 for 513) and must be honored exactly, no
+    // rounding toward either neighboring integer.
+    Params::MapArea oddArea = MakeArea("OddMap");
+    oddArea.width = 10.0f; oddArea.length = 10.0f;
+    Check(CenterAreaInMap(oddArea, 513), "an odd map size still reports the move");
+    Check(oddArea.originX == 251.5f && oddArea.originZ == 251.5f,
+          "half of an odd map size is fractional and lands exactly, not rounded");
+
+    // An area whose own width/length exceeds the map size still centers, by design - no clamping
+    // beyond whatever AreaOriginSliderRange's own slack already allows elsewhere in this file.
+    Params::MapArea oversizedArea = MakeArea("Oversized");
+    oversizedArea.width = 1000.0f; oversizedArea.length = 1000.0f;
+    Check(CenterAreaInMap(oversizedArea, 512), "an oversized area still reports the move");
+    Check(oversizedArea.originX == -244.0f && oversizedArea.originZ == -244.0f,
+          "and centers with a NEGATIVE origin rather than being clamped to the map's own edges");
+    Check(!CenterAreaInMap(oversizedArea, 512),
+          "a repeat press on the now-centered oversized area reports no movement either");
 }
 
 // The export keys areas by name, so two rows sharing one would silently drop an area.
@@ -254,6 +295,48 @@ void RunLockRenameRetargetingChecks() {
           "the unlocked value survives the rename - not silently reset to the LOCKED default");
 }
 
+// STEP223 bundled fix: mirrors RunColorRenameRetargetingChecks/RunLockRenameRetargetingChecks
+// exactly, one table over. AreasTab_UI.cpp's DrawAreaSettings now retargets the color, lock, AND
+// visibility entries on a committed rename - before this ticket, a hidden area that got renamed
+// silently reset back to default-visible on the next resolve, since only color/lock were retargeted.
+void RunVisibilityRenameRetargetingChecks() {
+    std::vector<AreaVisibilityEntry> areaVisibility;
+    bool* const originalVisible = ResolveAreaVisible(areaVisibility, "Base");
+    *originalVisible = false;   // hidden, before the rename
+
+    const std::string nameBeforeEdit = "Base";
+    const std::string nameAfterEdit  = "Renamed";
+    for (AreaVisibilityEntry& entry : areaVisibility)
+        if (entry.name == nameBeforeEdit) { entry.name = nameAfterEdit; break; }
+
+    Check(areaVisibility.size() == 1u,
+          "the rename retargets the existing entry in place rather than orphaning it");
+    bool* const resolvedAfterRename = ResolveAreaVisible(areaVisibility, nameAfterEdit);
+    Check(areaVisibility.size() == 1u,
+          "resolving under the NEW name finds the retargeted entry - it does not create a second");
+    Check(!*resolvedAfterRename,
+          "the hidden value survives the rename - not silently reset to the VISIBLE default");
+}
+
+// STEP222: `ResolveAreaVisible` mirrors `ResolveAreaColor`/`ResolveAreaLocked`'s own lazy-append
+// idiom, but — unlike lock — takes no `bDefaultXxx` parameter at all: every area, created or
+// pre-existing, defaults VISIBLE on first touch, with no second creation-time override anywhere.
+void RunAreaVisibilityResolutionChecks() {
+    std::vector<AreaVisibilityEntry> areaVisibility;
+    bool* const firstResolve = ResolveAreaVisible(areaVisibility, "Base");
+    Check(areaVisibility.size() == 1u, "the first touch of a name appends one entry");
+    Check(*firstResolve, "a fresh entry defaults VISIBLE — no creation-time override exists here, "
+                        "unlike AreaLockEntry's bDefaultLocked");
+
+    *firstResolve = false;
+    bool* const secondResolve = ResolveAreaVisible(areaVisibility, "Base");
+    Check(areaVisibility.size() == 1u, "resolving the same name again appends nothing");
+    Check(!*secondResolve, "and returns the SAME entry, edits intact");
+
+    ResolveAreaVisible(areaVisibility, "Other");
+    Check(areaVisibility.size() == 2u, "a different name gets its own entry");
+}
+
 // STEP21 ruling #7: `Params::MapArea`'s own defaults are 0/0 (correct for "absent from an
 // imported file degrades to nothing"), but a freshly authored row needs a visible, usable size.
 void RunFreshAreaSizeChecks() {
@@ -272,11 +355,275 @@ void RunFreshAreaSizeChecks() {
           "and a fresh area is seeded with a visible, non-zero size");
 }
 
+// STEP222 acceptance — driven through the real, public `DrawAreasTab`, headless (no GL). The scene
+// carries an engine-required PlayableArea, a uniquely-named "Target" area (whose own [o]/[L] icon
+// this test clicks), and TWO areas both named "Dup" — a rigged duplicate pair whose fate is the
+// observable proxy for `ApplyAreaListSignal`'s own return value: `DrawAreasTab` only ever calls
+// `MakeNamesUnique(recipe.areas)` when the signal applier reported the recipe moved, so "did the
+// duplicate pair get deduplicated this frame" is a faithful, black-box readout of a `bool` this
+// ticket deliberately cannot read directly (the applier is anonymous-namespace-private, by design,
+// unchanged by this ticket's own diff).
+struct AreaVisibilityToggleScene {
+    Params::MapRecipe                recipe;
+    AreasTabState                    state;
+    std::vector<AreaColorEntry>      areaColors;
+    std::vector<AreaVisibilityEntry> areaVisibility;
+    std::vector<Params::MapArea>     originalAreas;   // restores a probe that lands on X##delete
+};
+
+AreaVisibilityToggleScene MakeAreaVisibilityToggleScene() {
+    AreaVisibilityToggleScene scene;
+    constexpr int kMapSize = 512;
+    scene.recipe.geometry.mapSize = kMapSize;
+    Params::MapArea playable = MakeArea(kPlayableAreaName);
+    playable.width = static_cast<float>(kMapSize); playable.length = static_cast<float>(kMapSize);
+    Params::MapArea target = MakeArea("Target");
+    target.width = 64.0f; target.length = 64.0f;
+    Params::MapArea dupA = MakeArea("Dup");
+    dupA.width = 64.0f; dupA.length = 64.0f;
+    Params::MapArea dupB = MakeArea("Dup");
+    dupB.width = 64.0f; dupB.length = 64.0f;
+    scene.recipe.areas = { playable, target, dupA, dupB };
+    scene.originalAreas = scene.recipe.areas;
+    return scene;
+}
+
+// Tall enough that every row's own header line stays inside the window's own (NoScrollbar) clip
+// rect — RunHeadlessFrame never scrolls, so any content taller than the window is simply
+// unreachable by a synthetic click regardless of how far the sweep below searches.
+const ImVec2 kAreaVisibilitySceneWindowSize(560.0f, 1400.0f);
+
+// One frame of the real tab, `previewDriver = nullptr` (exactly like every other pure-logic test in
+// this file — DrawAreasTab's own NotifyPlacementChange no-ops on a null driver, Constitution §6).
+// Reports the window's own true right content edge and the tab's own total drawn height, so the
+// click sweep below never hardcodes a layout constant that could drift under an unrelated tab edit.
+void DrawAreaVisibilityToggleFrame(AreaVisibilityToggleScene& scene, const HeadlessMouseState& mouse,
+                                   float& outRightEdgeX, float& outBottomY) {
+    RunHeadlessFrame(mouse, kAreaVisibilitySceneWindowSize, [&] {
+        outRightEdgeX = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+        DrawAreasTab(scene.recipe, scene.state, nullptr, scene.areaColors, scene.areaVisibility);
+        outBottomY = ImGui::GetCursorScreenPos().y;
+    });
+}
+
+struct ClickSearchResult {
+    bool  bFound = false;
+    float x = 0.0f;
+    float y = 0.0f;
+};
+
+// Sweeps the row-affordance band (the tab's own right edge, where every row's [o]/[L]/X strip
+// lives) top-to-bottom, left-to-right, clicking each candidate cell until `probe()`'s own value
+// changes. The band spans all three icons — visibility, lock, AND delete — so this self-heals
+// every form of sweep collateral a blind click over REAL production UI can cause: (1) an
+// accidental X##delete hit, detected via the area count shrinking, restores the original four-row
+// scene; (2) an accidental flip of `guard()` — the OTHER per-row table this call is not searching
+// for — is reverted, and (since STEP222's `true` return for ToggleVisibility also trips
+// MakeNamesUnique) `recipe.areas` is restored wholesale, not just the one bool; (3) an accidental
+// collapse of either Section header's own full-width bar, which would silently reflow every row
+// underneath to a new Y for the rest of the search.
+template <typename ProbeFunction, typename GuardFunction, typename RevertGuardFunction>
+ClickSearchResult FindAffordanceIconByObservedFlip(AreaVisibilityToggleScene& scene, ProbeFunction probe,
+                                                   GuardFunction guard, RevertGuardFunction revertGuard) {
+    float rightEdgeX = 0.0f, bottomY = 0.0f;
+    DrawAreaVisibilityToggleFrame(scene, HeadlessMouseState(), rightEdgeX, bottomY);
+    DrawAreaVisibilityToggleFrame(scene, HeadlessMouseState(), rightEdgeX, bottomY);   // settle layout
+
+    ClickSearchResult result;
+    // The "Area Stack" section indents its own body (Section_UI.cpp's DrawSectionBegin) one level,
+    // so the row header — and its affordance strip — draws `WindowPadding.x + IndentSpacing` to the
+    // LEFT of `rightEdgeX` (measured OUTSIDE that indent, before DrawAreasTab was ever called).
+    // A generous buffer on both sides absorbs the exact pixel math so this sweep never has to
+    // hardcode ImGui's own indent constants precisely — the self-heal above already covers the
+    // (accepted) risk of also sweeping across X##delete along the way.
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float indentOffset = style.WindowPadding.x + style.IndentSpacing;
+    const float xStart = rightEdgeX - 76.0f - indentOffset - 12.0f;
+    const float xEnd   = rightEdgeX - indentOffset + 12.0f;
+    for (float y = 8.0f; y < bottomY && !result.bFound; y += 6.0f) {
+        for (float x = xStart; x < xEnd && !result.bFound; x += 4.0f) {
+            const std::size_t areaCountBefore = scene.recipe.areas.size();
+            const bool probeBefore = probe();
+            const bool guardBefore = guard();
+            HeadlessMouseState hover;   hover.position = ImVec2(x, y);
+            HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+            HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+            float unusedX = 0.0f, unusedY = 0.0f;
+            DrawAreaVisibilityToggleFrame(scene, hover,   unusedX, unusedY);
+            DrawAreaVisibilityToggleFrame(scene, press,   unusedX, unusedY);
+            DrawAreaVisibilityToggleFrame(scene, release, unusedX, unusedY);
+            // Heal an accidental hit on either Section header's own full-width bar (Section_UI.cpp's
+            // bypass-toolkit InvisibleButton, unrelated to any row): collapsing "Areas" or "Area
+            // Stack" reflows every row underneath to a NEW Y for every subsequent frame, silently
+            // invalidating this sweep's whole geometry for the rest of the search. Both sections stay
+            // forced open for the sweep's entire duration — there is no scenario here that wants
+            // either collapsed.
+            scene.state.globalSection.bOpen = true;
+            scene.state.areaSection.bOpen   = true;
+            if (scene.recipe.areas.size() != areaCountBefore) {
+                scene.recipe.areas = scene.originalAreas;   // heal an accidental X##delete
+                continue;
+            }
+            if (probe() != probeBefore) { result.bFound = true; result.x = x; result.y = y; continue; }
+            if (guard() != guardBefore) {
+                // Heal an accidental hit on Target's OWN other icon: revert its own bool AND restore
+                // `recipe.areas` wholesale (see the general dedup-repair note below for why a bare
+                // bool revert alone is not enough).
+                revertGuard(guardBefore);
+                scene.recipe.areas = scene.originalAreas;
+                continue;
+            }
+            // Heal an accidental ToggleVisibility hit on ANY OTHER row (PlayableArea's own icon, or
+            // one of the two rigged "Dup" rows' own icons — both sit in the very same affordance
+            // column this sweep scans, just at a different Y): STEP222's own `true` return applies
+            // to EVERY row, not just the one this call is searching for, so a stray hit anywhere
+            // else in the sweep can ALSO trip MakeNamesUnique and permanently deduplicate the rigged
+            // pair before this call ever reaches Target's own row. Restoring the full vector is the
+            // only complete undo (a per-row bool revert cannot un-rename anything).
+            if (scene.recipe.areas.size() == scene.originalAreas.size()
+                && (scene.recipe.areas[2].name != "Dup" || scene.recipe.areas[3].name != "Dup"))
+                scene.recipe.areas = scene.originalAreas;
+        }
+    }
+    return result;
+}
+
+// The contrast case FIRST (STEP212's own pre-existing, previously-untested-at-this-level behavior):
+// ToggleLock still returns false, so a click on Target's own [L]/[U] icon flips ONLY the lock table
+// and leaves the rigged "Dup"/"Dup" pair exactly as duplicate as they started.
+void RunAreaLockClickLeavesDuplicateNamesChecks() {
+    HeadlessImguiSession session;
+    AreaVisibilityToggleScene scene = MakeAreaVisibilityToggleScene();
+    auto targetLocked   = [&] { return *ResolveAreaLocked(scene.state.areaLocks, "Target"); };
+    auto targetVisible  = [&] { return *ResolveAreaVisible(scene.areaVisibility, "Target"); };
+    auto revertVisible  = [&](bool value) { *ResolveAreaVisible(scene.areaVisibility, "Target") = value; };
+
+    const bool lockedBefore = targetLocked();
+    const ClickSearchResult found =
+        FindAffordanceIconByObservedFlip(scene, targetLocked, targetVisible, revertVisible);
+    Check(found.bFound, "the [L]/[U] lock affordance for a non-Playable area row is reachable by click");
+    Check(targetLocked() != lockedBefore, "clicking it flips AreaLockEntry::bLocked for that row's area");
+    Check(scene.recipe.areas[2].name == "Dup" && scene.recipe.areas[3].name == "Dup",
+          "ApplyAreaListSignal still returns false for ToggleLock (unaffected by this ticket): the "
+          "duplicate \"Dup\" pair is left untouched, proving no MakeNamesUnique recompose ran");
+}
+
+// The new behavior this ticket adds: ToggleVisibility now returns true, so the SAME click sequence
+// on Target's own [o] icon both flips AreaVisibilityEntry::bVisible AND trips the recompose that
+// deduplicates the rigged "Dup"/"Dup" pair this same frame.
+void RunAreaVisibilityClickTogglesAndRecomposesChecks() {
+    HeadlessImguiSession session;
+    AreaVisibilityToggleScene scene = MakeAreaVisibilityToggleScene();
+    auto targetVisible = [&] { return *ResolveAreaVisible(scene.areaVisibility, "Target"); };
+    auto targetLocked  = [&] { return *ResolveAreaLocked(scene.state.areaLocks, "Target"); };
+    auto revertLocked  = [&](bool value) { *ResolveAreaLocked(scene.state.areaLocks, "Target") = value; };
+
+    const bool visibleBefore = targetVisible();
+    Check(visibleBefore, "a freshly resolved area defaults VISIBLE (ResolveAreaVisible's own default)");
+    const ClickSearchResult found =
+        FindAffordanceIconByObservedFlip(scene, targetVisible, targetLocked, revertLocked);
+    Check(found.bFound, "the [o]/[-] visibility affordance for a non-Playable area row is reachable by click");
+    Check(targetVisible() != visibleBefore,
+          "clicking it flips AreaVisibilityEntry::bVisible — verified via ResolveAreaVisible on the "
+          "same table, exactly as the acceptance test specifies");
+    Check(scene.recipe.areas[2].name != scene.recipe.areas[3].name,
+          "STEP222: ApplyAreaListSignal returns TRUE for ToggleVisibility (unlike ToggleLock above) — "
+          "the recompose trips MakeNamesUnique this same frame, deduplicating the \"Dup\"/\"Dup\" pair");
+}
+
+void RunAreaVisibilityClickAcceptanceChecks() {
+    RunAreaLockClickLeavesDuplicateNamesChecks();
+    RunAreaVisibilityClickTogglesAndRecomposesChecks();
+}
+
+// STEP223 acceptance — extends the click-sweep infrastructure above to the new "Center" header
+// button. That button sits in the header-extra slot RenderCollapsibleRow reserves immediately to
+// the LEFT of the [o]/[U]/X strip (DraggableListWidget_RowLayout_UI.h's own headerExtraWidthPixels
+// mechanism), so its own search band is offset kAreaCenterButtonWidthPixels further left of the
+// affordance-strip band FindAffordanceIconByObservedFlip already searches above. The observable
+// here is a position (Target's own originX/originZ), not a per-row bool table, so this is a
+// dedicated, smaller sibling search rather than a reuse of that bool-typed helper.
+ClickSearchResult FindCenterButtonByObservedMove(AreaVisibilityToggleScene& scene,
+                                                 float expectedOriginX, float expectedOriginZ) {
+    auto targetCentered = [&] {
+        return scene.recipe.areas[1].originX == expectedOriginX
+            && scene.recipe.areas[1].originZ == expectedOriginZ;
+    };
+
+    float rightEdgeX = 0.0f, bottomY = 0.0f;
+    DrawAreaVisibilityToggleFrame(scene, HeadlessMouseState(), rightEdgeX, bottomY);
+    DrawAreaVisibilityToggleFrame(scene, HeadlessMouseState(), rightEdgeX, bottomY);   // settle layout
+
+    ClickSearchResult result;
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float indentOffset = style.WindowPadding.x + style.IndentSpacing;
+    // 76.0f mirrors FindAffordanceIconByObservedFlip's own literal above (kAffordanceStripWidthPixels,
+    // DraggableListWidget_Types_UI.h) - the strip's own left edge, where the [o] icon itself begins.
+    const float affordanceStripLeftX = rightEdgeX - 76.0f - indentOffset;
+    const float xStart = affordanceStripLeftX - kAreaCenterButtonWidthPixels - 12.0f;
+    const float xEnd   = affordanceStripLeftX - 4.0f;   // stays clear of the strip's own icons
+    for (float y = 8.0f; y < bottomY && !result.bFound; y += 6.0f) {
+        for (float x = xStart; x < xEnd && !result.bFound; x += 4.0f) {
+            const std::size_t areaCountBefore = scene.recipe.areas.size();
+            HeadlessMouseState hover;   hover.position = ImVec2(x, y);
+            HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+            HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+            float unusedX = 0.0f, unusedY = 0.0f;
+            DrawAreaVisibilityToggleFrame(scene, hover,   unusedX, unusedY);
+            DrawAreaVisibilityToggleFrame(scene, press,   unusedX, unusedY);
+            DrawAreaVisibilityToggleFrame(scene, release, unusedX, unusedY);
+            // Heal an accidental hit on either Section header's own full-width bar - see
+            // FindAffordanceIconByObservedFlip's own identical comment above for why.
+            scene.state.globalSection.bOpen = true;
+            scene.state.areaSection.bOpen   = true;
+            if (scene.recipe.areas.size() != areaCountBefore) {
+                scene.recipe.areas = scene.originalAreas;   // heal an accidental X##delete
+                continue;
+            }
+            if (targetCentered()) { result.bFound = true; result.x = x; result.y = y; }
+        }
+    }
+    return result;
+}
+
+// Clicks Target's own "Center" button and confirms both (1) the live `Params::MapArea` in
+// `recipe.areas` actually recenters, and (2) the button renders strictly to the LEFT of the [o]
+// icon's own affordance strip - a position assertion, not just the behavior.
+void RunAreaCenterButtonClickAcceptanceChecks() {
+    HeadlessImguiSession session;
+    AreaVisibilityToggleScene scene = MakeAreaVisibilityToggleScene();
+    // Mirrors CenterAreaInMap's own math: (512 - 64) / 2, for Target's 64x64 rectangle.
+    constexpr float kExpectedOriginX = 224.0f;
+    constexpr float kExpectedOriginZ = 224.0f;
+
+    Check(scene.recipe.areas[1].name == "Target"
+          && (scene.recipe.areas[1].originX != kExpectedOriginX
+              || scene.recipe.areas[1].originZ != kExpectedOriginZ),
+          "Target starts off-center, so a real click is what centers it below, not a scene that "
+          "was already centered to begin with");
+
+    const ClickSearchResult found = FindCenterButtonByObservedMove(scene, kExpectedOriginX, kExpectedOriginZ);
+    Check(found.bFound, "the Center header button for a non-Playable area row is reachable by click");
+    Check(scene.recipe.areas[1].originX == kExpectedOriginX
+          && scene.recipe.areas[1].originZ == kExpectedOriginZ,
+          "clicking it actually recenters the live Params::MapArea in recipe.areas");
+
+    float rightEdgeX = 0.0f, bottomY = 0.0f;
+    DrawAreaVisibilityToggleFrame(scene, HeadlessMouseState(), rightEdgeX, bottomY);
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float indentOffset = style.WindowPadding.x + style.IndentSpacing;
+    const float affordanceStripLeftX = rightEdgeX - 76.0f - indentOffset;
+    Check(found.x < affordanceStripLeftX,
+          "the Center button renders to the LEFT of the [o]/[U]/X strip, per the human's own "
+          "request that it sit left of the [o] icon");
+}
+
 } // namespace
 
 int main() {
     RunPlayableAreaChecks();
     RunSetToMapSizeChecks();
+    RunCenterAreaInMapChecks();
     RunUniqueNameChecks();
     RunSliderAndSelectionChecks();
     RunAreaColorResolutionChecks();
@@ -284,7 +631,11 @@ int main() {
     RunColorRenameRetargetingChecks();
     RunAreaLockResolutionChecks();
     RunLockRenameRetargetingChecks();
+    RunVisibilityRenameRetargetingChecks();
+    RunAreaVisibilityResolutionChecks();
     RunFreshAreaSizeChecks();
+    RunAreaVisibilityClickAcceptanceChecks();
+    RunAreaCenterButtonClickAcceptanceChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

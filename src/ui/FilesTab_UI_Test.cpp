@@ -13,7 +13,8 @@ namespace FilesTabTest {
 namespace {
 
 void CheckEveryActionIsLabelledAndClassified() {
-    Check(Ui::filesTabActionCount == 9, "STEP77 adds ExportScenarioScript — nine actions total");
+    Check(Ui::filesTabActionCount == 10,
+          "STEP224 adds ImportScenarioAreas — ten actions total");
     int bakedFieldActionCount = 0;
     std::vector<std::string> labels;
     for (int actionIndex = 0; actionIndex < Ui::filesTabActionCount; ++actionIndex) {
@@ -33,7 +34,7 @@ void CheckEveryActionIsLabelledAndClassified() {
     Check(!scenarioLabel.empty(), "ExportScenarioScript's label is non-empty");
     int matchCount = 0;
     for (const std::string& label : labels) if (label == scenarioLabel) ++matchCount;
-    Check(matchCount == 1, "ExportScenarioScript's label is unique among all nine actions");
+    Check(matchCount == 1, "ExportScenarioScript's label is unique among all ten actions");
 }
 
 void CheckTheLogPanelIsBoundedAndDropsWholeLines() {
@@ -102,6 +103,7 @@ int main() {
     SanmapGen::FilesTabTest::RunRoundTripTests();
     SanmapGen::FilesTabTest::RunScenarioExportTests();
     SanmapGen::FilesTabTest::RunResetOnOpenTests();
+    SanmapGen::FilesTabTest::RunScenarioAreaImportTests();
     if (SanmapGen::FilesTabTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", SanmapGen::FilesTabTest::FailureCount());
     return 1;

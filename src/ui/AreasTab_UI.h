@@ -22,6 +22,7 @@
 //     lacked, not a setting v1 had.
 #pragma once
 #include "AreasTab_List_UI.h"
+#include "AreaVisibilityTable_UI.h"
 #include "Section_UI.h"
 #include "SliderScalar_UI.h"
 
@@ -30,10 +31,23 @@ namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
 namespace Ui {
 
+// The swatch an area color is edited with: alpha is a real channel (the overlay's opacity), so the
+// alpha channel and the picker's vertical alpha bar are both on. A tab state is seeded from this
+// once by the host rather than each draw re-deciding it (Constitution §8). STEP221 — area color is
+// always realtime (no RT button/choice, the same reasoning MarkersTab_Globals_UI.cpp already
+// applies to its own compact swatches).
+inline ColorSwatchOptions AreasTabColorSwatchOptions() {
+    ColorSwatchOptions options;
+    options.bAlphaEnabled         = true;
+    options.bAlphaBarShown        = true;
+    options.bRealtimeToggleHidden = true;   // STEP221 — area color is always realtime, no choice
+    return options;
+}
+
 struct AreasTabState {
     SectionState       globalSection;
     SectionState       areaSection;
-    ColorSwatchOptions colorOptions = ColorSwatchOptions();
+    ColorSwatchOptions colorOptions = AreasTabColorSwatchOptions();
     int  selectedAreaIndex = -1;
     // STEP212 — replaces the retired global `bool bAreasLocked = true;`: one lock bit PER AREA, the
     // same UI-only, name-keyed side-table shape `PreviewCompositeSettings::areaColors` uses for
@@ -48,22 +62,24 @@ struct AreasTabState {
     // ONE shared toggle set for the currently-selected area's detail section — not per-row: only
     // the selected area's settings ever draw, the same posture ArmiesTabState uses for its own
     // single-selection editor over a real PARAMS vector (STEP20/STEP21).
-    RealtimeToggle originXToggle;
-    RealtimeToggle originZToggle;
-    RealtimeToggle widthToggle;
-    RealtimeToggle lengthToggle;
-    RealtimeToggle colorToggle;
+    // STEP221 — all five force-constructed realtime-ON: area position/size/color feed a real
+    // recomposite (PreviewComposite::BuildMapAreaConfigurations), so hiding the RT button alone
+    // would still defer the commit to mouse-release and visibly freeze the fill mid-drag. Merely
+    // hiding the button (as the color swatch options above do) is NOT enough on its own —
+    // RealtimeToggle's default constructor still leaves `bRealtimeEnabled = false`.
+    RealtimeToggle originXToggle{true};
+    RealtimeToggle originZToggle{true};
+    RealtimeToggle widthToggle{true};
+    RealtimeToggle lengthToggle{true};
+    RealtimeToggle colorToggle{true};
 };
 
-// The swatch an area color is edited with: alpha is a real channel (the overlay's opacity), so the
-// alpha channel and the picker's vertical alpha bar are both on. A tab state is seeded from this
-// once by the host rather than each draw re-deciding it (Constitution §8).
-inline ColorSwatchOptions AreasTabColorSwatchOptions() {
-    ColorSwatchOptions options;
-    options.bAlphaEnabled  = true;
-    options.bAlphaBarShown = true;
-    return options;
-}
+// STEP221 — the compact Position/Size rows' fixed pixel widths (DrawSliderScalarCompact).
+inline constexpr float kAreaScalarCompactTrackWidthPixels = 56.0f;
+inline constexpr float kAreaScalarCompactFieldWidthPixels = 44.0f;
+
+// STEP223 — the "Center" header button's fixed reserved width (DraggableList's header-extra slot).
+inline constexpr float kAreaCenterButtonWidthPixels = 54.0f;
 
 // v1 fenced Width / Length to 1..2x the map side; both limits move with the map size, so a resize
 // can never leave an extent slider unable to express the map it belongs to.
@@ -97,7 +113,8 @@ inline int ResolvedAreaSelection(int selectedAreaIndex, int areaCount) {
 // `PreviewCompositeSettings::areaColors` (ARCH §14.17 item 9) — the tab's own call site passes
 // `composite.Settings().areaColors`, never a copy of its own.
 void DrawAreasTab(Params::MapRecipe& recipe, AreasTabState& state,
-                  Pipeline::PreviewDriver* previewDriver, std::vector<AreaColorEntry>& areaColors);
+                  Pipeline::PreviewDriver* previewDriver, std::vector<AreaColorEntry>& areaColors,
+                  std::vector<AreaVisibilityEntry>& areaVisibility);
 
 } // namespace Ui
 } // namespace SanmapGen

@@ -9,6 +9,7 @@
 #pragma once
 #include <vector>
 #include "AreaColorTable_UI.h"
+#include "AreaVisibilityTable_UI.h"
 #include "../params/GradientRamp_PARAMS.h"
 
 namespace SanmapGen {
@@ -101,6 +102,11 @@ struct PreviewCompositeSettings {
     // mutable table, and this is the category `gradientRamps`/`clearColor` already occupy —
     // presentation state that never serializes into `mapGeneratorData`.
     std::vector<AreaColorEntry> areaColors;
+
+    // STEP222 — the single owner of the per-area presentation VISIBILITY, mirroring areaColors'
+    // ownership exactly (composite-side reader: BuildMapAreaConfigurations skips a hidden area's
+    // fill). Session-only, never serialized, same category as areaColors/gradientRamps/clearColor.
+    std::vector<AreaVisibilityEntry> areaVisibility;
 };
 
 } // namespace Ui

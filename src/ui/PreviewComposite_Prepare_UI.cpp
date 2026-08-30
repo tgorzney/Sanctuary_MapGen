@@ -136,6 +136,9 @@ void PreviewComposite::BuildMapAreaConfigurations() {
     const float cellsPerWorldUnit = ReciprocalOrZero(settings.worldUnitsPerCell);
     for (int index = 0; index < static_cast<int>(areas.size()); ++index) {
         const Params::MapArea& area = areas[static_cast<std::size_t>(index)];
+        // STEP222 — a hidden area contributes nothing to the composite, exactly like a deleted
+        // one; the existing empty-list sentinel fallback below already covers "every area hidden."
+        if (!*ResolveAreaVisible(settings.areaVisibility, area.name)) continue;
         PreviewMapAreaRectangle record;
         record.minimumX = area.originX * cellsPerWorldUnit;
         record.minimumZ = area.originZ * cellsPerWorldUnit;

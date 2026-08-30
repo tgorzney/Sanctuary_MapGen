@@ -12,6 +12,7 @@
 #include "../data/MapFields_DATA.h"
 #include "../data/StratumArt_DATA.h"
 #include "../io/FilesystemPrimitives_IO.h"
+#include "../io/ScenarioScript_AreaImport_IO.h"
 #include "../io/UnknownImportBag_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <utility>
@@ -97,6 +98,21 @@ bool RunImportSupComLua(FilesTabState& state, Params::MapRecipe& recipe) {
     return bImported;
 }
 
+// ARCH §15.11 — human-triggered, one-shot: this action exists ONLY as an explicit click. It must
+// never be called from RunOpenSanmap or from anywhere else automatic (see this ticket's own
+// header comment for why).
+bool RunImportScenarioAreas(FilesTabState& state, Params::MapRecipe& recipe) {
+    if (state.scenarioAreaImportPath.empty()) {
+        AppendFilesTabLog(state, "Import refused: no scenario script .lua path is set.");
+        return false;
+    }
+    const Io::ScenarioAreaImportResult result =
+        Io::ImportAreaRectanglesFromScenarioScriptFile(state.scenarioAreaImportPath, recipe);
+    AppendFilesTabLog(state, result.debugLog);
+    return !result.bRefusedGeneratedFile && !result.bRefusedUnreadableFile
+        && !result.bRefusedOversizedFile && !result.writtenNames.empty();
+}
+
 bool RunRecipeExport(FilesTabAction action, FilesTabState& state, const Params::MapRecipe& recipe,
                      const Data::MapFields* fields, bool bBlueprintValidationAcknowledged) {
     // `state.assetPack` feeds the IO layer's own refuse-by-default blueprintPath gate
@@ -145,6 +161,7 @@ const char* FilesTabActionLabel(FilesTabAction action) {
     switch (action) {
     case FilesTabAction::OpenSanmap:         return "Open Sanmap File";
     case FilesTabAction::ImportSupComLua:    return "Import SupCom Lua";
+    case FilesTabAction::ImportScenarioAreas: return "Import Areas from Scenario Script";
     case FilesTabAction::ExportSanmapOnly:   return "Export Sanmap Only";
     case FilesTabAction::ExportAll:          return "Export All (Project+Textures)";
     case FilesTabAction::ExportHeightmapRaw: return "Export Heightmap RAW";
@@ -168,6 +185,7 @@ bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapR
     if (action == FilesTabAction::OpenSanmap)
         return RunOpenSanmap(state, recipe, fields, outBakedLayerImages, outStratumArt);
     if (action == FilesTabAction::ImportSupComLua) return RunImportSupComLua(state, recipe);
+    if (action == FilesTabAction::ImportScenarioAreas) return RunImportScenarioAreas(state, recipe);
     if (action == FilesTabAction::ExportSanmapOnly || action == FilesTabAction::ExportAll)
         return RunRecipeExport(action, state, recipe, fields, bBlueprintValidationAcknowledged);
     if (action == FilesTabAction::ExportScenarioScript)
