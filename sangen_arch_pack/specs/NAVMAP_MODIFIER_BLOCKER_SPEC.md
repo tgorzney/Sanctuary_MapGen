@@ -12,7 +12,8 @@ description remains **reasoned from source** (`BARRIERLOADER`'s recorded templat
 independently reproduced**, even though the blocker built to avoid it now works. This spec documents
 a **game-side Lua authoring pattern**, mirroring the classification and evidentiary style of
 `MAP_SCENARIO_SPEC.md` and `MAP_UNIT_SPAWNING_SPEC.md`; it shares those specs' companion role and
-does not restate their content.
+does not restate their content. **(2026-08-30) §1.1, §9.1-§9.2 fold in the SanGen-native
+mesh-ingestion/mask-generation successor, ratified `ARCH_22_NavmapModifierBlockers.md` §22.10-§22.17.**
 
 **Companion specs — read first, not duplicated here:**
 - `MAP_UNIT_SPAWNING_SPEC.md` — the one-`NewThread`-per-script rule, `pcall` discipline, and the
@@ -44,8 +45,6 @@ All five `NAVMOD`/`NAVLOADER`/`NAVLAYERS`/`LAYERS`/`BARRIERLOADER`/`BARRIER`/`TE
 this spec as the frozen extraction of that set. `DATA` below reuses `MAP_SCENARIO_SPEC.md`'s own
 alias for `Pandemonium Isthmus_data.lua` — same file, same per-map orchestrator.
 
----
-
 ## 1. What this is and why
 
 Navigation layers are created **per map**, at load, by `CreateNavigationLayers` (`NAVLAYERS`):
@@ -68,6 +67,28 @@ walking, flying, or sailing straight through it — unless the map author explic
 navmap-modifier-carrying prefab at that location. This spec formalizes how to do that from
 `<MapName>_data.lua`, with zero engine or `mapUtils.lua` changes, for both the all-layer case
 (§3, confirmed shipped) and the single/partial-layer case (§4, confirmed shipped).
+
+### 1.1 The six navigation layers and their height bands (ratified 2026-08-30, `ARCH_22_12_MaskGenerationAlgorithmAndScope.md`)
+
+Folded in from `forum_posts/TUTORIAL_NavMeshBlockers.md` (itself sourced against `NAVLAYERS`'s own
+`CreateNavigationLayers()`, "from a live, working implementation... and from engine source"),
+confirmed consistent with the always/water-gated split §1 above already states, now recorded as
+ratified ground truth rather than left in an informal companion document:
+
+| Layer | Always created? | Height band | Max slope |
+|---|---|---|---|
+| `Land` | yes | sea level to +∞ | 30° |
+| `Amphibious` | yes | -∞ to +∞ | 30° |
+| `Hover` | yes | -∞ to +∞ | 30° above water, ∞ below |
+| `Air` | yes | -∞ to +∞ | ∞ (unrestricted) |
+| `Submarine` | only if `Engine.HasWater()` | -∞ to (waterLevel - 1.5) | ∞ |
+| `Sea` | only if `Engine.HasWater()` | -∞ to waterLevel | ∞ |
+
+This table is the binding scoping ground truth behind the SanGen-native mask-generation successor's
+own v1 scope ruling (`ARCH_22_12_MaskGenerationAlgorithmAndScope.md`): only `Sea`/`Submarine`
+reference the water plane at all, which is why the water-plane-slice technique (§9.1) is scoped to
+those two layers for v1, with `Land`/`Amphibious`/`Hover`/`Air` deferred to a structurally different
+future "full silhouette" technique.
 
 ## 2. The two real native consumers (ground truth, not invented)
 
@@ -327,18 +348,17 @@ flags it as a strong candidate for a future SanGen-native feature.
    (§1) — so a diagonal or rotated real-world feature gets staircase-approximated by axis-aligned
    boxes. This is inherent to the engine primitive, not a limitation of the pipeline above.
 
-### 7.1 Future SanGen-native candidate — not built, not designed here
+### 7.1 SanGen-native successor — ratified 2026-08-30, not yet built
 
-This workflow's mask-authoring step (1-2 above) is the same class of raster asset
-`MASKING_SPEC.md`'s own Mask stage already reasons about (slope-gated stratum masks, stored-art
-merge); the rectangle-decomposition step (3-5) is a new capability with no current SanGen
-analog, most naturally scoped alongside `PLACEMENT_SCATTER_SPEC.md`'s scatter/placement rules. A
-future SanGen-native masking/placement feature — author a blocker mask inside SanGen, decompose it
-to `NavmapModifierTemplate` rectangle lists automatically, and export them as part of the Map
-Scenario / per-map Lua orchestration this spec's §3/§4 techniques describe — is a strong, flagged
-candidate. **Not designed here**: no PARAMS shape, no PROC stage, no IO/export surface is ruled on
-by this spec. `MASKING_SPEC.md` and `PLACEMENT_SCATTER_SPEC.md` each carry a short forward-pointer
-to this section (not a restatement) so a reader landing there first finds this note.
+**Superseded from "not designed here" to a ratified design.** §9.1/§9.2 below, and
+`ARCH_22_NavmapModifierBlockers.md` §22.10-§22.17, formally bring this workflow's SanGen-native
+successor into the owned architecture: mesh-vs-water-plane intersection (replacing step 1's
+hand-authored mask with a real, placed-prop-derived geometric computation) feeding the SAME
+rectangle-decomposition process (steps 2-5 above, unmodified) via a new PROC stage. `MASKING_SPEC.md`
+and `PLACEMENT_SCATTER_SPEC.md` each still carry their own short forward-pointer to this section (not
+a restatement) — a reader landing there first still finds the pointer here; those two specs are not
+independently updated by this ratification, since the actual PARAMS/PROC shape lives in the ARCH
+ruling and this spec's own §9.1/§9.2, not in either of them.
 
 ## 8. Pixel↔world coordinate convention for mask-derived rectangles — distinct from the entity-position convention
 
@@ -362,15 +382,45 @@ cannot be fully resolved from shipped maps alone — see that spec's own "Open q
 are **two different conventions for two different kinds of coordinates** — one for raster-texture
 pixel indices, one for JSON entity position fields — and a reader must not assume one informs or
 corrects the other. `SANMAP_FORMAT_SPEC.md` carries a short pointer to this section immediately
-after its own heightmap-sampling convention, for exactly this reason.
+after its own heightmap-sampling convention, for exactly this reason. §9.2 below states the SAME
+convention applies, unmodified, to the SanGen-native rasterization stage's own world→pixel direction.
 
-## 9. Ownership and scope — not yet a SanGen-owned construct
+## 9. Ownership and scope
 
 Per the layer-classification precedent `ARCH_15_01_LayerClassification.md` established for the Map
-Scenario system: this technique is **game-side Lua, not SanGen C++**. It runs inside the engine's
-own script sandbox, at map-load time, on the player's machine — it does not occupy a slot in the
-Constitution §1 layer stack, for the same reason the Scenario system does not. Full ruling and its
-relationship to SanGen's own future roadmap: `ARCH_22_09_OwnershipScopeRuling.md` §22.9.
+Scenario system: the **hand-authored Lua half** of this technique (§1-§8 above) is **game-side Lua,
+not SanGen C++**. It runs inside the engine's own script sandbox, at map-load time, on the player's
+machine — it does not occupy a slot in the Constitution §1 layer stack, for the same reason the
+Scenario system does not. Full ruling: `ARCH_22_09_OwnershipScopeRuling.md` §22.9, unmodified by
+this update.
+
+### 9.1 The SanGen-native successor — ratified into the owned architecture (2026-08-30)
+
+**Unlike §1-§8, the mesh-ingestion/mask-generation successor DOES occupy real slots in the
+Constitution §1 layer stack** — `SYS` (a `.sanmodel` binary reader), `IO` (visual-LOD extraction,
+pack-asset resolution, a run-scoped mesh cache), `MATH` (rigid-transform + triangle/plane
+primitives), `PROC` (plane-slice/rasterize/decompose kernels, CPU-only dispatch), `PARAMS` (the
+resolved rectangle-list type and per-layer merge settings), a new one-shot human-triggered
+`PIPELINE` bake responsibility (never wired into the automatic regeneration DAG), and `UI` (a
+Navmesh Tab). Full ruling, ratifying four 2026-08-30 domain-expert design consults:
+`ARCH_22_NavmapModifierBlockers.md` §22.10-§22.17.
+
+**v1 scope: Sea + Submarine only**, per §1.1's height-band table — the two layers whose bands are
+genuinely water-relative. Land/Amphibious/Hover/Air are explicitly deferred to a future, structurally
+different "full mesh silhouette" technique, not designed by this update
+(`ARCH_22_12_MaskGenerationAlgorithmAndScope.md`).
+
+**Determinism:** the resolved rectangle list is baked once, human-triggered, into an ordinary
+`Params::` field — never read live by the automatic regeneration pipeline, never independently
+recomputed by more than one machine. It sits outside `DETERMINISM_SPEC.md`'s bit-exact cross-machine
+regeneration bar by construction, achieving cross-machine parity by transport (as ordinary recipe
+data) rather than by recomputation — full reasoning: `ARCH_22_13_BakedArtifactStorageAndDeterminism.md`.
+
+### 9.2 The successor's own coordinate convention
+
+Unmodified from §8 above — the SanGen-native rasterization stage's world→pixel direction is the
+exact inverse of §8's pixel→world formula, over the same `heightmapResolution` raster space,
+distinct from the separate `.sanmap` entity-position convention exactly as §8 already states.
 
 ## 10. Cross-references
 
@@ -382,7 +432,8 @@ relationship to SanGen's own future roadmap: `ARCH_22_09_OwnershipScopeRuling.md
 - `SANMAP_FORMAT_SPEC.md` — the heightmap pixel↔world convention §8 reuses, and the separate,
   differently-derived entity-position convention §8 explicitly is not.
 - `UNIT_PROP_MARKER_DATA_SPEC.md` — `skirtSize`, the other real native consumer of this same
-  primitive (§2).
+  primitive (§2); and (2026-08-30) the mesh-body parsing this spec's §9.1 successor now performs.
 - `MASKING_SPEC.md`, `PLACEMENT_SCATTER_SPEC.md` — the natural future home for a SanGen-native
-  version of §7's mask-to-rectangle workflow (§7.1).
-- `ARCH_22_NavmapModifierBlockers.md` §22 — the binding ARCH ruling this spec is ratified under.
+  version of §7's mask-to-rectangle workflow (§7.1/§9.1).
+- `ARCH_22_NavmapModifierBlockers.md` §22 — the binding ARCH ruling this spec is ratified under,
+  including §22.10-§22.17's 2026-08-30 successor ratification.

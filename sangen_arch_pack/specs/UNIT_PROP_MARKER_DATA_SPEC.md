@@ -93,8 +93,15 @@ intentional — 36 instances (e.g. `edbm0142`–`edbm0150` all use
 ## The `.san*` proprietary format family
 `.sanmap` (map), `.santp` (unit/prop/marker template), `.sandecal` (decal),
 `.sanmodel` (proprietary FBX-like mesh — per owner), `.sananimation`, `.sanvfx`,
-`.sanmaterial`. SanGen references these by path; it does not need to parse the
-mesh/vfx bodies for map generation, only the templates/decals.
+`.sanmaterial`. SanGen references these by path for most purposes; it does not
+need to parse `.sananimation`/`.sanvfx`/`.sanmaterial` bodies for any purpose,
+and does not need to parse `.sanmodel` bodies for ordinary map generation, only
+the templates/decals. **(2026-08-30, corrected — the navmesh-blocker-generation
+feature is a real exception, not covered by the sentence above.)** SanGen parses
+`.sanmodel` mesh bodies for the navmesh-blocker-generation feature only —
+rest-pose geometry, LOD0/highest-fidelity only, static/non-skinned props only —
+see `ARCH_22_11_MeshIngestionShape.md`'s mesh-ingestion ratification. It still
+does not parse `.sanvfx`/`.sananimation`/`.sanmaterial` bodies for any purpose.
 
 ## Asset validation — pre-alpha files are unreliable (REQUIRED)
 The game ships `AI/UnitBlueprintValidator.lua` (171 KB) and

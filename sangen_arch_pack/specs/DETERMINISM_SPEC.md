@@ -18,6 +18,24 @@ smoothness, decoration. These stay on the fast GPU path.
 This maps onto the accuracy classes: **Deterministic = the Exact-class outputs,
 made cross-machine reproducible.** Visual class is never in scope.
 
+## A third category — gameplay-authoritative data that achieves parity by transport, not recomputation (added 2026-08-30, `ARCH_22_13_BakedArtifactStorageAndDeterminism.md`)
+Some fields are neither "must be independently regenerated bit-identically"
+(the Scope list above) nor "exempt/visual" — they are gameplay-authoritative,
+**baked once, human-triggered, from an external (install-local or asset-derived)
+source into an ordinary `Params::` field**, and never re-read live by any PROC
+stage or regeneration pass. Two real examples: the baked prop-footprint scalar
+(`ARCH_18_02_IngestedDataDeterminism.md`) and the baked navmesh-blocker rectangle
+list (`ARCH_22_13_BakedArtifactStorageAndDeterminism.md`). These achieve
+cross-machine parity by **transport** — the `Params::` field rides with
+settings+seed like any other recipe data, so every peer receives the literal
+same bytes — never by independent per-machine recomputation of the external
+source. They therefore sit **outside this spec's regeneration bar by
+construction**: the bar governs values more than one machine independently
+computes from seed, and these values are computed by exactly one machine (the
+author's), once. **They must never be wired into a live-regenerated PROC stage**
+— doing so would reopen the exact cross-install-divergence hazard this spec's
+bar exists to catch, collapsed onto whichever machine's install last changed.
+
 ## How determinism is achieved
 Realized as the **CPU Exact path + determinism discipline**:
 - **CPU-only.** GPUs are not cross-machine deterministic (vendor/driver rounding,

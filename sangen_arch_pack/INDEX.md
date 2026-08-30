@@ -28,7 +28,7 @@ spec(s) a question needs — never the whole pack.
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
 | preview compositing — passes, coloring, picking, dirty flags, the shadow-sim fix; the ratified v2 screen-space overlay-layering design (six domains — Alloy/SpawnsArmies/Units/Props/Reclaim/Decals; LOD icon rendering; **five** dirty-flag tiers A/B/B2/C/C2; the View toolbar's two-section popup; ARCH §14); map areas as a composited FIELD layer, not an overlay domain (`PreviewLayerKind::MapAreas`, ARCH §14.17), and the ONE-fill / live-blend-fidelity + tier-gated-baked-input-upload + 16-color-palette follow-up (ARCH §14.18, whose Part 3 closes its own Tier-B2 benchmark gate and adds the mandatory recomposite-cost watchdog) | `specs/PREVIEW_COMPOSITING_SPEC.md` |
-| core math library — SIMD/fast-math/Morton/spatial internals (stub reality + v2 target) | `specs/MATH_SIMD_SPEC.md` |
+| core math library — the live `src/math/*_MATH.h` primitive set (SIMD/trig/reciprocal/Morton/spatial/occlusion/rigid-transform) and its relationship to the legacy, still-linked `core/math/Sanmath_*.h` stubs | `specs/MATH_SIMD_SPEC.md` |
 | future sim passes — fluvial/glacial/snow-melt design on the shared sim framework | `specs/FUTURE_SIM_TYPES_SPEC.md` |
 | map AI-analyzability invariants + host/client shared-generation protocol | `specs/AI_HOSTCLIENT_SPEC.md` |
 
@@ -128,7 +128,7 @@ whether a stable id column exists for manual sub-layers; whether Decals actually
 through `Data::PlacementInstances` today; and whether `OverlayLayer_UI::blendMode` reuses
 `Ui::PreviewBlendMode` or needs a new enum (UI Expert's call). **The Alloy/SpawnsArmies row's
 "blocked — no `MarkerInstanceLayer` PARAMS type exists yet" note is now stale** — `ARCH_16_MarkerLayerSymmetry.md`
-§16 ratifies that type; `ARCH_14_PreviewOverlayLayering.md` §14.2/§14.5 carry forward-pointers to §16, and
+§16 ratifies that type; `ARCH_14_02_DataModel.md` §14.2/§14.5 carry forward-pointers to §16, and
 `PREVIEW_COMPOSITING_SPEC.md` itself still needs the same small update (not made in this
 session — flagged here so it is not lost).
 
@@ -1081,3 +1081,23 @@ specifies the implementation of items 1-5/8-9 — every one an edit to that ruli
 the matching narrative update (five tiers, the one-fill law, the palette, the Part 3 watchdog) —
 **not made in this session, flagged here so it is not lost.** `.sanmap` schema, `Params::MapArea`,
 picking and `SanGenVersion` remain untouched by §14.18, exactly as by §14.17.
+
+**`MATH_SIMD_SPEC.md` fully rewritten (2026-08-30) — pure factual-drift correction, no policy
+change.** The spec had gone stale: it still described the old `core/math/Sanmath_SIMD.h`/
+`Sanmath_FastMath.h`/`Sanmath_Morton.h`/`Sanmath_Spatial.h` stub family as "the" MATH layer, but
+real development had long since moved to a considerably more developed `src/math/*_MATH.h` set
+(`FloatVector_MATH.h`/`FloatVector_Scalar_MATH.h`, `Trigonometry_MATH.h`, `Reciprocal_MATH.h`,
+`Morton_MATH.h`, `RadialClearance_MATH.h`, `JumpFloodDistanceField_MATH.h`,
+`HeightOcclusion_MATH.h`, `RigidTransformPivot_MATH.h`), flagged by the Compute Optimization
+Expert while surveying `src/math/` for the navmesh-blocker geometry design work below. The rewrite
+documents each real file's actual purpose (not just its name) so a future coder can find an
+existing primitive instead of duplicating one, and records — confirmed by direct read, not
+assumed — that `core/math/Sanmath_*.h` is **not dead**: `core/TerrainGenerator.cpp`,
+`core/gen/Gen_FlowAndAccumulation.cpp`, `core/gen/Gen_Mask_Slope.cpp`, and
+`core/gen/Gen_Marker_Procedural.cpp` (the pre-`src/`-rebuild pipeline the opening hit-list already
+names as greenfield/legacy) still `#include` and compile against it, so it is legacy-and-still-
+linked, not retired law — new work targets `src/math/` only. This topic table's own one-line
+description above is updated to match. Raised because two work-orders in `work_orders/` —
+`DESIGN_NavmeshBlockerGeometryMath_R1.md` and, indirectly, `DESIGN_NavmeshBlockerMaskGeneration_R1.md`
+— propose new math primitives and need this spec's file inventory to be accurate so neither
+duplicates an existing primitive nor misses one that doesn't exist yet.
