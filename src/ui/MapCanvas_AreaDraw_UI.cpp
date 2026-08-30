@@ -26,6 +26,12 @@ bool IsMapAreasLayerEnabled(const PreviewCompositeSettings& settings) {
 
 void MapCanvas::DrawAreaOverlayPass(float regionOriginX, float regionOriginY) {
     if (composite == nullptr || manualAreaDrag.areas == nullptr) return;
+    // STEP228 — the SAME eligibility check every Area input/gesture path already trusts
+    // (TryBeginAreaDrag, the click-release deselect handler): the border, the 8 resize handles, AND
+    // the hover cursor-shape feedback below are all panel-scoped chrome. A stale selectedAreaIndex
+    // surviving a switch to another tab must not keep drawing this area's chrome over whatever the
+    // human is actually looking at now.
+    if (!AreaGestureEligible()) return;
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
     const std::vector<Params::MapArea>& areas = *manualAreaDrag.areas;
     const int selectedIndex = manualAreaDrag.selectedAreaIndex != nullptr ? *manualAreaDrag.selectedAreaIndex : -1;

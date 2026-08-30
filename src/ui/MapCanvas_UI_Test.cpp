@@ -34,6 +34,8 @@ void RunMapCanvasAreaDragRecompositeChecks(Sys::GpuResourceManager& manager);
 void RunMapCanvasAreaAltCenterResizeModifierChecks(Sys::GpuResourceManager& manager);
 // STEP227/ARCH §14.19 — MapCanvas_AreaOverlapHitTest_UI_Test.cpp.
 void RunMapCanvasAreaOverlapHitTestChecks(Sys::GpuResourceManager& manager);
+// STEP228 — MapCanvas_AreaOverlayPanelGate_UI_Test.cpp.
+void RunMapCanvasAreaOverlayPanelGateChecks(Sys::GpuResourceManager& manager);
 } // namespace Ui
 } // namespace SanmapGen
 
@@ -61,6 +63,7 @@ int main(int argumentCount, char** argumentValues) {
     Ui::RunMapCanvasAreaDragRecompositeChecks(manager);
     Ui::RunMapCanvasAreaAltCenterResizeModifierChecks(manager);
     Ui::RunMapCanvasAreaOverlapHitTestChecks(manager);
+    Ui::RunMapCanvasAreaOverlayPanelGateChecks(manager);
     wglMakeCurrent(nullptr, nullptr);
     wglDeleteContext(glContext);
     ReleaseDC(window, deviceContext);

@@ -598,7 +598,10 @@ add_sangen_test(MapCanvas_UI_Test
     src/ui/MapCanvas_AreaAltCenterResizeModifier_UI_Test.cpp
     # STEP227/ARCH §14.19 — the inverted Z hit-test: a small-at-index-0/large-at-index-1 overlap
     # selects the small area, not the large one.
-    src/ui/MapCanvas_AreaOverlapHitTest_UI_Test.cpp)
+    src/ui/MapCanvas_AreaOverlapHitTest_UI_Test.cpp
+    # STEP228 — DrawAreaOverlayPass's own AreaGestureEligible() gate: chrome/cursor suppressed the
+    # moment a non-Areas panel is active, even with a valid stale selectedAreaIndex.
+    src/ui/MapCanvas_AreaOverlayPanelGate_UI_Test.cpp)
 # STEP53 — the screen-space overlay icon draw pass. Culling/LOD, budget/decimation, and the C2
 # cache's invalidation decision are headless (no imgui frame, no GL); bucketing + the bulk vertex
 # write need one live headless imgui frame (no GL, no window backend) — mirrors MapCanvas_UI_Test's
