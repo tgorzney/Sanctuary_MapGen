@@ -99,17 +99,20 @@ PreviewColor PreviewComposite::LayerColorAtPixel(const PreviewLayerConfiguration
                                   configuration.splatWeightEpsilon);
     }
     if (layerKind == PreviewLayerKind::MapAreas) {
-        // ARCH §14.17 items 5/6 — forward iteration, LAST containing match wins (the same Z rule
-        // §21.8's own body hit-test already implements), so click-to-select and what-you-see can
-        // never disagree. The degenerate sentinel fails the first test unconditionally.
-        PreviewColor result;
+        // ARCH §14.19 (supersedes §14.17 items 5/6) — forward iteration, FIRST containing match
+        // wins, early exit: ascending array index is now Z-descending (index 0 = top), so the
+        // first hit scanning forward IS the topmost area (the same Z rule §21.8's own body
+        // hit-test now implements), so click-to-select and what-you-see can never disagree. The
+        // degenerate sentinel fails the first test unconditionally.
         for (const PreviewMapAreaRectangle& rectangle : mapAreaRectangles) {
             if (sampleX < rectangle.minimumX || sampleX > rectangle.maximumX) continue;
             if (sampleY < rectangle.minimumZ || sampleY > rectangle.maximumZ) continue;
+            PreviewColor result;
             result.red = rectangle.colorRed; result.green = rectangle.colorGreen;
             result.blue = rectangle.colorBlue; result.alpha = rectangle.colorAlpha;
+            return result;
         }
-        return result;
+        return PreviewColor();
     }
     if (layerKind == PreviewLayerKind::Water) {
         if (configuration.bWaterEnabled == 0) return PreviewColor();

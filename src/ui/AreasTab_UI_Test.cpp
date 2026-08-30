@@ -42,7 +42,7 @@ void RunPlayableAreaChecks() {
     std::vector<Params::MapArea> areas;
     Check(EnsurePlayableArea(areas, 512), "an empty list gains the engine-required area");
     Check(areas.size() == 1u && IsPlayableArea(areas[0]),
-          "and it is the PlayableArea, at the front");
+          "and it is the PlayableArea, the list's own only entry");
     Check(areas[0].width == 512.0f && areas[0].length == 512.0f
           && areas[0].originX == 0.0f && areas[0].originZ == 0.0f,
           "created at the map's own size, at the corner");
@@ -53,11 +53,15 @@ void RunPlayableAreaChecks() {
     Check(IsAreaRemovable(areas[1]), "every other area can");
 
     // The rule is keyed off the NAME, because the name is what the exported map file carries.
+    // ARCH §14.19 — EnsurePlayableArea now inserts through InsertMapAreaSortedBySize: a
+    // whole-map-sized PlayableArea (256*256) is virtually always the single largest entry, so it
+    // lands at the BACK here, not the old hardcoded front.
     std::vector<Params::MapArea> renamedFirst;
     renamedFirst.push_back(MakeArea("NotThePlayableArea"));
     Check(EnsurePlayableArea(renamedFirst, 256) && renamedFirst.size() == 2u
-          && IsPlayableArea(renamedFirst[0]),
-          "a list whose rows are all named something else still gains one, inserted first");
+          && IsPlayableArea(renamedFirst[1]),
+          "a list whose rows are all named something else still gains one, size-sorted to the back "
+          "since it is sized to the whole map (ARCH §14.19)");
 }
 
 void RunSetToMapSizeChecks() {
@@ -804,6 +808,73 @@ void RunAreaDetailSingleLineRowAcceptanceChecks() {
     }
 }
 
+// STEP227/ARCH §14.19 acceptance: "Add New Area" (DrawAreasGlobals) now inserts through
+// Params::InsertMapAreaSortedBySize, not an unconditional push_back-to-the-back.
+// DrawAreaList/DrawAreasGlobals stay anonymous-namespace-private to AreasTab_UI.cpp (unchanged by
+// this ticket), so this drives the real, public DrawAreasTab and locates the button by its own
+// observable side effect — recipe.areas.size() growing — the same click-sweep technique this
+// file's own STEP222/STEP223 acceptance checks already establish. The Area Stack section is forced
+// CLOSED for the sweep's entire duration so no row-affordance icon can collaterally intercept the
+// click.
+struct AddNewAreaSizeSortScene {
+    Params::MapRecipe                recipe;
+    AreasTabState                    state;
+    std::vector<AreaColorEntry>      areaColors;
+    std::vector<AreaVisibilityEntry> areaVisibility;
+};
+
+const ImVec2 kAddNewAreaSceneWindowSize(560.0f, 400.0f);
+
+void DrawAddNewAreaSizeSortFrame(AddNewAreaSizeSortScene& scene, const HeadlessMouseState& mouse) {
+    scene.state.areaSection.bOpen = false;   // keep the Area Stack rows off-screen for this sweep
+    RunHeadlessFrame(mouse, kAddNewAreaSceneWindowSize, [&] {
+        DrawAreasTab(scene.recipe, scene.state, nullptr, scene.areaColors, scene.areaVisibility);
+    });
+}
+
+void RunAddNewAreaSizeSortAcceptanceChecks() {
+    HeadlessImguiSession session;
+    AddNewAreaSizeSortScene scene;
+    scene.recipe.geometry.mapSize = 512;
+    Params::MapArea huge = MakeArea("Huge");
+    huge.width = 300.0f; huge.length = 300.0f;   // size 90000
+    scene.recipe.areas = { huge };
+
+    DrawAddNewAreaSizeSortFrame(scene, HeadlessMouseState());
+    DrawAddNewAreaSizeSortFrame(scene, HeadlessMouseState());   // settle: EnsurePlayableArea runs
+
+    Check(scene.recipe.areas.size() == 2u && scene.recipe.areas[0].name == "Huge"
+          && IsPlayableArea(scene.recipe.areas[1]),
+          "EnsurePlayableArea size-sorts the whole-map PlayableArea (262144) AFTER the pre-existing "
+          "Huge area (90000)");
+
+    const std::size_t areaCountBeforeClick = scene.recipe.areas.size();
+    bool bFoundButton = false;
+    for (float y = 8.0f; y < kAddNewAreaSceneWindowSize.y - 8.0f && !bFoundButton; y += 6.0f) {
+        for (float x = 8.0f; x < kAddNewAreaSceneWindowSize.x - 8.0f && !bFoundButton; x += 8.0f) {
+            HeadlessMouseState hover;   hover.position = ImVec2(x, y);
+            HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+            HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+            DrawAddNewAreaSizeSortFrame(scene, hover);
+            DrawAddNewAreaSizeSortFrame(scene, press);
+            DrawAddNewAreaSizeSortFrame(scene, release);
+            if (scene.recipe.areas.size() != areaCountBeforeClick) bFoundButton = true;
+        }
+    }
+    Check(bFoundButton, "the \"Add New Area\" button is reachable by click");
+    Check(scene.recipe.areas.size() == 3u, "and clicking it adds exactly one area");
+
+    // The freshly created area defaults to 100x100 (size 10000) — strictly SMALLER than Huge
+    // (90000), so it must land at index 0, BEFORE Huge, not appended to the back.
+    Check(scene.recipe.areas.size() == 3u && scene.recipe.areas[0].name != "Huge"
+          && scene.recipe.areas[0].name != kPlayableAreaName
+          && scene.recipe.areas[1].name == "Huge" && IsPlayableArea(scene.recipe.areas[2]),
+          "the new area (size 10000) size-sorts to index 0, before Huge (90000) and PlayableArea "
+          "(262144) — Params::InsertMapAreaSortedBySize, not push_back-to-the-back (ARCH §14.19)");
+    Check(scene.state.selectedAreaIndex == 0,
+          "state.selectedAreaIndex tracks the new area's ACTUAL landing index, not size()-1");
+}
+
 } // namespace
 
 int main() {
@@ -823,6 +894,7 @@ int main() {
     RunAreaVisibilityClickAcceptanceChecks();
     RunAreaCenterButtonClickAcceptanceChecks();
     RunAreaDetailSingleLineRowAcceptanceChecks();
+    RunAddNewAreaSizeSortAcceptanceChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

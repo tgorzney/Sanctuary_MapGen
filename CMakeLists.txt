@@ -421,6 +421,7 @@ add_sangen_test(Geometry_PARAMS_Test            src/params/Geometry_PARAMS_Test.
 add_sangen_test(GlobalMarkerSettings_PARAMS_Test src/params/GlobalMarkerSettings_PARAMS_Test.cpp)
 add_sangen_test(GradientRamp_PARAMS_Test        src/params/GradientRamp_PARAMS_Test.cpp)
 add_sangen_test(LayerStack_PARAMS_Test          src/params/LayerStack_PARAMS_Test.cpp)
+add_sangen_test(MapArea_PARAMS_Test             src/params/MapArea_PARAMS_Test.cpp)
 add_sangen_test(MapRecipe_PARAMS_Test           src/params/MapRecipe_PARAMS_Test.cpp)
 add_sangen_test(MarkerLayerBundle_PARAMS_Test   src/params/MarkerLayerBundle_PARAMS_Test.cpp)
 add_sangen_test(PropInstance_PARAMS_Test        src/params/PropInstance_PARAMS_Test.cpp)
@@ -594,7 +595,10 @@ add_sangen_test(MapCanvas_UI_Test
     # "exactly two recomposites per gesture" suppression-index design).
     src/ui/MapCanvas_AreaDragRecomposite_UI_Test.cpp
     # STEP214 — Alt is an additional trigger for the identical Ctrl center-resize behavior.
-    src/ui/MapCanvas_AreaAltCenterResizeModifier_UI_Test.cpp)
+    src/ui/MapCanvas_AreaAltCenterResizeModifier_UI_Test.cpp
+    # STEP227/ARCH §14.19 — the inverted Z hit-test: a small-at-index-0/large-at-index-1 overlap
+    # selects the small area, not the large one.
+    src/ui/MapCanvas_AreaOverlapHitTest_UI_Test.cpp)
 # STEP53 — the screen-space overlay icon draw pass. Culling/LOD, budget/decimation, and the C2
 # cache's invalidation decision are headless (no imgui frame, no GL); bucketing + the bulk vertex
 # write need one live headless imgui frame (no GL, no window backend) — mirrors MapCanvas_UI_Test's

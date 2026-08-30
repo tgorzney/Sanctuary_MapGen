@@ -221,12 +221,18 @@ bool DrawAreasGlobals(std::vector<Params::MapArea>& areas, AreasTabState& state)
         // (STEP21 ruling #7) — mirrors the name already being explicitly set above.
         area.width  = 100.0f;
         area.length = 100.0f;
-        areas.push_back(area);
-        state.selectedAreaIndex = static_cast<int>(areas.size()) - 1;
+        // ARCH §14.19 — the ONE insertion function, keeps recipe.areas continuously sorted
+        // ascending by size (supersedes the old push_back + size()-1 "landed at the back"
+        // assumption).
+        const std::size_t newIndex = Params::InsertMapAreaSortedBySize(areas, area);
+        state.selectedAreaIndex = static_cast<int>(newIndex);
         // STEP212 — the human's own explicit rule: a freshly created area starts UNLOCKED. Inserted
         // here, eagerly, using the name just assigned above — see "Interpretation calls made," item
-        // 7, for the narrow, accepted collision-rename exposure this shares with `areaColors`.
-        ResolveAreaLocked(state.areaLocks, area.name, /*bDefaultLocked=*/false);
+        // 7, for the narrow, accepted collision-rename exposure this shares with `areaColors`. Reads
+        // the name back from areas[newIndex] rather than the local `area` copy, matching the
+        // precedent CreateAreaFromDrag already sets (harmless either way — insertion moves the same
+        // object — but keeps both call sites textually consistent).
+        ResolveAreaLocked(state.areaLocks, areas[newIndex].name, /*bDefaultLocked=*/false);
         bAreasMoved = true;
     }
     DrawSectionEnd();

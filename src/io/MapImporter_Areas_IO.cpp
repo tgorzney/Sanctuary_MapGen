@@ -4,6 +4,7 @@
 // MapExporter_Rules_IO.cpp/MapImporter_Rules_IO.cpp array pattern this deliberately does not copy.
 // Flat; no recursion needed. No coordinate flip (finding 3).
 #include "JsonPrimitives_IO.h"
+#include "../params/MapArea_PARAMS.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {
@@ -20,7 +21,7 @@ void ReadAreasJson(const nlohmann::json& document, Params::MapRecipe& outRecipe)
         ReadJsonFloat(value, "y", area.originZ);
         ReadJsonFloat(value, "width", area.width);
         ReadJsonFloat(value, "height", area.length);
-        outRecipe.areas.push_back(area);
+        Params::InsertMapAreaSortedBySize(outRecipe.areas, area);
     }
 }
 

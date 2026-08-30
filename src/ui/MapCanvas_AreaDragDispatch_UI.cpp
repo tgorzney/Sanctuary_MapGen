@@ -76,14 +76,19 @@ bool MapCanvas::TryBeginAreaDrag(float regionLocalX, float regionLocalY) {
     }
 
     // Step 2 — a miss on the selected area's own handles/body (or it was locked and so never
-    // tested): body hit-test over EVERY UNLOCKED area, forward iteration, last match wins
-    // (later-in-vector is drawn topmost, Widget_AreaEditor.cpp's own "reverse Z-order" comment).
-    // STEP212 interpretation call 1: a LOCKED area is excluded from this scan entirely.
+    // tested): body hit-test over EVERY UNLOCKED area, forward iteration, FIRST match wins, early
+    // exit (ARCH §14.19 — supersedes this block's own former "last match wins" citation of the old
+    // §21.8 convention: ascending index is now Z-descending, so the first unlocked hit IS the
+    // topmost area). STEP212 interpretation call 1: a LOCKED area is excluded from this scan
+    // entirely.
     int hitIndex = -1;
-    for (int index = 0; index < static_cast<int>(areas.size()); ++index)
+    for (int index = 0; index < static_cast<int>(areas.size()); ++index) {
         if (!IsAreaLocked(index)
-            && IsWorldPointInsideArea(areas[static_cast<std::size_t>(index)], worldPoint.worldX, worldPoint.worldZ))
+            && IsWorldPointInsideArea(areas[static_cast<std::size_t>(index)], worldPoint.worldX, worldPoint.worldZ)) {
             hitIndex = index;
+            break;   // ascending index is Z-descending: the first unlocked hit IS the topmost area.
+        }
+    }
     if (hitIndex < 0) return false;   // total miss (or every candidate locked) — release resolves click/create
 
     if (manualAreaDrag.selectedAreaIndex != nullptr) *manualAreaDrag.selectedAreaIndex = hitIndex;
@@ -156,19 +161,22 @@ void MapCanvas::CreateAreaFromDrag(float pressRegionLocalX, float pressRegionLoc
     area.length  = std::max(kAreaMinimumExtentWorldUnits, std::fabs(releaseWorld.worldZ - pressWorld.worldZ));
     area.name = NextAreaName(static_cast<int>(manualAreaDrag.areas->size()));   // AreasTab_List_UI.h,
                                                                                  // the SAME helper "Add New Area" uses
-    manualAreaDrag.areas->push_back(area);
+    // ARCH §14.19 — the ONE insertion function, keeps recipe.areas continuously sorted ascending
+    // by size (supersedes the old push_back + size()-1 "landed at the back" assumption).
+    const std::size_t newIndex = Params::InsertMapAreaSortedBySize(*manualAreaDrag.areas, area);
     MakeNamesUnique(*manualAreaDrag.areas);   // called HERE, not left for DrawAreasTab's end-of-frame
                                                // call — see ARCH §21.8's own "Create-by-drag" section
-    const int newIndex = static_cast<int>(manualAreaDrag.areas->size()) - 1;
+                                               // — confirmed: mutates .name in place only, never
+                                               // reorders, so newIndex stays valid across this call
     // STEP212 — the human's own explicit rule: a freshly created area starts UNLOCKED. Reads the
     // area's FINAL (post-MakeNamesUnique) name back out of the vector rather than reusing the local
     // `area` copy's own name.
     if (manualAreaDrag.areaLocks != nullptr)
         ResolveAreaLocked(*manualAreaDrag.areaLocks,
-                          (*manualAreaDrag.areas)[static_cast<std::size_t>(newIndex)].name,
+                          (*manualAreaDrag.areas)[newIndex].name,
                           /*bDefaultLocked=*/false);
     if (manualAreaDrag.selectedAreaIndex != nullptr)
-        *manualAreaDrag.selectedAreaIndex = newIndex;
+        *manualAreaDrag.selectedAreaIndex = static_cast<int>(newIndex);
     // ARCH §14.18 item 4/14 — a brand-new area must appear: one recomposite, unchanged by this
     // ticket. Not throttle-gated (a create is a one-shot event, not a per-frame gesture).
     if (areaCompositeRefreshCallback) areaCompositeRefreshCallback();

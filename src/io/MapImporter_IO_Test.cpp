@@ -2872,6 +2872,33 @@ void CheckNextLayerIdentifier() {
           "GeoLayers returns 3");
 }
 
+// STEP227/ARCH §14.19 acceptance: ReadAreasJson now inserts every area through
+// Params::InsertMapAreaSortedBySize, not an unconditional push_back — a fresh native `.sanmap`
+// load lands `recipe.areas` fully size-ascending regardless of the JSON key visitation order
+// (nlohmann::json's own alphabetical key order for an object, deliberately NOT the size order
+// here: "Alpha" is the largest, "Zulu" the smallest, so a passing test cannot be an accident of
+// visitation order matching size order).
+void CheckReadAreasJsonProducesSizeSortedList() {
+    nlohmann::json document;
+    document["areas"] = nlohmann::json::object();
+    document["areas"]["Alpha"] = nlohmann::json::object(
+        { { "x", 0.0f }, { "y", 0.0f }, { "width", 100.0f }, { "height", 100.0f } });   // size 10000
+    document["areas"]["Mid"] = nlohmann::json::object(
+        { { "x", 0.0f }, { "y", 0.0f }, { "width", 10.0f }, { "height", 10.0f } });     // size 100
+    document["areas"]["Zulu"] = nlohmann::json::object(
+        { { "x", 0.0f }, { "y", 0.0f }, { "width", 1.0f }, { "height", 1.0f } });       // size 1
+
+    Params::MapRecipe recipe;
+    Io::ReadAreasJson(document, recipe);
+
+    Check(recipe.areas.size() == 3u, "all three areas import");
+    if (recipe.areas.size() != 3u) return;
+    Check(recipe.areas[0].name == "Zulu" && recipe.areas[1].name == "Mid" && recipe.areas[2].name == "Alpha",
+          "recipe.areas lands fully size-ascending (Zulu 1, Mid 100, Alpha 10000) regardless of the "
+          "JSON object's own alphabetical key visitation order — Params::InsertMapAreaSortedBySize, "
+          "not push_back (ARCH §14.19)");
+}
+
 } // namespace MapFormatTest
 } // namespace SanmapGen
 
@@ -2916,6 +2943,7 @@ int main() {
     SanmapGen::MapFormatTest::CheckMarkerLayerSynthesisPartialCoverageIsNoOp();
     SanmapGen::MapFormatTest::CheckLayerMissingBakedKeysLeaveDefaults();
     SanmapGen::MapFormatTest::CheckNextLayerIdentifier();
+    SanmapGen::MapFormatTest::CheckReadAreasJsonProducesSizeSortedList();
     SanmapGen::MapFormatTest::RunValidationTests();
     SanmapGen::MapFormatTest::RunBakedFieldTests();
     if (SanmapGen::MapFormatTest::FailureCount() == 0) { std::printf("ALL PASS\n"); return 0; }

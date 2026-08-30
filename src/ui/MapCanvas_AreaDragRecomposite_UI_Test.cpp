@@ -14,6 +14,9 @@
 // per-frame walkthrough in this ticket's own text for why that is true independent of the number.
 // AreaRecompositeThrottle_UI_Test.cpp is the throttle's own dedicated, fully-deterministic,
 // GPU-free coverage of the watchdog's arithmetic in isolation.
+// STEP227/ARCH §14.19 — Case 3 additionally proves CreateAreaFromDrag's own insertion now routes
+// through Params::InsertMapAreaSortedBySize: a freshly drag-created area lands by SIZE rank, not
+// unconditionally appended to the back.
 #include "MapCanvas_UI.h"
 #include "PreviewComposite_TestScene_UI.h"
 #include <imgui.h>
@@ -154,6 +157,37 @@ void RunMapCanvasAreaDragRecompositeChecks(Sys::GpuResourceManager& manager) {
     BeginHeadlessFrame(); DrawOneFrame(canvas);
     check(refreshCount == refreshCountBeforeMove + 3,
           "EndAreaDrag's refresh is unconditional and always fires, exactly once, at release");
+
+    // --- Case 3 (STEP227/ARCH §14.19): CreateAreaFromDrag now inserts through
+    // Params::InsertMapAreaSortedBySize, not an unconditional push_back-to-the-back. A pre-seeded
+    // large area (size 4) plus a freshly drag-created one (clamped to the 1x1 minimum extent, size
+    // 1) must land the SMALL new area BEFORE the large pre-existing one. ---
+    areas.clear();
+    Params::MapArea bigArea;
+    bigArea.name = "Big"; bigArea.originX = 0.0f; bigArea.originZ = 0.0f;
+    bigArea.width = 2.0f; bigArea.length = 2.0f;   // size 4, occupies world (0,0)-(2,2)
+    areas.push_back(bigArea);
+    ResolveAreaLocked(areaLocks, bigArea.name, /*bDefaultLocked=*/false);
+    selectedAreaIndex = -1;
+
+    const ImVec2 emptySpotPressPosition = ScreenPositionForWorld(canvas, composite, 3.0f, 3.0f);
+    io.AddMousePosEvent(emptySpotPressPosition.x, emptySpotPressPosition.y);
+    io.AddMouseButtonEvent(0, false);
+    BeginHeadlessFrame(); DrawOneFrame(canvas);
+    io.AddMouseButtonEvent(0, true);
+    BeginHeadlessFrame(); DrawOneFrame(canvas);
+    io.AddMousePosEvent(emptySpotPressPosition.x + 60.0f, emptySpotPressPosition.y + 60.0f);
+    BeginHeadlessFrame(); DrawOneFrame(canvas);
+    io.AddMouseButtonEvent(0, false);
+    BeginHeadlessFrame(); DrawOneFrame(canvas);
+
+    check(areas.size() == 2u, "the second press-drag-release on empty canvas space creates a new area");
+    check(areas[0].name != "Big" && areas[1].name == "Big",
+          "CreateAreaFromDrag's own InsertMapAreaSortedBySize call lands the SMALL new area (clamped "
+          "to the 1x1 minimum extent, size 1) BEFORE the pre-existing Big area (size 4) — not "
+          "appended to the back the old push_back would have used");
+    check(selectedAreaIndex == 0, "and selectedAreaIndex tracks the new area's ACTUAL landing index, "
+                                  "not size()-1");
 
     ImGui::DestroyContext();
 }

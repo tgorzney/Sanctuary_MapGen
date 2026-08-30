@@ -77,7 +77,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | **§11** | [ARCH_11_GlobalMarkerSettings.md](ARCH_11_GlobalMarkerSettings.md) | `Params::GlobalMarkerSettings` (ARCH ruling, completes `SANMAP_FORMAT_SPEC` Correction 7) | 40 lines |
 | **§12** | [ARCH_12_ManualPropDecalLayers.md](ARCH_12_ManualPropDecalLayers.md) | Manual-layer authoring for props/decals — `layerIndex` + `PropGroups`/`DecalGroups` (ARCH ruling, revises `ENTITY_AUTHORING_PARAMS_SPEC`) | 59 lines |
 | **§13** | [ARCH_13_RadialSymmetry.md](ARCH_13_RadialSymmetry.md) | Radial N-fold symmetry — `SymmetryAxis::Radial` + `radialSymmetryRepeatCount` (ARCH ruling, amends `Symmetry_PARAMS.h`, `SANMAP_FORMAT_SPEC` Correction 4) | 70 lines |
-| **§14** | [ARCH_14_PreviewOverlayLayering.md](ARCH_14_PreviewOverlayLayering.md) | Preview overlay layering — six-domain screen-space compositor (ARCH ruling, ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`) | index → 18 subsection files |
+| **§14** | [ARCH_14_PreviewOverlayLayering.md](ARCH_14_PreviewOverlayLayering.md) | Preview overlay layering — six-domain screen-space compositor (ARCH ruling, ratifies `work_orders/DESIGN_MarkerPreviewLayering_R2.md`) | index → 19 subsection files |
 | §14.1 | [ARCH_14_01_ModuleBoundaryDataVsParams.md](ARCH_14_01_ModuleBoundaryDataVsParams.md) | Module boundary and the DATA-vs-PARAMS split | 16 lines |
 | §14.2 | [ARCH_14_02_DataModel.md](ARCH_14_02_DataModel.md) | Data model (binding shape) | 43 lines |
 | §14.3 | [ARCH_14_03_IconRenderingLod.md](ARCH_14_03_IconRenderingLod.md) | Icon rendering — two-mode LOD, not constant-screen-size-only | 32 lines |
@@ -94,8 +94,9 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §14.14 | [ARCH_14_14_AlloySpawnsArmiesManualRouting.md](ARCH_14_14_AlloySpawnsArmiesManualRouting.md) | Alloy/SpawnsArmies Manual sub-layer routing — no discriminator field on `MarkerInstanceLayer`; routed per-transform by the reserved `"Spawn"` group name (responds to `STEP97_AlloySpawnsArmiesManualSubLayers_UI.md`) | 51 lines |
 | §14.15 | [ARCH_14_15_ManualCullStableIdMigration.md](ARCH_14_15_ManualCullStableIdMigration.md) | Manual props/decals cull-path stable-id migration — corrects §14.13 item 3's stale "unscheduled" line (both work-orders shipped); rules `MapCanvas_IconLayer_CullManual_UI.cpp` migrates its match key from positional `layerIndex` to stable `manualLayerId`, resolved live against PARAMS (not read from `Data::PlacementInstances`, a confirmed staleness hazard) | 106 lines |
 | §14.16 | [ARCH_14_16_PerArmyUnitsOverlayRows.md](ARCH_14_16_PerArmyUnitsOverlayRows.md) | Per-army Units overlay rows — dynamic row-per-army (not a fixed enum), real `UnitRule::armyIndex` plumbing for procedural units (corrects a relayed "Faction-only" premise), per-army tint reads `Army::armyColor` directly, plus the v1 default-color-palette port this ruling needs to not be inert | 114 lines |
-| §14.17 | [ARCH_14_17_MapAreaFieldLayer.md](ARCH_14_17_MapAreaFieldLayer.md) | Map areas are a composited FIELD LAYER, not a seventh overlay domain — `PreviewLayerKind::MapAreas`, analytic rectangles flattened from PARAMS at `PrepareRun()` (binding 12, 32-byte record, no `PreviewCompositeConfiguration` growth); states the general rule that §14's separation is about `Data::PlacementInstances`, not about "anything that is not a `Data::FloatField`"; amends §21.8's draw-pass ruling. **AMENDED 2026-08-29 by §14.18 — items 10/11/12 are partly or wholly superseded; do not cite them alone** | 352 lines |
+| §14.17 | [ARCH_14_17_MapAreaFieldLayer.md](ARCH_14_17_MapAreaFieldLayer.md) | Map areas are a composited FIELD LAYER, not a seventh overlay domain — `PreviewLayerKind::MapAreas`, analytic rectangles flattened from PARAMS at `PrepareRun()` (binding 12, 32-byte record, no `PreviewCompositeConfiguration` growth); states the general rule that §14's separation is about `Data::PlacementInstances`, not about "anything that is not a `Data::FloatField`"; amends §21.8's draw-pass ruling. **AMENDED 2026-08-29 by §14.18 — items 10/11/12 are partly or wholly superseded; do not cite them alone. AMENDED AGAIN 2026-08-30 by §14.19 — item 6 (the Z rule) is INVERTED; do not cite it alone** | 364 lines |
 | §14.18 | [ARCH_14_18_AreaLiveBlendFidelityAndPalette.md](ARCH_14_18_AreaLiveBlendFidelityAndPalette.md) | Map areas — ONE fill in every state: the drag-time immediate-mode fill is abolished (it used ImGui's fixed alpha-over, not the layer's destination-dependent `PreviewBlendMode`), `mapAreaSuppressedIndex` retired, one recomposite per moving drag frame (new Tier B2), enabled by **tier-gating the composite's baked-input uploads** off `RefreshTier::PreviewRender`; plus the 16-entry maximally-distinct color palette assigned inside `ResolveAreaColor`'s lazy append (covers imported areas too, unlike a creation-site rule). **PART 3 (items 17-24, 2026-08-29): item 10's benchmark gate CLOSED-PASS (STEP218); Piece C ruled to implementation detail with a MANDATORY cost watchdog (`PreviewComposite` measures via `LastComposeMillis()`, `MapCanvas` decides, 8 ms × 5 frames → 33 ms throttle); item 4's begin-time request and item 8's border-leads-fill bullet amended** | 650 lines |
+| §14.19 | [ARCH_14_19_AreaZOrderInversionAndImportSizeSort.md](ARCH_14_19_AreaZOrderInversionAndImportSizeSort.md) | Area Z-order convention INVERTED — array index 0 is now topmost (both on screen and in the Area Stack UI list), replacing §14.17 item 6's "last match wins"/§21.8's matching hit-test rule with "first match wins, early exit"; `recipe.areas` is kept CONTINUOUSLY sorted ascending by size (`width * length`) through one shared `Params::InsertMapAreaSortedBySize` used at every insertion point (native `.sanmap` import, foreign-scenario area import, "Add New Area," canvas create-by-drag, `EnsurePlayableArea`) — not merely "sorted once at import"; confirms no positional consumer exists elsewhere (export and the engine's own `GameUtils.GetArea` are both name-keyed) | 172 lines |
 | **§15** | [ARCH_15_MapScenarioSystem.md](ARCH_15_MapScenarioSystem.md) | The SanGen Map Scenario system — formalized as first-class law (ratifies `MAP_SCENARIO_SPEC.md`) | index → 11 subsection files |
 | §15.1 | [ARCH_15_01_LayerClassification.md](ARCH_15_01_LayerClassification.md) | Layer classification | 13 lines |
 | §15.2 | [ARCH_15_02_IoScopeRuling.md](ARCH_15_02_IoScopeRuling.md) | IO scope ruling — corrects an earlier assumption, does not reverse it | 39 lines |
@@ -170,7 +171,7 @@ Existing files are amended in place. **Only the ARCH Expert writes any of them.*
 | §21.5 | [ARCH_21_05_LockedItemExclusionCorrection.md](ARCH_21_05_LockedItemExclusionCorrection.md) | Locked-item exclusion — corrects §19.18; uniform across click/marquee/drag; procedural instances unaffected | 39 lines |
 | §21.6 | [ARCH_21_06_PickingInfrastructure.md](ARCH_21_06_PickingInfrastructure.md) | Picking infrastructure — `Data::SpatialGridSet`, `BuildSpatialGridSet`, three new `SpatialGrid` accessors, `PickInstancesInRegion` (renamed from the design's `PickMarkersInRegion`) | 64 lines |
 | §21.7 | [ARCH_21_07_FileSizeCeilingFlag.md](ARCH_21_07_FileSizeCeilingFlag.md) | File-size ceiling flag — `MapCanvas_UI.h` | 15 lines |
-| §21.8 | [ARCH_21_08_AreaCanvasGesture.md](ARCH_21_08_AreaCanvasGesture.md) | Area canvas gesture — create-by-drag, 8-handle resize + body-move for `Params::MapArea`, its own hand-written (non-`Traits`) substrate; independently dispatchable, not part of §21.1-§21.7's interlocking mechanism. **AMENDED 2026-08-29** — the draw pass is re-scoped by §14.17 (composite owns the steady-state fill) and re-scoped AGAIN by §14.18: the immediate-mode fill is abolished outright and the pass draws chrome only | 385 lines |
+| §21.8 | [ARCH_21_08_AreaCanvasGesture.md](ARCH_21_08_AreaCanvasGesture.md) | Area canvas gesture — create-by-drag, 8-handle resize + body-move for `Params::MapArea`, its own hand-written (non-`Traits`) substrate; independently dispatchable, not part of §21.1-§21.7's interlocking mechanism. **AMENDED 2026-08-29** — the draw pass is re-scoped by §14.17 (composite owns the steady-state fill) and re-scoped AGAIN by §14.18: the immediate-mode fill is abolished outright and the pass draws chrome only. **AMENDED AGAIN 2026-08-30 by §14.19** — the body hit-test's Z rule is INVERTED (first unlocked match wins, not last) and `CreateAreaFromDrag`'s insertion becomes rank-by-size, not `push_back` | 433 lines |
 | **§22** | [ARCH_22_NavmapModifierBlockers.md](ARCH_22_NavmapModifierBlockers.md) | Navmap Modifier blockers — formalizes a hand-authoring technique proven live on Pandemonium Isthmus, both the all-layer technique (confirmed twice) and the partial-layer technique (confirmed once, 2026-08-29) (ARCH ruling, ratifies `NAVMAP_MODIFIER_BLOCKER_SPEC.md`); not yet a SanGen `PARAMS`/`IO`/`UI` construct (§22.9) | index → 9 subsection files |
 | §22.1 | [ARCH_22_01_LayerClassification.md](ARCH_22_01_LayerClassification.md) | Layer classification — game-side Lua, not SanGen C++ (mirrors §15.1) | 14 lines |
 | §22.2 | [ARCH_22_02_NativePrimitiveGroundTruth.md](ARCH_22_02_NativePrimitiveGroundTruth.md) | The native `NavmapModifierTemplate` primitive — recorded ground truth, binding on both techniques | 26 lines |
@@ -199,14 +200,16 @@ gesture substrate, injected-pointer setter, press/release dispatch wiring, draw 
 a full page of explicit open-question rulings a coder work-order needs with no ambiguity
 left) that the human's own request scoped as ONE new subsection file, not a further
 `§21.8.N` breakdown this pack's numbering scheme does not otherwise use — kept whole
-rather than invent a nesting depth no other section has. The tenth,
+rather than invent a nesting depth no other section has; its two 2026-08-29/2026-08-30
+amendment appendices are added in place for the same reason every other amendment in this
+pack is appended rather than split off. The tenth,
 `ARCH_14_17_MapAreaFieldLayer.md`, is one ruling whose fourteen numbered items are a
 single seam specification (enum value → GPU `#define` → binding index → record layout →
 `LayerSourceField` case → both twins' color function → defaults → drag cost → border
 rule): each item is unusable without the others, and every one of them must be read
-together by whoever writes the coder work-order; its 2026-08-29 amendment markers add
-~34 lines rather than deleting the superseded items, because §14.18's ruling is only
-legible against the optimization it replaces. The eleventh,
+together by whoever writes the coder work-order; its 2026-08-29 and 2026-08-30 amendment
+markers add lines rather than deleting the superseded items, because §14.18's and §14.19's
+rulings are only legible against the text they replace. The eleventh,
 `ARCH_15_11_ForeignScenarioAreaImport.md`, is a carve-out from a "never" rule whose
 eleven boundary items ARE the carve-out — each one is what stops the exception widening,
 so any of them read in isolation understates the boundary and none may be split away
@@ -219,7 +222,14 @@ mis-implement it. Its Part 3 (items 17-24, appended 2026-08-29) roughly doubles 
 deliberately NOT a new `§14.19`: it closes item 10's own benchmark gate, amends item 4
 and item 8 in place, and specifies the implementation of items 1-5/8-9 — every one of
 those is an edit to this ruling rather than a new one, and a reader who loaded a separate
-§14.19 would still be holding the superseded text of the items it amends.
+§14.19 would still be holding the superseded text of the items it amends. The
+thirteenth, `ARCH_14_19_AreaZOrderInversionAndImportSizeSort.md`, is genuinely §14.19 (the
+prior paragraph's "deliberately NOT a new §14.19" refers only to §14.18's own follow-up,
+which stayed inline) — it is one Z-order-convention flip whose four pieces (the inverted
+compositor loop on both twins, the inverted hit-test loop, the one shared
+`InsertMapAreaSortedBySize` insertion point, and the confirmation that no positional
+consumer exists elsewhere) are a single dispatchable unit per the file's own closing
+paragraph, not four separate rulings.
 
 | File | Lines | Why it stays whole |
 |------|-------|--------------------|
@@ -231,10 +241,11 @@ those is an edit to this ruling rather than a new one, and a reader who loaded a
 | `ARCH_14_16_PerArmyUnitsOverlayRows.md` | 114 | One ruling: per-army row seeding + procedural-unit routing + tint source + default-palette prerequisite, deliberately kept together as one shippable unit |
 | `ARCH_21_03_DragGestureGenericization.md` | 122 | One ruling: the `Traits` contract plus its two load-bearing refinements (state de-templating, the missing-`name`-field fix) |
 | `ARCH_14_15_ManualCullStableIdMigration.md` | 106 | One ruling: the cull-path stable-id migration |
-| `ARCH_14_17_MapAreaFieldLayer.md` | 352 | One CPU↔GPU seam specification — enum, `#define`, binding, 32-byte record, both twins' color function, defaults, drag cost and border rule — no item of which is usable without the rest; plus the 2026-08-29 §14.18 amendment markers, kept inline rather than by deletion |
+| `ARCH_14_17_MapAreaFieldLayer.md` | 364 | One CPU↔GPU seam specification — enum, `#define`, binding, 32-byte record, both twins' color function, defaults, drag cost and border rule — no item of which is usable without the rest; plus the 2026-08-29 §14.18 and 2026-08-30 §14.19 amendment markers, kept inline rather than by deletion |
 | `ARCH_14_18_AreaLiveBlendFidelityAndPalette.md` | 650 | One ruling in three parts that depend on each other: the one-fill/live-blend law plus the upload gating that makes it affordable; the palette whose exact values are derived from the same `Overlay` equation the first half is about; and Part 3, which closes the file's own benchmark gate and amends its own items 4 and 8 in place — un-splittable because Part 3's whole function is to edit Parts 1-2 |
-| `ARCH_21_08_AreaCanvasGesture.md` | 385 | One whole, self-contained canvas-authoring subsystem — substrate, setter, dispatch wiring, draw pass, and every open-question ruling a coder needs, deliberately kept together as one shippable unit rather than forking a new `§N.M.K` nesting depth; plus the 2026-08-29 §14.17/§14.18 draw-pass amendments appended in place |
+| `ARCH_21_08_AreaCanvasGesture.md` | 433 | One whole, self-contained canvas-authoring subsystem — substrate, setter, dispatch wiring, draw pass, and every open-question ruling a coder needs, deliberately kept together as one shippable unit rather than forking a new `§N.M.K` nesting depth; plus the 2026-08-29 §14.17/§14.18 and 2026-08-30 §14.19 draw-pass/hit-test/insertion amendments appended in place |
 | `ARCH_15_11_ForeignScenarioAreaImport.md` | 115 | One carve-out from a "never" rule: the justification, the eleven boundary items that keep it from widening, the layer/placement routing, and the export-direction answer — the boundary is only safe read whole |
+| `ARCH_14_19_AreaZOrderInversionAndImportSizeSort.md` | 172 | One Z-order-convention flip specified as a single dispatchable unit (both compositor twins, the hit-test loop, and the one shared size-ranked insertion function) — the file's own closing paragraph states none of the pieces is independently useful |
 
 ---
 

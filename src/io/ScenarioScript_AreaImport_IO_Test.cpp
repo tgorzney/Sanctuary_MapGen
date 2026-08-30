@@ -179,6 +179,59 @@ static void TestNearMissesAndInFileCollisionsCarriedThrough() {
     Check(recipe.areas.size() == 1, "PassThrough: only the resolved AREA_DUP landed");
 }
 
+// 10. STEP227/ARCH §14.19: a successful import now inserts each accepted rectangle through
+//     Params::InsertMapAreaSortedBySize, not push_back -- two areas declared in DESCENDING size
+//     order in the source file must still land ASCENDING in recipe.areas.
+static void TestSuccessfulImportLandsSizeSorted() {
+    const std::string source =
+        "local BIG = { x = 0, y = 0, width = 100, height = 100 }\n"     // size 10000, declared FIRST
+        "local SMALL = { x = 0, y = 0, width = 1, height = 1 }\n";      // size 1, declared SECOND
+    const std::string folder = ScratchFolderPath("SizeSortedImport");
+    const std::string filePath = WriteScratchFile(folder, "ForeignMap_Scenarios_Script.lua", source);
+    Params::MapRecipe recipe;
+    const Io::ScenarioAreaImportResult result = Io::ImportAreaRectanglesFromScenarioScriptFile(filePath, recipe);
+    Check(!result.bRefusedGeneratedFile && !result.bRefusedUnreadableFile && !result.bRefusedOversizedFile,
+          "SizeSortedImport: no refusal");
+    Check(recipe.areas.size() == 2, "SizeSortedImport: both areas landed");
+    Check(recipe.areas.size() == 2 && recipe.areas[0].name == "SMALL" && recipe.areas[1].name == "BIG",
+          "SizeSortedImport: SMALL (size 1) lands BEFORE BIG (size 10000) in recipe.areas even "
+          "though BIG was declared first in the source file -- Params::InsertMapAreaSortedBySize, "
+          "not push_back-in-declaration-order (ARCH §14.19)");
+}
+
+// 11. STEP227/ARCH §14.19's own explicit interpretation call: this import path is a per-rectangle
+//     sorted INSERT, never a full re-sort of the whole list -- a pre-existing, manually-reordered
+//     (i.e. NOT size-sorted) recipe.areas keeps its own relative order among untouched entries,
+//     while the one newly-accepted rectangle lands at its own size rank relative to the array AS IT
+//     STANDS at the moment of that insert.
+static void TestAdditiveInsertPreservesExistingManualOrder() {
+    const std::string source = "local MEDIUM = { x = 0, y = 0, width = 10, height = 10 }\n";   // size 100
+    const std::string folder = ScratchFolderPath("PreservesManualOrder");
+    const std::string filePath = WriteScratchFile(folder, "ForeignMap_Scenarios_Script.lua", source);
+
+    Params::MapRecipe recipe;
+    Params::MapArea large;
+    large.name = "Large"; large.width = 100.0f; large.length = 100.0f;   // size 10000
+    Params::MapArea small;
+    small.name = "Small"; small.width = 1.0f; small.length = 1.0f;       // size 1
+    // Deliberately NOT size-sorted -- Large (10000) before Small (1) -- standing in for a
+    // designer's own prior manual drag-reorder this path must never silently undo.
+    recipe.areas.push_back(large);
+    recipe.areas.push_back(small);
+
+    const Io::ScenarioAreaImportResult result = Io::ImportAreaRectanglesFromScenarioScriptFile(filePath, recipe);
+    Check(!result.bRefusedGeneratedFile && result.writtenNames.size() == 1
+              && result.writtenNames[0] == "MEDIUM",
+          "PreservesManualOrder: MEDIUM imported, no refusal");
+    Check(recipe.areas.size() == 3, "PreservesManualOrder: recipe now carries all three areas");
+    Check(recipe.areas.size() == 3 && recipe.areas[0].name == "MEDIUM"
+              && recipe.areas[1].name == "Large" && recipe.areas[2].name == "Small",
+          "PreservesManualOrder: MEDIUM (size 100) inserts BEFORE Large (10000), at its own size "
+          "rank against the array as it stood -- but Large still precedes Small exactly as before, "
+          "proving this is a per-rectangle sorted INSERT, never a full re-sort that would have "
+          "silently undone the designer's own prior manual reorder");
+}
+
 int main() {
     TestRefusesSanGenOwnedFilenameRuntime();
     TestRefusesSanGenOwnedFilenameData();
@@ -189,6 +242,8 @@ int main() {
     TestSuccessfulImportAddsNewAreas();
     TestNameCollisionSkippedAndReportedAdditively();
     TestNearMissesAndInFileCollisionsCarriedThrough();
+    TestSuccessfulImportLandsSizeSorted();
+    TestAdditiveInsertPreservesExistingManualOrder();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

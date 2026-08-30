@@ -135,15 +135,17 @@ vec4 splatSurfaceStrata(float sampleX, float sampleY) {
     return splat;
 }
 
+// ARCH §14.19 — forward iteration, FIRST containing match wins, early return: ascending array
+// index is now Z-descending (index 0 = top). Must stay textually parallel with the CPU twin
+// (PreviewComposite_Cpu_UI.cpp's LayerColorAtPixel MapAreas branch) for byte-identical parity.
 vec4 mapAreaColorAtCell(float sampleX, float sampleY) {
-    vec4 result = vec4(0.0);
     for (int index = 0; index < mapAreaRectangles.length(); ++index) {
         MapAreaRectangle area = mapAreaRectangles[index];
         if (sampleX < area.minimumX || sampleX > area.maximumX) continue;
         if (sampleY < area.minimumZ || sampleY > area.maximumZ) continue;
-        result = vec4(area.colorRed, area.colorGreen, area.colorBlue, area.colorAlpha);
+        return vec4(area.colorRed, area.colorGreen, area.colorBlue, area.colorAlpha);
     }
-    return result;
+    return vec4(0.0);
 }
 
 // The pass unit reaches the layer records only through these, so the buffer is declared once.

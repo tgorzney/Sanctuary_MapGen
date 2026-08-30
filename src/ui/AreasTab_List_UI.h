@@ -93,15 +93,16 @@ inline bool CenterAreaInMap(Params::MapArea& area, int mapSize) {
 // domain wrapper over the shared cross-entity template (UniqueNameList_UI.h, STEP20 ARCH ruling).
 inline std::string NextAreaName(int areaCount) { return NextUniqueLabel("NewArea", areaCount); }
 
-// The engine-required area is present or it is created, at the FRONT and sized to the map. Reports
-// whether the list moved.
+// The engine-required area is present or it is created, size-sorted into place (ARCH §14.19 — in
+// practice this still lands PlayableArea at/near the back, since it is sized to the whole map and
+// is therefore almost always the single largest entry). Reports whether the list moved.
 inline bool EnsurePlayableArea(std::vector<Params::MapArea>& areas, int mapSize) {
     for (const Params::MapArea& area : areas)
         if (IsPlayableArea(area)) return false;
     Params::MapArea playableArea;
     playableArea.name = kPlayableAreaName;
     SetAreaToMapSize(playableArea, mapSize);
-    areas.insert(areas.begin(), playableArea);
+    Params::InsertMapAreaSortedBySize(areas, playableArea);
     return true;
 }
 

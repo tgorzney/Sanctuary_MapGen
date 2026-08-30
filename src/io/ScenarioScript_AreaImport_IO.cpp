@@ -4,6 +4,7 @@
 #include "ScenarioScript_AreaImport_IO.h"
 #include "FilesystemPrimitives_IO.h"
 #include "ScenarioScript_DataLua_IO.h"
+#include "../params/MapArea_PARAMS.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <algorithm>
 #include <filesystem>
@@ -113,7 +114,7 @@ ScenarioAreaImportResult ImportAreaRectanglesFromScenarioScriptFile(const std::s
                       "' -- an area with that name already exists in recipe.areas (ARCH §15.11 item 9)");
             continue;
         }
-        recipe.areas.push_back(candidateArea);
+        Params::InsertMapAreaSortedBySize(recipe.areas, candidateArea);
         result.writtenNames.push_back(candidateArea.name);
     }
 

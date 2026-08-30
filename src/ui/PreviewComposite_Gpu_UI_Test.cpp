@@ -182,6 +182,59 @@ void CheckAllBlendModesParity(Sys::GpuResourceManager& manager) {
     }
 }
 
+// STEP227/ARCH §14.19 — CPU/GPU parity for the inverted MapAreas Z rule: two fully-overlapping
+// areas of DIFFERENT sizes (a small area at index 0, a large one at index 1), so a bug that
+// resolved the OLD "last match wins" convention on one backend and the NEW "first match wins" on
+// the other would show up as a real color mismatch, not just a rounding difference. Both twins
+// must resolve to the SAME (small, index-0) color, byte for byte.
+void CheckMapAreasOverlapParity(Sys::GpuResourceManager& manager) {
+    Ui::PreviewTestScene gpuScene, cpuScene;
+    Ui::BuildPreviewTestScene(gpuScene);
+    Ui::BuildPreviewTestScene(cpuScene);
+    gpuScene.instances.Clear();
+    cpuScene.instances.Clear();
+
+    // Named smallArea/largeArea, not small/large — <rpcndr.h> (pulled in transitively by this
+    // file's own GL/Windows headers) `#define`s `small` to `char`.
+    Params::MapArea smallArea; smallArea.name = "Small"; smallArea.width = 1.0f; smallArea.length = 1.0f;
+    Params::MapArea largeArea; largeArea.name = "Large"; largeArea.width = 4.0f; largeArea.length = 4.0f;
+    gpuScene.areas.push_back(smallArea);   // index 0
+    gpuScene.areas.push_back(largeArea);   // index 1
+    cpuScene.areas.push_back(smallArea);
+    cpuScene.areas.push_back(largeArea);
+
+    Ui::PreviewComposite gpuComposite(gpuScene.geometry, gpuScene.water, gpuScene.strata, gpuScene.areas,
+                                      gpuScene.fields, gpuScene.instances, gpuScene.entityIdentifiers);
+    Ui::PreviewComposite cpuComposite(cpuScene.geometry, cpuScene.water, cpuScene.strata, cpuScene.areas,
+                                      cpuScene.fields, cpuScene.instances, cpuScene.entityIdentifiers);
+    gpuComposite.Settings().previewResolution = 4;
+    cpuComposite.Settings().previewResolution = 4;
+    gpuComposite.Settings().bEntitiesEnabled = false;
+    cpuComposite.Settings().bEntitiesEnabled = false;
+    gpuComposite.Settings().fieldLayers.push_back(
+        Ui::MakeLayer(Ui::PreviewLayerKind::MapAreas, Ui::PreviewBlendMode::AlphaBlend, -1, 0.0f, 1.0f));
+    cpuComposite.Settings().fieldLayers.push_back(
+        Ui::MakeLayer(Ui::PreviewLayerKind::MapAreas, Ui::PreviewBlendMode::AlphaBlend, -1, 0.0f, 1.0f));
+
+    Ui::AreaColorEntry smallColor;
+    smallColor.name = "Small"; smallColor.color[0] = 1.0f; smallColor.color[1] = 0.0f;
+    smallColor.color[2] = 0.0f; smallColor.color[3] = 1.0f;
+    Ui::AreaColorEntry largeColor;
+    largeColor.name = "Large"; largeColor.color[0] = 0.0f; largeColor.color[1] = 1.0f;
+    largeColor.color[2] = 0.0f; largeColor.color[3] = 1.0f;
+    gpuComposite.Settings().areaColors.push_back(smallColor);
+    gpuComposite.Settings().areaColors.push_back(largeColor);
+    cpuComposite.Settings().areaColors.push_back(smallColor);
+    cpuComposite.Settings().areaColors.push_back(largeColor);
+    gpuComposite.SetGpuResourceManager(&manager);
+
+    gpuComposite.Compose();
+    cpuComposite.ComposeOnCpu();
+    check(gpuComposite.CompositeTexels() == cpuComposite.CompositeTexels(),
+          "the inverted MapAreas Z rule (small at index 0 wins) is BYTE-IDENTICAL between the Gpu "
+          "and Cpu twins, not merely within tolerance");
+}
+
 // ARCH §14.18 items 6-7 — the ONE thing this ticket must prove: a gated recompose over UNCHANGED
 // baked fields is byte-identical to a full re-upload. The gate is a pure efficiency change; this
 // is its own dedicated acceptance test, exactly as the ruling's own dispatch note calls for
@@ -220,6 +273,7 @@ int main(int argumentCount, char** argumentValues) {
     check(manager.Initialize(), "the Gpu resource manager initializes");
     CheckGpuPathAndParity(manager);
     CheckAllBlendModesParity(manager);
+    CheckMapAreasOverlapParity(manager);
     CheckGatedUploadParity(manager);
     wglMakeCurrent(nullptr, nullptr);
     wglDeleteContext(glContext);

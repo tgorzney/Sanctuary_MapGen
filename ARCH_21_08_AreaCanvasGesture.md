@@ -188,6 +188,10 @@ gesture on it; a body hit on the ALREADY-selected area begins the move gesture d
 returns false WITHOUT recording any extra state — `pressStartRegionLocalX`/`pressStartRegionLocalY` (the
 existing §21.2 fields) already carry everything `CreateAreaFromDrag` needs at release.
 
+> **The "last match wins" body-hit-test rule described in the paragraph above is INVERTED by
+> [§14.19](ARCH_14_19_AreaZOrderInversionAndImportSizeSort.md) (2026-08-30) — see the amendment at
+> the end of this file. Do not implement it as written above; it is historical only.**
+
 Handles win priority over body on purpose: a handle circle sits ON the rectangle's own border, so a
 body-hit test that ran first would make every handle permanently unreachable.
 
@@ -270,6 +274,10 @@ visibility into a canvas-driven `push_back` (a real latent duplicate-name bug th
 consider — flagged and closed here). Finally `*manualAreaDrag.selectedAreaIndex = static_cast<int>(areas.size()) - 1`
 — auto-selects the new area, mirroring the "Add New Area" button's own identical closing line
 (`AreasTab_UI.cpp:119`).
+
+> **The "pushed" / "`areas.size() - 1`" insertion described in the paragraph above is REPLACED by
+> [§14.19](ARCH_14_19_AreaZOrderInversionAndImportSizeSort.md) (2026-08-30) — see the amendment at
+> the end of this file. Do not implement it as written above; it is historical only.**
 
 #### Explicit rulings on the plan's open questions
 
@@ -383,3 +391,42 @@ the real GPU-composited preview blend pipeline as a `PreviewFieldLayer` of the n
    `ResolveAreaColor` call site — including `MapCanvas_AreaDraw_UI.cpp`'s — keeps its exact existing form.
    `MapArea_PARAMS.h` and the `.sanmap` schema remain untouched (§14.17 item 13), as this section
    originally stated.
+
+---
+
+#### AMENDED 2026-08-30 — the Z-order convention is INVERTED and area insertion becomes rank-by-size (see [§14.19](ARCH_14_19_AreaZOrderInversionAndImportSizeSort.md))
+
+Two more clauses of the original ruling above are superseded, in place. Everything else in this section
+(the scope gate, the substrate shapes, the setter, the dispatch wiring, the draw-pass contract as already
+amended 2026-08-29, and every "explicit ruling on the plan's open questions") is unchanged.
+
+1. **`TryBeginAreaDrag` step 2's body hit-test — "forward iteration, last match wins" is INVERTED.**
+   Ascending array index is now Z-**descending** (index 0 is topmost, both on screen and in the Area
+   Stack UI list — §14.19's core invariant). The scan therefore takes the **first** unlocked hit and
+   `break`s, rather than continuing to overwrite `hitIndex` through the whole array:
+   ```cpp
+   int hitIndex = -1;
+   for (int index = 0; index < static_cast<int>(areas.size()); ++index) {
+       if (!IsAreaLocked(index)
+           && IsWorldPointInsideArea(areas[static_cast<std::size_t>(index)], worldPoint.worldX, worldPoint.worldZ)) {
+           hitIndex = index;
+           break;
+       }
+   }
+   ```
+   This is the exact same rule §14.17 item 6 states for the compositor's own Z rule — one shared
+   convention, still keeping click-to-select and what-you-see in agreement, only inverted from what this
+   section originally ported from `Widget_AreaEditor.cpp`'s v1 "reverse Z-order" comment.
+
+2. **`CreateAreaFromDrag`'s insertion changes from `push_back`/`size()-1` to the shared, rank-by-size
+   insert.** `manualAreaDrag.areas->push_back(area)` becomes
+   `const std::size_t newIndex = Params::InsertMapAreaSortedBySize(*manualAreaDrag.areas, area);`
+   (§14.19 item 3), landing the new area at its size-sorted rank rather than unconditionally at the back.
+   `MakeNamesUnique(*manualAreaDrag.areas)` still runs immediately after, unchanged in position — it only
+   mutates names, never reorders the vector, so `newIndex` stays valid across that call. The closing
+   `*manualAreaDrag.selectedAreaIndex = static_cast<int>(areas.size()) - 1` becomes
+   `*manualAreaDrag.selectedAreaIndex = static_cast<int>(newIndex);`, and the lock-table seed
+   (`ResolveAreaLocked`) reads the area's name back from `(*manualAreaDrag.areas)[newIndex]` rather than
+   assuming it sits at the last index. The "Add New Area" button (`AreasTab_UI.cpp`, not part of this
+   section's own ratified files but sharing the identical closing-line pattern this section's own prose
+   cites twice above) takes the same shape — see §14.19 item 3 for its exact before/after text.

@@ -10,6 +10,12 @@
 > moving drag frame instead of twice per gesture, and new areas draw from a 16-entry distinct-color
 > palette instead of a flat green. **Do not cite items 10/11/12 without reading §14.18.**
 
+> **AMENDED 2026-08-30 by [§14.19](ARCH_14_19_AreaZOrderInversionAndImportSizeSort.md).** Item **6**
+> (the Z rule) is INVERTED: forward iteration now keeps the FIRST containing match (ascending array
+> index = topmost, both on screen and in the Area Stack UI list), not the last, with an early exit —
+> the exact opposite of the rule stated below. Items 1-5, 7-9, 13-14 (as already amended by §14.18)
+> are unaffected. **Do not cite item 6 without reading §14.19.**
+
 Human-approved ruling, verified against the live code before being written down (not taken on the
 proposal's word): `PreviewComposite_Settings_UI.h`, `PreviewComposite_Kernel_UI.h`,
 `PreviewComposite_UI.h`, `PreviewComposite_Prepare_UI.cpp`, `PreviewComposite_Cpu_UI.cpp`,
@@ -137,7 +143,11 @@ returns for this kind before it — the exact same invariant `StratumSplat` alre
 `MapAreas` branch therefore MUST be added to `LayerColorAtPixel` in the same change as the
 `LayerSourceField` case, never separately.
 
-**6. Overlap / Z rule — forward iteration, LAST containing match wins.** One rule, shared by the
+**6. Overlap / Z rule — forward iteration, LAST containing match wins.**
+*(INVERTED by [§14.19](ARCH_14_19_AreaZOrderInversionAndImportSizeSort.md), 2026-08-30 — kept here
+verbatim as the historical rule that ruling supersedes. Do not implement the code below; it is no
+longer the law. §14.19 states the current rule: forward iteration, FIRST containing match wins,
+early exit — ascending array index is now Z-descending, index 0 topmost.)* One rule, shared by the
 hit-test and the visual, so click-to-select and what-you-see can never disagree. This is the rule
 `TryBeginAreaDrag`'s own body hit-test already implements
 (`MapCanvas_AreaDragDispatch_UI.cpp:46-49`, "forward iteration, last match wins") and it matches
@@ -258,10 +268,10 @@ bullets below are UNCHANGED and still law.)*
 "exactly two recomposites per gesture" optimization bought its cheapness by drawing the dragged area
 with a rival immediate-mode fill that could not reproduce the layer's `Overlay` blend, so an area
 turned solid the moment it was touched. `mapAreaSuppressedIndex` and every piece of plumbing named
-below are RETIRED; the composite refreshes once per moving drag frame (new Tier B2), enabled by
-tier-gating the baked-input uploads. Kept here in full because §14.18's ruling is only legible
-against what it replaces — but nothing in this item is current law except the last sentence of the
-"An index, not a `bEnabled` toggle" bullet, whose reasoning §14.18 explicitly endorses.)*
+below are RETIRED; the composite refreshes once per moving drag frame, enabled by tier-gating the
+baked-input uploads. Kept here in full because §14.18's ruling is only legible against what it
+replaces — but nothing in this item is current law except the last sentence of the "An index, not a
+`bEnabled` toggle" bullet, whose reasoning §14.18 explicitly endorses.)*
 A GPU
 recomposite per drag frame would violate the Tier B cost model (`ARCH_14_08_DirtyFlagTiers.md`) for
 an interaction §21.8 deliberately placed in the cheap tier. Ruled:
@@ -328,7 +338,9 @@ presentation state in the same category as `PreviewCompositeSettings` and the pr
 `AreaColorEntry` table — which STEP21 ruling #4 already decided has no `_PARAMS` home
 (`AreasTab_List_UI.h:16-20`). That decision stands; this ruling only moves where the non-serialized
 table lives inside UI, never whether it serializes. **§14.18 does not disturb this: the palette is
-also presentation-only and also never serializes.**
+also presentation-only and also never serializes. §14.19 does not disturb this either: the
+size-sort it adds is a pure in-memory ordering rule, and item 4 of that section confirms the wire
+format is order-agnostic.**
 
 **14. Documentation defect to fix in the same change.** `PreviewComposite_Settings_UI.h:16-22`'s
 comment states "Which BAKED field a layer colorizes. Every entry names a field `Data::MapFields`
