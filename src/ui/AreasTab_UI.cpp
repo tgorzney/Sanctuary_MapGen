@@ -27,31 +27,47 @@ bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize,
     const ScalarSliderRange originRange = AreaOriginSliderRange(mapSize);
     const ScalarSliderRange extentRange = AreaExtentSliderRange(mapSize);
     bool bCommitted = false;
-    if (IsPlayableArea(area)) {
+    const bool bIsPlayableArea = IsPlayableArea(area);
+    if (bIsPlayableArea)
         ImGui::TextDisabled("PlayableArea is required by the engine: it cannot be renamed or removed.");
+
+    // STEP226 — corrects STEP225: no scroll region. The docked settings window is several hundred
+    // pixels wide by default and freely resizable (Application_Settings_UI.h's
+    // settingsWindowWidth), so Name/X/Z/W/L/Color/"Map Size" fit on one plain SameLine-chained
+    // line with no artificial child/scrollbar. Only the tightened ItemSpacing survives from
+    // STEP225 — a real, harmless width saving, not the thing the human objected to.
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                        ImVec2(kAreaDetailRowItemSpacingPixels, ImGui::GetStyle().ItemSpacing.y));
+
+    if (bIsPlayableArea) {
+        ImGui::BeginDisabled();
+        DrawTextInput("Name", area.name, TextInputRules(), WidgetStyle(), nullptr,
+                     /*bLabelHidden=*/true, kAreaDetailNameFieldWidthPixels);
+        ImGui::EndDisabled();
     } else {
         // Captured BEFORE the edit: if the name commits to something new, the color, lock, AND
         // visibility entries keyed on the OLD name must all be retargeted, or a rename silently
         // reverts the area's color to default, its lock to LOCKED, and its visibility to VISIBLE
-        // next frame (STEP21 ruling #5 for color; STEP212 extends the same repair to the per-area
-        // lock table; STEP223 extends it a third time, to the visibility table).
+        // next frame (STEP21 ruling #5 for color; STEP212/STEP223 extend the same repair to lock
+        // and visibility).
         const std::string nameBeforeEdit = area.name;
         TextInputRules nameRules;
         nameRules.maximumLength = 48;
         nameRules.bAllowEmpty   = false;
         nameRules.fallbackText  = "Area";
-        bCommitted = DrawTextInput("Name", area.name, nameRules).bCommitted;
+        bCommitted = DrawTextInput("Name", area.name, nameRules, WidgetStyle(), nullptr,
+                                   /*bLabelHidden=*/true, kAreaDetailNameFieldWidthPixels).bCommitted;
         if (bCommitted && area.name != nameBeforeEdit) {
             for (AreaColorEntry& entry : areaColors)
                 if (entry.name == nameBeforeEdit) { entry.name = area.name; break; }
             for (AreaLockEntry& entry : state.areaLocks)
                 if (entry.name == nameBeforeEdit) { entry.name = area.name; break; }
-            // STEP223 — the same repair extended to STEP222's visibility table: without this, a
-            // rename silently resets a hidden area back to default-visible on the next resolve.
             for (AreaVisibilityEntry& entry : areaVisibility)
                 if (entry.name == nameBeforeEdit) { entry.name = area.name; break; }
         }
     }
+    ImGui::SameLine();
+
     ImGui::TextUnformatted("X");
     ImGui::SameLine();
     bCommitted = DrawSliderScalarCompact("X Position", area.originX, originRange, state.originXToggle,
@@ -65,7 +81,7 @@ bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize,
                                          kAreaScalarCompactTrackWidthPixels,
                                          kAreaScalarCompactFieldWidthPixels, WidgetStyle(), "%.0f",
                                          /*bShowRealtimeToggle=*/false).bCommitted || bCommitted;
-
+    ImGui::SameLine();
     ImGui::TextUnformatted("W");
     ImGui::SameLine();
     bCommitted = DrawSliderScalarCompact("Width", area.width, extentRange, state.widthToggle,
@@ -79,13 +95,12 @@ bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize,
                                          kAreaScalarCompactTrackWidthPixels,
                                          kAreaScalarCompactFieldWidthPixels, WidgetStyle(), "%.0f",
                                          /*bShowRealtimeToggle=*/false).bCommitted || bCommitted;
+    ImGui::SameLine();
+
     // ARCH §14.17 item 10 / §14.18 item 16 — PlayableArea is always Green and non-editable: re-pin
-    // its color before drawing (the swatch below is the only OTHER path that could ever set a
-    // PlayableArea color) and disable the control so a designer cannot pick a different one.
-    // `kDefaultAreaColor` is retired — `kPlayableAreaColor` is the pinned reserved color now that
-    // ordinary areas draw from the 16-entry palette instead.
+    // its color before drawing and disable the control so a designer cannot pick a different one.
     float* const color = ResolveAreaColor(areaColors, area.name);
-    if (IsPlayableArea(area)) {
+    if (bIsPlayableArea) {
         color[0] = kPlayableAreaColor[0]; color[1] = kPlayableAreaColor[1];
         color[2] = kPlayableAreaColor[2]; color[3] = kPlayableAreaColor[3];
         ImGui::BeginDisabled();
@@ -95,7 +110,10 @@ bool DrawAreaSettings(Params::MapArea& area, AreasTabState& state, int mapSize,
         bCommitted = DrawColorSwatch("Color", color, state.colorOptions,
                                      state.colorToggle).bCommitted || bCommitted;
     }
-    if (ImGui::Button("Set to Map Size")) bCommitted = SetAreaToMapSize(area, mapSize) || bCommitted;
+    ImGui::SameLine();
+    if (ImGui::Button("Map Size")) bCommitted = SetAreaToMapSize(area, mapSize) || bCommitted;
+
+    ImGui::PopStyleVar();
     return bCommitted;
 }
 

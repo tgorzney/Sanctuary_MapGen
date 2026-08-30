@@ -4,7 +4,9 @@
 // synthetic key sequence. No imgui frame, no window, no GL: the interaction is pure by
 // construction (TextInput_UI.h). The edit box itself is a by-eye check against a live frame.
 #include "TextInput_UI.h"
+#include "ListWidget_TestFrame_UI.h"
 #include <cstdio>
+#include <string>
 
 using namespace SanmapGen;
 
@@ -108,11 +110,90 @@ static void TestTypingChangesLiveAndLeavingCommits() {
     Check(IsSameText(requiredName, "Unnamed"), "but leaving it empty installs the fallback");
 }
 
+// STEP225 — `DrawTextInput` gained a `fixedWidthPixels` parameter (default 0.0f) so a caller can
+// chain it beside other controls via SameLine() instead of always claiming the rest of the line
+// (AreasTab_UI.cpp's own single-line Area detail row is the first such caller). The rendered width
+// itself is not assertable headless, so this instead protects every one of DrawTextInput's ~15
+// OTHER call sites, which still pass 3-5 positional args today: a real click+type+commit sequence
+// run through the 6-argument form and through the explicit 7-argument (fixedWidthPixels=0.0f) form
+// must land on the exact same committed value and the exact same WidgetChange shape.
+struct TextInputRunResult {
+    std::string value;
+    bool        bValueChangedAnyFrame = false;
+    bool        bCommittedAnyFrame    = false;
+};
+
+// One real mouse click to focus the field (hover/press/release, the same 3-frame sequence every
+// other click-driven test in this codebase uses to focus/activate a widget), one typed character,
+// then Enter (imgui's own commit-and-defocus for a single-line, non-multiline InputText) - run
+// through `DrawTextInput` itself so this exercises the actual imgui draw path, not just the pure
+// TextInputRules/StepTextInputInteraction helpers the checks above already cover.
+static TextInputRunResult RunTypeAndCommitSequenceThroughDrawTextInput(bool bPassFixedWidthPixelsExplicitly) {
+    Ui::HeadlessImguiSession session;
+    std::string value = "Old";
+    TextInputRunResult result;
+    // The field fills the window's own content width (both call forms below resolve to <= 0.0f),
+    // starting right after the default WindowPadding - well inside the field for any window this
+    // size, regardless of the exact font metrics this build's default font atlas settles on.
+    const ImVec2 kFieldClickPosition(50.0f, 18.0f);
+
+    auto drawOneFrame = [&](const ImVec2& mousePosition, bool bMouseDown, bool bTypeCharacterThisFrame,
+                            bool bEnterKeyDown) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.AddMousePosEvent(mousePosition.x, mousePosition.y);
+        io.AddMouseButtonEvent(ImGuiMouseButton_Left, bMouseDown);
+        io.AddKeyEvent(ImGuiKey_Enter, bEnterKeyDown);
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+        ImGui::SetNextWindowSize(ImVec2(240.0f, 80.0f));
+        ImGui::Begin("TextInputParityTestWindow", nullptr,
+                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar |
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
+        if (bTypeCharacterThisFrame) io.AddInputCharactersUTF8("Q");
+        const Ui::WidgetChange change = bPassFixedWidthPixelsExplicitly
+            ? Ui::DrawTextInput("Field", value, Ui::TextInputRules(), Ui::WidgetStyle(), nullptr,
+                                /*bLabelHidden=*/true, /*fixedWidthPixels=*/0.0f)
+            : Ui::DrawTextInput("Field", value, Ui::TextInputRules(), Ui::WidgetStyle(), nullptr,
+                                /*bLabelHidden=*/true);
+        ImGui::End();
+        ImGui::Render();
+        if (change.bValueChanged) result.bValueChangedAnyFrame = true;
+        if (change.bCommitted)    result.bCommittedAnyFrame    = true;
+    };
+
+    drawOneFrame(kFieldClickPosition, /*bMouseDown=*/false, false, false);   // hover
+    drawOneFrame(kFieldClickPosition, /*bMouseDown=*/true,  false, false);   // press: focuses the field
+    drawOneFrame(kFieldClickPosition, /*bMouseDown=*/false, false, false);   // release
+    drawOneFrame(kFieldClickPosition, /*bMouseDown=*/false, true,  false);   // type "Q" while focused
+    drawOneFrame(kFieldClickPosition, /*bMouseDown=*/false, false, true);    // Enter down: commits + defocuses
+    drawOneFrame(kFieldClickPosition, /*bMouseDown=*/false, false, false);   // Enter up
+
+    result.value = value;
+    return result;
+}
+
+static void TestFixedWidthPixelsDefaultIsByteIdenticalToTheSixArgumentForm() {
+    const TextInputRunResult sixArgumentForm   = RunTypeAndCommitSequenceThroughDrawTextInput(false);
+    const TextInputRunResult sevenArgumentForm = RunTypeAndCommitSequenceThroughDrawTextInput(true);
+
+    Check(sixArgumentForm.value != "Old",
+          "sanity: the typed character actually landed, so this comparison is not vacuously trivial");
+    Check(sixArgumentForm.value == sevenArgumentForm.value,
+          "omitting fixedWidthPixels and passing its 0.0f default explicitly commit the exact same "
+          "value - the new parameter changes only the rendered width, never the typing/commit result");
+    Check(sixArgumentForm.bValueChangedAnyFrame == sevenArgumentForm.bValueChangedAnyFrame
+          && sixArgumentForm.bCommittedAnyFrame == sevenArgumentForm.bCommittedAnyFrame,
+          "...and the same WidgetChange signal shape (bValueChanged/bCommitted) across the whole "
+          "sequence - every one of DrawTextInput's other ~15 call sites is unaffected by this ticket");
+}
+
 int main() {
     TestTheLengthCapIsAlwaysEnforced();
     TestTypingIsNotTrimmedButLeavingIs();
     TestAnEmptyNameFallsBackOnlyWhenItMust();
     TestTypingChangesLiveAndLeavingCommits();
+    TestFixedWidthPixelsDefaultIsByteIdenticalToTheSixArgumentForm();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

@@ -32,13 +32,14 @@ int StageTextIntoBuffer(const std::string& value, const TextInputRules& rules,
 } // namespace
 
 WidgetChange DrawTextInput(const char* label, std::string& value, const TextInputRules& rules,
-                           const WidgetStyle& style, const char* hintText, bool bLabelHidden) {
+                           const WidgetStyle& style, const char* hintText, bool bLabelHidden,
+                           float fixedWidthPixels) {
     char stagingBuffer[kTextInputBufferCapacity];
     const int capacity = StageTextIntoBuffer(value, rules, stagingBuffer, kTextInputBufferCapacity);
 
     ImGui::PushID(label);
     if (!bLabelHidden) ImGui::TextUnformatted(label);
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    ImGui::SetNextItemWidth(fixedWidthPixels > 0.0f ? fixedWidthPixels : ImGui::GetContentRegionAvail().x);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ResolveWidgetRounding(style));
     TextInputSignal signal;
     signal.bTextEditedThisFrame = (hintText != nullptr)

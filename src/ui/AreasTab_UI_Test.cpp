@@ -15,6 +15,7 @@
 #include "AreasTab_UI.h"
 #include "ListWidget_TestFrame_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -618,6 +619,191 @@ void RunAreaCenterButtonClickAcceptanceChecks() {
           "request that it sit left of the [o] icon");
 }
 
+// STEP225 acceptance, mechanism updated by STEP226 — the human's own single-line-row request:
+// Name, X, Z, W, L, Color and the Map Size button must all sit on ONE true imgui line
+// (DrawAreaSettings's own plain SameLine-chained row, no BeginChild/EndChild wrapper as of
+// STEP226 — the scroll-child STEP225 drew this row inside is gone, but the "one line" claim it was
+// meant to prove is unchanged). DrawAreaList/DrawAreaSettings stay anonymous-namespace-private to
+// AreasTab_UI.cpp (unchanged by this ticket), so — exactly like STEP222/STEP223's own click-sweep
+// checks above — this drives the real, public DrawAreasTab and reads the claim back through
+// OBSERVED SIDE EFFECTS: the row's own leftmost control (Name), one of its middle controls (the
+// X-position slider), and its own rightmost control (the "Map Size" button) are each located by an
+// independent click search over the row body's own drawn controls, and all three searches landing
+// on the SAME Y band is the runtime proxy for "one line, not stacked" this ticket's own diff cannot
+// otherwise assert headless (DrawAreasTab exposes no per-widget rect to a caller). This search was
+// never keyed to a named child window in the first place — it sweeps raw screen-space mouse
+// coordinates over the tab's real draw output — so removing the child changes nothing about HOW
+// this test finds each control, only that there is no more scrollbar/child boundary to reason about.
+struct AreaDetailRowScene {
+    Params::MapRecipe                recipe;
+    AreasTabState                    state;
+    std::vector<AreaColorEntry>      areaColors;
+    std::vector<AreaVisibilityEntry> areaVisibility;
+};
+
+AreaDetailRowScene MakeAreaDetailRowScene() {
+    AreaDetailRowScene scene;
+    constexpr int kMapSize = 512;
+    scene.recipe.geometry.mapSize = kMapSize;
+    Params::MapArea playable = MakeArea(kPlayableAreaName);
+    playable.width = static_cast<float>(kMapSize); playable.length = static_cast<float>(kMapSize);
+    Params::MapArea target = MakeArea("Target");
+    target.width   = 64.0f; target.length  = 64.0f;
+    target.originX = 10.0f; target.originZ = 20.0f;
+    scene.recipe.areas = { playable, target };
+    return scene;
+}
+
+// Wide enough that the row's own ~600px natural content (per STEP226's own reasoning in
+// AreasTab_UI.cpp: the docked settings window is several hundred pixels wide by default and
+// freely resizable) reaches the rightmost "Map Size" button with room to spare and no scrollbar of
+// any kind — STEP226 removed the scroll-child entirely, so there is no scrolled-away case left to
+// test here at all.
+const ImVec2 kAreaDetailRowSceneWindowSize(900.0f, 320.0f);
+
+// `bTypeCharacterThisFrame` feeds one synthetic keystroke into whatever control is currently ACTIVE
+// via real mouse focus (never a forced ImGui::SetKeyboardFocusHere) — the same click-then-type
+// sequence a real user drives, so a character only ever lands in the Name field if a prior frame's
+// click actually focused it.
+void DrawAreaDetailRowFrame(AreaDetailRowScene& scene, const HeadlessMouseState& mouse,
+                            bool bTypeCharacterThisFrame, float& outBottomY) {
+    RunHeadlessFrame(mouse, kAreaDetailRowSceneWindowSize, [&] {
+        if (bTypeCharacterThisFrame) ImGui::GetIO().AddInputCharactersUTF8("Q");
+        DrawAreasTab(scene.recipe, scene.state, nullptr, scene.areaColors, scene.areaVisibility);
+        outBottomY = ImGui::GetCursorScreenPos().y;
+    });
+}
+
+struct RowControlClickResult {
+    bool  bFound = false;
+    float y      = -1.0f;
+};
+
+// Sweeps the tab area for a click (hover/press/release, mirroring every other click search in this
+// file) after which `probe()`'s own value differs from before. `bTypeCharacterAfterClick` extends
+// the click with one more frame that injects a keystroke (only the Name field's InputText, once
+// focused by the click, ever consumes it). Heals the one collateral this two-row scene can suffer —
+// an accidental hit on Target's own [o]/[U]/X row-header strip removing it — by restoring the whole
+// vector from a snapshot; there is no OTHER area here for a rename to collide with, unlike the
+// rigged-duplicate scenes above, so a size-based heal alone is sufficient.
+// The x sweep starts PAST every row's own CollapsingHeader arrow (~WindowPadding.x + one tree-node
+// arrow width, comfortably under 30px) rather than at the window's own left edge: that arrow is the
+// ONE affordance in this scene `OpenOnArrow` does not shield from a plain click (unlike the header's
+// own label text, which - per RenderCollapsibleRow's own comment - never toggles collapse), and its
+// own persisted open/closed bool lives in imgui's OWN id-keyed storage, invisible to and unresettable
+// by this test's own scene/state structs, so an accidental hit there would silently blind the REST of
+// whichever search hit it - this sweep never needs that zone anyway, since every control this ticket
+// asks about (Name/X/Z/W/L/Color/Map Size) draws INSIDE the row's own indented, already-expanded body.
+template <typename ProbeFunction>
+RowControlClickResult FindRowControlByObservedChange(AreaDetailRowScene& scene, ProbeFunction probe,
+                                                     bool bTypeCharacterAfterClick) {
+    const std::vector<Params::MapArea> originalAreas = scene.recipe.areas;
+    float bottomY = 0.0f;
+    DrawAreaDetailRowFrame(scene, HeadlessMouseState(), false, bottomY);
+    DrawAreaDetailRowFrame(scene, HeadlessMouseState(), false, bottomY);   // settle layout
+
+    RowControlClickResult result;
+    for (float y = 8.0f; y < bottomY && !result.bFound; y += 8.0f) {
+        for (float x = 32.0f; x < kAreaDetailRowSceneWindowSize.x - 8.0f && !result.bFound; x += 10.0f) {
+            const auto probeBefore = probe();
+            HeadlessMouseState hover;   hover.position = ImVec2(x, y);
+            HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+            HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+            float unused = 0.0f;
+            DrawAreaDetailRowFrame(scene, hover,   false, unused);
+            DrawAreaDetailRowFrame(scene, press,   false, unused);
+            DrawAreaDetailRowFrame(scene, release, false, unused);
+            if (bTypeCharacterAfterClick) {
+                DrawAreaDetailRowFrame(scene, release, true, unused);
+                // A character queued via io.AddInputCharactersUTF8 inside a frame's OWN draw call is
+                // only guaranteed consumed by the still-active InputText on the NEXT redraw of that
+                // same widget (this build's event-queue timing) - one more settle frame (no new
+                // character) resolves it THIS iteration, so the very next line's `probe()` never
+                // depends on some LATER iteration's own frames to observe today's click.
+                DrawAreaDetailRowFrame(scene, release, false, unused);
+            }
+            const bool bFoundHere = probe() != probeBefore;
+            // Heal an accidental open of the Color swatch's own picker popup: left open, it renders
+            // OVER whatever sits to its own right (the "Map Size" button) for every later iteration,
+            // silently shadowing it from every further click this search tries. A real click on a
+            // neutral, empty spot BELOW every row's own content - never a real widget - closes any
+            // open popup exactly the way a user dismisses one (click outside it), without touching
+            // the keyboard at all: Escape was tried first here and, empirically, also interfered
+            // with the Name field's OWN focus/typing on later iterations, so a mouse-only heal is
+            // used instead, matching every other click this file already drives.
+            const ImVec2 safePosition(5.0f, bottomY + 40.0f);
+            HeadlessMouseState safeHover;   safeHover.position = safePosition;
+            HeadlessMouseState safePress   = safeHover; safePress.bLeftButtonDown   = true;
+            HeadlessMouseState safeRelease = safeHover; safeRelease.bLeftButtonDown = false;
+            DrawAreaDetailRowFrame(scene, safeHover,   false, unused);
+            DrawAreaDetailRowFrame(scene, safePress,   false, unused);
+            DrawAreaDetailRowFrame(scene, safeRelease, false, unused);
+            // Heal an accidental collapse of either Section header's own full-width bar - see
+            // FindAffordanceIconByObservedFlip's own identical comment above for why.
+            scene.state.globalSection.bOpen = true;
+            scene.state.areaSection.bOpen   = true;
+            if (scene.recipe.areas.size() != originalAreas.size()) {
+                scene.recipe.areas = originalAreas;   // heal an accidental X##delete
+                continue;
+            }
+            if (bFoundHere) { result.bFound = true; result.y = y; }
+        }
+    }
+    return result;
+}
+
+void RunAreaDetailSingleLineRowAcceptanceChecks() {
+    // The Name field: leftmost control. A click focuses it (real mouse focus, matching how a user
+    // actually reaches it); the very next frame's injected "Q" only lands if that click found it.
+    {
+        HeadlessImguiSession session;
+        AreaDetailRowScene scene = MakeAreaDetailRowScene();
+        auto targetName = [&] {
+            return scene.recipe.areas.size() > 1u ? scene.recipe.areas[1].name : std::string();
+        };
+        const RowControlClickResult nameResult =
+            FindRowControlByObservedChange(scene, targetName, /*bTypeCharacterAfterClick=*/true);
+        Check(nameResult.bFound, "the Name field for a non-Playable area's single-line row is "
+                                 "reachable by click, and accepts typed text once focused");
+
+        // The X-position slider: a middle control. A plain click (no drag needed - the track's own
+        // absolute-position mapping applies on the press frame, SliderScalar_Track_UI.cpp) sets
+        // area.originX from the click's own X coordinate.
+        AreaDetailRowScene sliderScene = MakeAreaDetailRowScene();
+        auto targetOriginX = [&] {
+            return sliderScene.recipe.areas.size() > 1u ? sliderScene.recipe.areas[1].originX : 0.0f;
+        };
+        const RowControlClickResult sliderResult =
+            FindRowControlByObservedChange(sliderScene, targetOriginX, /*bTypeCharacterAfterClick=*/false);
+        Check(sliderResult.bFound, "the X-position slider for a non-Playable area's single-line row "
+                                   "is reachable by a plain click");
+
+        // The "Map Size" button: rightmost control.
+        AreaDetailRowScene mapSizeScene = MakeAreaDetailRowScene();
+        auto targetIsMapSized = [&] {
+            return mapSizeScene.recipe.areas.size() > 1u
+                && mapSizeScene.recipe.areas[1].originX == 0.0f && mapSizeScene.recipe.areas[1].originZ == 0.0f
+                && mapSizeScene.recipe.areas[1].width == 512.0f && mapSizeScene.recipe.areas[1].length == 512.0f;
+        };
+        const RowControlClickResult mapSizeResult =
+            FindRowControlByObservedChange(mapSizeScene, targetIsMapSized, /*bTypeCharacterAfterClick=*/false);
+        Check(mapSizeResult.bFound, "the \"Map Size\" button for a non-Playable area's single-line "
+                                    "row is reachable by click");
+
+        // The acceptance test itself: all three, independently located, land on the SAME Y band -
+        // the runtime proxy for "one plain imgui line, no child/scrollbar wrapper," not the old
+        // five-line stack STEP221 shipped.
+        if (nameResult.bFound && sliderResult.bFound && mapSizeResult.bFound) {
+            constexpr float kSameLineTolerancePixels = 16.0f;   // two search steps' worth of slack
+            Check(std::fabs(nameResult.y - sliderResult.y) <= kSameLineTolerancePixels,
+                  "the Name field and the X-position slider land on the same Y - one imgui line");
+            Check(std::fabs(nameResult.y - mapSizeResult.y) <= kSameLineTolerancePixels,
+                  "the Name field and the \"Map Size\" button land on the same Y - one imgui line, "
+                  "not the old five-line stack");
+        }
+    }
+}
+
 } // namespace
 
 int main() {
@@ -636,6 +822,7 @@ int main() {
     RunFreshAreaSizeChecks();
     RunAreaVisibilityClickAcceptanceChecks();
     RunAreaCenterButtonClickAcceptanceChecks();
+    RunAreaDetailSingleLineRowAcceptanceChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

@@ -98,10 +98,14 @@ inline WidgetChange StepTextInputInteraction(std::string& value, const std::stri
 // — for a caller that draws its own label elsewhere (e.g. an inline rename box in a tree row's own
 // header-extra zone, MarkersTab_BundleHeaderExtras_UI.h), mirroring ColorSwatchOptions::bLabelHidden's
 // established shape.
+// `fixedWidthPixels` (default 0.0f, every existing call site unchanged): <= 0 keeps today's 'fill
+// remaining content width' behavior; a positive value fixes the box's own width instead, mirroring
+// `ColorSwatchOptions::swatchWidth` — the seam that lets a caller sit this control beside others via
+// `SameLine()` instead of always claiming the rest of the line.
 WidgetChange DrawTextInput(const char* label, std::string& value,
                            const TextInputRules& rules = TextInputRules(),
                            const WidgetStyle& style = WidgetStyle(), const char* hintText = nullptr,
-                           bool bLabelHidden = false);
+                           bool bLabelHidden = false, float fixedWidthPixels = 0.0f);
 
 } // namespace Ui
 } // namespace SanmapGen

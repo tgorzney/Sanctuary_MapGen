@@ -31,6 +31,9 @@ namespace Params { struct MapRecipe; }
 namespace Pipeline { class PreviewDriver; }
 namespace Ui {
 
+// STEP225 — the Color swatch's fixed width in the single-line Area detail row.
+inline constexpr float kAreaDetailColorSwatchWidthPixels = 24.0f;
+
 // The swatch an area color is edited with: alpha is a real channel (the overlay's opacity), so the
 // alpha channel and the picker's vertical alpha bar are both on. A tab state is seeded from this
 // once by the host rather than each draw re-deciding it (Constitution §8). STEP221 — area color is
@@ -41,6 +44,8 @@ inline ColorSwatchOptions AreasTabColorSwatchOptions() {
     options.bAlphaEnabled         = true;
     options.bAlphaBarShown        = true;
     options.bRealtimeToggleHidden = true;   // STEP221 — area color is always realtime, no choice
+    options.bLabelHidden          = true;   // STEP225 — chained inline, no room for a text label
+    options.swatchWidth           = kAreaDetailColorSwatchWidthPixels;   // STEP225 — fits one line
     return options;
 }
 
@@ -80,6 +85,10 @@ inline constexpr float kAreaScalarCompactFieldWidthPixels = 44.0f;
 
 // STEP223 — the "Center" header button's fixed reserved width (DraggableList's header-extra slot).
 inline constexpr float kAreaCenterButtonWidthPixels = 54.0f;
+
+// STEP225 — the single-line Area detail row's remaining fixed widths/spacing.
+inline constexpr float kAreaDetailNameFieldWidthPixels     = 70.0f;
+inline constexpr float kAreaDetailRowItemSpacingPixels     = 4.0f;   // half the default 8px, this row only
 
 // v1 fenced Width / Length to 1..2x the map side; both limits move with the map size, so a resize
 // can never leave an extent slider unable to express the map it belongs to.
