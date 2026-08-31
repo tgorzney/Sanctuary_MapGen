@@ -569,3 +569,13 @@ Atmosphere/Areas, `Application_Panels_UI.h`), **or does it warrant its own group
 not attempted here beyond noting Environment is the closest existing precedent (Water-adjacent,
 Areas-adjacent — both real dependencies of this feature per §3 and the "reuse Areas' interface"
 instruction).
+
+**Bake trigger mechanism — SPECIFIED by the human, superseding this document's original framing.**
+The bake is triggered by a **"Create Navmesh Blockers" button, right-aligned on each nav-type
+Section's own header** (§5.1's six sections) — not a single global trigger, not an extension of the
+STEP91 template-ingestion button. Clicking a given section's button runs the mesh-ingestion →
+plane-slice → rasterize → decompose pipeline **scoped to whichever props are currently selected on
+the canvas**, writing the result as `MeshGenerated` rectangles into that section's own layer(s) only.
+This is a hard requirement, not a recommendation: each of the (v1: two, Sea and Submarine) nav-type
+sections gets its own independent button and its own independent, selection-scoped invocation — the
+button is part of §5.1's Section header, not a separate global control anywhere else in the tab.
