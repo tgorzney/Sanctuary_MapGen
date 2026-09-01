@@ -32,6 +32,7 @@
 #include "UniqueNameList_UI.h"
 #include "../params/Army_PARAMS.h"
 #include "../params/MarkerInstance_PARAMS.h"
+#include "../params/MarkerLink_PARAMS.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -167,6 +168,7 @@ void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
                                const std::vector<Params::MarkerInstanceGroup>& markers,   // NEW — STEP126, for NextMarkerInstanceIdentifier's global-uniqueness scan
                                const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                               const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246
                                ManualMarkersState& state, int selectedMarkerLayerIndex,
                                const IconAtlasManifest* iconManifest);
 
@@ -178,6 +180,7 @@ void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
 void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
                        const std::vector<Params::Army>& armies,
                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                       const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246
                        ManualMarkersState& state, int selectedMarkerLayerIndex,
                        const IconAtlasManifest* iconManifest);
 

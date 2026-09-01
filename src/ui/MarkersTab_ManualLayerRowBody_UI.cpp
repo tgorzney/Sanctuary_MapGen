@@ -4,9 +4,12 @@
 // declared by MarkersTab_ManualLayers_UI.h. Mirrors MarkersTab_RuleLayers_UI.cpp/
 // MarkersTab_RuleLayerSettings_UI.cpp's own established aspect split.
 #include "MarkersTab_ManualLayerRowBody_UI.h"
+#include "MarkersTab_ManualLayerHelpers_UI.h"
+#include "MarkersTab_MarkerLinkResolvers_UI.h"
 #include "SymmetryClusterInstanceList_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
+#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -172,23 +175,38 @@ void PopToggleButtonStyle(bool bOn) {
 // this is now the ONLY place Color Override draws for EITHER an ungrouped row (the STEP123
 // DraggableList slot) or a bundled row (the Bundle tree's `drawLeafHeaderExtra` slot, ARCH §19.23).
 void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer& layer,
-                                                      ManualMarkerLayersState& state, bool& bAnyCommitted) {
-    ImGui::BeginDisabled(state.bUseGroupColor);
-    PushToggleButtonStyle(layer.bColorOverrideEnabled);
+                                                      ManualMarkerLayersState& state, bool& bAnyCommitted,
+                                                      const std::vector<Params::MarkerLink>& links) {
+    // STEP239, ARCH §19.31 Mechanism A — a Link-bound Layer's own field is an inert, read-only
+    // mirror while linked: the toggle goes disabled (added to the pre-existing bUseGroupColor
+    // disable) and both it and the swatch display the RESOLVED value, never `layer`'s raw fields.
+    const bool bLinked = layer.linkIdentifier >= 0;
+    const bool bEffectiveOverrideEnabled = EffectiveManualMarkerLayerColorOverrideEnabled(layer, links);
+    ImGui::BeginDisabled(state.bUseGroupColor || bLinked);
+    PushToggleButtonStyle(bEffectiveOverrideEnabled);
     const bool bOverrideCommitted = ImGui::SmallButton("COL##colorOverride");
-    PopToggleButtonStyle(layer.bColorOverrideEnabled);
+    PopToggleButtonStyle(bEffectiveOverrideEnabled);
     if (bOverrideCommitted) layer.bColorOverrideEnabled = !layer.bColorOverrideEnabled;
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Color Override");
     ImGui::SameLine();
-    ImGui::BeginDisabled(!layer.bColorOverrideEnabled);
+    ImGui::BeginDisabled(!bEffectiveOverrideEnabled);
     Ui::ColorSwatchOptions headerSwatchOptions = state.previewColorOptions;  // COPY: do not mutate
                                                                               // the shared block-level
                                                                               // options struct
     headerSwatchOptions.bLabelHidden = true;
     headerSwatchOptions.swatchWidth  = kMarkerLayerColorOverrideSwatchWidthPixels;
     headerSwatchOptions.bRealtimeToggleHidden = true;   // color edits are always realtime, no choice
-    const bool bColorCommitted = DrawColorSwatch("ColorOverrideHeaderSwatch", layer.color,
+    // A local, disposable buffer — never `layer.color` directly while linked: DrawColorSwatch takes
+    // a mutable pointer to write clamped/edited channels into, but the outer BeginDisabled(bLinked)
+    // above already blocks all input while linked, and the resolved (possibly Link-owned) value must
+    // never be copied back onto the Layer's own field regardless (ticket's own "read-and-resolve
+    // only" rule).
+    float effectiveColorBuffer[Ui::kColorSwatchChannelCount];
+    const float* const effectiveColor = EffectiveManualMarkerLayerColor(layer, links);
+    std::copy(effectiveColor, effectiveColor + Ui::kColorSwatchChannelCount, effectiveColorBuffer);
+    const bool bColorCommitted = DrawColorSwatch("ColorOverrideHeaderSwatch", effectiveColorBuffer,
         headerSwatchOptions, state.selectedLayerColorToggle).bCommitted;
+    if (!bLinked) std::copy(effectiveColorBuffer, effectiveColorBuffer + Ui::kColorSwatchChannelCount, layer.color);
     ImGui::EndDisabled();
     ImGui::EndDisabled();
     if (bOverrideCommitted || bColorCommitted) bAnyCommitted = true;
@@ -201,45 +219,73 @@ void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer
 // re-enabling restores the prior configuration unchanged. Human's own instruction: ignore per-layer
 // symmetry configuration for now — `layer.symmetry.bSymmetryUseGlobal` defaults true and nothing
 // left in DrawLayerRowBody's own body flips it, so SYM=on always resolves to GLOBAL symmetry.
-void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted) {
-    PushToggleButtonStyle(layer.bSymmetryEnabled);
+// STEP241, ARCH §19.31 correction — a Link-bound Layer's own field is an inert, read-only mirror
+// while linked: the button goes disabled and displays the RESOLVED (possibly Link-owned) state,
+// never `layer.bSymmetryEnabled` directly. Mirrors DrawManualMarkerLayerColorOverrideHeaderControl's
+// own bLinked shape exactly, one governed field over.
+void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted,
+                                                const std::vector<Params::MarkerLink>& links) {
+    const bool bLinked = layer.linkIdentifier >= 0;
+    const bool bEffectiveSymmetryEnabled = EffectiveManualMarkerLayerSymmetryEnabled(layer, links);
+    ImGui::BeginDisabled(bLinked);
+    PushToggleButtonStyle(bEffectiveSymmetryEnabled);
     const bool bSymmetryCommitted = ImGui::SmallButton("SYM##symmetry");
-    PopToggleButtonStyle(layer.bSymmetryEnabled);
+    PopToggleButtonStyle(bEffectiveSymmetryEnabled);
     if (bSymmetryCommitted) { layer.bSymmetryEnabled = !layer.bSymmetryEnabled; bAnyCommitted = true; }
+    ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Symmetry (global)");
 }
 
 // Human's own bug report — Icon Size, promoted from the row's own expanded body into the
 // always-visible header cluster. No RT button (bShowRealtimeToggle=false): a compact header field
 // has no room for one, and an icon-scale drag has no expensive downstream recompute to defer anyway.
+// STEP241, ARCH §19.31 correction — same bLinked treatment as Color Override/Symmetry above: a local
+// buffer seeded from the RESOLVED value feeds the slider (never `layer.iconScale` directly while
+// linked), and BeginDisabled blocks all input regardless; the write-back is additionally gated on
+// `!bLinked` so a Link-bound Layer's own field is never mutated even defensively (Constitution §6).
 void DrawMarkerLayerIconSizeHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
-                                          bool& bAnyCommitted) {
-    if (DrawSliderScalarCompact("Icon Size", layer.iconScale, state.iconScaleRange,
+                                          bool& bAnyCommitted, const std::vector<Params::MarkerLink>& links) {
+    const bool bLinked = layer.linkIdentifier >= 0;
+    float effectiveIconScale = EffectiveManualMarkerLayerIconScale(layer, links);
+    ImGui::BeginDisabled(bLinked);
+    const bool bIconScaleCommitted =
+        DrawSliderScalarCompact("Icon Size", effectiveIconScale, state.iconScaleRange,
                                 state.selectedLayerIconScaleToggle, kMarkerLayerIconSizeTrackWidthPixels,
                                 kMarkerLayerIconSizeFieldWidthPixels, WidgetStyle(), "%.2f",
-                                /*bShowRealtimeToggle=*/false).bCommitted)
-        bAnyCommitted = true;
+                                /*bShowRealtimeToggle=*/false).bCommitted;
+    if (bIconScaleCommitted && !bLinked) { layer.iconScale = effectiveIconScale; bAnyCommitted = true; }
+    ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Icon Size");
 }
 
 // Human's own bug report — Snap to Grid, promoted from a body Checkbox + Grid Size slider into a
 // "GRID" SmallButton toggle (mirrors SYM/COL's own "no more checkboxes" convention) plus its own
 // grid-size field, disabled while the toggle is off.
+// STEP241, ARCH §19.31 correction — the pair (bGridSnapEnabled, gridSnapSizeWorldUnits) resolves
+// together from a bound Link, same bLinked/local-buffer treatment as Icon Size above; the toggle
+// button and the size field both go inert while linked (an ADDITIONAL disable atop the pre-existing
+// "grayed while the toggle itself is off" one).
 void DrawMarkerLayerGridSnapHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
-                                          bool& bAnyCommitted) {
-    PushToggleButtonStyle(layer.bGridSnapEnabled);
+                                          bool& bAnyCommitted, const std::vector<Params::MarkerLink>& links) {
+    const bool bLinked = layer.linkIdentifier >= 0;
+    const bool bEffectiveGridSnapEnabled = EffectiveManualMarkerLayerGridSnapEnabled(layer, links);
+    float effectiveGridSnapSize = EffectiveManualMarkerLayerGridSnapSizeWorldUnits(layer, links);
+    ImGui::BeginDisabled(bLinked);
+    PushToggleButtonStyle(bEffectiveGridSnapEnabled);
     const bool bGridToggleCommitted = ImGui::SmallButton("GRID##gridSnap");
-    PopToggleButtonStyle(layer.bGridSnapEnabled);
+    PopToggleButtonStyle(bEffectiveGridSnapEnabled);
     if (bGridToggleCommitted) { layer.bGridSnapEnabled = !layer.bGridSnapEnabled; bAnyCommitted = true; }
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Snap to Grid");
     ImGui::SameLine();
-    ImGui::BeginDisabled(!layer.bGridSnapEnabled);
-    if (DrawSliderScalarCompact("Grid Size", layer.gridSnapSizeWorldUnits, state.gridSnapSizeRange,
+    ImGui::BeginDisabled(!bEffectiveGridSnapEnabled);
+    const bool bGridSizeCommitted =
+        DrawSliderScalarCompact("Grid Size", effectiveGridSnapSize, state.gridSnapSizeRange,
                                 state.selectedLayerGridSnapToggle, kMarkerLayerGridSizeTrackWidthPixels,
                                 kMarkerLayerGridSizeFieldWidthPixels, WidgetStyle(), "%.2f",
-                                /*bShowRealtimeToggle=*/false).bCommitted)
-        bAnyCommitted = true;
+                                /*bShowRealtimeToggle=*/false).bCommitted;
+    if (bGridSizeCommitted && !bLinked) { layer.gridSnapSizeWorldUnits = effectiveGridSnapSize; bAnyCommitted = true; }
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Grid Size");
+    ImGui::EndDisabled();
     ImGui::EndDisabled();
 }
 
@@ -267,7 +313,12 @@ bool DrawLayerHeaderNameOverlay(int layerIndex, Params::MarkerInstanceLayer& lay
         return true;
     }
 
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+    // STEP241, ARCH §19.31 correction: Name is now read-and-resolve like every other governed field
+    // — while `layer.linkIdentifier >= 0`, a double-click never starts a rename (the row's own
+    // displayed header text is already the Link-resolved name, ManualMarkerLayerRowLabel(layer,
+    // links), drawn by the caller BEFORE this overlay runs — this function only ever needs the
+    // field-local check, no `links` parameter required).
+    if (layer.linkIdentifier < 0 && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         state.renamingLayerIndex   = layerIndex;
         state.renameScratchText    = layer.name;
         state.bRenameFocusPending  = true;

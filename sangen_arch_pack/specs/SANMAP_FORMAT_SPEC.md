@@ -935,12 +935,17 @@ and routes the migration mechanics to the IO Architecture Expert as a standing r
 blocking on any ticket. **The new `MarkerLayerBundles` array (Correction 19) does not repeat this
 defect** — its own stable-id field is spelled `Identifier` from day one.
 
-### `markers[type].transforms[name]` — three new merged fields (extends Correction 11's `alias`/ARCH §12's `layerIndex` precedent)
+### `markers[type].transforms[name]` — five new merged fields (extends Correction 11's `alias`/ARCH §12's `layerIndex` precedent)
 All new, all **direct field injection** (ARCH §16.5/§1.8) into the existing format-native
-`MarkerTransform` object, all **lowerCamelCase**, merged the same way `alias` (Correction 11) and
-`armyColor` are — this is a format-native dictionary-value object, not a new SanGen-owned array, so
-ARCH §1.6's camelCase merge rule applies, not the PascalCase rule governing the new top-level
-`MarkerGroups`/`MarkersStack`/`MarkerLayerBundles` sections:
+`MarkerTransform` object, merged the same way `alias` (Correction 11) and `armyColor` are — this is a
+format-native dictionary-value object, not a new SanGen-owned array, so ARCH §1.6's camelCase merge
+rule applies by default, not the PascalCase rule governing the new top-level `MarkerGroups`/
+`MarkersStack`/`MarkerLayerBundles` sections. **Two of the five (`InstanceIdentifier`,
+`LinkIdentifier`) are explicit exceptions to that default — PascalCase on the wire, by direct analogy
+to the identically-shaped Bundle-tier/Layer-tier `LinkIdentifier` fields (`MarkerLayerBundles`/
+`MarkerGroups`, both PascalCase arrays already) — not a casing inconsistency, a deliberate precedent
+match. The other three (`layerIndex`/`symmetryGroupIdentifier`/`iconNameOverride`) stay
+lowerCamelCase:**
 
 - **`layerIndex`** (`int`, default `0`) — indexes `recipe.markerLayers` (`MarkerGroups` above).
   Spelled **identically** to the already-live `PropTransform`/`DecalTransform::layerIndex` wire key
@@ -960,8 +965,27 @@ ARCH §1.6's camelCase merge rule applies, not the PascalCase rule governing the
   `MarkerInstanceGroup`'s type-default icon; any non-empty value is an atlas-manifest NAME key
   (`ASSET_LOADING_SPEC`), never a numeric atlas index. No range to validate on import — any string is
   legal, same tolerance as `alias`.
+- **`InstanceIdentifier`** (`int`, default `-1`) — ARCH §19.16, previously undocumented in this
+  section despite already shipping (backfilled here, STEP245, Format Expert finding — not new
+  behavior). **PascalCase** — the one exception noted above. Stable, GLOBALLY unique across every
+  `MarkerInstanceGroup`'s transforms (not per-group), used solely for stable UI-selection addressing;
+  carries no round-tripping identity role of its own (`MakeNamesUnique`'s existing name-based identity
+  is untouched). Absent key on import backfills to a legacy-compat positional counter threaded across
+  the WHOLE nested `markers` walk (never reset per group); an explicit key overwrites that backfilled
+  default. No range/uniqueness validation on import beyond the backfill itself.
+- **`LinkIdentifier`** (`int`, default `-1`) — NEW (STEP244/245, `ARCH_19_33_LinkMembershipInstanceTierCorrection.md`).
+  **PascalCase** — the other exception noted above, by direct analogy to `InstanceIdentifier` on this
+  same struct and to the two already-shipped Bundle-tier/Layer-tier `LinkIdentifier` fields
+  (`MarkerLayerBundles`/`MarkerGroups`). The instance-tier Link-membership tag: `-1` = not Link-bound,
+  any other value is checked first against `Params::MarkerLink::identifier` (the resolver's new
+  first-tier check, ARCH §19.33), falling through to the unchanged Bundle/Layer-tier resolution when
+  absent or dangling. Bare/unvalidated on import — no clamp, no legacy-backfill counter (unlike
+  `InstanceIdentifier`, this field needs no cross-import uniqueness, only an absence-default). A
+  dangling value (resolves to no `Params::MarkerLink`) is a soft, logged degrade
+  (`WarnDanglingMarkerLinkIdentifiers`), never a repair or a refusal — identical posture to its
+  Bundle/Layer-tier siblings.
 
-All three fields are genuinely novel scalars with no format-native competing home, so all three use
+All five fields are genuinely novel scalars with no format-native competing home, so all five use
 direct field injection rather than a side table — the same §1.8/§12 rule already governing
 `armyColor`/`alias`/`layerIndex`, applied consistently (ARCH §16.5's own framing, restated here as
 format truth).

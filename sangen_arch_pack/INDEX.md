@@ -23,7 +23,7 @@ spec(s) a question needs — never the whole pack.
 | gamedata layout — folder map (units/props/stratum/icons), sprite pairs, sizes | `specs/GAMEDATA_LAYOUT_SPEC.md` |
 | noise generation (FastNoiseLite types/fractals) + heightfield blend modes, layer cache | `specs/NOISE_BLEND_SPEC.md` |
 | the Mask stage — slope gate, stored-art merge, `materialProportions` vs `surfaceStratumWeights`; see also the future-candidate forward-pointer to a SanGen-native mask-to-rectangle workflow (`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §7.1) | `specs/MASKING_SPEC.md` |
-| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the `SymmetrySetting` retrofit onto `PropRule`/`DecalRule`/`UnitRule`, ARCH §16.11; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19; Props/Decals `RuleLayer`/`LayerBundle`/Type-Section authoring parity, ARCH §20), prop SoA, scatter determinism, global marker icon/color/scale defaults; see also the future-candidate forward-pointer to a SanGen-native mask-to-rectangle placement workflow (`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §7.1) | `specs/PLACEMENT_SCATTER_SPEC.md` |
+| marker/prop/unit scatter, rules & gates, symmetry (incl. Radial N-fold, ARCH §13; the new layer-scoped `SymmetrySetting`/`MarkerRuleLayer`, ARCH §16, `SANMAP_FORMAT_SPEC` Correction 15; the `SymmetrySetting` retrofit onto `PropRule`/`DecalRule`/`UnitRule`, ARCH §16.11; the new Group-above-Layer container `MarkerLayerBundle`, ARCH §19, `SANMAP_FORMAT_SPEC` Correction 19; the cross-Marker-Type `MarkerLink` mechanic — `Params::MarkerLink`, `linkIdentifier` back-references, read-and-resolve vs. cascade-write propagation — ARCH §19.28-§19.32; Props/Decals `RuleLayer`/`LayerBundle`/Type-Section authoring parity, ARCH §20), prop SoA, scatter determinism, global marker icon/color/scale defaults (incl. `scaleSelectedAlloy/Plasma/Spawn`, ARCH §19.32); see also the future-candidate forward-pointer to a SanGen-native mask-to-rectangle placement workflow (`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §7.1) | `specs/PLACEMENT_SCATTER_SPEC.md` |
 | pass-through entity PARAMS — armies/unit groups/unit transforms/map areas AND resolved/baked markers/props/decals/marker chains, incl. manual prop/decal/marker layer authoring (`Params::Army`, `UnitGroup`, `UnitTransform`, `MapArea`, `InstancedTransform`, `MarkerInstanceGroup`, `MarkerTransform`, `PropInstanceGroup`, `PropTransform`, `DecalInstanceGroup`, `DecalTransform`, `PropInstanceLayer`, `DecalInstanceLayer`, `MarkerInstanceLayer`, `MarkerChain`, `ChainMarker`), distinct from procedural scatter rules; also the ratified export-time `blueprintPath` "warn, never block" ruling; `PropInstanceLayer`/`DecalInstanceLayer` gain full field parity with `MarkerInstanceLayer` under ARCH §20 (not yet reflected in this spec's own field tables — see the §20 narrative below); `PropTransform`/`DecalTransform` gain `instanceIdentifier`/`symmetryGroupIdentifier` under ARCH §21.4 (also not yet reflected — see the §21 narrative below) | `specs/ENTITY_AUTHORING_PARAMS_SPEC.md` |
 | `Params::Atmosphere` — sun/skylight/exposure-skybox/fog(×3)/wind recipe settings, promoted from the field-complete UI-only `Ui::AtmosphereSettings` | `specs/ATMOSPHERE_PARAMS_SPEC.md` |
 | the canonical CPU/GPU dispatch contract — kernel/backend/policy/resource-manager | `specs/DISPATCH_INTERFACE_SPEC.md` |
@@ -219,6 +219,22 @@ Scenario authoring/export ratification described above) — the gap that flag na
   `RefreshTier::PreviewRender` through `PreviewComposite::ComposeRequest::bBakedInputsChanged`,
   self-defended by `EnsureBuffer`'s own "(re)allocation happened" return, exactly as §14.18 item 6
   ruled — which unblocked §14.18's per-frame area-drag recomposite (Piece C).
+- **The live Markers Tab loops a hardcoded 3-entry Type-section array, not the ratified dynamic
+  enumeration (2026-08-31, confirmed by direct read, flagged during the `ARCH_19_28`–`ARCH_19_32`
+  Link-mechanic ratification session, not fixed by it).** `MarkersTab_UI.cpp:275-276`'s live outer
+  loop still iterates the fixed `markerGlobalScaleRowLabels`/`kMarkerGlobalScaleRowCount` array
+  (Alloy/Plasma/Spawn only) for the tab's OUTER Type-section enumeration — the only call site
+  actually wired from `Application_PanelEnvironment_UI.cpp:37`. `DrawMarkerTypeSections`
+  (`MarkersTab_TypeSections_UI.h`/`.cpp`), which correctly implements §19.14/§19.15's ratified
+  dynamic-enumeration-over-`markerTypeName` rule, has **zero call sites anywhere** — confirmed by
+  grep. Either this is dead/unwired code left over from an incomplete migration, or the dynamic-
+  enumeration ruling never actually shipped to the live tab despite this pack recording it as
+  ratified since 2026-08-26. Practical effect: "(Unassigned)"/custom-`markerTypeName` sections are
+  likely not rendering in the shipped UI today, contrary to §19.14/§19.15's text. Not entangled
+  with the Link mechanic itself (Links loop over `recipe.markerLinks`, §19.31/§3.6 of
+  `DESIGN_MarkerLink_R1.md`, an independent array regardless of which Type-section loop is live) —
+  needs its own coder ticket: wire `DrawMarkerTypeSections` in as the live outer loop, or retire it
+  if genuinely superseded (a decision, not to be assumed by whoever picks this up).
 
 ⚠️ **RETIRED 2026-08-28 — the naval-fleet paragraph that stood here is obsolete.** It recorded
 the 2026-08-21 shaping of `Params::ScenarioNavalFleet` / `ScenarioNavalPondSide` /
@@ -1101,3 +1117,36 @@ description above is updated to match. Raised because two work-orders in `work_o
 `DESIGN_NavmeshBlockerGeometryMath_R1.md` and, indirectly, `DESIGN_NavmeshBlockerMaskGeneration_R1.md`
 — propose new math primitives and need this spec's file inventory to be accurate so neither
 duplicates an existing primitive nor misses one that doesn't exist yet.
+
+**`ARCH_19_MarkerLayerBundle.md` §19 extended to §19.28–§19.32 (2026-08-31) — ratifies the
+new-field half of `work_orders/DESIGN_MarkerLink_R1.md` §3/§5, formalizing that design's own ARCH
+advisory consult into real ratified law.** The Link mechanic — a cross-Marker-Type grouping
+concept distinct from Assembly (Assembly never reassigns Layer/Bundle membership; Link's whole
+point is to move selected instances into per-type Groups) — gets a new stored PARAMS type,
+**`Params::MarkerLink`** (§19.28: `identifier`/`name`/`bColorOverrideEnabled`/`color[4]`,
+`MapRecipe::markerLinks`), confirmed stored rather than UI-derived because, unlike Type-sections
+(§19.14), a Link is new source-of-truth state with nothing existing to dedupe. Two new
+**independent** `linkIdentifier` scalar fields land on `MarkerLayerBundle` and
+`MarkerInstanceLayer` (§19.29) — applying the same two-tier back-reference pattern
+`markerTypeName` already established (§19.3/§19.13) a third time, not walk-up-derived from
+`parentBundleIdentifier`. The wire shape (§19.30) is a new top-level `MarkerLinks` array plus a
+`LinkIdentifier` field merged onto both `MarkerLayerBundles` and `MarkerGroups`; `Color` is
+confirmed `{r,g,b,a}` (verified against `PropGroups`/`DecalGroups`/`MarkerGroups`/`armyColor`'s
+own already-shipped object shape, correcting the design's original bare-array strawman). The
+propagated-property ruling (§19.31) draws a binding distinction between **two** mechanisms, not
+one: color-override/color/`bHidden` propagate via read-and-resolve (a bound Layer's own field
+becomes an inert read-only mirror, never copied down — the same "don't duplicate state that can
+drift" reasoning already used to reject a forward-reference shape for Assembly, §19.5, applied one
+tier over from membership to state), while `name` propagates via a genuinely different one-shot
+cascade-write-on-rename that leaves the Bundle's `name` freely re-editable afterward — conflating
+the two would misstate both. Finally, `GlobalMarkerSettings` gains
+`scaleSelectedAlloy/Plasma/Spawn` (§19.32) for the Marker-Type section header's icon-size rework,
+a strict per-type mirror of the existing `scaleAlloy/Plasma/Spawn` triplet (not a single tab-wide
+default+selected pair), wire-spelled `MarkerScaleSelectedAlloy/Plasma/Spawn` to preserve the
+established `Marker<Field><Type>` template. A real, pre-existing, unrelated defect surfaced while
+grounding this design — the live Markers Tab's outer Type-section loop is still hardcoded to a
+fixed 3-entry array rather than the ratified dynamic `DrawMarkerTypeSections` enumeration
+(§19.14/§19.15) — is recorded as a new entry in the "Standing recorded defects" list above, not
+folded into this ratification's own scope. `§1` (universal Delete key, all three manual domains)
+and `§2` ("+Group"/"+Layer" move-selection-in) of the same design needed no ARCH ruling and are
+coder-dispatchable independently of this extension.

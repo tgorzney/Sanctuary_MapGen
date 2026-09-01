@@ -7,6 +7,9 @@
 // canvas highlighting is a separate, larger change this ticket does not attempt.
 #pragma once
 #include <functional>
+#include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 #include "../params/MarkerInstance_PARAMS.h"
 
@@ -65,6 +68,51 @@ struct ManualInstanceRowInteractionContext_UI {
 // silent no-op per identifier (Constitution §6).
 void ReassignManualInstanceLayers(std::vector<Params::MarkerInstanceGroup>& markers,
                                   const std::vector<int>& movedIdentifiers, int newLayerIndex);
+
+// STEP247 — "+Link"'s own per-instance tagging step: mirrors ReassignManualInstanceLayers's exact
+// walk, one field over (`linkIdentifier` instead of `layerIndex`). Existing `layerIndex`/grouping is
+// never touched by this call. Out-of-range/missing identifiers are a silent no-op per identifier
+// (Constitution §6), same posture as ReassignManualInstanceLayers.
+void TagManualInstancesWithLink(std::vector<Params::MarkerInstanceGroup>& markers,
+                                const std::vector<int>& taggedIdentifiers, int linkIdentifier);
+
+// STEP247 — "+Link"'s own no-op guard: true the moment ANY resolved identifier in
+// `selectedIdentifiers` already carries `linkIdentifier >= 0` (already belongs to SOME existing
+// Link). Mirrors IsManualInstanceSelectionEntirelyType's shape, but is an ANY-match with no type
+// name involved. An unresolved/stale identifier is skipped (Constitution §6) — never itself a reason
+// to block; an empty selection resolves false (nothing to check).
+bool IsAnyManualInstanceSelectionAlreadyLinked(const std::vector<Params::MarkerInstanceGroup>& markers,
+                                               const std::vector<int>& selectedIdentifiers);
+
+// STEP235 — "+ Group"/"+ Layer" move a same-type selection into the new container: this predicate
+// answers ONE question — is a same-type reassignment legal — never "is there anything to reassign"
+// (an empty selection is NOT "entirely this type"; a caller that only wants to gate on non-empty must
+// do that separately). True only when every one of `selectedIdentifiers` resolves to a transform
+// whose OWN group, folded through Params::CanonicalMarkerTypeSectionName (the same alias-folding
+// DrawBaseSectionManualInstanceList/FindOrCreateMarkerInstanceGroupByName already apply,
+// MarkersTab_UI.cpp), equals `typeName`. An identifier that resolves to no transform at all (stale/
+// out-of-range) also makes this false, same as a genuine type mismatch would.
+bool IsManualInstanceSelectionEntirelyType(const std::vector<Params::MarkerInstanceGroup>& markers,
+                                           const std::vector<int>& selectedIdentifiers,
+                                           const std::string& typeName);
+
+// STEP239 — "+Link"'s own cross-type partition: groups `selectedIdentifiers` by
+// `Params::CanonicalMarkerTypeSectionName(group.name)` (the SAME alias-folding
+// IsManualInstanceSelectionEntirelyType/DrawBaseSectionManualInstanceList already apply), mirroring
+// BuildManualInstanceLayerIndex's own per-frame-map-build shape (ManualInstanceLayerIndex_UI.h),
+// keyed by canonical type name instead of layerIndex. An identifier that resolves to no transform at
+// all (stale/out-of-range) is silently omitted from every bucket (Constitution §6).
+std::unordered_map<std::string, std::vector<int>> PartitionSelectedManualInstancesByType(
+    const std::vector<Params::MarkerInstanceGroup>& markers, const std::vector<int>& selectedIdentifiers);
+
+// STEP248 — the Links Section's own hierarchical body needs: "every instanceIdentifier currently
+// tagged to Link X, grouped by canonical type name" — sibling of PartitionSelectedManualInstancesByType,
+// keyed by `transform.linkIdentifier == linkIdentifier` instead of membership in a live selection set.
+// Returns (groupIndex, transformIndex) pairs, matching DrawBaseSectionManualInstanceList's own item
+// type (MarkersTab_UI.cpp) exactly, since that's what DrawManualInstanceRow/
+// DrawSymmetryClusterInstanceList already consume.
+std::unordered_map<std::string, std::vector<std::pair<int, int>>> PartitionLinkedManualInstancesByType(
+    const std::vector<Params::MarkerInstanceGroup>& markers, int linkIdentifier);
 
 // STEP148 — the same drop mechanics DrawManualLayerInstanceDropTarget wraps below, split out for a
 // target that has no concrete `layerIndex` to reassign onto YET (a Group with no Manual Layer of

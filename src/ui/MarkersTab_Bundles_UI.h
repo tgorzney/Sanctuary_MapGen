@@ -25,6 +25,7 @@
 #include "../params/MarkerInstance_PARAMS.h"
 #include "../params/MarkerLayerBundle_PARAMS.h"
 #include "../params/MarkerLayerBundleQuery_PARAMS.h"
+#include "../params/MarkerLink_PARAMS.h"
 #include "../params/MarkerRule_PARAMS.h"
 
 namespace SanmapGen {
@@ -208,6 +209,9 @@ void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
 // own DrawManualLayerInstanceDropTarget. STEP144: `ruleLayers`/`previewDriver` back a Procedural
 // leaf's own E/D + V/I coupled toggle buttons (MarkerLayerEnabledVisibilityToggle_UI.h) — a
 // non-structural field flip is safe to notify/apply immediately, unlike delete/reparent.
+// STEP239: `links` (`recipe.markerLinks`) threads through to the Manual leaf's own Color Override
+// control (ARCH §19.31 Mechanism A). Trailing default so every pre-existing call site (including
+// MarkersTab_Bundles_UI_Test.cpp's own direct drives) compiles unchanged.
 void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     std::vector<Params::MarkerRuleLayer>& ruleLayers,
                                     std::vector<Params::MarkerInstanceLayer>& instanceLayers,
@@ -215,7 +219,8 @@ void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     ManualMarkerLayersState& manualLayersState,
                                     MarkerLayerBundlesState& bundlesState,
                                     const std::vector<int>& selectedManualInstanceIdentifiers,
-                                    Pipeline::PreviewDriver* previewDriver, bool& bAnyCommitted);
+                                    Pipeline::PreviewDriver* previewDriver, bool& bAnyCommitted,
+                                    const std::vector<Params::MarkerLink>& links = {});
 
 // Human's own bug report — a Procedural Rule Layer's header now supports double-click-to-rename too,
 // mirroring DrawLayerHeaderNameOverlay's own contract exactly (Manual Layers,
@@ -305,7 +310,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                const std::string& markerTypeNameFilter,
                                const std::function<void(int clickedInstanceIdentifier,
                                                         const std::vector<int>& selectedInstanceIdentifiers)>&
-                                   selectManualMarkerInstanceCallback = {});
+                                   selectManualMarkerInstanceCallback = {},
+                               const std::vector<Params::MarkerLink>& links = {});
 
 } // namespace Ui
 } // namespace SanmapGen

@@ -20,6 +20,7 @@
 #include "MarkerChain_PARAMS.h"
 #include "MarkerInstance_PARAMS.h"
 #include "MarkerLayerBundle_PARAMS.h"
+#include "MarkerLink_PARAMS.h"
 #include "MarkerRule_PARAMS.h"
 #include "PropInstance_PARAMS.h"
 #include "ScatterLayerBundle_PARAMS.h"
@@ -117,6 +118,9 @@ struct MapRecipe {
     // those two (see their own comment).
     std::vector<MarkerInstanceLayer> markerLayers;
     std::vector<MarkerLayerBundle> markerLayerBundles;   // ARCH §19, Correction 19. Additive.
+    // The Link tier (ARCH §19.28) — a flat sibling of markerLayerBundles, same tier, same file
+    // pattern. Additive, no SanGenVersion bump (ARCH §19.30).
+    std::vector<MarkerLink> markerLinks;
     // Lobby-resolved spawn/alloy scenario data (ARCH_15_05_ParamsScenariosType.md §15.5, amended by
     // ARCH_15_10 §15.10) — same hand-authored, pass-through posture as armies/areas/markers/chains.
     Params::Scenarios                scenarios;

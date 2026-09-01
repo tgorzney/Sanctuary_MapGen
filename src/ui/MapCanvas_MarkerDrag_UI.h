@@ -13,6 +13,7 @@
 #include "../params/MarkerInstance_PARAMS.h"
 #include "../params/Army_PARAMS.h"
 #include "../params/GlobalMarkerSettings_PARAMS.h"
+#include "../params/MarkerLink_PARAMS.h"
 
 struct ImDrawList;
 
@@ -51,6 +52,7 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
                             const MarkerDragGestureState& dragState, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionOriginX, float regionOriginY,
                             const std::vector<int>& selectedHighlightInstanceIdentifiers,
+                            const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246
                             ImDrawList& drawList);
 
 } // namespace Ui

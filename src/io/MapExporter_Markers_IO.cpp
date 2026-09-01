@@ -37,6 +37,10 @@ nlohmann::ordered_json BuildMarkerTransformJson(const Params::MarkerTransform& m
     // STEP114: empty = use the type default (§4a), same unconditional-write posture as alias.
     json["iconNameOverride"] = markerTransform.iconNameOverride;
     json["InstanceIdentifier"] = markerTransform.instanceIdentifier;
+    // ARCH §19.33 — instance-tier Link membership tag, PascalCase on the wire by direct analogy to
+    // InstanceIdentifier above (same struct, same posture), NOT the two existing Bundle/Layer-tier
+    // LinkIdentifier fields' own IO files.
+    json["LinkIdentifier"] = markerTransform.linkIdentifier;
     return json;
 }
 
@@ -84,6 +88,7 @@ nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["SymmetryEnabled"] = layer.bSymmetryEnabled;
         layerJson["ParentBundleIdentifier"] = layer.parentBundleIdentifier;
         layerJson["MarkerTypeName"] = layer.markerTypeName;
+        layerJson["LinkIdentifier"] = layer.linkIdentifier;   // ARCH §19.29/§19.30
         markerGroups.push_back(layerJson);
     }
     return markerGroups;
@@ -102,6 +107,7 @@ nlohmann::ordered_json BuildMarkerLayerBundlesJson(const Params::MapRecipe& reci
         bundleJson["ParentBundleIdentifier"] = bundle.parentBundleIdentifier;
         bundleJson["MarkerTypeName"] = bundle.markerTypeName;
         bundleJson["AssemblyIdentifier"] = bundle.assemblyIdentifier;
+        bundleJson["LinkIdentifier"] = bundle.linkIdentifier;   // ARCH §19.29/§19.30
         markerLayerBundles.push_back(bundleJson);
     }
     return markerLayerBundles;

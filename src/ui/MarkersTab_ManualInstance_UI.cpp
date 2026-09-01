@@ -10,6 +10,7 @@
 #include "MarkerInstanceId_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
+#include "../params/MarkerLink_PARAMS.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
 
@@ -104,6 +105,7 @@ void DrawMarkerInstanceLayerPicker(Params::MarkerTransform& transform,
 bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params::MarkerInstanceGroup& group,
                                 const std::vector<Params::Army>& armies,
                                 const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                const std::vector<Params::MarkerLink>& markerLinks,
                                 ManualMarkersState& state) {
     bool bCommitted = DrawTextInput("Alias", transform.alias).bCommitted;
 
@@ -126,7 +128,8 @@ bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params
 
     DrawMarkerInstanceLayerPicker(transform, markerLayers, state);
 
-    const bool bLayerLocked = IsMarkerInstanceLayerLocked(markerLayers, transform.layerIndex);
+    // STEP246, ARCH §19.33/§21.9: instance-tier-first, THEN Layer-tier lock resolution.
+    const bool bLayerLocked = IsMarkerInstanceLocked(transform, markerLayers, markerLinks);
     ImGui::BeginDisabled(bLayerLocked);
     ImGui::TextUnformatted("Position");
     ImGui::Columns(3, "markerPositionColumns", false);
@@ -140,7 +143,7 @@ bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params
         state.positionHorizontalRange, state.positionZToggle, WidgetStyle(), "%.1f");
     ImGui::Columns(1);
     if (positionXChange.bCommitted || positionZChange.bCommitted)
-        QuantizeMarkerPositionToLayerGrid(markerLayers, transform.layerIndex,
+        QuantizeMarkerPositionToLayerGrid(markerLayers, transform, markerLinks,
                                           transform.transform.positionX, transform.transform.positionZ);
     ImGui::EndDisabled();
     bCommitted = positionXChange.bCommitted || positionYChange.bCommitted || positionZChange.bCommitted || bCommitted;
@@ -156,6 +159,7 @@ DraggableListSignal DrawMarkerInstanceList(std::vector<Params::MarkerTransform>&
                                            const Params::MarkerInstanceGroup& group,
                                            const std::vector<Params::Army>& armies,
                                            const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                           const std::vector<Params::MarkerLink>& markerLinks,
                                            ManualMarkersState& state, bool& bAnyInstanceCommitted) {
     return DraggableList<Params::MarkerTransform>::Render(
         "manualMarkerInstances", transforms,
@@ -166,7 +170,7 @@ DraggableListSignal DrawMarkerInstanceList(std::vector<Params::MarkerTransform>&
         },
         [&](int rowIndex) {
             if (DrawSelectedMarkerInstance(transforms[static_cast<std::size_t>(rowIndex)], group, armies,
-                                           markerLayers, state))
+                                           markerLayers, markerLinks, state))
                 bAnyInstanceCommitted = true;
         },
         state.selectedInstanceIndex);
@@ -201,12 +205,13 @@ void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
                                const std::vector<Params::MarkerInstanceGroup>& markers,
                                const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                               const std::vector<Params::MarkerLink>& markerLinks,
                                ManualMarkersState& state, int selectedMarkerLayerIndex,
                                const IconAtlasManifest* iconManifest) {
     bool bInstancesMoved = false;
     bool bAnyInstanceCommitted = false;
     const DraggableListSignal signal =
-        DrawMarkerInstanceList(group.transforms, group, armies, markerLayers, state, bAnyInstanceCommitted);
+        DrawMarkerInstanceList(group.transforms, group, armies, markerLayers, markerLinks, state, bAnyInstanceCommitted);
     if (signal.bHasSignal())
         bInstancesMoved = ApplyMarkerInstanceListSignal(group.transforms, state, signal) || bInstancesMoved;
     bInstancesMoved = DrawMarkerInstanceListButtons(group.transforms, markers, state, markerLayers,

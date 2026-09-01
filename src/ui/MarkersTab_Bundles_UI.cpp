@@ -12,6 +12,7 @@
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
+#include "MarkersTab_MarkerLinkResolvers_UI.h"
 #include "MarkersTab_RuleLayers_UI.h"
 #include "MarkersTab_UI.h"
 #include "PlacementRuleSections_UI.h"
@@ -47,15 +48,21 @@ void DrawMarkerGroupLeafBody(const MarkerGroupLeafKey_UI& leaf, std::vector<Para
     }
 }
 
+// STEP241, ARCH §19.31 correction: a Manual leaf's own displayed label resolves through `links`
+// (the two-arg ManualMarkerLayerRowLabel, MarkersTab_MarkerLinkResolvers_UI.h) instead of the raw
+// `name` field, so a Link-bound Layer's tree row shows the Link's live name — the same treatment
+// DrawMarkerLayerBundleTree's own node-label lambda (below) already gives a Bundle's name.
 const char* MarkerGroupLeafLabel(const MarkerGroupLeafKey_UI& leaf,
                                  const std::vector<Params::MarkerRuleLayer>& ruleLayers,
-                                 const std::vector<Params::MarkerInstanceLayer>& instanceLayers) {
+                                 const std::vector<Params::MarkerInstanceLayer>& instanceLayers,
+                                 const std::vector<Params::MarkerLink>& links) {
     if (leaf.kind == MarkerGroupLeafKey_UI::Kind::Procedural)
         return (leaf.layerIndex >= 0 && leaf.layerIndex < static_cast<int>(ruleLayers.size())
                && !ruleLayers[static_cast<std::size_t>(leaf.layerIndex)].name.empty())
              ? ruleLayers[static_cast<std::size_t>(leaf.layerIndex)].name.c_str() : "Marker Layer";
     return (leaf.layerIndex >= 0 && leaf.layerIndex < static_cast<int>(instanceLayers.size()))
-         ? ManualMarkerLayerRowLabel(instanceLayers[static_cast<std::size_t>(leaf.layerIndex)]) : "Marker Layer";
+         ? ManualMarkerLayerRowLabel(instanceLayers[static_cast<std::size_t>(leaf.layerIndex)], links)
+         : "Marker Layer";
 }
 
 } // namespace
@@ -110,7 +117,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                const std::string& markerTypeNameFilter,
                                const std::function<void(int clickedInstanceIdentifier,
                                                         const std::vector<int>& selectedInstanceIdentifiers)>&
-                                   selectManualMarkerInstanceCallback) {
+                                   selectManualMarkerInstanceCallback,
+                               const std::vector<Params::MarkerLink>& links) {
     // STEP138/human's own correction: no "Add Group" button here — the Type-section header's own
     // "+ Group" (MarkersTab_UI.cpp) already owns this job; a second one here duplicated it and the
     // two, both minting via NextMarkerLayerBundleId against the same vector, produced confusing
@@ -132,7 +140,12 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
             "markerLayerBundles", filteredBundles,   // <-- the ONLY thing that changed inside Render's
             [](const Params::MarkerLayerBundle& bundle) { return bundle.identifier; },              // own call: filteredBundles, not bundles.
             [](const Params::MarkerLayerBundle& bundle) { return bundle.parentBundleIdentifier; },
-            [](const Params::MarkerLayerBundle& bundle) { return bundle.name.empty() ? "Group" : bundle.name.c_str(); },
+            [&](const Params::MarkerLayerBundle& bundle) {
+                // STEP241, ARCH §19.31 correction: a Link-bound Group's own displayed name resolves
+                // live from the Link (EffectiveMarkerLayerBundleName) instead of the raw `name` field.
+                const std::string& effectiveName = EffectiveMarkerLayerBundleName(bundle, links);
+                return effectiveName.empty() ? "Group" : effectiveName.c_str();
+            },
             [&](int bundleIdentifier) {
                 DrawMarkerLayerBundleNodeBody(bundleIdentifier, bundles, ruleLayers, instanceLayers, markers,
                                               state, rootState, previewDriver);   // unchanged: real bundles
@@ -142,7 +155,7 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                 const auto it = leafIndex.leavesByBundleIdentifier.find(bundleIdentifier);
                 return it != leafIndex.leavesByBundleIdentifier.end() ? it->second : kNoLeaves;
             },
-            [&](const MarkerGroupLeafKey_UI& leaf) { return MarkerGroupLeafLabel(leaf, ruleLayers, instanceLayers); },
+            [&](const MarkerGroupLeafKey_UI& leaf) { return MarkerGroupLeafLabel(leaf, ruleLayers, instanceLayers, links); },
             [&](const MarkerGroupLeafKey_UI& leaf) {
                 DrawMarkerGroupLeafBody(leaf, ruleLayers, instanceLayers, markers, geometry, globalSymmetryMask,
                                         globalRadialRepeatCount, markerSymmetryFixSettings, rootState, previewDriver,
@@ -155,7 +168,7 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
             [&](const MarkerGroupLeafKey_UI& leaf) {
                 DrawMarkerGroupLeafHeaderExtra(leaf, ruleLayers, instanceLayers, markers, rootState.manualLayers,
                                                state, rootState.selectedManualInstanceIdentifiers, previewDriver,
-                                               bHeaderExtraCommitted);
+                                               bHeaderExtraCommitted, links);
             },
             kMarkerLayerHeaderExtraCombinedWidthPixels,
             state.treeState, state.selectedBundleIdentifier, state.selectedLeaf);

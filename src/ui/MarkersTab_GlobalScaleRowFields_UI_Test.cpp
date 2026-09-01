@@ -23,17 +23,23 @@ void RunResolveGlobalMarkerScaleRowFieldsChecks() {
     Check(alloy.scale == &settings.scaleAlloy && alloy.color == settings.colorAlloy
           && alloy.iconName == &settings.iconNameAlloy && alloy.selectColor == settings.selectColorAlloy,
           "row 0 resolves to the Alloy fields, including selectColor (STEP134)");
+    Check(alloy.selectedScale == &settings.scaleSelectedAlloy,
+          "row 0 also resolves scaleSelectedAlloy (STEP240/ARCH §19.32)");
     const GlobalMarkerScaleRowFields plasma = ResolveGlobalMarkerScaleRowFields(settings, 1);
     Check(plasma.scale == &settings.scalePlasma && plasma.iconName == &settings.iconNamePlasma
           && plasma.selectColor == settings.selectColorPlasma,
           "row 1 resolves to the Plasma fields, including selectColor");
+    Check(plasma.selectedScale == &settings.scaleSelectedPlasma,
+          "row 1 also resolves scaleSelectedPlasma");
     const GlobalMarkerScaleRowFields spawn = ResolveGlobalMarkerScaleRowFields(settings, 2);
     Check(spawn.scale == &settings.scaleSpawn && spawn.iconName == &settings.iconNameSpawn
           && spawn.selectColor == settings.selectColorSpawn,
           "row 2 resolves to the Spawn fields, including selectColor");
+    Check(spawn.selectedScale == &settings.scaleSelectedSpawn,
+          "row 2 also resolves scaleSelectedSpawn");
     const GlobalMarkerScaleRowFields outOfRange = ResolveGlobalMarkerScaleRowFields(settings, 3);
     Check(outOfRange.scale == nullptr && outOfRange.color == nullptr && outOfRange.iconName == nullptr
-          && outOfRange.selectColor == nullptr,
+          && outOfRange.selectColor == nullptr && outOfRange.selectedScale == nullptr,
           "an out-of-range row resolves every pointer to null, not a stale/aliased one");
 }
 

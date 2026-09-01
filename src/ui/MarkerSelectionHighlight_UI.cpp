@@ -1,6 +1,7 @@
 // MarkerSelectionHighlight_UI.cpp
 #include "MarkerSelectionHighlight_UI.h"
 #include "MarkerDragGesture_UI.h"                    // ResolveEffectiveMarkerSymmetry
+#include "../params/MarkerLink_PARAMS.h"
 #include "../params/Symmetry_PARAMS.h"                // symmetryOrbitMaximum
 #include "../pipeline/SymmetryOrbitQuery_PIPELINE.h"   // BuildWorldSymmetryOrbit
 
@@ -30,8 +31,14 @@ std::vector<int> ComputeManualMarkerSelectionHighlight(
     const Params::MarkerTransform& selected = group.transforms[static_cast<std::size_t>(selectedTransformIndex)];
     result.push_back(selected.instanceIdentifier);
 
+    // STEP246, ARCH §19.33/§21.9 widened this function's own signature to take a transform + a
+    // Link roster; this call site (out of that ticket's own declared Domain, so not itself wired
+    // to a Link roster yet) passes `selected` (already the real transform in scope) with an EMPTY
+    // roster — the resolver's own Constitution §6 soft-degrade makes that behavior-IDENTICAL to
+    // today's Link-blind Layer-tier read, never a regression.
+    static const std::vector<Params::MarkerLink> kNoLinks;
     int effectiveMask = 0, effectiveRepeatCount = 0;
-    ResolveEffectiveMarkerSymmetry(markerLayers, selected.layerIndex, globalSymmetryMask,
+    ResolveEffectiveMarkerSymmetry(markerLayers, selected, kNoLinks, globalSymmetryMask,
                                    globalRadialRepeatCount, effectiveMask, effectiveRepeatCount);
 
     Pipeline::WorldSymmetryOrbitPoint orbitPoints[Params::symmetryOrbitMaximum];

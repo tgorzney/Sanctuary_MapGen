@@ -344,6 +344,10 @@ void CheckGlobalMarkerSettingsSurvives(const Params::MapRecipe& original,
           && NearlyEqual(loadedSettings.scalePlasma, originalSettings.scalePlasma)
           && NearlyEqual(loadedSettings.scaleSpawn, originalSettings.scaleSpawn),
           "GlobalMarkerSettings's three scales survive");
+    Check(NearlyEqual(loadedSettings.scaleSelectedAlloy, originalSettings.scaleSelectedAlloy)
+          && NearlyEqual(loadedSettings.scaleSelectedPlasma, originalSettings.scaleSelectedPlasma)
+          && NearlyEqual(loadedSettings.scaleSelectedSpawn, originalSettings.scaleSelectedSpawn),
+          "GlobalMarkerSettings's three scaleSelected* fields survive (ARCH §19.32)");
     Check(NearlyEqual(loadedSettings.selectColorAlloy[0], originalSettings.selectColorAlloy[0])
           && NearlyEqual(loadedSettings.selectColorAlloy[1], originalSettings.selectColorAlloy[1])
           && NearlyEqual(loadedSettings.selectColorAlloy[2], originalSettings.selectColorAlloy[2])
@@ -758,6 +762,8 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
             Check(loadedMarker.instanceIdentifier == originalMarker.instanceIdentifier,
                   "the marker's explicit instanceIdentifier (999) survives the OVERWRITE half of "
                   "the backfill-then-overwrite logic (STEP124)");
+            Check(loadedMarker.linkIdentifier == originalMarker.linkIdentifier,
+                  "MarkerTransform::linkIdentifier survives, non-default (ARCH §19.33/STEP245)");
             Check(NearlyEqual(loadedMarker.transform.positionX, originalMarker.transform.positionX)
                   && NearlyEqual(loadedMarker.transform.positionY, originalMarker.transform.positionY),
                   "positionX/Y survive untouched by the flip");
@@ -1273,6 +1279,10 @@ void FillFixturePlacementRules(Params::MapRecipe& recipe) {
     globalMarkerSettings.scaleAlloy  = 0.25f;
     globalMarkerSettings.scalePlasma = 0.3f;
     globalMarkerSettings.scaleSpawn  = 0.2f;
+    // ARCH §19.32 — the three scaleSelected* fields, non-default, distinct from their scale* siblings.
+    globalMarkerSettings.scaleSelectedAlloy  = 0.65f;
+    globalMarkerSettings.scaleSelectedPlasma = 0.7f;
+    globalMarkerSettings.scaleSelectedSpawn  = 0.6f;
     // STEP124: the four selectColor* fields, non-default, each component distinct (ARCH §19.17).
     globalMarkerSettings.selectColorAlloy[0] = 0.91f; globalMarkerSettings.selectColorAlloy[1] = 0.92f;
     globalMarkerSettings.selectColorAlloy[2] = 0.93f; globalMarkerSettings.selectColorAlloy[3] = 0.94f;
@@ -1371,6 +1381,14 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     bundle.assemblyIdentifier = 5;
     recipe.markerLayerBundles.push_back(bundle);
 
+    // ARCH §19.33/STEP245: one MarkerLink the fixture transform below resolves against, so its
+    // non-default linkIdentifier does NOT dangle — RunRoundTripTests's own "no warning" assertion
+    // would otherwise trip on WarnDanglingMarkerLinkIdentifiers' new third (instance-tier) loop.
+    Params::MarkerLink link;
+    link.identifier = 21;
+    link.name = "Forward Rally";
+    recipe.markerLinks.push_back(link);
+
     Params::MarkerTransform markerTransform;
     markerTransform.name = "Mex 0";
     markerTransform.transform.positionX = 8.0f;
@@ -1385,6 +1403,8 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerTransform.symmetryGroupIdentifier = 3;                      // non-zero: STEP68
     markerTransform.iconNameOverride = "CustomAlloyIcon";             // non-empty: STEP114
     markerTransform.instanceIdentifier = 999;                         // non-default, explicit: STEP124
+    markerTransform.linkIdentifier = 21;   // ARCH §19.33/STEP245, non-default, resolves against the
+                                            // MarkerLink above (identifier 21) — no dangling warning
 
     Params::MarkerInstanceGroup group;
     group.name = "Alloys";

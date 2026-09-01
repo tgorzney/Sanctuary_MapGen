@@ -28,6 +28,11 @@
 namespace SanmapGen {
 namespace Ui {
 
+// A domain with no Link concept (Props, Decals) instantiates every `Traits::Link`-shaped parameter
+// with this permanently-empty, never-populated, never-read placeholder — shared so Props/Decals
+// don't each invent their own dummy type for the same purpose. ARCH §21.9.
+struct NoInstanceLink {};
+
 // One gesture's full state: which member is being dragged, its frozen mask/count snapshot, the
 // one-shot correspondence table (built once, at BeginInstanceDragGesture, never rebuilt), and this
 // frame's ghost/refusal bookkeeping for the draw pass. Shared VERBATIM by every domain — no template
@@ -95,11 +100,13 @@ std::vector<InstanceOrbitCorrespondence> BuildInstanceCorrespondenceSeed(
 // gesture state from the resolved (groupIndex, transformIndex). A `symmetryGroupIdentifier == 0` hit
 // still returns true (a free, unrestricted drag) with an empty correspondence table and NO
 // `Pipeline::BuildWorldSymmetryOrbit` call. Returns false (state left inactive) for an out-of-range
-// group/transform index, or a locked owning layer (`Traits::IsInstanceLayerLocked`).
+// group/transform index, or an effectively-locked instance (`Traits::IsInstanceEffectivelyLocked` —
+// ARCH §21.9, checks the instance's own Link before its owning layer).
 template<typename Traits>
 bool BeginInstanceDragGesture(InstanceDragGestureState& state,
                               const std::vector<typename Traits::Group>& instances,
                               const std::vector<typename Traits::Layer>& layers,
+                              const std::vector<typename Traits::Link>& links,
                               const Params::Geometry& geometry, int globalSymmetryMask,
                               int globalRadialRepeatCount, int groupIndex, int transformIndex) {
     state = InstanceDragGestureState{};
@@ -107,7 +114,7 @@ bool BeginInstanceDragGesture(InstanceDragGestureState& state,
     const typename Traits::Group& group = instances[static_cast<std::size_t>(groupIndex)];
     if (transformIndex < 0 || transformIndex >= static_cast<int>(group.transforms.size())) return false;
     const typename Traits::Transform& dragged = group.transforms[static_cast<std::size_t>(transformIndex)];
-    if (Traits::IsInstanceLayerLocked(layers, dragged.layerIndex)) return false;
+    if (Traits::IsInstanceEffectivelyLocked(layers, dragged, links)) return false;
 
     state.bActive               = true;
     state.groupIndex            = groupIndex;
@@ -123,7 +130,7 @@ bool BeginInstanceDragGesture(InstanceDragGestureState& state,
         return true;
     }
 
-    Traits::ResolveEffectiveSymmetry(layers, dragged.layerIndex, globalSymmetryMask,
+    Traits::ResolveEffectiveSymmetry(layers, dragged, links, globalSymmetryMask,
                                      globalRadialRepeatCount, state.effectiveSymmetryMask,
                                      state.effectiveRadialRepeatCount);
 
@@ -149,6 +156,7 @@ bool BeginInstanceDragGesture(InstanceDragGestureState& state,
 template<typename Traits>
 void UpdateInstanceDragGesture(InstanceDragGestureState& state, std::vector<typename Traits::Group>& instances,
                                const std::vector<typename Traits::Layer>& layers,
+                               const std::vector<typename Traits::Link>& links,
                                const Params::Geometry& geometry, float newWorldX, float newWorldZ) {
     state.bSpawnCardinalityRefused = false;
     state.bCardinalityGrew         = false;
@@ -163,7 +171,7 @@ void UpdateInstanceDragGesture(InstanceDragGestureState& state, std::vector<type
 
     if (state.symmetryGroupIdentifier == 0) {           // ungrouped: free drag, zero orbit calls
         float quantizedX = newWorldX, quantizedZ = newWorldZ;
-        Traits::QuantizePositionToLayerGrid(layers, dragged->layerIndex, quantizedX, quantizedZ);
+        Traits::QuantizePositionToLayerGrid(layers, *dragged, links, quantizedX, quantizedZ);
         dragged->transform.positionX = quantizedX;
         dragged->transform.positionZ = quantizedZ;
         return;
@@ -182,7 +190,7 @@ void UpdateInstanceDragGesture(InstanceDragGestureState& state, std::vector<type
 
     {
         float quantizedDraggedX = newWorldX, quantizedDraggedZ = newWorldZ;
-        Traits::QuantizePositionToLayerGrid(layers, dragged->layerIndex, quantizedDraggedX, quantizedDraggedZ);
+        Traits::QuantizePositionToLayerGrid(layers, *dragged, links, quantizedDraggedX, quantizedDraggedZ);
         dragged->transform.positionX = quantizedDraggedX;  // unambiguous regardless of cardinality
         dragged->transform.positionZ = quantizedDraggedZ;
     }
@@ -197,7 +205,7 @@ void UpdateInstanceDragGesture(InstanceDragGestureState& state, std::vector<type
         if (sibling == nullptr) continue;
         float siblingX = orbitPoints[entry.lastMatchedOrbitSlot].worldPositionX;
         float siblingZ = orbitPoints[entry.lastMatchedOrbitSlot].worldPositionZ;
-        Traits::QuantizePositionToLayerGrid(layers, sibling->layerIndex, siblingX, siblingZ);
+        Traits::QuantizePositionToLayerGrid(layers, *sibling, links, siblingX, siblingZ);
         sibling->transform.positionX = siblingX;
         sibling->transform.positionZ = siblingZ;
         entry.referenceWorldX = sibling->transform.positionX;   // keep the match anchor fresh
@@ -296,10 +304,11 @@ void EndInstanceDragGesture(InstanceDragGestureState& state, std::vector<typenam
 // sibling's write. Refuses (returns false, moved member's own position still applied) if the target
 // position would change the group's orbit cardinality — this single-call form has no gesture to
 // defer a ghost/materialize step to. Also refuses (returns false, NO write at all) if the moved
-// member's own owning layer is locked (`Traits::IsInstanceLayerLocked`).
+// member is effectively locked (`Traits::IsInstanceEffectivelyLocked`).
 template<typename Traits>
 bool RepositionSymmetryGroupMember(std::vector<typename Traits::Group>& instances,
                                    const std::vector<typename Traits::Layer>& layers,
+                                   const std::vector<typename Traits::Link>& links,
                                    const Params::Geometry& geometry, int globalSymmetryMask,
                                    int globalRadialRepeatCount, int groupIndex,
                                    int movedTransformIndex, float newWorldX, float newWorldZ) {
@@ -307,7 +316,7 @@ bool RepositionSymmetryGroupMember(std::vector<typename Traits::Group>& instance
     if (group == nullptr) return false;
     typename Traits::Transform* const dragged = Traits::SelectedInstance(group->transforms, movedTransformIndex);
     if (dragged == nullptr) return false;
-    if (Traits::IsInstanceLayerLocked(layers, dragged->layerIndex)) return false;
+    if (Traits::IsInstanceEffectivelyLocked(layers, *dragged, links)) return false;
 
     if (dragged->symmetryGroupIdentifier == 0) {
         dragged->transform.positionX = newWorldX; dragged->transform.positionZ = newWorldZ;
@@ -315,7 +324,7 @@ bool RepositionSymmetryGroupMember(std::vector<typename Traits::Group>& instance
     }
 
     int effectiveMask = 0, effectiveRadialRepeatCount = 0;
-    Traits::ResolveEffectiveSymmetry(layers, dragged->layerIndex, globalSymmetryMask,
+    Traits::ResolveEffectiveSymmetry(layers, *dragged, links, globalSymmetryMask,
                                      globalRadialRepeatCount, effectiveMask, effectiveRadialRepeatCount);
 
     Pipeline::WorldSymmetryOrbitPoint startOrbit[Params::symmetryOrbitMaximum];

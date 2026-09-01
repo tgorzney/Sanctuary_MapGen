@@ -9,13 +9,16 @@
 // header-only, so the algorithm itself is compiled exactly once per domain, not once per including
 // translation unit.
 //
-// Both functions take an `isLayerLocked` predicate (ARCH §21.5) so a locked instance never becomes a
-// click-select or marquee-collect candidate in the first place — one shared gate, not a second copy
-// per call site. `HitTestManualMarkers` (MapCanvas_MarkerHitTest_UI.cpp) stays as a one-line wrapper
-// over `HitTestManualInstances<Params::MarkerInstanceGroup>`, unchanged name and signature, legal to
-// bind either an always-false-locked predicate (preserving the old bare behavior) or the real
-// `IsMarkerInstanceLayerLocked`-bound predicate — both are instantiations of the one template, never
-// two copies of the algorithm.
+// Both functions take an `isInstanceLocked` predicate (ARCH §21.5/§21.9) so a locked instance never
+// becomes a click-select or marquee-collect candidate in the first place — one shared gate, not a
+// second copy per call site. WIDENED (ARCH §21.9, STEP249) from `bool(int layerIndex)` to
+// `bool(const typename GroupT::TransformType&)` (STEP244's alias) — a Link can lock an instance
+// independent of its owning Layer, and a bare layerIndex can no longer answer that alone.
+// `HitTestManualMarkers` (MapCanvas_MarkerHitTest_UI.cpp) stays as a one-line wrapper over
+// `HitTestManualInstances<Params::MarkerInstanceGroup>`, unchanged name and signature, legal to bind
+// either an always-false-locked predicate (preserving the old bare behavior) or the real
+// `IsMarkerInstanceLocked`-bound predicate — both are instantiations of the one template, never two
+// copies of the algorithm.
 #pragma once
 #include <functional>
 #include <utility>
@@ -33,9 +36,9 @@ class PreviewComposite;
 // (the authoring-scale sizing posture this file's Marker-only predecessor already established); NOT
 // `Picking_UI::PickMarker`/`Data::SpatialGrid`, which operate only over `Data::PlacementInstances`
 // (manual instances have no presence there). Ties keep the first (lowest group, then lowest
-// transform) index. A locked owning layer (`isLayerLocked(transform.layerIndex)` true) is skipped
-// entirely — never becomes a candidate, ARCH §21.5. Answers false (both out-params left at -1) for
-// an unbaked composite, an empty roster, or no unlocked instance within radius.
+// transform) index. An effectively-locked instance (`isInstanceLocked(transform)` true) is skipped
+// entirely — never becomes a candidate, ARCH §21.5/§21.9. Answers false (both out-params left at -1)
+// for an unbaked composite, an empty roster, or no unlocked instance within radius.
 // `outDistanceSquared`, when given, receives the winning candidate's own squared screen-pixel
 // distance from the cursor — ARCH §21.2's `TryBeginManualInstanceDrag`/click-resolution 3-way
 // cross-domain dispatcher needs it to compare a hit found in one domain against a hit found in
@@ -44,7 +47,7 @@ template<typename GroupT>
 bool HitTestManualInstances(const std::vector<GroupT>& instances, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionLocalX, float regionLocalY,
                             float pickRadiusScreenPixels,
-                            const std::function<bool(int layerIndex)>& isLayerLocked,
+                            const std::function<bool(const typename GroupT::TransformType&)>& isInstanceLocked,
                             int& outGroupIndex, int& outTransformIndex,
                             float* outDistanceSquared = nullptr);
 
@@ -57,7 +60,7 @@ bool HitTestManualInstances(const std::vector<GroupT>& instances, const PreviewC
 template<typename GroupT>
 void CollectManualInstancesInWorldRegion(const std::vector<GroupT>& instances,
                                          float worldMinX, float worldMinZ, float worldMaxX, float worldMaxZ,
-                                         const std::function<bool(int layerIndex)>& isLayerLocked,
+                                         const std::function<bool(const typename GroupT::TransformType&)>& isInstanceLocked,
                                          std::vector<std::pair<int, int>>& outGroupTransformPairs);
 
 } // namespace Ui

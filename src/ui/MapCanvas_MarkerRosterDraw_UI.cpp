@@ -2,8 +2,10 @@
 // of MapCanvas_MarkerDrag_UI.cpp (STEP126) for the same ceiling reason as MapCanvas_MarkerHitTest_UI.cpp.
 #include "MapCanvas_MarkerDrag_UI.h"
 #include "MapCanvas_UI.h"
+#include "MarkersTab_MarkerLinkInstanceResolvers_UI.h"
 #include "PreviewComposite_UI.h"
 #include "../params/GlobalMarkerSettings_PARAMS.h"
+#include "../params/MarkerLink_PARAMS.h"
 #include <imgui.h>
 
 namespace SanmapGen {
@@ -12,14 +14,20 @@ namespace {
 
 constexpr float kManualMarkerBaseDotRadiusScreenPixels = 6.0f;
 
-// STEP122: replaces the hardcoded kManualMarkerDotRadiusScreenPixels — composes Global × per-layer
-// Icon Scale into the roster dot's radius, mirroring ManualMarkerTint's exact shape/posture
-// (same anonymous namespace, same signature family, reusing the same globalMarkerSettings
+// STEP122: replaces the hardcoded kManualMarkerDotRadiusScreenPixels — composes Global × effective
+// per-instance Icon Scale into the roster dot's radius, mirroring ManualMarkerTint's exact shape/
+// posture (same anonymous namespace, same signature family, reusing the same globalMarkerSettings
 // parameter STEP116 already threads through this file).
-float ManualMarkerDotRadius(const std::vector<Params::MarkerInstanceLayer>& markerLayers, int layerIndex,
+// STEP246, ARCH §19.33/§21.9: widened to take the owning `transform` + `links` (was a bare
+// layerIndex) — resolves instance-tier-first, THEN Layer-tier (EffectiveManualMarkerInstanceIconScale).
+float ManualMarkerDotRadius(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                            const Params::MarkerTransform& transform,
+                            const std::vector<Params::MarkerLink>& links,
                             const std::string& groupName, const Params::GlobalMarkerSettings& globalMarkerSettings) {
+    const int layerIndex = transform.layerIndex;
     const float layerIconScale = (layerIndex >= 0 && layerIndex < static_cast<int>(markerLayers.size()))
-        ? markerLayers[static_cast<std::size_t>(layerIndex)].iconScale : 1.0f;
+        ? EffectiveManualMarkerInstanceIconScale(transform, markerLayers[static_cast<std::size_t>(layerIndex)], links)
+        : 1.0f;
     return kManualMarkerBaseDotRadiusScreenPixels
          * Params::ResolveMarkerGroupTypeScale(groupName, globalMarkerSettings) * layerIconScale;
 }
@@ -31,23 +39,29 @@ ImVec2 ProjectWorldToScreen(const PreviewComposite& composite, const MapCanvasVi
     return ImVec2(regionOriginX + regionLocal.regionLocalX, regionOriginY + regionLocal.regionLocalY);
 }
 
-ImU32 ManualMarkerTint(const std::vector<Params::MarkerInstanceLayer>& markerLayers, int layerIndex,
+// STEP246, ARCH §19.33/§21.9: widened to take the owning `transform` + `links` (was a bare
+// layerIndex) — resolves instance-tier-first, THEN Layer-tier (EffectiveManualMarkerInstance*
+// ColorOverrideEnabled/Color), closing the pre-existing bug this ticket is FOR: neither this nor
+// any other render consumer ever actually reached a Link's own bColorOverrideEnabled/color before.
+ImU32 ManualMarkerTint(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                       const Params::MarkerTransform& transform, const std::vector<Params::MarkerLink>& links,
                        const std::string& groupName, const Params::GlobalMarkerSettings& globalMarkerSettings) {
+    const int layerIndex = transform.layerIndex;
+    const bool bInRange = layerIndex >= 0 && layerIndex < static_cast<int>(markerLayers.size());
     // A missing/out-of-range layer (the common case — MarkerTransform::layerIndex defaults to 0, and
     // recipe.markerLayers is empty until a Manual Layer is actually authored) has no override to
-    // apply — same as an IN-range layer with bColorOverrideEnabled == false, both fall through to
-    // the Type's own configured tint, never a hardcoded grey (the bug: grey silently WON over the
-    // real colorAlloy/colorPlasma/colorSpawn for every marker with no explicit per-layer override).
-    const bool bHasOverride = layerIndex >= 0 && layerIndex < static_cast<int>(markerLayers.size())
-        && markerLayers[static_cast<std::size_t>(layerIndex)].bColorOverrideEnabled;
+    // apply — same as an IN-range layer/instance with the override resolved off, both fall through
+    // to the Type's own configured tint, never a hardcoded grey.
+    const bool bHasOverride = bInRange && EffectiveManualMarkerInstanceColorOverrideEnabled(
+        transform, markerLayers[static_cast<std::size_t>(layerIndex)], links);
     if (bHasOverride) {
-        const Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(layerIndex)];
-        return ImGui::ColorConvertFloat4ToU32(ImVec4(layer.color[0], layer.color[1], layer.color[2], layer.color[3]));
+        const float* const color = EffectiveManualMarkerInstanceColor(
+            transform, markerLayers[static_cast<std::size_t>(layerIndex)], links);
+        return ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], color[3]));
     }
     float typeRed = 1.0f, typeGreen = 1.0f, typeBlue = 1.0f;
     Params::ResolveMarkerGroupTypeTintColor(groupName, globalMarkerSettings, typeRed, typeGreen, typeBlue);
-    const float alpha = (layerIndex >= 0 && layerIndex < static_cast<int>(markerLayers.size()))
-        ? markerLayers[static_cast<std::size_t>(layerIndex)].color[3] : 1.0f;
+    const float alpha = bInRange ? markerLayers[static_cast<std::size_t>(layerIndex)].color[3] : 1.0f;
     return ImGui::ColorConvertFloat4ToU32(ImVec4(typeRed, typeGreen, typeBlue, alpha));
 }
 
@@ -84,6 +98,7 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
                             const MarkerDragGestureState& dragState, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionOriginX, float regionOriginY,
                             const std::vector<int>& selectedHighlightInstanceIdentifiers,   // NEW — STEP126
+                            const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246
                             ImDrawList& drawList) {
     if (composite.PixelsPerPreviewCell() <= 0.0f) return;
     const ImU32 refusedTint = IM_COL32(220, 60, 40, 255);
@@ -116,23 +131,28 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
                 tint = ImGui::ColorConvertFloat4ToU32(ImVec4(selectRed, selectGreen, selectBlue, 1.0f));
             } else if (IsSpawnMarkerGroup(group)) {
                 tint = ManualSpawnArmyTint(armies, transform.name,
-                                           ManualMarkerTint(markerLayers, transform.layerIndex, group.name, globalMarkerSettings));
+                                           ManualMarkerTint(markerLayers, transform, markerLinks, group.name, globalMarkerSettings));
             } else {
-                tint = ManualMarkerTint(markerLayers, transform.layerIndex, group.name, globalMarkerSettings);
+                tint = ManualMarkerTint(markerLayers, transform, markerLinks, group.name, globalMarkerSettings);
             }
             drawList.AddCircleFilled(screenCenter,
-                                     ManualMarkerDotRadius(markerLayers, transform.layerIndex, group.name, globalMarkerSettings),
+                                     ManualMarkerDotRadius(markerLayers, transform, markerLinks, group.name, globalMarkerSettings),
                                      tint);
         }
         if (bThisGroupDragging) {
-            // STEP122: the ghost points belong to the same dragged transform — its own layerIndex
-            // (not the last transform iterated above, which is out of scope here) resolves the
-            // drag-group's own dot size, consistent with the ghost being that same group's sibling
-            // orbit slots.
-            const int draggedLayerIndex = (dragState.draggedTransformIndex >= 0
+            // STEP122: the ghost points belong to the same dragged transform (not the last transform
+            // iterated above, which is out of scope here) — resolves the drag-group's own dot size,
+            // consistent with the ghost being that same group's sibling orbit slots. A missing dragged
+            // transform (out-of-range index) falls back to a synthetic layerIndex=-1 transform, the
+            // exact "out of range" shape ManualMarkerDotRadius already treats as scale 1.0.
+            const Params::MarkerTransform* const draggedTransform = (dragState.draggedTransformIndex >= 0
                 && static_cast<std::size_t>(dragState.draggedTransformIndex) < group.transforms.size())
-                ? group.transforms[static_cast<std::size_t>(dragState.draggedTransformIndex)].layerIndex : -1;
-            const float ghostDotRadius = ManualMarkerDotRadius(markerLayers, draggedLayerIndex, group.name, globalMarkerSettings);
+                ? &group.transforms[static_cast<std::size_t>(dragState.draggedTransformIndex)] : nullptr;
+            Params::MarkerTransform noDraggedTransformFallback;
+            noDraggedTransformFallback.layerIndex = -1;
+            const float ghostDotRadius = ManualMarkerDotRadius(markerLayers,
+                draggedTransform != nullptr ? *draggedTransform : noDraggedTransformFallback,
+                markerLinks, group.name, globalMarkerSettings);
             for (const Pipeline::WorldSymmetryOrbitPoint& ghost : dragState.currentGhostPoints) {
                 const ImVec2 screenCenter = ProjectWorldToScreen(composite, view, ghost.worldPositionX,
                                                                  ghost.worldPositionZ, regionOriginX, regionOriginY);

@@ -22,6 +22,14 @@ struct GlobalMarkerSettings {
     float scalePlasma = 0.50f;   // STEP127 item 3 — was 0.17f
     float scaleSpawn  = 0.50f;   // STEP127 item 3 — was 0.17f
 
+    // ARCH §19.32 — per-Type-section "selected" icon-size pair, strict mirror of
+    // scaleAlloy/Plasma/Spawn's own shape/placement/default. Resolved via
+    // ResolveMarkerGroupSelectedTypeScale below; the render-consumer fold-in site is out of scope
+    // for this ticket (STEP240).
+    float scaleSelectedAlloy  = 0.50f;
+    float scaleSelectedPlasma = 0.50f;
+    float scaleSelectedSpawn  = 0.50f;
+
     // ARCH §19.17 — selection-highlight tint. selectColorAlloy/Plasma/Spawn strictly mirror
     // colorAlloy/Plasma/Spawn's shape/placement; selectColorDefault is the one signed-off 4th-field
     // deviation from that mirror (see ResolveMarkerGroupSelectTintColor below for why).
@@ -70,6 +78,17 @@ inline float ResolveMarkerGroupTypeScale(const std::string& groupName, const Glo
     if (groupName == kSpawnMarkerGroupName || groupName == "Spawns") return settings.scaleSpawn;
     if (groupName == "Alloy" || groupName == "Alloys")               return settings.scaleAlloy;
     if (groupName == "Plasma" || groupName == "Plasmas")             return settings.scalePlasma;
+    return 1.0f;
+}
+
+// ARCH §19.32: the "selected" counterpart to ResolveMarkerGroupTypeScale above — strict mirror,
+// same name-matching vocabulary (Spawn/Spawns, Alloy/Alloys, Plasma/Plasmas), same unmatched-name
+// fallback (1.0f, the multiplicative no-op — no white-vs-white-style ambiguity a COLOR fallback
+// would have, so no separate "selected default" field is needed the way selectColorDefault was).
+inline float ResolveMarkerGroupSelectedTypeScale(const std::string& groupName, const GlobalMarkerSettings& settings) {
+    if (groupName == kSpawnMarkerGroupName || groupName == "Spawns") return settings.scaleSelectedSpawn;
+    if (groupName == "Alloy" || groupName == "Alloys")               return settings.scaleSelectedAlloy;
+    if (groupName == "Plasma" || groupName == "Plasmas")             return settings.scaleSelectedPlasma;
     return 1.0f;
 }
 

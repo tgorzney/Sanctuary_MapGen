@@ -1,5 +1,14 @@
 [← ARCH index](ARCH.md) · [§21 ARCH_21_CanvasInteractionUnification](ARCH_21_CanvasInteractionUnification.md) · SanGen ARCH §21.5. **Only the ARCH Expert writes this file.**
 
+> **⚠️ WIDENED 2026-08-31 — see `ARCH_21_09_LinkTierContractWidening.md`.** The `isLayerLocked`
+> predicate this section names (`std::function<bool(int layerIndex)>`) is widened and renamed
+> `isInstanceLocked` (`std::function<bool(const typename GroupT::TransformType&)>`), so a locked
+> `MarkerTransform::linkIdentifier` tag (`§19.33`) can gate acquisition too, not only the owning
+> Layer's own `bLocked`. The mechanism/binding rule below is otherwise unchanged — one shared gate,
+> not three, still gates the same click/marquee/drag-begin triple. `§21.9` is authoritative on the
+> exact widened shape; this file's text below is left unedited beneath this notice for historical
+> record.
+
 ### 21.5 Locked-item exclusion — corrects §19.18; uniform across click, marquee, and drag; procedural instances unaffected
 
 **Human-decided.** Reverses the reading `ARCH_19_18_SelectionTintPriorityAndVisualLanguage.md`

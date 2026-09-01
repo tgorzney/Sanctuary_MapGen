@@ -278,35 +278,82 @@ if(WIN32)
     # unavoidably links a standalone luajit.exe from that same archive (the script has no flag to
     # skip that step in static mode) -- allowed explicitly by STEP65 ("otherwise that's fine, just
     # link the static lib"). It must run with CWD = <luajit>/src (its own DASMDIR is `..\dynasm`).
-    set(SANGEN_LUAJIT_LIB "${luajit_SOURCE_DIR}/src/lua51.lib")
-    set(SANGEN_LUAJIT_BUILD_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/BuildLuaJIT.bat")
-    # `set NoDefaultCurrentDirectoryInExePath=` restores cmd.exe's OWN out-of-the-box default (that
-    # variable is normally unset, meaning the current directory IS searched for a bare executable
-    # name) in case the invoking shell set it to harden itself -- msvcbuild.bat's internal steps
-    # invoke its own freshly-built minilua.exe/buildvm.exe by bare name from the CWD (upstream's
-    # design, not something this wrapper is entitled to rewrite), so the wrapper must not leave a
-    # non-default shell hardening setting in place that breaks that assumption.
-    file(WRITE "${SANGEN_LUAJIT_BUILD_SCRIPT}"
+    #
+    # BUGFIX (post-STEP236 Debug link failure): msvcbuild.bat passes no /MT*/MD* flag of its own, so
+    # every object it compiles gets cl.exe's bare default -- LIBCMT, i.e. the RELEASE static CRT --
+    # regardless of which CMake configuration is active. That is fine for Release (line 5's
+    # CMAKE_MSVC_RUNTIME_LIBRARY resolves to the same MultiThreaded/LIBCMT there) but wrong for Debug,
+    # where line 5 resolves to MultiThreadedDebug/LIBCMTD: the resulting Debug link mixed LIBCMTD (every
+    # other object) with LIBCMT (lua51.lib alone), which is what produced the LNK4098
+    # "defaultlib 'LIBCMT' conflicts with use of other libs" warning and the unresolved
+    # __std_find_last_trivial_1/__std_find_end_1/__std_search_1/__std_find_last_of_trivial_pos_1
+    # externals (MSVC's newer vectorized <algorithm> helpers, compiled into libcpmtd.lib for the Debug
+    # CRT and libcpmt.lib for the Release one -- never both, and the mismatched defaultlib pull left
+    # the Debug ones out of the link). Confirmed via `dumpbin /directives` on the built lua51.lib
+    # (DEFAULTLIB:LIBCMT, always) versus build/Debug/SanGenV2.lib (DEFAULTLIB:LIBCMTD + libcpmtd).
+    #
+    # msvcbuild.bat is an IN-SOURCE build -- it writes .obj/.lib beside the .c files -- so it cannot be
+    # run twice against one source tree for two different CRT variants. Each CMake configuration
+    # therefore gets its own copy of the LuaJIT source tree, its own CL-injected runtime-library flag
+    # (matching line 5's own per-config switch exactly), and its own IMPORTED_LOCATION_<CONFIG>, so a
+    # multi-config Visual Studio build (CMAKE_CONFIGURATION_TYPES: Debug;Release;RelWithDebInfo;MinSizeRel)
+    # links the matching CRT variant no matter which configuration is actually built.
+    foreach(sangenLuaJitConfig Debug Release RelWithDebInfo MinSizeRel)
+        if(sangenLuaJitConfig STREQUAL "Debug")
+            set(sangenLuaJitCrtFlag "/MTd")
+        else()
+            set(sangenLuaJitCrtFlag "/MT")
+        endif()
+        string(TOUPPER "${sangenLuaJitConfig}" sangenLuaJitConfigUpper)
+        set(sangenLuaJitConfigSourceDir "${CMAKE_CURRENT_BINARY_DIR}/luajit_${sangenLuaJitConfig}")
+        set(sangenLuaJitConfigLib "${sangenLuaJitConfigSourceDir}/src/lua51.lib")
+        set(sangenLuaJitConfigBuildScript "${CMAKE_CURRENT_BINARY_DIR}/BuildLuaJIT_${sangenLuaJitConfig}.bat")
+        # `set NoDefaultCurrentDirectoryInExePath=` restores cmd.exe's OWN out-of-the-box default (that
+        # variable is normally unset, meaning the current directory IS searched for a bare executable
+        # name) in case the invoking shell set it to harden itself -- msvcbuild.bat's internal steps
+        # invoke its own freshly-built minilua.exe/buildvm.exe by bare name from the CWD (upstream's
+        # design, not something this wrapper is entitled to rewrite), so the wrapper must not leave a
+        # non-default shell hardening setting in place that breaks that assumption.
+        # `set CL=...` is cl.exe's own documented "always-prepended extra options" environment
+        # variable -- msvcbuild.bat's LJCOMPILE line never specifies a runtime-library flag itself, so
+        # this is the one hook available to make an UNMODIFIED copy of upstream's own build script
+        # emit the CRT variant this configuration needs, without patching msvcbuild.bat.
+        file(WRITE "${sangenLuaJitConfigBuildScript}"
 "@echo off\n\
 call \"${SANGEN_VCVARS64_BAT}\" >nul\n\
 if errorlevel 1 exit /b 1\n\
 set NoDefaultCurrentDirectoryInExePath=\n\
-cd /d \"${luajit_SOURCE_DIR}/src\"\n\
+if not exist \"${sangenLuaJitConfigSourceDir}\" mkdir \"${sangenLuaJitConfigSourceDir}\"\n\
+xcopy /e /i /y /q \"${luajit_SOURCE_DIR}\" \"${sangenLuaJitConfigSourceDir}\" >nul\n\
+if errorlevel 1 exit /b 1\n\
+set CL=${sangenLuaJitCrtFlag}\n\
+cd /d \"${sangenLuaJitConfigSourceDir}/src\"\n\
 call .\\msvcbuild.bat static\n\
 exit /b %errorlevel%\n")
 
-    add_custom_command(
-        OUTPUT "${SANGEN_LUAJIT_LIB}"
-        COMMAND cmd /c "${SANGEN_LUAJIT_BUILD_SCRIPT}"
-        WORKING_DIRECTORY "${luajit_SOURCE_DIR}/src"
-        DEPENDS "${luajit_SOURCE_DIR}/src/msvcbuild.bat"
-        COMMENT "STEP65: building LuaJIT (pinned commit ${SANGEN_LUAJIT_COMMIT}) via its own msvcbuild.bat"
-        VERBATIM)
-    add_custom_target(SanGenLuaJitBuild DEPENDS "${SANGEN_LUAJIT_LIB}")
+        add_custom_command(
+            OUTPUT "${sangenLuaJitConfigLib}"
+            COMMAND cmd /c "${sangenLuaJitConfigBuildScript}"
+            WORKING_DIRECTORY "${luajit_SOURCE_DIR}/src"
+            DEPENDS "${luajit_SOURCE_DIR}/src/msvcbuild.bat"
+            COMMENT "STEP65: building LuaJIT (pinned commit ${SANGEN_LUAJIT_COMMIT}) for ${sangenLuaJitConfig} (${sangenLuaJitCrtFlag}) via its own msvcbuild.bat"
+            VERBATIM)
+        add_custom_target(SanGenLuaJitBuild_${sangenLuaJitConfig} DEPENDS "${sangenLuaJitConfigLib}")
+
+        list(APPEND SANGEN_LUAJIT_CONFIG_TARGETS SanGenLuaJitBuild_${sangenLuaJitConfig})
+        list(APPEND SANGEN_LUAJIT_CONFIG_LOCATION_ARGS IMPORTED_LOCATION_${sangenLuaJitConfigUpper} "${sangenLuaJitConfigLib}")
+        if(sangenLuaJitConfig STREQUAL "Release")
+            set(SANGEN_LUAJIT_DEFAULT_LIB "${sangenLuaJitConfigLib}")
+        endif()
+    endforeach()
 
     add_library(luajit STATIC IMPORTED GLOBAL)
-    set_target_properties(luajit PROPERTIES IMPORTED_LOCATION "${SANGEN_LUAJIT_LIB}")
-    add_dependencies(luajit SanGenLuaJitBuild)
+    # A plain fallback for any configuration outside the four above (e.g. a custom one); every
+    # configuration CMAKE_CONFIGURATION_TYPES actually lists gets its own exact match above instead.
+    set_target_properties(luajit PROPERTIES
+        IMPORTED_LOCATION "${SANGEN_LUAJIT_DEFAULT_LIB}"
+        ${SANGEN_LUAJIT_CONFIG_LOCATION_ARGS})
+    add_dependencies(luajit ${SANGEN_LUAJIT_CONFIG_TARGETS})
 
     # PRIVATE: no consumer of SanGenV2's public headers gains a Lua include-path dependency. CMake
     # still propagates the static archive itself transitively to any executable that links
@@ -423,6 +470,7 @@ add_sangen_test(GradientRamp_PARAMS_Test        src/params/GradientRamp_PARAMS_T
 add_sangen_test(LayerStack_PARAMS_Test          src/params/LayerStack_PARAMS_Test.cpp)
 add_sangen_test(MapArea_PARAMS_Test             src/params/MapArea_PARAMS_Test.cpp)
 add_sangen_test(MapRecipe_PARAMS_Test           src/params/MapRecipe_PARAMS_Test.cpp)
+add_sangen_test(MarkerInstance_PARAMS_Test      src/params/MarkerInstance_PARAMS_Test.cpp)
 add_sangen_test(MarkerLayerBundle_PARAMS_Test   src/params/MarkerLayerBundle_PARAMS_Test.cpp)
 add_sangen_test(PropInstance_PARAMS_Test        src/params/PropInstance_PARAMS_Test.cpp)
 add_sangen_test(PlacementRules_PARAMS_Test      src/params/PlacementRules_PARAMS_Test.cpp)
@@ -847,6 +895,15 @@ add_sangen_test(MarkersTab_Bundles_UI_Test src/ui/MarkersTab_Bundles_UI_Test.cpp
 # STEP125: EnumerateMarkerTypeSectionNames — the Markers tab's dynamic Type-section outer loop
 # (ARCH §19.14) — pure, no imgui frame needed.
 add_sangen_test(MarkersTab_TypeSections_UI_Test src/ui/MarkersTab_TypeSections_UI_Test.cpp)
+# STEP239: the Links tier's own pure logic (ApplyAddLinkAction, the color/override-enabled
+# propagation resolvers, CommitMarkerLinkRename's cascade, DeleteMarkerLink) — pure, no imgui frame
+# needed, mirroring MarkersTab_Bundles_UI_Test's own posture for the equivalent Bundle-tier functions.
+add_sangen_test(MarkersTab_Links_UI_Test src/ui/MarkersTab_Links_UI_Test.cpp)
+# STEP241 (ARCH §19.31 correction — uniform master/slave read-and-resolve, Name included): the new
+# MarkersTab_MarkerLinkResolvers_UI.h resolvers (Name at both tiers, bHidden, iconScale, grid-snap
+# pair, symmetry pair) — pure, no imgui frame needed, mirroring MarkersTab_Links_UI_Test's own
+# posture for the pre-existing color resolvers.
+add_sangen_test(MarkersTab_MarkerLinkResolvers_UI_Test src/ui/MarkersTab_MarkerLinkResolvers_UI_Test.cpp)
 # STEP94: MarkerDragGesture_UI's pure gesture state machine (correspondence build/match, live
 # per-frame writes, cardinality growth/shrink, Spawn-refusal freeze, ungrouped free-drag) and
 # RepositionSymmetryGroupMember (R2 §4's roster-slider counterpart) — pure/imgui-free, no window.
@@ -863,10 +920,23 @@ add_sangen_test(DecalDragGesture_UI_Test  src/ui/DecalDragGesture_UI_Test.cpp)
 # Marker-only test nor its behavior ever exercised before this ticket. CPU-composited fixture, no
 # imgui frame, no window/GL.
 add_sangen_test(ManualInstanceHitTest_UI_Test src/ui/ManualInstanceHitTest_UI_Test.cpp)
+# STEP234 — the generic DeleteManualInstancesById<GroupT>/per-domain wrapper mutation sibling to
+# HitTestManualInstances<GroupT> above: erases only the targeted identifiers, skips locked-layer
+# members (a soft partial-delete degrade, not a whole-batch refusal), no-ops on a missing identifier,
+# and each of the three per-domain wrappers binds its own domain's lock predicate correctly.
+# Pure/imgui-free, no window/GL.
+add_sangen_test(ManualInstanceDelete_UI_Test src/ui/ManualInstanceDelete_UI_Test.cpp)
 # ARCH §21.1 — the ordered multi-select set: primary-as-last-element, Replace/Toggle/Union's exact
 # contracts, and the order-sensitive equality the release-time gesture resolver depends on to skip a
 # no-op callback. Pure/imgui-free, no window.
 add_sangen_test(MapCanvas_SelectionSet_UI_Test src/ui/MapCanvas_SelectionSet_UI_Test.cpp)
+# STEP234 — the global Delete-key shortcut's own pure logic: ShouldApplyGlobalDeleteShortcut's gating
+# (a live text field or Scenario Edit Mode both defer) and DeleteSelectedManualInstancesAcrossDomains'
+# cross-domain partition+erase (empty/all-procedural selection is a no-op; a mixed Marker+Prop+Decal
+# selection deletes from every domain it touches, ignoring Units). Pure/imgui-free, no window/GL — the
+# private Application::ApplyGlobalDeleteShortcut method itself is an untestable-without-a-window thin
+# glue over exactly these two functions.
+add_sangen_test(Application_DeleteKey_UI_Test src/ui/Application_DeleteKey_UI_Test.cpp)
 # Human's own bug report — "When creating an Instance, symmetry needs to be checked and duplicates
 # created for proper symmetry": CreateSymmetricManualMarkerInstances' own pure/imgui-free coverage.
 add_sangen_test(MarkerInstanceCreateSymmetric_UI_Test src/ui/MarkerInstanceCreateSymmetric_UI_Test.cpp)
@@ -919,6 +989,15 @@ add_sangen_test(MapExporter_ArmySpawnMarkerValidation_IO_Test
 # target immediately above.
 add_sangen_test(MapExporter_ScenarioAreaNameValidation_IO_Test
     src/io/MapExporter_ScenarioAreaNameValidation_IO_Test.cpp)
+# STEP237_MarkerLinkParamsAndIO_PARAMS_IO: the new `MarkerLinks` array + the two merged
+# `LinkIdentifier` back-reference fields (ARCH §19.28/§19.29/§19.30) — own pair of small, disk-free
+# round-trip binaries, same "own file, own test" convention as
+# MapExporter_ArmySpawnMarkerValidation_IO_Test immediately above. Both touch nlohmann::json
+# directly (hand-built fixtures), so both need the direct link, same as MapExporter_IO_Test.
+add_sangen_test(MapExporter_MarkerLink_IO_Test src/io/MapExporter_MarkerLink_IO_Test.cpp)
+target_link_libraries(MapExporter_MarkerLink_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+add_sangen_test(MapImporter_MarkerLink_IO_Test src/io/MapImporter_MarkerLink_IO_Test.cpp)
+target_link_libraries(MapImporter_MarkerLink_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 add_sangen_test(MapImporter_IO_Test
     src/io/MapImporter_IO_Test.cpp
     src/io/MapImporter_Validation_IO_Test.cpp

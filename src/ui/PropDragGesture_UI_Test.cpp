@@ -38,6 +38,10 @@ Params::PropTransform MakeTransform(float x, float z, int symmetryGroupIdentifie
     return transform;
 }
 
+// ARCH §21.9 — Props has no Link concept: every widened call below passes this permanently-empty
+// NoInstanceLink roster, never populated/read (PropDragTraits's own inert pass-through bodies).
+const std::vector<NoInstanceLink> kNoLinks;
+
 // Live mirror-follow, growth, and release-time materialize — proves the generic core, not just its
 // Marker instantiation, actually drives PropTransform writes correctly.
 void RunLiveMirrorAndGrowthChecks() {
@@ -47,13 +51,13 @@ void RunLiveMirrorAndGrowthChecks() {
     const Params::Geometry geometry = MakeTestGeometry();
 
     InstanceDragGestureState state;
-    Check(BeginInstanceDragGesture<PropDragTraits>(state, props, {}, geometry,
+    Check(BeginInstanceDragGesture<PropDragTraits>(state, props, {}, kNoLinks, geometry,
                                                    Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0),
           "a Prop gesture begins on a grouped member, same as Markers");
     Check(state.gestureStartOrbitCount == 1, "on-axis, no sibling: gesture-start orbit is one point");
     Check(!state.bCardinalityFrozen, "Props has no reserved cardinality-frozen group");
 
-    UpdateInstanceDragGesture<PropDragTraits>(state, props, {}, geometry, 7.0f, 3.0f);   // off the axis
+    UpdateInstanceDragGesture<PropDragTraits>(state, props, {}, kNoLinks, geometry, 7.0f, 3.0f);   // off the axis
     Check(state.bCardinalityGrew, "moving off the axis is flagged as growth, identically to Markers");
     Check(static_cast<int>(props[0].transforms.size()) == 1, "zero PARAMS write for the ghost point");
     Check(static_cast<int>(state.currentGhostPoints.size()) == 1, "exactly one ghost point this frame");
@@ -79,10 +83,10 @@ void RunNoCardinalityFreezeChecks() {
     const Params::Geometry geometry = MakeTestGeometry();
 
     InstanceDragGestureState state;
-    BeginInstanceDragGesture<PropDragTraits>(state, props, {}, geometry, Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0);
+    BeginInstanceDragGesture<PropDragTraits>(state, props, {}, kNoLinks, geometry, Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0);
     Check(!state.bCardinalityFrozen, "PropDragTraits::IsCardinalityFrozenGroup is unconditionally false");
 
-    UpdateInstanceDragGesture<PropDragTraits>(state, props, {}, geometry, 5.0f, 3.0f);   // collapses the orbit
+    UpdateInstanceDragGesture<PropDragTraits>(state, props, {}, kNoLinks, geometry, 5.0f, 3.0f);   // collapses the orbit
     Check(!state.bSpawnCardinalityRefused,
           "a cardinality-changing Prop drag is never refused — no reserved group concept exists here");
 }
@@ -96,7 +100,7 @@ void RunLockRefusalChecks() {
     const Params::Geometry geometry = MakeTestGeometry();
 
     InstanceDragGestureState state;
-    Check(!BeginInstanceDragGesture<PropDragTraits>(state, props, lockedLayers, geometry,
+    Check(!BeginInstanceDragGesture<PropDragTraits>(state, props, lockedLayers, kNoLinks, geometry,
                                                     Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0),
           "a locked Prop layer refuses to begin a drag");
     Check(!state.bActive, "the gesture state is left inactive");
@@ -104,7 +108,7 @@ void RunLockRefusalChecks() {
     std::vector<Params::PropInstanceGroup> pair(1);
     pair[0].transforms.push_back(MakeTransform(2.0f, 3.0f, 3, /*layerIndex=*/0));
     pair[0].transforms.push_back(MakeTransform(8.0f, 3.0f, 3, /*layerIndex=*/0));
-    Check(!RepositionSymmetryGroupMember<PropDragTraits>(pair, lockedLayers, geometry,
+    Check(!RepositionSymmetryGroupMember<PropDragTraits>(pair, lockedLayers, kNoLinks, geometry,
                                                          Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0, 1.0f, 3.0f),
           "a locked Prop layer refuses RepositionSymmetryGroupMember outright");
     Check(NearlyEqual(pair[0].transforms[0].transform.positionX, 2.0f),

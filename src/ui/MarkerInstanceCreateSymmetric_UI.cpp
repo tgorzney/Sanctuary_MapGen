@@ -15,9 +15,16 @@ int CreateSymmetricManualMarkerInstances(Params::MarkerInstanceGroup& group,
                                          const Params::Geometry& geometry, int globalSymmetryMask,
                                          int globalRadialRepeatCount, int layerIndex,
                                          float worldX, float worldY, float worldZ) {
+    // STEP246, ARCH §19.33/§21.9 widened ResolveEffectiveMarkerSymmetry's signature; this call site
+    // (creating a brand-new instance — no transform, hence no linkIdentifier, exists yet) passes a
+    // synthetic layerIndex-only transform + an EMPTY Link roster, behavior-IDENTICAL to this call's
+    // own pre-ticket Link-blind Layer-tier read (Constitution §6 soft-degrade).
+    Params::MarkerTransform layerIndexOnlyTransform;
+    layerIndexOnlyTransform.layerIndex = layerIndex;
+    static const std::vector<Params::MarkerLink> kNoLinks;
     int effectiveMask = 0, effectiveRadialRepeatCount = 0;
-    ResolveEffectiveMarkerSymmetry(markerLayers, layerIndex, globalSymmetryMask, globalRadialRepeatCount,
-                                   effectiveMask, effectiveRadialRepeatCount);
+    ResolveEffectiveMarkerSymmetry(markerLayers, layerIndexOnlyTransform, kNoLinks, globalSymmetryMask,
+                                   globalRadialRepeatCount, effectiveMask, effectiveRadialRepeatCount);
 
     Pipeline::WorldSymmetryOrbitPoint orbitPoints[Params::symmetryOrbitMaximum];
     const int orbitCount = Pipeline::BuildWorldSymmetryOrbit(geometry, effectiveMask, effectiveRadialRepeatCount,

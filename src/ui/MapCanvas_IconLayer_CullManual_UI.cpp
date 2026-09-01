@@ -15,9 +15,12 @@
 // PARAMS read timing as before (zero DAG coupling, zero staleness); only the match key changed.
 #include "MapCanvas_IconLayer_CullInternal_UI.h"
 #include "Application_Defaults_UI.h"
+#include "MapCanvas_SelectionSet_UI.h"   // STEP240 — SelectionSetContains, for the selected-scale fold-in
+#include "MarkersTab_MarkerLinkInstanceResolvers_UI.h"   // STEP246 — per-instance Hidden/IconScale/Color
 #include "MarkerTypeVisibility_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../params/Army_PARAMS.h"
+#include "../params/MarkerLink_PARAMS.h"
 #include "../params/PropInstance_PARAMS.h"
 
 namespace SanmapGen {
@@ -138,29 +141,12 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
                           std::vector<OverlayVisibleInstance>& outCandidates,
                           const int* targetInstanceIdentifier) {
     const bool bWantSpawnGroups = (layer.domainKind == OverlayDomainKind_UI::SpawnsArmies);
-    // STEP144 — a hidden Layer contributes NO candidates at all, checked first so a hidden layer's
-    // own group/transform walk below never runs. Bounds-checked the same defensive way
-    // bLayerOverrideEnabled/layerIconScale already are, just below.
-    if (subLayerArrayIndex >= 0
-        && static_cast<std::size_t>(subLayerArrayIndex) < input.recipe->markerLayers.size()
-        && input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)].bHidden)
-        return;
-    // STEP116: the override check is hoisted ONCE per call — subLayerArrayIndex/markerLayers are
-    // invariant for the whole function.
-    const bool bLayerOverrideEnabled = subLayerArrayIndex >= 0
-        && static_cast<std::size_t>(subLayerArrayIndex) < input.recipe->markerLayers.size()
-        && input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)].bColorOverrideEnabled;
-    // STEP122: layer.iconScale hoisted ONCE per call, same posture as bLayerOverrideEnabled above.
-    const float layerIconScale = (subLayerArrayIndex >= 0
-        && static_cast<std::size_t>(subLayerArrayIndex) < input.recipe->markerLayers.size())
-        ? input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)].iconScale : 1.0f;
-    float overrideTintRed = 1.0f, overrideTintGreen = 1.0f, overrideTintBlue = 1.0f;
-    if (bLayerOverrideEnabled) {
-        const Params::MarkerInstanceLayer& overrideLayer =
-            input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)];
-        overrideTintRed = overrideLayer.color[0]; overrideTintGreen = overrideLayer.color[1];
-        overrideTintBlue = overrideLayer.color[2];
-    }
+    // subLayerArrayIndex/markerLayers are invariant for the whole function — only the RESOLVED
+    // (Hidden/color-override/iconScale) reads move per-instance below (STEP246), not this lookup.
+    const bool bSubLayerInRange = subLayerArrayIndex >= 0
+        && static_cast<std::size_t>(subLayerArrayIndex) < input.recipe->markerLayers.size();
+    const Params::MarkerInstanceLayer* const subLayer =
+        bSubLayerInRange ? &input.recipe->markerLayers[static_cast<std::size_t>(subLayerArrayIndex)] : nullptr;
     for (const Params::MarkerInstanceGroup& group : input.recipe->markers) {
         // STEP133 — the per-Type Hide/Unhide preview filter, gated at group level (the group's own
         // `name` IS the marker Type name, MarkerInstance_PARAMS.h), mirroring ResolvePropsManual's
@@ -168,12 +154,6 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
         if (input.markerTypeVisibility != nullptr && input.markerTypeVisibility->IsHidden(group.name)) continue;
         const bool bIsSpawnGroup = group.name == Params::kSpawnMarkerGroupName;
         if (bIsSpawnGroup != bWantSpawnGroups) continue;
-        // Type-default resolves once per GROUP (mirrors ResolvePropsManual's bReclaimable en-bloc
-        // gate above) — group.name is invariant within the inner transform loop too.
-        float groupTintRed = overrideTintRed, groupTintGreen = overrideTintGreen, groupTintBlue = overrideTintBlue;
-        if (!bLayerOverrideEnabled)
-            Params::ResolveMarkerGroupTypeTintColor(group.name, input.recipe->globalMarkerSettings,
-                                                     groupTintRed, groupTintGreen, groupTintBlue);
         const float groupTypeScale = Params::ResolveMarkerGroupTypeScale(group.name, input.recipe->globalMarkerSettings);   // STEP122
         for (std::size_t index = 0; index < group.transforms.size(); ++index) {
             const Params::MarkerTransform& transform = group.transforms[index];
@@ -188,6 +168,31 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
             // transform except the one target, when a target is given.
             if (targetInstanceIdentifier != nullptr && transform.instanceIdentifier != *targetInstanceIdentifier)
                 continue;
+            // STEP246, ARCH §19.33/§21.9 — Hidden/color-override/iconScale are now resolved PER
+            // INSTANCE (transform-tier-first, then Layer-tier), moved INSIDE this loop from a
+            // once-per-Layer hoist: different transforms on the same Layer can resolve differently
+            // once any one of them is Link-tagged (that's the whole point of instance-tier tagging;
+            // a Layer's own raw bHidden is no longer a valid "skip the whole Layer" shortcut). This
+            // is a deliberate perf-shape change (hoisted-once -> per-instance) — negligible at
+            // authoring-scale instance counts, not an accidental regression.
+            if (subLayer != nullptr && EffectiveManualMarkerInstanceHidden(transform, *subLayer, input.recipe->markerLinks))
+                continue;
+            float groupTintRed = 1.0f, groupTintGreen = 1.0f, groupTintBlue = 1.0f;
+            float layerIconScale = 1.0f;
+            if (subLayer != nullptr) {
+                layerIconScale = EffectiveManualMarkerInstanceIconScale(transform, *subLayer, input.recipe->markerLinks);
+                if (EffectiveManualMarkerInstanceColorOverrideEnabled(transform, *subLayer, input.recipe->markerLinks)) {
+                    const float* const overrideColor =
+                        EffectiveManualMarkerInstanceColor(transform, *subLayer, input.recipe->markerLinks);
+                    groupTintRed = overrideColor[0]; groupTintGreen = overrideColor[1]; groupTintBlue = overrideColor[2];
+                } else {
+                    Params::ResolveMarkerGroupTypeTintColor(group.name, input.recipe->globalMarkerSettings,
+                                                             groupTintRed, groupTintGreen, groupTintBlue);
+                }
+            } else {
+                Params::ResolveMarkerGroupTypeTintColor(group.name, input.recipe->globalMarkerSettings,
+                                                         groupTintRed, groupTintGreen, groupTintBlue);
+            }
             const std::string templateIdentifier =
                 ResolveMarkerIconTemplateIdentifier(transform, group, input.recipe->globalMarkerSettings);
             // ARCH §19.25 — the selection key is `transform.instanceIdentifier` (globally unique,
@@ -197,9 +202,34 @@ void ResolveMarkersManual(const DrawOverlayIconLayersInput& input, const Overlay
             // incorrectly lighting up an unrelated manual marker's `bSelected` — the fix this ruling
             // closes. `bManual=true` tags the key so a procedural array-position key of the same
             // numeric value never compares equal to it.
+            //
+            // ARCH §19.32/STEP240 — the render-consumer fold-in for GlobalMarkerSettings'
+            // scaleSelected*: resolved and composed HERE, in this markers-domain-aware function,
+            // deliberately NOT threaded through the shared, domain-agnostic
+            // EmitCandidateIfVisible/AppendCandidate choke point every collection kind (Units/Props/
+            // Decals/Markers) funnels through (MapCanvas_IconLayer_DrawInternal_UI.h's own header
+            // comment already rejects giving that function marker-domain knowledge, for the adjacent
+            // selectColor* case — the identical reasoning applies here). `bSelected` therefore has to
+            // be known at THIS site too, one frame ahead of AppendCandidate's own canonical
+            // SelectionSetContains check — not a second, driftable source of truth, since both sites
+            // query the same live `input.selectedInstanceKeys` with the same key shape, they simply
+            // query it twice in the same frame. When `targetInstanceIdentifier != nullptr` this call
+            // is already the C2 cache's own scoped replay-frame resolve for exactly this one
+            // instanceIdentifier (MapCanvas_IconLayer_Cull_UI.cpp's ResolveSelectedManualMarkerCandidate),
+            // which only ever runs for an instance already known to be selected — no redundant
+            // membership query needed in that path.
+            const bool bSelected = targetInstanceIdentifier != nullptr
+                || (input.selectedInstanceKeys != nullptr
+                    && SelectionSetContains(*input.selectedInstanceKeys,
+                                            OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers,
+                                                                  transform.instanceIdentifier, true, true}));
+            const float selectedTypeScale = bSelected
+                ? Params::ResolveMarkerGroupSelectedTypeScale(group.name, input.recipe->globalMarkerSettings)
+                : 1.0f;
             ConsiderManualInstance(input, layer, layerIndex, templateIdentifier,
                                    transform.transform.positionX, transform.transform.positionZ,
-                                   transform.transform.scaleX * groupTypeScale * layerIconScale,   // STEP122
+                                   // STEP122 groupTypeScale/layerIconScale, STEP240 selectedTypeScale
+                                   transform.transform.scaleX * groupTypeScale * layerIconScale * selectedTypeScale,
                                    PlacementCollectionKind_UI::Markers, transform.instanceIdentifier,
                                    groupTintRed, groupTintGreen, groupTintBlue,   // STEP116
                                    stableOrderCounter, outAabb, viewRect, diagnostics, outCandidates,

@@ -37,6 +37,11 @@ struct MarkerLayerBundle {
     int assemblyIdentifier     = -1;   // ARCH §19.5 — Assembly-references-Bundle hook. Inert until
                                         // the separate, still-unbuilt Assembly feature exists; no
                                         // Params::Assembly type exists yet to validate against.
+    int linkIdentifier         = -1;   // ARCH §19.29 — organizational: which Params::MarkerLink
+                                        // created this Group; drives the Links tier's own
+                                        // membership/ungroup walk (ARCH §19.31's Delete-Link
+                                        // semantics). -1 = not Link-bound, the shared sentinel this
+                                        // whole struct family already uses.
 };
 
 // True when reparenting `candidateId` under `newParentId` would create a cycle (including

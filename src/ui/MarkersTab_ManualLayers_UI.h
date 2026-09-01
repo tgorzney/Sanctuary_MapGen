@@ -38,6 +38,7 @@
 #include "SliderScalar_UI.h"
 #include "../params/Geometry_PARAMS.h"
 #include "../params/MarkerInstance_PARAMS.h"
+#include "../params/MarkerLink_PARAMS.h"
 #include "../params/Symmetry_PARAMS.h"
 
 namespace SanmapGen {
@@ -112,8 +113,11 @@ void DrawManualMarkerLayerBlockSettings(ManualMarkerLayersState& state);
 // `ImGui::GetContentRegionAvail()` to size the right-align push reached all the way to the row's
 // TRUE right edge, PAST the strip's own reserved space, so the push overshot and landed this
 // cluster on top of the strip instead of beside it.
+// STEP239: `links` (`recipe.markerLinks`) threads through to the Color Override control's own new
+// Link-resolution parameter. Defaulted so every pre-existing call site compiles unchanged.
 void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer,
-                                                  ManualMarkerLayersState& state, bool& bAnyCommitted);
+                                                  ManualMarkerLayersState& state, bool& bAnyCommitted,
+                                                  const std::vector<Params::MarkerLink>& links = {});
 
 // The layer stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.
 // STEP110: each row's body, whenever the row's own CollapsingHeader is open (never gated on
@@ -137,7 +141,8 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                   const std::string& markerTypeNameFilter,
                                   const std::function<void(int clickedInstanceIdentifier,
                                                            const std::vector<int>& selectedInstanceIdentifiers)>&
-                                      selectManualMarkerInstanceCallback = {});
+                                      selectManualMarkerInstanceCallback = {},
+                                  const std::vector<Params::MarkerLink>& links = {});
 
 // The Add Marker Layer button. STEP120: gains an optional Bundle-scoped parent so a Bundle node's
 // own "add a Layer here" (MarkersTab_Bundles_UI.cpp) can reuse it; moved out of the anonymous
@@ -168,7 +173,8 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                    const std::function<void(int clickedInstanceIdentifier,
                                                             const std::vector<int>& selectedInstanceIdentifiers)>&
-                                       selectManualMarkerInstanceCallback = {});
+                                       selectManualMarkerInstanceCallback = {},
+                                   const std::vector<Params::MarkerLink>& links = {});
 
 } // namespace Ui
 } // namespace SanmapGen

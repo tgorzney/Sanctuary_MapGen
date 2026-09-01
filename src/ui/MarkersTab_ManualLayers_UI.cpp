@@ -9,6 +9,7 @@
 #include "MarkersTab_ManualInstanceSelection_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
+#include "MarkersTab_MarkerLinkResolvers_UI.h"
 #include "imgui.h"
 
 namespace SanmapGen {
@@ -40,19 +41,30 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
         selectedManualInstanceIdentifier = anchorIdentifier;
         return false;
     }
+    // STEP242, ARCH §19.31 follow-up amendment: bLocked is now read-and-resolve while Link-bound,
+    // same posture as bHidden's own ToggleVisibility branch just below — a click on the built-in
+    // [L]/[U] affordance must not mutate the Layer's own (inert) field while linked; the icon's own
+    // DISPLAYED state already reflects the resolved value via the row-building lambda's
+    // EffectiveManualMarkerLayerLocked read, below.
     if (signal.kind == DraggableListSignalKind::ToggleLock) {
-        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(markerLayers.size()))
-            markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked =
-                !markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bLocked;
+        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(markerLayers.size())) {
+            Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)];
+            if (layer.linkIdentifier < 0) layer.bLocked = !layer.bLocked;
+        }
         return false;   // cosmetic-only: no structural move, same posture as Select
     }
     // STEP144 — the row's own built-in visibility icon now does something: MarkerInstanceLayer::
     // bHidden (new field), a straight V/I toggle (no E/D concept for a hand-placed Manual layer, so
     // no coupling the way the Procedural sibling needs — MarkerLayerEnabledVisibilityToggle_UI.h).
+    // STEP241, ARCH §19.31 correction: bHidden is now read-and-resolve while Link-bound — a click on
+    // the built-in icon must not mutate the Layer's own (inert) field while linked; the icon's own
+    // DISPLAYED state already reflects the resolved value via the row-building lambda's
+    // EffectiveManualMarkerLayerHidden read, below.
     if (signal.kind == DraggableListSignalKind::ToggleVisibility) {
-        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(markerLayers.size()))
-            markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bHidden =
-                !markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)].bHidden;
+        if (signal.sourceRowIndex >= 0 && signal.sourceRowIndex < static_cast<int>(markerLayers.size())) {
+            Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(signal.sourceRowIndex)];
+            if (layer.linkIdentifier < 0) layer.bHidden = !layer.bHidden;
+        }
         return false;   // cosmetic-only: no structural move, same posture as ToggleLock
     }
     const bool bDeleting            = signal.kind == DraggableListSignalKind::Delete;
@@ -78,7 +90,8 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
 // DrawRightAlignedDeleteButton, MarkersTab_BundleHeaderExtras_UI.cpp). STEP145: promoted out of the
 // anonymous namespace — see the header's own comment (MarkersTab_ManualLayers_UI.h) for why.
 void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer,
-                                                  ManualMarkerLayersState& state, bool& bAnyCommitted) {
+                                                  ManualMarkerLayersState& state, bool& bAnyCommitted,
+                                                  const std::vector<Params::MarkerLink>& links) {
     // Human's own bug report — Icon Size/Snap to Grid join this cluster, left of [SYM], same
     // right-align-against-the-reserved-zone math as before (V/I and X are NOT part of clusterWidth
     // here — DraggableList's own built-in affordance strip already draws those, see this function's
@@ -104,13 +117,13 @@ void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& l
     // right-aligning against IT lands this cluster flush against the strip with no gap and no overlap.
     if (kMarkerLayerHeaderExtraCombinedWidthPixels > clusterWidth)
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kMarkerLayerHeaderExtraCombinedWidthPixels - clusterWidth);
-    DrawMarkerLayerIconSizeHeaderControl(layer, state, bAnyCommitted);
+    DrawMarkerLayerIconSizeHeaderControl(layer, state, bAnyCommitted, links);
     ImGui::SameLine();
-    DrawMarkerLayerGridSnapHeaderControl(layer, state, bAnyCommitted);
+    DrawMarkerLayerGridSnapHeaderControl(layer, state, bAnyCommitted, links);
     ImGui::SameLine();
-    DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
+    DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted, links);
     ImGui::SameLine();
-    DrawManualMarkerLayerColorOverrideHeaderControl(layer, state, bAnyCommitted);
+    DrawManualMarkerLayerColorOverrideHeaderControl(layer, state, bAnyCommitted, links);
 }
 
 // STEP125: promoted out of the anonymous namespace (was DrawLayerSettings), called exactly once,
@@ -133,20 +146,27 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
                                   const std::string& markerTypeNameFilter,
                                   const std::function<void(int clickedInstanceIdentifier,
                                                            const std::vector<int>& selectedInstanceIdentifiers)>&
-                                      selectManualMarkerInstanceCallback) {
+                                      selectManualMarkerInstanceCallback,
+                                  const std::vector<Params::MarkerLink>& links) {
     return DraggableList<Params::MarkerInstanceLayer>::Render(
         "manualMarkerLayers", markerLayers,
         [&](int rowIndex) {
             DraggableListRow row;
             row.bRowSuppressed = IsMarkerInstanceLayerRowSuppressed(
                 markerLayers[static_cast<std::size_t>(rowIndex)], markerTypeNameFilter);   // CHANGED — STEP125
-            row.label   = ManualMarkerLayerRowLabel(markerLayers[static_cast<std::size_t>(rowIndex)]);
-            row.bLocked = markerLayers[static_cast<std::size_t>(rowIndex)].bLocked;
+            // STEP241, ARCH §19.31 correction: the row's own displayed name/visibility both resolve
+            // through the Link, not the raw field, whenever `linkIdentifier >= 0` — the two-arg
+            // ManualMarkerLayerRowLabel/EffectiveManualMarkerLayerHidden (MarkersTab_MarkerLinkResolvers_UI.h).
+            row.label   = ManualMarkerLayerRowLabel(markerLayers[static_cast<std::size_t>(rowIndex)], links);
+            // STEP242, ARCH §19.31 follow-up amendment: the built-in [L]/[U] icon's own displayed
+            // state resolves through the Link too, mirroring row.bVisible's own
+            // EffectiveManualMarkerLayerHidden read just below.
+            row.bLocked = EffectiveManualMarkerLayerLocked(markerLayers[static_cast<std::size_t>(rowIndex)], links);
             // STEP144/145 — the built-in [o]/[-] icon's own displayed state: bHidden wasn't wired
             // here when the field was added, so the icon always showed "visible" regardless of the
             // real state (clicking it still correctly flipped bHidden via ApplyLayerListSignal's
             // ToggleVisibility branch, but the icon itself never reflected it back).
-            row.bVisible = !markerLayers[static_cast<std::size_t>(rowIndex)].bHidden;
+            row.bVisible = !EffectiveManualMarkerLayerHidden(markerLayers[static_cast<std::size_t>(rowIndex)], links);
             return row;
         },
         [&](int rowIndex) {
@@ -171,7 +191,7 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
             // sits flush against DraggableList's own [o]/[L]/[X] strip with no dead gap (this row
             // draws no delete button of its own — that strip's built-in "X##delete" already covers
             // it, unlike the Bundle tree's Manual leaf, which has none and right-aligns its own X).
-            DrawRightAlignedSymmetryColorOverrideCluster(layer, state, bAnyNameCommitted);
+            DrawRightAlignedSymmetryColorOverrideCluster(layer, state, bAnyNameCommitted, links);
         },
         kMarkerLayerHeaderExtraCombinedWidthPixels,
         state.selectedLayerIndex);
@@ -207,7 +227,8 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
                                    std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
                                    const std::function<void(int clickedInstanceIdentifier,
                                                             const std::vector<int>& selectedInstanceIdentifiers)>&
-                                       selectManualMarkerInstanceCallback) {
+                                       selectManualMarkerInstanceCallback,
+                                   const std::vector<Params::MarkerLink>& links) {
     // STEP138/human's own correction: no "Add Marker Layer" button here — fully redundant with the
     // Type-section header's own "+ Layer" (MarkersTab_UI.cpp), and drawing both produced the same
     // confusing double-add the header's "+ Group" duplicate did.
@@ -218,7 +239,7 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
         globalRadialRepeatCount, markerSymmetryFixSettings, state, bAnyNameCommitted,
         instanceIndex, selectedManualInstanceIdentifier,
         selectedManualInstanceIdentifiers, anchorIdentifier, markerTypeNameFilter,
-        selectManualMarkerInstanceCallback);
+        selectManualMarkerInstanceCallback, links);
     if (signal.bHasSignal())
         ApplyLayerListSignal(markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
                              selectedManualInstanceIdentifiers, anchorIdentifier, signal);

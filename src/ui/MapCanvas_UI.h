@@ -314,6 +314,12 @@ public:
     // primary (e.g. Application::WireCallbacks()'s own partition into tabState.markers.
     // selectedManualInstanceIdentifiers).
     const OverlayInstanceKeySet_UI& SelectedInstanceKeys() const { return selectedInstanceKeys; }
+    // STEP234 — the shell's only public way to clear a selection outright (e.g. after a Delete-key
+    // erase, DESIGN_MarkerLink_R1.md §1.4): a stale held key surviving a structural mutation
+    // underneath it is the same index-staleness hazard DESIGN_Assembly_R1.md §2 already named.
+    // Mirrors `SetSelection`'s own "public method thinly wraps the private canonical entry point"
+    // shape (below) exactly — an empty batch is an unconditional Replace-to-nothing.
+    void ClearSelection() { ApplySelectionGesture(std::vector<OverlayInstanceKey_UI>{}, false, false); }
     const PreviewPixelCoordinate& LastPickedPixel() const { return lastPickedPixel; }
     // The toolkit identifier the image draw uses; zero when nothing has been composited yet.
     unsigned long long PresentationIdentifier() const;

@@ -19,10 +19,17 @@ void DrawFixSymmetryCommand(int layerIndex, const std::vector<Params::MarkerInst
                            int globalSymmetryMask, int globalRadialRepeatCount,
                            Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                            ManualMarkerLayersState& state) {
+    // STEP246, ARCH §19.33/§21.9 widened ResolveEffectiveMarkerSymmetry's signature; this is a
+    // Layer-row header control with no specific transform in hand (§19.33's own carve-out for such
+    // sites) — a synthetic layerIndex-only transform + an EMPTY Link roster resolves purely at the
+    // Layer tier, behavior-IDENTICAL to this call's own pre-ticket Link-blind read.
+    Params::MarkerTransform layerIndexOnlyTransform;
+    layerIndexOnlyTransform.layerIndex = layerIndex;
+    static const std::vector<Params::MarkerLink> kNoLinks;
     int effectiveMask = 0;
     int effectiveRadialRepeatCount = 0;
-    ResolveEffectiveMarkerSymmetry(markerLayers, layerIndex, globalSymmetryMask, globalRadialRepeatCount,
-                                   effectiveMask, effectiveRadialRepeatCount);
+    ResolveEffectiveMarkerSymmetry(markerLayers, layerIndexOnlyTransform, kNoLinks, globalSymmetryMask,
+                                   globalRadialRepeatCount, effectiveMask, effectiveRadialRepeatCount);
     DrawSliderScalar("Fix Symmetry Distance Tolerance", markerSymmetryFixSettings.distanceTolerance,
                      state.fixSymmetryToleranceRange, state.fixSymmetryToleranceToggle, WidgetStyle(), "%.2f");
     DrawCheckbox("Overwrite manually-adjusted positions", state.bFixSymmetryOverwrite);

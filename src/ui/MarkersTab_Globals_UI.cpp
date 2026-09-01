@@ -59,14 +59,19 @@ void DrawGlobalScaleRowIconButton(MarkerGlobalScaleRow& row, std::string& iconNa
 }
 
 // STEP136 (was DrawGlobalScaleRow, STEP134) — one Type-section header's own marker-settings row:
-// icon button / icon-color swatch (unlabeled) / "Selected" label + select-color swatch / compact
-// scale slider (unlabeled) — every control bound directly to `Params::GlobalMarkerSettings`, no
-// scratch intermediary. No type-name label here: the Type-section's own header text already shows
-// it (MarkersTab_UI.cpp). Human's own instruction: color edits should ALWAYS be realtime — no RT
-// button on either color swatch, and none on the scale slider either (GlobalMarkerSettings never
-// triggers anything beyond a preview repaint). No AlignTextToFramePadding on any label: every item
-// in this SameLine() run must share the row's own top Y (the acceptance test's literal contract),
-// and align-to-frame-padding would shift a label's item rect down by FramePadding.y and break that.
+// icon button / icon-color swatch (unlabeled) / "Selected" label + select-color swatch / base
+// icon-size dial / selected icon-size dial (both unlabeled) — every control bound directly to
+// `Params::GlobalMarkerSettings`, no scratch intermediary. No type-name label here: the
+// Type-section's own header text already shows it (MarkersTab_UI.cpp). Human's own instruction:
+// color edits should ALWAYS be realtime — no RT button on either color swatch, and none on either
+// scale dial either (GlobalMarkerSettings never triggers anything beyond a preview repaint). No
+// AlignTextToFramePadding on any label: every item in this SameLine() run must share the row's own
+// top Y (the acceptance test's literal contract), and align-to-frame-padding would shift a label's
+// item rect down by FramePadding.y and break that.
+// STEP240 (ARCH §19.32): the row's single DrawSliderScalarCompact scale control is replaced by TWO
+// DrawDialCompact controls (STEP236) — base scale (`fields.scale`) then selected scale
+// (`fields.selectedScale`) — both sharing the row's own new, narrower `globals.scaleDialRange`
+// ([0.25, 2.0]), never the wider `globals.iconScaleRange` this row used before.
 void DrawTypeSectionMarkerSettingsRow(MarkersTabGlobals& globals, int rowIndex,
                                       Params::GlobalMarkerSettings& globalMarkerSettings,
                                       const IconAtlasManifest* iconManifest,
@@ -93,10 +98,14 @@ void DrawTypeSectionMarkerSettingsRow(MarkersTabGlobals& globals, int rowIndex,
     DrawColorSwatch("SelectColor", fields.selectColor, compactSwatchOptions, row.selectColorToggle);
     ImGui::SameLine();
 
-    DrawSliderScalarCompact("Icon Scale (Global)", *fields.scale, globals.iconScaleRange,
-                            row.iconScaleToggle, kMarkerGlobalScaleRowTrackWidthPixels,
-                            kMarkerGlobalScaleRowFieldWidthPixels, WidgetStyle(), "%.2f",
-                            /*bShowRealtimeToggle=*/false);
+    DrawDialCompact("Icon Scale (Global)", *fields.scale, globals.scaleDialRange,
+                    row.iconScaleToggle, kMarkerGlobalScaleRowFieldWidthPixels, WidgetStyle(), "%.2f",
+                    /*bShowRealtimeToggle=*/false);
+    ImGui::SameLine();
+
+    DrawDialCompact("Icon Scale (Selected)", *fields.selectedScale, globals.scaleDialRange,
+                    row.selectedScaleToggle, kMarkerGlobalScaleRowFieldWidthPixels, WidgetStyle(), "%.2f",
+                    /*bShowRealtimeToggle=*/false);
     ImGui::PopID();
 }
 

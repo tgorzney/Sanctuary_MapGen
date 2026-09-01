@@ -10,6 +10,7 @@
 #include "MarkersTab_ManualLayers_UI.h"
 #include <cmath>
 #include <cstdio>
+#include <vector>
 
 using namespace SanmapGen;
 using namespace SanmapGen::Ui;
@@ -34,12 +35,13 @@ struct FrameResult {
 };
 
 FrameResult RunHeaderControlFrame(HeadlessMouseState mouse, Params::MarkerInstanceLayer& layer,
-                                  ManualMarkerLayersState& state) {
+                                  ManualMarkerLayersState& state,
+                                  const std::vector<Params::MarkerLink>& links = {}) {
     FrameResult result;
     RunHeadlessFrame(mouse, kWindowSize, [&] {
         result.origin  = ImGui::GetCursorScreenPos();
         result.boxSize = ResolveWidgetTrackHeight(WidgetStyle());
-        DrawManualMarkerLayerColorOverrideHeaderControl(layer, state, result.bAnyCommitted);
+        DrawManualMarkerLayerColorOverrideHeaderControl(layer, state, result.bAnyCommitted, links);
     });
     return result;
 }
@@ -203,6 +205,155 @@ void RunCombinedControlsNonOverlappingPositionCheck() {
           "both controls share the same row (same Y)");
 }
 
+// STEP239, ARCH §19.31 Mechanism A — a Link-bound Layer's own Color Override control goes inert
+// (added to the pre-existing bUseGroupColor disable) and displays the RESOLVED (Link-owned) state,
+// never the Layer's own raw fields, exactly the same "inert, not merely gray" proof
+// RunInertWhileGroupColorForcedCheck already gives for bUseGroupColor, one condition over.
+void RunInertWhileLinkedShowsResolvedColorCheck() {
+    HeadlessImguiSession session;
+    Params::MarkerInstanceLayer layer;
+    ManualMarkerLayersState state;
+    layer.bColorOverrideEnabled = false;   // the Layer's OWN field disagrees with the Link on purpose
+    layer.linkIdentifier        = 7;
+    std::vector<Params::MarkerLink> links(1);
+    links[0].identifier             = 7;
+    links[0].bColorOverrideEnabled  = true;
+
+    // A click at the checkbox's own known coordinates must do nothing while linked — mirrors
+    // RunInertWhileGroupColorForcedCheck's own click-through proof exactly.
+    const FrameResult settle = RunHeaderControlFrame(HeadlessMouseState(), layer, state, links);
+    const ImVec2 checkboxCenter(settle.origin.x + settle.boxSize * 0.5f, settle.origin.y + settle.boxSize * 0.5f);
+    HeadlessMouseState hover;   hover.position = checkboxCenter;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    RunHeaderControlFrame(hover, layer, state, links);
+    RunHeaderControlFrame(press, layer, state, links);
+    const FrameResult clicked = RunHeaderControlFrame(release, layer, state, links);
+
+    Check(!layer.bColorOverrideEnabled,
+         "a Link-bound Layer's own COL toggle stays inert to a click at the same coordinates");
+    Check(!clicked.bAnyCommitted, "and reports no commit either — mirrors the bUseGroupColor case exactly");
+
+    layer.linkIdentifier = -1;   // un-linked: the control reverts to editable, own-field behavior
+    const FrameResult unlinkedClicked = ClickAt(checkboxCenter, layer, state);
+    Check(layer.bColorOverrideEnabled,
+         "once un-linked, the SAME control is editable again and flips the Layer's own field");
+    (void)unlinkedClicked;
+}
+
+// STEP241, ARCH §19.31 correction — DrawMarkerLayerIconSizeHeaderControl: a Link-bound Layer's own
+// iconScale goes inert (BeginDisabled), mirroring RunInertWhileLinkedShowsResolvedColorCheck's own
+// click-through proof exactly, using SliderScalar_UI_Test.cpp's own "click on the right 3/4 of the
+// track" technique to attempt a real value-changing interaction.
+void RunIconSizeInertWhileLinkedCheck() {
+    HeadlessImguiSession session;
+    const ImVec2 windowSize(400.0f, 100.0f);
+    Params::MarkerInstanceLayer layer;
+    ManualMarkerLayersState state;
+    layer.iconScale      = 1.0f;
+    layer.linkIdentifier = 7;
+    std::vector<Params::MarkerLink> links(1);
+    links[0].identifier = 7;
+    links[0].iconScale  = 5.0f;
+
+    bool bAnyCommitted = false;
+    ImVec2 rowOrigin;
+    RunHeadlessFrame(HeadlessMouseState(), windowSize, [&] {
+        rowOrigin = ImGui::GetCursorScreenPos();
+        DrawMarkerLayerIconSizeHeaderControl(layer, state, bAnyCommitted, links);
+    });
+
+    const float trackHeight = ResolveWidgetTrackHeight(WidgetStyle());
+    const ImVec2 clickPoint(rowOrigin.x + kMarkerLayerIconSizeTrackWidthPixels * 0.9f,
+                            rowOrigin.y + trackHeight * 0.5f);
+    HeadlessMouseState hover;   hover.position = clickPoint;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    RunHeadlessFrame(hover, windowSize, [&] {
+        DrawMarkerLayerIconSizeHeaderControl(layer, state, bAnyCommitted, links);
+    });
+    RunHeadlessFrame(press, windowSize, [&] {
+        DrawMarkerLayerIconSizeHeaderControl(layer, state, bAnyCommitted, links);
+    });
+    RunHeadlessFrame(release, windowSize, [&] {
+        DrawMarkerLayerIconSizeHeaderControl(layer, state, bAnyCommitted, links);
+    });
+
+    Check(layer.iconScale == 1.0f,
+         "a Link-bound Layer's own iconScale is untouched by a click-drag on the (disabled) track");
+    Check(!bAnyCommitted, "and reports no commit either");
+}
+
+// STEP241, ARCH §19.31 correction — DrawMarkerLayerGridSnapHeaderControl: both the GRID toggle
+// button and the grid-size field go inert while linked. The toggle's own click-through mirrors
+// RunInertWhileGroupColorForcedCheck's proven SmallButton shape exactly.
+void RunGridSnapInertWhileLinkedCheck() {
+    HeadlessImguiSession session;
+    const ImVec2 windowSize(400.0f, 100.0f);
+    Params::MarkerInstanceLayer layer;
+    ManualMarkerLayersState state;
+    layer.bGridSnapEnabled       = false;
+    layer.gridSnapSizeWorldUnits = 1.0f;
+    layer.linkIdentifier         = 7;
+    std::vector<Params::MarkerLink> links(1);
+    links[0].identifier            = 7;
+    links[0].bGridSnapEnabled      = true;
+    links[0].gridSnapSizeWorldUnits = 8.0f;
+
+    bool bAnyCommitted = false;
+    ImVec2 origin; float boxSize = 0.0f;
+    RunHeadlessFrame(HeadlessMouseState(), windowSize, [&] {
+        origin  = ImGui::GetCursorScreenPos();
+        boxSize = ResolveWidgetTrackHeight(WidgetStyle());
+        DrawMarkerLayerGridSnapHeaderControl(layer, state, bAnyCommitted, links);
+    });
+    const ImVec2 toggleCenter(origin.x + boxSize * 0.5f, origin.y + boxSize * 0.5f);
+
+    HeadlessMouseState hover;   hover.position = toggleCenter;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    RunHeadlessFrame(hover, windowSize, [&] { DrawMarkerLayerGridSnapHeaderControl(layer, state, bAnyCommitted, links); });
+    RunHeadlessFrame(press, windowSize, [&] { DrawMarkerLayerGridSnapHeaderControl(layer, state, bAnyCommitted, links); });
+    RunHeadlessFrame(release, windowSize, [&] { DrawMarkerLayerGridSnapHeaderControl(layer, state, bAnyCommitted, links); });
+
+    Check(!layer.bGridSnapEnabled,
+         "a Link-bound Layer's own bGridSnapEnabled stays inert to a click at the GRID toggle's coordinates");
+    Check(!bAnyCommitted, "and reports no commit either");
+}
+
+// STEP241, ARCH §19.31 correction — DrawMarkerLayerSymmetryToggleHeaderControl: the SYM button goes
+// inert while linked, mirroring RunSymmetryToggleFlipCheck's own proven click shape exactly.
+void RunSymmetryInertWhileLinkedCheck() {
+    HeadlessImguiSession session;
+    const ImVec2 windowSize(400.0f, 100.0f);
+    Params::MarkerInstanceLayer layer;
+    layer.bSymmetryEnabled = true;
+    layer.linkIdentifier   = 7;
+    std::vector<Params::MarkerLink> links(1);
+    links[0].identifier        = 7;
+    links[0].bSymmetryEnabled  = false;
+
+    bool bAnyCommitted = false;
+    ImVec2 origin; float boxSize = 0.0f;
+    RunHeadlessFrame(HeadlessMouseState(), windowSize, [&] {
+        origin  = ImGui::GetCursorScreenPos();
+        boxSize = ResolveWidgetTrackHeight(WidgetStyle());
+        DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted, links);
+    });
+    const ImVec2 symButtonCenter(origin.x + boxSize * 0.5f, origin.y + boxSize * 0.5f);
+
+    HeadlessMouseState hover;   hover.position = symButtonCenter;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    RunHeadlessFrame(hover, windowSize, [&] { DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted, links); });
+    RunHeadlessFrame(press, windowSize, [&] { DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted, links); });
+    RunHeadlessFrame(release, windowSize, [&] { DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted, links); });
+
+    Check(layer.bSymmetryEnabled,
+         "a Link-bound Layer's own bSymmetryEnabled stays inert (still true) to a click at the SYM button's coordinates");
+    Check(!bAnyCommitted, "and reports no commit either");
+}
+
 } // namespace
 
 int main() {
@@ -211,6 +362,10 @@ int main() {
     RunSwatchDisabledEnabledCheck();
     RunSymmetryToggleFlipCheck();
     RunCombinedControlsNonOverlappingPositionCheck();
+    RunInertWhileLinkedShowsResolvedColorCheck();
+    RunIconSizeInertWhileLinkedCheck();
+    RunGridSnapInertWhileLinkedCheck();
+    RunSymmetryInertWhileLinkedCheck();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

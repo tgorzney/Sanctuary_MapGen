@@ -136,12 +136,16 @@ void MapCanvas::ApplyMarqueeGesture(float pressRegionLocalX, float pressRegionLo
             hits.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Decals, index, true, false});
     }
 
-    // Manual half — Markers/Props/Decals, each lock-gated (ARCH §21.5).
+    // Manual half — Markers/Props/Decals, each lock-gated (ARCH §21.5/§21.9).
     if (manualMarkerDragMarkers != nullptr) {
         const std::vector<Params::MarkerInstanceLayer>* layers = manualMarkerDragLayers;
-        const std::function<bool(int)> isLocked = [layers](int layerIndex) {
-            return layers != nullptr && IsMarkerInstanceLayerLocked(*layers, layerIndex);
-        };
+        static const std::vector<Params::MarkerLink> kNoMarkerLinks;
+        const std::vector<Params::MarkerLink>& links =
+            manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->markerLinks : kNoMarkerLinks;
+        const std::function<bool(const Params::MarkerTransform&)> isLocked =
+            [layers, &links](const Params::MarkerTransform& t) {
+                return layers != nullptr && IsMarkerInstanceLocked(t, *layers, links);
+            };
         std::vector<std::pair<int, int>> pairs;
         CollectManualInstancesInWorldRegion<Params::MarkerInstanceGroup>(
             *manualMarkerDragMarkers, rect.minX, rect.minZ, rect.maxX, rect.maxZ, isLocked, pairs);
@@ -150,9 +154,10 @@ void MapCanvas::ApplyMarqueeGesture(float pressRegionLocalX, float pressRegionLo
     }
     if (manualPropDrag.props != nullptr) {
         const std::vector<Params::PropInstanceLayer>* layers = manualPropDrag.layers;
-        const std::function<bool(int)> isLocked = [layers](int layerIndex) {
-            return layers != nullptr && IsPropInstanceLayerLocked(*layers, layerIndex);
-        };
+        const std::function<bool(const Params::PropTransform&)> isLocked =
+            [layers](const Params::PropTransform& t) {
+                return layers != nullptr && IsPropInstanceLayerLocked(*layers, t.layerIndex);
+            };
         std::vector<std::pair<int, int>> pairs;
         CollectManualInstancesInWorldRegion<Params::PropInstanceGroup>(
             *manualPropDrag.props, rect.minX, rect.minZ, rect.maxX, rect.maxZ, isLocked, pairs);
@@ -161,9 +166,10 @@ void MapCanvas::ApplyMarqueeGesture(float pressRegionLocalX, float pressRegionLo
     }
     if (manualDecalDrag.decals != nullptr) {
         const std::vector<Params::DecalInstanceLayer>* layers = manualDecalDrag.layers;
-        const std::function<bool(int)> isLocked = [layers](int layerIndex) {
-            return layers != nullptr && IsDecalInstanceLayerLocked(*layers, layerIndex);
-        };
+        const std::function<bool(const Params::DecalTransform&)> isLocked =
+            [layers](const Params::DecalTransform& t) {
+                return layers != nullptr && IsDecalInstanceLayerLocked(*layers, t.layerIndex);
+            };
         std::vector<std::pair<int, int>> pairs;
         CollectManualInstancesInWorldRegion<Params::DecalInstanceGroup>(
             *manualDecalDrag.decals, rect.minX, rect.minZ, rect.maxX, rect.maxZ, isLocked, pairs);

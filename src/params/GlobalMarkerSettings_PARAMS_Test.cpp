@@ -98,6 +98,37 @@ int main() {
           && blue == settings.selectColorDefault[2],
           "an arbitrary freeform name also resolves selectColorDefault");
 
+    // ARCH §19.32 — ResolveMarkerGroupSelectedTypeScale, strict mirror of ResolveMarkerGroupTypeScale
+    // (STEP122, exercised for the base scale in MapCanvas_IconLayer_Cull_UI_Test.cpp's own
+    // CheckResolveMarkerGroupTypeScale). Same name-matching vocabulary, unmatched name falls back
+    // to 1.0f (the multiplicative no-op), not settings.scaleSelectedAlloy/etc. or any color-style
+    // "selected default" field — no white-vs-white ambiguity a color fallback has (ARCH §19.32).
+    GlobalMarkerSettings scaleSettings;
+    scaleSettings.scaleSelectedAlloy  = 0.8f;
+    scaleSettings.scaleSelectedPlasma = 1.2f;
+    scaleSettings.scaleSelectedSpawn  = 1.6f;
+
+    Check(ResolveMarkerGroupSelectedTypeScale("Spawn", scaleSettings) == 1.6f,
+          "\"Spawn\" resolves scaleSelectedSpawn");
+    Check(ResolveMarkerGroupSelectedTypeScale(kSpawnMarkerGroupName, scaleSettings) == 1.6f,
+          "kSpawnMarkerGroupName resolves scaleSelectedSpawn");
+    Check(ResolveMarkerGroupSelectedTypeScale("Spawns", scaleSettings) == 1.6f,
+          "\"Spawns\" (plural) resolves scaleSelectedSpawn");
+    Check(ResolveMarkerGroupSelectedTypeScale("Alloy", scaleSettings) == 0.8f,
+          "\"Alloy\" resolves scaleSelectedAlloy");
+    Check(ResolveMarkerGroupSelectedTypeScale("Alloys", scaleSettings) == 0.8f,
+          "\"Alloys\" (plural) resolves scaleSelectedAlloy");
+    Check(ResolveMarkerGroupSelectedTypeScale("Plasma", scaleSettings) == 1.2f,
+          "\"Plasma\" resolves scaleSelectedPlasma");
+    Check(ResolveMarkerGroupSelectedTypeScale("Plasmas", scaleSettings) == 1.2f,
+          "\"Plasmas\" (plural) resolves scaleSelectedPlasma");
+    Check(ResolveMarkerGroupSelectedTypeScale("Generic", scaleSettings) == 1.0f,
+          "\"Generic\" resolves 1.0f, the multiplicative no-op fallback");
+    Check(ResolveMarkerGroupSelectedTypeScale("Expansion", scaleSettings) == 1.0f,
+          "\"Expansion\" resolves 1.0f, the multiplicative no-op fallback");
+    Check(ResolveMarkerGroupSelectedTypeScale("SomeFreeformGroupName", scaleSettings) == 1.0f,
+          "an arbitrary freeform name resolves 1.0f, the multiplicative no-op fallback");
+
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

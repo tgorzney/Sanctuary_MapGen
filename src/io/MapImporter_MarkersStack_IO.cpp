@@ -97,6 +97,10 @@ void ReadGlobalMarkerSettingsJson(const nlohmann::json& document, Params::MapRec
     ReadJsonFloat(json, "MarkerScaleAlloy", settings.scaleAlloy);
     ReadJsonFloat(json, "MarkerScalePlasma", settings.scalePlasma);
     ReadJsonFloat(json, "MarkerScaleSpawn", settings.scaleSpawn);
+    // ARCH §19.32 — per-Type-section "selected" icon-size pair, alongside the base triplet above.
+    ReadJsonFloat(json, "MarkerScaleSelectedAlloy", settings.scaleSelectedAlloy);
+    ReadJsonFloat(json, "MarkerScaleSelectedPlasma", settings.scaleSelectedPlasma);
+    ReadJsonFloat(json, "MarkerScaleSelectedSpawn", settings.scaleSelectedSpawn);
     ReadJsonColorRgba(json, "MarkerSelectColorAlloy", settings.selectColorAlloy);
     ReadJsonColorRgba(json, "MarkerSelectColorPlasma", settings.selectColorPlasma);
     ReadJsonColorRgba(json, "MarkerSelectColorSpawn", settings.selectColorSpawn);

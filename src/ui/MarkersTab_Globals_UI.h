@@ -26,6 +26,8 @@
 #include "FilePathPicker_UI.h"
 #include "IconAtlasPairing_UI.h"
 #include "IconGridWidget_UI.h"
+#include "LabelledDialWidget_UI.h"   // NEW — STEP240: DialRange/DrawDialCompact for the base+selected
+                                     // icon-size pair (ARCH §19.32)
 #include "Section_UI.h"
 #include "SliderScalar_UI.h"
 #include "imgui.h"
@@ -47,7 +49,9 @@ inline const char* const markerGlobalScaleRowLabels[kMarkerGlobalScaleRowCount] 
 // "settings, not literals" does not reach it. The design doc's own flagged width-budget risk
 // (DESIGN_MarkersUICorrectionRound2_R1.md item 1+14) is why the track and icon are the two
 // SHRUNK-FIRST values here rather than the plan's rough 90px/48px estimate.
-inline constexpr float kMarkerGlobalScaleRowTrackWidthPixels  = 60.0f;
+// kMarkerGlobalScaleRowTrackWidthPixels retired — STEP240 converts the row's scale control(s) from
+// DrawSliderScalarCompact (a linear TRACK) to DrawDialCompact (a circular knob sized from the row's
+// own frame height, ARCH §19.32); a "track width" no longer names anything this row draws.
 inline constexpr float kMarkerGlobalScaleRowFieldWidthPixels  = 42.0f;
 inline constexpr float kMarkerGlobalScaleRowSwatchWidthPixels = 20.0f;
 
@@ -58,18 +62,33 @@ struct MarkerGlobalScaleRow {
     // struct's existing two-separate-toggles convention — each field keeps its own
     // RT-tweakability, never merged).
     RealtimeToggle selectColorToggle{true};
+    // NEW — STEP240 (ARCH §19.32): the "selected" icon-size dial's own RT bookkeeping, independent
+    // of iconScaleToggle above — mirrors selectColorToggle's own "each field keeps its own"
+    // reasoning one control over. Never surfaced as a drawn RT button (bShowRealtimeToggle=false,
+    // same "scale edits are always realtime" posture as the base-scale dial), but StepDialInteraction
+    // still needs a live RealtimeToggle instance to run its commit-timing bookkeeping against.
+    RealtimeToggle selectedScaleToggle{true};
     // NEW — STEP121: this row's OWN popup/highlight state, so each row's picker remembers its own
     // scroll position and highlighted cell independently. Replaces the single shared
     // MarkersTabGlobals::iconGridState + selectedScaleRowIndex "click a row to make it the active
     // target" model this ticket retires — only one popup can be open at a time regardless (imgui's
-    // own popup-stack behavior), so nothing is lost by giving each row its own state, and the
-    // popup can now seed its highlight from THIS row's current icon on open (§3).
+    // own popup-stack behavior), so nothing is lost by giving each row's picker its own state, and
+    // the popup can now seed its highlight from THIS row's current icon on open (§3).
     IconGridState  iconGridState;
 };
 
 struct MarkersTabGlobals {
     SectionState      section;
+    // No longer read by this file's own row draw as of STEP240 (the row's scale controls moved to
+    // the narrower scaleDialRange below) — left in place rather than removed: MarkersTab_UI_Test.cpp
+    // still asserts its default bounds, and retiring a field neither the ticket nor its own test
+    // asked to change is out of this ticket's scope.
     ScalarSliderRange iconScaleRange{ 0.1f, 10.0f, 0.0f };
+    // NEW — STEP240 (ARCH §19.32): the base+selected icon-size dial pair's own narrower range,
+    // scoped to just this row — deliberately NOT a change to iconScaleRange above (that field's own
+    // wider {0.1, 10.0} bounds are untouched, matching ARCH §19.32's explicit "does not change the
+    // per-Manual-Layer iconScale control's own wider range" ruling).
+    DialRange         scaleDialRange{ 0.25f, 2.0f, 0.0f, 200.0f };
     MarkerGlobalScaleRow scaleRows[kMarkerGlobalScaleRowCount];
     // STEP134: shrunk 48->32 — the FIRST of the ticket's own "shrink icon button and track width
     // first" width-budget remedies, now that the row carries 5 controls on one line instead of 3
@@ -88,13 +107,16 @@ struct MarkersTabGlobals {
 // mirroring the posture MarkersTab_ManualLayerRowBody_UI.cpp already uses for `layer.iconScale`
 // (bind straight to the PARAMS field, no scratch intermediary).
 struct GlobalMarkerScaleRowFields {
-    float*       scale       = nullptr;
-    float*       color       = nullptr;   // 4 floats: colorAlloy/colorPlasma/colorSpawn
-    std::string* iconName    = nullptr;   // iconNameAlloy/iconNamePlasma/iconNameSpawn
+    float*       scale         = nullptr;
+    // NEW — STEP240 (ARCH §19.32): scaleSelectedAlloy/Plasma/Spawn, the per-type "selected" icon-size
+    // counterpart to `scale` above — same direct-binding posture, no scratch intermediary.
+    float*       selectedScale = nullptr;
+    float*       color         = nullptr;   // 4 floats: colorAlloy/colorPlasma/colorSpawn
+    std::string* iconName      = nullptr;   // iconNameAlloy/iconNamePlasma/iconNameSpawn
     // NEW — STEP134 (ARCH §19.17's select-tint field, item 14): 4 floats:
     // selectColorAlloy/Plasma/Spawn. selectColorDefault is never resolved to by this per-type row —
     // it is the resolver's own unmatched-name fallback (GlobalMarkerSettings_PARAMS.h), not a 4th row.
-    float*       selectColor = nullptr;
+    float*       selectColor   = nullptr;
 };
 
 // rowIndex -> the GlobalMarkerSettings fields that row edits (Alloy=0/Plasma=1/Spawn=2, the same
@@ -105,12 +127,12 @@ struct GlobalMarkerScaleRowFields {
 inline GlobalMarkerScaleRowFields ResolveGlobalMarkerScaleRowFields(
     Params::GlobalMarkerSettings& settings, int rowIndex) {
     switch (rowIndex) {
-        case 0: return { &settings.scaleAlloy,  settings.colorAlloy,  &settings.iconNameAlloy,
-                         settings.selectColorAlloy };
-        case 1: return { &settings.scalePlasma, settings.colorPlasma, &settings.iconNamePlasma,
-                         settings.selectColorPlasma };
-        case 2: return { &settings.scaleSpawn,  settings.colorSpawn,  &settings.iconNameSpawn,
-                         settings.selectColorSpawn };
+        case 0: return { &settings.scaleAlloy,  &settings.scaleSelectedAlloy,
+                         settings.colorAlloy,  &settings.iconNameAlloy, settings.selectColorAlloy };
+        case 1: return { &settings.scalePlasma, &settings.scaleSelectedPlasma,
+                         settings.colorPlasma, &settings.iconNamePlasma, settings.selectColorPlasma };
+        case 2: return { &settings.scaleSpawn,  &settings.scaleSelectedSpawn,
+                         settings.colorSpawn,  &settings.iconNameSpawn, settings.selectColorSpawn };
         default: return {};
     }
 }
@@ -129,26 +151,34 @@ void DrawGlobalScaleRowIconButton(MarkerGlobalScaleRow& row, std::string& iconNa
 // anonymous) so the headless-frame acceptance test can drive it directly, mirroring
 // DrawManualMarkerLayerColorOverrideHeaderControl's own test-callable posture
 // (MarkersTab_ManualLayerRowBody_UI.h). Human's own explicit order: icon thumbnail (unlabeled) ->
-// icon-color swatch (unlabeled) -> "Selected" label + select-color swatch -> Size slider (unlabeled
-// — DrawSliderScalarCompact's own `label` param is tooltip/ID-only, never rendered). No type-name
-// label: the Type-section's own header text already shows it (MarkersTab_UI.cpp).
+// icon-color swatch (unlabeled) -> "Selected" label + select-color swatch -> base icon-size dial ->
+// selected icon-size dial (both unlabeled — DrawDialCompact's own `label` param is tooltip/ID-only,
+// never rendered, STEP236). No type-name label: the Type-section's own header text already shows it
+// (MarkersTab_UI.cpp). STEP240 (ARCH §19.32) converts the row's ONE scale slider into this pair of
+// compact dials — DrawSliderScalarCompact is no longer used by this row.
 void DrawTypeSectionMarkerSettingsRow(MarkersTabGlobals& globals, int rowIndex,
                                       Params::GlobalMarkerSettings& globalMarkerSettings,
                                       const IconAtlasManifest* iconManifest,
                                       const IconAtlasPairingLookup* pairingLookup);
 
 // This row's own total rendered width (icon button + icon-color swatch + "Selected" label +
-// select-color swatch + Size slider, the exact DrawTypeSectionMarkerSettingsRow sequence above), so
-// MarkersTab_UI.cpp can fold it into a Type-section header's own reserved-right-zone math without
-// the two ever drifting apart (mirrors that file's own TypeSectionHeaderButtonClusterWidth
-// companion-function pattern).
+// select-color swatch + base icon-size dial + selected icon-size dial, the exact
+// DrawTypeSectionMarkerSettingsRow sequence above), so MarkersTab_UI.cpp can fold it into a
+// Type-section header's own reserved-right-zone math without the two ever drifting apart (mirrors
+// that file's own TypeSectionHeaderButtonClusterWidth companion-function pattern).
 inline float TypeSectionMarkerSettingsRowWidth(const MarkersTabGlobals& globals) {
     const float itemSpacing = ImGui::GetStyle().ItemSpacing.x;
+    // Each DrawDialCompact call (bShowRealtimeToggle=false, matching the row's own "scale edits are
+    // always realtime" posture) draws a knob (diameter = the default style.dialRadius fallback,
+    // ImGui::GetFrameHeight()) SameLine'd with a fixed-width field — no RT-button term, mirroring
+    // this row's own color swatches.
+    const float perDialWidth = ImGui::GetFrameHeight() + itemSpacing + kMarkerGlobalScaleRowFieldWidthPixels;
     return globals.iconButtonSizePixels + itemSpacing
          + kMarkerGlobalScaleRowSwatchWidthPixels + itemSpacing
          + ImGui::CalcTextSize("Selected").x + itemSpacing
          + kMarkerGlobalScaleRowSwatchWidthPixels + itemSpacing
-         + kMarkerGlobalScaleRowTrackWidthPixels + kMarkerGlobalScaleRowFieldWidthPixels;
+         + perDialWidth + itemSpacing
+         + perDialWidth;
 }
 
 // Draws the global section: the gamedata root and the icon scan request only (STEP136 — the three

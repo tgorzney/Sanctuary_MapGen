@@ -11,6 +11,7 @@
 #include "MarkerLayerEnabledVisibilityToggle_UI.h"
 #include "MarkersTab_ManualInstanceSelection_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
+#include "MarkersTab_MarkerLinkResolvers_UI.h"
 #include "PlacementRuleSections_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
@@ -209,7 +210,16 @@ void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
         return;
     }
 
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+    // STEP241, ARCH §19.31 correction: Name is now read-and-resolve at the Bundle tier too — while
+    // this Group is Link-bound, a double-click never starts a rename (the tree's own displayed node
+    // label is already the Link-resolved name, EffectiveMarkerLayerBundleName, drawn by
+    // DrawMarkerLayerBundleTree's own node-label lambda). A field-local check only, no `links`
+    // parameter needed here.
+    bool bLinked = false;
+    for (const Params::MarkerLayerBundle& bundle : bundles)
+        if (bundle.identifier == bundleIdentifier) { bLinked = bundle.linkIdentifier >= 0; break; }
+
+    if (!bLinked && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         state.renamingBundleIdentifier = bundleIdentifier;
         state.bRenameFocusPending      = true;
         for (const Params::MarkerLayerBundle& bundle : bundles)
@@ -246,7 +256,8 @@ void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     ManualMarkerLayersState& manualLayersState,
                                     MarkerLayerBundlesState& bundlesState,
                                     const std::vector<int>& selectedManualInstanceIdentifiers,
-                                    Pipeline::PreviewDriver* previewDriver, bool& bAnyCommitted) {
+                                    Pipeline::PreviewDriver* previewDriver, bool& bAnyCommitted,
+                                    const std::vector<Params::MarkerLink>& links) {
     if (leaf.kind == MarkerGroupLeafKey_UI::Kind::Manual) {
         DrawManualLayerInstanceDropTarget(leaf.layerIndex, markers, selectedManualInstanceIdentifiers);
         if (leaf.layerIndex < 0 || leaf.layerIndex >= static_cast<int>(instanceLayers.size())) return;
@@ -256,21 +267,31 @@ void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
         if (DrawLayerHeaderNameOverlay(leaf.layerIndex, layer, manualLayersState, bAnyCommitted)) return;
         // Human's own bug report — Icon Size/Snap to Grid now live in the header, mirroring how
         // SYM/COL already do (left of them, same [SYM][COL][swatch][V/I][X] cluster convention).
-        DrawMarkerLayerIconSizeHeaderControl(layer, manualLayersState, bAnyCommitted);
+        // STEP241, ARCH §19.31 correction: `links` threads through to every one of these now —
+        // widened from STEP239's color-only treatment.
+        DrawMarkerLayerIconSizeHeaderControl(layer, manualLayersState, bAnyCommitted, links);
         ImGui::SameLine();
-        DrawMarkerLayerGridSnapHeaderControl(layer, manualLayersState, bAnyCommitted);
+        DrawMarkerLayerGridSnapHeaderControl(layer, manualLayersState, bAnyCommitted, links);
         ImGui::SameLine();
-        DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted);
+        DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted, links);
         ImGui::SameLine();
-        DrawManualMarkerLayerColorOverrideHeaderControl(layer, manualLayersState, bAnyCommitted);
+        DrawManualMarkerLayerColorOverrideHeaderControl(layer, manualLayersState, bAnyCommitted, links);
         ImGui::SameLine();
-        // STEP144 — a straight V/I toggle, no E/D coupling (a hand-placed Manual layer has no
-        // "generation enabled" concept the way a Procedural one does).
-        if (ImGui::SmallButton(layer.bHidden ? "I##visible" : "V##visible")) {
-            layer.bHidden = !layer.bHidden;
-            bAnyCommitted = true;
+        // STEP144 -> STEP241/ARCH §19.31 correction: bHidden IS now read-and-resolved from a bound
+        // Link, exactly like every other governed field (retracts STEP239's "no such field exists on
+        // Params::MarkerLink... stays independently editable" text) — the toggle goes inert while
+        // linked and its displayed icon reflects the RESOLVED value, never `layer.bHidden` directly.
+        {
+            const bool bHiddenLinked = layer.linkIdentifier >= 0;
+            const bool bEffectiveHidden = EffectiveManualMarkerLayerHidden(layer, links);
+            ImGui::BeginDisabled(bHiddenLinked);
+            if (ImGui::SmallButton(bEffectiveHidden ? "I##visible" : "V##visible")) {
+                layer.bHidden = !layer.bHidden;
+                bAnyCommitted = true;
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Visible / Invisible in preview");
         }
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Visible / Invisible in preview");
         ImGui::SameLine();
         if (DrawRightAlignedDeleteButton("X##deleteLayer")) ImGui::OpenPopup("deleteManualLayerPopup");
         if (ImGui::BeginPopup("deleteManualLayerPopup")) {

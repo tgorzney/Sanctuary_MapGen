@@ -19,12 +19,16 @@ bool MapCanvas::HitTestManualInstanceAcrossDomains(float regionLocalX, float reg
     bool bHitAny = false;
     float bestDistanceSquared = 0.0f;
 
+    static const std::vector<Params::MarkerLink> kNoMarkerLinksHitTest;
     if (manualMarkerDragMarkers != nullptr) {
         int groupIndex = -1, transformIndex = -1; float distanceSquared = 0.0f;
         const std::vector<Params::MarkerInstanceLayer>* layers = manualMarkerDragLayers;
-        const std::function<bool(int)> isLocked = [layers](int layerIndex) {
-            return layers != nullptr && IsMarkerInstanceLayerLocked(*layers, layerIndex);
-        };
+        const std::vector<Params::MarkerLink>& links =
+            manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->markerLinks : kNoMarkerLinksHitTest;
+        const std::function<bool(const Params::MarkerTransform&)> isLocked =
+            [layers, &links](const Params::MarkerTransform& t) {
+                return layers != nullptr && IsMarkerInstanceLocked(t, *layers, links);
+            };
         if (HitTestManualInstances<Params::MarkerInstanceGroup>(*manualMarkerDragMarkers, *composite, view,
                 regionLocalX, regionLocalY, pickRadiusScreenPixels, isLocked, groupIndex, transformIndex,
                 &distanceSquared)
@@ -39,9 +43,10 @@ bool MapCanvas::HitTestManualInstanceAcrossDomains(float regionLocalX, float reg
     if (manualPropDrag.props != nullptr) {
         int groupIndex = -1, transformIndex = -1; float distanceSquared = 0.0f;
         const std::vector<Params::PropInstanceLayer>* layers = manualPropDrag.layers;
-        const std::function<bool(int)> isLocked = [layers](int layerIndex) {
-            return layers != nullptr && IsPropInstanceLayerLocked(*layers, layerIndex);
-        };
+        const std::function<bool(const Params::PropTransform&)> isLocked =
+            [layers](const Params::PropTransform& t) {
+                return layers != nullptr && IsPropInstanceLayerLocked(*layers, t.layerIndex);
+            };
         if (HitTestManualInstances<Params::PropInstanceGroup>(*manualPropDrag.props, *composite, view,
                 regionLocalX, regionLocalY, pickRadiusScreenPixels, isLocked, groupIndex, transformIndex,
                 &distanceSquared)
@@ -54,9 +59,10 @@ bool MapCanvas::HitTestManualInstanceAcrossDomains(float regionLocalX, float reg
     if (manualDecalDrag.decals != nullptr) {
         int groupIndex = -1, transformIndex = -1; float distanceSquared = 0.0f;
         const std::vector<Params::DecalInstanceLayer>* layers = manualDecalDrag.layers;
-        const std::function<bool(int)> isLocked = [layers](int layerIndex) {
-            return layers != nullptr && IsDecalInstanceLayerLocked(*layers, layerIndex);
-        };
+        const std::function<bool(const Params::DecalTransform&)> isLocked =
+            [layers](const Params::DecalTransform& t) {
+                return layers != nullptr && IsDecalInstanceLayerLocked(*layers, t.layerIndex);
+            };
         if (HitTestManualInstances<Params::DecalInstanceGroup>(*manualDecalDrag.decals, *composite, view,
                 regionLocalX, regionLocalY, pickRadiusScreenPixels, isLocked, groupIndex, transformIndex,
                 &distanceSquared)
@@ -90,6 +96,7 @@ bool MapCanvas::TryBeginManualInstanceDrag(float regionLocalX, float regionLocal
     static const std::vector<Params::MarkerInstanceLayer> kNoMarkerLayers;
     static const std::vector<Params::PropInstanceLayer>   kNoPropLayers;
     static const std::vector<Params::DecalInstanceLayer>  kNoDecalLayers;
+    static const std::vector<NoInstanceLink>              kNoLinks;   // ARCH §21.9 — shared by Props/Decals
 
     switch (hitCollection) {
     case PlacementCollectionKind_UI::Markers:
@@ -98,6 +105,7 @@ bool MapCanvas::TryBeginManualInstanceDrag(float regionLocalX, float regionLocal
         bManualMarkerDragActive = BeginInstanceDragGesture<MarkerDragTraits>(
             manualMarkerDragState, *manualMarkerDragMarkers,
             manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoMarkerLayers,
+            manualMarkerDragRecipe->markerLinks,
             *manualMarkerDragGeometry, manualMarkerDragRecipe->globalSymmetryMask,
             manualMarkerDragRecipe->radialSymmetryRepeatCount, hitGroupIndex, hitTransformIndex);
         return bManualMarkerDragActive;
@@ -106,7 +114,7 @@ bool MapCanvas::TryBeginManualInstanceDrag(float regionLocalX, float regionLocal
             || manualPropDrag.recipe == nullptr) return false;
         bManualPropDragActive = BeginInstanceDragGesture<PropDragTraits>(
             manualPropDrag.state, *manualPropDrag.props,
-            manualPropDrag.layers != nullptr ? *manualPropDrag.layers : kNoPropLayers,
+            manualPropDrag.layers != nullptr ? *manualPropDrag.layers : kNoPropLayers, kNoLinks,
             *manualPropDrag.geometry, manualPropDrag.recipe->globalSymmetryMask,
             manualPropDrag.recipe->radialSymmetryRepeatCount, hitGroupIndex, hitTransformIndex);
         return bManualPropDragActive;
@@ -115,7 +123,7 @@ bool MapCanvas::TryBeginManualInstanceDrag(float regionLocalX, float regionLocal
             || manualDecalDrag.recipe == nullptr) return false;
         bManualDecalDragActive = BeginInstanceDragGesture<DecalDragTraits>(
             manualDecalDrag.state, *manualDecalDrag.decals,
-            manualDecalDrag.layers != nullptr ? *manualDecalDrag.layers : kNoDecalLayers,
+            manualDecalDrag.layers != nullptr ? *manualDecalDrag.layers : kNoDecalLayers, kNoLinks,
             *manualDecalDrag.geometry, manualDecalDrag.recipe->globalSymmetryMask,
             manualDecalDrag.recipe->radialSymmetryRepeatCount, hitGroupIndex, hitTransformIndex);
         return bManualDecalDragActive;
@@ -132,18 +140,21 @@ void MapCanvas::ContinueManualInstanceDrag(float regionLocalX, float regionLocal
     static const std::vector<Params::MarkerInstanceLayer> kNoMarkerLayers;
     static const std::vector<Params::PropInstanceLayer>   kNoPropLayers;
     static const std::vector<Params::DecalInstanceLayer>  kNoDecalLayers;
+    static const std::vector<Params::MarkerLink>          kNoMarkerLinks;
+    static const std::vector<NoInstanceLink>              kNoLinks;   // ARCH §21.9 — shared by Props/Decals
 
     if (bManualMarkerDragActive && manualMarkerDragMarkers != nullptr && manualMarkerDragGeometry != nullptr) {
         UpdateInstanceDragGesture<MarkerDragTraits>(manualMarkerDragState, *manualMarkerDragMarkers,
             manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoMarkerLayers,
+            manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->markerLinks : kNoMarkerLinks,
             *manualMarkerDragGeometry, worldPoint.worldX, worldPoint.worldZ);
     } else if (bManualPropDragActive && manualPropDrag.props != nullptr && manualPropDrag.geometry != nullptr) {
         UpdateInstanceDragGesture<PropDragTraits>(manualPropDrag.state, *manualPropDrag.props,
-            manualPropDrag.layers != nullptr ? *manualPropDrag.layers : kNoPropLayers,
+            manualPropDrag.layers != nullptr ? *manualPropDrag.layers : kNoPropLayers, kNoLinks,
             *manualPropDrag.geometry, worldPoint.worldX, worldPoint.worldZ);
     } else if (bManualDecalDragActive && manualDecalDrag.decals != nullptr && manualDecalDrag.geometry != nullptr) {
         UpdateInstanceDragGesture<DecalDragTraits>(manualDecalDrag.state, *manualDecalDrag.decals,
-            manualDecalDrag.layers != nullptr ? *manualDecalDrag.layers : kNoDecalLayers,
+            manualDecalDrag.layers != nullptr ? *manualDecalDrag.layers : kNoDecalLayers, kNoLinks,
             *manualDecalDrag.geometry, worldPoint.worldX, worldPoint.worldZ);
     }
 }

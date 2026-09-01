@@ -62,6 +62,11 @@ struct MarkerInstanceLayer {
     std::string markerTypeName;   // ARCH §19.13 — free-form, same string space as
                                    // MarkerLayerBundle::markerTypeName (STEP119), NOT MarkerCategory
                                    // (ARCH §19.21). Additive.
+    int linkIdentifier = -1;      // ARCH §19.29 — the ACTUAL color/visibility-resolution key
+                                   // (ARCH §19.31) — checked directly, never derived by walking up
+                                   // parentBundleIdentifier, so a later re-nest of this Layer under
+                                   // a different Group never silently changes which Link governs
+                                   // its color/visibility. -1 = not Link-bound. Additive.
 };
 
 struct MarkerTransform {
@@ -86,6 +91,7 @@ struct MarkerTransform {
     // solely for stable UI-selection addressing (Ticket C) — carries no round-tripping/export-key
     // role of its own; MakeNamesUnique's existing name-based identity is untouched.
     int instanceIdentifier = -1;
+    int linkIdentifier = -1;   // ARCH §19.33 — instance-tier Link membership; -1 = not Link-bound.
 };
 
 struct MarkerInstanceGroup {
@@ -94,6 +100,11 @@ struct MarkerInstanceGroup {
                                               // NOT MarkerCategory; see the spec's cardinality ruling
     bool bResource = false;                  // format's `resource`, b-prefixed per §1.1
     std::vector<MarkerTransform> transforms;
+
+    using TransformType = MarkerTransform;   // ARCH §21.9 — lets GroupT-generic consumers
+                                              // (ManualInstanceHitTest_UI.h/ManualInstanceDelete_UI.h)
+                                              // recover the owned transform type without a per-domain
+                                              // trait specialization. Unused until STEP249.
 };
 
 // The fixed group name SANMAP_FORMAT_SPEC reserves for the commander-spawn roster (moved from

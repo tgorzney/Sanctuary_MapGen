@@ -95,5 +95,22 @@ WidgetChange DrawLabelledDial(const char* label, float& value, const DialRange& 
                               RealtimeToggle& realtimeToggle, const WidgetStyle& style = WidgetStyle(),
                               const char* valueFormat = "%.3f");
 
+// STEP236 — the single-line variant a caller composing its OWN row (a section-header strip, for
+// instance) reaches for instead of the 2-line label+field/RT stack above: no label line — `label`
+// only scopes the ImGui ID and stands in as a hover tooltip on the knob, mirroring the already-
+// shipped IsItemHovered()/SetTooltip pattern at MarkersTab_ManualLayerRowBody_UI.cpp and
+// DrawSliderScalarCompact's own STEP134 precedent. Composition: PushID(label) -> knob (diameter =
+// the row's own frame height, unless style.dialRadius overrides it) -> SameLine -> fixed-width
+// DragFloat -> optional RT button. Shares DrawLabelledDial's arc/pointer draw code and interaction
+// step untouched — only the layout differs.
+// `bShowRealtimeToggle` (default true, byte-identical to before this parameter existed): a caller
+// whose field never triggers anything beyond a cheap preview repaint can pass `false` to drop the
+// RT button entirely — `realtimeToggle` still governs the underlying commit timing (unchanged), the
+// caller simply never draws the control that would let a user flip it off.
+WidgetChange DrawDialCompact(const char* label, float& value, const DialRange& range,
+                             RealtimeToggle& realtimeToggle, float fieldWidthPixels,
+                             const WidgetStyle& style = WidgetStyle(), const char* valueFormat = "%.2f",
+                             bool bShowRealtimeToggle = true);
+
 } // namespace Ui
 } // namespace SanmapGen

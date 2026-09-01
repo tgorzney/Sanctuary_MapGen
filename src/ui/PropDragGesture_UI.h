@@ -28,17 +28,24 @@ struct PropDragTraits {
     static Transform* SelectedInstance(std::vector<Transform>& transforms, int transformIndex) {
         return SelectedPropInstance(transforms, transformIndex);
     }
-    static bool IsInstanceLayerLocked(const std::vector<Layer>& layers, int layerIndex) {
-        return IsPropInstanceLayerLocked(layers, layerIndex);
+    // ARCH §21.9 — Props has no Link concept: `using Link = NoInstanceLink` and every widened method
+    // below is an inert pass-through, ignoring `links` and reading `transform.layerIndex` into the
+    // SAME unchanged, still-2-parameter free functions this file always called.
+    using Link = NoInstanceLink;
+
+    static bool IsInstanceEffectivelyLocked(const std::vector<Layer>& layers, const Transform& transform,
+                                            const std::vector<Link>&) {
+        return IsPropInstanceLayerLocked(layers, transform.layerIndex);
     }
-    static void QuantizePositionToLayerGrid(const std::vector<Layer>& layers, int layerIndex,
-                                            float& x, float& z) {
-        QuantizePropPositionToLayerGrid(layers, layerIndex, x, z);
+    static void QuantizePositionToLayerGrid(const std::vector<Layer>& layers, const Transform& transform,
+                                            const std::vector<Link>&, float& x, float& z) {
+        QuantizePropPositionToLayerGrid(layers, transform.layerIndex, x, z);
     }
-    static void ResolveEffectiveSymmetry(const std::vector<Layer>& layers, int layerIndex,
-                                         int globalMask, int globalRadialCount, int& outMask,
-                                         int& outRadialCount) {
-        ResolveEffectivePropSymmetry(layers, layerIndex, globalMask, globalRadialCount, outMask, outRadialCount);
+    static void ResolveEffectiveSymmetry(const std::vector<Layer>& layers, const Transform& transform,
+                                         const std::vector<Link>&, int globalMask, int globalRadialCount,
+                                         int& outMask, int& outRadialCount) {
+        ResolveEffectivePropSymmetry(layers, transform.layerIndex, globalMask, globalRadialCount,
+                                     outMask, outRadialCount);
     }
     // Props has no reserved, cardinality-frozen group (unlike Markers' Spawn roster) — always false.
     static bool IsCardinalityFrozenGroup(const Group&) { return false; }

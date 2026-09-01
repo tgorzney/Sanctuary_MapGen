@@ -14,7 +14,8 @@ bool HitTestManualMarkers(const std::vector<Params::MarkerInstanceGroup>& marker
                           const PreviewComposite& composite, const MapCanvasView& view,
                           float regionLocalX, float regionLocalY, float pickRadiusScreenPixels,
                           int& outGroupIndex, int& outTransformIndex) {
-    static const std::function<bool(int)> kAlwaysUnlocked = [](int) { return false; };
+    static const std::function<bool(const Params::MarkerTransform&)> kAlwaysUnlocked =
+        [](const Params::MarkerTransform&) { return false; };
     return HitTestManualInstances<Params::MarkerInstanceGroup>(
         markers, composite, view, regionLocalX, regionLocalY, pickRadiusScreenPixels,
         kAlwaysUnlocked, outGroupIndex, outTransformIndex);

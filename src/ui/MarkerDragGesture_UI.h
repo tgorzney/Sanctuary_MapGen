@@ -24,6 +24,7 @@
 #include "UniqueNameList_UI.h"
 #include "../params/Geometry_PARAMS.h"
 #include "../params/MarkerInstance_PARAMS.h"
+#include "../params/MarkerLink_PARAMS.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -53,17 +54,27 @@ struct MarkerDragTraits {
     static Transform* SelectedInstance(std::vector<Transform>& transforms, int transformIndex) {
         return SelectedMarkerInstance(transforms, transformIndex);
     }
-    static bool IsInstanceLayerLocked(const std::vector<Layer>& layers, int layerIndex) {
-        return IsMarkerInstanceLayerLocked(layers, layerIndex);
+    using Link = Params::MarkerLink;
+
+    // ARCH §21.9 — widened (and renamed from IsInstanceLayerLocked): takes the whole transform (not
+    // a bare layerIndex) plus the domain's own Link roster, so a Link-tagged instance can be locked
+    // independent of its owning Layer. Calls STEP246's IsMarkerInstanceLocked for real.
+    static bool IsInstanceEffectivelyLocked(const std::vector<Layer>& layers, const Transform& transform,
+                                            const std::vector<Link>& links) {
+        return IsMarkerInstanceLocked(transform, layers, links);
     }
-    static void QuantizePositionToLayerGrid(const std::vector<Layer>& layers, int layerIndex,
-                                            float& x, float& z) {
-        QuantizeMarkerPositionToLayerGrid(layers, layerIndex, x, z);
+    // ARCH §21.9 — widened the same way; calls STEP246's widened free functions directly (no more
+    // synthetic layerIndex-only transform/empty-links workaround — this Traits contract now has a
+    // real transform and links roster in hand).
+    static void QuantizePositionToLayerGrid(const std::vector<Layer>& layers, const Transform& transform,
+                                            const std::vector<Link>& links, float& x, float& z) {
+        QuantizeMarkerPositionToLayerGrid(layers, transform, links, x, z);
     }
-    static void ResolveEffectiveSymmetry(const std::vector<Layer>& layers, int layerIndex,
-                                         int globalMask, int globalRadialCount, int& outMask,
-                                         int& outRadialCount) {
-        ResolveEffectiveMarkerSymmetry(layers, layerIndex, globalMask, globalRadialCount, outMask, outRadialCount);
+    static void ResolveEffectiveSymmetry(const std::vector<Layer>& layers, const Transform& transform,
+                                         const std::vector<Link>& links, int globalMask,
+                                         int globalRadialCount, int& outMask, int& outRadialCount) {
+        ResolveEffectiveMarkerSymmetry(layers, transform, links, globalMask, globalRadialCount,
+                                       outMask, outRadialCount);
     }
     // Markers: the reserved Spawn roster's cardinality is frozen (R2 §3). Props/Decals: always false
     // (PropDragGesture_UI.h/DecalDragGesture_UI.h) — there is no equivalent reserved group there.
@@ -82,9 +93,10 @@ struct MarkerDragTraits {
 inline bool BeginMarkerDragGesture(MarkerDragGestureState& state,
                                    const std::vector<Params::MarkerInstanceGroup>& markers,
                                    const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                   const std::vector<Params::MarkerLink>& markerLinks,
                                    const Params::Geometry& geometry, int globalSymmetryMask,
                                    int globalRadialRepeatCount, int groupIndex, int transformIndex) {
-    return BeginInstanceDragGesture<MarkerDragTraits>(state, markers, markerLayers, geometry,
+    return BeginInstanceDragGesture<MarkerDragTraits>(state, markers, markerLayers, markerLinks, geometry,
                                                        globalSymmetryMask, globalRadialRepeatCount,
                                                        groupIndex, transformIndex);
 }
@@ -92,8 +104,10 @@ inline bool BeginMarkerDragGesture(MarkerDragGestureState& state,
 inline void UpdateMarkerDragGesture(MarkerDragGestureState& state,
                                     std::vector<Params::MarkerInstanceGroup>& markers,
                                     const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                    const std::vector<Params::MarkerLink>& markerLinks,
                                     const Params::Geometry& geometry, float newWorldX, float newWorldZ) {
-    UpdateInstanceDragGesture<MarkerDragTraits>(state, markers, markerLayers, geometry, newWorldX, newWorldZ);
+    UpdateInstanceDragGesture<MarkerDragTraits>(state, markers, markerLayers, markerLinks, geometry,
+                                                newWorldX, newWorldZ);
 }
 
 inline void EndMarkerDragGesture(MarkerDragGestureState& state,
@@ -104,10 +118,11 @@ inline void EndMarkerDragGesture(MarkerDragGestureState& state,
 
 inline bool RepositionSymmetryGroupMember(std::vector<Params::MarkerInstanceGroup>& markers,
                                           const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                          const std::vector<Params::MarkerLink>& markerLinks,
                                           const Params::Geometry& geometry, int globalSymmetryMask,
                                           int globalRadialRepeatCount, int groupIndex,
                                           int movedTransformIndex, float newWorldX, float newWorldZ) {
-    return RepositionSymmetryGroupMember<MarkerDragTraits>(markers, markerLayers, geometry,
+    return RepositionSymmetryGroupMember<MarkerDragTraits>(markers, markerLayers, markerLinks, geometry,
                                                             globalSymmetryMask, globalRadialRepeatCount,
                                                             groupIndex, movedTransformIndex,
                                                             newWorldX, newWorldZ);

@@ -15,6 +15,7 @@
 // confirmed by re-reading every reader's own file, and by the full round-trip suite staying green.
 #include "MapImporter_ArmyIdentityNormalize_IO.h"
 #include "MapImporter_IO.h"
+#include "MapImporter_MarkerLink_IO.h"
 #include "MapImporter_Recipe_IO.h"
 #include "Sanmap_MigrationRunner_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -73,7 +74,16 @@ void ParseEntityDomainsJson(const nlohmann::json& document, Params::MapRecipe& o
     ReadArmiesJson(document, outRecipe);
     ReadMarkerGroupsJson(document, outRecipe);
     ReadMarkerLayerBundlesJson(document, outRecipe, result);
+    // ReadMarkerLinksJson (ARCH §19.28/§19.30) runs AFTER both readers above and populates
+    // outRecipe.markerLinks — pure population only (STEP245/ARCH §19.33).
+    ReadMarkerLinksJson(document, outRecipe, result);
     ReadMarkersJson(document, outRecipe, result);
+    // ARCH §19.33/STEP245 — WarnDanglingMarkerLinkIdentifiers moved HERE, explicitly, AFTER
+    // ReadMarkersJson: its third (instance-tier, MarkerTransform::linkIdentifier) loop needs
+    // outRecipe.markers already populated. Calling it from inside ReadMarkerLinksJson (the old
+    // shape) ran too early — outRecipe.markers was still empty at that point, so a dangling
+    // transform-tier LinkIdentifier would have silently never warned.
+    WarnDanglingMarkerLinkIdentifiers(outRecipe, result);
     ReconcileMarkerLayers(outRecipe, result);              // STEP115
     ReadChainsJson(document, outRecipe);
     ReadPropGroupsJson(document, outRecipe);

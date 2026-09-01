@@ -26,7 +26,7 @@ const std::unordered_set<std::string>& KnownTopLevelSanmapKeys() {
         "name", "credits", "height", "width",
         "hasWater", "waterLevel", "waterDepth",                // STEP27_WaterTopLevelImport_IO
         "deepWaterDepthMin",                                   // STEP30_LegacyBlobFieldHoming_IO
-        "areas", "armies", "markers", "MarkerGroups", "MarkerLayerBundles", "chains",
+        "areas", "armies", "markers", "MarkerGroups", "MarkerLayerBundles", "MarkerLinks", "chains",
         "PropGroups", "PropLayerBundles", "props", "DecalGroups", "DecalLayerBundles", "decals",
         "Scenarios",                                            // STEP69_ParamsScenariosRoundTrip_IO
         "MarkersStack", "GlobalMarkerSettings", "PropsStack", "GlobalPropSettings",

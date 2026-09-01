@@ -40,6 +40,79 @@ void ReassignManualInstanceLayers(std::vector<Params::MarkerInstanceGroup>& mark
                 transform.layerIndex = newLayerIndex;
 }
 
+void TagManualInstancesWithLink(std::vector<Params::MarkerInstanceGroup>& markers,
+                                const std::vector<int>& taggedIdentifiers, int linkIdentifier) {
+    for (Params::MarkerInstanceGroup& group : markers)
+        for (Params::MarkerTransform& transform : group.transforms)
+            if (IsManualInstanceSelected(taggedIdentifiers, transform.instanceIdentifier))
+                transform.linkIdentifier = linkIdentifier;
+}
+
+bool IsAnyManualInstanceSelectionAlreadyLinked(const std::vector<Params::MarkerInstanceGroup>& markers,
+                                               const std::vector<int>& selectedIdentifiers) {
+    for (const int identifier : selectedIdentifiers) {
+        for (const Params::MarkerInstanceGroup& group : markers) {
+            for (const Params::MarkerTransform& transform : group.transforms) {
+                if (transform.instanceIdentifier != identifier) continue;
+                if (transform.linkIdentifier >= 0) return true;
+                break;
+            }
+        }
+    }
+    return false;
+}
+
+bool IsManualInstanceSelectionEntirelyType(const std::vector<Params::MarkerInstanceGroup>& markers,
+                                           const std::vector<int>& selectedIdentifiers,
+                                           const std::string& typeName) {
+    if (selectedIdentifiers.empty()) return false;
+    for (const int identifier : selectedIdentifiers) {
+        bool bResolved = false;
+        for (const Params::MarkerInstanceGroup& group : markers) {
+            for (const Params::MarkerTransform& transform : group.transforms) {
+                if (transform.instanceIdentifier != identifier) continue;
+                if (Params::CanonicalMarkerTypeSectionName(group.name) != typeName) return false;
+                bResolved = true;
+                break;
+            }
+            if (bResolved) break;
+        }
+        if (!bResolved) return false;   // stale/out-of-range identifier -- can't be "entirely this type"
+    }
+    return true;
+}
+
+std::unordered_map<std::string, std::vector<int>> PartitionSelectedManualInstancesByType(
+        const std::vector<Params::MarkerInstanceGroup>& markers, const std::vector<int>& selectedIdentifiers) {
+    std::unordered_map<std::string, std::vector<int>> byType;
+    for (const int identifier : selectedIdentifiers) {
+        for (const Params::MarkerInstanceGroup& group : markers) {
+            bool bResolved = false;
+            for (const Params::MarkerTransform& transform : group.transforms) {
+                if (transform.instanceIdentifier != identifier) continue;
+                byType[Params::CanonicalMarkerTypeSectionName(group.name)].push_back(identifier);
+                bResolved = true;
+                break;
+            }
+            if (bResolved) break;
+        }
+    }
+    return byType;
+}
+
+std::unordered_map<std::string, std::vector<std::pair<int, int>>> PartitionLinkedManualInstancesByType(
+        const std::vector<Params::MarkerInstanceGroup>& markers, int linkIdentifier) {
+    std::unordered_map<std::string, std::vector<std::pair<int, int>>> byType;
+    for (int groupIndex = 0; groupIndex < static_cast<int>(markers.size()); ++groupIndex) {
+        const Params::MarkerInstanceGroup& group = markers[static_cast<std::size_t>(groupIndex)];
+        for (int transformIndex = 0; transformIndex < static_cast<int>(group.transforms.size()); ++transformIndex) {
+            if (group.transforms[static_cast<std::size_t>(transformIndex)].linkIdentifier != linkIdentifier) continue;
+            byType[Params::CanonicalMarkerTypeSectionName(group.name)].push_back({ groupIndex, transformIndex });
+        }
+    }
+    return byType;
+}
+
 std::vector<int> DetectManualInstanceDropTarget(const std::vector<int>& selectedIdentifiers) {
     std::vector<int> movedIdentifiers;
     if (!ImGui::BeginDragDropTarget()) return movedIdentifiers;

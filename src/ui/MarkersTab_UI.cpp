@@ -6,6 +6,7 @@
 #include "MarkerInstanceCreateSymmetric_UI.h"
 #include "MarkerLayerId_UI.h"
 #include "MarkersTab_BundleDelete_UI.h"
+#include "MarkersTab_Links_UI.h"
 #include "MarkersTab_ManualInstanceSelection_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
@@ -40,6 +41,7 @@ float TypeSectionHeaderButtonClusterWidth(bool bHidden) {
     return SmallButtonWidth("+ Instance") + kHeaderButtonSpacingPixels
          + SmallButtonWidth("+ Group")    + kHeaderButtonSpacingPixels
          + SmallButtonWidth("+ Layer")    + kHeaderButtonSpacingPixels
+         + SmallButtonWidth("+ Link")     + kHeaderButtonSpacingPixels
          + SmallButtonWidth(bHidden ? "Unhide" : "Hide");
 }
 
@@ -63,6 +65,7 @@ struct TypeSectionHeaderButtons_UI {
     bool bAddGroupClicked           = false;
     bool bAddManualLayerClicked     = false;
     bool bAddProceduralLayerClicked = false;
+    bool bAddLinkClicked            = false;
     bool bHideToggleClicked         = false;
 };
 
@@ -78,7 +81,8 @@ struct TypeSectionHeaderButtons_UI {
 // cluster, then STEP136 widened again to include the relocated marker-settings row).
 TypeSectionHeaderButtons_UI DrawRightAlignedTypeSectionHeaderButtons(
         MarkersTabGlobals& globals, int rowIndex, Params::GlobalMarkerSettings& globalMarkerSettings,
-        const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup, bool bHidden) {
+        const IconAtlasManifest* iconManifest, const IconAtlasPairingLookup* pairingLookup, bool bHidden,
+        bool bSelectionNonEmpty) {
     TypeSectionHeaderButtons_UI result;
     const char* const hideLabel = bHidden ? "Unhide" : "Hide";
     const float totalWidth = TypeSectionMarkerSettingsRowWidth(globals) + kHeaderButtonSpacingPixels
@@ -100,6 +104,14 @@ TypeSectionHeaderButtons_UI DrawRightAlignedTypeSectionHeaderButtons(
         if (ImGui::MenuItem("Procedural")) result.bAddProceduralLayerClicked = true;
         ImGui::EndPopup();
     }
+    ImGui::SameLine(0.0f, kHeaderButtonSpacingPixels);
+    // STEP239 — unlike "+ Group"/"+ Layer" (same-type only, §2), "+ Link" always acts on the WHOLE
+    // tab-wide selection regardless of which Type-section's own copy is clicked (DESIGN_MarkerLink_R1
+    // §3.6) — an identical, always-available affordance drawn in every section header on purpose.
+    // Enabled only while the tab-wide selection is non-empty (the ticket's own explicit gate).
+    ImGui::BeginDisabled(!bSelectionNonEmpty);
+    result.bAddLinkClicked = ImGui::SmallButton("+ Link");
+    ImGui::EndDisabled();
     ImGui::SameLine(0.0f, kHeaderButtonSpacingPixels);
     result.bHideToggleClicked = ImGui::SmallButton(hideLabel);
     return result;
@@ -268,6 +280,14 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                         selectProceduralMarkerInstanceCallback) {
     ImGui::PushID("markersTab");
     DrawMarkersTabGlobals(state.globals);
+    // STEP248 — the Links tier moves to right after the Global section (BRIEF_MarkerLinkCorrection_R1
+    // ruling): a Link's own body now supports the same full Ctrl/Shift/drag selection every other
+    // instance list in this tab has, so it needs the same shared selection state/callback every
+    // Type-section body below already receives — passing it here, not inventing new plumbing.
+    DrawMarkerLinksSection(recipe, state.links, state.selectedManualInstanceIdentifier,
+                          state.selectedManualInstanceIdentifiers,
+                          state.manualInstanceSelectionAnchorIdentifier,
+                          selectManualMarkerInstanceCallback, previewDriver);
     // Global plus three collapsible Type-sections (Alloy/Plasma/Spawn) — no free-floating Rule stack,
     // no old "Manual Markers"/"Placed Markers" editors. STEP133/STEP135/STEP136 add the header's own
     // Hide/Unhide, "+ Instance"/"+ Group"/"+ Layer", and the relocated per-Type marker-settings row.
@@ -286,7 +306,8 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                              HeaderButtonsSectionOptions(state.globals, bHidden))) {
             ImGui::SameLine();
             const TypeSectionHeaderButtons_UI buttons = DrawRightAlignedTypeSectionHeaderButtons(
-                state.globals, rowIndex, recipe.globalMarkerSettings, iconManifest, pairingLookup, bHidden);
+                state.globals, rowIndex, recipe.globalMarkerSettings, iconManifest, pairingLookup, bHidden,
+                !state.selectedManualInstanceIdentifiers.empty());
 
             if (buttons.bAddInstanceClicked) {
                 // Human's own bug report — "When creating an Instance, symmetry needs to be checked
@@ -326,6 +347,18 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     recipe.markerLayerBundles, state.bundles.selectedBundleIdentifier, typeName);
                 recipe.markerLayerBundles.push_back(bundle);
                 state.bundles.selectedBundleIdentifier = bundle.identifier;
+                // STEP235 — a same-type selection moves into the new Group's own first Manual Layer,
+                // the SAME "mint a Layer + reassign" convention a drop onto a bare Group's own header
+                // already uses (ApplyPendingCreateLayerForBundle, MarkersTab_BundleHeaderExtras_UI.cpp's
+                // own pending-create path) — reused here, not reinvented. A mixed-type or empty
+                // selection leaves the Group exactly as created above: empty, no Layer, no move
+                // (DESIGN_MarkerLink_R1.md §2).
+                if (IsManualInstanceSelectionEntirelyType(recipe.markers,
+                                                          state.selectedManualInstanceIdentifiers, typeName)) {
+                    ApplyPendingCreateLayerForBundle(bundle.identifier, typeName,
+                                                     state.selectedManualInstanceIdentifiers,
+                                                     recipe.markerLayers, recipe.markers);
+                }
             }
             if (buttons.bAddManualLayerClicked) {
                 Params::MarkerInstanceLayer layer;
@@ -336,7 +369,21 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                 layer.markerTypeName = typeName;
                 recipe.markerLayers.push_back(layer);
                 state.manualLayers.selectedLayerIndex = static_cast<int>(recipe.markerLayers.size()) - 1;
+                // STEP235 — a same-type selection reassigns directly onto the new Layer; mixed-type or
+                // empty leaves it empty, exactly as created above (DESIGN_MarkerLink_R1.md §2).
+                if (IsManualInstanceSelectionEntirelyType(recipe.markers,
+                                                          state.selectedManualInstanceIdentifiers, typeName)) {
+                    ReassignManualInstanceLayers(recipe.markers, state.selectedManualInstanceIdentifiers,
+                                                 state.manualLayers.selectedLayerIndex);
+                }
             }
+            // STEP239 — "+Link": always the WHOLE tab-wide selection (§3.6), never scoped to this
+            // one Type-section's own copy of the button. ApplyAddLinkAction is the pure, directly
+            // testable composed action (MarkersTab_Links_UI.h) — mint the Link, partition the
+            // selection by type, create one root-scoped Group+Layer per represented type (both
+            // tagged with the new Link's identifier), reassign that type's instances onto it.
+            if (buttons.bAddLinkClicked)
+                ApplyAddLinkAction(recipe, state.selectedManualInstanceIdentifiers);
             bool bRecipeMoved = false;
             if (buttons.bAddProceduralLayerClicked) {
                 Params::MarkerRuleLayer layer;
@@ -363,7 +410,7 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                                       recipe.markers, recipe.geometry, recipe.globalSymmetryMask,
                                       recipe.radialSymmetryRepeatCount, recipe.markerSymmetryFixSettings,
                                       state.bundles, state, previewDriver, iconManifest, typeName,
-                                      selectManualMarkerInstanceCallback);
+                                      selectManualMarkerInstanceCallback, recipe.markerLinks);
 
             // STEP140 — the tree's own header-extra "X" only RECORDS a pending choice (mutating
             // bundles/ruleLayers/instanceLayers mid-walk would desync the walk's own position-based
@@ -429,7 +476,7 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                                           typeName, state.selectedManualInstanceIdentifier,
                                           state.selectedManualInstanceIdentifiers,
                                           state.manualInstanceSelectionAnchorIdentifier,
-                                          selectManualMarkerInstanceCallback);
+                                          selectManualMarkerInstanceCallback, recipe.markerLinks);
             ImGui::Separator();
             DrawBaseSectionManualInstanceList(recipe.markers, recipe.markerLayers, typeName,
                                               state.selectedManualInstanceIdentifier,

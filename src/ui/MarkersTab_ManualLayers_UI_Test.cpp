@@ -6,6 +6,7 @@
 #include "ListWidget_TestFrame_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
+#include "../params/MarkerLink_PARAMS.h"
 #include <cmath>
 #include <cstdio>
 
@@ -40,9 +41,20 @@ void RunIsMarkerInstanceLayerLockedChecks() {
           "an index at size() resolves to false, never trusted as 'locked'");
 }
 
+// Constructs a MarkerTransform pinned to `layerIndex` (and optionally an instance-tier `linkIdentifier`)
+// — everything else default. Shared by every QuantizeMarkerPositionToLayerGrid/IsMarkerInstanceLocked
+// check below.
+Params::MarkerTransform MakeTransformAt(int layerIndex, int linkIdentifier = -1) {
+    Params::MarkerTransform transform;
+    transform.layerIndex = layerIndex;
+    transform.linkIdentifier = linkIdentifier;
+    return transform;
+}
+
 // bGridSnapEnabled == false leaves the position untouched regardless of value; a non-positive
 // gridSnapSizeWorldUnits is a defensive no-op, not a divide-by-zero; an out-of-range layerIndex
-// leaves the position unchanged too.
+// leaves the position unchanged too. No Links in play here — STEP246's own Link-tier resolution is
+// covered separately by RunQuantizeMarkerPositionToLayerGridLinkTierChecks below.
 void RunQuantizeMarkerPositionToLayerGridChecks() {
     std::vector<Params::MarkerInstanceLayer> markerLayers(3);
     markerLayers[0].bGridSnapEnabled = false;
@@ -51,35 +63,91 @@ void RunQuantizeMarkerPositionToLayerGridChecks() {
     markerLayers[1].gridSnapSizeWorldUnits = 4.0f;
     markerLayers[2].bGridSnapEnabled = true;
     markerLayers[2].gridSnapSizeWorldUnits = 0.0f;
+    const std::vector<Params::MarkerLink> noLinks;
 
     float worldX = 6.1f, worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, 0, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0), noLinks, worldX, worldZ);
     Check(NearlyEqual(worldX, 6.1f) && NearlyEqual(worldZ, -3.9f),
           "grid snap off on the layer leaves the position unchanged regardless of value");
 
     worldX = 6.1f; worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, 1, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(1), noLinks, worldX, worldZ);
     Check(NearlyEqual(worldX, 8.0f) && NearlyEqual(worldZ, -4.0f),
           "(6.1, -3.9) snaps to the nearest 4.0-unit cell: (8.0, -4.0)");
 
     // Tie case: std::round is ties-away-from-zero, so 2.0 / 4.0 == 0.5 rounds to 1.0, landing on 4.0.
     worldX = 2.0f; worldZ = 0.0f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, 1, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(1), noLinks, worldX, worldZ);
     Check(NearlyEqual(worldX, 4.0f), "an exact tie (2.0 against a 4.0 cell) rounds away from zero to 4.0");
 
     worldX = 6.1f; worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, 2, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(2), noLinks, worldX, worldZ);
     Check(NearlyEqual(worldX, 6.1f) && NearlyEqual(worldZ, -3.9f),
           "a non-positive gridSnapSizeWorldUnits is a defensive no-op, not a divide-by-zero");
 
     worldX = 6.1f; worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, -1, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(-1), noLinks, worldX, worldZ);
     Check(NearlyEqual(worldX, 6.1f) && NearlyEqual(worldZ, -3.9f),
           "an out-of-range layerIndex leaves the position unchanged");
     worldX = 6.1f; worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, 3, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(3), noLinks, worldX, worldZ);
     Check(NearlyEqual(worldX, 6.1f) && NearlyEqual(worldZ, -3.9f),
           "and so does an index at size()");
+}
+
+// STEP246, ARCH §19.33/§21.9 — instance-tier-first, THEN Layer-tier (itself Link-aware), THEN the
+// Layer's own stored field. Grid-snap chosen as the representative case for
+// QuantizeMarkerPositionToLayerGrid; IsMarkerInstanceLocked covers the sixth governed field below.
+void RunQuantizeMarkerPositionToLayerGridLinkTierChecks() {
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+    markerLayers[0].bGridSnapEnabled = false;           // the Layer's OWN stored field: snap OFF
+    markerLayers[0].gridSnapSizeWorldUnits = 4.0f;
+    markerLayers[0].linkIdentifier = 100;                // Layer-tier bound to Link 100
+
+    std::vector<Params::MarkerLink> links(2);
+    links[0].identifier = 100; links[0].bGridSnapEnabled = true; links[0].gridSnapSizeWorldUnits = 5.0f;
+    links[1].identifier = 200; links[1].bGridSnapEnabled = true; links[1].gridSnapSizeWorldUnits = 2.0f;
+
+    // An instance tagged directly to Link 200 resolves THAT Link's own pair, even though its owning
+    // Layer is bound to a DIFFERENT Link (100) — the exact new capability this correction is for.
+    float worldX = 3.1f, worldZ = 0.0f;
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0, /*linkIdentifier=*/200), links, worldX, worldZ);
+    Check(NearlyEqual(worldX, 4.0f),
+          "an instance tagged to Link 200 resolves THAT Link's grid (2.0), not its Layer's Link 100");
+
+    // An untagged instance on this same Link-bound Layer still resolves the LAYER's own Link (100) —
+    // existing §19.31 Layer-tier behavior, unchanged by this correction.
+    worldX = 3.1f; worldZ = 0.0f;
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0), links, worldX, worldZ);
+    Check(NearlyEqual(worldX, 5.0f), "an untagged instance still resolves its Layer's own bound Link (100)");
+
+    // A dangling instance-tier linkIdentifier (no matching Params::MarkerLink) soft-degrades to the
+    // Layer-tier result — never a crash, never a refusal (Constitution §6).
+    worldX = 3.1f; worldZ = 0.0f;
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0, /*linkIdentifier=*/999), links, worldX, worldZ);
+    Check(NearlyEqual(worldX, 5.0f), "a dangling instance linkIdentifier soft-degrades to the Layer-tier result");
+}
+
+// The sixth governed field (bLocked) — same three-tier resolution order, exercised through the
+// out-of-range-safe IsMarkerInstanceLocked wrapper.
+void RunIsMarkerInstanceLockedChecks() {
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+    markerLayers[0].bLocked = false;
+    markerLayers[0].linkIdentifier = 100;
+
+    std::vector<Params::MarkerLink> links(2);
+    links[0].identifier = 100; links[0].bLocked = false;
+    links[1].identifier = 200; links[1].bLocked = true;
+
+    Check(IsMarkerInstanceLocked(MakeTransformAt(0, /*linkIdentifier=*/200), markerLayers, links),
+          "an instance tagged to Link 200 (locked) resolves locked, even though its Layer's own "
+          "bound Link (100) is unlocked");
+    Check(!IsMarkerInstanceLocked(MakeTransformAt(0), markerLayers, links),
+          "an untagged instance still resolves its Layer's own bound Link (100, unlocked)");
+    Check(!IsMarkerInstanceLocked(MakeTransformAt(0, /*linkIdentifier=*/999), markerLayers, links),
+          "a dangling instance linkIdentifier soft-degrades to the Layer-tier result, never a crash");
+    Check(!IsMarkerInstanceLocked(MakeTransformAt(-1), markerLayers, links),
+          "an out-of-range layerIndex resolves to false, mirroring IsMarkerInstanceLayerLocked");
 }
 
 // STEP126: BuildManualInstanceLayerIndex — three groups, transforms spread across layerIndex
@@ -262,6 +330,8 @@ void RunUngroupedClusterDoesNotOverlapAffordanceStripCheck(bool bPushExaggerated
 int main() {
     RunIsMarkerInstanceLayerLockedChecks();
     RunQuantizeMarkerPositionToLayerGridChecks();
+    RunQuantizeMarkerPositionToLayerGridLinkTierChecks();
+    RunIsMarkerInstanceLockedChecks();
     RunBuildManualInstanceLayerIndexChecks();
     RunIsMarkerInstanceLayerRowSuppressedChecks();
     RunDrawLayerListButtonsTypeSeedChecks();

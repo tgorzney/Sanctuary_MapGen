@@ -19,8 +19,14 @@ void MapCanvas::DrawManualMarkerDragPass(float regionOriginX, float regionOrigin
     if (composite == nullptr || manualMarkerDragMarkers == nullptr) return;
     static const std::vector<Params::MarkerInstanceLayer> kNoLayers;
     static const std::vector<Params::Army> kNoArmies;
+    static const std::vector<Params::MarkerLink> kNoLinks;
     static const Params::GlobalMarkerSettings kDefaultGlobalMarkerSettings;
     static const Params::MarkerSymmetryFixSettings kDefaultMarkerSymmetryFixSettings;
+    // STEP246, ARCH §19.33/§21.9 — reuses the already-threaded manualMarkerDragRecipe pointer
+    // (globalSymmetryMask/radialSymmetryRepeatCount already source from it just below); no new
+    // injected field needed on MapCanvas_UI.h.
+    const std::vector<Params::MarkerLink>& markerLinks =
+        manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->markerLinks : kNoLinks;
     // STEP231 — sourced directly from THIS class's own canonical multi-select set
     // (selectedInstanceKeys, ARCH §21.1, MapCanvas_UI.h:377), not the retired injected single-scalar
     // pointer (SetManualMarkerSelectionSource/manualMarkerSelectedInstanceIdentifier — see this
@@ -46,7 +52,7 @@ void MapCanvas::DrawManualMarkerDragPass(float regionOriginX, float regionOrigin
                           manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->armies : kNoArmies,
                           manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->globalMarkerSettings : kDefaultGlobalMarkerSettings,
                           manualMarkerDragState, *composite, view, regionOriginX, regionOriginY,
-                          selectedHighlight, *ImGui::GetWindowDrawList());
+                          selectedHighlight, markerLinks, *ImGui::GetWindowDrawList());
 }
 
 } // namespace Ui

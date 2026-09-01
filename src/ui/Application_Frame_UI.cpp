@@ -9,6 +9,7 @@
 //   6 icon bridge   - a new atlas pick becomes the selected rule's template id
 //   7 service tier  - Refresh() runs the pipeline OR only the composite, then re-points the canvas
 //   8 the canvas    - drawn AFTER the service, so an edit is visible in the SAME frame
+//   8b delete key   - STEP234, after the canvas draw so `io.WantTextInput` reflects the whole frame
 //   9 end frame
 #include "Application_UI.h"
 #include <imgui.h>
@@ -51,6 +52,7 @@ bool Application::RunOneFrame() {
     ResolveIconSelections();
     ServiceDirtyTier();
     DrawCanvasWindow();
+    ApplyGlobalDeleteShortcut();   // STEP234
     EndImguiFrame();
     ++frameCount;
     return IsWindowOpen();

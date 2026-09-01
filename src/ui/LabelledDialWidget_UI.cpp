@@ -38,27 +38,41 @@ void DrawKnob(const ImVec2& center, float radius, float value, const DialRange& 
                       pointerColor, thickness);
 }
 
-// The label, the numeric field and the RT button, stacked beside the knob. A field edit is
-// applied immediately and reported, so one interaction step folds it in with the knob drag.
-DialPointerInput DrawLabelAndField(const char* label, float& value, const DialRange& range,
-                                   RealtimeToggle& realtimeToggle, const WidgetStyle& style,
-                                   const char* valueFormat) {
+// The numeric field + optional RT button. `fieldWidthPixels` mirrors SliderScalar_UI.cpp's
+// DrawFloatFieldRow convention (STEP236): the caller (label row or compact row alike) has already
+// resolved the exact pixel width, so this helper only draws — it never touches the label or the
+// group. A field edit is applied immediately and reported, so one interaction step folds it in
+// with the knob drag.
+DialPointerInput DrawFieldAndToggle(float& value, const DialRange& range, RealtimeToggle& realtimeToggle,
+                                    const WidgetStyle& style, const char* valueFormat,
+                                    float fieldWidthPixels, bool bShowRealtimeToggle) {
     DialPointerInput input;
-    const float spacing = ImGui::GetStyle().ItemSpacing.x;
     const float dragSpeed = range.increment > 0.0f ? range.increment
                                                    : (range.maximumValue - range.minimumValue) * 0.001f;
-    ImGui::BeginGroup();
-    ImGui::TextUnformatted(label);
-    const float fieldWidth = ImGui::GetContentRegionAvail().x - spacing - style.realtimeButtonWidth;
-    ImGui::SetNextItemWidth(fieldWidth > 1.0f ? fieldWidth : 1.0f);
+    ImGui::SetNextItemWidth(fieldWidthPixels > 1.0f ? fieldWidthPixels : 1.0f);
     if (ImGui::DragFloat("##value", &value, dragSpeed, range.minimumValue, range.maximumValue, valueFormat)) {
         value = ClampDialValue(value, range);
         input.bFieldEdited = true;
     }
     input.bFieldActive = ImGui::IsItemActive();
-    ImGui::SameLine();
-    DrawRealtimeToggleButton("realtime", realtimeToggle, style);
-    ImGui::EndGroup();
+    if (bShowRealtimeToggle) {
+        ImGui::SameLine();
+        DrawRealtimeToggleButton("realtime", realtimeToggle, style);
+    }
+    return input;
+}
+
+// The knob's InvisibleButton + drag bookkeeping, shared by the labelled and compact layouts. The
+// grab frame contributes NO delta: on the frame the knob is seized the mouse may have arrived from
+// anywhere on screen, and MouseDelta still carries that jump. Charging it to the dial would snap
+// the value on a plain click.
+DialPointerInput DrawKnobButton(float radius, ImVec2& outKnobOrigin) {
+    DialPointerInput input;
+    outKnobOrigin = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton("##knob", ImVec2(radius * 2.0f, radius * 2.0f));
+    input.bDragInProgress = ImGui::IsItemActive();
+    const bool bGrabbedThisFrame = ImGui::IsItemActivated();
+    input.dragDeltaY = (input.bDragInProgress && !bGrabbedThisFrame) ? ImGui::GetIO().MouseDelta.y : 0.0f;
     return input;
 }
 
@@ -72,18 +86,49 @@ WidgetChange DrawLabelledDial(const char* label, float& value, const DialRange& 
 
     ImGui::PushID(label);
     const float radius = style.dialRadius > 0.0f ? style.dialRadius : ImGui::GetFrameHeight();
-    const ImVec2 knobOrigin = ImGui::GetCursorScreenPos();
-    ImGui::InvisibleButton("##knob", ImVec2(radius * 2.0f, radius * 2.0f));
-    const bool bDragInProgress = ImGui::IsItemActive();
-    // The grab frame contributes NO delta: on the frame the knob is seized the mouse may have
-    // arrived from anywhere on screen, and MouseDelta still carries that jump. Charging it to the
-    // dial would snap the value on a plain click.
-    const bool bGrabbedThisFrame = ImGui::IsItemActivated();
+    ImVec2 knobOrigin;
+    DialPointerInput input = DrawKnobButton(radius, knobOrigin);
+    const bool bDragInProgress = input.bDragInProgress;
     ImGui::SameLine();
 
-    DialPointerInput input = DrawLabelAndField(label, value, range, realtimeToggle, style, valueFormat);
-    input.bDragInProgress = bDragInProgress;
-    input.dragDeltaY      = (bDragInProgress && !bGrabbedThisFrame) ? ImGui::GetIO().MouseDelta.y : 0.0f;
+    ImGui::BeginGroup();
+    ImGui::TextUnformatted(label);
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float fieldWidth = ImGui::GetContentRegionAvail().x - spacing - style.realtimeButtonWidth;
+    const DialPointerInput fieldInput =
+        DrawFieldAndToggle(value, range, realtimeToggle, style, valueFormat, fieldWidth, true);
+    ImGui::EndGroup();
+    input.bFieldEdited = fieldInput.bFieldEdited;
+    input.bFieldActive = fieldInput.bFieldActive;
+
+    const WidgetChange change = StepDialInteraction(realtimeToggle, value, range, input);
+    DrawKnob(ImVec2(knobOrigin.x + radius, knobOrigin.y + radius), radius, value, range,
+             style, bDragInProgress);                                   // drawn last: zero-lag pointer
+    ImGui::PopID();
+    return change;
+}
+
+// STEP236: the single-line variant. Same interaction/paint pipeline as DrawLabelledDial above, only
+// the layout differs — a knob sized to one row SameLine'd with a fixed-width field, a hover tooltip
+// standing in for the dropped label line.
+WidgetChange DrawDialCompact(const char* label, float& value, const DialRange& rawRange,
+                             RealtimeToggle& realtimeToggle, float fieldWidthPixels,
+                             const WidgetStyle& style, const char* valueFormat, bool bShowRealtimeToggle) {
+    const DialRange range = ResolvedDialRange(rawRange);
+    value = ClampDialValue(value, range);
+
+    ImGui::PushID(label);
+    const float radius = style.dialRadius > 0.0f ? style.dialRadius : ImGui::GetFrameHeight() * 0.5f;
+    ImVec2 knobOrigin;
+    DialPointerInput input = DrawKnobButton(radius, knobOrigin);
+    const bool bDragInProgress = input.bDragInProgress;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", label);
+    ImGui::SameLine();
+
+    const DialPointerInput fieldInput = DrawFieldAndToggle(value, range, realtimeToggle, style, valueFormat,
+                                                           fieldWidthPixels, bShowRealtimeToggle);
+    input.bFieldEdited = fieldInput.bFieldEdited;
+    input.bFieldActive = fieldInput.bFieldActive;
 
     const WidgetChange change = StepDialInteraction(realtimeToggle, value, range, input);
     DrawKnob(ImVec2(knobOrigin.x + radius, knobOrigin.y + radius), radius, value, range,

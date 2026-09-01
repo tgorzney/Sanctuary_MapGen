@@ -35,6 +35,10 @@ Params::DecalTransform MakeTransform(float x, float z, int symmetryGroupIdentifi
     return transform;
 }
 
+// ARCH §21.9 — Decals has no Link concept: every widened call below passes this permanently-empty
+// NoInstanceLink roster, never populated/read (DecalDragTraits's own inert pass-through bodies).
+const std::vector<NoInstanceLink> kNoLinks;
+
 void RunLiveMirrorFollowChecks() {
     std::vector<Params::DecalInstanceGroup> decals(1);
     decals[0].transforms.push_back(MakeTransform(2.0f, 3.0f, 42));
@@ -42,12 +46,12 @@ void RunLiveMirrorFollowChecks() {
     const Params::Geometry geometry = MakeTestGeometry();
 
     InstanceDragGestureState state;
-    Check(BeginInstanceDragGesture<DecalDragTraits>(state, decals, {}, geometry,
+    Check(BeginInstanceDragGesture<DecalDragTraits>(state, decals, {}, kNoLinks, geometry,
                                                     Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0),
           "a Decal gesture begins on a grouped member");
     Check(!state.bCardinalityFrozen, "Decals has no reserved cardinality-frozen group");
 
-    UpdateInstanceDragGesture<DecalDragTraits>(state, decals, {}, geometry, 4.0f, 3.0f);
+    UpdateInstanceDragGesture<DecalDragTraits>(state, decals, {}, kNoLinks, geometry, 4.0f, 3.0f);
     Check(NearlyEqual(decals[0].transforms[0].transform.positionX, 4.0f), "the dragged member follows the cursor");
     Check(NearlyEqual(decals[0].transforms[1].transform.positionX, 6.0f), "the sibling mirrors live, this frame");
 
@@ -63,7 +67,7 @@ void RunLockRefusalChecks() {
     const Params::Geometry geometry = MakeTestGeometry();
 
     InstanceDragGestureState state;
-    Check(!BeginInstanceDragGesture<DecalDragTraits>(state, decals, lockedLayers, geometry,
+    Check(!BeginInstanceDragGesture<DecalDragTraits>(state, decals, lockedLayers, kNoLinks, geometry,
                                                      Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0),
           "a locked Decal layer refuses to begin a drag");
 }

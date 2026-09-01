@@ -14,7 +14,7 @@ template<typename GroupT>
 bool HitTestManualInstances(const std::vector<GroupT>& instances, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionLocalX, float regionLocalY,
                             float pickRadiusScreenPixels,
-                            const std::function<bool(int layerIndex)>& isLayerLocked,
+                            const std::function<bool(const typename GroupT::TransformType&)>& isInstanceLocked,
                             int& outGroupIndex, int& outTransformIndex, float* outDistanceSquared) {
     outGroupIndex = -1; outTransformIndex = -1;
     if (outDistanceSquared != nullptr) *outDistanceSquared = 0.0f;
@@ -25,7 +25,7 @@ bool HitTestManualInstances(const std::vector<GroupT>& instances, const PreviewC
         const auto& transforms = instances[groupIndex].transforms;
         for (std::size_t transformIndex = 0; transformIndex < transforms.size(); ++transformIndex) {
             const auto& transform = transforms[transformIndex];
-            if (isLayerLocked && isLayerLocked(transform.layerIndex)) continue;   // ARCH §21.5
+            if (isInstanceLocked && isInstanceLocked(transform)) continue;   // ARCH §21.5/§21.9
             const PreviewComposite::PreviewPixelPoint previewPixel =
                 composite.WorldToPreviewPixel(transform.transform.positionX, transform.transform.positionZ);
             const RegionLocalPoint screenPoint =
@@ -52,14 +52,14 @@ bool HitTestManualInstances(const std::vector<GroupT>& instances, const PreviewC
 template<typename GroupT>
 void CollectManualInstancesInWorldRegion(const std::vector<GroupT>& instances,
                                          float worldMinX, float worldMinZ, float worldMaxX, float worldMaxZ,
-                                         const std::function<bool(int layerIndex)>& isLayerLocked,
+                                         const std::function<bool(const typename GroupT::TransformType&)>& isInstanceLocked,
                                          std::vector<std::pair<int, int>>& outGroupTransformPairs) {
     if (!(worldMaxX >= worldMinX) || !(worldMaxZ >= worldMinZ)) return;   // degenerate/NaN box: nothing
     for (std::size_t groupIndex = 0; groupIndex < instances.size(); ++groupIndex) {
         const auto& transforms = instances[groupIndex].transforms;
         for (std::size_t transformIndex = 0; transformIndex < transforms.size(); ++transformIndex) {
             const auto& transform = transforms[transformIndex];
-            if (isLayerLocked && isLayerLocked(transform.layerIndex)) continue;   // ARCH §21.5
+            if (isInstanceLocked && isInstanceLocked(transform)) continue;   // ARCH §21.5/§21.9
             const float positionX = transform.transform.positionX;
             const float positionZ = transform.transform.positionZ;
             if (positionX < worldMinX || positionX > worldMaxX
@@ -72,23 +72,23 @@ void CollectManualInstancesInWorldRegion(const std::vector<GroupT>& instances,
 
 template bool HitTestManualInstances<Params::MarkerInstanceGroup>(
     const std::vector<Params::MarkerInstanceGroup>&, const PreviewComposite&, const MapCanvasView&,
-    float, float, float, const std::function<bool(int)>&, int&, int&, float*);
+    float, float, float, const std::function<bool(const Params::MarkerTransform&)>&, int&, int&, float*);
 template bool HitTestManualInstances<Params::PropInstanceGroup>(
     const std::vector<Params::PropInstanceGroup>&, const PreviewComposite&, const MapCanvasView&,
-    float, float, float, const std::function<bool(int)>&, int&, int&, float*);
+    float, float, float, const std::function<bool(const Params::PropTransform&)>&, int&, int&, float*);
 template bool HitTestManualInstances<Params::DecalInstanceGroup>(
     const std::vector<Params::DecalInstanceGroup>&, const PreviewComposite&, const MapCanvasView&,
-    float, float, float, const std::function<bool(int)>&, int&, int&, float*);
+    float, float, float, const std::function<bool(const Params::DecalTransform&)>&, int&, int&, float*);
 
 template void CollectManualInstancesInWorldRegion<Params::MarkerInstanceGroup>(
     const std::vector<Params::MarkerInstanceGroup>&, float, float, float, float,
-    const std::function<bool(int)>&, std::vector<std::pair<int, int>>&);
+    const std::function<bool(const Params::MarkerTransform&)>&, std::vector<std::pair<int, int>>&);
 template void CollectManualInstancesInWorldRegion<Params::PropInstanceGroup>(
     const std::vector<Params::PropInstanceGroup>&, float, float, float, float,
-    const std::function<bool(int)>&, std::vector<std::pair<int, int>>&);
+    const std::function<bool(const Params::PropTransform&)>&, std::vector<std::pair<int, int>>&);
 template void CollectManualInstancesInWorldRegion<Params::DecalInstanceGroup>(
     const std::vector<Params::DecalInstanceGroup>&, float, float, float, float,
-    const std::function<bool(int)>&, std::vector<std::pair<int, int>>&);
+    const std::function<bool(const Params::DecalTransform&)>&, std::vector<std::pair<int, int>>&);
 
 } // namespace Ui
 } // namespace SanmapGen

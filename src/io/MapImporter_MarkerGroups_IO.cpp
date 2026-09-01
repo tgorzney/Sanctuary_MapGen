@@ -55,6 +55,7 @@ void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& out
             ReadJsonBoolean(layerJson, "SymmetryEnabled", layer.bSymmetryEnabled);
             ReadJsonInteger(layerJson, "ParentBundleIdentifier", layer.parentBundleIdentifier);
             ReadJsonText(layerJson, "MarkerTypeName", layer.markerTypeName);   // NEW, STEP124/ARCH §19.13
+            ReadJsonInteger(layerJson, "LinkIdentifier", layer.linkIdentifier);   // ARCH §19.29/§19.30
         }
         outRecipe.markerLayers.push_back(layer);
     }

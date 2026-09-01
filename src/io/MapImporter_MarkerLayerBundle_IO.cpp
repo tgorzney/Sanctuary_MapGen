@@ -29,6 +29,7 @@ void PopulateMarkerLayerBundlesFromJson(const nlohmann::json& document, Params::
             ReadJsonInteger(bundleJson, "ParentBundleIdentifier", bundle.parentBundleIdentifier);
             ReadJsonText(bundleJson, "MarkerTypeName", bundle.markerTypeName);
             ReadJsonInteger(bundleJson, "AssemblyIdentifier", bundle.assemblyIdentifier);
+            ReadJsonInteger(bundleJson, "LinkIdentifier", bundle.linkIdentifier);   // ARCH §19.29/§19.30
         }
         outRecipe.markerLayerBundles.push_back(bundle);
     }

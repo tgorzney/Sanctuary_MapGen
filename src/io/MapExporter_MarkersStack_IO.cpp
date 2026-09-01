@@ -91,6 +91,10 @@ nlohmann::ordered_json BuildGlobalMarkerSettingsJson(const Params::MapRecipe& re
     json["MarkerScaleAlloy"]  = settings.scaleAlloy;
     json["MarkerScalePlasma"] = settings.scalePlasma;
     json["MarkerScaleSpawn"]  = settings.scaleSpawn;
+    // ARCH §19.32 — per-Type-section "selected" icon-size pair, alongside the base triplet above.
+    json["MarkerScaleSelectedAlloy"]  = settings.scaleSelectedAlloy;
+    json["MarkerScaleSelectedPlasma"] = settings.scaleSelectedPlasma;
+    json["MarkerScaleSelectedSpawn"]  = settings.scaleSelectedSpawn;
     json["MarkerSelectColorAlloy"]   = { { "r", settings.selectColorAlloy[0] },
         { "g", settings.selectColorAlloy[1] }, { "b", settings.selectColorAlloy[2] },
         { "a", settings.selectColorAlloy[3] } };

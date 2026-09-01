@@ -36,6 +36,7 @@
 #include "LabelledDialWidget_UI.h"
 #include "MarkersTab_Bundles_UI.h"
 #include "MarkersTab_Globals_UI.h"
+#include "MarkersTab_Links_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
 #include "MarkersTab_Manual_UI.h"
 #include "MarkersTab_Placed_UI.h"
@@ -136,6 +137,10 @@ struct MarkersTabState {
     // MapCanvas::SetMarkerTypeVisibilitySource (MarkerTypeVisibility_UI.h's own header comment) —
     // never a PARAMS field, never folded into OverlayLayerSettings.
     MarkerTypeVisibility_UI markerTypeVisibility;
+
+    // STEP239 — the Links tier's own per-Link collapse/rename state (MarkersTab_Links_UI.h). The
+    // stored data itself (Params::MarkerLink) lives on `recipe.markerLinks`; this is UI-session-only.
+    MarkerLinksState_UI links;
 };
 
 // rule -> widget mirrors (the paired min/max fields the range sliders edit, and the int count).

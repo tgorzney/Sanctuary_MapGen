@@ -4,8 +4,10 @@
 // (not just compiles for one instantiation), plus the §21.5 lock-gate this ticket adds that the old
 // Marker-only HitTestManualMarkers never had.
 #include "ManualInstanceHitTest_UI.h"
+#include "MarkersTab_ManualLayerHelpers_UI.h"   // IsMarkerInstanceLocked, STEP249's real predicate
 #include "PreviewComposite_TestScene_UI.h"
 #include "../params/MarkerInstance_PARAMS.h"
+#include "../params/MarkerLink_PARAMS.h"
 #include "../params/PropInstance_PARAMS.h"
 #include <cstdio>
 
@@ -53,7 +55,12 @@ Params::PropTransform MakePropTransform(float x, float z, int layerIndex = 0) {
     return t;
 }
 
-const std::function<bool(int)> kAlwaysUnlocked = [](int) { return false; };
+const std::function<bool(const Params::MarkerTransform&)> kAlwaysUnlockedMarker =
+    [](const Params::MarkerTransform&) { return false; };
+const std::function<bool(const Params::PropTransform&)> kAlwaysUnlockedProp =
+    [](const Params::PropTransform&) { return false; };
+const std::function<bool(const Params::DecalTransform&)> kAlwaysUnlockedDecal =
+    [](const Params::DecalTransform&) { return false; };
 
 // ---- HitTestManualInstances: parity with the old Marker-only behavior, now also proven for Props.
 
@@ -67,19 +74,19 @@ void RunHitTestParityChecks() {
     int groupIndex = -99, transformIndex = -99;
     Check(HitTestManualInstances<Params::MarkerInstanceGroup>(
               markers, *fixture.composite, fixture.view, onA.regionLocalX, onA.regionLocalY, 8.0f,
-              kAlwaysUnlocked, groupIndex, transformIndex),
+              kAlwaysUnlockedMarker, groupIndex, transformIndex),
           "a press exactly on an instance's projected point hits it");
     Check(groupIndex == 0 && transformIndex == 0, "resolves the correct (group, transform) pair");
 
     groupIndex = -99; transformIndex = -99;
     Check(!HitTestManualInstances<Params::MarkerInstanceGroup>(
-              markers, *fixture.composite, fixture.view, -500.0f, -500.0f, 8.0f, kAlwaysUnlocked,
+              markers, *fixture.composite, fixture.view, -500.0f, -500.0f, 8.0f, kAlwaysUnlockedMarker,
               groupIndex, transformIndex),
           "a press far from every instance misses");
     Check(groupIndex == -1 && transformIndex == -1, "a miss leaves both out-params at -1");
 
     Check(!HitTestManualInstances<Params::MarkerInstanceGroup>(
-              {}, *fixture.composite, fixture.view, 0.0f, 0.0f, 8.0f, kAlwaysUnlocked,
+              {}, *fixture.composite, fixture.view, 0.0f, 0.0f, 8.0f, kAlwaysUnlockedMarker,
               groupIndex, transformIndex),
           "an empty roster never hits");
 
@@ -90,7 +97,7 @@ void RunHitTestParityChecks() {
     groupIndex = -99; transformIndex = -99;
     Check(HitTestManualInstances<Params::PropInstanceGroup>(
               props, *fixture.composite, fixture.view, onProp.regionLocalX, onProp.regionLocalY, 8.0f,
-              kAlwaysUnlocked, groupIndex, transformIndex),
+              kAlwaysUnlockedProp, groupIndex, transformIndex),
           "the same template instantiated for Props finds a hit identically");
 }
 
@@ -102,7 +109,8 @@ void RunHitTestLockGateChecks() {
     markers[0].transforms.push_back(MakeMarkerTransform(2.0f, 2.0f, /*layerIndex=*/3));
     const RegionLocalPoint onIt = ScreenPointFor(fixture, 2.0f, 2.0f);
 
-    const std::function<bool(int)> lockLayerThree = [](int layerIndex) { return layerIndex == 3; };
+    const std::function<bool(const Params::MarkerTransform&)> lockLayerThree =
+        [](const Params::MarkerTransform& transform) { return transform.layerIndex == 3; };
     int groupIndex = -99, transformIndex = -99;
     Check(!HitTestManualInstances<Params::MarkerInstanceGroup>(
               markers, *fixture.composite, fixture.view, onIt.regionLocalX, onIt.regionLocalY, 8.0f,
@@ -112,7 +120,7 @@ void RunHitTestLockGateChecks() {
 
     Check(HitTestManualInstances<Params::MarkerInstanceGroup>(
               markers, *fixture.composite, fixture.view, onIt.regionLocalX, onIt.regionLocalY, 8.0f,
-              kAlwaysUnlocked, groupIndex, transformIndex),
+              kAlwaysUnlockedMarker, groupIndex, transformIndex),
           "the same instance IS a candidate once its layer is not the locked one");
 
     // A nearer LOCKED instance never beats a farther UNLOCKED one — the lock gate excludes it
@@ -141,7 +149,8 @@ void RunCollectRegionChecks() {
 
     std::vector<std::pair<int, int>> hits;
     hits.emplace_back(77, 77);   // pre-existing entries from an earlier-queried domain: must survive
-    const std::function<bool(int)> lockLayerFive = [](int layerIndex) { return layerIndex == 5; };
+    const std::function<bool(const Params::MarkerTransform&)> lockLayerFive =
+        [](const Params::MarkerTransform& transform) { return transform.layerIndex == 5; };
     CollectManualInstancesInWorldRegion<Params::MarkerInstanceGroup>(
         markers, 0.0f, 0.0f, 20.0f, 20.0f, lockLayerFive, hits);
     Check(hits.size() == 2, "the pre-existing entry survives (append, not clear) and exactly one new hit is added");
@@ -155,15 +164,57 @@ void RunCollectRegionChecks() {
     decals[0].transforms.push_back(decalTransform);
     std::vector<std::pair<int, int>> decalHits;
     CollectManualInstancesInWorldRegion<Params::DecalInstanceGroup>(
-        decals, 0.0f, 0.0f, 10.0f, 10.0f, kAlwaysUnlocked, decalHits);
+        decals, 0.0f, 0.0f, 10.0f, 10.0f, kAlwaysUnlockedDecal, decalHits);
     Check(decalHits.size() == 1 && decalHits[0] == std::make_pair(0, 0),
           "the same template instantiated for Decals collects a box hit identically");
 
     // A degenerate box collects nothing, never crashes.
     std::vector<std::pair<int, int>> degenerateHits;
     CollectManualInstancesInWorldRegion<Params::MarkerInstanceGroup>(
-        markers, 20.0f, 20.0f, 0.0f, 0.0f, kAlwaysUnlocked, degenerateHits);
+        markers, 20.0f, 20.0f, 0.0f, 0.0f, kAlwaysUnlockedMarker, degenerateHits);
     Check(degenerateHits.empty(), "a degenerate box (min > max) collects nothing");
+}
+
+// STEP249, ARCH §21.9 — the widened predicate (`bool(const typename GroupT::TransformType&)`) lets a
+// real caller bind `IsMarkerInstanceLocked` (transform + layers + links), proving hit-test AND the
+// marquee/collect counterpart both honor an instance-tier Link lock the same way
+// `BeginInstanceDragGesture` does, even when the instance's own owning Layer is unlocked.
+void RunInstanceTierLinkLockChecks() {
+    Fixture fixture;
+    std::vector<Params::MarkerInstanceLayer> unlockedLayers(1);   // the owning Layer is NOT locked
+    std::vector<Params::MarkerLink> links(1);
+    links[0].identifier = 500; links[0].bLocked = true;           // but the Link IS
+
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.push_back(MakeMarkerTransform(2.0f, 2.0f, /*layerIndex=*/0));
+    markers[0].transforms[0].linkIdentifier = 500;   // Link-tagged, Link-locked
+    const RegionLocalPoint onIt = ScreenPointFor(fixture, 2.0f, 2.0f);
+
+    const std::function<bool(const Params::MarkerTransform&)> isLinkLocked =
+        [&unlockedLayers, &links](const Params::MarkerTransform& t) {
+            return IsMarkerInstanceLocked(t, unlockedLayers, links);
+        };
+
+    int groupIndex = -99, transformIndex = -99;
+    Check(!HitTestManualInstances<Params::MarkerInstanceGroup>(
+              markers, *fixture.composite, fixture.view, onIt.regionLocalX, onIt.regionLocalY, 8.0f,
+              isLinkLocked, groupIndex, transformIndex),
+          "a Link-locked instance is never a click-select candidate, even with its own Layer unlocked");
+    Check(groupIndex == -1 && transformIndex == -1, "the out-params stay at -1");
+
+    std::vector<std::pair<int, int>> hits;
+    CollectManualInstancesInWorldRegion<Params::MarkerInstanceGroup>(
+        markers, 0.0f, 0.0f, 10.0f, 10.0f, isLinkLocked, hits);
+    Check(hits.empty(), "the marquee/box-select counterpart excludes the same Link-locked instance");
+
+    // Untag the Link: the same instance becomes a candidate again — proves the exclusion tracks the
+    // Link tag itself, not some other accidental property of the fixture.
+    markers[0].transforms[0].linkIdentifier = -1;
+    groupIndex = -99; transformIndex = -99;
+    Check(HitTestManualInstances<Params::MarkerInstanceGroup>(
+              markers, *fixture.composite, fixture.view, onIt.regionLocalX, onIt.regionLocalY, 8.0f,
+              isLinkLocked, groupIndex, transformIndex),
+          "the same instance IS a candidate once it is no longer tagged to the locked Link");
 }
 
 } // namespace
@@ -172,6 +223,7 @@ int main() {
     RunHitTestParityChecks();
     RunHitTestLockGateChecks();
     RunCollectRegionChecks();
+    RunInstanceTierLinkLockChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

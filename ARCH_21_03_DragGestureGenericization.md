@@ -1,5 +1,15 @@
 [← ARCH index](ARCH.md) · [§21 ARCH_21_CanvasInteractionUnification](ARCH_21_CanvasInteractionUnification.md) · SanGen ARCH §21.3. **Only the ARCH Expert writes this file.**
 
+> **⚠️ WIDENED 2026-08-31 — see `ARCH_21_09_LinkTierContractWidening.md`.** The `Traits` contract below
+> is widened, not replaced: `IsInstanceLayerLocked` (renamed `IsInstanceEffectivelyLocked`),
+> `QuantizePositionToLayerGrid`, and `ResolveEffectiveSymmetry` each gain a `Transform` parameter (in
+> place of a bare `layerIndex`) and a new `Link`-typed roster parameter, to resolve `§19.33`'s
+> instance-tier `MarkerTransform::linkIdentifier` tag ahead of the Layer-tier resolution already
+> described here. `EndInstanceDragGesture<Traits>` is confirmed UNCHANGED (it calls none of the three).
+> Props/Decals gain a new shared `NoInstanceLink` placeholder type and inert pass-through method bodies
+> — `§21.9` is authoritative on the exact widened shapes; this file's text below is left unedited
+> beneath this notice for historical record.
+
 ### 21.3 Drag-gesture genericization — `InstanceDragGestureState`, `Begin/Update/EndInstanceDragGesture<Traits>`, `RepositionSymmetryGroupMember<Traits>`, `HitTestManualInstances<GroupT>`/`CollectManualInstancesInWorldRegion<GroupT>`
 
 **Ratified as designed, with two refinements this section's own direct re-read of

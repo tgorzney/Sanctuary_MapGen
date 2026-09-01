@@ -81,6 +81,11 @@ void ReadMarkerTransformJson(const nlohmann::json& json, Params::MarkerTransform
     // conditional increment.
     markerTransform.instanceIdentifier = inOutNextInstanceIdentifier++;
     ReadJsonInteger(json, "InstanceIdentifier", markerTransform.instanceIdentifier);
+    // ARCH §19.33 — bare/unvalidated, absent key -> struct default (-1, "not Link-bound"). NOT
+    // instanceIdentifier's uniqueness-key posture: no legacy-backfill counter, no clamp, a dangling
+    // (non-existent) value is a soft, logged degrade handled entirely by
+    // WarnDanglingMarkerLinkIdentifiers (MapImporter_MarkerLink_IO.cpp), called after ReadMarkersJson.
+    ReadJsonInteger(json, "LinkIdentifier", markerTransform.linkIdentifier);
 }
 
 // ARCH §12 / Constitution §6: an out-of-range layerIndex is a loud, logged clamp to 0, applied PER

@@ -2,6 +2,7 @@
 // MapExporter_Recipe_IO.cpp verbatim (STEP31_ExporterRecipeOrchestrator_IO), so
 // BuildSanmapJsonText's own file holds zero real logic beyond its own calling sequence.
 #include "MapExporter_DocumentAssembly_IO.h"
+#include "MapExporter_MarkerLink_IO.h"
 #include "MapExporter_Recipe_IO.h"
 #include "MapExporter_IO.h"
 #include "Sanmap_MigrationManifest_IO.h"
@@ -66,6 +67,7 @@ void AppendEntityDomainsJson(const Params::MapRecipe& recipe, nlohmann::ordered_
     document["markers"]     = BuildMarkersJson(recipe);
     document["MarkerGroups"] = BuildMarkerGroupsJson(recipe);
     document["MarkerLayerBundles"] = BuildMarkerLayerBundlesJson(recipe);
+    document["MarkerLinks"] = BuildMarkerLinksJson(recipe);   // ARCH §19.28/§19.30
     document["chains"]      = BuildChainsJson(recipe);
     document["decals"]      = BuildDecalsJson(recipe);
     document["props"]       = BuildPropsJson(recipe);

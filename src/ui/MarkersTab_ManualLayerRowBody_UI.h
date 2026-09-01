@@ -18,6 +18,7 @@
 #include "MarkersTab_ManualLayers_UI.h"
 #include "../params/Geometry_PARAMS.h"
 #include "../params/MarkerInstance_PARAMS.h"
+#include "../params/MarkerLink_PARAMS.h"
 #include "../params/Symmetry_PARAMS.h"
 
 namespace SanmapGen {
@@ -105,26 +106,47 @@ bool DrawLayerRowBody(Params::MarkerInstanceLayer& layer, int layerIndex,
 // is now the ONLY place Color Override draws — the body copy formerly here for bundled layers
 // (which had no other way to reach the control) is deleted, since the Bundle tree's own
 // `drawLeafHeaderExtra` slot (ARCH §19.23) now reaches this same function for bundled rows too.
+// STEP239, ARCH §19.31 Mechanism A: `links` is `recipe.markerLinks`, threaded through so the
+// toggle's own highlighted state and the swatch's displayed color both read
+// EffectiveManualMarkerLayerColorOverrideEnabled/EffectiveManualMarkerLayerColor instead of
+// `layer.bColorOverrideEnabled`/`layer.color` directly whenever `layer.linkIdentifier >= 0` resolves
+// — the control itself also goes BeginDisabled in that case (added to the existing
+// `state.bUseGroupColor` disable), since a Link-bound Layer's own field is a read-only mirror, never
+// independently editable, never written back onto the Layer (a Link's OWN toggle+swatch, on the new
+// Links tier, MarkersTab_Links_UI.h, is the one editable surface while linked). Defaulted so every
+// pre-existing (pre-Link) call site compiles unchanged.
 void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer& layer,
-                                                      ManualMarkerLayersState& state, bool& bAnyCommitted);
+                                                      ManualMarkerLayersState& state, bool& bAnyCommitted,
+                                                      const std::vector<Params::MarkerLink>& links = {});
 
 // STEP130/STEP142: the row header's own Symmetry-toggle control — a "SYM" SmallButton (was a plain
 // checkbox, human's own instruction), highlighted while on. Mirrors
 // DrawManualMarkerLayerColorOverrideHeaderControl's own shape (hover tooltip). Drawn LEFT of the
 // Color Override control at every call site (`[SYM][COL][swatch]`).
-void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted);
+// STEP241, ARCH §19.31 correction: `links` threads through so the button's own highlighted state
+// reads EffectiveManualMarkerLayerSymmetryEnabled instead of `layer.bSymmetryEnabled` directly
+// whenever `layer.linkIdentifier >= 0` resolves — the control itself also goes BeginDisabled in that
+// case, exactly the same treatment DrawManualMarkerLayerColorOverrideHeaderControl already has.
+// Defaulted so every pre-existing call site compiles unchanged.
+void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted,
+                                                const std::vector<Params::MarkerLink>& links = {});
 
 // Human's own bug report — Icon Size, promoted from the row's own expanded body (where it used to be
 // the only way to reach it) up into the always-visible header cluster, mirroring the SYM/COL
 // controls' own precedent. Drawn LEFT of [GRID] at every call site.
+// STEP241, ARCH §19.31 correction: same disable-while-linked + Effective-resolver treatment as
+// Symmetry/Color Override above — the slider reads/displays EffectiveManualMarkerLayerIconScale
+// while linked and never writes back onto `layer.iconScale`.
 void DrawMarkerLayerIconSizeHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
-                                          bool& bAnyCommitted);
+                                          bool& bAnyCommitted, const std::vector<Params::MarkerLink>& links = {});
 
 // Human's own bug report — Snap to Grid, promoted from a body Checkbox + Grid Size slider into a
 // "GRID" SmallButton toggle (mirrors SYM/COL's own "no more checkboxes" convention) plus its
 // grid-size field, disabled while the toggle is off. Drawn LEFT of [SYM] at every call site.
+// STEP241, ARCH §19.31 correction: same disable-while-linked + Effective-resolver treatment,
+// resolving the pair (bGridSnapEnabled, gridSnapSizeWorldUnits) together from the bound Link.
 void DrawMarkerLayerGridSnapHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
-                                          bool& bAnyCommitted);
+                                          bool& bAnyCommitted, const std::vector<Params::MarkerLink>& links = {});
 
 // STEP142 — double-click-the-header rename for a Layer row (mirrors the Group's own STEP140
 // mechanism, human's own instruction), positioned OVER the header's own name text rather than in the

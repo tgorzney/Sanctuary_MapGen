@@ -683,6 +683,64 @@ void CheckManualMarkerLayerOverrideWinsOverTypeDefault() {
               "the layer's explicit color override wins over the group's type-default colorAlloy");
 }
 
+// STEP246, ARCH §19.33/§21.9: an instance tagged directly to a Link resolves THAT Link's own
+// color-override, even though its owning Layer carries no override of its own — the real,
+// previously-unreachable render path this correction is FOR (before this ticket, `ResolveMarkersManual`
+// never consulted `recipe.markerLinks` at all).
+void CheckManualMarkerInstanceLinkColorOverrideWinsOverLayer() {
+    ManualMarkerTestFixture fixture;
+    fixture.fixture.recipe.markerLayers[0].bColorOverrideEnabled = false;   // the Layer itself: no override
+    fixture.fixture.recipe.markers[0].transforms[0].linkIdentifier = 42;    // tag the Alloys instance
+    Params::MarkerLink link;
+    link.identifier = 42;
+    link.bColorOverrideEnabled = true;
+    link.color[0] = 0.11f; link.color[1] = 0.22f; link.color[2] = 0.33f; link.color[3] = 1.0f;
+    fixture.fixture.recipe.markerLinks = {link};
+    fixture.fixture.overlaySettings.overlayLayers = {fixture.alloyLayer};
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.fixture.Input(), fixture.fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 1, "the Link-tagged Alloys instance still resolves exactly one candidate");
+    if (!candidates.empty())
+        check(candidates[0].tintColorRed == 0.11f && candidates[0].tintColorGreen == 0.22f
+              && candidates[0].tintColorBlue == 0.33f,
+              "an instance tagged to a Link resolves THAT Link's own color override, not its Layer's "
+              "(disabled) override or the group's type-default");
+}
+
+// STEP246, ARCH §19.33/§21.9 — the live regression this correction is explicitly FOR: two markers
+// sharing one Layer, one tagged to a Link with bHidden = true, the other untagged. Before this
+// ticket, NO render consumer ever reached a Link's bHidden at all (Layer-tier or instance-tier) —
+// this proves the fix at the actual canvas render/cull path, ResolveMarkersManual, not a resolver
+// unit test alone.
+void CheckManualMarkerInstanceLinkHiddenOnlyHidesTaggedInstance() {
+    ManualMarkerTestFixture fixture;
+    fixture.fixture.recipe.markerLayers[0].bHidden = false;   // the shared Layer itself: not hidden
+    Params::MarkerTransform& taggedTransform = fixture.fixture.recipe.markers[0].transforms[0];
+    taggedTransform.instanceIdentifier = 1;
+    taggedTransform.linkIdentifier = 42;   // tagged to the Link below
+    Params::MarkerTransform untaggedTransform = ManualMarkerTestFixture::MakeVisibleMarkerTransform();
+    untaggedTransform.instanceIdentifier = 2;
+    untaggedTransform.transform.positionX = 3.0f;   // still in-view, a distinct position
+    untaggedTransform.transform.positionZ = 3.0f;
+    fixture.fixture.recipe.markers[0].transforms.push_back(untaggedTransform);
+
+    Params::MarkerLink hiddenLink;
+    hiddenLink.identifier = 42;
+    hiddenLink.bHidden = true;
+    fixture.fixture.recipe.markerLinks = {hiddenLink};
+    fixture.fixture.overlaySettings.overlayLayers = {fixture.alloyLayer};
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.fixture.Input(), fixture.fixture.aabbCache, nullptr, candidates);
+    check(candidates.size() == 1,
+          "exactly one candidate resolves: the Link-tagged (hidden) instance is excluded, the "
+          "untagged sibling on the SAME Layer stays visible");
+    if (!candidates.empty())
+        check(candidates[0].instanceKey.instanceIndex == 2,
+              "the surviving candidate is the UNTAGGED instance (identifier 2), not the Link-hidden one");
+}
+
 // STEP116: a MANUAL group named "Generic" stays white despite non-default colorAlloy/colorSpawn —
 // mirrors CheckMarkerGenericAndExpansionStayWhite's own shape, but for the manual (not procedural)
 // marker path.
@@ -805,6 +863,45 @@ void CheckManualMarkerScaleUnrecognizedGroupNameStaysNoOp() {
         const float expected = baselineCandidates[0].screenSize * 2.0f;
         check(scaledCandidates[0].screenSize > expected * 0.99f && scaledCandidates[0].screenSize < expected * 1.01f,
               "an unrecognized group name leaves the group-type term at 1.0f — only layerIconScale(2.0) applies");
+    }
+}
+
+// ARCH §19.32 / STEP240 — ResolveMarkersManual folds ResolveMarkerGroupSelectedTypeScale into the
+// manual marker's rendered screenSize, multiplicatively alongside groupTypeScale/layerIconScale
+// (STEP122), ONLY for a candidate whose transform.instanceIdentifier is a live member of
+// input.selectedInstanceKeys. Mirrors CheckManualMarkerScaleComposesEndToEnd's own
+// baseline-vs-scaled comparison shape, but varies SELECTION rather than a PARAMS value, so this
+// stays correct regardless of WorldFootprintSizeTable's own default. Reuses the SAME fixture/AABB
+// cache across both resolves, mirroring CheckIndexSpaceCollisionRegressionClosed's own precedent
+// for that pattern.
+void CheckManualMarkerSelectedScaleComposesOnlyWhenSelected() {
+    ManualMarkerTestFixture fixture;
+    fixture.fixture.recipe.globalMarkerSettings.scaleAlloy = 1.0f;           // isolate the selected term
+    fixture.fixture.recipe.globalMarkerSettings.scaleSelectedAlloy = 3.0f;
+    fixture.fixture.recipe.markers[0].transforms[0].instanceIdentifier = 55;   // globally-unique id
+    fixture.fixture.overlaySettings.overlayLayers = {fixture.alloyLayer};
+
+    DrawOverlayIconLayersInput input = fixture.fixture.Input();
+    OverlayInstanceKeySet_UI emptySelection;
+    input.selectedInstanceKeys = &emptySelection;
+    std::vector<OverlayVisibleInstance> unselectedCandidates;
+    ResolveVisibleCandidates(input, fixture.fixture.aabbCache, nullptr, unselectedCandidates);
+    check(unselectedCandidates.size() == 1, "the unselected Alloys manual instance resolves exactly one candidate");
+
+    OverlayInstanceKeySet_UI selectionSet;
+    selectionSet.keys = {OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 55, true, /*bManual=*/true}};
+    input.selectedInstanceKeys = &selectionSet;
+    std::vector<OverlayVisibleInstance> selectedCandidates;
+    ResolveVisibleCandidates(input, fixture.fixture.aabbCache, nullptr, selectedCandidates);
+    check(selectedCandidates.size() == 1, "the selected Alloys manual instance resolves exactly one candidate");
+
+    if (!unselectedCandidates.empty() && !selectedCandidates.empty()) {
+        check(!unselectedCandidates[0].bSelected, "the first resolve's own candidate correctly reports unselected");
+        check(selectedCandidates[0].bSelected, "the second resolve's own candidate correctly reports selected");
+        const float expected = unselectedCandidates[0].screenSize * 3.0f;
+        check(selectedCandidates[0].screenSize > expected * 0.99f && selectedCandidates[0].screenSize < expected * 1.01f,
+              "scaleSelectedAlloy(3.0) composes into a SELECTED manual marker's rendered screenSize, "
+              "and is absent from the same instance's UNSELECTED screenSize");
     }
 }
 
@@ -1122,10 +1219,13 @@ void RunMapCanvasIconLayerCullChecks() {
     CheckManualMarkerLayerIndexFilter();
     CheckManualMarkerTypeDefaultColorResolvesEndToEnd();
     CheckManualMarkerLayerOverrideWinsOverTypeDefault();
+    CheckManualMarkerInstanceLinkColorOverrideWinsOverLayer();
+    CheckManualMarkerInstanceLinkHiddenOnlyHidesTaggedInstance();
     CheckManualMarkerGenericGroupStaysWhite();
     CheckResolveMarkerGroupTypeScale();
     CheckManualMarkerScaleComposesEndToEnd();
     CheckManualMarkerScaleUnrecognizedGroupNameStaysNoOp();
+    CheckManualMarkerSelectedScaleComposesOnlyWhenSelected();
     CheckProceduralMarkerScaleComposesEndToEnd();
     CheckIndexSpaceCollisionRegressionClosed();
     CheckSelectedInstanceCandidateResolvesManualMarker();

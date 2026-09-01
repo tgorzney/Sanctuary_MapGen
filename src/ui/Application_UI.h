@@ -136,6 +136,13 @@ private:
     void DrawSettingsWindow();               // Application_Draw_UI.cpp
     void DrawActivePanel();                  // Application_Draw_UI.cpp
     void DrawCanvasWindow();                 // Application_Draw_UI.cpp
+    // STEP234 — the global Delete-key shortcut: erases the canvas's selected MANUAL (bManual)
+    // Marker/Prop/Decal instances (procedural instances and Units are silently skipped,
+    // DESIGN_MarkerLink_R1.md §0/§1). Called from RunOneFrame() after DrawCanvasWindow(), before
+    // EndImguiFrame(), so `ImGui::GetIO().WantTextInput` reflects every widget this frame's own
+    // panels/canvas submitted. Its own gating/mutation logic is factored into pure, testable free
+    // functions (Application_DeleteKey_UI.h) — this method is a thin imgui/Application-state glue.
+    void ApplyGlobalDeleteShortcut();        // Application_DeleteKey_UI.cpp
     void DrawViewLayersPopup();              // Application_ViewLayersPopup_UI.cpp
     void DrawPanelSwitcher();                // Application_LeftColumn_UI.cpp
     void DrawTerrainGroupPanel();            // Application_PanelTerrain_UI.cpp
