@@ -61,9 +61,15 @@ bool bDialectCarriesFootprint(TemplateDialectKind dialectKind) {
            dialectKind == TemplateDialectKind::PropTemplateUppercase;
 }
 
+} // namespace
+
 // Root-table detection (STEP87 §2.1): checks the five recognized dialect globals in order,
-// first hit wins. Returns nullptr (dialectKind left Unrecognized) when none match.
-const Sys::LuaTableValue* DetectRootTable(const Sys::LuaTableValue& globals, TemplateDialectKind& dialectKind) {
+// first hit wins. Returns nullptr (dialectKind left Unrecognized) when none match. Promoted out of
+// this file's anonymous namespace (Auto-NavMesh mesh-ingestion work) so TemplateVisualLod_IO — a
+// new additive sibling file, never an extension of TemplateRecord's own shipped scope — can reuse
+// the exact same dialect detection instead of re-deriving it.
+const Sys::LuaTableValue* DetectTemplateRootTable(const Sys::LuaTableValue& globals,
+                                                  TemplateDialectKind& dialectKind) {
     const Sys::LuaTableValue* rootTable = nullptr;
     if ((rootTable = globals.Find("UnitTemplate")) != nullptr) dialectKind = TemplateDialectKind::UnitTemplate;
     else if ((rootTable = globals.Find("propTemplate")) != nullptr) dialectKind = TemplateDialectKind::PropTemplateLowercase;
@@ -72,8 +78,6 @@ const Sys::LuaTableValue* DetectRootTable(const Sys::LuaTableValue& globals, Tem
     else if ((rootTable = globals.Find("MarkerTemplate")) != nullptr) dialectKind = TemplateDialectKind::MarkerTemplate;
     return rootTable;
 }
-
-} // namespace
 
 std::string DeriveTemplateIdentifierFromPath(const std::string& path) {
     return std::filesystem::path(path).stem().string();
@@ -92,7 +96,7 @@ TemplateParseOutcome ParseTemplateSource(const Sys::LuaTableEvaluateResult& eval
     }
 
     TemplateDialectKind dialectKind = TemplateDialectKind::Unrecognized;
-    const Sys::LuaTableValue* rootTable = DetectRootTable(evaluated.globals, dialectKind);
+    const Sys::LuaTableValue* rootTable = DetectTemplateRootTable(evaluated.globals, dialectKind);
     if (rootTable == nullptr) {
         outcome.diagnosticMessage = "no recognized root table (possibly non-Lua content, e.g. a JSON .sanprop)";
         return outcome;

@@ -7,6 +7,7 @@
 #pragma once
 #include <cstddef>
 #include <string>
+#include <vector>
 
 namespace SanmapGen {
 namespace Io {
@@ -30,6 +31,12 @@ bool WriteBinaryFileBytes(const std::string& filePath, const void* bytes, std::s
 // (STEP72) bundled/override resolution and later reused by ScenarioScript_Export_IO's (STEP71)
 // overwrite-safety banner check.
 bool ReadTextFileBytes(const std::string& filePath, std::string& outText);
+
+// Reads filePath's entire contents as raw bytes. False + outBytes left EMPTY if the file does not
+// exist or cannot be opened for read — never throws, never partial-fills outBytes on failure. The
+// binary counterpart to ReadTextFileBytes/WriteBinaryFileBytes, first needed by the Auto-NavMesh
+// mesh-ingestion work's pack-relative asset resolver (a `.sanmodel` is binary, not text).
+bool ReadBinaryFileBytes(const std::string& filePath, std::vector<unsigned char>& outBytes);
 
 } // namespace Io
 } // namespace SanmapGen

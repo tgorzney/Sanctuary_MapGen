@@ -46,8 +46,12 @@ void Application::DrawEnvironmentGroupPanel() {
                          &assetBridge.templateIngestReport);
             break;
         case ApplicationPanel::Props:
+            // Auto-NavMesh Phase 0 — gameInstallRoot/gpuResourceManager thread into the Mesh
+            // Preview section; both already exist as Application members (STEP64/Window init), no
+            // new state needed here.
             DrawPropsTab(recipe, tabState.props, &previewDriver, ActiveIconManifest(),
-                         &assembler.Placements().props, &assetBridge.templateIngestReport);
+                         &assembler.Placements().props, &assetBridge.templateIngestReport,
+                         &gameInstallRoot, gpuResourceManager.get());
             break;
         case ApplicationPanel::Decals:
             DrawDecalsTab(recipe, tabState.decals, &previewDriver, ActiveIconManifest(),

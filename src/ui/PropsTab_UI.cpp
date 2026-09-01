@@ -120,11 +120,16 @@ Params::PropRule* SelectedPropRule(std::vector<Params::PropRule>& propRules,
 void DrawPropsTab(Params::MapRecipe& recipe, PropsTabState& state,
                   Pipeline::PreviewDriver* previewDriver, const IconAtlasManifest* iconManifest,
                   const Data::PlacementInstances* placedProps,
-                  const Io::TemplateIngestReport* templateIngestReport) {
+                  const Io::TemplateIngestReport* templateIngestReport,
+                  const std::string* gameInstallRoot, Sys::GpuResourceManager* gpuResourceManager) {
     ImGui::PushID("propsTab");
     DrawManualPropLayers(state.manualLayers, recipe.propLayers, recipe.props, recipe.propLayerBundles,
                         placedProps);
     DrawRuleStack(recipe, state, previewDriver, iconManifest, templateIngestReport);
+    static const std::string emptyGameInstallRoot;
+    DrawPropMeshPreviewSection(state.meshPreview, recipe.props,
+                              gameInstallRoot != nullptr ? *gameInstallRoot : emptyGameInstallRoot,
+                              gpuResourceManager);
     ImGui::PopID();
 }
 

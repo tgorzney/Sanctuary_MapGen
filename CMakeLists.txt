@@ -486,6 +486,7 @@ add_sangen_test(ThreadPool_SYS_Test             src/sys/ThreadPool_SYS_Test.cpp)
 add_sangen_test(AtlasResidency_SYS_Test         src/sys/AtlasResidency_SYS_Test.cpp)
 add_sangen_test(LuaSyntaxCheck_SYS_Test         src/sys/LuaSyntaxCheck_SYS_Test.cpp)
 add_sangen_test(LuaTableEvaluate_SYS_Test       src/sys/LuaTableEvaluate_SYS_Test.cpp)
+add_sangen_test(SanmodelRead_SYS_Test           src/sys/SanmodelRead_SYS_Test.cpp)
 
 # IO — the M5-4 asset pipeline. One binary whose main() lives in SanpackReader_IO_Test.cpp; the
 # synthetic sanpack it runs against is written with the miniz WRITER, so this target (unlike the
@@ -508,9 +509,20 @@ add_sangen_test(WorldFootprintSizeTable_IO_Test src/io/WorldFootprintSizeTable_I
 add_sangen_test(TemplateSourceScan_IO_Test src/io/TemplateSourceScan_IO_Test.cpp)
 target_include_directories(TemplateSourceScan_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
+# Auto-NavMesh Phase 0 — pack-relative asset resolver (blueprintPath/visuals.lods[].model -> raw
+# bytes), generalizing STEP86's own unzipped-tree/sanpack-fallback ordering past .santp/.sanprop
+# text. Same miniz-WRITER synthetic-sanpack posture as TemplateSourceScan_IO_Test above.
+add_sangen_test(ResolvePackRelativeAsset_IO_Test src/io/ResolvePackRelativeAsset_IO_Test.cpp)
+target_include_directories(ResolvePackRelativeAsset_IO_Test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core)
+
 # STEP87 — classifies an already-evaluated Sys::LuaTableValue tree by its root-table dialect,
 # extracts footprint/tpId/tags, detects tpId collisions. Pure/stateless, builds fixtures directly.
 add_sangen_test(TemplateDialect_IO_Test src/io/TemplateDialect_IO_Test.cpp)
+
+# Auto-NavMesh Phase 0 — visuals.lods[] extraction, a new additive sibling to TemplateDialect_IO
+# (never an extension of its shipped TemplateRecord). Same fixture-construction posture as
+# TemplateDialect_IO_Test above: builds Sys::LuaTableValue trees directly, no live Lua evaluation.
+add_sangen_test(TemplateVisualLod_IO_Test src/io/TemplateVisualLod_IO_Test.cpp)
 
 # STEP88 — fingerprinted disk cache (nlohmann::json, not AssetAtlasCache's binary ByteCursor) for a
 # whole ingestion run's TemplateRecord set. TemplateIngestCache_IO.cpp and TemplateIngestCache_Record_IO.cpp
@@ -913,6 +925,9 @@ add_sangen_test(MarkerDragGesture_UI_Test src/ui/MarkerDragGesture_UI_Test.cpp)
 # mirror-follow, growth+materialize with the no-op name hooks, lock refusal, no reserved
 # cardinality-frozen group, and each domain's own symmetry-gate resolver. Pure/imgui-free, no window.
 add_sangen_test(PropDragGesture_UI_Test   src/ui/PropDragGesture_UI_Test.cpp)
+# Auto-NavMesh Phase 0 — the Props-tab mesh preview's CPU software rasterizer. Pure/GL-free (this
+# file never touches GL, see its own header note), no window/context needed.
+add_sangen_test(MeshPreviewRasterize_UI_Test src/ui/MeshPreviewRasterize_UI_Test.cpp)
 add_sangen_test(DecalDragGesture_UI_Test  src/ui/DecalDragGesture_UI_Test.cpp)
 # ARCH §21.3/§21.5 — the generic HitTestManualInstances<GroupT>/CollectManualInstancesInWorldRegion
 # <GroupT>: parity with the old Marker-only hit-test across all three domains, plus the new lock gate

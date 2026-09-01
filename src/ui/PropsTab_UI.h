@@ -24,6 +24,7 @@
 #pragma once
 #include "IconGridWidget_UI.h"
 #include "LabelledDialWidget_UI.h"
+#include "PropMeshPreview_UI.h"
 #include "PropsTab_Manual_UI.h"
 #include "PropsTab_Rules_UI.h"
 #include "RangeSliderWidget_UI.h"
@@ -69,6 +70,10 @@ struct PropsTabState {
     PlacementTransformState transform;
     ManualPropLayersState   manualLayers;
 
+    // Auto-NavMesh Phase 0 — the "Mesh Preview" section (PropMeshPreview_UI.h): pick a
+    // `recipe.props` entry, resolve+render its LOD0 `.sanmodel` mesh.
+    PropMeshPreviewState    meshPreview;
+
     // STEP96_FootprintBakeAndStalenessCheck_IO.md §2 — the selected rule's own "Resolve Footprint"
     // inline message (a bake-not-found notice; empty otherwise). One shared slot, same posture as
     // every other single-selection editor mirror on this state (only the selected rule's controls
@@ -105,11 +110,16 @@ Params::PropRule* SelectedPropRule(std::vector<Params::PropRule>& propRules,
 // the typed tpId, and before the first generation the transform list simply says so.
 // `templateIngestReport` is nullable (STEP90/91's session-scoped ingestion state) — the "Resolve
 // Footprint" button degrades to its "no ingested data" inline message with nothing bound.
+// `gameInstallRoot`/`gpuResourceManager` (Auto-NavMesh Phase 0) are both nullable too: with no
+// install root configured or no live GPU context, the Mesh Preview section degrades to its own
+// inline message rather than doing nothing silently.
 void DrawPropsTab(Params::MapRecipe& recipe, PropsTabState& state,
                   Pipeline::PreviewDriver* previewDriver,
                   const IconAtlasManifest* iconManifest = nullptr,
                   const Data::PlacementInstances* placedProps = nullptr,
-                  const Io::TemplateIngestReport* templateIngestReport = nullptr);
+                  const Io::TemplateIngestReport* templateIngestReport = nullptr,
+                  const std::string* gameInstallRoot = nullptr,
+                  Sys::GpuResourceManager* gpuResourceManager = nullptr);
 
 } // namespace Ui
 } // namespace SanmapGen

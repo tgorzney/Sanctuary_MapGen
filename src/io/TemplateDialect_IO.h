@@ -64,6 +64,14 @@ struct TemplateParseOutcome {
 // "<sanpackPath>!<entryName>" logical paths.
 std::string DeriveTemplateIdentifierFromPath(const std::string& path);
 
+// Root-table detection (STEP87 §2.1), promoted out of this file's own .cpp (Auto-NavMesh
+// mesh-ingestion work) so a second consumer (TemplateVisualLod_IO — a new additive sibling file)
+// can classify an already-evaluated table by the same five-dialect rule without re-deriving it.
+// Checks the five recognized dialect globals in declaration order, first hit wins; returns nullptr
+// (dialectKind left Unrecognized) when none match.
+const Sys::LuaTableValue* DetectTemplateRootTable(const Sys::LuaTableValue& globals,
+                                                  TemplateDialectKind& dialectKind);
+
 // One file's already-evaluated result in, one outcome out — pure, stateless, safe to call from any
 // thread (ticket 89's ThreadPool fan-out). sourceLogicalPath/sourcePriorityRank/sourceByteSize/
 // sourceModifiedTime/sourceContentHash are carried through verbatim onto the returned record.
