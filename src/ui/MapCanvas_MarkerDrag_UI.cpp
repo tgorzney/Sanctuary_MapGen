@@ -48,10 +48,20 @@ void MapCanvas::DrawManualMarkerDragPass(float regionOriginX, float regionOrigin
                                                  : kDefaultMarkerSymmetryFixSettings.distanceTolerance,
               selectedManualInstanceIdentifiers)
         : std::vector<int>{};
+    // Follow-up to BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI — DrawManualMarkerRoster now
+    // takes one MarkerDragGestureState PER dragged instance (widened from that ticket's deliberate
+    // first-entry-only narrowing, human-approved directly): every entry in manualMarkerDragEntries
+    // contributes its own ghost/soft-hide/refused visual, not just the grabbed instance's. One-line
+    // map from entries to their own `.state` — a single-entry drag reduces to the prior one-state call,
+    // byte-identical.
+    std::vector<MarkerDragGestureState> dragStates;
+    dragStates.reserve(manualMarkerDragEntries.size());
+    for (const ManualInstanceDragEntry_UI& entry : manualMarkerDragEntries)
+        dragStates.push_back(entry.state);
     DrawManualMarkerRoster(*manualMarkerDragMarkers, manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoLayers,
                           manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->armies : kNoArmies,
                           manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->globalMarkerSettings : kDefaultGlobalMarkerSettings,
-                          manualMarkerDragState, *composite, view, regionOriginX, regionOriginY,
+                          dragStates, *composite, view, regionOriginX, regionOriginY,
                           selectedHighlight, markerLinks, *ImGui::GetWindowDrawList());
 }
 

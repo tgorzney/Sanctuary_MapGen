@@ -83,7 +83,10 @@ nlohmann::ordered_json BuildMarkerGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["Locked"] = layer.bLocked;
         layerJson["Hidden"] = layer.bHidden;   // STEP144
         layerJson["GridSnapEnabled"] = layer.bGridSnapEnabled;
-        layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeWorldUnits;
+        // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — same wire key, now a
+        // whole-number cell multiplier instead of a raw world-unit float (no migration; see the
+        // work-order's own "Saved-map compatibility" note).
+        layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeCellMultiplier;
         layerJson["ColorOverrideEnabled"] = layer.bColorOverrideEnabled;
         layerJson["SymmetryEnabled"] = layer.bSymmetryEnabled;
         layerJson["ParentBundleIdentifier"] = layer.parentBundleIdentifier;

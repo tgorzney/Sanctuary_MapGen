@@ -411,18 +411,22 @@ void RunLinkGridSnapAndSymmetryDuringDragChecks() {
         std::vector<Params::MarkerInstanceLayer> layers(1);
         layers[0].bGridSnapEnabled = false;   // the Layer itself: snap OFF
         std::vector<Params::MarkerLink> links(1);
-        links[0].identifier = 500; links[0].bGridSnapEnabled = true; links[0].gridSnapSizeWorldUnits = 2.0f;
-        const Params::Geometry geometry = MakeTestGeometry();
+        links[0].identifier = 500; links[0].bGridSnapEnabled = true; links[0].gridSnapSizeCellMultiplier = 2;
+        const Params::Geometry geometry = MakeTestGeometry();   // worldUnitsPerCell = 1.0, so a
+                                                                 // multiplier of 2 == a 2.0-unit cell
 
         MarkerDragGestureState state;
         Check(BeginMarkerDragGesture(state, markers, layers, links, geometry,
                                      Params::SymmetryAxis::MirrorAcrossX, 3, 0, 0),
               "an unlocked Link-tagged instance begins a drag normally");
         UpdateMarkerDragGesture(state, markers, layers, links, geometry, 5.3f, 5.3f);
-        Check(NearlyEqual(markers[0].transforms[0].transform.positionX, 6.0f)
-              && NearlyEqual(markers[0].transforms[0].transform.positionZ, 6.0f),
-              "the Link's OWN grid-snap (enabled, cell 2.0) governs, snapping 5.3 -> 6.0, "
-              "even though the Layer's own grid-snap is disabled");
+        // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — snapping now lands on the
+        // owning cell's CENTER (floor+half-cell), not the old vertex-snapping round(): 5.3's owning
+        // 2.0-unit cell is [4,6) -> center 5.0.
+        Check(NearlyEqual(markers[0].transforms[0].transform.positionX, 5.0f)
+              && NearlyEqual(markers[0].transforms[0].transform.positionZ, 5.0f),
+              "the Link's OWN grid-snap (enabled, cell 2.0) governs, snapping 5.3 -> its cell center "
+              "5.0, even though the Layer's own grid-snap is disabled");
     }
 
     // Symmetry: the Layer resolves to MirrorAcrossZ; the Link the instance is tagged to resolves to

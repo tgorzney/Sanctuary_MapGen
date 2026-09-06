@@ -261,15 +261,22 @@ void DrawMarkerLayerIconSizeHeaderControl(Params::MarkerInstanceLayer& layer, Ma
 // Human's own bug report — Snap to Grid, promoted from a body Checkbox + Grid Size slider into a
 // "GRID" SmallButton toggle (mirrors SYM/COL's own "no more checkboxes" convention) plus its own
 // grid-size field, disabled while the toggle is off.
-// STEP241, ARCH §19.31 correction — the pair (bGridSnapEnabled, gridSnapSizeWorldUnits) resolves
+// STEP241, ARCH §19.31 correction — the pair (bGridSnapEnabled, gridSnapSizeCellMultiplier) resolves
 // together from a bound Link, same bLinked/local-buffer treatment as Icon Size above; the toggle
 // button and the size field both go inert while linked (an ADDITIONAL disable atop the pre-existing
 // "grayed while the toggle itself is off" one).
+// BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — the field is now a whole-number
+// cell MULTIPLIER, not a world-unit distance (see MarkerInstanceLayer::gridSnapSizeCellMultiplier's
+// own comment). `DrawSliderScalarCompact` has no integer twin (only the 3-line `DrawSliderScalar`/
+// `DrawSliderScalarInteger` pair does), so this reads/writes through a local float shadow on a
+// whole-integer lattice (range increment 1, "%.0f" display) rather than adding a new widget-library
+// variant for one call site.
 void DrawMarkerLayerGridSnapHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
                                           bool& bAnyCommitted, const std::vector<Params::MarkerLink>& links) {
     const bool bLinked = layer.linkIdentifier >= 0;
     const bool bEffectiveGridSnapEnabled = EffectiveManualMarkerLayerGridSnapEnabled(layer, links);
-    float effectiveGridSnapSize = EffectiveManualMarkerLayerGridSnapSizeWorldUnits(layer, links);
+    float effectiveGridSnapMultiplier =
+        static_cast<float>(EffectiveManualMarkerLayerGridSnapSizeCellMultiplier(layer, links));
     ImGui::BeginDisabled(bLinked);
     PushToggleButtonStyle(bEffectiveGridSnapEnabled);
     const bool bGridToggleCommitted = ImGui::SmallButton("GRID##gridSnap");
@@ -279,12 +286,15 @@ void DrawMarkerLayerGridSnapHeaderControl(Params::MarkerInstanceLayer& layer, Ma
     ImGui::SameLine();
     ImGui::BeginDisabled(!bEffectiveGridSnapEnabled);
     const bool bGridSizeCommitted =
-        DrawSliderScalarCompact("Grid Size", effectiveGridSnapSize, state.gridSnapSizeRange,
+        DrawSliderScalarCompact("Grid Size", effectiveGridSnapMultiplier, state.gridSnapSizeRange,
                                 state.selectedLayerGridSnapToggle, kMarkerLayerGridSizeTrackWidthPixels,
-                                kMarkerLayerGridSizeFieldWidthPixels, WidgetStyle(), "%.2f",
+                                kMarkerLayerGridSizeFieldWidthPixels, WidgetStyle(), "%.0f",
                                 /*bShowRealtimeToggle=*/false).bCommitted;
-    if (bGridSizeCommitted && !bLinked) { layer.gridSnapSizeWorldUnits = effectiveGridSnapSize; bAnyCommitted = true; }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Grid Size");
+    if (bGridSizeCommitted && !bLinked) {
+        layer.gridSnapSizeCellMultiplier = std::max(1, static_cast<int>(effectiveGridSnapMultiplier + 0.5f));
+        bAnyCommitted = true;
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Grid Size (cells)");
     ImGui::EndDisabled();
     ImGui::EndDisabled();
 }

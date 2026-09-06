@@ -713,8 +713,8 @@ void CheckMarkersAndChains(const Params::MapRecipe& original, const Params::MapR
               "MarkerInstanceLayer::bHidden survives, non-default (STEP144)");
         Check(loadedLayer.bGridSnapEnabled == originalLayer.bGridSnapEnabled,
               "MarkerInstanceLayer::bGridSnapEnabled survives, non-default");
-        Check(NearlyEqual(loadedLayer.gridSnapSizeWorldUnits, originalLayer.gridSnapSizeWorldUnits),
-              "MarkerInstanceLayer::gridSnapSizeWorldUnits survives, non-default");
+        Check(loadedLayer.gridSnapSizeCellMultiplier == originalLayer.gridSnapSizeCellMultiplier,
+              "MarkerInstanceLayer::gridSnapSizeCellMultiplier survives, non-default");
         Check(loadedLayer.bColorOverrideEnabled == originalLayer.bColorOverrideEnabled,
               "MarkerInstanceLayer::bColorOverrideEnabled survives, non-default");
         Check(loadedLayer.bSymmetryEnabled == originalLayer.bSymmetryEnabled && !loadedLayer.bSymmetryEnabled,
@@ -816,8 +816,8 @@ void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRec
               "PropInstanceLayer::bHidden survives, non-default (ARCH §20)");
         Check(loadedLayer.bGridSnapEnabled == originalLayer.bGridSnapEnabled,
               "PropInstanceLayer::bGridSnapEnabled survives, non-default (ARCH §20)");
-        Check(NearlyEqual(loadedLayer.gridSnapSizeWorldUnits, originalLayer.gridSnapSizeWorldUnits),
-              "PropInstanceLayer::gridSnapSizeWorldUnits survives, non-default (ARCH §20)");
+        Check(loadedLayer.gridSnapSizeCellMultiplier == originalLayer.gridSnapSizeCellMultiplier,
+              "PropInstanceLayer::gridSnapSizeCellMultiplier survives, non-default (ARCH §20)");
         Check(loadedLayer.bColorOverrideEnabled == originalLayer.bColorOverrideEnabled,
               "PropInstanceLayer::bColorOverrideEnabled survives, non-default (ARCH §20)");
         Check(loadedLayer.bSymmetryEnabled == originalLayer.bSymmetryEnabled && !loadedLayer.bSymmetryEnabled,
@@ -875,8 +875,8 @@ void CheckPropsAndDecals(const Params::MapRecipe& original, const Params::MapRec
               "DecalInstanceLayer::bHidden survives, non-default (ARCH §20)");
         Check(loadedLayer.bGridSnapEnabled == originalLayer.bGridSnapEnabled,
               "DecalInstanceLayer::bGridSnapEnabled survives, non-default (ARCH §20)");
-        Check(NearlyEqual(loadedLayer.gridSnapSizeWorldUnits, originalLayer.gridSnapSizeWorldUnits),
-              "DecalInstanceLayer::gridSnapSizeWorldUnits survives, non-default (ARCH §20)");
+        Check(loadedLayer.gridSnapSizeCellMultiplier == originalLayer.gridSnapSizeCellMultiplier,
+              "DecalInstanceLayer::gridSnapSizeCellMultiplier survives, non-default (ARCH §20)");
         Check(loadedLayer.bColorOverrideEnabled == originalLayer.bColorOverrideEnabled,
               "DecalInstanceLayer::bColorOverrideEnabled survives, non-default (ARCH §20)");
         Check(loadedLayer.bSymmetryEnabled == originalLayer.bSymmetryEnabled && !loadedLayer.bSymmetryEnabled,
@@ -1363,7 +1363,7 @@ void FillFixtureMarkersAndChains(Params::MapRecipe& recipe) {
     markerLayer.bLocked = true;                                       // STEP106, non-default
     markerLayer.bHidden = true;                                       // STEP144, non-default
     markerLayer.bGridSnapEnabled = true;                              // STEP106, non-default
-    markerLayer.gridSnapSizeWorldUnits = 4.0f;                        // STEP106, non-default
+    markerLayer.gridSnapSizeCellMultiplier = 4;                       // STEP106, non-default
     markerLayer.bColorOverrideEnabled = true;                         // STEP116, non-default
     markerLayer.bSymmetryEnabled = false;                             // STEP130, non-default (ARCH §19.24)
     markerLayer.parentBundleIdentifier = 42;                          // STEP119, non-default
@@ -1433,7 +1433,7 @@ void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
     propLayer.bLocked = true;                                       // non-default
     propLayer.bHidden = true;                                       // ARCH §20, non-default
     propLayer.bGridSnapEnabled = true;                              // ARCH §20, non-default
-    propLayer.gridSnapSizeWorldUnits = 4.0f;                        // ARCH §20, non-default
+    propLayer.gridSnapSizeCellMultiplier = 4;                       // ARCH §20, non-default
     propLayer.bColorOverrideEnabled = true;                         // ARCH §20, non-default
     propLayer.bSymmetryEnabled = false;                             // ARCH §20, non-default
     propLayer.parentBundleIdentifier = 42;                          // ARCH §20, non-default
@@ -1477,7 +1477,7 @@ void FillFixturePropsAndDecals(Params::MapRecipe& recipe) {
     decalLayer.bLocked = true;                                       // non-default
     decalLayer.bHidden = true;                                       // ARCH §20, non-default
     decalLayer.bGridSnapEnabled = true;                              // ARCH §20, non-default
-    decalLayer.gridSnapSizeWorldUnits = 2.0f;                        // ARCH §20, non-default
+    decalLayer.gridSnapSizeCellMultiplier = 2;                       // ARCH §20, non-default
     decalLayer.bColorOverrideEnabled = true;                         // ARCH §20, non-default
     decalLayer.bSymmetryEnabled = false;                             // ARCH §20, non-default
     decalLayer.parentBundleIdentifier = 13;                          // ARCH §20, non-default
@@ -2287,8 +2287,8 @@ void CheckMarkerGroupsLegacyLockAndSnapDefaults() {
           "bHidden (STEP144) keeps its struct default (false) when the key is absent");
     Check(layer.bGridSnapEnabled == false,
           "bGridSnapEnabled keeps its struct default (false) when the key is absent");
-    Check(NearlyEqual(layer.gridSnapSizeWorldUnits, 1.0f),
-          "gridSnapSizeWorldUnits keeps its struct default (1.0f) when the key is absent");
+    Check(layer.gridSnapSizeCellMultiplier == 1,
+          "gridSnapSizeCellMultiplier keeps its struct default (1) when the key is absent");
     Check(layer.bColorOverrideEnabled == false,
           "bColorOverrideEnabled keeps its struct default (false) when the key is absent");
     Check(layer.bSymmetryEnabled == true,
@@ -2317,8 +2317,8 @@ void CheckPropDecalGroupsLegacyDefaults() {
         Check(layer.bHidden == false, "PropInstanceLayer::bHidden keeps its struct default when absent");
         Check(layer.bGridSnapEnabled == false,
               "PropInstanceLayer::bGridSnapEnabled keeps its struct default when absent");
-        Check(NearlyEqual(layer.gridSnapSizeWorldUnits, 1.0f),
-              "PropInstanceLayer::gridSnapSizeWorldUnits keeps its struct default (1.0f) when absent");
+        Check(layer.gridSnapSizeCellMultiplier == 1,
+              "PropInstanceLayer::gridSnapSizeCellMultiplier keeps its struct default (1) when absent");
         Check(layer.bColorOverrideEnabled == false,
               "PropInstanceLayer::bColorOverrideEnabled keeps its struct default when absent");
         Check(layer.bSymmetryEnabled == true,
@@ -2331,8 +2331,8 @@ void CheckPropDecalGroupsLegacyDefaults() {
         Check(layer.bHidden == false, "DecalInstanceLayer::bHidden keeps its struct default when absent");
         Check(layer.bGridSnapEnabled == false,
               "DecalInstanceLayer::bGridSnapEnabled keeps its struct default when absent");
-        Check(NearlyEqual(layer.gridSnapSizeWorldUnits, 1.0f),
-              "DecalInstanceLayer::gridSnapSizeWorldUnits keeps its struct default (1.0f) when absent");
+        Check(layer.gridSnapSizeCellMultiplier == 1,
+              "DecalInstanceLayer::gridSnapSizeCellMultiplier keeps its struct default (1) when absent");
         Check(layer.bColorOverrideEnabled == false,
               "DecalInstanceLayer::bColorOverrideEnabled keeps its struct default when absent");
         Check(layer.bSymmetryEnabled == true,
@@ -2767,7 +2767,7 @@ void CheckMarkerLayerSynthesisOnEmptyMarkerGroups() {
           && NearlyEqual(synthesizedLayer.iconScale, defaultLayer.iconScale)
           && synthesizedLayer.bLocked == defaultLayer.bLocked
           && synthesizedLayer.bGridSnapEnabled == defaultLayer.bGridSnapEnabled
-          && NearlyEqual(synthesizedLayer.gridSnapSizeWorldUnits, defaultLayer.gridSnapSizeWorldUnits),
+          && synthesizedLayer.gridSnapSizeCellMultiplier == defaultLayer.gridSnapSizeCellMultiplier,
           "a synthesized layer is struct-default in every field but name/layerId/markerTypeName"
           " (white-as-unset)");
     // NEW — human's own bug report: an unset markerTypeName meant a synthesized layer never matched
@@ -2807,7 +2807,7 @@ void CheckMarkerLayerSynthesisIsNoOpWhenMarkerGroupsPresent() {
               && NearlyEqual(layer.color[0], fixture.markerLayers[0].color[0])
               && layer.bLocked == fixture.markerLayers[0].bLocked
               && layer.bGridSnapEnabled == fixture.markerLayers[0].bGridSnapEnabled
-              && NearlyEqual(layer.gridSnapSizeWorldUnits, fixture.markerLayers[0].gridSnapSizeWorldUnits),
+              && layer.gridSnapSizeCellMultiplier == fixture.markerLayers[0].gridSnapSizeCellMultiplier,
               "the real MarkerGroups entry is byte-identical to before the Reconcile call");
     }
     Check(result.warningCount == warningCountBeforeReconcile,

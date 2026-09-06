@@ -1,5 +1,6 @@
 // MapCanvas_MarkerRosterDraw_UI.cpp — DrawManualMarkerRoster and its own draw-time helpers, split out
 // of MapCanvas_MarkerDrag_UI.cpp (STEP126) for the same ceiling reason as MapCanvas_MarkerHitTest_UI.cpp.
+#include "CoordinateSpace_UI.h"
 #include "MapCanvas_MarkerDrag_UI.h"
 #include "MapCanvas_UI.h"
 #include "MarkersTab_MarkerLinkInstanceResolvers_UI.h"
@@ -32,11 +33,14 @@ float ManualMarkerDotRadius(const std::vector<Params::MarkerInstanceLayer>& mark
          * Params::ResolveMarkerGroupTypeScale(groupName, globalMarkerSettings) * layerIconScale;
 }
 
+// BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 1 — a one-line call to the new
+// shared CoordinateSpace_UI::WorldToScreen, same output as before (WorldToPreviewPixel +
+// ProjectPreviewPixelToRegionLocal composed), just routed through the one shared function instead
+// of this file's own one-off.
 ImVec2 ProjectWorldToScreen(const PreviewComposite& composite, const MapCanvasView& view,
                             float worldX, float worldZ, float regionOriginX, float regionOriginY) {
-    const PreviewComposite::PreviewPixelPoint previewPixel = composite.WorldToPreviewPixel(worldX, worldZ);
-    const RegionLocalPoint regionLocal = view.ProjectPreviewPixelToRegionLocal(previewPixel.pixelX, previewPixel.pixelY);
-    return ImVec2(regionOriginX + regionLocal.regionLocalX, regionOriginY + regionLocal.regionLocalY);
+    const ScreenPoint screen = WorldToScreen(view, composite, WorldPoint{worldX, worldZ});
+    return ImVec2(regionOriginX + screen.screenX, regionOriginY + screen.screenY);
 }
 
 // STEP246, ARCH §19.33/§21.9: widened to take the owning `transform` + `links` (was a bare
@@ -89,13 +93,52 @@ bool IsInstanceHighlighted(const std::vector<int>& selectedHighlightInstanceIden
     return false;
 }
 
+// Follow-up to BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI — the four small helpers below
+// fold `dragStates`' plurality into the same single-bool/single-check shape the rest of this file's
+// logic already expects, so the per-instance loop and the ghost-draw pass below read exactly as they
+// did for a single `dragState`, just OR'd/unioned across every entry. A single-element vector reduces
+// to precisely the old single-state boolean, byte-identical.
+
+// True when ANY drag gesture in `dragStates` is actively dragging a member of `groupIndex`.
+bool AnyDragStateActiveForGroup(const std::vector<MarkerDragGestureState>& dragStates, int groupIndex) {
+    for (const MarkerDragGestureState& state : dragStates)
+        if (state.bActive && state.groupIndex == groupIndex) return true;
+    return false;
+}
+
+// True when ANY drag gesture active on `groupIndex` is itself Spawn-cardinality-refused — the flag
+// is group-wide (the whole roster's Spawn slot count is frozen), so one refused dragger is enough to
+// tint every instance in that group red, exactly as the single-state code already did for its one
+// dragger.
+bool AnyDragStateRefusedForGroup(const std::vector<MarkerDragGestureState>& dragStates, int groupIndex) {
+    for (const MarkerDragGestureState& state : dragStates)
+        if (state.bActive && state.groupIndex == groupIndex && state.bSpawnCardinalityRefused) return true;
+    return false;
+}
+
+// True when ANY drag gesture reports `(groupIndex, transformIndex)` as this frame's soft-hidden.
+bool AnyInstanceSoftHiddenThisFrame(const std::vector<MarkerDragGestureState>& dragStates, int groupIndex,
+                                    int transformIndex) {
+    for (const MarkerDragGestureState& state : dragStates)
+        if (IsMarkerSoftHiddenThisFrame(state, groupIndex, transformIndex)) return true;
+    return false;
+}
+
+// True when ANY drag gesture in `dragStates` is both active and Spawn-cardinality-refused, regardless
+// of which group — the tooltip is a single global status line, not per-group.
+bool AnyDragStateActiveAndRefused(const std::vector<MarkerDragGestureState>& dragStates) {
+    for (const MarkerDragGestureState& state : dragStates)
+        if (state.bActive && state.bSpawnCardinalityRefused) return true;
+    return false;
+}
+
 } // namespace
 
 void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& markers,
                             const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                             const std::vector<Params::Army>& armies,
                             const Params::GlobalMarkerSettings& globalMarkerSettings,
-                            const MarkerDragGestureState& dragState, const PreviewComposite& composite,
+                            const std::vector<MarkerDragGestureState>& dragStates, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionOriginX, float regionOriginY,
                             const std::vector<int>& selectedHighlightInstanceIdentifiers,   // NEW — STEP126
                             const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246
@@ -106,17 +149,18 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
 
     for (std::size_t groupIndex = 0; groupIndex < markers.size(); ++groupIndex) {
         const Params::MarkerInstanceGroup& group = markers[groupIndex];
-        const bool bThisGroupDragging = dragState.bActive && dragState.groupIndex == static_cast<int>(groupIndex);
+        const bool bThisGroupDragging = AnyDragStateActiveForGroup(dragStates, static_cast<int>(groupIndex));
+        const bool bThisGroupRefused = AnyDragStateRefusedForGroup(dragStates, static_cast<int>(groupIndex));
         for (std::size_t transformIndex = 0; transformIndex < group.transforms.size(); ++transformIndex) {
             if (bThisGroupDragging
-                && IsMarkerSoftHiddenThisFrame(dragState, static_cast<int>(groupIndex), static_cast<int>(transformIndex)))
+                && AnyInstanceSoftHiddenThisFrame(dragStates, static_cast<int>(groupIndex), static_cast<int>(transformIndex)))
                 continue;
             const Params::MarkerTransform& transform = group.transforms[transformIndex];
             const ImVec2 screenCenter = ProjectWorldToScreen(composite, view, transform.transform.positionX,
                                                              transform.transform.positionZ, regionOriginX, regionOriginY);
             ImU32 tint;
             // ARCH §19.18 — canonical priority, highest to lowest:
-            if (bThisGroupDragging && dragState.bSpawnCardinalityRefused) {
+            if (bThisGroupDragging && bThisGroupRefused) {
                 tint = refusedTint;
             } else if (IsInstanceHighlighted(selectedHighlightInstanceIdentifiers, transform.instanceIdentifier)) {
                 // NEW — full fill replacement, opaque. ResolveMarkerGroupSelectTintColor's own
@@ -140,27 +184,36 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
                                      tint);
         }
         if (bThisGroupDragging) {
-            // STEP122: the ghost points belong to the same dragged transform (not the last transform
-            // iterated above, which is out of scope here) — resolves the drag-group's own dot size,
-            // consistent with the ghost being that same group's sibling orbit slots. A missing dragged
-            // transform (out-of-range index) falls back to a synthetic layerIndex=-1 transform, the
-            // exact "out of range" shape ManualMarkerDotRadius already treats as scale 1.0.
-            const Params::MarkerTransform* const draggedTransform = (dragState.draggedTransformIndex >= 0
-                && static_cast<std::size_t>(dragState.draggedTransformIndex) < group.transforms.size())
-                ? &group.transforms[static_cast<std::size_t>(dragState.draggedTransformIndex)] : nullptr;
-            Params::MarkerTransform noDraggedTransformFallback;
-            noDraggedTransformFallback.layerIndex = -1;
-            const float ghostDotRadius = ManualMarkerDotRadius(markerLayers,
-                draggedTransform != nullptr ? *draggedTransform : noDraggedTransformFallback,
-                markerLinks, group.name, globalMarkerSettings);
-            for (const Pipeline::WorldSymmetryOrbitPoint& ghost : dragState.currentGhostPoints) {
-                const ImVec2 screenCenter = ProjectWorldToScreen(composite, view, ghost.worldPositionX,
-                                                                 ghost.worldPositionZ, regionOriginX, regionOriginY);
-                drawList.AddCircle(screenCenter, ghostDotRadius, ghostTint, 0, 2.0f);
+            // Follow-up to BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI — every drag gesture
+            // active on THIS group draws its own ghost ring set (its own draggedTransformIndex's own
+            // dot size, its own currentGhostPoints), not just the first-grabbed instance's. A
+            // single-element `dragStates` reduces to exactly one iteration here, byte-identical to the
+            // pre-widening single-state draw.
+            for (const MarkerDragGestureState& dragState : dragStates) {
+                if (!dragState.bActive || dragState.groupIndex != static_cast<int>(groupIndex)) continue;
+                // STEP122: the ghost points belong to the same dragged transform (not the last
+                // transform iterated above, which is out of scope here) — resolves the drag-group's
+                // own dot size, consistent with the ghost being that same group's sibling orbit slots.
+                // A missing dragged transform (out-of-range index) falls back to a synthetic
+                // layerIndex=-1 transform, the exact "out of range" shape ManualMarkerDotRadius
+                // already treats as scale 1.0.
+                const Params::MarkerTransform* const draggedTransform = (dragState.draggedTransformIndex >= 0
+                    && static_cast<std::size_t>(dragState.draggedTransformIndex) < group.transforms.size())
+                    ? &group.transforms[static_cast<std::size_t>(dragState.draggedTransformIndex)] : nullptr;
+                Params::MarkerTransform noDraggedTransformFallback;
+                noDraggedTransformFallback.layerIndex = -1;
+                const float ghostDotRadius = ManualMarkerDotRadius(markerLayers,
+                    draggedTransform != nullptr ? *draggedTransform : noDraggedTransformFallback,
+                    markerLinks, group.name, globalMarkerSettings);
+                for (const Pipeline::WorldSymmetryOrbitPoint& ghost : dragState.currentGhostPoints) {
+                    const ImVec2 ghostScreenCenter = ProjectWorldToScreen(composite, view, ghost.worldPositionX,
+                                                                          ghost.worldPositionZ, regionOriginX, regionOriginY);
+                    drawList.AddCircle(ghostScreenCenter, ghostDotRadius, ghostTint, 0, 2.0f);
+                }
             }
         }
     }
-    if (dragState.bActive && dragState.bSpawnCardinalityRefused)
+    if (AnyDragStateActiveAndRefused(dragStates))
         ImGui::SetTooltip("Spawn count is fixed - drag limited.");
 }
 

@@ -9,6 +9,8 @@
 #pragma once
 #include <cmath>
 #include <vector>
+#include "CoordinateSpace_UI.h"
+#include "../params/Geometry_PARAMS.h"
 #include "../params/PropInstance_PARAMS.h"
 #include "../params/ScatterInstanceLayer_PARAMS.h"
 #include "../params/Symmetry_PARAMS.h"
@@ -29,15 +31,20 @@ inline Params::PropTransform* SelectedPropInstance(std::vector<Params::PropTrans
     return &transforms[static_cast<std::size_t>(selectedInstanceIndex)];
 }
 
-// Mirrors QuantizeMarkerPositionToLayerGrid exactly (MarkersTab_ManualLayerHelpers_UI.h).
+// Mirrors QuantizeMarkerPositionToLayerGrid exactly (MarkersTab_ManualLayerHelpers_UI.h) — `geometry`
+// scales the whole-number `gridSnapSizeCellMultiplier` into a world-unit cell size (Part 3), and the
+// snap itself is CoordinateSpace_UI's WorldToGrid+GridToWorld, always landing on a cell center.
 inline void QuantizePropPositionToLayerGrid(const std::vector<Params::PropInstanceLayer>& propLayers,
-                                            int layerIndex, float& worldX, float& worldZ) {
+                                            int layerIndex, const Params::Geometry& geometry,
+                                            float& worldX, float& worldZ) {
     if (layerIndex < 0 || layerIndex >= static_cast<int>(propLayers.size())) return;
     const Params::PropInstanceLayer& layer = propLayers[static_cast<std::size_t>(layerIndex)];
-    if (!layer.bGridSnapEnabled || layer.gridSnapSizeWorldUnits <= 0.0f) return;
-    const float cellSize = layer.gridSnapSizeWorldUnits;
-    worldX = std::round(worldX / cellSize) * cellSize;
-    worldZ = std::round(worldZ / cellSize) * cellSize;
+    if (!layer.bGridSnapEnabled || layer.gridSnapSizeCellMultiplier < 1) return;
+    const float cellSizeWorldUnits = static_cast<float>(layer.gridSnapSizeCellMultiplier) * geometry.worldUnitsPerCell;
+    const WorldPoint snapped =
+        GridToWorld(cellSizeWorldUnits, WorldToGrid(cellSizeWorldUnits, WorldPoint{worldX, worldZ}));
+    worldX = snapped.worldX;
+    worldZ = snapped.worldZ;
 }
 
 // Mirrors ResolveEffectiveMarkerSymmetry exactly (MarkersTab_ManualLayerHelpers_UI.h), including

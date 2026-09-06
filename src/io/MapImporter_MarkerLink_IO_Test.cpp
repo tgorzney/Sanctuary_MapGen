@@ -63,7 +63,7 @@ static void TestMarkerLinksRoundTripAllElevenFields() {
     link.bHidden = true;
     link.iconScale = 2.5f;
     link.bGridSnapEnabled = true;
-    link.gridSnapSizeWorldUnits = 4.0f;
+    link.gridSnapSizeCellMultiplier = 4;
     link.bSymmetryEnabled = false;
     link.symmetry.bSymmetryUseGlobal = false;
     link.symmetry.symmetryMask = 5;
@@ -88,7 +88,7 @@ static void TestMarkerLinksRoundTripAllElevenFields() {
     Check(roundTripped.bHidden == true, "bHidden survives");
     Check(roundTripped.iconScale == 2.5f, "iconScale survives");
     Check(roundTripped.bGridSnapEnabled == true, "bGridSnapEnabled survives");
-    Check(roundTripped.gridSnapSizeWorldUnits == 4.0f, "gridSnapSizeWorldUnits survives");
+    Check(roundTripped.gridSnapSizeCellMultiplier == 4, "gridSnapSizeCellMultiplier survives");
     Check(roundTripped.bSymmetryEnabled == false, "bSymmetryEnabled survives");
     Check(roundTripped.symmetry.bSymmetryUseGlobal == false, "symmetry.bSymmetryUseGlobal survives");
     Check(roundTripped.symmetry.symmetryMask == 5, "symmetry.symmetryMask survives");
@@ -126,8 +126,8 @@ static void TestLegacyShapeMissingSevenNewKeysDefaults() {
     Check(link.iconScale == defaults.iconScale, "missing IconScale falls back to the struct default (1.0)");
     Check(link.bGridSnapEnabled == defaults.bGridSnapEnabled,
           "missing GridSnapEnabled falls back to the struct default (false)");
-    Check(link.gridSnapSizeWorldUnits == defaults.gridSnapSizeWorldUnits,
-          "missing GridSnapSizeWorldUnits falls back to the struct default (1.0)");
+    Check(link.gridSnapSizeCellMultiplier == defaults.gridSnapSizeCellMultiplier,
+          "missing GridSnapSizeWorldUnits falls back to the struct default (1)");
     Check(link.bSymmetryEnabled == defaults.bSymmetryEnabled,
           "missing SymmetryEnabled falls back to the struct default (true)");
     Check(link.symmetry.bSymmetryUseGlobal == defaults.symmetry.bSymmetryUseGlobal,

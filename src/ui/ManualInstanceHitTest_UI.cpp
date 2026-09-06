@@ -70,6 +70,24 @@ void CollectManualInstancesInWorldRegion(const std::vector<GroupT>& instances,
     }
 }
 
+template<typename GroupT>
+bool LocateManualInstanceByIdentifier(const std::vector<GroupT>& instances, int instanceIdentifier,
+                                      int& outGroupIndex, int& outTransformIndex) {
+    outGroupIndex = -1; outTransformIndex = -1;
+    if (instanceIdentifier < 0) return false;
+    for (std::size_t groupIndex = 0; groupIndex < instances.size(); ++groupIndex) {
+        const auto& transforms = instances[groupIndex].transforms;
+        for (std::size_t transformIndex = 0; transformIndex < transforms.size(); ++transformIndex) {
+            if (transforms[transformIndex].instanceIdentifier == instanceIdentifier) {
+                outGroupIndex = static_cast<int>(groupIndex);
+                outTransformIndex = static_cast<int>(transformIndex);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 template bool HitTestManualInstances<Params::MarkerInstanceGroup>(
     const std::vector<Params::MarkerInstanceGroup>&, const PreviewComposite&, const MapCanvasView&,
     float, float, float, const std::function<bool(const Params::MarkerTransform&)>&, int&, int&, float*);
@@ -89,6 +107,13 @@ template void CollectManualInstancesInWorldRegion<Params::PropInstanceGroup>(
 template void CollectManualInstancesInWorldRegion<Params::DecalInstanceGroup>(
     const std::vector<Params::DecalInstanceGroup>&, float, float, float, float,
     const std::function<bool(const Params::DecalTransform&)>&, std::vector<std::pair<int, int>>&);
+
+template bool LocateManualInstanceByIdentifier<Params::MarkerInstanceGroup>(
+    const std::vector<Params::MarkerInstanceGroup>&, int, int&, int&);
+template bool LocateManualInstanceByIdentifier<Params::PropInstanceGroup>(
+    const std::vector<Params::PropInstanceGroup>&, int, int&, int&);
+template bool LocateManualInstanceByIdentifier<Params::DecalInstanceGroup>(
+    const std::vector<Params::DecalInstanceGroup>&, int, int&, int&);
 
 } // namespace Ui
 } // namespace SanmapGen

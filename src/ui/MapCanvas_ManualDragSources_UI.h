@@ -19,12 +19,26 @@
 namespace SanmapGen {
 namespace Ui {
 
+// BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 2 — one dragged instance's own
+// gesture state PLUS the world position it started the press at. `state` is the pre-existing,
+// unchanged `InstanceDragGestureState` (Begin/Update/End keep their own established per-instance
+// contract); `startWorldX/Z` is new — it is what lets a multi-select drag feed every dragged
+// instance `startWorld + delta` (its OWN start position plus the shared cursor delta) instead of
+// the cursor's raw position, so N simultaneously-dragged instances keep their relative offsets. A
+// domain now carries a std::vector of these (one per currently-dragged instance) instead of the one
+// singular `InstanceDragGestureState` it carried before this ticket.
+struct ManualInstanceDragEntry_UI {
+    InstanceDragGestureState state;
+    float startWorldX = 0.0f;
+    float startWorldZ = 0.0f;
+};
+
 struct ManualPropDragSources_UI {
     std::vector<Params::PropInstanceGroup>*       props    = nullptr;
     const std::vector<Params::PropInstanceLayer>* layers   = nullptr;
     const Params::Geometry*                       geometry = nullptr;
     const Params::MapRecipe*                       recipe   = nullptr;
-    InstanceDragGestureState                       state;
+    std::vector<ManualInstanceDragEntry_UI>        entries;
 };
 
 struct ManualDecalDragSources_UI {
@@ -32,7 +46,7 @@ struct ManualDecalDragSources_UI {
     const std::vector<Params::DecalInstanceLayer>* layers   = nullptr;
     const Params::Geometry*                        geometry = nullptr;
     const Params::MapRecipe*                        recipe   = nullptr;
-    InstanceDragGestureState                        state;
+    std::vector<ManualInstanceDragEntry_UI>         entries;
 };
 
 // ARCH §21.8 — the Area canvas gesture's own injected-pointer bundle. `recipe.areas` is a flat

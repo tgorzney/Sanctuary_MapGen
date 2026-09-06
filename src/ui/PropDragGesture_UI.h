@@ -12,6 +12,7 @@
 #include "InstanceDragGesture_UI.h"
 #include "PropsTab_Manual_UI.h"                  // IsPropInstanceLayerLocked
 #include "PropsTab_ManualLayerHelpers_UI.h"
+#include "../params/Geometry_PARAMS.h"
 #include "../params/PropInstance_PARAMS.h"
 
 namespace SanmapGen {
@@ -38,8 +39,9 @@ struct PropDragTraits {
         return IsPropInstanceLayerLocked(layers, transform.layerIndex);
     }
     static void QuantizePositionToLayerGrid(const std::vector<Layer>& layers, const Transform& transform,
-                                            const std::vector<Link>&, float& x, float& z) {
-        QuantizePropPositionToLayerGrid(layers, transform.layerIndex, x, z);
+                                            const std::vector<Link>&, const Params::Geometry& geometry,
+                                            float& x, float& z) {
+        QuantizePropPositionToLayerGrid(layers, transform.layerIndex, geometry, x, z);
     }
     static void ResolveEffectiveSymmetry(const std::vector<Layer>& layers, const Transform& transform,
                                          const std::vector<Link>&, int globalMask, int globalRadialCount,

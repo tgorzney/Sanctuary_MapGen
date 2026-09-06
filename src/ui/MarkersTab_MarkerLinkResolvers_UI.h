@@ -1,6 +1,6 @@
 // MarkersTab_MarkerLinkResolvers_UI.h — the full "STEP241/ARCH §19.31" read-and-resolve surface: one
 // getter per Section/Group-equivalent setting a Link governs, at whichever tier already carries that
-// field (Bundle: name only; Layer: name/bHidden/iconScale/bGridSnapEnabled+gridSnapSizeWorldUnits/
+// field (Bundle: name only; Layer: name/bHidden/iconScale/bGridSnapEnabled+gridSnapSizeCellMultiplier/
 // bSymmetryEnabled+symmetry/bLocked). Sibling of MarkersTab_ManualLayerHelpers_UI.h, NOT folded into
 // it — that file is already close to ARCH §1.5's soft ceiling before this ticket's own eight new
 // resolvers; this is a plain "new file for a distinct concern" split, the same reasoning
@@ -71,8 +71,9 @@ inline float EffectiveManualMarkerLayerIconScale(const Params::MarkerInstanceLay
     return layer.iconScale;
 }
 
-// bGridSnapEnabled/gridSnapSizeWorldUnits resolve as a pair (ARCH §19.31: "a size with no enabling
-// toggle is meaningless and vice versa") — two separate getters, same resolved linkIdentifier match.
+// bGridSnapEnabled/gridSnapSizeCellMultiplier resolve as a pair (ARCH §19.31: "a size with no
+// enabling toggle is meaningless and vice versa") — two separate getters, same resolved
+// linkIdentifier match.
 inline bool EffectiveManualMarkerLayerGridSnapEnabled(const Params::MarkerInstanceLayer& layer,
                                                       const std::vector<Params::MarkerLink>& links) {
     if (layer.linkIdentifier >= 0)
@@ -81,12 +82,15 @@ inline bool EffectiveManualMarkerLayerGridSnapEnabled(const Params::MarkerInstan
     return layer.bGridSnapEnabled;
 }
 
-inline float EffectiveManualMarkerLayerGridSnapSizeWorldUnits(const Params::MarkerInstanceLayer& layer,
-                                                              const std::vector<Params::MarkerLink>& links) {
+// BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — renamed from
+// EffectiveManualMarkerLayerGridSnapSizeWorldUnits/returned a raw world-unit float; now the
+// whole-number cell-MULTIPLIER (MarkerInstanceLayer::gridSnapSizeCellMultiplier's own comment).
+inline int EffectiveManualMarkerLayerGridSnapSizeCellMultiplier(const Params::MarkerInstanceLayer& layer,
+                                                                const std::vector<Params::MarkerLink>& links) {
     if (layer.linkIdentifier >= 0)
         for (const Params::MarkerLink& link : links)
-            if (link.identifier == layer.linkIdentifier) return link.gridSnapSizeWorldUnits;
-    return layer.gridSnapSizeWorldUnits;
+            if (link.identifier == layer.linkIdentifier) return link.gridSnapSizeCellMultiplier;
+    return layer.gridSnapSizeCellMultiplier;
 }
 
 inline bool EffectiveManualMarkerLayerSymmetryEnabled(const Params::MarkerInstanceLayer& layer,

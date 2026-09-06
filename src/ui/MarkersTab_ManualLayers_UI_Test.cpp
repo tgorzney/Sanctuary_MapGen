@@ -6,6 +6,7 @@
 #include "ListWidget_TestFrame_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_ManualLayerRowBody_UI.h"
+#include "../params/Geometry_PARAMS.h"
 #include "../params/MarkerLink_PARAMS.h"
 #include <cmath>
 #include <cstdio>
@@ -51,46 +52,65 @@ Params::MarkerTransform MakeTransformAt(int layerIndex, int linkIdentifier = -1)
     return transform;
 }
 
-// bGridSnapEnabled == false leaves the position untouched regardless of value; a non-positive
-// gridSnapSizeWorldUnits is a defensive no-op, not a divide-by-zero; an out-of-range layerIndex
+// bGridSnapEnabled == false leaves the position untouched regardless of value; a sub-1
+// gridSnapSizeCellMultiplier is a defensive no-op, not a divide-by-zero; an out-of-range layerIndex
 // leaves the position unchanged too. No Links in play here — STEP246's own Link-tier resolution is
 // covered separately by RunQuantizeMarkerPositionToLayerGridLinkTierChecks below.
+// BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — the field is now a whole-number
+// cell MULTIPLIER (`geometry.worldUnitsPerCell` scales it into a world-unit cell size), and snapping
+// lands on the cell's CENTER (floor+half-cell), never the old vertex-snapping `std::round` result.
 void RunQuantizeMarkerPositionToLayerGridChecks() {
+    Params::Geometry geometry;   // Geometry_PARAMS's own default is 10.0f now (game-real cell size);
+                                 // pinned to 1.0f here so a multiplier of 4 == a 4.0-world-unit
+                                 // cell, matching this test's pre-existing numbers.
+    geometry.worldUnitsPerCell = 1.0f;
     std::vector<Params::MarkerInstanceLayer> markerLayers(3);
     markerLayers[0].bGridSnapEnabled = false;
-    markerLayers[0].gridSnapSizeWorldUnits = 4.0f;
+    markerLayers[0].gridSnapSizeCellMultiplier = 4;
     markerLayers[1].bGridSnapEnabled = true;
-    markerLayers[1].gridSnapSizeWorldUnits = 4.0f;
+    markerLayers[1].gridSnapSizeCellMultiplier = 4;
     markerLayers[2].bGridSnapEnabled = true;
-    markerLayers[2].gridSnapSizeWorldUnits = 0.0f;
+    markerLayers[2].gridSnapSizeCellMultiplier = 0;
     const std::vector<Params::MarkerLink> noLinks;
 
     float worldX = 6.1f, worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0), noLinks, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0), noLinks, geometry, worldX, worldZ);
     Check(NearlyEqual(worldX, 6.1f) && NearlyEqual(worldZ, -3.9f),
           "grid snap off on the layer leaves the position unchanged regardless of value");
 
+    // (6.1, -3.9) at a 4.0-unit cell: worldX's owning cell is [4,8) -> center 6.0; worldZ's owning
+    // cell is [-4,0) -> center -2.0. Always a CELL CENTER, never a vertex.
     worldX = 6.1f; worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(1), noLinks, worldX, worldZ);
-    Check(NearlyEqual(worldX, 8.0f) && NearlyEqual(worldZ, -4.0f),
-          "(6.1, -3.9) snaps to the nearest 4.0-unit cell: (8.0, -4.0)");
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(1), noLinks, geometry, worldX, worldZ);
+    Check(NearlyEqual(worldX, 6.0f) && NearlyEqual(worldZ, -2.0f),
+          "(6.1, -3.9) snaps to its owning 4.0-unit cell's CENTER: (6.0, -2.0)");
 
-    // Tie case: std::round is ties-away-from-zero, so 2.0 / 4.0 == 0.5 rounds to 1.0, landing on 4.0.
+    // A position already exactly at a cell center is a no-op (idempotent).
     worldX = 2.0f; worldZ = 0.0f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(1), noLinks, worldX, worldZ);
-    Check(NearlyEqual(worldX, 4.0f), "an exact tie (2.0 against a 4.0 cell) rounds away from zero to 4.0");
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(1), noLinks, geometry, worldX, worldZ);
+    Check(NearlyEqual(worldX, 2.0f) && NearlyEqual(worldZ, 2.0f),
+          "a position already at a cell center snaps to itself (idempotent)");
+
+    // Either side of a cell boundary resolves to that boundary's OWN cell center, never a shared or
+    // lopsided result — the exact defect this ticket's own Part 3 calls out.
+    worldX = 3.9f; worldZ = 0.0f;
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(1), noLinks, geometry, worldX, worldZ);
+    Check(NearlyEqual(worldX, 2.0f), "just below a cell boundary (3.9) snaps to the LOWER cell's center (2.0)");
+    worldX = 4.1f; worldZ = 0.0f;
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(1), noLinks, geometry, worldX, worldZ);
+    Check(NearlyEqual(worldX, 6.0f), "just above the same boundary (4.1) snaps to the UPPER cell's center (6.0)");
 
     worldX = 6.1f; worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(2), noLinks, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(2), noLinks, geometry, worldX, worldZ);
     Check(NearlyEqual(worldX, 6.1f) && NearlyEqual(worldZ, -3.9f),
-          "a non-positive gridSnapSizeWorldUnits is a defensive no-op, not a divide-by-zero");
+          "a sub-1 gridSnapSizeCellMultiplier is a defensive no-op, not a divide-by-zero");
 
     worldX = 6.1f; worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(-1), noLinks, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(-1), noLinks, geometry, worldX, worldZ);
     Check(NearlyEqual(worldX, 6.1f) && NearlyEqual(worldZ, -3.9f),
           "an out-of-range layerIndex leaves the position unchanged");
     worldX = 6.1f; worldZ = -3.9f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(3), noLinks, worldX, worldZ);
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(3), noLinks, geometry, worldX, worldZ);
     Check(NearlyEqual(worldX, 6.1f) && NearlyEqual(worldZ, -3.9f),
           "and so does an index at size()");
 }
@@ -98,34 +118,41 @@ void RunQuantizeMarkerPositionToLayerGridChecks() {
 // STEP246, ARCH §19.33/§21.9 — instance-tier-first, THEN Layer-tier (itself Link-aware), THEN the
 // Layer's own stored field. Grid-snap chosen as the representative case for
 // QuantizeMarkerPositionToLayerGrid; IsMarkerInstanceLocked covers the sixth governed field below.
+// BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — same cell-MULTIPLIER/cell-CENTER
+// reinterpretation as RunQuantizeMarkerPositionToLayerGridChecks above, applied through the Link tier.
 void RunQuantizeMarkerPositionToLayerGridLinkTierChecks() {
+    Params::Geometry geometry;   // Geometry_PARAMS's own default is 10.0f now; pinned to 1.0f to
+                                 // match this test's pre-existing numbers (see the sibling check above).
+    geometry.worldUnitsPerCell = 1.0f;
     std::vector<Params::MarkerInstanceLayer> markerLayers(1);
     markerLayers[0].bGridSnapEnabled = false;           // the Layer's OWN stored field: snap OFF
-    markerLayers[0].gridSnapSizeWorldUnits = 4.0f;
+    markerLayers[0].gridSnapSizeCellMultiplier = 4;
     markerLayers[0].linkIdentifier = 100;                // Layer-tier bound to Link 100
 
     std::vector<Params::MarkerLink> links(2);
-    links[0].identifier = 100; links[0].bGridSnapEnabled = true; links[0].gridSnapSizeWorldUnits = 5.0f;
-    links[1].identifier = 200; links[1].bGridSnapEnabled = true; links[1].gridSnapSizeWorldUnits = 2.0f;
+    links[0].identifier = 100; links[0].bGridSnapEnabled = true; links[0].gridSnapSizeCellMultiplier = 5;
+    links[1].identifier = 200; links[1].bGridSnapEnabled = true; links[1].gridSnapSizeCellMultiplier = 2;
 
     // An instance tagged directly to Link 200 resolves THAT Link's own pair, even though its owning
     // Layer is bound to a DIFFERENT Link (100) — the exact new capability this correction is for.
+    // A 2.0-unit cell owns [3.1] as [2,4) -> center 3.0.
     float worldX = 3.1f, worldZ = 0.0f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0, /*linkIdentifier=*/200), links, worldX, worldZ);
-    Check(NearlyEqual(worldX, 4.0f),
-          "an instance tagged to Link 200 resolves THAT Link's grid (2.0), not its Layer's Link 100");
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0, /*linkIdentifier=*/200), links, geometry, worldX, worldZ);
+    Check(NearlyEqual(worldX, 3.0f),
+          "an instance tagged to Link 200 resolves THAT Link's 2.0-unit cell center (3.0), not Layer's Link 100");
 
     // An untagged instance on this same Link-bound Layer still resolves the LAYER's own Link (100) —
-    // existing §19.31 Layer-tier behavior, unchanged by this correction.
+    // existing §19.31 Layer-tier behavior, unchanged by this correction. A 5.0-unit cell owns [3.1]
+    // as [0,5) -> center 2.5.
     worldX = 3.1f; worldZ = 0.0f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0), links, worldX, worldZ);
-    Check(NearlyEqual(worldX, 5.0f), "an untagged instance still resolves its Layer's own bound Link (100)");
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0), links, geometry, worldX, worldZ);
+    Check(NearlyEqual(worldX, 2.5f), "an untagged instance still resolves its Layer's own bound Link (100)");
 
     // A dangling instance-tier linkIdentifier (no matching Params::MarkerLink) soft-degrades to the
     // Layer-tier result — never a crash, never a refusal (Constitution §6).
     worldX = 3.1f; worldZ = 0.0f;
-    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0, /*linkIdentifier=*/999), links, worldX, worldZ);
-    Check(NearlyEqual(worldX, 5.0f), "a dangling instance linkIdentifier soft-degrades to the Layer-tier result");
+    QuantizeMarkerPositionToLayerGrid(markerLayers, MakeTransformAt(0, /*linkIdentifier=*/999), links, geometry, worldX, worldZ);
+    Check(NearlyEqual(worldX, 2.5f), "a dangling instance linkIdentifier soft-degrades to the Layer-tier result");
 }
 
 // The sixth governed field (bLocked) — same three-tier resolution order, exercised through the

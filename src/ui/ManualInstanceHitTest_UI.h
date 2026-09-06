@@ -63,5 +63,16 @@ void CollectManualInstancesInWorldRegion(const std::vector<GroupT>& instances,
                                          const std::function<bool(const typename GroupT::TransformType&)>& isInstanceLocked,
                                          std::vector<std::pair<int, int>>& outGroupTransformPairs);
 
+// BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 2 — the reverse of the hit-test above:
+// given a stable `instanceIdentifier` (ARCH §21.4/§19.16 — globally unique per domain, never a raw
+// index), finds the (groupIndex, transformIndex) pair that still owns it right now. Needed by the
+// multi-select drag rewrite, which records a whole selection's worth of instanceIdentifiers at
+// mouse-down and must re-resolve each one to a live index before beginning its own gesture.
+// O(instance count) — the same authoring-scale linear-scan posture as the two functions above.
+// Answers false (both out-params left at -1) if no transform in any group carries that identifier.
+template<typename GroupT>
+bool LocateManualInstanceByIdentifier(const std::vector<GroupT>& instances, int instanceIdentifier,
+                                      int& outGroupIndex, int& outTransformIndex);
+
 } // namespace Ui
 } // namespace SanmapGen

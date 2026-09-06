@@ -74,7 +74,9 @@ nlohmann::ordered_json BuildDecalGroupsJson(const Params::MapRecipe& recipe) {
         layerJson["Locked"] = layer.bLocked;
         layerJson["Hidden"] = layer.bHidden;
         layerJson["GridSnapEnabled"] = layer.bGridSnapEnabled;
-        layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeWorldUnits;
+        // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — same wire key, now a
+        // whole-number cell multiplier (no migration).
+        layerJson["GridSnapSizeWorldUnits"] = layer.gridSnapSizeCellMultiplier;
         layerJson["ColorOverrideEnabled"] = layer.bColorOverrideEnabled;
         layerJson["SymmetryEnabled"] = layer.bSymmetryEnabled;
         layerJson["ParentBundleIdentifier"] = layer.parentBundleIdentifier;

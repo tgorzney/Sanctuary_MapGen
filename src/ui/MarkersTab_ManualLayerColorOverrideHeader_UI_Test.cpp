@@ -293,12 +293,12 @@ void RunGridSnapInertWhileLinkedCheck() {
     Params::MarkerInstanceLayer layer;
     ManualMarkerLayersState state;
     layer.bGridSnapEnabled       = false;
-    layer.gridSnapSizeWorldUnits = 1.0f;
+    layer.gridSnapSizeCellMultiplier = 1;
     layer.linkIdentifier         = 7;
     std::vector<Params::MarkerLink> links(1);
     links[0].identifier            = 7;
     links[0].bGridSnapEnabled      = true;
-    links[0].gridSnapSizeWorldUnits = 8.0f;
+    links[0].gridSnapSizeCellMultiplier = 8;
 
     bool bAnyCommitted = false;
     ImVec2 origin; float boxSize = 0.0f;

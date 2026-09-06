@@ -50,7 +50,12 @@ void ReadMarkerGroupsJson(const nlohmann::json& document, Params::MapRecipe& out
                                                                     // file) leaves the struct default,
                                                                     // false, i.e. visible.
             ReadJsonBoolean(layerJson, "GridSnapEnabled", layer.bGridSnapEnabled);
-            ReadJsonFloat(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeWorldUnits);
+            // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — same wire key, now read
+            // as the whole-number cell multiplier (no migration); a saved value below 1 (including a
+            // legacy sub-1 world-unit float, truncated) clamps up to the minimum, never a snap-off-by-
+            // corruption.
+            ReadJsonInteger(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeCellMultiplier);
+            if (layer.gridSnapSizeCellMultiplier < 1) layer.gridSnapSizeCellMultiplier = 1;
             ReadJsonBoolean(layerJson, "ColorOverrideEnabled", layer.bColorOverrideEnabled);
             ReadJsonBoolean(layerJson, "SymmetryEnabled", layer.bSymmetryEnabled);
             ReadJsonInteger(layerJson, "ParentBundleIdentifier", layer.parentBundleIdentifier);

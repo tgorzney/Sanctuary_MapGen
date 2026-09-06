@@ -110,7 +110,9 @@ struct MarkerLinksState_UI {
     // one tier up exactly (same bounds, same "Params::MarkerLink cannot own a RealtimeToggle" reason).
     ScalarSliderRange iconScaleRange{ 0.1f, 10.0f, 0.0f };
     RealtimeToggle    iconScaleToggle{true};
-    ScalarSliderRange gridSnapSizeRange{ 0.1f, 100.0f, 0.0f };
+    // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — a whole-number cell-count
+    // range (minimum 1), not a world-unit distance range.
+    ScalarSliderRange gridSnapSizeRange{ 1.0f, 20.0f, 1.0f };
     RealtimeToggle    gridSnapSizeToggle{true};
 
     // Deferred delete — applied by DrawMarkerLinksSection itself AFTER the per-Link loop finishes,

@@ -33,7 +33,10 @@ void PopulateMarkerLinksFromJson(const nlohmann::json& document, Params::MapReci
             ReadJsonBoolean(linkJson, "Hidden", link.bHidden);
             ReadJsonFloat(linkJson, "IconScale", link.iconScale);
             ReadJsonBoolean(linkJson, "GridSnapEnabled", link.bGridSnapEnabled);
-            ReadJsonFloat(linkJson, "GridSnapSizeWorldUnits", link.gridSnapSizeWorldUnits);
+            // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — same wire key, now the
+            // whole-number cell multiplier (no migration); clamps a sub-1 saved value up to 1.
+            ReadJsonInteger(linkJson, "GridSnapSizeWorldUnits", link.gridSnapSizeCellMultiplier);
+            if (link.gridSnapSizeCellMultiplier < 1) link.gridSnapSizeCellMultiplier = 1;
             ReadJsonBoolean(linkJson, "SymmetryEnabled", link.bSymmetryEnabled);
             ReadJsonBoolean(linkJson, "SymmetryUseGlobal", link.symmetry.bSymmetryUseGlobal);
             ReadJsonInteger(linkJson, "SymmetryMask", link.symmetry.symmetryMask);

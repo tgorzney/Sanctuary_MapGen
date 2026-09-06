@@ -32,7 +32,10 @@ struct PropInstanceLayer {
     bool  bLocked = false;              // Blocks drag/reposition/add/remove for every prop on this layer.
     bool  bHidden = false;              // Hides every prop on this layer from the preview.
     bool  bGridSnapEnabled = false;
-    float gridSnapSizeWorldUnits = 1.0f;
+    // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — see
+    // MarkerInstanceLayer::gridSnapSizeCellMultiplier's own comment for the full rationale; mirrors
+    // it field-for-field. A whole-number multiplier of Params::Geometry::worldUnitsPerCell; minimum 1.
+    int   gridSnapSizeCellMultiplier = 1;
     bool  bColorOverrideEnabled = false;   // false: `color` is ignored, resolves the owning
                                             // Type Section's default (GlobalPropSettings) instead.
     int   parentBundleIdentifier = -1;     // -1 = root (ungrouped); PropLayerBundle membership.
@@ -49,7 +52,9 @@ struct DecalInstanceLayer {
     bool  bLocked = false;
     bool  bHidden = false;
     bool  bGridSnapEnabled = false;
-    float gridSnapSizeWorldUnits = 1.0f;
+    // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — see
+    // MarkerInstanceLayer::gridSnapSizeCellMultiplier's own comment for the full rationale.
+    int   gridSnapSizeCellMultiplier = 1;
     bool  bColorOverrideEnabled = false;
     int   parentBundleIdentifier = -1;   // -1 = root (ungrouped); DecalLayerBundle membership.
     // No type-tag field — Decals has exactly one Type Section (see file header).

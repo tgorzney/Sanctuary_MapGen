@@ -30,7 +30,7 @@ Params::MarkerLink MakeTestLink() {
     link.bHidden                = true;
     link.iconScale               = 3.5f;
     link.bGridSnapEnabled        = true;
-    link.gridSnapSizeWorldUnits  = 12.5f;
+    link.gridSnapSizeCellMultiplier = 12;
     link.bSymmetryEnabled        = false;
     link.symmetry.bSymmetryUseGlobal        = false;
     link.symmetry.symmetryMask              = Params::SymmetryAxis::MirrorAcrossX;
@@ -111,16 +111,16 @@ void RunEffectiveManualMarkerLayerGridSnapChecks() {
     const std::vector<Params::MarkerLink> links{ MakeTestLink() };
 
     Params::MarkerInstanceLayer bound;
-    bound.bGridSnapEnabled = false; bound.gridSnapSizeWorldUnits = 1.0f; bound.linkIdentifier = 7;
+    bound.bGridSnapEnabled = false; bound.gridSnapSizeCellMultiplier = 1; bound.linkIdentifier = 7;
     Check(EffectiveManualMarkerLayerGridSnapEnabled(bound, links) == true,
          "a Link-bound Layer's effective bGridSnapEnabled resolves from the LINK (true), not its own (false) field");
-    Check(EffectiveManualMarkerLayerGridSnapSizeWorldUnits(bound, links) == 12.5f,
-         "a Link-bound Layer's effective gridSnapSizeWorldUnits resolves from the LINK, not its own field");
+    Check(EffectiveManualMarkerLayerGridSnapSizeCellMultiplier(bound, links) == 12,
+         "a Link-bound Layer's effective gridSnapSizeCellMultiplier resolves from the LINK, not its own field");
 
     Params::MarkerInstanceLayer unbound;
-    unbound.bGridSnapEnabled = false; unbound.gridSnapSizeWorldUnits = 1.0f; unbound.linkIdentifier = -1;
+    unbound.bGridSnapEnabled = false; unbound.gridSnapSizeCellMultiplier = 1; unbound.linkIdentifier = -1;
     Check(EffectiveManualMarkerLayerGridSnapEnabled(unbound, links) == false
-          && EffectiveManualMarkerLayerGridSnapSizeWorldUnits(unbound, links) == 1.0f,
+          && EffectiveManualMarkerLayerGridSnapSizeCellMultiplier(unbound, links) == 1,
          "an unbound Layer's effective grid-snap pair resolves from its own fields");
 }
 

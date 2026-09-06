@@ -50,7 +50,13 @@ struct MarkerLink {
                                           // the field to exist here as the resolve-from source.
     float iconScale               = 1.0f; // mirrors MarkerInstanceLayer::iconScale.
     bool  bGridSnapEnabled        = false;// mirrors MarkerInstanceLayer::bGridSnapEnabled.
-    float gridSnapSizeWorldUnits  = 1.0f; // mirrors MarkerInstanceLayer::gridSnapSizeWorldUnits.
+    // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — mirrors
+    // MarkerInstanceLayer::gridSnapSizeCellMultiplier (renamed/reinterpreted from the old
+    // `gridSnapSizeWorldUnits` float — see that field's own comment). A Link-bound Layer's effective
+    // grid-snap size resolves from here, so this must stay the same unit (a cell multiplier) as the
+    // Layer-tier field it governs, or a Link-bound instance would snap inconsistently with an
+    // unbound one.
+    int   gridSnapSizeCellMultiplier = 1;
     bool  bSymmetryEnabled        = true; // mirrors MarkerInstanceLayer::bSymmetryEnabled.
     Params::SymmetrySetting symmetry;     // mirrors MarkerInstanceLayer::symmetry.
     bool  bLocked                 = false; // STEP242, ARCH §19.31 follow-up amendment (governed field

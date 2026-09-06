@@ -144,7 +144,7 @@ void DrawMarkerLayerIconSizeHeaderControl(Params::MarkerInstanceLayer& layer, Ma
 // "GRID" SmallButton toggle (mirrors SYM/COL's own "no more checkboxes" convention) plus its
 // grid-size field, disabled while the toggle is off. Drawn LEFT of [SYM] at every call site.
 // STEP241, ARCH §19.31 correction: same disable-while-linked + Effective-resolver treatment,
-// resolving the pair (bGridSnapEnabled, gridSnapSizeWorldUnits) together from the bound Link.
+// resolving the pair (bGridSnapEnabled, gridSnapSizeCellMultiplier) together from the bound Link.
 void DrawMarkerLayerGridSnapHeaderControl(Params::MarkerInstanceLayer& layer, ManualMarkerLayersState& state,
                                           bool& bAnyCommitted, const std::vector<Params::MarkerLink>& links = {});
 

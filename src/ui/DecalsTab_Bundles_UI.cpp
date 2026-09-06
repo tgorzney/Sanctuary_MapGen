@@ -98,8 +98,10 @@ void DrawDecalLayerLeafBody(Params::DecalInstanceLayer& layer, ManualDecalLayers
     DrawCheckbox("Hidden", layer.bHidden);
     DrawCheckbox("Snap to Grid", layer.bGridSnapEnabled);
     if (layer.bGridSnapEnabled)
-        DrawSliderScalar("Grid Size", layer.gridSnapSizeWorldUnits, state.gridSnapSizeRange,
-                         state.selectedLayerGridSnapToggle, WidgetStyle(), "%.2f");
+        // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — whole-number cell
+        // multiplier, not a world-unit distance.
+        DrawSliderScalarInteger("Grid Size (cells)", layer.gridSnapSizeCellMultiplier, state.gridSnapSizeRange,
+                                state.selectedLayerGridSnapToggle, WidgetStyle(), "%d");
     DrawCheckbox("Color Override", layer.bColorOverrideEnabled);
     DrawCheckbox("Symmetry Enabled", layer.bSymmetryEnabled);
 }

@@ -12,9 +12,11 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include "CoordinateSpace_UI.h"
 #include "MarkersTab_ManualLayers_UI.h"
 #include "MarkersTab_MarkerLinkResolvers_UI.h"
 #include "UniqueNameList_UI.h"
+#include "../params/Geometry_PARAMS.h"
 #include "../params/MarkerInstance_PARAMS.h"
 #include "../params/MarkerLink_PARAMS.h"
 
@@ -42,23 +44,33 @@ inline bool IsMarkerInstanceLayerRowSuppressed(const Params::MarkerInstanceLayer
 // ARCH §19.33/§21.9 order: (1) `transform.linkIdentifier` resolves -> that Link's grid-snap pair;
 // (2) else the Layer-tier resolvers just above (already Link-aware) -> their result; a dangling
 // identifier at either tier soft-degrades to the next step, never a refusal.
+// BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — `geometry` is new: the resolved
+// setting is now a whole-number CELL MULTIPLIER, never a raw world-unit distance, so this always
+// scales by `geometry.worldUnitsPerCell` (the ONE owner of "how big is a terrain cell in world
+// units," Mask_Prepare_PROC.cpp:21) to get the effective world-unit cell size, then snaps via
+// CoordinateSpace_UI's WorldToGrid+GridToWorld applied back-to-back — always a cell CENTER, never a
+// vertex (the old bug: `std::round(world / cellSize) * cellSize` lands on vertices).
 inline void QuantizeMarkerPositionToLayerGrid(const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                               const Params::MarkerTransform& transform,
                                               const std::vector<Params::MarkerLink>& links,
+                                              const Params::Geometry& geometry,
                                               float& worldX, float& worldZ) {
     const int layerIndex = transform.layerIndex;
     if (layerIndex < 0 || layerIndex >= static_cast<int>(markerLayers.size())) return;
     const Params::MarkerInstanceLayer& layer = markerLayers[static_cast<std::size_t>(layerIndex)];
     bool bEnabled = EffectiveManualMarkerLayerGridSnapEnabled(layer, links);
-    float cellSize = EffectiveManualMarkerLayerGridSnapSizeWorldUnits(layer, links);
+    int cellMultiplier = EffectiveManualMarkerLayerGridSnapSizeCellMultiplier(layer, links);
     if (transform.linkIdentifier >= 0)
         for (const Params::MarkerLink& link : links)
             if (link.identifier == transform.linkIdentifier) {
-                bEnabled = link.bGridSnapEnabled; cellSize = link.gridSnapSizeWorldUnits; break;
+                bEnabled = link.bGridSnapEnabled; cellMultiplier = link.gridSnapSizeCellMultiplier; break;
             }
-    if (!bEnabled || cellSize <= 0.0f) return;
-    worldX = std::round(worldX / cellSize) * cellSize;
-    worldZ = std::round(worldZ / cellSize) * cellSize;
+    if (!bEnabled || cellMultiplier < 1) return;
+    const float cellSizeWorldUnits = static_cast<float>(cellMultiplier) * geometry.worldUnitsPerCell;
+    const WorldPoint snapped =
+        GridToWorld(cellSizeWorldUnits, WorldToGrid(cellSizeWorldUnits, WorldPoint{worldX, worldZ}));
+    worldX = snapped.worldX;
+    worldZ = snapped.worldZ;
 }
 
 // The EFFECTIVE mask/count for `transform` — `symmetry->bSymmetryUseGlobal` selects between the

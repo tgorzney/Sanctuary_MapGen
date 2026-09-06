@@ -48,7 +48,7 @@ static void TestBuildMarkerLinksJsonNewFieldsShape() {
     link.bHidden = true;                       // default false
     link.iconScale = 2.5f;                     // default 1.0f
     link.bGridSnapEnabled = true;               // default false
-    link.gridSnapSizeWorldUnits = 4.0f;         // default 1.0f
+    link.gridSnapSizeCellMultiplier = 4;        // default 1
     link.bSymmetryEnabled = false;              // default true
     link.symmetry.bSymmetryUseGlobal = false;   // default true
     link.symmetry.symmetryMask = 5;             // default 0
@@ -61,7 +61,7 @@ static void TestBuildMarkerLinksJsonNewFieldsShape() {
     Check(linkJson["Hidden"].get<bool>() == true, "Hidden survives");
     Check(linkJson["IconScale"].get<float>() == 2.5f, "IconScale survives");
     Check(linkJson["GridSnapEnabled"].get<bool>() == true, "GridSnapEnabled survives");
-    Check(linkJson["GridSnapSizeWorldUnits"].get<float>() == 4.0f, "GridSnapSizeWorldUnits survives");
+    Check(linkJson["GridSnapSizeWorldUnits"].get<int>() == 4, "GridSnapSizeWorldUnits (now a cell multiplier) survives");
     Check(linkJson["SymmetryEnabled"].get<bool>() == false, "SymmetryEnabled survives");
     Check(linkJson["SymmetryUseGlobal"].get<bool>() == false,
           "symmetry.bSymmetryUseGlobal flattens to sibling SymmetryUseGlobal key");

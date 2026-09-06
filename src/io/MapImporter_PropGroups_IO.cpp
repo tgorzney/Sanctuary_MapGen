@@ -40,7 +40,10 @@ void ReadPropGroupsJson(const nlohmann::json& document, Params::MapRecipe& outRe
             ReadJsonBoolean(layerJson, "Locked", layer.bLocked);
             ReadJsonBoolean(layerJson, "Hidden", layer.bHidden);
             ReadJsonBoolean(layerJson, "GridSnapEnabled", layer.bGridSnapEnabled);
-            ReadJsonFloat(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeWorldUnits);
+            // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — same wire key, now the
+            // whole-number cell multiplier (no migration); clamps a sub-1 saved value up to 1.
+            ReadJsonInteger(layerJson, "GridSnapSizeWorldUnits", layer.gridSnapSizeCellMultiplier);
+            if (layer.gridSnapSizeCellMultiplier < 1) layer.gridSnapSizeCellMultiplier = 1;
             ReadJsonBoolean(layerJson, "ColorOverrideEnabled", layer.bColorOverrideEnabled);
             ReadJsonBoolean(layerJson, "SymmetryEnabled", layer.bSymmetryEnabled);
             ReadJsonInteger(layerJson, "ParentBundleIdentifier", layer.parentBundleIdentifier);

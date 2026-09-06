@@ -30,7 +30,9 @@ nlohmann::ordered_json BuildMarkerLinksJson(const Params::MapRecipe& recipe) {
         linkJson["Hidden"] = link.bHidden;
         linkJson["IconScale"] = link.iconScale;
         linkJson["GridSnapEnabled"] = link.bGridSnapEnabled;
-        linkJson["GridSnapSizeWorldUnits"] = link.gridSnapSizeWorldUnits;
+        // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — same wire key, now a
+        // whole-number cell multiplier (no migration).
+        linkJson["GridSnapSizeWorldUnits"] = link.gridSnapSizeCellMultiplier;
         linkJson["SymmetryEnabled"] = link.bSymmetryEnabled;
         linkJson["SymmetryUseGlobal"] = link.symmetry.bSymmetryUseGlobal;
         linkJson["SymmetryMask"] = link.symmetry.symmetryMask;

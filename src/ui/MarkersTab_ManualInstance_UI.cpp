@@ -106,7 +106,7 @@ bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params
                                 const std::vector<Params::Army>& armies,
                                 const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                 const std::vector<Params::MarkerLink>& markerLinks,
-                                ManualMarkersState& state) {
+                                const Params::Geometry& geometry, ManualMarkersState& state) {
     bool bCommitted = DrawTextInput("Alias", transform.alias).bCommitted;
 
     if (IsSpawnMarkerGroup(group)) {
@@ -143,7 +143,7 @@ bool DrawSelectedMarkerInstance(Params::MarkerTransform& transform, const Params
         state.positionHorizontalRange, state.positionZToggle, WidgetStyle(), "%.1f");
     ImGui::Columns(1);
     if (positionXChange.bCommitted || positionZChange.bCommitted)
-        QuantizeMarkerPositionToLayerGrid(markerLayers, transform, markerLinks,
+        QuantizeMarkerPositionToLayerGrid(markerLayers, transform, markerLinks, geometry,
                                           transform.transform.positionX, transform.transform.positionZ);
     ImGui::EndDisabled();
     bCommitted = positionXChange.bCommitted || positionYChange.bCommitted || positionZChange.bCommitted || bCommitted;
@@ -160,6 +160,7 @@ DraggableListSignal DrawMarkerInstanceList(std::vector<Params::MarkerTransform>&
                                            const std::vector<Params::Army>& armies,
                                            const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                            const std::vector<Params::MarkerLink>& markerLinks,
+                                           const Params::Geometry& geometry,
                                            ManualMarkersState& state, bool& bAnyInstanceCommitted) {
     return DraggableList<Params::MarkerTransform>::Render(
         "manualMarkerInstances", transforms,
@@ -170,7 +171,7 @@ DraggableListSignal DrawMarkerInstanceList(std::vector<Params::MarkerTransform>&
         },
         [&](int rowIndex) {
             if (DrawSelectedMarkerInstance(transforms[static_cast<std::size_t>(rowIndex)], group, armies,
-                                           markerLayers, markerLinks, state))
+                                           markerLayers, markerLinks, geometry, state))
                 bAnyInstanceCommitted = true;
         },
         state.selectedInstanceIndex);
@@ -206,12 +207,13 @@ void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
                                const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                const std::vector<Params::MarkerLink>& markerLinks,
+                               const Params::Geometry& geometry,
                                ManualMarkersState& state, int selectedMarkerLayerIndex,
                                const IconAtlasManifest* iconManifest) {
     bool bInstancesMoved = false;
     bool bAnyInstanceCommitted = false;
     const DraggableListSignal signal =
-        DrawMarkerInstanceList(group.transforms, group, armies, markerLayers, markerLinks, state, bAnyInstanceCommitted);
+        DrawMarkerInstanceList(group.transforms, group, armies, markerLayers, markerLinks, geometry, state, bAnyInstanceCommitted);
     if (signal.bHasSignal())
         bInstancesMoved = ApplyMarkerInstanceListSignal(group.transforms, state, signal) || bInstancesMoved;
     bInstancesMoved = DrawMarkerInstanceListButtons(group.transforms, markers, state, markerLayers,

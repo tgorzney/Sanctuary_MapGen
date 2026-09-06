@@ -106,6 +106,7 @@ void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
                        const std::vector<Params::Army>& armies,
                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                        const std::vector<Params::MarkerLink>& markerLinks,
+                       const Params::Geometry& geometry,
                        ManualMarkersState& state, int selectedMarkerLayerIndex,
                        const IconAtlasManifest* iconManifest) {
     if (!DrawSectionBegin("Manual Markers", state.section)) return;
@@ -116,7 +117,7 @@ void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
         ImGui::TextUnformatted("Select a marker type to edit its roster.");
     } else {
         ImGui::Separator();
-        DrawMarkerInstanceSection(*group, markers, armies, markerLayers, markerLinks, state,
+        DrawMarkerInstanceSection(*group, markers, armies, markerLayers, markerLinks, geometry, state,
                                   selectedMarkerLayerIndex, iconManifest);
     }
     DrawSectionEnd();

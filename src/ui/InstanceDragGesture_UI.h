@@ -171,7 +171,7 @@ void UpdateInstanceDragGesture(InstanceDragGestureState& state, std::vector<type
 
     if (state.symmetryGroupIdentifier == 0) {           // ungrouped: free drag, zero orbit calls
         float quantizedX = newWorldX, quantizedZ = newWorldZ;
-        Traits::QuantizePositionToLayerGrid(layers, *dragged, links, quantizedX, quantizedZ);
+        Traits::QuantizePositionToLayerGrid(layers, *dragged, links, geometry, quantizedX, quantizedZ);
         dragged->transform.positionX = quantizedX;
         dragged->transform.positionZ = quantizedZ;
         return;
@@ -190,7 +190,7 @@ void UpdateInstanceDragGesture(InstanceDragGestureState& state, std::vector<type
 
     {
         float quantizedDraggedX = newWorldX, quantizedDraggedZ = newWorldZ;
-        Traits::QuantizePositionToLayerGrid(layers, *dragged, links, quantizedDraggedX, quantizedDraggedZ);
+        Traits::QuantizePositionToLayerGrid(layers, *dragged, links, geometry, quantizedDraggedX, quantizedDraggedZ);
         dragged->transform.positionX = quantizedDraggedX;  // unambiguous regardless of cardinality
         dragged->transform.positionZ = quantizedDraggedZ;
     }
@@ -205,7 +205,7 @@ void UpdateInstanceDragGesture(InstanceDragGestureState& state, std::vector<type
         if (sibling == nullptr) continue;
         float siblingX = orbitPoints[entry.lastMatchedOrbitSlot].worldPositionX;
         float siblingZ = orbitPoints[entry.lastMatchedOrbitSlot].worldPositionZ;
-        Traits::QuantizePositionToLayerGrid(layers, *sibling, links, siblingX, siblingZ);
+        Traits::QuantizePositionToLayerGrid(layers, *sibling, links, geometry, siblingX, siblingZ);
         sibling->transform.positionX = siblingX;
         sibling->transform.positionZ = siblingZ;
         entry.referenceWorldX = sibling->transform.positionX;   // keep the match anchor fresh

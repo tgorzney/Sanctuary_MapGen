@@ -67,8 +67,9 @@ struct MarkerDragTraits {
     // synthetic layerIndex-only transform/empty-links workaround — this Traits contract now has a
     // real transform and links roster in hand).
     static void QuantizePositionToLayerGrid(const std::vector<Layer>& layers, const Transform& transform,
-                                            const std::vector<Link>& links, float& x, float& z) {
-        QuantizeMarkerPositionToLayerGrid(layers, transform, links, x, z);
+                                            const std::vector<Link>& links, const Params::Geometry& geometry,
+                                            float& x, float& z) {
+        QuantizeMarkerPositionToLayerGrid(layers, transform, links, geometry, x, z);
     }
     static void ResolveEffectiveSymmetry(const std::vector<Layer>& layers, const Transform& transform,
                                          const std::vector<Link>& links, int globalMask,

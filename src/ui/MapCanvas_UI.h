@@ -492,7 +492,11 @@ private:
     // STEP133 — the per-Type Hide/Unhide preview filter source (injected, see
     // SetMarkerTypeVisibilitySource).
     const MarkerTypeVisibility_UI*                  markerTypeVisibilitySource = nullptr;
-    MarkerDragGestureState manualMarkerDragState;
+    // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 2 — one entry per Marker currently
+    // being dragged (the grabbed one, plus every other selected Marker when the grabbed one is part
+    // of the current selection). Replaces the single `MarkerDragGestureState manualMarkerDragState`
+    // this ticket retires: dragging one instance is just this vector holding exactly one entry.
+    std::vector<ManualInstanceDragEntry_UI> manualMarkerDragEntries;
     bool                   bManualMarkerDragActive = false;   // this press started on a manual marker
     // ARCH §21.2/§21.7 — Props/Decals' own drag sources + live gesture state, grouped into two small
     // structs (MapCanvas_ManualDragSources_UI.h) rather than eight more scattered fields here (this
@@ -503,6 +507,12 @@ private:
     ManualDecalDragSources_UI manualDecalDrag;
     bool                       bManualPropDragActive  = false;
     bool                       bManualDecalDragActive = false;
+    // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 2 — the ONE shared mouse-down
+    // world anchor for the whole press, however many instances (across however many of the three
+    // domains) end up being dragged together: `delta = ScreenToWorld(cursor) - dragAnchorWorld`,
+    // computed once per frame and applied identically to every recorded entry's own start position.
+    float manualDragAnchorWorldX = 0.0f;
+    float manualDragAnchorWorldZ = 0.0f;
 
     // ARCH §21.8 — the Area gesture's own drag source + live state (mirrors manualPropDrag/
     // manualDecalDrag's shape one struct type over). Independent of bManualMarkerDragActive/

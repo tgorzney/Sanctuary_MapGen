@@ -12,6 +12,7 @@
 #include "SymmetryClusterInstanceList_UI.h"
 #include "TextInput_UI.h"
 #include "imgui.h"
+#include <algorithm>
 
 namespace SanmapGen {
 namespace Ui {
@@ -78,7 +79,10 @@ void DrawMarkerLinkIconScaleHeaderControl(Params::MarkerLink& link, MarkerLinksS
 }
 
 // STEP241 — mirrors DrawMarkerLayerGridSnapHeaderControl's own shape, bound directly to
-// `link.bGridSnapEnabled`/`link.gridSnapSizeWorldUnits`.
+// `link.bGridSnapEnabled`/`link.gridSnapSizeCellMultiplier`.
+// BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — same float-shadow adapter as
+// DrawMarkerLayerGridSnapHeaderControl (MarkersTab_ManualLayerRowBody_UI.cpp): the field is now a
+// whole-number cell multiplier and `DrawSliderScalarCompact` has no integer twin.
 void DrawMarkerLinkGridSnapHeaderControl(Params::MarkerLink& link, MarkerLinksState_UI& state,
                                          bool& bAnyCommitted) {
     if (link.bGridSnapEnabled)
@@ -89,12 +93,15 @@ void DrawMarkerLinkGridSnapHeaderControl(Params::MarkerLink& link, MarkerLinksSt
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Snap to Grid");
     ImGui::SameLine();
     ImGui::BeginDisabled(!link.bGridSnapEnabled);
-    if (DrawSliderScalarCompact("Grid Size", link.gridSnapSizeWorldUnits, state.gridSnapSizeRange,
+    float gridSnapMultiplier = static_cast<float>(link.gridSnapSizeCellMultiplier);
+    if (DrawSliderScalarCompact("Grid Size", gridSnapMultiplier, state.gridSnapSizeRange,
                                 state.gridSnapSizeToggle, kMarkerLayerGridSizeTrackWidthPixels,
-                                kMarkerLayerGridSizeFieldWidthPixels, WidgetStyle(), "%.2f",
-                                /*bShowRealtimeToggle=*/false).bCommitted)
+                                kMarkerLayerGridSizeFieldWidthPixels, WidgetStyle(), "%.0f",
+                                /*bShowRealtimeToggle=*/false).bCommitted) {
+        link.gridSnapSizeCellMultiplier = std::max(1, static_cast<int>(gridSnapMultiplier + 0.5f));
         bAnyCommitted = true;
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Grid Size");
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Grid Size (cells)");
     ImGui::EndDisabled();
 }
 

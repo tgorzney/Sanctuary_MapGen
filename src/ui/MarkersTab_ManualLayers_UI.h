@@ -48,7 +48,9 @@ struct ManualMarkerLayersState {
     SectionState       section;
     ColorSwatchOptions previewColorOptions;                     // picker only, no RGBA fields
     ScalarSliderRange  iconScaleRange{ 0.1f, 10.0f, 0.0f };     // same bounds as props (§8)
-    ScalarSliderRange  gridSnapSizeRange{ 0.1f, 100.0f, 0.0f };  // Constitution §8 — a setting, not a
+    // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — a whole-number cell-count
+    // range (minimum 1), not a world-unit distance range.
+    ScalarSliderRange  gridSnapSizeRange{ 1.0f, 20.0f, 1.0f };   // Constitution §8 — a setting, not a
                                                                   // literal at the DrawSliderScalar call
 
     bool           bUseGroupColor = false;                      // one tint for every layer

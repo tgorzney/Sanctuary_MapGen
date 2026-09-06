@@ -45,11 +45,17 @@ bool HitTestManualMarkers(const std::vector<Params::MarkerInstanceGroup>& marker
 // STEP126: `selectedHighlightInstanceIdentifiers` is this frame's ComputeManualMarkerSelectionHighlight
 // result — every instanceIdentifier that should draw with the select tint (ARCH §19.18), highest
 // priority after refused-drag-red. Empty = nothing selected, no highlight branch taken.
+// Follow-up to BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI — widened from a single
+// `const MarkerDragGestureState& dragState` to `dragStates`: one entry per instance currently being
+// dragged this gesture (a multi-select drag carries one `InstanceDragGestureState` per grabbed
+// instance, MapCanvas_UI.h's own `manualMarkerDragEntries`). A single-element vector is
+// byte-identical to the pre-widening one-state call: every instance's own ghost/soft-hide/refused
+// feedback now shows, not just the first-grabbed instance's.
 void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& markers,
                             const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                             const std::vector<Params::Army>& armies,
                             const Params::GlobalMarkerSettings& globalMarkerSettings,
-                            const MarkerDragGestureState& dragState, const PreviewComposite& composite,
+                            const std::vector<MarkerDragGestureState>& dragStates, const PreviewComposite& composite,
                             const MapCanvasView& view, float regionOriginX, float regionOriginY,
                             const std::vector<int>& selectedHighlightInstanceIdentifiers,
                             const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246

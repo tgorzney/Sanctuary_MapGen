@@ -31,6 +31,7 @@
 #include "TextInput_UI.h"
 #include "UniqueNameList_UI.h"
 #include "../params/Army_PARAMS.h"
+#include "../params/Geometry_PARAMS.h"
 #include "../params/MarkerInstance_PARAMS.h"
 #include "../params/MarkerLink_PARAMS.h"
 
@@ -169,6 +170,7 @@ void DrawMarkerInstanceSection(Params::MarkerInstanceGroup& group,
                                const std::vector<Params::Army>& armies,
                                const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                                const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246
+                               const Params::Geometry& geometry,   // NEW — BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI Part 3
                                ManualMarkersState& state, int selectedMarkerLayerIndex,
                                const IconAtlasManifest* iconManifest);
 
@@ -181,6 +183,7 @@ void DrawManualMarkers(std::vector<Params::MarkerInstanceGroup>& markers,
                        const std::vector<Params::Army>& armies,
                        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
                        const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246
+                       const Params::Geometry& geometry,   // NEW — BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI Part 3
                        ManualMarkersState& state, int selectedMarkerLayerIndex,
                        const IconAtlasManifest* iconManifest);
 

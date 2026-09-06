@@ -56,7 +56,9 @@ struct ManualPropLayersState {
     ScalarSliderRange  iconScaleRange{ 0.1f, 10.0f, 0.0f };
     // ARCH §20 — grid-snap size range, sibling of iconScaleRange; mirrors
     // ManualMarkerLayersState::gridSnapSizeRange.
-    ScalarSliderRange  gridSnapSizeRange{ 0.1f, 50.0f, 0.0f };
+    // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — a whole-number cell-count
+    // range (minimum 1, one terrain cell at a time), not a world-unit distance range.
+    ScalarSliderRange  gridSnapSizeRange{ 1.0f, 20.0f, 1.0f };
 
     bool           bUseGroupColor = false;                        // one tint for every layer
     float          groupColor[kColorSwatchChannelCount] = { 1.0f, 1.0f, 1.0f, 1.0f };
