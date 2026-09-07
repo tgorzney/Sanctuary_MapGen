@@ -95,6 +95,10 @@ float LargestWeightDifference(const Data::MapFields& first, const Data::MapField
 void RunParityTests(const char* shaderDirectory) {
     Params::Geometry geometry;
     geometry.mapSize = kMapSize;
+    // Pinned to the historical 1.0f (Geometry_PARAMS's own default is 10.0f now): MakeParitySettings'
+    // per-stratum slope-degree windows are calibrated against FillTestHeightfield's gradient at a
+    // 1.0-world-unit cell run.
+    geometry.worldUnitsPerCell = 1.0f;
     const std::vector<Params::Stratum> strata = MakeParitySettings();
     const std::vector<Data::StratumArt> stratumArt = MakeParityArt();
     const Params::SlopeDefaults slopeDefaults;

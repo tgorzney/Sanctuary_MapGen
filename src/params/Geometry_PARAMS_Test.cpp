@@ -12,7 +12,9 @@ int main() {
     if (geometry.VertexCount() != 257ull * 257ull) { std::printf("FAIL VertexCount\n"); ++failures; }
     if (!geometry.IsValid()) { std::printf("FAIL default valid\n"); ++failures; }
     // M5-0a: worldUnitsPerCell relocated here from Proc::PlacementConstants, same default.
-    if (geometry.worldUnitsPerCell != 1.0f) { std::printf("FAIL worldUnitsPerCell default\n"); ++failures; }
+    // Default changed 1.0f -> 10.0f (human-approved, this game's real terrain-cell size) so a
+    // brand-new map's own default is correct without a per-map override.
+    if (geometry.worldUnitsPerCell != 10.0f) { std::printf("FAIL worldUnitsPerCell default\n"); ++failures; }
     geometry.mapSize = 0;
     if (geometry.IsValid()) { std::printf("FAIL invalid mapSize\n"); ++failures; }
     geometry.mapSize = 512; geometry.terrainMaxHeight = 0.0f;

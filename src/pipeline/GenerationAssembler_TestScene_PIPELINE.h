@@ -67,6 +67,10 @@ inline Params::MapRecipe MakeRecipe(unsigned int seed) {
     recipe.geometry.mapSize          = mapSize;
     recipe.geometry.seed             = seed;
     recipe.geometry.terrainMaxHeight = 128.0f;
+    // Pinned to the historical 1.0f (Geometry_PARAMS's own default is 10.0f now): AddStrata's own
+    // slope-degree window below, plus this fixture's exact marker/prop-count and checksum
+    // assertions, are calibrated against the generated terrain's gradient at a 1.0-world-unit cell.
+    recipe.geometry.worldUnitsPerCell = 1.0f;
     // STEP16_SymmetryGlobalSettings_IO: the default `globalSymmetryMask` changed from None to
     // RotateHalfTurn (ARCH-ratified). The spawn layer below has `symmetry.bSymmetryUseGlobal ==
     // true` (its default, STEP66), so a non-None global mask would multiply markers.Count() past

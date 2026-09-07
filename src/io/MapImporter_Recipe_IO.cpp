@@ -49,8 +49,8 @@ void ClampGeometryBand(Params::Geometry& geometry, MapImportResult& result) {
         geometry.terrainMinHeight = geometry.terrainMaxHeight - 1.0f;
     }
     if (!(geometry.worldUnitsPerCell > 0.0f)) {
-        result.Warn("WorldUnitsPerCell was not positive; restored to 1.");
-        geometry.worldUnitsPerCell = 1.0f;
+        result.Warn("WorldUnitsPerCell was not positive; restored to 10.");
+        geometry.worldUnitsPerCell = 10.0f;
     }
 }
 

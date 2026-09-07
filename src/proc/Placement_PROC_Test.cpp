@@ -21,6 +21,10 @@ static Params::MapRecipe MakeRecipe(unsigned int seed) {
     recipe.geometry.mapSize = PlacementTest::mapSize;
     recipe.geometry.seed = seed;
     recipe.geometry.terrainMaxHeight = 128.0f;
+    // Placement_Test_Terrain.h's own contract: BuildTestFields(fields) below bakes its slope field
+    // at worldUnitsPerCell 1.0f (its own default param) — the recipe's copy must match or the two
+    // disagree about cell world-size (Geometry_PARAMS's own default is 10.0f now).
+    recipe.geometry.worldUnitsPerCell = 1.0f;
     // STEP16_SymmetryGlobalSettings_IO: the default `globalSymmetryMask` changed from None to
     // RotateHalfTurn (ARCH-ratified). This fixture's spawn layer has `symmetry.bSymmetryUseGlobal
     // == true` (its default, STEP66), so a non-None global mask would multiply markers.Count()

@@ -164,7 +164,7 @@ void CheckGeometryBandClampsWithNoLegacyBlockPresent() {
         Check(Io::MapImporter::ParseSanmapJsonText(documentText, recipe, options, result),
               "a document with a non-positive WorldUnitsPerCell and no legacy block still parses");
         Check(recipe.geometry.worldUnitsPerCell > 0.0f,
-              "WorldUnitsPerCell is restored to 1 even with no mapGeneratorData block present");
+              "WorldUnitsPerCell is restored to 10 even with no mapGeneratorData block present");
         Check(result.warningCount > 0, "with the clamp logged as a warning");
     }
 }
