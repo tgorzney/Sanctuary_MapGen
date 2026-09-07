@@ -7,6 +7,7 @@
 // ImDrawList's vertex colors directly rather than only counting vertices, since this file's states
 // mostly differ by TINT alone (AddCircleFilled every time), which a vertex-count proxy cannot see.
 #include "MapCanvas_MarkerDrag_UI.h"
+#include "OverlayLayer_Settings_UI.h"
 #include "PreviewComposite_TestScene_UI.h"
 #include <cmath>
 #include <cstdio>
@@ -668,6 +669,94 @@ void RunLockedLayerSelectedTintChecks() {
           "a locked layer's selected instance still draws the select tint normally, no lock conflict");
 }
 
+// ---- BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 1: OverlayLayerSettings/bEnabled gating -
+
+// A disabled Alloy row (OverlayLayer_UI::bEnabled = false) hides an "Alloys" group entirely; the
+// same group draws again once the row is re-enabled — the acceptance test's own toggle-off/toggle-
+// back-on roundtrip, exercised directly against DrawManualMarkerRoster.
+void RunOverlayVisibilityGateChecks() {
+    DrawFixture fixture;
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].name = "Alloys";
+    markers[0].transforms.push_back(MakeTransform("Mex 0", 1.0f, 1.0f));
+    std::vector<Params::MarkerInstanceLayer> noLayers;
+    std::vector<Params::Army> noArmies;
+    Params::GlobalMarkerSettings globalMarkerSettings;
+    MarkerDragGestureState inactiveDragState;
+    ImDrawList& drawList = *ImGui::GetWindowDrawList();
+
+    OverlayLayerSettings overlaySettings;
+    OverlayLayer_UI alloyLayer;
+    alloyLayer.domainKind = OverlayDomainKind_UI::Alloy;
+    alloyLayer.bEnabled = false;
+    overlaySettings.overlayLayers.push_back(alloyLayer);
+
+    int beforeVertexCount = drawList.VtxBuffer.Size;
+    DrawManualMarkerRoster(markers, noLayers, noArmies, globalMarkerSettings,
+                           std::vector<MarkerDragGestureState>{inactiveDragState}, *fixture.composite,
+                           fixture.view, 0.0f, 0.0f, std::vector<int>{}, std::vector<Params::MarkerLink>{},
+                           drawList, &overlaySettings);
+    Check(drawList.VtxBuffer.Size == beforeVertexCount,
+          "a group whose domain row is disabled draws nothing");
+
+    overlaySettings.overlayLayers[0].bEnabled = true;
+    beforeVertexCount = drawList.VtxBuffer.Size;
+    DrawManualMarkerRoster(markers, noLayers, noArmies, globalMarkerSettings,
+                           std::vector<MarkerDragGestureState>{inactiveDragState}, *fixture.composite,
+                           fixture.view, 0.0f, 0.0f, std::vector<int>{}, std::vector<Params::MarkerLink>{},
+                           drawList, &overlaySettings);
+    Check(drawList.VtxBuffer.Size > beforeVertexCount,
+          "the same group draws again once its domain row is re-enabled");
+
+    // A Spawn group is gated on OverlayDomainKind_UI::SpawnsArmies, NOT Alloy — the Alloy-only
+    // settings above (row still present, re-enabled) must not accidentally hide it, and its OWN
+    // disabled row must.
+    std::vector<Params::MarkerInstanceGroup> spawnMarkers(1);
+    spawnMarkers[0].name = Params::kSpawnMarkerGroupName;
+    spawnMarkers[0].transforms.push_back(MakeTransform("ARMY_01", 2.0f, 2.0f));
+    beforeVertexCount = drawList.VtxBuffer.Size;
+    DrawManualMarkerRoster(spawnMarkers, noLayers, noArmies, globalMarkerSettings,
+                           std::vector<MarkerDragGestureState>{inactiveDragState}, *fixture.composite,
+                           fixture.view, 0.0f, 0.0f, std::vector<int>{}, std::vector<Params::MarkerLink>{},
+                           drawList, &overlaySettings);
+    Check(drawList.VtxBuffer.Size > beforeVertexCount,
+          "a Spawn group is unaffected by the Alloy row's own state (no configured Spawns row yet)");
+
+    OverlayLayer_UI spawnsLayer;
+    spawnsLayer.domainKind = OverlayDomainKind_UI::SpawnsArmies;
+    spawnsLayer.bEnabled = false;
+    overlaySettings.overlayLayers.push_back(spawnsLayer);
+    beforeVertexCount = drawList.VtxBuffer.Size;
+    DrawManualMarkerRoster(spawnMarkers, noLayers, noArmies, globalMarkerSettings,
+                           std::vector<MarkerDragGestureState>{inactiveDragState}, *fixture.composite,
+                           fixture.view, 0.0f, 0.0f, std::vector<int>{}, std::vector<Params::MarkerLink>{},
+                           drawList, &overlaySettings);
+    Check(drawList.VtxBuffer.Size == beforeVertexCount,
+          "a Spawn group draws nothing once its OWN (SpawnsArmies) row is disabled");
+
+    // A live drag gesture on a domain-disabled group is ALSO suppressed — the gate applies before
+    // any drag-specific feedback (ghost rings, refused tint), not just the at-rest dot.
+    MarkerDragGestureState activeDragState;
+    activeDragState.bActive = true; activeDragState.groupIndex = 0;
+    beforeVertexCount = drawList.VtxBuffer.Size;
+    DrawManualMarkerRoster(spawnMarkers, noLayers, noArmies, globalMarkerSettings,
+                           std::vector<MarkerDragGestureState>{activeDragState}, *fixture.composite,
+                           fixture.view, 0.0f, 0.0f, std::vector<int>{}, std::vector<Params::MarkerLink>{},
+                           drawList, &overlaySettings);
+    Check(drawList.VtxBuffer.Size == beforeVertexCount,
+          "an active drag on a domain-disabled group still draws nothing (the gate wins)");
+
+    // No OverlayLayerSettings source at all (nullptr, the default) is unfiltered — every other test
+    // in this file already relies on exactly this, proven again here explicitly.
+    beforeVertexCount = drawList.VtxBuffer.Size;
+    DrawManualMarkerRoster(spawnMarkers, noLayers, noArmies, globalMarkerSettings,
+                           std::vector<MarkerDragGestureState>{inactiveDragState}, *fixture.composite,
+                           fixture.view, 0.0f, 0.0f, std::vector<int>{}, std::vector<Params::MarkerLink>{},
+                           drawList);
+    Check(drawList.VtxBuffer.Size > beforeVertexCount,
+          "nullptr overlayLayerSettings (not wired) is unfiltered, drawing proceeds as before this ticket");
+}
+
 } // namespace
 
 int main() {
@@ -689,6 +778,7 @@ int main() {
     RunSelectedTintChecks();
     RunTintPriorityOrderingChecks();
     RunLockedLayerSelectedTintChecks();
+    RunOverlayVisibilityGateChecks();
 
     ImGui::End();
     ImGui::Render();

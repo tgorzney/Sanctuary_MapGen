@@ -31,10 +31,12 @@
 
 namespace SanmapGen {
 namespace Data { class MapFields; struct BakedLayerImage; struct StratumArt; }
-namespace Params { struct MapRecipe; }
+namespace Params { struct MapRecipe; struct PropInstanceGroup; }
 namespace Pipeline { class PreviewDriver; }
 namespace Io { class SanpackReader; class TemplateIngestReport; struct UnknownImportBag; }
 namespace Ui {
+
+class IconAtlasPairingLookup;   // BUGFIX_OverlayVisibilityAndPropIconFallback_R1 — see below
 
 // See SCOPE NOTE 1. Returns true when the recipe was populated; `outLog` is appended to the panel.
 using SupComLuaImportFunction = bool (*)(void* userData, const char* luaFilePath,
@@ -106,6 +108,14 @@ struct FilesTabState {
     // OpenSanmap simply skips the post-load staleness check rather than forcing an ingest.
     const Io::TemplateIngestReport* templateIngestReport = nullptr;
 
+    // BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2 — same nullable, caller-owned posture
+    // as `assetPack`/`templateIngestReport` above: Application wires this once, at construction,
+    // to `assetBridge.iconPairingLookup` (a stable address for the whole process lifetime). Read by
+    // RunOpenSanmap (FilesTab_Actions_UI.cpp) ONLY, to log the one-time "N props unresolved" summary
+    // right after a successful Open; nullptr (no atlas loaded this session) skips that check
+    // entirely rather than reporting a bogus "everything unresolved".
+    const IconAtlasPairingLookup* iconPairingLookup = nullptr;
+
     // The blueprintPath confirm-dialog's pending state (Files-tab flow, FilesTab_Draw_UI.cpp only):
     // set on a dirty ExportSanmapOnly/ExportAll click, cleared on OK or Cancel. RunFilesTabAction
     // itself never sees any of this — it stays the same headless, unconditional "just do it" call.
@@ -147,6 +157,16 @@ inline void AppendFilesTabLog(FilesTabState& state, const std::string& text) {
     state.debugLog = lineStart == std::string::npos ? std::string()
                                                     : state.debugLog.substr(lineStart + 1);
 }
+
+// BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2 — recipe-WIDE (never view-culled) count of
+// props whose blueprintPath-derived templateIdentifier does not resolve against `pairingLookup`
+// (mirrors MapCanvas_IconLayer_CullManual_UI.cpp's own ResolvePropsManual stem-extraction and
+// EmitCandidateIfVisible's own miss test, `IconIdentifierPairing::thumbnailIconId == kInvalidIconId`)
+// — every transform in an unresolved group's blueprintPath counts once. Declared here (not
+// anonymous) so it is directly unit-testable, mirroring ResolveMarkerIconTemplateIdentifier's own
+// precedent (MapCanvas_IconLayer_CullManual_UI.cpp). Pure — no imgui, no IO.
+int CountUnresolvedPropIcons(const std::vector<Params::PropInstanceGroup>& props,
+                             const IconAtlasPairingLookup& pairingLookup);
 
 // Runs one action end to end and logs the outcome. `recipe` is written by the two import actions;
 // `fields` is nullable (SCOPE NOTE 2). `bBlueprintValidationAcknowledged` reaches

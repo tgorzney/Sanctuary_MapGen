@@ -21,6 +21,7 @@ namespace SanmapGen {
 namespace Ui {
 
 class PreviewComposite;
+struct OverlayLayerSettings;   // BUGFIX_OverlayVisibilityAndPropIconFallback_R1 — see below
 
 // Nearest manual marker (any group) within `pickRadiusScreenPixels` of the region-local cursor —
 // projected via STEP47's `PreviewComposite::WorldToPreviewPixel` + `MapCanvasView::
@@ -39,9 +40,17 @@ bool HitTestManualMarkers(const std::vector<Params::MarkerInstanceGroup>& marker
 // dots, one per `MarkerTransform`, tinted by its layer's color override, its group's type-default
 // color, or a neutral default. A gesture's own soft-hidden siblings are skipped (not erased, just
 // not drawn); its unclaimed orbit slots draw as a distinct hollow ghost ring; a Spawn-refused
-// gesture's whole group tints red and a short status tooltip is drawn. Superseded outright by a
-// future real overlay/icon ticket — not `OverlayLayer_UI`/View-toolbar participation of any kind
-// (ARCH_14_PreviewOverlayLayering.md §14).
+// gesture's whole group tints red and a short status tooltip is drawn.
+// BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 1 — `overlayLayerSettings` (new, nullable,
+// trailing/defaulted parameter, last below) is consulted per-group (IsMarkerGroupDomainVisible,
+// MapCanvas_MarkerRosterDraw_UI.cpp's own anonymous namespace) so a group whose View-toolbar row is
+// toggled off (`OverlayLayer_UI::bEnabled`) is skipped here too, exactly like the gated
+// DrawOverlayIconLayerPass (STEP53) already honors that same state — this pass used to draw
+// unconditionally, painting every marker on top regardless of the toggle (the "dead STEP94 stopgap"
+// bug). `nullptr` (no source wired — every pre-ticket call site, including this file's own tests)
+// means "unfiltered," byte-identical to the pre-ticket behavior; never a regression for a caller
+// that does not care about visibility gating. Still NOT `OverlayLayer_UI`/View-toolbar
+// PARTICIPATION of any other kind (ARCH_14_PreviewOverlayLayering.md §14) — this is visibility-only.
 // STEP126: `selectedHighlightInstanceIdentifiers` is this frame's ComputeManualMarkerSelectionHighlight
 // result — every instanceIdentifier that should draw with the select tint (ARCH §19.18), highest
 // priority after refused-drag-red. Empty = nothing selected, no highlight branch taken.
@@ -59,7 +68,8 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
                             const MapCanvasView& view, float regionOriginX, float regionOriginY,
                             const std::vector<int>& selectedHighlightInstanceIdentifiers,
                             const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246
-                            ImDrawList& drawList);
+                            ImDrawList& drawList,
+                            const OverlayLayerSettings* overlayLayerSettings = nullptr);   // NEW — see above
 
 } // namespace Ui
 } // namespace SanmapGen

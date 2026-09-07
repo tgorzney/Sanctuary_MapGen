@@ -132,6 +132,25 @@ bool AnyDragStateActiveAndRefused(const std::vector<MarkerDragGestureState>& dra
     return false;
 }
 
+// BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 1 — mirrors the exact domain gate
+// MapCanvas_IconLayer_CullManual_UI.cpp's ResolveMarkersManual already applies via its caller's
+// `if (!layer.bEnabled) continue;` (MapCanvas_IconLayer_Cull_UI.cpp's ResolveVisibleCandidates):
+// `group`'s domain is Alloy unless it's the reserved Spawn group name (IsSpawnMarkerGroup, the SAME
+// discriminator ResolveMarkersManual itself uses via `bWantSpawnGroups`/`bIsSpawnGroup`). A `nullptr`
+// source (not wired — every pre-ticket caller, including this file's own tests) means "unfiltered."
+// A domain with no configured OverlayLayer_UI row at all (should not happen once
+// ConfigureDefaultOverlayLayers has run, Application_UI.cpp) defaults to visible, never a silent
+// hide for a shell that has not finished configuring its overlay rows yet.
+bool IsMarkerGroupDomainVisible(const OverlayLayerSettings* overlayLayerSettings,
+                                const Params::MarkerInstanceGroup& group) {
+    if (overlayLayerSettings == nullptr) return true;
+    const OverlayDomainKind_UI targetDomain =
+        IsSpawnMarkerGroup(group) ? OverlayDomainKind_UI::SpawnsArmies : OverlayDomainKind_UI::Alloy;
+    for (const OverlayLayer_UI& layer : overlayLayerSettings->overlayLayers)
+        if (layer.domainKind == targetDomain) return layer.bEnabled;
+    return true;
+}
+
 } // namespace
 
 void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& markers,
@@ -142,13 +161,26 @@ void DrawManualMarkerRoster(const std::vector<Params::MarkerInstanceGroup>& mark
                             const MapCanvasView& view, float regionOriginX, float regionOriginY,
                             const std::vector<int>& selectedHighlightInstanceIdentifiers,   // NEW — STEP126
                             const std::vector<Params::MarkerLink>& markerLinks,   // NEW — STEP246
-                            ImDrawList& drawList) {
+                            ImDrawList& drawList,
+                            const OverlayLayerSettings* overlayLayerSettings) {   // NEW — see MapCanvas_MarkerDrag_UI.h
     if (composite.PixelsPerPreviewCell() <= 0.0f) return;
     const ImU32 refusedTint = IM_COL32(220, 60, 40, 255);
     const ImU32 ghostTint   = IM_COL32(200, 200, 200, 130);
 
     for (std::size_t groupIndex = 0; groupIndex < markers.size(); ++groupIndex) {
         const Params::MarkerInstanceGroup& group = markers[groupIndex];
+        // BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 1 — the dead-stopgap bug: this pass
+        // used to draw every group unconditionally, regardless of the View toolbar's per-domain
+        // OverlayLayer_UI::bEnabled toggle the gated DrawOverlayIconLayerPass already honors
+        // (MapCanvas_IconLayer_CullManual_UI.cpp's ResolveMarkersManual). Narrowing to active-drag-
+        // only groups was considered and rejected: MapCanvas_MarkerDrag_UI_Test.cpp's own coverage
+        // proves this function's tint/radius/selection resolution is unit-tested ONLY by observing
+        // its at-rest (no active drag) draw output, so removing the at-rest draw here would silently
+        // delete that coverage's ability to exercise ManualMarkerTint/ManualMarkerDotRadius at all.
+        // Consulting the SAME OverlayLayerSettings/bEnabled state instead — IsMarkerGroupDomainVisible,
+        // this file's own anonymous namespace below — is the fix the work-order names as the fallback
+        // when the narrower fix is not sufficient.
+        if (!IsMarkerGroupDomainVisible(overlayLayerSettings, group)) continue;
         const bool bThisGroupDragging = AnyDragStateActiveForGroup(dragStates, static_cast<int>(groupIndex));
         const bool bThisGroupRefused = AnyDragStateRefusedForGroup(dragStates, static_cast<int>(groupIndex));
         for (std::size_t transformIndex = 0; transformIndex < group.transforms.size(); ++transformIndex) {

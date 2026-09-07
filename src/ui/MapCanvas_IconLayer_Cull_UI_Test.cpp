@@ -42,6 +42,54 @@ void CheckPairingMissLoggedOnce() {
           "two instances sharing one unresolved templateIdentifier log it exactly once");
 }
 
+// BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2 — an unresolved templateIdentifier now
+// draws the reserved placeholder chip instead of nothing, PROVIDED the shell registered one under
+// kUnresolvedIconPlaceholderTemplateIdentifier (Application_Assets_UI.cpp's
+// RegisterUnresolvedIconPlaceholder — this fixture stands in for that registration via the same
+// SeedAtlasEntry helper every other test in this file already uses).
+void CheckUnresolvedPropFallsBackToPlaceholder() {
+    IconLayerTestFixture fixture;
+    AppendPropInstance(fixture.placements, 2.0f, 2.0f, 0, "propMissing");
+    fixture.ruleBucketIndex.props.Build(fixture.placements.props.ruleIndex.data(), 1, 1);
+    SeedAtlasEntry(fixture.pairingLookup, fixture.atlasManifest,
+                   kUnresolvedIconPlaceholderTemplateIdentifier, 5, /*atlasPage=*/2);
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::Props;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.strategicIconScreenSizePixels = 12.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    std::vector<OverlayVisibleInstance> candidates;
+    IconLayerCullDiagnostics_UI diagnostics;
+    ResolveVisibleCandidates(fixture.Input(), fixture.aabbCache, &diagnostics, candidates);
+    check(candidates.size() == 1, "an unresolved templateIdentifier draws the placeholder chip, not nothing");
+    if (!candidates.empty()) {
+        check(candidates[0].atlasPage == 2, "the placeholder candidate uses the registered placeholder's atlasPage");
+        check(candidates[0].screenSize > 11.99f && candidates[0].screenSize < 12.01f,
+              "the placeholder draws at the layer's fixed strategicIconScreenSizePixels, not the LOD formula");
+    }
+    check(diagnostics.loggedMissingTemplateIdentifiers.size() == 1,
+          "the original miss is still logged once, exactly as before this ticket");
+}
+
+// The pre-ticket posture is unchanged when the shell never registered a placeholder (no
+// kUnresolvedIconPlaceholderTemplateIdentifier entry seeded) — mirrors CheckPairingMissLoggedOnce's
+// own fixture exactly, proving no regression for a shell that has not wired Part 2's registration.
+void CheckUnresolvedPropWithNoPlaceholderRegisteredDrawsNothing() {
+    IconLayerTestFixture fixture;
+    AppendPropInstance(fixture.placements, 2.0f, 2.0f, 0, "propMissing");
+    fixture.ruleBucketIndex.props.Build(fixture.placements.props.ruleIndex.data(), 1, 1);
+    OverlayLayer_UI layer; layer.domainKind = OverlayDomainKind_UI::Props;
+    layer.thumbnailLodThresholdPixels = 1.0f;
+    layer.subLayers.push_back(OverlaySubLayerRef_UI{OverlaySubLayerKind_UI::ProceduralRule, 0, true});
+    fixture.overlaySettings.overlayLayers.push_back(layer);
+
+    std::vector<OverlayVisibleInstance> candidates;
+    ResolveVisibleCandidates(fixture.Input(), fixture.aabbCache, nullptr, candidates);
+    check(candidates.empty(),
+          "with no placeholder registered, an unresolved templateIdentifier still draws nothing (unchanged)");
+}
+
 // Above threshold: thumbnail mode, at the scaled size.
 void CheckThumbnailModeAboveThreshold() {
     IconLayerTestFixture fixture;
@@ -1199,6 +1247,8 @@ void CheckMarqueeStyleMultiSelectHighlightsAllMembers() {
 void RunMapCanvasIconLayerCullChecks() {
     CheckAabbEarlyOut();
     CheckPairingMissLoggedOnce();
+    CheckUnresolvedPropFallsBackToPlaceholder();
+    CheckUnresolvedPropWithNoPlaceholderRegisteredDrawsNothing();
     CheckThumbnailModeAboveThreshold();
     CheckStrategicModeBelowThreshold();
     CheckManualReclaimPartitionCorrectness();

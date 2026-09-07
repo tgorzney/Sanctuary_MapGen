@@ -13,6 +13,7 @@
 // asset family the stem is the best available name and is reported as such; nothing here invents a
 // mapping the spec does not state.
 #include "Application_UI.h"
+#include "../io/AssetAtlasCache_Decode_IO.h"
 #include <cstring>
 
 namespace SanmapGen {
@@ -27,6 +28,41 @@ std::string FileStemOfEntryName(const std::string& entryName) {
     const std::size_t stemEnd =
         (lastDot == std::string::npos || lastDot < stemBegin) ? entryName.size() : lastDot;
     return entryName.substr(stemBegin, stemEnd - stemBegin);
+}
+
+// BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2 — reserves ONE atlas entry that is not
+// sourced from the sanpack at all: a generic checkerboard chip (the SAME MakePlaceholderImage the
+// atlas builder already uses for a corrupt/rejected SanGen entry, AssetAtlasCache_PropThumbnail_IO.cpp),
+// uploaded as one extra resident page past the real atlas pages. Registered under
+// kUnresolvedIconPlaceholderTemplateIdentifier (IconAtlasPairing_UI.h) so EmitCandidateIfVisible can
+// Resolve() it by name on a miss — the exact same lookup path every other candidate already goes
+// through, no second "is this the placeholder" branch downstream of the pairing lookup. Called ONLY
+// on LoadAssetAtlas()'s success path (after BuildIconAtlasManifest/BuildIconAtlasPairingLookup have
+// already run and been assigned — both CLEAR their target containers unconditionally, so registering
+// any earlier would be wiped out) — a shell with no atlas at all already renders nothing for every
+// overlay icon, so skipping the placeholder too on that path is not a new gap.
+void RegisterUnresolvedIconPlaceholder(ApplicationAssetBridge& assetBridge,
+                                       const Io::AtlasBuildSettings& atlasBuildSettings,
+                                       Sys::GpuResourceManager* gpuResourceManager) {
+    if (gpuResourceManager == nullptr) return;
+    const Io::AtlasImage placeholderImage = Io::Decode::MakePlaceholderImage(
+        atlasBuildSettings.placeholderWidth, atlasBuildSettings.placeholderHeight);
+    const int pageIndex = assetBridge.atlasResidency.PageCount();
+    if (!assetBridge.atlasResidency.UploadPage(*gpuResourceManager, pageIndex, placeholderImage.width,
+                                               placeholderImage.height, placeholderImage.rgbaPixels.data(),
+                                               placeholderImage.rgbaPixels.size()))
+        return;   // upload failed: the miss case simply stays silent, exactly as before this ticket
+
+    IconAtlasEntry placeholderEntry;
+    placeholderEntry.iconId    = static_cast<int>(assetBridge.iconManifest.entries.size());
+    placeholderEntry.atlasPage = pageIndex;
+    // Full-page UV rect (0..1) — the placeholder image IS the whole page; no packing needed for one entry.
+    assetBridge.iconManifest.entries.push_back(placeholderEntry);
+    assetBridge.iconManifest.pageTextureIdentifiers.push_back(
+        gpuResourceManager->TexturePresentationIdentifier(assetBridge.atlasResidency.PageTexture(pageIndex)));
+    assetBridge.iconTemplateIdentifiers.push_back(kUnresolvedIconPlaceholderTemplateIdentifier);
+    assetBridge.iconPairingLookup.SetThumbnailIconId(kUnresolvedIconPlaceholderTemplateIdentifier,
+                                                      placeholderEntry.iconId);
 }
 
 } // namespace
@@ -120,6 +156,7 @@ bool Application::LoadAssetAtlas() {
                            gpuResourceManager.get(), assetBridge.iconManifest,
                            assetBridge.iconTemplateIdentifiers);
     assetBridge.iconPairingLookup = BuildIconAtlasPairingLookup(assetBridge.iconTemplateIdentifiers);
+    RegisterUnresolvedIconPlaceholder(assetBridge, settings.atlasBuildSettings, gpuResourceManager.get());
     assetBridge.assetStatusMessage =
         "Atlas: " + std::to_string(assetBridge.assetAtlasCache.Atlas().EntryCount()) +
         " icons on " + std::to_string(assetBridge.assetAtlasCache.Atlas().PageCount()) +

@@ -8,6 +8,7 @@
 // tab writes no byte and creates no folder itself — `Io::EnsureExportFolderExists` is the door.
 #include "FilesTab_UI.h"
 #include "FilesTab_ScenarioExport_Actions_UI.h"
+#include "IconAtlasPairing_UI.h"
 #include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
 #include "../data/StratumArt_DATA.h"
@@ -19,6 +20,38 @@
 
 namespace SanmapGen {
 namespace Ui {
+namespace {
+
+// Mirrors MapCanvas_IconLayer_CullManual_UI.cpp's TemplateIdentifierFromBlueprintPath exactly (the
+// same five-line mechanical stem op) — duplicated here per that file's own established precedent
+// (Application_Assets_UI.cpp's FileStemOfEntryName) rather than exported across an unrelated module.
+std::string PropTemplateIdentifierFromBlueprintPath(const std::string& blueprintPath) {
+    const std::size_t lastSeparator = blueprintPath.find_last_of("/\\");
+    const std::size_t stemBegin = lastSeparator == std::string::npos ? 0 : lastSeparator + 1;
+    const std::size_t lastDot = blueprintPath.find_last_of('.');
+    const std::size_t stemEnd = (lastDot == std::string::npos || lastDot < stemBegin) ? blueprintPath.size() : lastDot;
+    return blueprintPath.substr(stemBegin, stemEnd - stemBegin);
+}
+
+} // namespace
+
+// BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2 — declared in FilesTab_UI.h (external
+// linkage, directly unit-testable); see that declaration's own comment for the exact contract. Not
+// itself anonymous-namespace-local, unlike PropTemplateIdentifierFromBlueprintPath above (still
+// reachable here — an anonymous namespace's contents are visible everywhere later in this file via
+// ordinary unqualified lookup, the same posture ResolveMarkerIconTemplateIdentifier's sibling
+// precedent already relies on).
+int CountUnresolvedPropIcons(const std::vector<Params::PropInstanceGroup>& props,
+                             const IconAtlasPairingLookup& pairingLookup) {
+    int unresolvedCount = 0;
+    for (const Params::PropInstanceGroup& group : props) {
+        const std::string templateIdentifier = PropTemplateIdentifierFromBlueprintPath(group.blueprintPath);
+        if (pairingLookup.Resolve(templateIdentifier).thumbnailIconId == kInvalidIconId)
+            unresolvedCount += static_cast<int>(group.transforms.size());
+    }
+    return unresolvedCount;
+}
+
 namespace {
 
 // `<exportFolder>/Textures`, created on demand. False (logged) when there is no destination.
@@ -77,6 +110,20 @@ bool RunOpenSanmap(FilesTabState& state, Params::MapRecipe& recipe, Data::MapFie
         if (fields != nullptr) *fields = std::move(scratchFields);
         if (outBakedLayerImages != nullptr) *outBakedLayerImages = std::move(scratchBakedImages);
         if (outStratumArt != nullptr) *outStratumArt = std::move(scratchStratumArt);
+        // BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2 — one-time, user-visible summary:
+        // how many of THIS import's props never resolve against SanGen's own icon atlas (expected
+        // for an externally-authored map's own blueprints) and therefore render as a placeholder
+        // chip on the canvas (MapCanvas_IconLayer_CullEmit_UI.cpp's EmitCandidateIfVisible) instead
+        // of a real icon. Recipe-wide, not view-culled — the canvas's own per-frame cull pass only
+        // ever sees what is on screen, so it cannot report an accurate total. `nullptr` (no atlas
+        // loaded this session) skips the check entirely rather than reporting a bogus "everything
+        // unresolved".
+        if (state.iconPairingLookup != nullptr) {
+            const int unresolvedPropCount = CountUnresolvedPropIcons(recipe.props, *state.iconPairingLookup);
+            if (unresolvedPropCount > 0)
+                AppendFilesTabLog(state, std::to_string(unresolvedPropCount)
+                                  + " prop(s) could not be matched to an icon and are shown as placeholders.");
+        }
     }
     return result.bSucceeded;
 }

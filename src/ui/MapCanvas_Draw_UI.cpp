@@ -44,6 +44,9 @@ void MapCanvas::Draw(const char* canvasIdentifier, float regionSidePixels) {
     // not correctness — click-picking is off the draw list, STEP48 onward).
     DrawOverlayIconLayerPass(regionOrigin.x, regionOrigin.y, regionSidePixels);
     // STEP94 — Gap 6's minimal stopgap manual-marker draw, on top of the terrain/overlay stack.
+    // BUGFIX_OverlayVisibilityAndPropIconFallback_R1 Part 1 — DrawManualMarkerRoster now consults
+    // this MapCanvas's own `overlayLayerSettings` per group, so a marker-type row toggled off via
+    // the View toolbar no longer leaks through this pass either (it used to draw unconditionally).
     DrawManualMarkerDragPass(regionOrigin.x, regionOrigin.y);
     // STEP207 — the marquee's own rubber-band rectangle, on top of the normal overlay stack.
     DrawMarqueeRectanglePass(regionOrigin.x, regionOrigin.y);

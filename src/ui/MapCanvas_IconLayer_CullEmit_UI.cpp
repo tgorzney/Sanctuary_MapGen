@@ -89,7 +89,28 @@ void EmitCandidateIfVisible(const DrawOverlayIconLayersInput& input, const Overl
         || input.composite == nullptr || input.view == nullptr)
         return;
     const IconIdentifierPairing pairing = input.pairingLookup->Resolve(templateIdentifier);
-    if (pairing.thumbnailIconId == kInvalidIconId) { LogMissOnce(diagnostics, templateIdentifier); return; }
+    if (pairing.thumbnailIconId == kInvalidIconId) {
+        LogMissOnce(diagnostics, templateIdentifier);
+        // BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2 — an unresolved templateIdentifier
+        // (expected for an externally-authored map's own blueprints, never ingested into SanGen's own
+        // atlas) now draws the reserved placeholder chip Application_Assets_UI.cpp's
+        // RegisterUnresolvedIconPlaceholder registers, instead of silently vanishing. A shell that
+        // never wired the placeholder (this Resolve() call itself misses too) falls through to the
+        // pre-existing "draw nothing" behavior — no crash, no second failure mode. Fixed strategic-
+        // size chip, not the two-mode LOD formula above: a generic "unresolved" marker is not a real
+        // footprint the LOD math has any authored size for.
+        const int placeholderIconId =
+            input.pairingLookup->Resolve(kUnresolvedIconPlaceholderTemplateIdentifier).thumbnailIconId;
+        if (placeholderIconId < 0 || placeholderIconId >= input.atlasManifest->EntryCount()) return;
+        ResolvedLod_UI placeholderLod;
+        placeholderLod.iconId = placeholderIconId;
+        placeholderLod.screenSize = layer.strategicIconScreenSizePixels;
+        AppendCandidate(input, layer, layerIndex, placeholderLod,
+                        input.atlasManifest->entries[static_cast<std::size_t>(placeholderIconId)],
+                        worldX, worldZ, collection, instanceIndex, tintColorRed, tintColorGreen, tintColorBlue,
+                        stableOrderCounter, outCandidates, bManual);
+        return;
+    }
     const ResolvedLod_UI lod = ResolveLodModeAndIcon(input, layer, pairing, templateIdentifier, instanceScale);
     if (lod.iconId < 0 || lod.iconId >= input.atlasManifest->EntryCount()) {
         LogMissOnce(diagnostics, templateIdentifier);   // §14.3: strategic mode with no authored icon yet

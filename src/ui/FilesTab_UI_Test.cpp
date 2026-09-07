@@ -5,6 +5,7 @@
 // pixels are a by-eye check against a live frame; nothing here asserts on them.
 #include "FilesTab_TestSupport_UI.h"
 #include "FilesTab_UI.h"
+#include "IconAtlasPairing_UI.h"
 #include "../data/MapFields_DATA.h"
 #include "../params/MapRecipe_PARAMS.h"
 
@@ -86,6 +87,34 @@ void CheckAMissingDestinationIsRefusedEvenWithFields() {
     Check(!state.debugLog.empty(), "with the reason logged both times");
 }
 
+// BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2.
+void CheckCountUnresolvedPropIconsResolvesAgainstPairingLookup() {
+    Ui::IconAtlasPairingLookup pairingLookup;
+    pairingLookup.SetThumbnailIconId("known_prop", 0);
+
+    std::vector<Params::PropInstanceGroup> props;
+    Params::PropInstanceGroup resolvedGroup;
+    resolvedGroup.blueprintPath = "/Env/Props/known_prop.sanmodel";
+    resolvedGroup.transforms.resize(2);
+    props.push_back(resolvedGroup);
+    Check(Ui::CountUnresolvedPropIcons(props, pairingLookup) == 0,
+          "a group whose stem resolves against the pairing lookup contributes zero unresolved props");
+
+    Params::PropInstanceGroup unresolvedGroup;
+    unresolvedGroup.blueprintPath = "/External/Env/Props/unknown_external_prop.sanmodel";
+    unresolvedGroup.transforms.resize(3);
+    props.push_back(unresolvedGroup);
+    Check(Ui::CountUnresolvedPropIcons(props, pairingLookup) == 3,
+          "an unresolved group's EVERY transform counts, one per instance, not once per group");
+
+    Params::PropInstanceGroup anotherUnresolvedGroup;
+    anotherUnresolvedGroup.blueprintPath = "/External/Env/Props/another_unknown_prop.sanmodel";
+    anotherUnresolvedGroup.transforms.resize(1);
+    props.push_back(anotherUnresolvedGroup);
+    Check(Ui::CountUnresolvedPropIcons(props, pairingLookup) == 4,
+          "multiple unresolved groups accumulate across the whole recipe, not just the first");
+}
+
 } // namespace
 
 void RunTabStateTests() {
@@ -93,6 +122,7 @@ void RunTabStateTests() {
     CheckTheLogPanelIsBoundedAndDropsWholeLines();
     CheckActionsAreRefusedWithAReasonRatherThanHalfDone();
     CheckAMissingDestinationIsRefusedEvenWithFields();
+    CheckCountUnresolvedPropIconsResolvesAgainstPairingLookup();
 }
 
 } // namespace FilesTabTest

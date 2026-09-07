@@ -17,6 +17,18 @@ namespace Ui {
 // convention (IconGridWidget_UI.h:26, :80).
 inline constexpr int kInvalidIconId = -1;
 
+// BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2 — a reserved templateIdentifier no real
+// sanpack payload's file stem can ever produce (ASSET_LOADING_SPEC file stems are plain asset names;
+// none begin with a double underscore). Application::LoadAssetAtlas() registers exactly one atlas
+// entry under this identifier — a generic checkerboard chip (AssetAtlasCache_PropThumbnail_IO.cpp's
+// MakePlaceholderImage) uploaded as one extra resident page past the real atlas pages
+// (Application_Assets_UI.cpp's RegisterUnresolvedIconPlaceholder) — so EmitCandidateIfVisible
+// (MapCanvas_IconLayer_CullEmit_UI.cpp) can fall back to it, through this SAME Resolve() lookup path
+// every other candidate already goes through, instead of silently dropping a prop whose real
+// templateIdentifier never resolves against SanGen's own atlas (an externally-authored map's own
+// blueprints, never ingested into SanGen's sanpack).
+inline const char* const kUnresolvedIconPlaceholderTemplateIdentifier = "__unresolved_icon_placeholder__";
+
 struct IconIdentifierPairing {
     int thumbnailIconId = kInvalidIconId;
     int strategicIconId = kInvalidIconId;

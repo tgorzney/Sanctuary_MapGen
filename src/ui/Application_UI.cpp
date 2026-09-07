@@ -45,6 +45,11 @@ Application::Application(ApplicationSettings applicationSettings)
     // STEP96_FootprintBakeAndStalenessCheck_IO.md §3.1 call site 1 — same one-time wiring posture as
     // the pair above: `assetBridge.templateIngestReport` is stable for the whole process lifetime.
     tabState.files.templateIngestReport               = &assetBridge.templateIngestReport;
+    // BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 2 — same one-time wiring posture:
+    // `assetBridge.iconPairingLookup` is stable for the whole process lifetime; LoadAssetAtlas()
+    // reassigns its CONTENTS (never relocates the object), so this pointer stays valid across a
+    // reload.
+    tabState.files.iconPairingLookup                  = &assetBridge.iconPairingLookup;
     tabState.files.scenarioRuntimeResourceDirectory   = settings.scenarioRuntimeResourceDirectory;
     tabState.scenarios.scenarioRuntimeOverridePath      = &scenarioRuntimeOverridePath;
     tabState.scenarios.scenarioRuntimeResourceDirectory = settings.scenarioRuntimeResourceDirectory;
