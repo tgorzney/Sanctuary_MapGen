@@ -175,7 +175,7 @@ void RunCanvasPickingChecks(PreviewIntegrationScene& scene) {
                                             zoomStepScale);
         const float pickRadiusWorldUnits = outsideRadiusPickRadiusScreenPixels
             * canvas.View().PreviewPixelsPerRegionPixel()
-            * scene.composite.Settings().worldUnitsPerCell / scene.composite.PixelsPerPreviewCell();
+            * scene.composite.WorldUnitsPerCell() / scene.composite.PixelsPerPreviewCell();
         float emptyWorldX = 0.0f, emptyWorldZ = 0.0f;
         check(FindEmptyWorldPosition(markers, grid.MapWorldSize(), pickRadiusWorldUnits + 2.0f,
                                      emptyWorldX, emptyWorldZ),

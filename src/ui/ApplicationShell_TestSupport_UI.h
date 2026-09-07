@@ -65,7 +65,7 @@ inline void MarkerCursorPosition(Application& application, std::size_t markerInd
                                  float& cursorX, float& cursorY) {
     const Data::PlacementInstances& markers = application.Assembler().Placements().markers;
     const float cellsPerWorldUnit =
-        ReciprocalOrZero(application.Composite().Settings().worldUnitsPerCell);
+        ReciprocalOrZero(application.Composite().WorldUnitsPerCell());
     const float pixelsPerCell = ShellPreviewPixelsPerCell(application);
     const float regionPerPixel = application.Canvas().View().RegionSidePixels()
                                / static_cast<float>(application.Composite().Resolution());

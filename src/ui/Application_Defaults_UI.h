@@ -20,8 +20,7 @@ namespace Ui {
 
 Params::MapRecipe MakeDefaultMapRecipe();                          // Application_Recipe_UI.cpp
 void ConfigureDefaultStages(Pipeline::GenerationAssembler& assembler);   // Application_Recipe_UI.cpp
-void ConfigureDefaultPreview(PreviewCompositeSettings& previewSettings, int previewResolution,
-                             float worldUnitsPerCell);            // Application_PreviewSetup_UI.cpp
+void ConfigureDefaultPreview(PreviewCompositeSettings& previewSettings, int previewResolution);   // Application_PreviewSetup_UI.cpp
 
 // The overlay stack's launch default (ARCH_14_02_DataModel.md §14.2) — one `OverlayLayer_UI` per
 // domain, EXCEPT Units, which seeds one row per `recipe.armies[i]` in roster order

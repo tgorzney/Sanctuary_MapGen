@@ -40,12 +40,11 @@ struct PreviewIntegrationScene {
     // ONE colorized layer (height through a black->white ramp, Replace) so every pixel the marks
     // do not cover is exactly the ramp applied to the baked height — that is what makes
     // "the preview matches the bake" an exact assertion rather than an eyeball.
-    // worldUnitsPerCell comes from PIPELINE: it is the recipe's map geometry (M5-0a), the same
-    // value Placement emitted its positions with.
+    // worldUnitsPerCell is no longer presentation state: PreviewComposite::WorldUnitsPerCell() reads
+    // `recipe.geometry.worldUnitsPerCell` directly, live — nothing to configure here.
     void ConfigureCompositeSettings() {
         PreviewCompositeSettings& settings = composite.Settings();
         settings.previewResolution = previewIntegrationResolution;
-        settings.worldUnitsPerCell = assembler.WorldUnitsPerCell();
         settings.gradientRamps.push_back(MakeBlackToWhiteRamp());
         settings.fieldLayers.push_back(MakeLayer(PreviewLayerKind::HeightRamp,
                                                  PreviewBlendMode::Replace, heightRampIndex,
@@ -64,7 +63,7 @@ inline float PreviewPixelsPerCell(const PreviewIntegrationScene& scene) {
 inline void MarkerPixel(const PreviewIntegrationScene& scene, std::size_t markerIndex,
                         int& pixelX, int& pixelY) {
     const Data::PlacementInstances& markers = scene.assembler.Placements().markers;
-    const float cellsPerWorldUnit = ReciprocalOrZero(scene.composite.Settings().worldUnitsPerCell);
+    const float cellsPerWorldUnit = ReciprocalOrZero(scene.composite.WorldUnitsPerCell());
     const float pixelsPerCell = PreviewPixelsPerCell(scene);
     pixelX = static_cast<int>(markers.positionX[markerIndex] * cellsPerWorldUnit * pixelsPerCell);
     pixelY = static_cast<int>(markers.positionZ[markerIndex] * cellsPerWorldUnit * pixelsPerCell);

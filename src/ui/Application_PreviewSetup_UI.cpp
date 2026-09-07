@@ -57,10 +57,8 @@ void PushDefaultRamps(PreviewCompositeSettings& previewSettings) {
 
 // Terrain first (it is the Replace layer that clears the frame), then the strata splat and the
 // water, then the three analytical overlays on top of everything they describe.
-void ConfigureDefaultPreview(PreviewCompositeSettings& previewSettings, int previewResolution,
-                             float worldUnitsPerCell) {
+void ConfigureDefaultPreview(PreviewCompositeSettings& previewSettings, int previewResolution) {
     previewSettings.previewResolution = previewResolution;
-    previewSettings.worldUnitsPerCell = worldUnitsPerCell;
     PushDefaultRamps(previewSettings);
     previewSettings.fieldLayers.push_back(MakeFieldLayer(
         PreviewLayerKind::HeightRamp, PreviewBlendMode::Replace, heightRampRow, 0.0f, 1.0f, 1.0f));

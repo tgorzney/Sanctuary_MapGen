@@ -88,6 +88,13 @@ public:
     // zero-when-unbaked contract).
     float PixelsPerPreviewCell() const;   // PreviewComposite_Prepare_UI.cpp — mapFields.VertexSize()-derived
 
+    // Heightfield cell -> game units (X/Z) — READS `geometry` DIRECTLY, live, every call. There is
+    // exactly one owner of this number, `Params::Geometry::worldUnitsPerCell` (the recipe Open/New
+    // populates); this is not a cached copy, so it can never go stale against whatever map is
+    // currently loaded (the bug a prior cached-copy-in-PreviewCompositeSettings design had: that
+    // copy was only ever assigned once, at Application startup, and never refreshed on Open).
+    float WorldUnitsPerCell() const { return geometry.worldUnitsPerCell; }
+
     // World (positionX/positionZ — the horizontal plane; positionY is height,
     // PlacementInstance_DATA) -> preview pixel. The exact mapping BuildEntityPoints already bakes
     // marks through; extracted so there is exactly one copy (ARCH_08_03_SpatialGridVsSpacingGrid.md

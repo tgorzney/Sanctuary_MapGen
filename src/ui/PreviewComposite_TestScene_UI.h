@@ -51,6 +51,11 @@ inline float QuantizeChannel(float value) {
 inline void BuildPreviewTestScene(PreviewTestScene& scene) {
     scene.geometry.mapSize = 4;
     scene.geometry.terrainMaxHeight = 100.0f;
+    // Explicit, not left to the struct default (which is not 1.0 — Geometry_PARAMS.h's own comment
+    // explains why): every expected pixel in every test built on this scene is hand-derived assuming
+    // world units == cell units, same posture as this codebase's other Geometry test fixtures
+    // (e.g. MarkerDragGesture_UI_Test.cpp's own MakeTestGeometry).
+    scene.geometry.worldUnitsPerCell = 1.0f;
     scene.fields.Resize(scene.geometry.VertexSize(), 0.0f);
     scene.fields.heightfield.Fill(0.25f);
     scene.fields.flow.Fill(1.0f);

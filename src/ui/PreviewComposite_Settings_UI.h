@@ -91,11 +91,6 @@ struct PreviewCompositeSettings {
     float entityMarkRadiusPixels = 2.0f;
     float entityMarkColor[4]     = {1.0f, 0.85f, 0.1f, 1.0f};
 
-    // Heightfield cell -> game units (X/Z), the same quantity Placement emitted its instance
-    // positions with (`Params::Geometry::worldUnitsPerCell` — map geometry, M5-0a). PIPELINE
-    // sets this mirror and Placement's reader from that one recipe value (M4-5).
-    float worldUnitsPerCell = 1.0f;
-
     // ARCH_14_17_MapAreaFieldLayer.md §14.17 item 9 — the single owner of the per-area presentation
     // color, moved here from `AreasTabState::areaColors` (removed, not duplicated): the Areas tab,
     // MapCanvas's own drag gesture and the composite's own field-layer flattening all need the SAME

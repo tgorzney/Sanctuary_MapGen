@@ -65,7 +65,7 @@ void MapCanvas::ApplyClickGesture(float regionLocalX, float regionLocalY, bool b
                                        static_cast<float>(lastPickedPixel.pixelY));
     const float pickRadiusWorldUnits = pickRadiusScreenPixels
         * view.PreviewPixelsPerRegionPixel()
-        * composite->Settings().worldUnitsPerCell / composite->PixelsPerPreviewCell();
+        * composite->WorldUnitsPerCell() / composite->PixelsPerPreviewCell();
     const std::int32_t pickedIndex = PickMarker(*pickMarkerSpatialGrid, *pickMarkerInstances,
                                                 worldPoint.worldX, worldPoint.worldZ, pickRadiusWorldUnits);
     if (pickedIndex != kNoMarkerPicked) {

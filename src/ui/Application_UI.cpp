@@ -55,8 +55,7 @@ Application::Application(ApplicationSettings applicationSettings)
     tabState.scenarios.scenarioRuntimeResourceDirectory = settings.scenarioRuntimeResourceDirectory;
     // STEP78 — same one-time wiring posture as the pair above.
     tabState.scenarios.scenarioEditModeState = &scenarioEditMode;
-    ConfigureDefaultPreview(composite.Settings(), settings.previewResolution,
-                            assembler.WorldUnitsPerCell());
+    ConfigureDefaultPreview(composite.Settings(), settings.previewResolution);
     ConfigureDefaultOverlayLayers(overlaySettings, recipe);
     // The left column's `[O]`/`[ ]` rows are the composite's layer flags from the first frame on,
     // so the column and the image agree before anything is clicked (Application_Visibility_UI.h).
