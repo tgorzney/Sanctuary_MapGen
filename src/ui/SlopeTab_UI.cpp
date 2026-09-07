@@ -48,9 +48,20 @@ void DrawSlopeTab(PreviewCompositeSettings& compositeSettings, SlopeTabState& st
     DrawSlopeDomain(*layer, state, previewDriver);
 
     Params::GradientRamp* const ramp = PreviewRampOfFieldLayer(compositeSettings, *layer);
-    if (ramp == nullptr) ImGui::TextUnformatted("This layer names no gradient ramp.");
-    else if (DrawGradientEditor("Slope Gradient", *ramp, state.gradientEditor))
-        NotifyChange(true, previewDriver);
+    if (ramp == nullptr) { ImGui::TextUnformatted("This layer names no gradient ramp."); }
+    else {
+        // Only Slope has a bounded real-world unit for its stop locations (its own
+        // minimumDegrees/maximumDegrees domain, already converted elsewhere in this file) — so
+        // only Slope's call site hides the "Slope Gradient" label and shows the stop-location
+        // slider in degrees (WO BUGFIX_SlopeTabUICorrection_R1 Parts 3-4).
+        GradientEditorOptions options;
+        options.ToDisplayUnits = [](float normalizedLocation) { return normalizedLocation * 90.0f; };
+        options.FromDisplayUnits = [](float displayDegrees) { return displayDegrees / 90.0f; };
+        options.locationSliderLabel = "Stop location (deg)";
+        options.bLabelHidden = true;
+        if (DrawGradientEditor("Slope Gradient", *ramp, state.gradientEditor, options))
+            NotifyChange(true, previewDriver);
+    }
     ImGui::PopID();
 }
 

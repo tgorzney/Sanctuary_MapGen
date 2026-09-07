@@ -68,10 +68,12 @@ void ConfigureDefaultPreview(PreviewCompositeSettings& previewSettings, int prev
         PreviewLayerKind::StratumSplat, PreviewBlendMode::AlphaBlend, -1, 0.0f, 1.0f, 0.65f));
     previewSettings.fieldLayers.push_back(MakeFieldLayer(
         PreviewLayerKind::Water, PreviewBlendMode::AlphaBlend, waterDepthRampRow, 0.0f, 1.0f, 1.0f));
-    // The slope domain is gradient magnitude (rise/run), the pinned unit: 0..1 is 0..45 degrees,
-    // which is the pair SlopeTabState shows on its first frame (SlopeTab_UI.h).
+    // The slope domain is gradient magnitude (rise/run), the pinned unit: 0..1 is 0..90 degrees,
+    // which is the pair SlopeTabState shows on its first frame (SlopeTab_UI.h). Overlay (not
+    // AlphaBlend) is the default blend so the ramp reads as a terrain tint rather than a flat
+    // paint-over (WO BUGFIX_SlopeTabUICorrection_R1 Part 6).
     previewSettings.fieldLayers.push_back(MakeFieldLayer(
-        PreviewLayerKind::Slope, PreviewBlendMode::AlphaBlend, slopeRampRow, 0.0f, 1.0f, 1.0f));
+        PreviewLayerKind::Slope, PreviewBlendMode::Overlay, slopeRampRow, 0.0f, 1.0f, 1.0f));
     previewSettings.fieldLayers.push_back(
         MakeAutoDomainLayer(PreviewLayerKind::Flow, flowRampRow, 1.0f));
     previewSettings.fieldLayers.push_back(

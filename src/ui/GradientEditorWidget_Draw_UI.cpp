@@ -1,12 +1,14 @@
-// GradientEditorWidget_Draw_UI.cpp — the imgui interaction half of the gradient editor (M5-3),
-// split from the pure edit semantics (GradientEditorWidget_UI.cpp) and from the painting
-// (GradientEditorWidget_Paint_UI.cpp) per ARCH §1.5. Hit-testing is one InvisibleButton over the
-// whole strip (UI_FRAMEWORK_SPEC bypass toolkit #1), and every mutation goes through the pure
-// functions — this TU adds no edit rule of its own.
+// GradientEditorWidget_Draw_UI.cpp — the imgui interaction half of the gradient editor (M5-3):
+// the strip, its stop handles and add/smooth-toggle. Split from the pure edit semantics
+// (GradientEditorWidget_UI.cpp), the painting (GradientEditorWidget_Paint_UI.cpp) and the
+// selected-stop sub-panel (GradientEditorWidget_StopControls_UI.cpp) per ARCH §1.5. Hit-testing
+// is one InvisibleButton over the whole strip (UI_FRAMEWORK_SPEC bypass toolkit #1), and every
+// mutation goes through the pure functions — this TU adds no edit rule of its own.
 //
 // The strip preview is baked with Ui::BakeGradientLut (M4-2) at the widget's own small sample
 // count; the CALLER still re-bakes at its resolution when this returns true.
 #include "GradientEditorWidget_Paint_UI.h"
+#include "GradientEditorWidget_StopControls_UI.h"
 #include "GradientLut_UI.h"
 #include <cstddef>
 
@@ -85,44 +87,13 @@ bool DrawStripAndHandles(Params::GradientRamp& ramp, GradientEditorState& state)
     return UpdateStripInteraction(ramp, state, lookupTable, sampleCount, origin, width);
 }
 
-void ClearSelectionAfterDelete(GradientEditorState& state, int deletedStopIndex) {
-    if (state.selectedStopIndex == deletedStopIndex) state.selectedStopIndex = -1;
-    else if (state.selectedStopIndex > deletedStopIndex) --state.selectedStopIndex;
-    state.draggedStopIndex = -1;
-}
-
-bool DrawSelectedStopControls(Params::GradientRamp& ramp, GradientEditorState& state) {
-    if (state.selectedStopIndex < 0 ||
-        state.selectedStopIndex >= static_cast<int>(ramp.stops.size())) return false;
-    const std::size_t stopIndex = static_cast<std::size_t>(state.selectedStopIndex);
-
-    bool bChanged = false;
-    float color[kGradientStopChannelCount];
-    for (int channel = 0; channel < kGradientStopChannelCount; ++channel)
-        color[channel] = ramp.stops[stopIndex].color[channel];
-    if (ImGui::ColorEdit4("Stop color", color, ImGuiColorEditFlags_AlphaBar))
-        bChanged = RecolorGradientStop(ramp, state.selectedStopIndex, color) || bChanged;
-
-    float location = ramp.stops[stopIndex].location;
-    if (ImGui::SliderFloat("Stop location", &location, 0.0f, 1.0f))
-        bChanged = MoveGradientStop(ramp, state.selectedStopIndex, location) || bChanged;
-
-    if (ImGui::Button("Delete stop")) {
-        const int deletedStopIndex = state.selectedStopIndex;
-        if (DeleteGradientStop(ramp, deletedStopIndex)) {
-            ClearSelectionAfterDelete(state, deletedStopIndex);
-            bChanged = true;
-        }
-    }
-    return bChanged;
-}
-
 } // namespace
 
-bool DrawGradientEditor(const char* label, Params::GradientRamp& ramp, GradientEditorState& state) {
+bool DrawGradientEditor(const char* label, Params::GradientRamp& ramp, GradientEditorState& state,
+                        const GradientEditorOptions& options) {
     bool bChanged = false;
-    ImGui::PushID(label);
-    ImGui::TextUnformatted(label);
+    ImGui::PushID(label);                              // ID scoping always runs, label or not
+    if (!options.bLabelHidden) ImGui::TextUnformatted(label);
 
     bool bSmoothInterpolation = ramp.bSmoothInterpolation;
     if (ImGui::Checkbox("Smooth interpolation", &bSmoothInterpolation))
@@ -134,7 +105,7 @@ bool DrawGradientEditor(const char* label, Params::GradientRamp& ramp, GradientE
     }
 
     bChanged = DrawStripAndHandles(ramp, state) || bChanged;
-    bChanged = DrawSelectedStopControls(ramp, state) || bChanged;
+    bChanged = DrawSelectedStopControls(ramp, state, options) || bChanged;
 
     ImGui::PopID();
     return bChanged;

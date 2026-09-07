@@ -38,13 +38,14 @@ Params::GradientRamp MakeWaterDepthRamp() {
     return ramp;
 }
 
-// Flat is transparent, steep is hot: an overlay reads as an overlay only if its low end lets the
-// terrain through.
+// Flat is green, a small rise is a caution yellow, and 30 degrees or steeper reads as hazard red —
+// locations are degrees/90 against the tab's 0-90 degree domain (SlopeTab_UI.h). Alpha is uniform
+// across all three stops (confirmed with the human; supersedes any earlier per-stop alpha).
 Params::GradientRamp MakeSlopeRamp() {
     Params::GradientRamp ramp = MakeRamp("Slope");
-    ramp.stops.push_back(MakeStop(0.0f, 0.10f, 0.55f, 0.20f, 0.0f));
-    ramp.stops.push_back(MakeStop(0.5f, 0.90f, 0.80f, 0.15f, 0.65f));
-    ramp.stops.push_back(MakeStop(1.0f, 0.90f, 0.15f, 0.10f, 0.90f));
+    ramp.stops.push_back(MakeStop(0.0f,       0.090196f, 0.474510f, 0.043137f, 0.603922f)); // 0 deg,  green
+    ramp.stops.push_back(MakeStop(2.0f/90.0f, 1.0f,      1.0f,      0.0f,      0.603922f)); // 2 deg,  yellow
+    ramp.stops.push_back(MakeStop(30.0f/90.0f, 0.901961f, 0.149020f, 0.101961f, 0.603922f)); // 30 deg, red
     return ramp;
 }
 

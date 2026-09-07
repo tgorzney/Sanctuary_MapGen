@@ -83,13 +83,14 @@ void RunDomainMirrorChecks() {
     PreviewFieldLayer& layer = *PreviewFieldLayerOfKind(settings, PreviewLayerKind::Slope);
     SlopeTabState state;
 
-    // The tab's default band (0-45 degrees) IS the layer's default 0..1 gradient domain, so the
-    // first store is a genuine no-op — which is the contract: a store that moves nothing reports
-    // nothing, and so cannot trip a preview refresh on a frame the user did not touch anything.
-    Check(!StoreSlopeTabValues(state, layer), "an unchanged store reports nothing moved");
-    Check(NearlyEqual(layer.domainMinimum, 0.0f, 1.0e-6f)
-          && NearlyEqual(layer.domainMaximum, 1.0f, 1.0e-5f),
-          "and 0-45 degrees is exactly the 0..1 gradient domain");
+    // The tab's default band is 0-90 degrees (BUGFIX_SlopeTabUICorrection_R1 Part 2), steeper than
+    // the layer's own default 0..1 gradient domain (tan(45 deg) == 1) — so unlike the old 0-45
+    // degree default, the very first store is NOT a no-op; it widens the domain out to the
+    // kSlopeDegreeCeiling clamp (90 itself sits on tan()'s asymptote, so 90 reads as 89).
+    Check(StoreSlopeTabValues(state, layer), "the wider 0-90 default band moves the layer's domain");
+    Check(NearlyEqual(layer.domainMinimum, 0.0f, 1.0e-6f), "0 degrees is still exactly zero gradient");
+    Check(NearlyEqual(layer.domainMaximum, SlopeGradientFromDegrees(90.0f), 1.0e-4f),
+          "90 degrees reaches the layer clamped to the kSlopeDegreeCeiling gradient");
 
     state.maximumDegrees = 60.0f;
     Check(StoreSlopeTabValues(state, layer), "a moved bound reports the layer moved");

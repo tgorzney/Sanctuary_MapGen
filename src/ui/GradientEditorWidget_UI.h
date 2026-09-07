@@ -14,6 +14,7 @@
 // (GradientEditorWidget_Draw_UI.cpp — the ARCH §1.5 aspect split behind this one small header).
 #pragma once
 #include "../params/GradientRamp_PARAMS.h"
+#include "RtToggleWidget_UI.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -33,6 +34,26 @@ struct GradientEditorState {
     float stripeHeight      = 28.0f;   // on-screen height of the ramp strip, in pixels
     float handleRadius      = 6.0f;    // stop-handle radius / grab tolerance, in pixels
     int   stripeSampleCount = 64;      // LUT entries used to paint the strip (never hardcoded)
+    // Drives the selected stop's Ui::DrawColorSwatch. The picker already writes the stop's color
+    // array live every frame it is open (ColorSwatch_UI.cpp), matching the old ImGui::ColorEdit4
+    // path's own every-frame write; this toggle only governs DrawColorSwatch's own RT button.
+    RealtimeToggle stopColorRealtimeToggle;
+};
+
+// Per-call tweakables (Constitution §8) for one DrawGradientEditor instance. Defaults reproduce
+// today's behavior byte-for-byte for every call site that does not opt in — Slope is currently the
+// only one that does (SlopeTab_UI.cpp), because it is the only one of the five gradient tabs with a
+// bounded real-world unit for its stop locations (WO BUGFIX_SlopeTabUICorrection_R1 Part 3).
+struct GradientEditorOptions {
+    // nullptr on either pair member means identity (the stop's raw 0..1 `location`, unchanged
+    // behavior). When both are set, the stop-location slider's range becomes
+    // [ToDisplayUnits(0), ToDisplayUnits(1)] instead of the hardcoded 0..1.
+    float (*ToDisplayUnits)(float normalizedLocation) = nullptr;
+    float (*FromDisplayUnits)(float displayValue)     = nullptr;
+    const char* locationSliderLabel                   = "Stop location";
+    // Skips the ImGui::TextUnformatted(label) line only; ImGui::PushID(label) always still runs,
+    // so this never affects the widget's ID scoping (mirrors ColorSwatchOptions::bLabelHidden).
+    bool bLabelHidden = false;
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -73,7 +94,10 @@ int NearestGradientStopIndex(const Params::GradientRamp& ramp, float location);
 // Draws the strip, its stop handles, the smooth/linear toggle and the selected-stop controls,
 // mutating `ramp` through the functions above. Returns true iff the ramp changed this frame —
 // the caller's cue to re-bake via Ui::BakeGradientLut and trip its preview dirty flag.
-bool DrawGradientEditor(const char* label, Params::GradientRamp& ramp, GradientEditorState& state);
+// `options` defaults to identity/visible, so every call site but Slope's is source- and
+// behavior-unchanged.
+bool DrawGradientEditor(const char* label, Params::GradientRamp& ramp, GradientEditorState& state,
+                        const GradientEditorOptions& options = GradientEditorOptions());
 
 } // namespace Ui
 } // namespace SanmapGen

@@ -45,7 +45,7 @@ struct SlopeTabState {
     RealtimeToggle    maximumDegreesToggle;
     GradientEditorState gradientEditor;
     float minimumDegrees = 0.0f;
-    float maximumDegrees = 45.0f;
+    float maximumDegrees = 90.0f;
 };
 
 // layer domain -> the degree mirrors.
