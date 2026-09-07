@@ -28,7 +28,7 @@ extra unit spawns are all functions of **lobby composition** — how many player
 vs. AI, and separately *which* army slots are filled. The system resolves all of that **once,
 deterministically, synchronously, at map load**, from an ordered rule table authored per map.
 
-Two live files today, three under ratified ARCH law (§9). Runtime link:
+Two live files today, four categories under ratified ARCH law (§14). Runtime link:
 `Import("maps/<MapName>/<MapName>_Scenarios_Script.lua").Scenario` (`DATA:91`).
 
 ## 2. ⚠️ AS-BUILT vs. RATIFIED-TARGET — read before trusting any other section
@@ -39,7 +39,7 @@ Do not read the ARCH sections as descriptions of running code.
 
 | Concern | Live today (`SCEN`/`DATA`) | Ratified target | Status |
 |---|---|---|---|
-| File shape | 2 files: `_data.lua` + `_Scenarios_Script.lua` | 3 files: `_data.lua` + `_Scenarios_Runtime.lua` + `_Scenarios_Data.lua` | `ARCH_15_04` — not migrated |
+| File shape | 2 files: `_data.lua` + `_Scenarios_Script.lua` | 4 categories: `_data.lua` + `_Scenarios_Runtime.lua` + `_Scenarios_Data.lua` + one `_Scenarios_<ScenarioName>.lua` per `spawnsUnits == true` scenario (splittable to `_<FunctionName>.lua`) | `ARCH_15_04` (amended 2026-09-03, category 4) — not migrated |
 | `ResolveAndApply` 4th arg | `slotPattern` string (`SCEN:391`, `DATA:499`) | `playersInformation` array | `ARCH_15_10` §1 — not migrated |
 | `BuildSlotPattern` owner | the orchestrator, `DATA:399-410` | the runtime file | `ARCH_15_10` §1 — not migrated |
 | Slot-count bound | hardcoded `for i = 1, 16` (`DATA:400`) | rendered `MAX_ARMY_SLOT_COUNT` | `ARCH_15_10` §2 — not built |
@@ -266,7 +266,7 @@ Areas (`SCEN:61-64`), world x/z rects matching the `.sanmap` `areas` format:
 
 | Field | Type | Tier | Read at | Meaning |
 |---|---|---|---|---|
-| `name` | string | all | `SCEN:378`, `:399`, `:404` | Log identifier **and** the dispatch key for unit spawning (§11) — not cosmetic. |
+| `name` | string | all | `SCEN:378`, `:399`, `:404` | Log identifier **and** the dispatch key for unit spawning (§11) — not cosmetic. **Ratified target only** (`ARCH_15_05`, amended 2026-09-03 — not yet migrated, §2): under the category-4 file split, `name` is also string-formatted directly into a filesystem path (`<MapName>_Scenarios_<name>.lua`, §11.2) and therefore carries a validation rule the live two-file shape does not yet enforce — safe-filename charset `^[A-Za-z0-9_]+$` (digits may lead; every live name including `1v1` already satisfies it) plus case-insensitive uniqueness across the whole `Scenarios` set. |
 | `pattern` | 16-char string | 1 only | `SCEN:283` | Exact `slotPattern` equality. |
 | `match` | `function(total, humanCount, aiCount, slotPattern) -> boolean` | 2 only | `SCEN:288` | `pcall`'d. Returning nil/false falls through. |
 | `area` | `{x, y, width, height}` | all | `SCEN:393` | World-space rect; `y` is world **z**. Returned to the orchestrator, applied via `Area.FromMapArea` (`DATA:468-469`). |
@@ -503,10 +503,63 @@ Consequently:
   it has no `spawnsUnits` and no dispatch branch — stated in its own comment (`SCEN:182-185`).
 - **`ARCH_15_05` §15.5's `ScenarioNavalFleet`/`ScenarioNavalPondSide`/`ScenarioNavalPondAssignment`
   types and `ScenarioBody::navy` were shaped on 2026-08-21 from a live read of a `SpawnNavalFleets`
-  body that no longer exists.** This spec does not and cannot amend the ARCH. **Action required:
-  the ARCH Expert should review §15.5 against the current `spawnsUnits` model.** The parallel
-  `Params::Scenarios` field is `navy` + `navalFleet`; the live field is `spawnsUnits` + a
-  name-keyed dispatch.
+  body that no longer exists.** **Resolved:** the ARCH Expert's review landed as `ARCH_15_05`'s own
+  "RETIRED 2026-08-28" section (formally retiring all four types and `navy`) plus its "AMENDED
+  2026-09-03" section resolving where per-scenario dispatch/generator code lives under the file
+  split (§11.2 below, `ARCH_15_04`'s category 4). The parallel `Params::Scenarios` field is now
+  `spawnsUnits` + a per-scenario category-4 file, matching the live `spawnsUnits` + name-keyed
+  dispatch shape.
+
+### 11.2 Ratified target — category 4 + generic lazy dispatch (`ARCH_15_04` amended 2026-09-03, resolves `ARCH_15_05`'s OPEN item 2)
+
+The live `if/elseif` chain in §11 above is what runs today, in the un-migrated two-file live
+reference — nothing changes there until a human migrates the map (§14, §2.2). The **ratified
+target** it migrates to eliminates the `if/elseif` chain entirely, replacing §11's Step 2 with a
+different mechanism:
+
+- **Step 1 is unchanged.** `spawnsUnits = true` on the scenario record is still the opt-in flag,
+  still meaningless alone.
+- **Step 2 is no longer "add a branch."** Every `spawnsUnits == true` scenario instead gets its own
+  hand-authored file, `<MapName>_Scenarios_<ScenarioName>.lua` (splittable to
+  `<MapName>_Scenarios_<ScenarioName>_<FunctionName>.lua` under a 100-line-soft/150-line-hard
+  ceiling — `ARCH_15_04`'s category 4), exposing a **global** `GenerateScenarioUnits(area)` that
+  returns the same flat `{armyIndex, templateIdentifier, x, y, z}` instruction array
+  `Scenario.SpawnUnits` already consumes. SanGen scaffolds this file once if missing, then never
+  touches it again (§14's third overwrite-safety class) — the direct replacement for hand-editing
+  an `elseif` branch into the old monolithic script.
+- **Dispatch becomes generic and lives entirely in `_Scenarios_Runtime.lua`** (category 2), never
+  edited per map or per scenario:
+
+  ```lua
+  function Scenario.SpawnMatchedScenarioUnits(area)
+      if not currentMatchedScenarioName then return end
+      local path = string.format("maps/%s/%s_Scenarios_%s.lua",
+          currentMapName, currentMapName, currentMatchedScenarioName)
+      local importOk, generatorModule = pcall(Import, path)
+      if not importOk or not generatorModule or not generatorModule.GenerateScenarioUnits then
+          return  -- no such file: this scenario did not opt into unit spawning -- not an error
+      end
+      local buildOk, instructions = pcall(generatorModule.GenerateScenarioUnits, area)
+      if buildOk and instructions then
+          Scenario.SpawnUnits(instructions)
+      end
+  end
+  ```
+
+  `Import()`'d **only for the one matched scenario** (`currentMatchedScenarioName`) — never eager,
+  never a name→function table built up front, never an enumeration of the full authored
+  `Scenarios` set. A missing file for a `spawnsUnits == false` scenario is the silent, expected
+  common case; a missing file for `spawnsUnits == true` is a real authoring gap that `pcall`
+  degrades to "no units spawned," not an abort — the same per-call `pcall` ordering law §3.1
+  already states.
+- The **executor/generator split** (`Scenario.SpawnUnits`, §11's closing paragraph) is unaffected —
+  only the mechanism that decides which generator function runs for the matched scenario changes.
+
+This closes the gap §11.1 above used to flag as an open ARCH question: where per-scenario dispatch
+and generator code lives under the file split now has a ratified answer (`ARCH_15_04`'s category 4;
+`ARCH_15_05`'s matching `ScenarioBody::name` filesystem-safety-charset amendment, §6). It is not yet
+built or migrated (§2) — the live reference's hardcoded chain in §11 above is exactly what still
+runs today.
 
 ## 12. Complete worked example — a new scenario, end to end
 
@@ -629,6 +682,7 @@ playable area and will not be culled.
 | Scenario field is `navy` (bool) | `spawnsUnits` is read; `navy` has no reader | `navy` is a dead field left on 5 entries. §6 |
 | `ResolveAndApply(total, humanCount, aiCount, playersInformation)`, runtime builds `slotPattern` | `(…, slotPattern)`; orchestrator builds it at `DATA:399-411` | `ARCH_15_10` §1 is ratified but **not migrated**. §2 |
 | Three-file split described as the shape | two files; `_Scenarios_Script.lua` still live | `ARCH_15_04` ratified, not migrated. §2, §14 |
+| §2/§14 described the ratified target as a fixed three-file split with no answer for where per-scenario dispatch/generator code lives | `ARCH_15_04` amended 2026-09-03: a fourth category, `_Scenarios_<ScenarioName>.lua` (splittable to `_<FunctionName>.lua`), holds per-scenario generator code; dispatch is a generic lazy `Import()`-by-name mechanism living in `_Scenarios_Runtime.lua`, never an `elseif` chain, in the ratified target | Still not migrated — the live reference script's hardcoded `if/elseif` chain (§11) is exactly what runs today. §2, §11.2, §14 |
 | `occupancy` "deletes markers for armies with no player" | loop is `for armyId = 1, 4` | Only roster armies 1-4 are ever considered; armies 5-16 are unmanaged. §6.1, §7 |
 | `explicit` deletes markers of unmentioned armies | true — but only the 12 names in `KNOWN_ALLOY_MARKERS` | 276 of the map's 288 alloy markers are untouched by every mode. §6.1 |
 | Not previously stated | `spawns` writes only if the transform already exists (`SCEN:311`) | An entry for an army with no `Spawn` marker is silently ignored. §8 |
@@ -643,23 +697,47 @@ export; it never parses Lua back (option (c) — no Lua parser in the import dir
 one narrow carve-out ratified 2026-08-29: `ARCH_15_11` permits a human-triggered, non-executing
 extraction of **area rectangles only** from a foreign scenario `.lua` SanGen never writes.
 
-| File | Role | Written by SanGen? |
-|---|---|---|
-| `<MapName>_data.lua` | Orchestrator — load-scope gate, lobby read, counts, `NewThread`, wiring | **Never, under any code path.** |
-| `<MapName>_Scenarios_Runtime.lua` | Generic algorithm — `BuildSlotPattern`, `FindMatchingScenario`, `ApplyScenario`, `ResolveAndApply`, the spawn executor, all tuning constants. Identical across every map. | Yes — bundled resource, copied per export. |
-| `<MapName>_Scenarios_Data.lua` | Per-map tables — `PATTERN_SCENARIOS`/`COUNT_SCENARIOS`/`DEFAULT_SCENARIO`/`MAX_ARMY_SLOT_COUNT`, rendered from `Params::Scenarios` (`ARCH_15_05`, `ARCH_15_10` §2). | Yes — fully regenerated per export, never hand-edited, never read back. |
+**Four on-disk categories**, per `ARCH_15_04` (amended 2026-09-03 to add category 4):
 
-- **All three colocated in `LJ/lua/maps/<MapName>/`.** Cross-tree `Import` is impossible — the map's
-  asset folder (`Sanctuary_Data/Maps/<MapName>/`) is unreachable (`MAP_UNIT_SPAWNING_SPEC` §3,
-  disproved via `Engine.FileExists`). This is not a preference; the pair cannot be separated.
-- The generated data file declares its tables as **globals**, for the same `Import()` global-capture
-  reason as `Scenario` (§10).
-- **Overwrite safety** (`ARCH_15_04`): (1) filename disjointness — SanGen writes only the two
-  `_Scenarios_Runtime`/`_Scenarios_Data` paths, never `_data.lua` nor the legacy
-  `_Scenarios_Script.lua`; (2) a machine-checkable generated-file banner token in both; (3) on an
-  unrecognized occupant, refuse to write **that file only**, log loudly by path, and continue the
-  rest of the export. A write-target safety refusal — distinct from Constitution §6's import-time
+| # | File | Role | Written by SanGen? |
+|---|---|---|---|
+| 1 | `<MapName>_data.lua` | Orchestrator — load-scope gate, lobby read, counts, `NewThread`, wiring | **Never, under any code path.** |
+| 2 | `<MapName>_Scenarios_Runtime.lua` | Generic algorithm — `BuildSlotPattern`, `FindMatchingScenario`, `ApplyScenario`, `ResolveAndApply`, the spawn executor, the generic lazy per-scenario dispatcher (`Scenario.SpawnMatchedScenarioUnits`, §11.2), any universal per-scenario helpers, all tuning constants. Identical across every map. | Yes — bundled resource, copied per export. |
+| 3 | `<MapName>_Scenarios_Data.lua` | Per-map tables — `PATTERN_SCENARIOS`/`COUNT_SCENARIOS`/`DEFAULT_SCENARIO`/`MAX_ARMY_SLOT_COUNT`, rendered from `Params::Scenarios` (`ARCH_15_05`, `ARCH_15_10` §2). | Yes — fully regenerated per export, never hand-edited, never read back. |
+| 4 | `<MapName>_Scenarios_<ScenarioName>.lua` (splittable to `<MapName>_Scenarios_<ScenarioName>_<FunctionName>.lua`) | One per `spawnsUnits == true` scenario — hand-authored per-scenario unit-spawn generator exposing a global `GenerateScenarioUnits(area)` (§11.2). Added 2026-09-03; resolves the "where does per-scenario generator code live" gap §11.1 used to flag as open. | **Scaffold-once-if-missing, then never again** — a third, distinct overwrite-safety posture, below. |
+
+- **All four categories colocated in `LJ/lua/maps/<MapName>/`.** Cross-tree `Import` is impossible —
+  the map's asset folder (`Sanctuary_Data/Maps/<MapName>/`) is unreachable
+  (`MAP_UNIT_SPAWNING_SPEC` §3, disproved via `Engine.FileExists`). This is not a preference; none
+  of the four categories can be separated from the others.
+- The generated data file (category 3) declares its tables as **globals**, for the same `Import()`
+  global-capture reason as `Scenario` (§10). Category 4 files are `Import()`'d the same way and
+  expose their `GenerateScenarioUnits` global identically.
+- **Overwrite safety — three classes** (`ARCH_15_04`, amended 2026-09-03 to add the third):
+  1. **Categories 2-3 (`_Scenarios_Runtime.lua`/`_Scenarios_Data.lua`) — always regenerate, refuse
+     on foreign-marker collision.** (a) filename disjointness — SanGen writes only these two
+     literal paths, never `_data.lua` nor the legacy `_Scenarios_Script.lua`; (b) a
+     machine-checkable generated-file banner token in both; (c) on an unrecognized occupant,
+     refuse to write **that file only**, log loudly by path, and continue the rest of the export.
+  2. **Category 1 (`_data.lua`) — never write, ever, under any code path.**
+  3. **Category 4 (`_Scenarios_<ScenarioName>.lua`) — scaffold-once-if-missing, then permanently
+     hands-off.** Collision detection is a **glob/pattern match**
+     (`<MapName>_Scenarios_*.lua`, excluding the two category-2/3 literal names), not the literal
+     two-name check categories 2-3 use — used only to detect "does a generator file already exist
+     for this scenario," never to decide whether to overwrite it. On export, for every
+     `spawnsUnits == true` scenario whose expected generator file does not yet exist, SanGen writes
+     a minimal scaffold (`GenerateScenarioUnits(area) return {} end`) under a distinct, weaker
+     banner (`-- SANGEN-CREATED STARTING POINT -- freely hand-edit -- never regenerated`), once. On
+     every subsequent export, if the file exists in any state (untouched stub, hand-edited, no
+     marker at all), SanGen never touches it again. Creating a scaffold is logged exactly as loudly
+     as writing categories 2-3; skipping an already-present category-4 file is a quiet, expected
+     no-op — the common case on every export after the first.
+  All three classes are write-target safety refusals — distinct from Constitution §6's import-time
   "a version marker is never grounds to refuse the file."
+- **File-size ceiling — category 4 only.** Soft 100 / hard 150 lines per category-4 file, functions
+  ≤ 40 lines; a generator function that would not fit splits one-file-per-function
+  (`<ScenarioName>_<FunctionName>.lua`). Explicitly **not** retroactive to `_Scenarios_Runtime.lua`
+  (already 309 lines) or `_Scenarios_Data.lua`'s renderer output.
 - **`COUNT_SCENARIOS` array order is the authoring action for match priority** (`ARCH_15_06`), so the
   UI surface must be a reorderable list — never a set or an unordered table. §5.1 is why.
 - ⚠️ **`<map>_data.lua` is engine-writable.** `host/testUtils.lua` can `table.save` over it as
@@ -668,7 +746,12 @@ extraction of **area rectangles only** from a foreign scenario `.lua` SanGen nev
 - **Migration of the live map is a one-time human action** (`ARCH_15_04`, `ARCH_15_10` §1): author the
   data in SanGen preserving `COUNT_SCENARIOS` order exactly and set `maxArmySlotCount = 16`; export
   once; then hand-edit `_data.lua` to retarget its `Import()`, change the `ResolveAndApply` call to
-  pass `playersInformation`, and delete its own `BuildSlotPattern`. SanGen never deletes the orphaned
+  pass `playersInformation`, and delete its own `BuildSlotPattern`. For any scenario with
+  `spawnsUnits = true` (today, `slots5to8AnyFilled`), the human must also hand-carry its existing
+  generator function (e.g. `BuildSlots5to8Instructions`) out of the legacy monolithic script into
+  its own new `<MapName>_Scenarios_<ScenarioName>.lua` file, renaming its entry point to the
+  required global `GenerateScenarioUnits(area)` (§11.2) — SanGen's create-if-missing scaffold only
+  writes an empty stub, it never migrates existing logic for you. SanGen never deletes the orphaned
   legacy file — as forbidden as overwriting one.
 
 ## 15. Cross-references
@@ -682,8 +765,12 @@ extraction of **area rectangles only** from a foreign scenario `.lua` SanGen nev
 - `NAVMAP_MODIFIER_BLOCKER_SPEC.md` — a separate hand-authoring technique sharing this system's
   exact `<MapName>_data.lua`/single-`NewThread` surface; §6/§6.1's ordering-law extension confirms,
   not corrects, how §3.1's own live order above should be read.
-- `ARCH_15_MapScenarioSystem.md` §15 and subsections §15.1-§15.11 — the binding law. §15.5 needs
-  review against §11.1 of this spec.
+- `ARCH_15_MapScenarioSystem.md` §15 and subsections §15.1-§15.11 — the binding law.
+  `ARCH_15_04_ThreeFileOnDiskShape.md` §15.4 and `ARCH_15_05_ParamsScenariosType.md` §15.5 were
+  both amended 2026-09-03, adding the category-4 on-disk file (§11.2, §14) and the matching
+  `ScenarioBody::name` filesystem-safety-charset/uniqueness validation rule (§6) — resolving the
+  "where does per-scenario dispatch/generator code live" question this spec previously flagged
+  (§11.1) as needing ARCH-Expert review.
 - `IO_MIGRATION_SPEC.md` §1 — the per-domain `.sanmap` JSON IO convention the new `Scenarios`
   section may extend; the companion-`.lua` surface explicitly does **not** reuse it.
 - `AI_HOSTCLIENT_SPEC.md` — host/client split; background for the `IsHost` gating in §3.1.

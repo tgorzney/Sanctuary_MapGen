@@ -68,7 +68,9 @@ Root table `PropTemplate` (capital P).
   no model/material paths, no impostor, no snapping
 
 **Load-bearing misspellings in shipped files — do NOT "correct" them:**
-`maxVerrtices` (double r), `positonOffset` (missing i).
+`maxVerrtices` (double r) — read literally by `propTemplateLoader.lua`'s impostor
+block; correcting it would make the loader read nil. `positonOffset` (missing i) —
+separately safe, never read by the loader at all (editor-side metadata only).
 
 **Data-quality defects found (report upstream, do not replicate):** 9 of 98 files
 have `general.tpId` != filename — all in Pandemonium. The 8 `CrystCluster_*` files
@@ -79,6 +81,26 @@ therefore detect and report collisions rather than silently overwrite.
 **Not a defect:** props sharing another prop's `.sanmaterial` is normal and
 intentional — 36 instances (e.g. `edbm0142`–`edbm0150` all use
 `edbm0141_lod0.sanmaterial`). A validator must not flag it.
+
+### Culling and LOD are presence-gated, not value-gated (confirmed in-game)
+A prop's LOD and culling behaviour is gated on whether the `LODTemplate` /
+`CullingTemplate` attachment **exists** on the entity, not on the values inside
+it. Arbitrarily large `renderDistance` / `radius` values do nothing — tested
+in-game and confirmed inert. The only way to make a prop always render is to
+**omit both attachments** (pass `nil`, not an empty table, so the attachment is
+genuinely absent) while still keeping the `MeshTemplate`.
+
+**Mesh/LOD coupling:** `MeshTemplate` is only built when `tp.visuals.lods` is
+non-empty (verbatim engine schema in `ASSET_LOADING_SPEC.md`'s culling/LOD
+section). Removing `lods` gives **no mesh at all**, not an always-rendering
+prop — a `.santp` blueprint alone can never express "always render"; doing so
+requires the loader change recorded in `ASSET_LOADING_SPEC.md`, which is
+outside SanGen's control.
+
+This is not a SanGen feature today. If SanGen ever offers an always-render
+toggle, it must be **opt-in per prop**, never a blanket default — some maps
+carry 20k+ prop instances, and forcing full-detail meshes on all of them at
+every distance would be a real cost.
 
 ## Markers
 - `markers/markerTemplates/`: `alloyMarker` (mex), construction/formation/

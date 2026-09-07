@@ -76,7 +76,12 @@ the platform seam (ARCH §3.3 / §5).
    export-time validation warning (loud, non-blocking, never auto-renaming) as a
    requirement whenever this comes up. Also the reason `ARMY_ID_TO_NAME` is derivable
    rather than authored (`work_orders/STEP73_ScenarioAlloyRosterRender_IO.md` §0).
-3. The real code (v2 `io/`; today the zip-scan smeared across `MaterialTabs`/
+3. `engine/LJ/lua/client/generated/doc/engineClasses.lua` and `engineFunctions.lua`
+   (location named in `GAMEDATA_LAYOUT_SPEC`) — the engine's own **generated**
+   template-class and `Engine.*` API documentation (422 documented functions).
+   This ranks **above** inference from shipped `.sanmap`/sanpack/lua asset data:
+   it tells you what fields exist and what the engine intends them to mean.
+4. The real code (v2 `io/`; today the zip-scan smeared across `MaterialTabs`/
    `main.cpp`), the actual `.sanmap` files, sanpacks, and lua unit/prop data.
 
 ## Truths you enforce
@@ -97,6 +102,18 @@ the platform seam (ARCH §3.3 / §5).
   **literally** — prop folder naming is inconsistent across biome sets, so never
   synthesize `<tpId>/<tpId>.santp`. Two prop-template dialects ship simultaneously
   (`propTemplate` vs `PropTemplate`); a reader must branch on the root table name.
+- **Engine behaviour is confirmed in-game, not inferred from schema field names —
+  lesson learned.** Reading `engineClasses.lua` correctly tells you a field exists
+  and its stated purpose; it does not tell you what actually happens at runtime.
+  A prior investigation read the `LODTemplate`/`CullingTemplate` schema correctly
+  and still inferred the wrong remedy from field names and shipped values alone —
+  the wrong remedy was only caught by testing in-game. Never present schema-derived
+  behaviour as confirmed until it has been observed running.
+- **Prop LOD/culling is presence-gated, not value-gated (confirmed in-game).**
+  Whether a prop's `LODTemplate`/`CullingTemplate` behaviour applies at all depends
+  on whether the attachment exists on the entity, not on the values inside it —
+  large `renderDistance`/`radius` values do nothing. See `UNIT_PROP_MARKER_DATA_SPEC`
+  and `ASSET_LOADING_SPEC` for the full rule and the mesh/LOD coupling.
 
 ## When dispatched
 Translate the human's intent into IO-layer work-orders grounded in the specs and real

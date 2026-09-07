@@ -1,5 +1,19 @@
 [← ARCH index](ARCH.md) · [§19 ARCH_19_MarkerLayerBundle](ARCH_19_MarkerLayerBundle.md) · SanGen ARCH §19.31. **Only the ARCH Expert writes this file.**
 
+> **⚠️ FIELD RENAMED/REINTERPRETED 2026-09-03 (documentation catch-up, no ruling change) — the
+> `bGridSnapEnabled`/`gridSnapSizeWorldUnits` pair named throughout this file (item 5 of the
+> Layer-tier list, the `MarkerLink` struct, and the resolver surface below) shipped as
+> `bGridSnapEnabled`/`gridSnapSizeCellMultiplier` (int, default 1, minimum 1 — a whole-number
+> terrain-cell multiplier, not a world-unit float; `Params::Geometry::worldUnitsPerCell` stays the
+> sole source of truth for cell size). Human-approved, landed via
+> `work_orders/BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI.md`, confirmed by direct read
+> of `MarkerInstance_PARAMS.h`/`ScatterInstanceLayer_PARAMS.h`/`MarkerLink_PARAMS.h` and their IO
+> paths. The wire/JSON key is UNCHANGED (`"GridSnapSizeWorldUnits"`) — only the C++ field name and
+> the value's type/meaning changed; no IO migration exists, old stored floats are reinterpreted
+> directly as the new integer meaning. This is a pure rename/retype of an already-governed field —
+> it does not change which fields this section governs or how the read-and-resolve mechanism works,
+> so the struct/resolver code below are corrected in place rather than superseded.**
+
 > **⚠️ FURTHER CORRECTED 2026-08-31 — see `ARCH_19_33_LinkMembershipInstanceTierCorrection.md`.**
 > This section's resolver contract (the `Effective*` functions below) is **widened, not replaced**:
 > six of the seven governed fields below (every one except `name`) now resolve against the owning
@@ -84,9 +98,10 @@ carries:**
    size is as much a Section/Group-level "function" as color or visibility, with no principled
    reason to exclude it once the master/slave framing is taken at face value. Read-and-resolve: a
    bound Layer's icon-size control goes inert, displays the Link's own `iconScale`.
-5. `bGridSnapEnabled` + `gridSnapSizeWorldUnits` — same reasoning as `iconScale`. Both fields
-   together (the pair is one functional unit — a size with no enabling toggle is meaningless and
-   vice versa), read-and-resolve as a pair.
+5. `bGridSnapEnabled` + `gridSnapSizeCellMultiplier` (renamed/retyped 2026-09-03 from
+   `gridSnapSizeWorldUnits`, a float — see the correction banner at the top of this file) — same
+   reasoning as `iconScale`. Both fields together (the pair is one functional unit — a size with no
+   enabling toggle is meaningless and vice versa), read-and-resolve as a pair.
 6. `bSymmetryEnabled` + `symmetry` (the `Params::SymmetrySetting` sub-record) — same reasoning.
    Read-and-resolve as a pair, mirroring `ResolveEffectiveMarkerSymmetry`'s own existing "resolve at
    read time" idiom (`MarkersTab_ManualLayerHelpers_UI.h`) — this ruling adds a Link-resolution step
@@ -174,8 +189,11 @@ struct MarkerLink {
                                               // read-and-resolve field like color, requiring the
                                               // field to exist here as the resolve-from source.
     float iconScale                = 1.0f;   // mirrors MarkerInstanceLayer::iconScale.
-    bool  bGridSnapEnabled         = false;  // mirrors MarkerInstanceLayer::bGridSnapEnabled.
-    float gridSnapSizeWorldUnits   = 1.0f;   // mirrors MarkerInstanceLayer::gridSnapSizeWorldUnits.
+    bool  bGridSnapEnabled          = false; // mirrors MarkerInstanceLayer::bGridSnapEnabled.
+    int   gridSnapSizeCellMultiplier = 1;    // mirrors MarkerInstanceLayer::gridSnapSizeCellMultiplier
+                                              // (renamed/retyped 2026-09-03 from the float
+                                              // gridSnapSizeWorldUnits — whole-number terrain-cell
+                                              // multiplier, minimum 1; see the correction banner above).
     bool  bSymmetryEnabled         = true;   // mirrors MarkerInstanceLayer::bSymmetryEnabled.
     Params::SymmetrySetting symmetry;        // mirrors MarkerInstanceLayer::symmetry. Requires
                                               // MarkerLink_PARAMS.h to #include "Symmetry_PARAMS.h".
@@ -215,8 +233,11 @@ float EffectiveManualMarkerLayerIconScale(const Params::MarkerInstanceLayer& lay
                                           const std::vector<Params::MarkerLink>& links);
 bool  EffectiveManualMarkerLayerGridSnapEnabled(const Params::MarkerInstanceLayer& layer,
                                                 const std::vector<Params::MarkerLink>& links);
-float EffectiveManualMarkerLayerGridSnapSizeWorldUnits(const Params::MarkerInstanceLayer& layer,
-                                                       const std::vector<Params::MarkerLink>& links);
+int   EffectiveManualMarkerLayerGridSnapSizeCellMultiplier(const Params::MarkerInstanceLayer& layer,
+                                                            const std::vector<Params::MarkerLink>& links);
+// Renamed/retyped 2026-09-03 from float EffectiveManualMarkerLayerGridSnapSizeWorldUnits — see the
+// correction banner at the top of this file. Matches the shipped
+// MarkersTab_MarkerLinkResolvers_UI.h::EffectiveManualMarkerLayerGridSnapSizeCellMultiplier name.
 bool  EffectiveManualMarkerLayerSymmetryEnabled(const Params::MarkerInstanceLayer& layer,
                                                 const std::vector<Params::MarkerLink>& links);
 const Params::SymmetrySetting& EffectiveManualMarkerLayerSymmetry(

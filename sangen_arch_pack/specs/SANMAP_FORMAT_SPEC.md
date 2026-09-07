@@ -901,7 +901,9 @@ MarkerGroups: [ N × {
     RadialSymmetryRepeatCount  (int)      // Params::MarkerInstanceLayer::symmetry.radialSymmetryRepeatCount
     Locked                     (bool)     // Params::MarkerInstanceLayer::bLocked (STEP106)
     GridSnapEnabled            (bool)     // Params::MarkerInstanceLayer::bGridSnapEnabled (STEP106)
-    GridSnapSizeWorldUnits     (float)    // Params::MarkerInstanceLayer::gridSnapSizeWorldUnits (STEP106)
+    GridSnapSizeWorldUnits     (int)      // Params::MarkerInstanceLayer::gridSnapSizeCellMultiplier
+                                           // (STEP106; renamed/retyped from a world-unit float to a
+                                           // whole-number terrain-cell multiplier — Correction 20)
     ColorOverrideEnabled       (bool)     // Params::MarkerInstanceLayer::bColorOverrideEnabled (STEP116)
     ParentBundleIdentifier     (int)      // NEW, Correction 19 (ARCH §19.4) — Params::MarkerInstanceLayer::
                                            // parentBundleIdentifier, -1/absent = root (ungrouped)
@@ -1120,6 +1122,36 @@ migration-mechanics sign-off, per the same split already used at §16.4/ARCH §1
 `ParentBundleIdentifier` field by this correction — the analogous `PropLayerBundles`/
 `DecalLayerBundles` arrays are a separate, later, independently-ticketed addition (ARCH §19.2), not
 implied or reserved by this entry.
+
+### `GridSnapSizeWorldUnits` — Correction 20 (grid-snap field semantics, documentation-only — wire key unchanged)
+**Wire key spelling is unchanged.** This is a value-semantics/type correction to an already-shipped
+key, not a new field or a rename of the wire format itself — flagged so a reader doesn't go looking
+for a renamed JSON key that doesn't exist.
+
+`MarkerGroups[i].GridSnapSizeWorldUnits` (Correction 16) and its `PropGroups`/`DecalGroups`/
+`MarkerLinks` counterparts (same key, same shape, wherever the exporter emits it —
+`MapExporter_Markers_IO.cpp`/`MapExporter_Props_IO.cpp`/`MapExporter_Decals_IO.cpp`/
+`MapExporter_MarkerLink_IO.cpp`) were shipped as a `float` — a raw, arbitrary world-unit distance
+with no relationship to the terrain grid. Landed via
+`work_orders/BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI.md` (human-approved), the backing
+C++ field is renamed `gridSnapSizeCellMultiplier` and retyped `int` (default `1`, minimum `1`) — it
+now means "snap every N terrain cells, centered," scaled against `Params::Geometry::worldUnitsPerCell`
+(the sole source of truth for cell size; no second cell-size constant was introduced). The wire key
+itself — `"GridSnapSizeWorldUnits"` on every array above — is **unchanged**: only the JSON value's
+type (float → integer-valued) and meaning changed, confirmed by direct read of
+`MapExporter_Markers_IO.cpp:89`/`MapImporter_MarkerGroups_IO.cpp:57-58` and the parallel Props/Decals/
+MarkerLink IO files, all of which read/write the field as `int` under the same unchanged key.
+
+**No IO migration added, by design (human-approved).** An existing `.sanmap`'s stored value is
+reinterpreted directly under the new meaning on next load — the common case (`1.0` old default) means
+the same thing either way; any other previously-authored value silently shifts meaning (a snap
+distance in world units becomes a cell-count multiplier). This is treated as a plain authoring-side
+behavior change, not gameplay-authoritative data, so it does not fall under Constitution §6's
+version-tolerance law the way a schema-breaking field would.
+
+Corrects Correction 16's `MarkerGroups` field-list entry above (type `float` → `int`) and
+`ARCH_19_31_PropagatedPropertyMechanisms.md` §19.31's `Params::MarkerLink` struct/resolver code
+(same rename, corrected in place there — see that file's own 2026-09-03 banner).
 
 ### Verified deletions (pure duplicates — delete outright)
 Confirmed line-for-line against a real map — no replacement needed, each

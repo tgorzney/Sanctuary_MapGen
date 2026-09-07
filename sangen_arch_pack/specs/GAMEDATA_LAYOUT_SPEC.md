@@ -25,6 +25,25 @@ not a bare `<Name>`) was wrong.
 of the kind every other pack has — a shorthand this spec previously used and that does
 not describe anything that exists. See "Units" below.
 
+## Generated engine docs — authoritative schema source, above asset inference
+`<install root>/engine/LJ/lua/client/generated/doc/` holds the engine's own
+**generated** API and template documentation:
+- `engineClasses.lua` — every engine template class, field-by-field, with
+  descriptions (`LODTemplate`, `LODLevelTemplate`, `CullingTemplate`, etc. — see
+  `ASSET_LOADING_SPEC.md`'s LOD/culling schema section for the verbatim block).
+- `engineFunctions.lua` — all 422 documented `Engine.*` Lua functions.
+
+Also present under `client/generated/`: `ffi/structs.lua`, `functionWrappers.lua`,
+`luaToEngineDelegates.lua`, `engineConstructors.lua`, `lua/enums.lua`.
+
+These files are generated **from the engine itself**, not authored asset data.
+**Rank this directory above inference from shipped `.santp`/sanpack asset files**
+for any question about what a template field means or does. Reading a schema off
+a shipped asset tells you what fields exist and what values shipped content
+happens to use; it does not tell you what the engine does with them — that must
+still be confirmed in-game (see `sangen-format-expert.md`'s Truths for the
+lesson this rule exists to enforce).
+
 ## Sprites are `.dds` + `.sansprite` pairs
 Every UI image is a **`.dds`** (the pixels) + a small **`.sansprite`** (~430 B
 descriptor — UV/pivot/metadata). SanGen loads the `.dds`; the `.sansprite`
@@ -102,3 +121,5 @@ directly.
   cache) distinct from the loose-directory read every other pack uses — see "Units"
   above. Any asset-loading code that assumes a `Units/Units/<tpId>/` loose tree is
   reading a path that does not exist on a real install.
+- **Template/API schema questions go to the generated engine docs first** (see
+  above), never to inference from shipped asset field names alone.

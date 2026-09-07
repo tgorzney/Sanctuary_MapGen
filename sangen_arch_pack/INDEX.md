@@ -9,7 +9,7 @@ spec(s) a question needs — never the whole pack.
 | .sanmap schema version migrations — SanGenVersion gating, the migration runner/manifest, JSON transform primitives | `specs/IO_MIGRATION_SPEC.md` |
 | units / props / markers, tpId scheme, factions, asset validation, .san* formats | `specs/UNIT_PROP_MARKER_DATA_SPEC.md` |
 | map scripting & events, lua sandbox, Tags, AI system, modding, validators | `specs/MODDING_SCRIPTING_SPEC.md` |
-| the Map Scenario system — `<MapName>_data.lua`/`<MapName>_Scenarios_Runtime.lua`/`<MapName>_Scenarios_Data.lua` three-file split, module API contract, three-tier scenario matching, `alloyMode` semantics, the mandatory-`spawns` hard requirement, execution/timing law, the ratified export-only IO design (`Params::Scenarios`, overwrite safety, ARCH §15) | `specs/MAP_SCENARIO_SPEC.md` |
+| the Map Scenario system — `<MapName>_data.lua`/`<MapName>_Scenarios_Runtime.lua`/`<MapName>_Scenarios_Data.lua`/`<MapName>_Scenarios_<ScenarioName>.lua` four-category on-disk split (category 4 added 2026-09-03, `ARCH_15_04`), module API contract, three-tier scenario matching, `alloyMode` semantics, execution/timing law, the ratified export-only IO design (`Params::Scenarios`, overwrite safety incl. the category-4 scaffold-once class, ARCH §15); the mandatory per-army `spawns` hard requirement is SUPERSEDED 2026-09-04 by the shared `spawnPoints` pool + `spawnIds` two-step resolution (`ARCH_15_12`/`ARCH_15_13`) — this spec's own §6/§8/§11 spawn text is now stale, not yet caught up by the Format Expert; Tier 2's `ScenarioCountField` also gains a 4th enumerator, `SlotRangeOccupiedCount`, plus `slotRangeStart`/`slotRangeEnd` sibling condition fields (`ARCH_15_05` AMENDED 2026-09-04) — this spec's §4/§5.1/§6 field/comparator tables are now also stale, not yet caught up by the Format Expert | `specs/MAP_SCENARIO_SPEC.md` |
 | how to spawn units from a per-map Lua script — the load/execution chain, the `Import()`-cache double-execution hazard, `Import()` semantics, the one-`NewThread`-per-script rule + ordering, the `CreateUnit` call, position validation, diagnostics, known-good `tpId`s (companion to `MAP_SCENARIO_SPEC.md`, not restated there) | `specs/MAP_UNIT_SPAWNING_SPEC.md` |
 | the engine's native per-navigation-layer pathing-block primitive (Navmap Modifiers) — the all-layer blocker technique (confirmed shipped, twice) and the partial/single-layer technique (confirmed shipped), the per-Lua-state execution nuance distinct from `MAP_UNIT_SPAWNING_SPEC`'s own double-execution hazard, the shared-`NewThread` ordering law (blocker work runs LAST, after unit spawning) and its `pcall`-per-call corollary, and the current manual mask-to-rectangle authoring workflow (ARCH §22) | `specs/NAVMAP_MODIFIER_BLOCKER_SPEC.md` |
 | data model (GenerationParams), generation pipeline, GPU toggles, enums | `specs/PARAMS_PIPELINE_SPEC.md` |
@@ -146,6 +146,21 @@ reference above as unresolved (`ARCH.md` ended at §14 at the time, with no §15
 `ARCH_15_MapScenarioSystem.md` §15 was written in a later session and has since been extended to §15.9 (the Map
 Scenario authoring/export ratification described above) — the gap that flag named is closed.
 
+**Doc catch-up (2026-09-03) — grid-snap field rename/retype, already shipped, ARCH pack was
+stale.** `MarkerInstanceLayer`/`PropInstanceLayer`/`DecalInstanceLayer`/`MarkerLink`'s grid-snap
+size field shipped (via `work_orders/BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI.md`,
+human-approved) as `gridSnapSizeCellMultiplier` (int, default/minimum 1 — snaps to every N terrain
+cells, scaled by `Params::Geometry::worldUnitsPerCell`), replacing the old
+`gridSnapSizeWorldUnits` (float, arbitrary world-unit distance). The `.sanmap` wire key is
+unchanged (`"GridSnapSizeWorldUnits"`); no IO migration exists — old stored floats are reinterpreted
+directly under the new integer meaning. Confirmed by direct read of `MarkerInstance_PARAMS.h`,
+`ScatterInstanceLayer_PARAMS.h`, `MarkerLink_PARAMS.h`, and their IO/UI call sites before this note
+was written. `ARCH_19_31_PropagatedPropertyMechanisms.md` §19.31 (struct + resolver code) and
+`SANMAP_FORMAT_SPEC.md` (Correction 16's field-list entry, plus a new Correction 20 stating the
+change on its own) are both corrected to match — this is a pure documentation catch-up, not a new
+ruling; the field was already governed by §19.31's read-and-resolve mechanism before and after the
+rename.
+
 **Standing recorded defects awaiting a coder work-order (not yet fixed):**
 - `Params::symmetryOrbitMaximum = 16` (`src/params/Symmetry_PARAMS.h`) can silently overflow
   once a designer-chosen `radialSymmetryRepeatCount` combines with mirror axes — see
@@ -254,8 +269,80 @@ any declarative PARAMS form at all. Current truth for the runtime mechanism is
 `MAP_UNIT_SPAWNING_SPEC.md`; current truth for the scenario system is `MAP_SCENARIO_SPEC.md`,
 whose §2 carries an as-built vs ratified-target divergence table.
 
+**One of those two OPEN items closed 2026-09-03 — `ARCH_15_04_ThreeFileOnDiskShape.md` §15.4
+amended to a fourth on-disk file category.** Ratifies a work-order-ready design for exactly the
+"where per-scenario dispatch/generator code lives" gap the paragraph above flags: a new category 4
+(`<MapName>_Scenarios_<ScenarioName>.lua`, splittable to `_<FunctionName>.lua`), a generic lazy
+`Import()`-by-name dispatcher living entirely in `_Scenarios_Runtime.lua` (no per-map/per-scenario
+edits to it), universal helpers folding into that same file, a new third overwrite-safety class
+(scaffold-once-if-missing, then permanently hands-off — distinct from both of §15.4's existing
+classes), and a 100/150-line ceiling scoped to category 4 only (explicitly not retroactive to the
+already-shipped 309-line `_Scenarios_Runtime.lua`). `ARCH_15_05_ParamsScenariosType.md` §15.5 gained
+a matching addendum the same day: `ScenarioBody::name` becomes a literal path component under this
+dispatch scheme, so it now needs a safe-filesystem charset (`^[A-Za-z0-9_]+$`) plus
+case-insensitive uniqueness across the whole `Scenarios` set. **The advisory draft this ratified
+proposed a stricter charset requiring a leading letter, which the live example scenario name
+`1v1` fails; that requirement was dropped rather than kept** — `name` is only ever substituted into
+a `string.format` path string, never used as a Lua identifier, so a leading digit is filesystem-safe
+on every target this project cares about and the stricter rule would have protected nothing. No
+rename, grandfather-list, or exception was needed; every live reference scenario name, `1v1`
+included, satisfies the corrected charset unchanged. The remaining OPEN item (whether per-scenario
+unit-spawn generator logic ever becomes declarative `PARAMS` data) is untouched by this
+amendment — category 4 stays hand-authored Lua. **Caught up 2026-09-03 (same day, second pass):**
+the Format Expert drafted, and the ARCH Expert applied, the matching refresh to
+`sangen_arch_pack/specs/MAP_SCENARIO_SPEC.md` (new §11.2, the §14 four-category table and
+three-class overwrite safety, the §6 `name` charset note, a new §13 correction row, updated §2/§15
+cross-references) and to this INDEX's own topic-row description above (line 12) — both now
+describe the four-category shape. Content ownership of `MAP_SCENARIO_SPEC.md` stays the Format
+Expert's; the ARCH Expert only performed the physical write, per "no other agent writes
+`sangen_arch_pack/`."
+
 Still standing from that 2026-08-21 session: `alloyMode`'s `Occupancy` default was promoted from
 placeholder to ratified law (`ARCH_15_05_ParamsScenariosType.md` §15.5).
+
+**New `ARCH_15_12_ScenarioSpawnIdentity.md`/`ARCH_15_13_ScenarioSpawnIdRuntimeResolution.md` §15.12/
+§15.13 (2026-09-04), ratifying `work_orders/ARCH_AMENDMENT_DRAFT_ScenarioSpawnId.md` (revision 3) in
+full.** Closes the cross-scenario literal-coordinate-duplication gap `Params::ScenarioSpawn` left
+open (the live reference retypes the identical `ARMY_01` coordinate across three scenario entries) and
+the missing per-scenario duplicate-`armyName` validator. `ScenarioSpawn` is retired outright, replaced
+by a shared, `Scenarios`-level `spawnPoints` pool (`ScenarioSpawnPoint`) referenced by
+`ScenarioBody::spawnIds` (a flat string list, was `spawns`) via a two-step resolve — pool first, then a
+literal `ARMY_XX` fallback read live off the `.sanmap`'s own baked default, never a second stored copy
+of it. Pool `spawnId`s are a hard-reserved namespace excluding every `ARMY_XX`-shaped string
+(`Io::IsArmyIdentityWellFormed` negated), making the two-step resolution's non-collision structural,
+not conventional. The `.sanmap` JSON leg's per-scenario `"Spawns"` key (array of objects) is retired
+for `"SpawnIds"` (array of strings) — a real breaking wire-type change — **ratified with NO migration
+entry**: exactly one `.sanmap` exists today and is hand-edited directly by the human, per §15.4's
+existing "one-time human migration" precedent for hand-authored files. `SanGenScenarioRuntime.lua`'s
+`ApplyScenario` is rewritten (§15.13) as part of this same ratification, not left to coder discretion.
+`sangen_arch_pack/specs/MAP_SCENARIO_SPEC.md`'s own §6/§8/§11 spawn text (the mandatory per-army
+`spawns` table, `SCEN:306-318`'s apply loop) is now stale against this ruling — flagged in this
+INDEX's topic-row above, not yet refreshed by the Format Expert as of this pass.
+
+**New `ARCH_15_05_ParamsScenariosType.md` §15.5 AMENDED 2026-09-04, ratifying
+`work_orders/ARCH_AMENDMENT_DRAFT_ScenarioSlotRangeCondition.md` in full, no corrections needed.**
+Resolves `work_orders/DESIGN_ScenarioSlotRangeCondition_R1.md`'s Path B — the live, shipping
+`slots5to8AnyFilled` `COUNT_SCENARIOS` entry predicates on **which** army slots are occupied, a
+predicate class `ScenarioCountField`'s three existing aggregate-count enumerators
+(`Total`/`HumanCount`/`AiCount`) cannot express in any tier. `ScenarioCountField` gains a 4th
+enumerator, `SlotRangeOccupiedCount`, and `ScenarioCountCondition` gains two new sibling int
+fields, `slotRangeStart`/`slotRangeEnd` (1-based, inclusive), meaningful only for that enumerator —
+reusing the existing, already-ratified `ScenarioComparator`/`value` pair verbatim rather than
+inventing a discriminated variant or a second predicate vocabulary. Bounds
+(`1 <= slotRangeStart <= slotRangeEnd <= maxArmySlotCount`) are validated loud/logged/non-blocking,
+never silently clamped, the same posture `ARCH_15_10` already uses for `maxArmySlotCount` itself.
+`resources/lua/SanGenScenarioRuntime.lua`'s `EvaluateScenarioCondition`/`EvaluateScenarioConditions`
+widen by one parameter (`slotPattern`, already in scope at their one call site but never forwarded)
+plus one new field branch — a category-2 content change (`ARCH_15_04`), not a shape change. The
+ruling explicitly reconciles with, rather than silently overriding, §15.5's original "small
+comparator vocabulary suffices" rationale: that premise covered every live predicate as of
+2026-08-21 and remains correct for all of them except `slots5to8AnyFilled`, introduced later
+(2026-08-27) — the comparator vocabulary itself is unchanged, only the set of countable quantities
+grows from three to four. Flags two follow-ups, neither resolved by this pass: the Format Expert's
+`MAP_SCENARIO_SPEC.md` §4/§5.1/§6 catch-up (this INDEX's topic-row above), and a UI-Expert-owned
+composition-matrix recommendation (a second, visually distinct hatch mark for
+`SlotRangeOccupiedCount`'s identity-dependent ambiguity, mirroring but not reusing Tier 1's own
+pre-emption hatch).
 
 `ARCH_16_MarkerLayerSymmetry.md` §16 ratifies the UI Expert's two-round Markers Tab + layer-scoped symmetry consult
 (`work_orders/DESIGN_MarkerLayerSymmetry_R1.md` + `_R2.md`): the new `Params::SymmetrySetting`

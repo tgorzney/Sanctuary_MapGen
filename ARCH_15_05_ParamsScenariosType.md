@@ -52,8 +52,17 @@ struct ScenarioBody {
 struct PatternScenario { ScenarioBody body; std::string slotPattern; };            // TIER 1
 
 enum class ScenarioComparator { Equal, NotEqual, GreaterThan, GreaterOrEqual, LessThan, LessOrEqual };
-enum class ScenarioCountField { Total, HumanCount, AiCount };
-struct ScenarioCountCondition { ScenarioCountField field; ScenarioComparator comparator; int value = 0; };
+enum class ScenarioCountField { Total, HumanCount, AiCount, SlotRangeOccupiedCount };  // 4th
+                                                            // enumerator ADDED 2026-09-04, see below
+struct ScenarioCountCondition {
+    ScenarioCountField field           = ScenarioCountField::Total;
+    ScenarioComparator comparator      = ScenarioComparator::Equal;
+    int                value           = 0;
+    int                slotRangeStart  = 1;   // ADDED 2026-09-04, see below — 1-based, inclusive;
+                                                // meaningful ONLY when field == SlotRangeOccupiedCount
+    int                slotRangeEnd    = 1;   // ADDED 2026-09-04, see below — 1-based, inclusive;
+                                                // meaningful ONLY when field == SlotRangeOccupiedCount
+};
 struct CountScenario { ScenarioBody body; std::vector<ScenarioCountCondition> conditions; };  // TIER 2,
                                                             // conditions are AND'd (conjunction)
 
@@ -307,8 +316,11 @@ out rather than guess at:
    struct, an instruction-list field, or any reuse of the existing `Params::UnitGroup`/
    `UnitTransform` family (§9) for this without a human ruling — none of those was evaluated against
    this use case.
-2. **Where the per-scenario dispatch branches and generator functions live under the ratified
-   three-file split is unresolved and looks like a real gap, not just an unanswered nice-to-have.**
+2. **RESOLVED 2026-09-03 by `ARCH_15_04`'s category-4 amendment and the "AMENDED 2026-09-03"
+   section below — kept here unedited so the resolution is legible against the gap it closes, per
+   this file's own established audit style (see the "RETIRED"/"AMENDED" sections above).** Where
+   the per-scenario dispatch branches and generator functions live under the ratified three-file
+   split is unresolved and looks like a real gap, not just an unanswered nice-to-have.
    `ARCH_15_04`/`MAP_SCENARIO_SPEC.md` §14 describe `<MapName>_Scenarios_Runtime.lua` as *generic,
    identical across every map* (bundled, copied verbatim) and `<MapName>_Scenarios_Data.lua` as
    *pure per-map data tables, never containing algorithm code*. `Scenario.SpawnMatchedScenarioUnits`
@@ -317,4 +329,159 @@ out rather than guess at:
    ratified has no named home for. The live reference script has not migrated to the three-file
    split at all yet (`MAP_SCENARIO_SPEC.md` §2's divergence table), so this gap has not yet had to
    be resolved in practice. Flagging for a future ARCH ruling before any coder work-order attempts
-   to render per-scenario unit-spawn generators from SanGen; not resolved by this amendment.
+   to render per-scenario unit-spawn generators from SanGen; not resolved by this amendment (as of
+   2026-09-03, item 2 above IS resolved — see the "RESOLVED" note prepended to it and the new
+   section immediately below).
+
+---
+
+### AMENDED 2026-09-03 — `ScenarioBody::name` becomes a load-bearing path component (validation rule; resolves OPEN item 2 above, in tandem with `ARCH_15_04`'s category-4 amendment)
+
+**What changes.** `name` was, until now, documentation/log-identifier data only — read for
+`Log`/`Warn` text and, in the pre-amendment live reference, as an in-file `if/elseif` string
+compare (`MAP_SCENARIO_SPEC.md` §11). Under `ARCH_15_04`'s category-4 dispatch ruling, `name`
+becomes a literal filesystem path component — string-formatted directly into the `Import()` path
+SanGen and the runtime both use to locate a scenario's generator file
+(`<MapName>_Scenarios_<ScenarioName>.lua`). This is a real new load-bearing role, not cosmetic,
+and needs validation it did not need before:
+
+- **Safe-filename charset — `^[A-Za-z0-9_]+$`: non-empty, letters/digits/underscore only, no
+  path separators, spaces, or other punctuation Windows or the game's own filesystem layer could
+  treat specially.** This corrects the advisory draft's provisional proposal
+  (`^[A-Za-z][A-Za-z0-9_]*$`, requiring a leading letter). **The leading-letter requirement is
+  dropped: `name` is substituted into a `string.format` path as a plain string — it is never used
+  as a Lua identifier or variable — so there is no Lua-syntax reason to forbid a leading digit,
+  and neither Windows nor this project's target filesystem restricts leading digits in
+  filenames.** The draft flagged that its own proposed charset would fail the live reference
+  scenario name `1v1` (leading digit) and left resolving that conflict — rename, grandfather-list,
+  or relax the rule — open for ratification. Relaxing the rule is the correct resolution: it
+  protects nothing a leading-letter requirement would have protected, and every live reference
+  name (`slots5to8AnyFilled`, `4human`, `2h1ai`, `floor169`, `1v1`) satisfies the corrected charset
+  unchanged — no rename, no exception list, no migration.
+- **Case-insensitive uniqueness across the whole `Scenarios` set.** `name` must be unique —
+  checked case-insensitively — across `patternScenarios`, `countScenarios`, and `defaultScenario`
+  combined within one `Params::Scenarios`. Windows (and this system's target filesystem) folds
+  case for file lookup, so `"FooBar"` and `"foobar"` would silently resolve to the same
+  `Import()` path today with no error — a strictly worse, newly-introduced failure mode this
+  amendment must close, not merely inherit. (Prior to this amendment, duplicate/differently-cased
+  `name` values were merely a confusing log/debug identifier collision, never a functional
+  collision — this addendum is what makes uniqueness load-bearing.)
+- **Enforcement point and posture:** validated at the same layer/points `ARCH_15_10`'s
+  `maxArmySlotCount` and this file's own stale-`areaName` staleness checks are validated
+  (UI-authoring time and export time), loud-logged on violation, **never silently renamed,
+  truncated, or deduplicated by SanGen** — matching Constitution §6's "loud, logged, never
+  silent" posture and this file family's own established idiom. A violating export is not blocked
+  outright (consistent with this file's existing "never a flat refusal" posture elsewhere), but
+  the specific scenario's category-4 file write is refused with a named, specific error — the same
+  refusal shape `ARCH_15_04` already uses for a foreign-marker collision on categories 2–3, a new
+  instance of an existing shape, not a new mechanism.
+- **No other field on `ScenarioBody`/`PatternScenario`/`CountScenario` changes.** This addendum is
+  additive validation only; the binding shape above is unchanged.
+
+---
+
+### AMENDED 2026-09-04 — `ScenarioCountField::SlotRangeOccupiedCount` (Tier 2 gains a slot-identity predicate; resolves `work_orders/DESIGN_ScenarioSlotRangeCondition_R1.md` Path B; ratifies `work_orders/ARCH_AMENDMENT_DRAFT_ScenarioSlotRangeCondition.md` in full, no corrections needed)
+
+**This is a shape amendment to an already-ratified type, recorded the same way the "RETIRED"/
+"AMENDED" corrections above are** — auditable, not a silent bolt-on. Already applied to the binding
+shape at the top of this file.
+
+**The gap this closes.** `ScenarioCountField` (`Total`/`HumanCount`/`AiCount`) can only express
+aggregate-count conjunctions. The live, shipping reference script's own first-priority
+`COUNT_SCENARIOS` entry, `slots5to8AnyFilled` (`MAP_SCENARIO_SPEC.md` §5.1/§5.2), predicates on
+**which slots** are occupied, not merely how many — two players in slots 5 and 7 are
+indistinguishable from two players in slots 1 and 2 to every existing field. Not authorable through
+SanGen today, in any tier.
+
+**What changed.** One new enumerator, `SlotRangeOccupiedCount`, and two new sibling int fields,
+`slotRangeStart`/`slotRangeEnd` (1-based, inclusive — matches `slotPattern`/Lua's
+`:sub(a,b)`/`BuildSlotPattern`/`ARMY_ID_TO_NAME`'s convention exactly), meaningful only when
+`field == SlotRangeOccupiedCount` — the same "flat sibling fields, only the ones matching the
+record's own mode are meaningful" idiom this file already uses for `ScenarioBody`'s
+`alloys`/`alloysToAdd`/`alloysToRemove`. Reuses the existing, already-ratified
+`ScenarioComparator`/`value` pair verbatim — no new predicate vocabulary, no discriminated variant:
+- "Any of slots 5-8 filled" → `SlotRangeOccupiedCount, slotRangeStart=5, slotRangeEnd=8, GreaterOrEqual, value=1`
+- "All of slots 5-8 filled" → same range, `Equal` (or `GreaterOrEqual`), `value=4` (the range's own width)
+- "At least N of slots 5-8 filled" → same range, `GreaterOrEqual, value=N`
+
+A discriminated `SlotRangeCondition` sibling/variant type was considered and **rejected** — it would
+duplicate the comparator/value machinery for no added expressiveness, and adds a second wire shape,
+UI clause type, and evaluator branch structure, against this file's own "no `std::variant` precedent
+in `src/params/`" posture. A boolean-only "any filled" field (no comparator) was also **rejected** as
+under-general for zero implementation savings versus reusing the existing pair.
+
+**Bounds — validated, never silently clamped, against `maxArmySlotCount` (§15.10), not a hardcoded
+16.** `1 <= slotRangeStart <= slotRangeEnd <= scenarios.maxArmySlotCount`, enforced at the same two
+points and posture as `ARCH_15_10` point 2's roster-vs-slot-count check and this file's own
+`areaName`/`name`-uniqueness checks: UI-authoring time and export time, loud-logged on violation,
+never silently reordered/clamped/truncated.
+
+**Wire spellings — additive, no version bump**, following this record family's established
+"additive key, no `SanGenVersion` bump" posture (this file's `AreaName` amendment above):
+- `ScenarioCountField`'s spelling table (`.sanmap` JSON leg and the `<MapName>_Scenarios_Data.lua`
+  leg) gains a 4th entry, `"SlotRangeOccupiedCount"` — same PascalCase convention as
+  `"Total"`/`"HumanCount"`/`"AiCount"`.
+- The `.sanmap` JSON leg's condition object gains two new sibling int keys, `"SlotRangeStart"`/
+  `"SlotRangeEnd"`, **always emitted** (matching this record's "every scalar field is always
+  present" convention) — meaningless when `"Field"` is not `"SlotRangeOccupiedCount"`, same as
+  `value` is already meaningless-but-present for conditions that don't need it. An absent key
+  (every pre-existing `.sanmap`) leaves both fields at their struct default (1, 1) — legacy files
+  unaffected, no migration entry needed.
+- The `<MapName>_Scenarios_Data.lua` leg's condition row gains the matching lowercase keys,
+  `slotRangeStart = N, slotRangeEnd = M`, also always emitted alongside `field`/`comparator`/`value`.
+  The field names above are fixed by this ruling; Correction-numbering and any remaining
+  round-trip-fidelity detail are the Format Expert's call, per §15.7's ownership split — flagged
+  below, not asserted here.
+
+**Runtime evaluation — `resources/lua/SanGenScenarioRuntime.lua`'s `EvaluateScenarioCondition`/
+`EvaluateScenarioConditions` widen by one parameter, threading a value already in scope; no new call
+site.** Confirmed by direct read of the live bundled runtime: `FindMatchingScenario(total,
+humanCount, aiCount, slotPattern)` already receives `slotPattern` but never forwards it into TIER
+2's evaluator (`EvaluateScenarioCondition`/`EvaluateScenarioConditions` currently take only
+`(condition, total, humanCount, aiCount)`). Ruled fix: both functions gain a 5th parameter,
+`slotPattern`, forwarded unchanged through the one existing `FindMatchingScenario` call site;
+`EvaluateScenarioCondition` gains one new `elseif` branch — `condition.field ==
+"SlotRangeOccupiedCount"` counts non-`"-"` characters in
+`slotPattern:sub(slotRangeStart, slotRangeEnd)`, then falls into the SAME, unchanged comparator
+branch every other field already uses. No other call site changes — `Scenario.ResolveAndApply`
+already builds `slotPattern` via `BuildSlotPattern` (`ARCH_15_10`) before calling
+`FindMatchingScenario`. Governed by the same `ARCH_15_04` category-2 ("generic runtime algorithm,
+byte-identical across every map") posture already in force — stays inside the one bundled
+`_Scenarios_Runtime.lua` file; no new category, no overwrite-safety change. `ARCH_15_04` itself
+needs no shape-level edit for this — flagged, not amended.
+
+**Reconciling with this file's own "small vocabulary suffices" rationale — narrowed, not
+overridden.** The original ruling above states: *"Comparator vocabulary is deliberately small
+(...) — per the human's own settled framing: 'every live predicate is a simple conjunction over
+total/human/AI counts, so a small vocabulary suffices.'"* That premise was incomplete, not wrong,
+for what it covered: every other live `COUNT_SCENARIOS` entry (`1v1`, `2h1ai`, `4human`, `1h3ai`,
+`6total`, `2hRestAI`, `floor169`) genuinely is, and remains, a pure conjunction over
+`Total`/`HumanCount`/`AiCount`, unchanged in shape by this amendment. It predates the 2026-08-27
+live-reference rewrite that introduced `slots5to8AnyFilled` as the script's own new first-priority
+rule — an identity predicate, not a cardinality one, that the small comparator vocabulary was never
+asked to express. The comparator vocabulary itself is unchanged; only the set of countable
+quantities it can be asked to evaluate grows from three to four. `Total`/`HumanCount`/`AiCount`
+remain the common case; `SlotRangeOccupiedCount` is the deliberately narrow escape hatch for the one
+live predicate class the original ruling had no example of yet.
+
+**Rejected alternatives, recorded so a future reader does not re-propose them:**
+1. A discriminated `SlotRangeCondition` sibling/variant type — rejected, see above.
+2. A boolean-only "any filled" field with no comparator — rejected, see above.
+3. Hardcoding the bound check against a literal `16` — rejected; must check against the map's own
+   authored `maxArmySlotCount` (`ARCH_15_10`), which may legitimately exceed or fall short of 16.
+4. Silently clamping an out-of-range `slotRangeEnd` at export time — rejected; violates this file
+   family's "loud, logged, never silent, never auto-clamped" posture (`ARCH_15_10` point 2).
+
+**No other field on `ScenarioBody`/`PatternScenario`/`ScenarioComparator` changes.** Additive to
+`ScenarioCountField`/`ScenarioCountCondition` only; every existing authored
+`Total`/`HumanCount`/`AiCount` condition round-trips and evaluates completely unchanged.
+
+**Follow-ups, not resolved here:**
+- **Format Expert** — `MAP_SCENARIO_SPEC.md` §4/§5.1/§6 need the new field/keys documented; flagged
+  in `sangen_arch_pack/INDEX.md`'s Map Scenario topic-row, per §15.7's ownership split.
+- **UI Expert** — the Tier-2 clause editor's slot-range picker and the composition matrix's second,
+  visually distinct hatch mark for `SlotRangeOccupiedCount`'s identity-dependent ambiguity
+  (recommended in the ratified advisory draft — a tri-state definitely-true/definitely-false/
+  ambiguous evaluator, `ResolvedScenarioNameForTriple` treating "ambiguous" as "keep walking," a
+  second corner-triangle hatch distinct from Tier 1's own) are UI-Expert-owned implementation
+  detail, not ruled here.
