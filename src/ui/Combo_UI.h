@@ -21,6 +21,17 @@ struct ComboOptions {
     const char* const* labels          = nullptr;
     int                count           = 0;
     const char*        emptyLabel      = "<none>";  // shown when the list is empty or nothing is picked
+
+    // NEW — STEP250. Mirrors ColorSwatchOptions::bLabelHidden: skip the TextUnformatted(label) line so
+    // the closed row can sit on ONE line via SameLine (a compact-row slot). `label` still scopes
+    // ImGui::PushID; only the visible text is skipped. Every existing call site is unaffected
+    // (default false, byte-identical to today).
+    bool  bLabelHidden      = false;
+    // NEW — STEP250. Mirrors TextInput_UI.h's fixedWidthPixels: <= 0 keeps today's "fill remaining
+    // content width" behavior; a positive value fixes the closed row's own width instead, the seam
+    // that lets a caller sit this control beside others via SameLine() instead of always claiming the
+    // rest of the line.
+    float fixedWidthPixels  = 0.0f;
 };
 
 // The index a combo may legally show: inside the list, or -1 for "nothing picked". An index that

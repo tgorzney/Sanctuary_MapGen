@@ -1,11 +1,10 @@
 // ArmiesTab_UI.cpp — the imgui composition of the armies tab. Layer: UI.
-// Shared widgets only: DraggableList for the army stack, ColorSwatch / Combo / SliderScalar /
-// TextInput / FilePathPicker / Section for the per-army settings, and ArmiesTab_Units_UI for the
-// unit rules. No ImGui::SliderFloat / DragFloat / VSliderFloat in this file.
+// Shared widgets only: DraggableList for the army stack, ArmiesTab_RowLayout_UI for the per-army
+// settings row, and ArmiesTab_Units_UI for the unit rules. No ImGui::SliderFloat / DragFloat /
+// VSliderFloat in this file.
 #include "ArmiesTab_UI.h"
-#include "Combo_UI.h"
+#include "ArmiesTab_RowLayout_UI.h"
 #include "DraggableListWidget_UI.h"
-#include "TextInput_UI.h"
 #include "../io/Sanmap_ArmyIdentity_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include "../pipeline/PreviewDriver_PIPELINE.h"
@@ -14,8 +13,6 @@
 namespace SanmapGen {
 namespace Ui {
 namespace {
-
-void DrawArmySettings(std::vector<Params::Army>& armies, int armyIndex, ArmiesTabState& state);
 
 // The army stack. STEP110: each row's own settings render directly below its own header (via
 // drawRowBody), operating on that row's own army — never on whatever `selectedArmyIndex` happened
@@ -83,48 +80,8 @@ bool DrawArmiesGlobals(std::vector<Params::Army>& armies, ArmiesTabState& state)
     return bArmiesMoved;
 }
 
-// One row's own fields (SCOPE NOTE 1: none of it notifies the driver). STEP76: "Name" binds
-// `displayName`, never machine-owned `name` (ruling 2). STEP75: also draws the mirror-onto-next-
-// army button (ruling 1); its confirm dialog is drawn separately by DrawArmiesTab so it stays
-// reachable on a frame this function does not run (DrawPendingDeleteRuleLayerDialog's pattern).
-// STEP110: called once per EXPANDED row (armyIndex is that row's own index, not necessarily
-// `state.selectedArmyIndex`) rather than once at the bottom for whatever was selected. The Mirror
-// button is safe to draw unconditionally per row, unlike LayerEditor_Group_UI's import-path picker
-// (STEP104): it owns no persisted per-frame edit buffer, only a single click that stamps
-// `armyIndex` into the shared pending-mirror state and opens the (still singly-drawn) confirm
-// dialog, so two expanded rows can never fight over a live text edit the way a picker could.
-void DrawArmySettings(std::vector<Params::Army>& armies, int armyIndex, ArmiesTabState& state) {
-    Params::Army& army = armies[static_cast<std::size_t>(armyIndex)];
-    ImGui::TextDisabled("Engine ID: %s", army.name.c_str());   // machine-owned, ruling 2 — no input
-
-    TextInputRules displayNameRules;
-    displayNameRules.maximumLength = 48;
-    displayNameRules.bAllowEmpty   = true;    // display-only; blank is legal, ArmyRowLabel falls back
-    DrawTextInput("Name", army.displayName, displayNameRules);
-
-    TextInputRules aliasRules;
-    aliasRules.maximumLength = 48;
-    DrawTextInput("Alias", army.alias, aliasRules);
-
-    DrawColorSwatch("Team Color", army.armyColor, state.armyColorOptions, state.armyColorToggle);
-
-    // Same-frame local int mirror: a combo pick commits immediately, so it carries no RealtimeToggle
-    // of its own (STEP20 ruling #6).
-    int factionIndex = static_cast<int>(army.faction);
-    ComboOptions factionOptions;
-    factionOptions.labels = armyFactionLabels;
-    factionOptions.count  = kArmyFactionCount;
-    if (DrawCombo("Faction", factionIndex, factionOptions).bCommitted)
-        army.faction = static_cast<Params::Faction>(factionIndex);
-
-    DrawSliderScalar("Starting Alloys", army.alloys, state.alloysRange, state.alloysToggle,
-                     WidgetStyle(), "%.0f");
-    DrawSliderScalar("Starting Energy", army.energy, state.energyRange, state.energyToggle,
-                     WidgetStyle(), "%.0f");
-
-    DrawMirrorArmyButton(armies, armyIndex, state.pendingMirrorSourceArmyIndex,
-                         state.mirrorConfirmDialogState);
-}
+// DrawArmySettings — one row's own fields — is now ArmiesTab_RowLayout_UI.h/.cpp (STEP250 split,
+// ARCH §1.5 size ceiling); DrawArmyList below calls it via that header.
 
 } // namespace
 

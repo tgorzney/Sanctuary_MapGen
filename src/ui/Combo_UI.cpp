@@ -18,8 +18,9 @@ WidgetChange DrawCombo(const char* label, int& selectedIndex, const ComboOptions
     int pickedIndex = -1;
 
     ImGui::PushID(label);
-    ImGui::TextUnformatted(label);
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    if (!options.bLabelHidden) ImGui::TextUnformatted(label);
+    ImGui::SetNextItemWidth(options.fixedWidthPixels > 0.0f ? options.fixedWidthPixels
+                                                            : ImGui::GetContentRegionAvail().x);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ResolveWidgetRounding(style));
     if (ImGui::BeginCombo("##combo", ComboSelectionLabel(selectedIndex, options))) {
         for (int optionIndex = 0; optionIndex < options.count; ++optionIndex) {
