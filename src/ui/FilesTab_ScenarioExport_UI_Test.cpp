@@ -95,7 +95,7 @@ void TestMandatorySpawnsPreCheck() {
     acknowledged.patternScenarios.push_back(patternWithNote);
     Params::CountScenario countWithSpawns;
     countWithSpawns.body.name = "SpawnedComposition";
-    countWithSpawns.body.spawns.push_back(Params::ScenarioSpawn());
+    countWithSpawns.body.spawnIds.push_back("ARMY_01");
     acknowledged.countScenarios.push_back(countWithSpawns);
 
     const std::vector<std::string> affectedWhenAcknowledged =

@@ -34,9 +34,7 @@ void PopulateFullScenarioBody(Params::ScenarioBody& body, const std::string& nam
     body.spawnsUnits = true;
     body.alloyMode = Params::ScenarioAlloyMode::Delta;
 
-    Params::ScenarioSpawn spawn;
-    spawn.armyName = "ArmyOne"; spawn.positionX = 10.0f; spawn.positionY = 1.0f; spawn.positionZ = 7.0f;
-    body.spawns.push_back(spawn);
+    body.spawnIds.push_back("ArmyOne");
 
     Params::ScenarioAlloyOverride alloy;
     alloy.armyName = "ArmyOne"; alloy.markerName = "Mass1";
@@ -66,14 +64,10 @@ void CheckScenarioBodyEquals(const Params::ScenarioBody& original, const Params:
     Check(loaded.spawnsUnits == original.spawnsUnits, (label + " spawnsUnits survives").c_str());
     Check(loaded.alloyMode == original.alloyMode, (label + " alloyMode survives").c_str());
 
-    Check(loaded.spawns.size() == original.spawns.size() && loaded.spawns.size() == 1,
-          (label + " one spawn survives").c_str());
-    if (loaded.spawns.size() == 1) {
-        Check(loaded.spawns[0].armyName == original.spawns[0].armyName
-              && NearlyEqual(loaded.spawns[0].positionX, original.spawns[0].positionX)
-              && NearlyEqual(loaded.spawns[0].positionY, original.spawns[0].positionY)
-              && NearlyEqual(loaded.spawns[0].positionZ, original.spawns[0].positionZ),
-              (label + " spawn fields survive, including the Z coordinate flip round trip").c_str());
+    Check(loaded.spawnIds.size() == original.spawnIds.size() && loaded.spawnIds.size() == 1,
+          (label + " one spawnId survives").c_str());
+    if (loaded.spawnIds.size() == 1) {
+        Check(loaded.spawnIds[0] == original.spawnIds[0], (label + " spawnId string survives").c_str());
     }
 
     Check(loaded.alloys.size() == original.alloys.size() && loaded.alloys.size() == 1,
@@ -113,6 +107,12 @@ Params::MapRecipe BuildFixtureRecipe() {
 
     PopulateFullScenarioBody(recipe.scenarios.defaultScenario, "Default");
     recipe.scenarios.maxArmySlotCount = 20;   // non-default, exercises the round trip too
+
+    // STEP252 (ARCH_15_12_ScenarioSpawnIdentity.md §15.12) — the shared spawn-point pool.
+    Params::ScenarioSpawnPoint spawnPoint;
+    spawnPoint.spawnId = "North_1v1"; spawnPoint.armyName = "ArmyOne";
+    spawnPoint.positionX = 30.0f; spawnPoint.positionY = 4.0f; spawnPoint.positionZ = 40.0f;
+    recipe.scenarios.spawnPoints.push_back(spawnPoint);
 
     return recipe;
 }
@@ -172,6 +172,18 @@ void RunPureRoundTripTests() {
     }
     CheckScenarioBodyEquals(original.scenarios.defaultScenario, loaded.scenarios.defaultScenario, "DefaultScenario");
     Check(loaded.scenarios.maxArmySlotCount == 20, "MaxArmySlotCount round trips (non-default value)");
+
+    // --- STEP252: the shared spawn-point pool round-trips exactly, including the Z coordinate flip. -
+    Check(loaded.scenarios.spawnPoints.size() == 1, "one SpawnPoints pool entry survives");
+    if (loaded.scenarios.spawnPoints.size() == 1) {
+        const Params::ScenarioSpawnPoint& loadedPoint = loaded.scenarios.spawnPoints[0];
+        const Params::ScenarioSpawnPoint& originalPoint = original.scenarios.spawnPoints[0];
+        Check(loadedPoint.spawnId == originalPoint.spawnId && loadedPoint.armyName == originalPoint.armyName
+              && NearlyEqual(loadedPoint.positionX, originalPoint.positionX)
+              && NearlyEqual(loadedPoint.positionY, originalPoint.positionY)
+              && NearlyEqual(loadedPoint.positionZ, originalPoint.positionZ),
+              "SpawnPoints pool entry's spawnId/armyName/position survive, including the Z flip");
+    }
 
     // --- Item 6: an empty scenarios set still serializes PatternScenarios/CountScenarios as []. --
     Params::MapRecipe emptyRecipe;
@@ -288,6 +300,49 @@ void RunLegacyNavalFleetFixtureDroppedTest() {
           "legacy fixture: the retired Navy/NavalFleet keys are dropped silently -- zero warnings");
 }
 
+// STEP252 (ARCH_15_12_ScenarioSpawnIdentity.md §15.12) -- the RETIRED "Spawns" array-of-objects
+// shape (pre-STEP252) is present but NOT read into spawnIds, and the importer WARNS (not silently,
+// unlike the Navy/NavalFleet legacy drop above -- §15.12 explicitly requires a loud warning here).
+void RunLegacySpawnsShapeWarnOnlyTest() {
+    nlohmann::ordered_json document;
+    nlohmann::ordered_json legacyDefaultScenario;
+    legacyDefaultScenario["Name"] = "LegacySpawnsShape";
+    nlohmann::ordered_json legacySpawnRow;
+    legacySpawnRow["ArmyName"] = "ArmyOne";
+    legacySpawnRow["Position"] = { { "x", 1.0 }, { "y", 2.0 }, { "z", 3.0 } };
+    legacyDefaultScenario["Spawns"] = nlohmann::ordered_json::array({ legacySpawnRow });
+    document["Scenarios"]["DefaultScenario"] = legacyDefaultScenario;
+
+    Params::MapRecipe loaded;
+    loaded.geometry.mapSize = 512;
+    Io::MapImportResult result;
+    Io::ReadScenariosJson(document, loaded, result);
+
+    Check(loaded.scenarios.defaultScenario.name == "LegacySpawnsShape",
+          "legacy Spawns-shape fixture: ordinary fields still import normally");
+    Check(loaded.scenarios.defaultScenario.spawnIds.empty(),
+          "legacy Spawns-shape fixture: the retired array-of-objects shape is NOT read into spawnIds");
+    Check(result.warningCount >= 1,
+          "legacy Spawns-shape fixture: the importer logs a loud warning (never silent, per §15.12)");
+
+    // A NEW-shape "SpawnIds" fixture (array of strings) round trips exactly and logs no warning.
+    nlohmann::ordered_json newShapeDocument;
+    nlohmann::ordered_json newShapeDefaultScenario;
+    newShapeDefaultScenario["Name"] = "NewSpawnIdsShape";
+    newShapeDefaultScenario["SpawnIds"] = nlohmann::ordered_json::array({ "North_1v1", "ARMY_02" });
+    newShapeDocument["Scenarios"]["DefaultScenario"] = newShapeDefaultScenario;
+
+    Params::MapRecipe newShapeLoaded;
+    newShapeLoaded.geometry.mapSize = 512;
+    Io::MapImportResult newShapeResult;
+    Io::ReadScenariosJson(newShapeDocument, newShapeLoaded, newShapeResult);
+    Check(newShapeLoaded.scenarios.defaultScenario.spawnIds.size() == 2
+          && newShapeLoaded.scenarios.defaultScenario.spawnIds[0] == "North_1v1"
+          && newShapeLoaded.scenarios.defaultScenario.spawnIds[1] == "ARMY_02",
+          "new-shape SpawnIds (array of strings) round trips exactly");
+    Check(newShapeResult.warningCount == 0, "new-shape SpawnIds logs zero warnings");
+}
+
 // STEP204 §8 item 3: negative assertions -- exported output never contains retired naval spellings.
 void RunNoNavalSpellingsInOutputTest() {
     Params::MapRecipe recipe = BuildFixtureRecipe();
@@ -298,6 +353,11 @@ void RunNoNavalSpellingsInOutputTest() {
     Check(documentText.find("PondSideByArmy") == std::string::npos, "export: no \"PondSideByArmy\" key anywhere");
     Check(documentText.find("SpawnsUnits") != std::string::npos,
           "export: \"SpawnsUnits\" IS present (the replacement field)");
+    // STEP252 (ARCH_15_12_ScenarioSpawnIdentity.md §15.12): the retired "Spawns" key is gone,
+    // replaced by "SpawnIds" (per-record) and "SpawnPoints" (the top-level pool).
+    Check(documentText.find("\"Spawns\"") == std::string::npos, "export: no retired \"Spawns\" key anywhere");
+    Check(documentText.find("\"SpawnIds\"") != std::string::npos, "export: \"SpawnIds\" IS present");
+    Check(documentText.find("\"SpawnPoints\"") != std::string::npos, "export: \"SpawnPoints\" IS present");
 }
 
 // 7. Live-document integration: BuildSanmapJsonText then ParseSanmapJsonText.
@@ -561,6 +621,7 @@ int main() {
     RunAlloyModeAbsentDefaultsTest();
     RunSpawnsUnitsRoundTripBothStatesTest();
     RunLegacyNavalFleetFixtureDroppedTest();
+    RunLegacySpawnsShapeWarnOnlyTest();
     RunNoNavalSpellingsInOutputTest();
     RunLiveDocumentIntegrationTest();
     RunScenarioAreaNameTests();

@@ -83,7 +83,8 @@ inline std::string ScenarioCountRowLabel(const Params::Scenarios& scenarios, int
 inline DraggableListSignal DrawScenarioPatternList(std::vector<Params::PatternScenario>& scenarios,
                                                     const std::vector<Params::Army>& armies,
                                                     const std::vector<Params::MapArea>& areas,
-                                                    int maxArmySlotCount, int selectedIndex) {
+                                                    int maxArmySlotCount, int selectedIndex,
+                                                    const Params::Scenarios& allScenarios) {
     std::string labelBuffer;
     return DraggableList<Params::PatternScenario>::Render(
         "patternScenarios", scenarios,
@@ -96,7 +97,7 @@ inline DraggableListSignal DrawScenarioPatternList(std::vector<Params::PatternSc
             Params::PatternScenario& scenario = scenarios[static_cast<std::size_t>(rowIndex)];
             DrawSlotPatternToggleRow(scenario.slotPattern, armies, maxArmySlotCount);
             DrawScenarioSpawnsWarningBanner(scenario.body, armies);
-            DrawScenarioBodyFields(scenario.body, armies, areas);
+            DrawScenarioBodyFields(scenario.body, armies, areas, allScenarios);
         },
         selectedIndex);
 }
@@ -117,7 +118,7 @@ inline DraggableListSignal DrawScenarioCountList(Params::Scenarios& scenarios,
             Params::CountScenario& scenario = scenarios.countScenarios[static_cast<std::size_t>(rowIndex)];
             DrawScenarioCountConditionsEditor(scenario.conditions, scenarios.maxArmySlotCount);
             DrawScenarioSpawnsWarningBanner(scenario.body, armies);
-            DrawScenarioBodyFields(scenario.body, armies, areas);
+            DrawScenarioBodyFields(scenario.body, armies, areas, scenarios);
         },
         selectedIndex);
 }

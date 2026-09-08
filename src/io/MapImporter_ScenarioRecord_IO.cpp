@@ -1,9 +1,11 @@
 // MapImporter_ScenarioRecord_IO.cpp — see the header for the split rationale. The exact inverse of
-// MapExporter_Scenarios_IO.cpp's per-record builders. Field shape per
+// MapExporter_ScenarioRecord_IO.cpp's per-record builders. Field shape per
 // STEP69_ParamsScenariosRoundTrip_IO.md §1/§3/§5/§6/§7 (this ticket's own inline tables are the
 // binding source of truth — no live SANMAP_FORMAT_SPEC "Correction 17" exists to cite instead).
+// "SpawnIds"/"SpawnPoints" per ARCH_15_12_ScenarioSpawnIdentity.md §15.12 (STEP252).
 #include "MapImporter_ScenarioRecord_IO.h"
 #include "JsonPrimitives_IO.h"
+#include "MapImporter_IO.h"
 #include "../params/Scenario_PARAMS.h"
 
 namespace SanmapGen {
@@ -28,17 +30,15 @@ void ReadPositionJson(const nlohmann::json& parent, float& x, float& y, float& z
     if (ReadJsonFloat(position, "z", jsonZ)) z = static_cast<float>(mapSize) - jsonZ - 1.0f;
 }
 
-void ReadSpawnsJson(const nlohmann::json& parent, const char* key,
-                    std::vector<Params::ScenarioSpawn>& outSpawns, int mapSize) {
+// RETIRED 2026-09-08 (STEP252, ARCH_15_12_ScenarioSpawnIdentity.md §15.12): ReadSpawnsJson (the old
+// array-of-{ArmyName,Position} shape) is gone, replaced by ReadSpawnIdsJson below (per-record) and
+// ReadSpawnPointsJson (Scenarios-level, exposed via the header — see its own doc comment there).
+void ReadSpawnIdsJson(const nlohmann::json& parent, const char* key,
+                     std::vector<std::string>& outSpawnIds) {
     if (!parent.contains(key) || !parent[key].is_array()) return;
-    outSpawns.clear();
-    for (const nlohmann::json& spawnJson : parent[key]) {
-        if (!spawnJson.is_object()) continue;
-        Params::ScenarioSpawn spawn;
-        ReadJsonText(spawnJson, "ArmyName", spawn.armyName);
-        ReadPositionJson(spawnJson, spawn.positionX, spawn.positionY, spawn.positionZ, mapSize);
-        outSpawns.push_back(spawn);
-    }
+    outSpawnIds.clear();
+    for (const nlohmann::json& entry : parent[key])
+        if (entry.is_string()) outSpawnIds.push_back(entry.get<std::string>());
 }
 
 void ReadAlloyOverridesJson(const nlohmann::json& parent, const char* key,
@@ -68,7 +68,38 @@ void ReadAlloyRemovalsJson(const nlohmann::json& parent, const char* key,
     }
 }
 
+// ARCH_15_12_ScenarioSpawnIdentity.md §15.12's own required migration posture for the "Spawns" ->
+// "SpawnIds" breaking shape change: "if a scenario record's Spawns key is present with
+// object-shaped elements ... log one loud warning ... never converted, never populated into
+// spawnIds." The old shape's own structural signature is an array whose first element (if any) is
+// a JSON object; the new shape's elements are plain strings.
+void WarnIfLegacySpawnsShapePresent(const nlohmann::json& json, const Params::ScenarioBody& body,
+                                    MapImportResult& result) {
+    if (!json.contains("Spawns") || !json["Spawns"].is_array()) return;
+    const nlohmann::json& spawnsArray = json["Spawns"];
+    if (spawnsArray.empty() || !spawnsArray.front().is_object()) return;
+    result.Warn("scenario \"" + body.name + "\" carries the RETIRED \"Spawns\" array-of-objects "
+               "shape (pre-STEP252) -- NOT read, NOT converted. Hand-convert it to \"SpawnIds\" "
+               "(a flat array of spawnId strings) per ARCH_15_12_ScenarioSpawnIdentity.md §15.12.");
+}
+
 } // namespace
+
+// §15.12 (STEP252) — exposed (not anonymous-namespace-private) so MapImporter_Scenarios_IO.cpp can
+// call it once, at the Scenarios-level parse site — see the header's own doc comment.
+void ReadSpawnPointsJson(const nlohmann::json& parent, const char* key,
+                        std::vector<Params::ScenarioSpawnPoint>& outSpawnPoints, int mapSize) {
+    if (!parent.contains(key) || !parent[key].is_array()) return;
+    outSpawnPoints.clear();
+    for (const nlohmann::json& pointJson : parent[key]) {
+        if (!pointJson.is_object()) continue;
+        Params::ScenarioSpawnPoint point;
+        ReadJsonText(pointJson, "SpawnId", point.spawnId);
+        ReadJsonText(pointJson, "ArmyName", point.armyName);
+        ReadPositionJson(pointJson, point.positionX, point.positionY, point.positionZ, mapSize);
+        outSpawnPoints.push_back(point);
+    }
+}
 
 // RETIRED 2026-08-28 (STEP204, human ruling): a pre-STEP204 `.sanmap`'s "Navy"/"NavalFleet" (and
 // any "PondSide"/"PondAssignment" nested keys) are deprecated data — SILENTLY DROPPED here, never
@@ -77,7 +108,8 @@ void ReadAlloyRemovalsJson(const nlohmann::json& parent, const char* key,
 // exactly like any other unrecognized field at this nesting level (there is no strict/reject-
 // unknown-key mode here to work around — confirmed by reading this function; see MapImporter_
 // ScenariosRecord_IO_Test.cpp's legacy-fixture coverage).
-void ReadScenarioBodyJson(const nlohmann::json& json, Params::ScenarioBody& body, int mapSize) {
+void ReadScenarioBodyJson(const nlohmann::json& json, Params::ScenarioBody& body, int mapSize,
+                          MapImportResult& result) {
     ReadJsonText(json, "Name", body.name);
     if (json.contains("Area") && json["Area"].is_object()) {
         const nlohmann::json& area = json["Area"];
@@ -96,7 +128,8 @@ void ReadScenarioBodyJson(const nlohmann::json& json, Params::ScenarioBody& body
     int alloyModeValue = static_cast<int>(body.alloyMode);
     if (ReadJsonEnumerationText(json, "AlloyMode", kAlloyModeSpellings, kAlloyModeCount, alloyModeValue))
         body.alloyMode = static_cast<Params::ScenarioAlloyMode>(alloyModeValue);
-    ReadSpawnsJson(json, "Spawns", body.spawns, mapSize);
+    WarnIfLegacySpawnsShapePresent(json, body, result);
+    ReadSpawnIdsJson(json, "SpawnIds", body.spawnIds);
     ReadAlloyOverridesJson(json, "Alloys", body.alloys, mapSize);
     ReadAlloyOverridesJson(json, "AlloysToAdd", body.alloysToAdd, mapSize);
     ReadAlloyRemovalsJson(json, "AlloysToRemove", body.alloysToRemove);

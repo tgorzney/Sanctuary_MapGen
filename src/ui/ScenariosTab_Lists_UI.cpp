@@ -46,7 +46,8 @@ void DrawScenarioPatternTier(Params::Scenarios& scenarios, ScenariosTabState& st
     DrawScenarioTierToolbar("Add Pattern Scenario", scenarios.patternScenarios, state, ScenarioSelectedTier::Pattern);
     const int priorSelection = state.selectedTier == ScenarioSelectedTier::Pattern ? state.selectedIndex : -1;
     const DraggableListSignal signal = DrawScenarioPatternList(scenarios.patternScenarios, armies, areas,
-                                                               scenarios.maxArmySlotCount, priorSelection);
+                                                               scenarios.maxArmySlotCount, priorSelection,
+                                                               scenarios);
     if (signal.bHasSignal())
         ApplyScenarioListSignal(scenarios.patternScenarios, state, ScenarioSelectedTier::Pattern, signal);
     DrawSectionEnd();
@@ -79,7 +80,7 @@ void DrawScenarioDefaultTier(Params::Scenarios& scenarios, ScenariosTabState& st
     ImGui::TextWrapped("The catch-all: whatever no Tier 1/2 rule claims lands here.");
     SelectScenarioDefaultTier(state);
     // Tier 3 is never spawns-flagged (see ScenariosTab_UI.h) — no warning banner drawn.
-    DrawScenarioBodyFields(scenarios.defaultScenario, armies, areas);
+    DrawScenarioBodyFields(scenarios.defaultScenario, armies, areas, scenarios);
     DrawSectionEnd();
     ImGui::PopID();
 }
@@ -90,6 +91,7 @@ void DrawScenariosTab(Params::MapRecipe& recipe, ScenariosTabState& state, Pipel
     ImGui::PushID("scenariosTab");
     Params::Scenarios& scenarios = recipe.scenarios;
     DrawScenarioSettings(scenarios, state.settingsSection, recipe.armies);
+    DrawScenarioSpawnPointPoolFields(scenarios, state.spawnPointPoolSection, recipe.armies);
     DrawScenarioPatternTier(scenarios, state, recipe.armies, recipe.areas);
     DrawScenarioCountTier(scenarios, state, recipe.armies, recipe.areas);
     DrawScenarioDefaultTier(scenarios, state, recipe.armies, recipe.areas);

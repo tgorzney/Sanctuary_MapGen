@@ -9,6 +9,7 @@
 #include "GameInstallLocation_IO.h"
 #include "MapExporter_ScenarioAreaNameValidation_IO.h"
 #include "ScenarioSlotRangeValidation_IO.h"
+#include "ScenarioSpawnIdValidation_IO.h"
 #include "ScenarioScript_DataLua_IO.h"
 #include "ScenarioScript_RuntimeResource_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -94,6 +95,12 @@ ScenarioExportResult ExportMapScenario(const std::string& gameInstallRoot,
     // (ScenarioScript_DataLua_IO.cpp) -- this only reports it loudly.
     const ScenarioSlotRangeValidationReport slotRangeReport = ValidateScenarioSlotRanges(recipe);
     if (!slotRangeReport.AllRangesValid()) result.Log(slotRangeReport.SummaryText());
+
+    // STEP252 -- warn, never block, same tier/posture as the two checks immediately above. The
+    // actual fix-up happens at BuildScenarioDataLuaText's own serialization point
+    // (ScenarioScript_DataLua_IO.cpp) -- this only reports it loudly.
+    const ScenarioSpawnIdValidationReport spawnIdReport = ValidateScenarioSpawnIds(recipe.scenarios);
+    if (!spawnIdReport.AllValid()) result.Log(spawnIdReport.SummaryText());
 
     // 5. Syntax pre-check on SanGen's own render -- refuse rather than write known-broken Lua.
     const Sys::LuaSyntaxCheckResult dataSyntax = Sys::CheckLuaSyntax(dataLuaText);

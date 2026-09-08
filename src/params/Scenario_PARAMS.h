@@ -5,7 +5,9 @@
 //
 // Source of truth is ARCH_15_05_ParamsScenariosType.md §15.5 (and §15.10 for `maxArmySlotCount`);
 // this file is a VERBATIM transcription, not a reinterpretation — any future shape change is an
-// ARCH ratification first, this file second.
+// ARCH ratification first, this file second. `ScenarioSpawnPoint`/`ScenarioBody::spawnIds`/
+// `Scenarios::spawnPoints` specifically are per ARCH_15_12_ScenarioSpawnIdentity.md §15.12
+// (STEP252) — `Params::ScenarioSpawn` is RETIRED outright, not extended.
 #pragma once
 #include <cstdint>
 #include <string>
@@ -17,12 +19,23 @@ namespace Params {
 
 enum class ScenarioAlloyMode { Explicit, Occupancy, KeepAll, Delta };  // §5, MAP_SCENARIO_SPEC
 
-// DEVIATION FROM §15.5's LITERAL TEXT, flagged (STEP69 coder): the ratified block declares these
-// three trailing floats with no `= 0.0f` (unlike every other numeric field in this file). Same
-// indeterminate-value hazard as `ScenarioCountCondition` below — added here too. Shape unchanged.
-struct ScenarioSpawn         { std::string armyName; float positionX = 0.0f, positionY = 0.0f, positionZ = 0.0f; };
 struct ScenarioAlloyOverride { std::string armyName; std::string markerName; float positionX = 0.0f, positionY = 0.0f, positionZ = 0.0f; };
 struct ScenarioAlloyRemoval  { std::string armyName; std::string markerName; };
+
+// RETIRED 2026-09-08 (STEP252, ARCH_15_12_ScenarioSpawnIdentity.md §15.12): `ScenarioSpawn` (a bare
+// `armyName` + inline position, one row per scenario) is gone outright, replaced by the shared,
+// `Scenarios`-level pool below plus `ScenarioBody::spawnIds` (a flat array of strings referencing
+// either a pool row's `spawnId` or a literal `ARMY_XX` name). Authored ONCE in the pool; referenced
+// by `spawnId` from any scenario's `spawnIds` list. Never holds an `ARMY_XX` default position — only
+// genuine per-scenario overrides (e.g. "North_1v1" -> ARMY_01); the `.sanmap`'s own baked
+// `markers.Spawn.transforms[ARMY_XX]` stays the single source of truth for that.
+struct ScenarioSpawnPoint {
+    std::string spawnId;    // required non-empty; unique across the WHOLE pool (flat, shared
+                             // namespace). Must NOT be ARMY_XX-shaped, case-insensitively
+                             // (Io::ResemblesArmyIdentityCaseInsensitive) — ARCH_15_12's Validator.
+    std::string armyName;   // required non-empty -- the ARMY_XX this custom point targets.
+    float positionX = 0.0f, positionY = 0.0f, positionZ = 0.0f;
+};
 
 struct ScenarioBody {
     std::string name;                                    // log/debug identifier AND the dispatch
@@ -48,8 +61,12 @@ struct ScenarioBody {
                                                             // must also exist in the runtime dispatch
                                                             // (ARCH_15_05 §15.5 OPEN item 2)
     ScenarioAlloyMode alloyMode = ScenarioAlloyMode::Occupancy;   // RATIFIED default, see below
-    std::vector<ScenarioSpawn> spawns;                     // §6 HARD REQUIREMENT — empty is only
-                                                            // legal with documented intent
+    // RESHAPED 2026-09-08 (STEP252, was `std::vector<ScenarioSpawn> spawns`) — §6 HARD REQUIREMENT
+    // — empty is only legal with documented intent. Each entry is EITHER a
+    // `Scenarios::spawnPoints[].spawnId` (a custom override) OR a literal `ARMY_XX` name (use that
+    // army's own live baked `.sanmap` default) — resolved by the two-step lookup
+    // (`Io::ResolveSpawnId`, ARCH_15_12/§15.13), never distinguished by shape here.
+    std::vector<std::string> spawnIds;
     std::vector<ScenarioAlloyOverride> alloys;             // meaningful for `Explicit` only
     std::vector<ScenarioAlloyOverride> alloysToAdd;         // meaningful for `Delta` only
     std::vector<ScenarioAlloyRemoval>  alloysToRemove;      // meaningful for `Delta` only
@@ -100,6 +117,9 @@ struct Scenarios {
     int                          maxArmySlotCount = 16;  // §15.10 — slotPattern string length;
                                                          // rendered as the Lua global
                                                          // MAX_ARMY_SLOT_COUNT (STEP70)
+    std::vector<ScenarioSpawnPoint> spawnPoints;   // NEW (STEP252, ARCH_15_12 §15.12) — the shared
+                                                    // custom-spawn-point pool, authored once,
+                                                    // referenced by spawnId from any scenario.
 };
 
 } // namespace Params

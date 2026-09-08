@@ -7,6 +7,7 @@
 #include "MapExporter_BlueprintValidation_IO.h"
 #include "MapExporter_ScenarioAreaNameValidation_IO.h"
 #include "ScenarioSlotRangeValidation_IO.h"
+#include "ScenarioSpawnIdValidation_IO.h"
 #include "MapExporter_Recipe_IO.h"
 #include "UnknownImportBag_IO.h"
 #include "../data/MapFields_DATA.h"
@@ -35,6 +36,15 @@ void ReportScenarioSlotRangeViolations(const Params::MapRecipe& recipe, MapExpor
     result.Warn(report.SummaryText());
 }
 
+// STEP252 -- warn, never block, same tier/posture as ReportScenarioSlotRangeViolations immediately
+// above (the actual fix-up happens at BuildScenariosJson's own serialization point, via
+// ApplyScenarioSpawnIdFixups on its own copy — ARCH_15_12_ScenarioSpawnIdentity.md §15.12).
+void ReportScenarioSpawnIdViolations(const Params::MapRecipe& recipe, MapExportResult& result) {
+    const ScenarioSpawnIdValidationReport report = ValidateScenarioSpawnIds(recipe.scenarios);
+    if (report.AllValid()) return;
+    result.Warn(report.SummaryText());
+}
+
 bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe& recipe,
                          const MapExportOptions& options, MapExportResult& result,
                          const UnknownImportBag* unknownData) {
@@ -46,6 +56,7 @@ bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe&
     CheckArmyIdentitiesWellFormed(recipe.armies, result);
     ReportScenarioAreaNameReferences(recipe, result);
     ReportScenarioSlotRangeViolations(recipe, result);
+    ReportScenarioSpawnIdViolations(recipe, result);
 
     // The output file name matches the document's own `mapName` (STEP25_MapNameCredits_IO moved
     // this off `MapExportOptions` onto the recipe — it is real, importable document content, not an

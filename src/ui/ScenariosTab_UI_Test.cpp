@@ -31,7 +31,7 @@ void RunSpawnsAcknowledgmentChecks() {
     Check(ScenarioNeedsSpawnsAcknowledgment(body), "empty spawns + empty note needs acknowledgment");
     body.authoringNote = "intentional";
     Check(!ScenarioNeedsSpawnsAcknowledgment(body), "empty spawns + a note does not");
-    body.spawns.push_back(Params::ScenarioSpawn());
+    body.spawnIds.push_back("ARMY_01");
     Check(!ScenarioNeedsSpawnsAcknowledgment(body), "non-empty spawns + a note does not");
     body.authoringNote.clear();
     Check(!ScenarioNeedsSpawnsAcknowledgment(body), "non-empty spawns + no note still does not");

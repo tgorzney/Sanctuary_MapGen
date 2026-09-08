@@ -3,13 +3,18 @@
 // hand-rolled Lua string concatenation outside those primitives.
 //
 // Domain-local string-spelling tables below are a DELIBERATE duplicate of
-// MapExporter_Scenarios_IO.cpp's own kAlloyModeSpellings/kCountFieldSpellings/kComparatorSpellings
-// (STEP69) -- "each file owns its own copy" precedent (STEP69 §5); this file must never #include
-// MapExporter_Scenarios_IO.cpp. Spellings are reused VERBATIM -- one shared vocabulary between the
-// .sanmap JSON persistence leg and this Lua-rendering leg.
+// MapExporter_ScenarioRecord_IO.cpp's own kAlloyModeSpellings and MapExporter_Scenarios_IO.cpp's own
+// kCountFieldSpellings/kComparatorSpellings (STEP69) -- "each file owns its own copy" precedent
+// (STEP69 §5); this file must never #include either of those. Spellings are reused VERBATIM -- one
+// shared vocabulary between the .sanmap JSON persistence leg and this Lua-rendering leg.
+//
+// "spawnIds"/SCENARIO_SPAWN_POINTS reshaped/added per ARCH_15_12_ScenarioSpawnIdentity.md §15.12
+// (STEP252) -- see BuildSpawnPointsTable's own doc comment below for why SCENARIO_SPAWN_POINTS is
+// exempt from this file's derived-vs-authored-global distinction.
 #include "ScenarioScript_DataLua_IO.h"
 #include "LuaTableWriter_IO.h"
 #include "ScenarioSlotRangeValidation_IO.h"
+#include "ScenarioSpawnIdValidation_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <algorithm>
 #include <utility>
@@ -66,16 +71,6 @@ std::string BuildPositionedRowBody(const std::string& armyName, const std::strin
     return row;
 }
 
-std::vector<std::string> BuildSpawnRowBodies(const std::vector<Params::ScenarioSpawn>& spawns, int mapSize) {
-    std::vector<std::string> rows;
-    rows.reserve(spawns.size());
-    for (const Params::ScenarioSpawn& spawn : spawns) {
-        rows.push_back(BuildPositionedRowBody(spawn.armyName, nullptr, spawn.positionX, spawn.positionY,
-                                              spawn.positionZ, mapSize));
-    }
-    return rows;
-}
-
 std::vector<std::string> BuildAlloyOverrideRowBodies(const std::vector<Params::ScenarioAlloyOverride>& overrides,
                                                       int mapSize) {
     std::vector<std::string> rows;
@@ -123,7 +118,10 @@ void AppendScenarioBodyFields(std::string& out, int indentLevel, const Params::S
     AppendKeyValueLine(out, indentLevel, "alloyMode",
                        QuotedLuaString(kScenarioAlloyModeSpellings[static_cast<int>(body.alloyMode)]));
 
-    AppendArrayOfTables(out, indentLevel, "spawns", BuildSpawnRowBodies(body.spawns, mapSize));
+    // RESHAPED 2026-09-08 (STEP252, was an array-of-tables "spawns" render via BuildSpawnRowBodies)
+    // -- ARCH_15_12_ScenarioSpawnIdentity.md §15.12: a flat array of quoted spawnId strings, the
+    // exact same primitive KNOWN_ALLOY_MARKERS's own per-army marker list already uses below.
+    AppendArrayOfQuotedStrings(out, indentLevel, "spawnIds", body.spawnIds);
     AppendArrayOfTables(out, indentLevel, "alloys", BuildAlloyOverrideRowBodies(body.alloys, mapSize));
     AppendArrayOfTables(out, indentLevel, "alloysToAdd", BuildAlloyOverrideRowBodies(body.alloysToAdd, mapSize));
     AppendArrayOfTables(out, indentLevel, "alloysToRemove", BuildAlloyRemovalRowBodies(body.alloysToRemove));
@@ -287,11 +285,42 @@ std::string BuildKnownAlloyMarkersTable(const Params::Scenarios& scenarios) {
     return out;
 }
 
+// §15.12 (STEP252) -- SCENARIO_SPAWN_POINTS is genuinely authored Params::Scenarios data (a direct
+// 1:1 render of spawnPoints), NOT a derived global like ARMY_ID_TO_NAME/KNOWN_ALLOY_MARKERS above --
+// this file's own header comment warning against adding a Params::Scenarios field to match those two
+// does not apply here. Always rendered, even when spawnPoints is empty ("= {}"), matching this
+// family's "every table always present" convention.
+// NOT AppendArrayOfTables (STEP63): that primitive always emits a trailing comma after the closing
+// brace (CloseTable(..., true)), correct for a row NESTED inside an outer table/array but NOT for a
+// top-level global statement -- a stray "," after "SCENARIO_SPAWN_POINTS = { ... }" is a Lua syntax
+// error (caught by TestSelfCheckViaLuaSyntaxCheck, STEP252 coder). This instead mirrors
+// BuildPatternScenariosTable/BuildDefaultScenarioTable's own manual OpenTable/loop/CloseTable(false)
+// shape, the established pattern for every OTHER top-level global table in this file.
+std::string BuildSpawnPointsTable(const std::vector<Params::ScenarioSpawnPoint>& spawnPoints, int mapSize) {
+    std::string out;
+    OpenTable(out, 0, "SCENARIO_SPAWN_POINTS");
+    for (const Params::ScenarioSpawnPoint& point : spawnPoints) {
+        OpenTable(out, 1, "");
+        AppendKeyValueLine(out, 1, "spawnId", QuotedLuaString(point.spawnId));
+        AppendKeyValueLine(out, 1, "armyName", QuotedLuaString(point.armyName));
+        AppendKeyValueLine(out, 1, "x", RenderLuaNumber(point.positionX));
+        AppendKeyValueLine(out, 1, "y", RenderLuaNumber(point.positionY));
+        AppendKeyValueLine(out, 1, "z", RenderLuaNumber(FlipPositionZ(point.positionZ, mapSize)));
+        CloseTable(out, 1, true);
+    }
+    CloseTable(out, 0, false);
+    return out;
+}
+
 } // namespace
 
 std::string BuildScenarioDataLuaText(const Params::MapRecipe& recipe) {
     const int mapSize = recipe.geometry.mapSize;
-    const Params::Scenarios& scenarios = recipe.scenarios;
+    // This leg is independently rendered from the .sanmap JSON leg and never shares its resolved
+    // data (this file's own header comment's "each leg owns its own copy" precedent) -- so it
+    // applies ValidateScenarioSpawnIds's fix-ups (ARCH_15_12 §15.12) to its OWN copy before
+    // rendering, exactly mirroring MapExporter_Scenarios_IO.cpp's BuildScenariosJson.
+    const Params::Scenarios scenarios = ApplyScenarioSpawnIdFixups(recipe.scenarios);
 
     std::string out;
     out += std::string(kScenarioGeneratedFileBannerLine) + "\n";
@@ -307,6 +336,7 @@ std::string BuildScenarioDataLuaText(const Params::MapRecipe& recipe) {
     // so they are grouped with it, ahead of the three scenario tier tables.
     out += BuildArmyIdToNameTable(recipe.armies) + "\n";
     out += BuildKnownAlloyMarkersTable(scenarios) + "\n";
+    out += BuildSpawnPointsTable(scenarios.spawnPoints, mapSize) + "\n";
 
     out += BuildPatternScenariosTable(scenarios.patternScenarios, mapSize, recipe.areas);
     out += "\n";

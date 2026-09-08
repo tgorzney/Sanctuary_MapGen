@@ -41,6 +41,7 @@ enum class ScenarioSelectedTier { None, Pattern, Count, Default };
 
 struct ScenariosTabState {
     SectionState settingsSection;      // maxArmySlotCount + its warning banner
+    SectionState spawnPointPoolSection; // STEP252 — the shared Scenarios::spawnPoints pool editor
     SectionState patternSection;       // Tier 1 DraggableList
     SectionState countSection;         // Tier 2 DraggableList
     SectionState defaultSection;       // Tier 3 fixed panel
@@ -80,9 +81,11 @@ inline const char* ScenarioRowLabel(const Params::ScenarioBody& body) {
 // live-documented 2h1ai regression (MAP_SCENARIO_SPEC.md §6) when it has no explicit spawns AND has
 // not documented that as intentional in its own authoringNote (the exact mechanism §15.5 ratified
 // `authoringNote` FOR). Tier 3 (defaultScenario) is NEVER flagged by this function — its own empty
-// `spawns` correctly means "inherit the .sanmap baseline" — callers skip it explicitly (Fix §4).
+// `spawnIds` correctly means "inherit the .sanmap baseline" — callers skip it explicitly (Fix §4).
+// RESHAPED 2026-09-08 (STEP252, was `body.spawns.empty()`) — ARCH_15_12_ScenarioSpawnIdentity.md
+// §15.12: the vector itself is still what matters here, only its element type changed.
 inline bool ScenarioNeedsSpawnsAcknowledgment(const Params::ScenarioBody& body) {
-    return body.spawns.empty() && body.authoringNote.empty();
+    return body.spawnIds.empty() && body.authoringNote.empty();
 }
 
 // Fix §4's export-time gate predicate, exported publicly so STEP77 calls it rather than duplicating
@@ -145,8 +148,26 @@ void DrawSlotPatternToggleRow(std::string& slotPattern, const std::vector<Params
 void DrawScenarioCountConditionsEditor(std::vector<Params::ScenarioCountCondition>& conditions,
                                        int maxArmySlotCount);
 
+// armies[i].displayName label, `Army::name` key — the Combo shows the human label, the stored
+// armyNameKey stays the machine identity (STEP76 amendment). Falls back to a free-text field when
+// no armies are authored yet, so authoring is never blocked. Shared by the per-scenario spawnIds
+// picker and the spawn-point pool editor (both need "pick an ARMY_XX identity", STEP252).
+void DrawArmyNameField(const char* label, std::string& armyNameKey,
+                       const std::vector<Params::Army>& armies);                     // Detail_UI.cpp
+
 void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params::Army>& armies,
-                            const std::vector<Params::MapArea>& areas);              // Detail_UI.cpp
+                            const std::vector<Params::MapArea>& areas,
+                            const Params::Scenarios& scenarios);                     // Detail_UI.cpp
+// STEP252 (ARCH_15_12_ScenarioSpawnIdentity.md §15.12) — the per-scenario spawnIds picker + its own
+// live inline warning. Split out of DrawScenarioBodyFields for the ARCH §1.5 file-size ceiling
+// (mirrors DrawScenarioBodyExtendedFields' own split, immediately below), called only by it.
+void DrawScenarioSpawnIdsSection(Params::ScenarioBody& body, const Params::Scenarios& scenarios,
+                                 const std::vector<Params::Army>& armies);            // DetailSpawns_UI.cpp
+// STEP252 (ARCH_15_12_ScenarioSpawnIdentity.md §15.12) — the shared, Scenarios-level custom-
+// spawn-point pool editor. Mirrors DrawScenarioSettings' own (Params::Scenarios&, SectionState&,
+// armies) shape.
+void DrawScenarioSpawnPointPoolFields(Params::Scenarios& scenarios, SectionState& poolSection,
+                                      const std::vector<Params::Army>& armies);       // SpawnPointPool_UI.cpp
 // alloys/alloysToAdd/alloysToRemove — split out of DrawScenarioBodyFields for the ARCH §1.5
 // file-size ceiling (called by it, never directly by Lists.cpp).
 void DrawScenarioBodyExtendedFields(Params::ScenarioBody& body,

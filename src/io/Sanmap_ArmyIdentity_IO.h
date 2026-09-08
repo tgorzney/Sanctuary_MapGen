@@ -7,6 +7,7 @@
 // Pure, headless, testable: zero includes beyond the standard library and Army_PARAMS.h — no
 // imgui, no nlohmann (ARCH §1.5 — the identity itself is not a JSON concern, only its callers are).
 #pragma once
+#include <cctype>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -36,6 +37,39 @@ inline bool IsArmyIdentityWellFormed(const std::string& name) {
     if (name.size() <= prefix.size()) return false;
     if (name.compare(0, prefix.size(), prefix) != 0) return false;
     const std::string digits = name.substr(prefix.size());
+    if (digits.size() < 2u) return false;
+    for (char digitCharacter : digits)
+        if (digitCharacter < '0' || digitCharacter > '9') return false;
+    return true;
+}
+
+// True when `name` merely RESEMBLES an ARMY_XX identity, case-insensitively — a narrower question
+// than IsArmyIdentityWellFormed's "is this a real, usable army identity" (which is case-sensitive,
+// correct for STEP76 minting: the engine's Spawn.transforms lookup is exact-case, so a genuinely
+// malformed lowercase name must still be flagged there). Used ONLY to forbid a
+// Scenarios::spawnPoints row's spawnId from shadowing ARMY_XX (ARCH_15_12_ScenarioSpawnIdentity.md
+// §15.12's Validator, corrected 2026-09-05) — never substituted for IsArmyIdentityWellFormed's own
+// call sites (STEP76 army minting/well-formedness).
+//
+// CORRECTNESS NOTE (STEP252 coder, flagged per this ticket's own "flag the discrepancy" rule): the
+// ratified §15.12 text and STEP252's own work-order both describe this predicate as folding `name`
+// to lowercase and then "applying the identical prefix-plus-two-or-more-digits shape
+// IsArmyIdentityWellFormed checks, on the folded string" — but IsArmyIdentityWellFormed itself
+// hardcodes an UPPERCASE "ARMY_" prefix, so literally calling
+// `IsArmyIdentityWellFormed(loweredName)` (the work-order's own literal code sample) can never
+// return true for ANY input, lowered or not — it would silently defeat the entire reserved-namespace
+// rule the ARCH ratifies (and fail this ticket's own acceptance test 1, which requires "ARMY_01"/
+// "army_01"/"Army_01" all flagged). This reimplements the identical shape check directly against the
+// folded (lowercase) string with a lowercase "army_" prefix instead of delegating to
+// IsArmyIdentityWellFormed, which is the only way to deliver the case-insensitive behavior both the
+// ARCH text and the acceptance tests actually require.
+inline bool ResemblesArmyIdentityCaseInsensitive(const std::string& name) {
+    std::string folded = name;
+    for (char& c : folded) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    static const std::string prefix = "army_";
+    if (folded.size() <= prefix.size()) return false;
+    if (folded.compare(0, prefix.size(), prefix) != 0) return false;
+    const std::string digits = folded.substr(prefix.size());
     if (digits.size() < 2u) return false;
     for (char digitCharacter : digits)
         if (digitCharacter < '0' || digitCharacter > '9') return false;

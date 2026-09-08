@@ -1,7 +1,11 @@
 // ScenariosTab_Detail_UI.cpp — Fix §5's core `ScenarioBody` fields: name, area, spawnsUnits,
-// alloyMode (with its consequence card), the spawns list, and authoringNote.
+// alloyMode (with its consequence card), the spawnIds list, and authoringNote.
 // alloys/alloysToAdd/alloysToRemove are ScenariosTab_DetailAlloys_UI.cpp's half (ARCH §1.5 split).
 // Layer: UI. `spawnsUnits` RENAMED 2026-08-28, was `navy` (STEP204, ARCH_15_05 §15.5 amended).
+// The spawns editor RESHAPED 2026-09-08 (STEP252, ARCH_15_12_ScenarioSpawnIdentity.md §15.12): a
+// per-scenario picker over `body.spawnIds` (bare strings) — the pool editor for
+// `Scenarios::spawnPoints` itself lives in its own file, ScenariosTab_SpawnPointPool_UI.cpp
+// (Scenarios-level, not per-scenario-body).
 //
 // Backend policy N/A (no PROC stage reads `recipe.scenarios`): every scalar here uses a THROWAWAY,
 // function-local `RealtimeToggle` rather than one persisted in `ScenariosTabState` — the value write
@@ -12,7 +16,6 @@
 // Constitution §8: alloyMode's four labels each carry a real consequence card, per Fix §5.
 #include "ScenariosTab_UI.h"
 #include "AreasTab_List_UI.h"
-#include "ArmiesTab_UI.h"
 #include "Checkbox_UI.h"
 #include "Combo_UI.h"
 #include "SliderScalar_UI.h"
@@ -36,27 +39,6 @@ const char* const scenarioAlloyModeConsequenceCards[kScenarioAlloyModeCount] = {
 // A generous, world-coordinate-scale range: DrawScenarioBodyFields carries no `mapSize` to derive a
 // tighter one from (unlike AreasTab_UI's AreaOriginSliderRange), so this stays a fixed constant.
 ScalarSliderRange ScenarioWorldPositionRange() { return ScalarSliderRange{ -8192.0f, 8192.0f, 0.0f }; }
-
-// armies[i].displayName label, `Army::name` key — the Combo shows the human label, the stored
-// `armyName` stays the machine identity (STEP76 amendment). Falls back to a free-text field when no
-// armies are authored yet, so authoring is never blocked.
-void DrawArmyNameField(const char* label, std::string& armyNameKey, const std::vector<Params::Army>& armies) {
-    if (armies.empty()) {
-        TextInputRules rules; rules.bAllowEmpty = true; rules.maximumLength = 48;
-        DrawTextInput(label, armyNameKey, rules);
-        return;
-    }
-    std::vector<const char*> labels;
-    labels.reserve(armies.size());
-    int selectedIndex = -1;
-    for (std::size_t index = 0u; index < armies.size(); ++index) {
-        labels.push_back(ArmyRowLabel(armies[index]));
-        if (armies[index].name == armyNameKey) selectedIndex = static_cast<int>(index);
-    }
-    ComboOptions options; options.labels = labels.data(); options.count = static_cast<int>(labels.size());
-    if (DrawCombo(label, selectedIndex, options).bCommitted && selectedIndex >= 0)
-        armyNameKey = armies[static_cast<std::size_t>(selectedIndex)].name;
-}
 
 // The Combo is NOT DrawArmyNameField's exact shape: empty areaName is a real, permanent, authored
 // state here ("this scenario owns its own private rectangle"), unlike DrawArmyNameField's transient
@@ -113,30 +95,6 @@ void DrawScenarioAlloyModeField(Params::ScenarioBody& body) {
     ImGui::TextWrapped("%s", scenarioAlloyModeConsequenceCards[modeIndex]);
 }
 
-// Flat list, no drag-reorder (order not load-bearing). Cardinality is tens of rows, so a plain loop
-// is correct — no VirtualListWidget_UI (Fix §5: that is for 100k rows).
-void DrawScenarioSpawnsList(std::vector<Params::ScenarioSpawn>& spawns, const std::vector<Params::Army>& armies) {
-    const ScalarSliderRange range = ScenarioWorldPositionRange();
-    int removeIndex = -1;
-    for (std::size_t index = 0u; index < spawns.size(); ++index) {
-        ImGui::PushID(static_cast<int>(index));
-        Params::ScenarioSpawn& spawn = spawns[index];
-        DrawArmyNameField("Army", spawn.armyName, armies);
-        RealtimeToggle xToggle, yToggle, zToggle;
-        ImGui::SameLine(); ImGui::SetNextItemWidth(90.0f);
-        DrawSliderScalar("X", spawn.positionX, range, xToggle, WidgetStyle(), "%.1f");
-        ImGui::SameLine(); ImGui::SetNextItemWidth(90.0f);
-        DrawSliderScalar("Y", spawn.positionY, range, yToggle, WidgetStyle(), "%.1f");
-        ImGui::SameLine(); ImGui::SetNextItemWidth(90.0f);
-        DrawSliderScalar("Z", spawn.positionZ, range, zToggle, WidgetStyle(), "%.1f");
-        ImGui::SameLine();
-        if (ImGui::SmallButton("X##removeSpawn")) removeIndex = static_cast<int>(index);
-        ImGui::PopID();
-    }
-    if (removeIndex >= 0) spawns.erase(spawns.begin() + removeIndex);
-    if (ImGui::Button("+ Add Spawn")) spawns.push_back(Params::ScenarioSpawn());
-}
-
 // Raw `ImGui::InputTextMultiline` per Fix §5's own text — a multi-line box has no shared-library
 // widget yet, so this stages a local buffer exactly as TextInput_UI.cpp does for the single-line one.
 void DrawAuthoringNoteField(std::string& authoringNote) {
@@ -151,8 +109,14 @@ void DrawAuthoringNoteField(std::string& authoringNote) {
 
 } // namespace
 
+// `scenarios` is the OWNING Scenarios struct `body` is a sub-object of (patternScenarios[i].body /
+// countScenarios[i].body / defaultScenario) — a mutable sub-reference alongside a const reference to
+// its own owner is an established idiom in this exact file family already (DrawScenarioCountList's
+// `scenario.conditions` + `scenarios.maxArmySlotCount`, ScenariosTab_ListMechanics_UI.h). Needed here
+// for `scenarios.spawnPoints` (the spawnIds picker's own options) and the live inline warning below.
 void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params::Army>& armies,
-                            const std::vector<Params::MapArea>& areas) {
+                            const std::vector<Params::MapArea>& areas,
+                            const Params::Scenarios& scenarios) {
     TextInputRules nameRules; nameRules.maximumLength = 64; nameRules.bAllowEmpty = true;
     DrawTextInput("Name", body.name, nameRules);
     ImGui::SeparatorText("Area");
@@ -168,7 +132,9 @@ void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params
     ImGui::SeparatorText("Alloys");
     DrawScenarioAlloyModeField(body);
     ImGui::SeparatorText("Spawns");
-    DrawScenarioSpawnsList(body.spawns, armies);
+    // Split out of this file for the ARCH §1.5 ceiling — ScenariosTab_DetailSpawns_UI.cpp (mirrors
+    // DrawScenarioBodyExtendedFields' own split for alloys, immediately below).
+    DrawScenarioSpawnIdsSection(body, scenarios, armies);
     ImGui::SeparatorText("Authoring Note");
     DrawAuthoringNoteField(body.authoringNote);
     DrawScenarioBodyExtendedFields(body, armies);

@@ -474,6 +474,9 @@ add_sangen_test(MarkerInstance_PARAMS_Test      src/params/MarkerInstance_PARAMS
 add_sangen_test(MarkerLayerBundle_PARAMS_Test   src/params/MarkerLayerBundle_PARAMS_Test.cpp)
 add_sangen_test(PropInstance_PARAMS_Test        src/params/PropInstance_PARAMS_Test.cpp)
 add_sangen_test(PlacementRules_PARAMS_Test      src/params/PlacementRules_PARAMS_Test.cpp)
+# STEP252_ScenarioSpawnIdentityImplementation_PARAMS_IO_UI: ScenarioSpawnPoint's own default
+# construction (ARCH_15_12_ScenarioSpawnIdentity.md §15.12).
+add_sangen_test(Scenario_PARAMS_Test            src/params/Scenario_PARAMS_Test.cpp)
 
 # SYS
 add_sangen_test(ArenaAllocator_SYS_Test         src/sys/ArenaAllocator_SYS_Test.cpp)
@@ -999,6 +1002,11 @@ add_sangen_test(MapExporter_ScenarioAreaNameValidation_IO_Test
 # ScenarioAreaNameValidation target immediately above.
 add_sangen_test(ScenarioSlotRangeValidation_IO_Test
     src/io/ScenarioSlotRangeValidation_IO_Test.cpp)
+# STEP252_ScenarioSpawnIdentityImplementation_PARAMS_IO_UI: the spawnId pool validator/resolver
+# (ARCH_15_12_ScenarioSpawnIdentity.md §15.12) — same posture as the ScenarioSlotRangeValidation
+# target immediately above.
+add_sangen_test(ScenarioSpawnIdValidation_IO_Test
+    src/io/ScenarioSpawnIdValidation_IO_Test.cpp)
 # STEP237_MarkerLinkParamsAndIO_PARAMS_IO: the new `MarkerLinks` array + the two merged
 # `LinkIdentifier` back-reference fields (ARCH §19.28/§19.29/§19.30) — own pair of small, disk-free
 # round-trip binaries, same "own file, own test" convention as

@@ -3,9 +3,12 @@
 // (ScenariosTab_Lists_UI.cpp), and tier 3 (the export-time gate) is `AnyScenarioNeedsSpawnsAcknowledgment`
 // in ScenariosTab_UI.h, exported for STEP77 to call — nothing to build here for it. Layer: UI.
 //
-// Constitution §6: [Set Explicit Spawns] seeds a ZEROED starting point — there is no "current
-// baseline spawn" value reachable from `Params::MapRecipe` (STEP78's canvas mode owns that). Stated,
-// not hidden, per Correction 1's own text.
+// RESHAPED 2026-09-08 (STEP252, ARCH_15_12_ScenarioSpawnIdentity.md §15.12): [Set Explicit Spawns]
+// no longer seeds a zeroed placeholder position (Correction 1's old text, now stale) — under the
+// spawnId model there is nothing to seed a POSITION with at all: listing each army's own literal
+// ARMY_XX name in `spawnIds` is itself the acknowledgment, and the two-step resolve
+// (Io::ResolveSpawnId / ARCH_15_13) reads that army's live baked .sanmap position at match-load
+// time, never a second stored copy of it.
 #include "ScenariosTab_UI.h"
 #include "imgui.h"
 
@@ -16,17 +19,13 @@ namespace {
 constexpr const char* kAcknowledgmentSentence =
     "Acknowledged: intentionally inherits the .sanmap baseline spawn.";
 
-// One `ScenarioSpawn` per army, positioned at the origin — the honest zeroed placeholder Correction
-// 1 documents; the designer hand-edits real positions via the flat list editor (Fix §5). Stores the
-// engine identity (`Army::name`), never the display label (STEP76 amendment).
+// One literal ARMY_XX spawnId per army — resolves live, at match-load time, to that army's own
+// current .sanmap baked Spawn position (the literal-fallback branch of Io::ResolveSpawnId). Stores
+// the engine identity (`Army::name`), never the display label (STEP76 amendment).
 void SeedExplicitSpawnsFromArmies(Params::ScenarioBody& body, const std::vector<Params::Army>& armies) {
-    body.spawns.clear();
-    body.spawns.reserve(armies.size());
-    for (const Params::Army& army : armies) {
-        Params::ScenarioSpawn spawn;
-        spawn.armyName = army.name;
-        body.spawns.push_back(spawn);
-    }
+    body.spawnIds.clear();
+    body.spawnIds.reserve(armies.size());
+    for (const Params::Army& army : armies) body.spawnIds.push_back(army.name);
 }
 
 } // namespace

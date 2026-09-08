@@ -16,6 +16,10 @@
 -- data remains: every per-map value below arrives from the generated sibling
 -- <MapName>_Scenarios_Data.lua, Import()'d below.
 --
+-- ApplyScenario's spawn-application block is ARCH_15_13_ScenarioSpawnIdRuntimeResolution.md §15.13
+-- ratified law (STEP252), resolving against the shape ARCH_15_12_ScenarioSpawnIdentity.md §15.12
+-- ratifies -- read both before touching that block.
+--
 -- MUST stay a GLOBAL table (`Scenario = {}`, never `local`) -- Import() (common/systems/import.lua)
 -- captures only a file's GLOBAL variables, never its `return` value; a `local`-scoped module
 -- silently yields none of its fields through Import(), with no error (MAP_SCENARIO_SPEC.md §3 --
@@ -41,6 +45,10 @@ local PATTERN_SCENARIOS   = ScenarioData.PATTERN_SCENARIOS
 local COUNT_SCENARIOS     = ScenarioData.COUNT_SCENARIOS
 local DEFAULT_SCENARIO    = ScenarioData.DEFAULT_SCENARIO
 local MAX_ARMY_SLOT_COUNT = ScenarioData.MAX_ARMY_SLOT_COUNT
+-- ARCH_15_12_ScenarioSpawnIdentity.md §15.12 / ARCH_15_13_ScenarioSpawnIdRuntimeResolution.md §15.13
+-- (STEP252) -- the shared, Scenarios-level custom-spawn-point pool. Always present (rendered even
+-- when empty, "= {}") -- never nil, unlike ARMY_ID_TO_NAME/KNOWN_ALLOY_MARKERS below.
+local SCENARIO_SPAWN_POINTS = ScenarioData.SCENARIO_SPAWN_POINTS
 
 -- ⚠️ GAP, FLAGGED NOT INVENTED (`ARCH_15_10_SlotPatternConstructionMoves.md` §15.10 point 3): no ratified renderer anywhere in the pack
 -- emits ARMY_ID_TO_NAME/KNOWN_ALLOY_MARKERS into <MapName>_Scenarios_Data.lua yet. This runtime
@@ -170,23 +178,53 @@ end
 -- Applies a matched scenario's spawn/alloy data (MAP_SCENARIO_SPEC.md §5, all four alloyMode
 -- branches). Must run before RunMapSetup/CreateArmies read the same tables.
 --
--- ⚠️ STRUCTURAL PORT, not a byte-for-byte copy of the reference's loop bodies: the reference's
--- scenario.spawns/scenario.alloys were tables KEYED BY ARMY NAME ({ ARMY_01 = {...}, ... }). The
--- SanGen-rendered contract (ScenarioScript_DataLua_IO, STEP70) instead emits
--- Params::ScenarioSpawn/Params::ScenarioAlloyOverride as FLAT ARRAYS OF ROWS, each row carrying
--- its own armyName field -- a real shape difference, not cosmetic. Every loop below ipairs() the
--- flat array and reads armyName/markerName off each row.
+-- ⚠️ STRUCTURAL PORT, not a byte-for-byte copy of the reference's loop bodies. TWO independent
+-- ports live in this function:
+-- (1) alloys: the reference's scenario.alloys were tables KEYED BY ARMY NAME ({ ARMY_01 = {...},
+--     ... }). The SanGen-rendered contract (ScenarioScript_DataLua_IO, STEP70) instead emits
+--     Params::ScenarioAlloyOverride as FLAT ARRAYS OF ROWS, each row carrying its own armyName
+--     field -- a real shape difference, not cosmetic. Every alloy loop below ipairs() the flat
+--     array and reads armyName/markerName off each row.
+-- (2) spawns (STEP252, ARCH_15_12/§15.13): scenario.spawnIds is a flat array of BARE STRINGS, each
+--     resolved via ResolveSpawnId against SCENARIO_SPAWN_POINTS (the custom pool, checked first)
+--     then the live .sanmap ARMY_XX default (the literal-fallback branch) -- never scenario.spawns'
+--     old per-row {armyName, x, y, z} table shape.
 -- ============================================================================
+-- Two-step resolution (§15.12): the custom pool first, then a literal ARMY_XX fallback read
+-- straight off the live .sanmap default -- never a second stored copy of that default. Pool
+-- spawnIds are RULED to never be ARMY_XX-shaped (§15.12 Validator), so these two steps can never
+-- collide on one string. Returns nil (and Warn()s) if spawnId matches neither.
+local function ResolveSpawnId(spawnId, spawnTransforms)
+    for _, point in ipairs(SCENARIO_SPAWN_POINTS) do
+        if point.spawnId == spawnId then
+            return point.armyName, point.x, point.y, point.z
+        end
+    end
+    local defaultTransform = spawnTransforms and spawnTransforms[spawnId]
+    if defaultTransform then
+        return spawnId, defaultTransform.position.x, defaultTransform.position.y,
+               defaultTransform.position.z
+    end
+    Warn("SANGEN: scenario spawnId '"..tostring(spawnId).."' matched neither the custom "..
+         "spawn-point pool nor a live ARMY_XX Spawn marker -- skipped, no transform written.")
+    return nil
+end
+
 local function ApplyScenario(scenario, total, slotPattern)
-    if scenario.spawns then
+    if scenario.spawnIds then
         local spawnTransforms = GameInfo.MapData.markers and GameInfo.MapData.markers.Spawn
             and GameInfo.MapData.markers.Spawn.transforms
         if spawnTransforms then
-            for _, spawnRow in ipairs(scenario.spawns) do
-                if spawnTransforms[spawnRow.armyName] then
-                    spawnTransforms[spawnRow.armyName].position.x = spawnRow.x
-                    spawnTransforms[spawnRow.armyName].position.y = spawnRow.y
-                    spawnTransforms[spawnRow.armyName].position.z = spawnRow.z
+            for _, spawnId in ipairs(scenario.spawnIds) do
+                local armyName, x, y, z = ResolveSpawnId(spawnId, spawnTransforms)
+                -- UNCHANGED guard: never creates a missing transform, same as today. The literal-
+                -- ARMY_XX-fallback branch writes back the exact value it just read -- a harmless,
+                -- deliberate no-op (armyName == spawnId in that branch); not special-cased, since
+                -- this runs once per scenario match at map load, not a hot path.
+                if armyName and spawnTransforms[armyName] then
+                    spawnTransforms[armyName].position.x = x
+                    spawnTransforms[armyName].position.y = y
+                    spawnTransforms[armyName].position.z = z
                 end
             end
         end

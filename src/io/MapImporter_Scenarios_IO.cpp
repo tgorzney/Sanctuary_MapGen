@@ -45,7 +45,7 @@ void ReadPatternScenariosJson(const nlohmann::json& parent, std::vector<Params::
     for (const nlohmann::json& patternJson : parent["PatternScenarios"]) {
         Params::PatternScenario pattern;
         if (patternJson.is_object()) {
-            ReadScenarioBodyJson(patternJson, pattern.body, mapSize);
+            ReadScenarioBodyJson(patternJson, pattern.body, mapSize, result);
             ReadJsonText(patternJson, "Pattern", pattern.slotPattern);
         }
         outPatterns.push_back(pattern);
@@ -62,7 +62,7 @@ void ReadCountScenariosJson(const nlohmann::json& parent, std::vector<Params::Co
     for (const nlohmann::json& countJson : parent["CountScenarios"]) {
         Params::CountScenario countScenario;
         if (countJson.is_object()) {
-            ReadScenarioBodyJson(countJson, countScenario.body, mapSize);
+            ReadScenarioBodyJson(countJson, countScenario.body, mapSize, result);
             if (countJson.contains("Conditions") && countJson["Conditions"].is_array()) {
                 for (const nlohmann::json& conditionJson : countJson["Conditions"]) {
                     if (!conditionJson.is_object()) continue;
@@ -103,7 +103,11 @@ void ReadScenariosJson(const nlohmann::json& document, Params::MapRecipe& outRec
     ReadCountScenariosJson(scenariosJson, scenarios.countScenarios, mapSize, result);
 
     if (scenariosJson.contains("DefaultScenario") && scenariosJson["DefaultScenario"].is_object())
-        ReadScenarioBodyJson(scenariosJson["DefaultScenario"], scenarios.defaultScenario, mapSize);
+        ReadScenarioBodyJson(scenariosJson["DefaultScenario"], scenarios.defaultScenario, mapSize, result);
+
+    // §15.12 (STEP252) — the shared, Scenarios-level custom-spawn-point pool. Same tier as
+    // MaxArmySlotCount above, never per-ScenarioBody.
+    ReadSpawnPointsJson(scenariosJson, "SpawnPoints", scenarios.spawnPoints, mapSize);
 }
 
 } // namespace Io

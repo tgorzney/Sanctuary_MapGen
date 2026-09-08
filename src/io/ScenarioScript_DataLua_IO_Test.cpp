@@ -30,9 +30,7 @@ void PopulateFullScenarioBody(Params::ScenarioBody& body, const std::string& nam
     body.spawnsUnits = true;
     body.alloyMode = Params::ScenarioAlloyMode::Delta;
 
-    Params::ScenarioSpawn spawn;
-    spawn.armyName = "ArmyOne"; spawn.positionX = 10.0f; spawn.positionY = 1.0f; spawn.positionZ = 100.0f;
-    body.spawns.push_back(spawn);
+    body.spawnIds.push_back("ArmyOne");
 
     Params::ScenarioAlloyOverride alloy;
     alloy.armyName = "ArmyOne"; alloy.markerName = "Mass1";
@@ -325,14 +323,18 @@ void TestAlloyModeAllFourSpellings() {
     }
 }
 
-// 5. Coordinate flip, deterministic.
+// 5. Coordinate flip, deterministic. STEP252 (ARCH_15_12_ScenarioSpawnIdentity.md §15.12): spawn
+// positions now live ONLY in the shared spawn-point pool (SCENARIO_SPAWN_POINTS), never per-scenario
+// (spawnIds is a flat array of bare strings with no coordinates of its own) -- so this exercises the
+// pool's own render instead of the retired per-scenario ScenarioSpawn shape.
 void TestCoordinateFlipDeterministic() {
     Params::MapRecipe recipe;
     recipe.geometry.mapSize = 512;
 
-    Params::ScenarioSpawn spawn;
-    spawn.armyName = "ArmyOne"; spawn.positionX = 5.0f; spawn.positionY = 6.0f; spawn.positionZ = 100.0f;
-    recipe.scenarios.defaultScenario.spawns.push_back(spawn);
+    Params::ScenarioSpawnPoint spawnPoint;
+    spawnPoint.spawnId = "North"; spawnPoint.armyName = "ArmyOne";
+    spawnPoint.positionX = 5.0f; spawnPoint.positionY = 6.0f; spawnPoint.positionZ = 100.0f;
+    recipe.scenarios.spawnPoints.push_back(spawnPoint);
 
     const std::string output = Io::BuildScenarioDataLuaText(recipe);
 
@@ -340,6 +342,37 @@ void TestCoordinateFlipDeterministic() {
     Check(output.find("z = 100") == std::string::npos, "the unflipped positionZ value never appears");
     Check(output.find("x = 5") != std::string::npos, "x renders unflipped");
     Check(output.find("y = 6") != std::string::npos, "y renders unflipped");
+}
+
+// STEP252 -- SCENARIO_SPAWN_POINTS is always rendered, including "= {}" when the pool is empty, and
+// a scenario's spawnIds renders as a flat array of quoted strings, never array-of-tables (unlike
+// alloys/alloysToAdd, which still use AppendArrayOfTables).
+void TestSpawnPointsTableAndSpawnIdsFlatRender() {
+    {
+        Params::MapRecipe recipe;   // default-constructed: no spawnPoints authored
+        const std::string output = Io::BuildScenarioDataLuaText(recipe);
+        Check(output.find("SCENARIO_SPAWN_POINTS = {\n}") != std::string::npos,
+              "SCENARIO_SPAWN_POINTS renders as an empty table, never omitted, when the pool is empty");
+    }
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        Params::ScenarioSpawnPoint point;
+        point.spawnId = "North_1v1"; point.armyName = "ARMY_01";
+        recipe.scenarios.spawnPoints.push_back(point);
+        recipe.scenarios.defaultScenario.spawnIds = { "North_1v1", "ARMY_02" };
+
+        const std::string output = Io::BuildScenarioDataLuaText(recipe);
+        Check(output.find("spawnId = \"North_1v1\"") != std::string::npos
+              && output.find("armyName = \"ARMY_01\"") != std::string::npos,
+              "the pool row's spawnId/armyName render");
+        // A flat array of quoted strings ("spawnIds = { \"a\", \"b\" },"), never an array-of-tables
+        // row shape (which would render "{ armyName = ..." for each entry, matching alloys instead).
+        Check(output.find("spawnIds = { \"North_1v1\", \"ARMY_02\" }") != std::string::npos,
+              "spawnIds renders as a flat array of quoted strings, matching AppendArrayOfQuotedStrings");
+        Check(output.find("spawnIds = {\n") == std::string::npos,
+              "spawnIds is NOT rendered as a multi-line array-of-tables (the retired ScenarioSpawn shape)");
+    }
 }
 
 // 6. conditions spellings match STEP69's own tables.
@@ -586,6 +619,7 @@ int main() {
     TestBannerFirstLineExactMatch();
     TestAlloyModeAllFourSpellings();
     TestCoordinateFlipDeterministic();
+    TestSpawnPointsTableAndSpawnIdsFlatRender();
     TestConditionSpellingsMatchStep69();
     TestSlotRangeOccupiedCountRendersFieldAndRange();
     TestSlotRangeInvalidConditionRowSkipped();
