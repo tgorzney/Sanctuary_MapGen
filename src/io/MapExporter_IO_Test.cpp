@@ -264,6 +264,24 @@ static void TestFolderPreparationIsTheOneDoorAboveIo() {
     Check(Io::EnsureExportFolderExists(scratchFolder, result), "and creating it twice is fine");
 }
 
+// STEP251 item 20 -- the .sanmap leg's own wiring: an invalidly-named ScenarioBody::name is warned on
+// (never blocked) even when exported through the plain ExportSanmapOnly action, not only through the
+// Files tab's separate "Export Scenario Script" button.
+static void TestInvalidScenarioNameWarnsOnSanmapLegButNeverBlocks() {
+    const std::string scratchFolder = ScratchFolderPath();
+    Params::MapRecipe recipe;
+    recipe.geometry.mapSize = 4;
+    recipe.mapName = "scratch";
+    recipe.scenarios.defaultScenario.name = "Bad Name!";
+
+    const Io::MapExportResult result = Io::MapExporter::ExportSanmapOnly(scratchFolder, recipe);
+
+    Check(result.bSucceeded, "an invalid scenario name never blocks the .sanmap export");
+    Check(result.warningCount >= 1, "and increments warningCount by at least one");
+    Check(result.debugLog.find("Bad Name!") != std::string::npos,
+          "debugLog names the offending scenario name");
+}
+
 int main() {
     TestQuantizersClampInsteadOfWrapping();
     TestPathJoinNeverDoublesASeparator();
@@ -274,6 +292,7 @@ int main() {
     TestAnInvalidRecipeIsRefusedBeforeAnythingIsWritten();
     TestExportAllWritesEveryPayload();
     TestFolderPreparationIsTheOneDoorAboveIo();
+    TestInvalidScenarioNameWarnsOnSanmapLegButNeverBlocks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

@@ -298,6 +298,52 @@ static void TestStaleAreaNameLogsViaResultLog() {
           "stale areaName: debugLog names the missing areaName");
 }
 
+// STEP251 item 15 -- end-to-end wiring: a spawnsUnits==true, validly-named scenario, run through the
+// real ExportMapScenario, produces a scaffold on disk plus the log/writtenFilePaths evidence.
+static void TestCategoryFourScaffoldWiringEndToEnd() {
+    const std::string root = ScratchFolderPath("CategoryFourWiring_Root");
+    MakeValidGameInstallRoot(root);
+    const std::string bundledDirectory = MakeValidBundledRuntimeDirectory("CategoryFourWiring_Bundled");
+    Params::MapRecipe recipe = MakeRecipe("TestMap11");
+    recipe.scenarios.defaultScenario.name = "MyGenScenario";
+    recipe.scenarios.defaultScenario.spawnsUnits = true;
+
+    const Io::ScenarioExportResult result = Io::ExportMapScenario(root, recipe, bundledDirectory, "");
+
+    const std::string mapScriptDirectory = MapScriptDirectoryFor(root, recipe.mapName);
+    const std::string categoryFourPath =
+        Io::JoinExportPath(mapScriptDirectory, recipe.mapName + "_Scenarios_MyGenScenario.lua");
+    Check(FileExists(categoryFourPath), "category-4 wiring: the scaffold file exists on disk");
+    bool bWrittenPathRecorded = false;
+    for (const std::string& writtenPath : result.writtenFilePaths)
+        if (writtenPath == categoryFourPath) bWrittenPathRecorded = true;
+    Check(bWrittenPathRecorded, "category-4 wiring: result.writtenFilePaths contains it");
+    Check(result.debugLog.find("Scaffolded new category-4") != std::string::npos,
+          "category-4 wiring: debugLog contains the scaffold log line");
+}
+
+// STEP251 item 16 -- invalid-name wiring: the refusal is logged, no category-4 file is written, and
+// the other two legs (Data.lua/Runtime.lua) are unaffected.
+static void TestCategoryFourInvalidNameWiringRefusesOnlyItsOwnLeg() {
+    const std::string root = ScratchFolderPath("CategoryFourInvalidWiring_Root");
+    MakeValidGameInstallRoot(root);
+    const std::string bundledDirectory =
+        MakeValidBundledRuntimeDirectory("CategoryFourInvalidWiring_Bundled");
+    Params::MapRecipe recipe = MakeRecipe("TestMap12");
+    recipe.scenarios.defaultScenario.name = "Bad Name";
+    recipe.scenarios.defaultScenario.spawnsUnits = true;
+
+    const Io::ScenarioExportResult result = Io::ExportMapScenario(root, recipe, bundledDirectory, "");
+
+    Check(result.debugLog.find("was NOT written") != std::string::npos,
+          "invalid-name wiring: debugLog contains the refusal message");
+    const std::string mapScriptDirectory = MapScriptDirectoryFor(root, recipe.mapName);
+    Check(!FileExists(Io::JoinExportPath(mapScriptDirectory, recipe.mapName + "_Scenarios_Bad Name.lua")),
+          "invalid-name wiring: no category-4 file was written");
+    Check(result.bDataLuaWritten, "invalid-name wiring: Data.lua still writes cleanly");
+    Check(result.bRuntimeCopied, "invalid-name wiring: Runtime.lua still writes cleanly");
+}
+
 int main() {
     TestInvalidRootReturnsAllDefaultsAndTouchesNothing();
     TestCleanExportFreshFolder();
@@ -309,6 +355,8 @@ int main() {
     TestRuntimeResolutionFailureDoesNotBlockDataLua();
     TestFolderAutoCreation();
     TestStaleAreaNameLogsViaResultLog();
+    TestCategoryFourScaffoldWiringEndToEnd();
+    TestCategoryFourInvalidNameWiringRefusesOnlyItsOwnLeg();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

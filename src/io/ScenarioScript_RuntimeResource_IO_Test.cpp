@@ -4,6 +4,7 @@
 // SANGEN_V2_LUA_RESOURCE_DIRECTORY holding the real bundled SanGenScenarioRuntime.lua.
 #include "ScenarioScript_RuntimeResource_IO.h"
 #include "FilesystemPrimitives_IO.h"
+#include "../sys/LuaSyntaxCheck_SYS.h"
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -109,10 +110,11 @@ static void TestReadableOverrideShortCircuitsBeforeTouchingBundledDirectory() {
 }
 
 // 6. Real bundled resource self-check, driven off the CMake-staged directory (argv[2]).
-// Correction 2026-08-22: items (a)/(d) of the ticket's original acceptance test depend on
-// STEP65 (Sys::CheckLuaSyntax) and STEP70 (Io::kScenarioGeneratedFileBannerLine), neither of
-// which exists in this worktree yet. (a) is replaced with a hardcoded literal comparison; (d) is
-// skipped outright, both per the ticket's correction.
+// Correction 2026-08-22: item (a) of the ticket's original acceptance test depended on STEP70
+// (Io::kScenarioGeneratedFileBannerLine), which did not exist in this worktree yet -- replaced with a
+// hardcoded literal comparison, per the ticket's correction. Item (d) depended on STEP65
+// (Sys::CheckLuaSyntax) and was skipped outright at the time; STEP251 closes that TODO below now
+// that STEP65 has shipped.
 static void TestRealBundledResourceSelfCheck(const std::string& luaResourceDirectory) {
     if (luaResourceDirectory.empty()) {
         std::printf("SKIP TestRealBundledResourceSelfCheck: no lua resource directory given (argv[2])\n");
@@ -159,7 +161,19 @@ static void TestRealBundledResourceSelfCheck(const std::string& luaResourceDirec
     Check(text.find("matchedScenario.navy") == std::string::npos,
           "the retired matchedScenario.navy read is gone");
 
-    // (d) TODO(after STEP65 lands): add Sys::CheckLuaSyntax(runtimeLuaText).bSucceeded == true
+    // (d) STEP251 -- closes this file's own pre-existing TODO: Sys::CheckLuaSyntax (STEP65) now
+    // exists in this worktree (it did not when the TODO above was written). Incidental fix, flagged
+    // here rather than silently bundled -- this ticket's own dependency on Sys::CheckLuaSyntax
+    // happens to unblock it.
+    Check(Sys::CheckLuaSyntax(text).bSucceeded, "the real bundled resource is syntactically valid Lua");
+
+    // STEP251 -- the generic per-scenario dispatcher (ARCH_15_04_ThreeFileOnDiskShape.md
+    // "AMENDED 2026-09-03") is defined, and the ARCH_15_05 OPEN-item placeholder comment it replaces
+    // is gone, not merely supplemented.
+    Check(text.find("function Scenario.SpawnMatchedScenarioUnits") != std::string::npos,
+          "the generic per-scenario dispatcher is defined");
+    Check(text.find("is deliberately NOT added here") == std::string::npos,
+          "the ARCH_15_05 OPEN-item placeholder comment was replaced, not merely supplemented");
 
     // 7b. Missing-alloy-roster guard is present and loud (text assertions on the bundled resource).
     Check(text.find("bAlloyRosterAvailable") != std::string::npos,

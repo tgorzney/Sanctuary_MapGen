@@ -1007,6 +1007,14 @@ add_sangen_test(ScenarioSlotRangeValidation_IO_Test
 # target immediately above.
 add_sangen_test(ScenarioSpawnIdValidation_IO_Test
     src/io/ScenarioSpawnIdValidation_IO_Test.cpp)
+# STEP251_ScenarioCategoryFourExport_IO: pure charset/uniqueness/reserved-name validation of
+# ScenarioBody::name, shared by the UI's inline warning and the category-4 export gate.
+add_sangen_test(ScenarioNameValidation_IO_Test src/io/ScenarioNameValidation_IO_Test.cpp)
+
+# STEP251_ScenarioCategoryFourExport_IO: the scaffold-once-if-missing category-4 file writer. Pure
+# string-building + std::filesystem + Sys::CheckLuaSyntax, no JSON type in sight -- no nlohmann link
+# needed, same posture as ScenarioScript_Export_IO_Test.
+add_sangen_test(ScenarioScript_CategoryFourExport_IO_Test src/io/ScenarioScript_CategoryFourExport_IO_Test.cpp)
 # STEP237_MarkerLinkParamsAndIO_PARAMS_IO: the new `MarkerLinks` array + the two merged
 # `LinkIdentifier` back-reference fields (ARCH §19.28/§19.29/§19.30) — own pair of small, disk-free
 # round-trip binaries, same "own file, own test" convention as

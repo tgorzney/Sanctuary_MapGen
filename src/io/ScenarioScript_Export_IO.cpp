@@ -1,15 +1,16 @@
 // ScenarioScript_Export_IO.cpp -- see ScenarioScript_Export_IO.h for the file-level contract.
-// Implements the 8-step sequence of STEP71 §3: validate root -> ensure the map script folder ->
+// Implements STEP71 §3's sequence: validate root -> ensure the map script folder ->
 // existence-only orchestrator check -> render Data.lua -> syntax pre-check -> banner-gated write
-// for Data.lua -> resolve+syntax-check+banner-gated write for Runtime.lua -> return. Every failure
-// path degrades gracefully (Constitution §6) -- never a crash, never a partial/corrupt write, never
-// one file's refusal blocking the other's write.
+// for Data.lua -> resolve+syntax-check+banner-gated write for Runtime.lua -> category-4 scaffold
+// export (STEP251) -> return. Every failure path degrades gracefully (Constitution §6) -- never a
+// crash, never a partial/corrupt write, never one file's refusal blocking another's write.
 #include "ScenarioScript_Export_IO.h"
 #include "FilesystemPrimitives_IO.h"
 #include "GameInstallLocation_IO.h"
 #include "MapExporter_ScenarioAreaNameValidation_IO.h"
 #include "ScenarioSlotRangeValidation_IO.h"
 #include "ScenarioSpawnIdValidation_IO.h"
+#include "ScenarioScript_CategoryFourExport_IO.h"
 #include "ScenarioScript_DataLua_IO.h"
 #include "ScenarioScript_RuntimeResource_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -146,7 +147,20 @@ ScenarioExportResult ExportMapScenario(const std::string& gameInstallRoot,
     // !bSucceeded -> bRuntimeCopied stays false; a missing/unreadable runtime never blocks the
     // Data.lua write already completed above, and never crashes the export.
 
-    // 8. Return.
+    // 8. Category-4 scaffold export (STEP251) -- runs even if the Data.lua/Runtime.lua legs above
+    // failed; a category-4 scaffold's own name-validation gate is per-scenario, independent of
+    // whether the map's other two SanGen-owned files wrote cleanly this export.
+    const ScenarioCategoryFourExportReport categoryFourReport =
+        ExportScenarioCategoryFourScaffolds(mapScriptDirectory, recipe);
+    for (const std::string& scaffoldedPath : categoryFourReport.scaffoldedFilePaths) {
+        result.writtenFilePaths.push_back(scaffoldedPath);
+        result.Log("Scaffolded new category-4 generator file: " + scaffoldedPath);
+    }
+    for (const std::string& refusal : categoryFourReport.writeRefusals) {
+        result.Log(refusal);
+    }
+
+    // 9. Return.
     return result;
 }
 

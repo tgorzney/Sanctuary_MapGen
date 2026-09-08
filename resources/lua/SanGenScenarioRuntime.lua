@@ -298,9 +298,8 @@ local function ApplyScenario(scenario, total, slotPattern)
     Log("SANGEN: scenario '"..tostring(scenario.name).."' applied ("..total.." occupied slot(s)).")
 end
 
--- Set inside ResolveAndApply, read by a future Scenario.SpawnMatchedScenarioUnits (NOT defined in
--- this file -- see ARCH_15_05_ParamsScenariosType.md §15.5's OPEN item 2; forward-compatible
--- plumbing only, harmless with no consumer, and does not itself decide where that consumer lives).
+-- Set inside ResolveAndApply, read by Scenario.SpawnMatchedScenarioUnits below (STEP251,
+-- ARCH_15_04_ThreeFileOnDiskShape.md "AMENDED 2026-09-03" -- resolves ARCH_15_05's OPEN item 2).
 local currentMatchedScenarioName = nil
 
 function Scenario.ResolveAndApply(total, humanCount, aiCount, playersInformation)
@@ -348,11 +347,28 @@ function Scenario.SpawnUnits(instructions)
         placed, failed, #instructions))
 end
 
--- `Scenario.SpawnMatchedScenarioUnits(area)` -- the per-scenario dispatcher that would call
--- Scenario.SpawnUnits above -- is deliberately NOT added here. ARCH_15_05_ParamsScenariosType.md
--- §15.5 OPEN item 2: where per-scenario dispatch/generator code lives under the ratified
--- three-file split is an unresolved ARCH question. Adding it (even as a no-op stub) would invent an
--- answer this ticket is not authorized to give.
+-- ============================================================================
+-- Generic per-scenario dispatch (`ARCH_15_04_ThreeFileOnDiskShape.md` "AMENDED 2026-09-03",
+-- MAP_SCENARIO_SPEC.md §11.2). Lazily Import()s ONLY the one matched scenario's own category-4
+-- generator file, <MapName>_Scenarios_<ScenarioName>.lua -- never eager, never a name->function table
+-- built up front, never an enumeration of the whole authored Scenarios set. A missing file for a
+-- spawnsUnits == false scenario is the silent, expected common case; a missing file for
+-- spawnsUnits == true is a real authoring gap that pcall degrades to "no units spawned," never an
+-- abort -- the same per-call pcall ordering law this file's own FindMatchingScenario already follows.
+-- ============================================================================
+function Scenario.SpawnMatchedScenarioUnits(area)
+    if not currentMatchedScenarioName then return end
+    local path = string.format("maps/%s/%s_Scenarios_%s.lua",
+        currentMapName, currentMapName, currentMatchedScenarioName)
+    local importOk, generatorModule = pcall(Import, path)
+    if not importOk or not generatorModule or not generatorModule.GenerateScenarioUnits then
+        return  -- no such file: this scenario did not opt into unit spawning -- not an error
+    end
+    local buildOk, instructions = pcall(generatorModule.GenerateScenarioUnits, area)
+    if buildOk and instructions then
+        Scenario.SpawnUnits(instructions)
+    end
+end
 
 return Scenario -- inert (Import() ignores a module's `return`, MAP_SCENARIO_SPEC.md §3) -- kept
                 -- only for parity with the live reference's own final line.

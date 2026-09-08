@@ -6,6 +6,7 @@
 #include "MapExporter_ArmySpawnMarkerValidation_IO.h"
 #include "MapExporter_BlueprintValidation_IO.h"
 #include "MapExporter_ScenarioAreaNameValidation_IO.h"
+#include "ScenarioNameValidation_IO.h"
 #include "ScenarioSlotRangeValidation_IO.h"
 #include "ScenarioSpawnIdValidation_IO.h"
 #include "MapExporter_Recipe_IO.h"
@@ -45,6 +46,16 @@ void ReportScenarioSpawnIdViolations(const Params::MapRecipe& recipe, MapExportR
     result.Warn(report.SummaryText());
 }
 
+// STEP251 -- warn, never block. An invalid/duplicate/reserved ScenarioBody::name is caught here too
+// (not only in ScenarioScript_Export_IO's category-4 gate) because the .sanmap leg is a separate,
+// independently-triggerable export action -- Constitution §6's "loud, logged" posture applies
+// regardless of which button produced the document.
+void ReportScenarioNameViolations(const Params::MapRecipe& recipe, MapExportResult& result) {
+    const ScenarioNameValidationReport report = ValidateScenarioNames(recipe.scenarios);
+    if (report.AllNamesValid()) return;
+    result.Warn(report.SummaryText());
+}
+
 bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe& recipe,
                          const MapExportOptions& options, MapExportResult& result,
                          const UnknownImportBag* unknownData) {
@@ -55,6 +66,7 @@ bool WriteSanmapDocument(const std::string& folderPath, const Params::MapRecipe&
     // panel reads.
     CheckArmyIdentitiesWellFormed(recipe.armies, result);
     ReportScenarioAreaNameReferences(recipe, result);
+    ReportScenarioNameViolations(recipe, result);
     ReportScenarioSlotRangeViolations(recipe, result);
     ReportScenarioSpawnIdViolations(recipe, result);
 

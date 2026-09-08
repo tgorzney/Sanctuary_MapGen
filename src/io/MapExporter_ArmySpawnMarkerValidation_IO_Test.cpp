@@ -178,6 +178,11 @@ static void TestExportDoesNotMutateTheRecipe() {
 static void TestOneAggregateWarningNotOnePerArmy() {
     Params::MapRecipe recipe;
     recipe.mapName = "scratch";
+    // STEP251: a default-constructed ScenarioBody::name is empty, which is itself a charset
+    // violation (ScenarioNameValidation_IO) regardless of spawnsUnits -- give the default scenario a
+    // valid name so this test's own warningCount assertion stays isolated to the army-orphan concern
+    // it actually tests, not incidentally coupled to an unrelated validator's default-state warning.
+    recipe.scenarios.defaultScenario.name = "Default";
     recipe.armies.push_back(MakeArmy("ARMY_01"));
     recipe.armies.push_back(MakeArmy("ARMY_02"));
     recipe.armies.push_back(MakeArmy("ARMY_03"));

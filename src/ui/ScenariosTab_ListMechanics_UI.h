@@ -84,7 +84,8 @@ inline DraggableListSignal DrawScenarioPatternList(std::vector<Params::PatternSc
                                                     const std::vector<Params::Army>& armies,
                                                     const std::vector<Params::MapArea>& areas,
                                                     int maxArmySlotCount, int selectedIndex,
-                                                    const Params::Scenarios& allScenarios) {
+                                                    const Params::Scenarios& allScenarios,
+                                                    const Io::ScenarioNameValidationReport& nameReport) {
     std::string labelBuffer;
     return DraggableList<Params::PatternScenario>::Render(
         "patternScenarios", scenarios,
@@ -97,7 +98,7 @@ inline DraggableListSignal DrawScenarioPatternList(std::vector<Params::PatternSc
             Params::PatternScenario& scenario = scenarios[static_cast<std::size_t>(rowIndex)];
             DrawSlotPatternToggleRow(scenario.slotPattern, armies, maxArmySlotCount);
             DrawScenarioSpawnsWarningBanner(scenario.body, armies);
-            DrawScenarioBodyFields(scenario.body, armies, areas, allScenarios);
+            DrawScenarioBodyFields(scenario.body, armies, areas, allScenarios, nameReport);
         },
         selectedIndex);
 }
@@ -105,7 +106,8 @@ inline DraggableListSignal DrawScenarioPatternList(std::vector<Params::PatternSc
 inline DraggableListSignal DrawScenarioCountList(Params::Scenarios& scenarios,
                                                   const std::vector<Params::Army>& armies,
                                                   const std::vector<Params::MapArea>& areas,
-                                                  int selectedIndex) {
+                                                  int selectedIndex,
+                                                  const Io::ScenarioNameValidationReport& nameReport) {
     std::string labelBuffer;
     return DraggableList<Params::CountScenario>::Render(
         "countScenarios", scenarios.countScenarios,
@@ -118,7 +120,7 @@ inline DraggableListSignal DrawScenarioCountList(Params::Scenarios& scenarios,
             Params::CountScenario& scenario = scenarios.countScenarios[static_cast<std::size_t>(rowIndex)];
             DrawScenarioCountConditionsEditor(scenario.conditions, scenarios.maxArmySlotCount);
             DrawScenarioSpawnsWarningBanner(scenario.body, armies);
-            DrawScenarioBodyFields(scenario.body, armies, areas, scenarios);
+            DrawScenarioBodyFields(scenario.body, armies, areas, scenarios, nameReport);
         },
         selectedIndex);
 }

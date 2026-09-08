@@ -20,12 +20,17 @@
 #include "Combo_UI.h"
 #include "SliderScalar_UI.h"
 #include "TextInput_UI.h"
+#include "../io/ScenarioNameValidation_IO.h"
 #include "imgui.h"
 #include <cstring>
 
 namespace SanmapGen {
 namespace Ui {
 namespace {
+
+// STEP251 -- duplicating FilesTab_ScenarioExportRow_Draw_UI.cpp's exact value (same established
+// "each file owns its own copy" precedent this ARCH family already uses repeatedly).
+const ImVec4 kErrorTextColor(0.95f, 0.35f, 0.35f, 1.0f);
 
 enum : int { kScenarioAlloyModeCount = 4 };
 const char* const scenarioAlloyModeLabels[kScenarioAlloyModeCount] = { "Explicit", "Occupancy", "Keep All", "Delta" };
@@ -116,19 +121,22 @@ void DrawAuthoringNoteField(std::string& authoringNote) {
 // for `scenarios.spawnPoints` (the spawnIds picker's own options) and the live inline warning below.
 void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params::Army>& armies,
                             const std::vector<Params::MapArea>& areas,
-                            const Params::Scenarios& scenarios) {
+                            const Params::Scenarios& scenarios,
+                            const Io::ScenarioNameValidationReport& nameReport) {
     TextInputRules nameRules; nameRules.maximumLength = 64; nameRules.bAllowEmpty = true;
     DrawTextInput("Name", body.name, nameRules);
+    // STEP251 -- non-blocking, informational, live inline warning: never auto-corrects/renames/
+    // truncates/dedupes (ARCH ruling), just surfaces the same rule the export-time gate enforces.
+    if (const std::string* invalidReason = nameReport.FindViolationReasonForName(body.name))
+        ImGui::TextColored(kErrorTextColor, "%s", ("\xE2\x9A\xA0 " + *invalidReason).c_str());
     ImGui::SeparatorText("Area");
     DrawScenarioAreaFields(body, areas);
     DrawCheckbox("Spawns Units", body.spawnsUnits);
-    // Two-step opt-in, load-bearing to say out loud (ARCH_15_05_ParamsScenariosType.md §15.5,
-    // MAP_SCENARIO_SPEC.md §11): this checkbox alone spawns nothing. A matching name-keyed branch
-    // must ALSO exist in the map's own Lua dispatch. This UI does not, and cannot, validate that
-    // such a branch exists (ARCH §15.5 OPEN item 2 — not this ticket's to resolve).
-    ImGui::TextWrapped("%s", "\xE2\x9A\xA0 Setting this alone spawns nothing. The map's own Lua "
-        "runtime also needs a matching branch, keyed off this scenario's Name, that actually "
-        "spawns units.");
+    // STEP251: this text used to describe the now-superseded if/elseif dispatch. SanGen now scaffolds
+    // the category-4 generator file itself (ARCH_15_04_ThreeFileOnDiskShape.md "AMENDED 2026-09-03").
+    ImGui::TextWrapped("%s", "\xE2\x9A\xA0 Setting this alone spawns nothing. SanGen scaffolds "
+        "<MapName>_Scenarios_<Name>.lua on the next Scenario Script export if it does not exist yet -- "
+        "open that file and fill in GenerateScenarioUnits(area) to actually spawn units.");
     ImGui::SeparatorText("Alloys");
     DrawScenarioAlloyModeField(body);
     ImGui::SeparatorText("Spawns");

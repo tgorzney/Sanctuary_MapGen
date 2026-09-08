@@ -31,6 +31,7 @@
 #include "LuaCodeEditor_UI.h"
 #include "Section_UI.h"
 #include "UniqueNameList_UI.h"
+#include "../io/ScenarioNameValidation_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {
@@ -157,7 +158,8 @@ void DrawArmyNameField(const char* label, std::string& armyNameKey,
 
 void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params::Army>& armies,
                             const std::vector<Params::MapArea>& areas,
-                            const Params::Scenarios& scenarios);                     // Detail_UI.cpp
+                            const Params::Scenarios& scenarios,
+                            const Io::ScenarioNameValidationReport& nameReport);      // Detail_UI.cpp
 // STEP252 (ARCH_15_12_ScenarioSpawnIdentity.md §15.12) — the per-scenario spawnIds picker + its own
 // live inline warning. Split out of DrawScenarioBodyFields for the ARCH §1.5 file-size ceiling
 // (mirrors DrawScenarioBodyExtendedFields' own split, immediately below), called only by it.

@@ -38,7 +38,8 @@ void DrawScenarioTierToolbar(const char* addLabel, std::vector<ScenarioT>& scena
 // draw that used to run once at the bottom for whatever they pointed at is gone.
 void DrawScenarioPatternTier(Params::Scenarios& scenarios, ScenariosTabState& state,
                              const std::vector<Params::Army>& armies,
-                             const std::vector<Params::MapArea>& areas) {
+                             const std::vector<Params::MapArea>& areas,
+                             const Io::ScenarioNameValidationReport& nameReport) {
     ImGui::PushID("pattern");
     if (!DrawSectionBegin("Exact Slot Patterns", state.patternSection)) { ImGui::PopID(); return; }
     ImGui::TextWrapped("Order here is cosmetic - exact-match only, first-and-only match wins "
@@ -47,7 +48,7 @@ void DrawScenarioPatternTier(Params::Scenarios& scenarios, ScenariosTabState& st
     const int priorSelection = state.selectedTier == ScenarioSelectedTier::Pattern ? state.selectedIndex : -1;
     const DraggableListSignal signal = DrawScenarioPatternList(scenarios.patternScenarios, armies, areas,
                                                                scenarios.maxArmySlotCount, priorSelection,
-                                                               scenarios);
+                                                               scenarios, nameReport);
     if (signal.bHasSignal())
         ApplyScenarioListSignal(scenarios.patternScenarios, state, ScenarioSelectedTier::Pattern, signal);
     DrawSectionEnd();
@@ -56,14 +57,15 @@ void DrawScenarioPatternTier(Params::Scenarios& scenarios, ScenariosTabState& st
 
 void DrawScenarioCountTier(Params::Scenarios& scenarios, ScenariosTabState& state,
                            const std::vector<Params::Army>& armies,
-                           const std::vector<Params::MapArea>& areas) {
+                           const std::vector<Params::MapArea>& areas,
+                           const Io::ScenarioNameValidationReport& nameReport) {
     ImGui::PushID("count");
     if (!DrawSectionBegin("Composition Rules", state.countSection)) { ImGui::PopID(); return; }
     ImGui::TextWrapped("Array order IS match priority (\xC2\xA7 15.6) - drag to reorder, checked top "
                        "to bottom; the label's leading number always agrees with position.");
     DrawScenarioTierToolbar("Add Composition Rule", scenarios.countScenarios, state, ScenarioSelectedTier::Count);
     const int priorSelection = state.selectedTier == ScenarioSelectedTier::Count ? state.selectedIndex : -1;
-    const DraggableListSignal signal = DrawScenarioCountList(scenarios, armies, areas, priorSelection);
+    const DraggableListSignal signal = DrawScenarioCountList(scenarios, armies, areas, priorSelection, nameReport);
     if (signal.bHasSignal())
         ApplyScenarioListSignal(scenarios.countScenarios, state, ScenarioSelectedTier::Count, signal);
     DrawSectionEnd();
@@ -74,13 +76,14 @@ void DrawScenarioCountTier(Params::Scenarios& scenarios, ScenariosTabState& stat
 // the section body selects it outright (Fix §2's "clicking inside the fixed Default panel").
 void DrawScenarioDefaultTier(Params::Scenarios& scenarios, ScenariosTabState& state,
                              const std::vector<Params::Army>& armies,
-                             const std::vector<Params::MapArea>& areas) {
+                             const std::vector<Params::MapArea>& areas,
+                             const Io::ScenarioNameValidationReport& nameReport) {
     ImGui::PushID("default");
     if (!DrawSectionBegin("Default (always matches)", state.defaultSection)) { ImGui::PopID(); return; }
     ImGui::TextWrapped("The catch-all: whatever no Tier 1/2 rule claims lands here.");
     SelectScenarioDefaultTier(state);
     // Tier 3 is never spawns-flagged (see ScenariosTab_UI.h) — no warning banner drawn.
-    DrawScenarioBodyFields(scenarios.defaultScenario, armies, areas, scenarios);
+    DrawScenarioBodyFields(scenarios.defaultScenario, armies, areas, scenarios, nameReport);
     DrawSectionEnd();
     ImGui::PopID();
 }
@@ -90,11 +93,14 @@ void DrawScenarioDefaultTier(Params::Scenarios& scenarios, ScenariosTabState& st
 void DrawScenariosTab(Params::MapRecipe& recipe, ScenariosTabState& state, Pipeline::PreviewDriver*) {
     ImGui::PushID("scenariosTab");
     Params::Scenarios& scenarios = recipe.scenarios;
+    // STEP251 -- computed ONCE per frame, never once per row (that would be needless repeated O(n)
+    // work per row); threaded down to every DrawScenarioBodyFields call site.
+    const Io::ScenarioNameValidationReport nameReport = Io::ValidateScenarioNames(scenarios);
     DrawScenarioSettings(scenarios, state.settingsSection, recipe.armies);
     DrawScenarioSpawnPointPoolFields(scenarios, state.spawnPointPoolSection, recipe.armies);
-    DrawScenarioPatternTier(scenarios, state, recipe.armies, recipe.areas);
-    DrawScenarioCountTier(scenarios, state, recipe.armies, recipe.areas);
-    DrawScenarioDefaultTier(scenarios, state, recipe.armies, recipe.areas);
+    DrawScenarioPatternTier(scenarios, state, recipe.armies, recipe.areas, nameReport);
+    DrawScenarioCountTier(scenarios, state, recipe.armies, recipe.areas, nameReport);
+    DrawScenarioDefaultTier(scenarios, state, recipe.armies, recipe.areas, nameReport);
     DrawScenarioMatrix(scenarios, state.matrixSection);
     DrawScenarioRuntimeScriptSection(state);
     ImGui::PopID();
