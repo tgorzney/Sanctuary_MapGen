@@ -54,9 +54,17 @@ std::vector<char> ParseSlotPatternToToggles(const std::string& pattern, int maxA
 
 // AND-of-clauses, matching the runtime's Lua truth table exactly. Vacuously true for an empty
 // conjunction (no conditions authored == "always matches", the Tier 2 default-of-the-tier reading).
+//
+// SlotRangeOccupiedCount (STEP253) fails CLOSED here rather than silently reusing `ai`'s slot: this
+// (total, human, ai)-only overload was never given WHICH slots are filled, so it cannot answer a
+// slot-identity-dependent clause honestly. Callers needing a real answer for that field use
+// EvaluateScenarioConditionsTriState below, which takes maxArmySlotCount and reasons about the
+// achievable occupied-count range instead of guessing (matches the Lua runtime's own "unknown field
+// -> fail closed, never matches" posture for a condition this overload cannot evaluate).
 bool MatchesScenarioConditions(const std::vector<Params::ScenarioCountCondition>& conditions,
                                int total, int human, int ai) {
     for (const Params::ScenarioCountCondition& condition : conditions) {
+        if (condition.field == Params::ScenarioCountField::SlotRangeOccupiedCount) return false;
         const int fieldValue = condition.field == Params::ScenarioCountField::Total ? total
                               : condition.field == Params::ScenarioCountField::HumanCount ? human : ai;
         bool bClausePasses = false;
@@ -72,6 +80,9 @@ bool MatchesScenarioConditions(const std::vector<Params::ScenarioCountCondition>
     }
     return true;
 }
+
+// EvaluateScenarioConditionsTriState (the composition matrix's own tri-state extension, STEP253)
+// lives in ScenariosTab_SlotRangeTriState_UI.cpp — split out for the ARCH §1.5 file-size ceiling.
 
 namespace {
 // The first countScenarios[] index matching this triple, by array order, or -1 (default's turn).

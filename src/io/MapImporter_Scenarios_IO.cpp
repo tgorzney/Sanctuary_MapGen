@@ -15,9 +15,10 @@ namespace SanmapGen {
 namespace Io {
 namespace {
 
-// Index == the enum's own declaration order (ARCH_15_05_ParamsScenariosType.md §15.5).
-constexpr const char* kCountFieldSpellings[3] = { "Total", "HumanCount", "AiCount" };
-constexpr int         kCountFieldCount        = 3;
+// Index == the enum's own declaration order (ARCH_15_05_ParamsScenariosType.md §15.5). 4th entry
+// ADDED 2026-09-04 (STEP253, §15.5 AMENDED 2026-09-04).
+constexpr const char* kCountFieldSpellings[4] = { "Total", "HumanCount", "AiCount", "SlotRangeOccupiedCount" };
+constexpr int         kCountFieldCount        = 4;
 constexpr const char* kComparatorSpellings[6] =
     { "Equal", "NotEqual", "GreaterThan", "GreaterOrEqual", "LessThan", "LessOrEqual" };
 constexpr int         kComparatorCount        = 6;
@@ -73,6 +74,11 @@ void ReadCountScenariosJson(const nlohmann::json& parent, std::vector<Params::Co
                     if (ReadJsonEnumerationText(conditionJson, "Comparator", kComparatorSpellings, kComparatorCount, comparatorValue))
                         condition.comparator = static_cast<Params::ScenarioComparator>(comparatorValue);
                     ReadJsonInteger(conditionJson, "Value", condition.value);
+                    // Absent key (every pre-STEP253 .sanmap) -> stays at the struct default (1, 1).
+                    // Legacy files unaffected, no migration entry needed (ARCH_15_05
+                    // §15.5 AMENDED 2026-09-04).
+                    ReadJsonInteger(conditionJson, "SlotRangeStart", condition.slotRangeStart);
+                    ReadJsonInteger(conditionJson, "SlotRangeEnd", condition.slotRangeEnd);
                     countScenario.conditions.push_back(condition);
                 }
             }

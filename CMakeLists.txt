@@ -1007,6 +1007,11 @@ add_sangen_test(MapExporter_ArmySpawnMarkerValidation_IO_Test
 # target immediately above.
 add_sangen_test(MapExporter_ScenarioAreaNameValidation_IO_Test
     src/io/MapExporter_ScenarioAreaNameValidation_IO_Test.cpp)
+# STEP253_ScenarioSlotRangeCondition_PARAMS_IO_UI: the export-time, warn-only
+# ScenarioCountCondition::slotRangeStart/slotRangeEnd bounds scan. Same posture as the
+# ScenarioAreaNameValidation target immediately above.
+add_sangen_test(ScenarioSlotRangeValidation_IO_Test
+    src/io/ScenarioSlotRangeValidation_IO_Test.cpp)
 # STEP237_MarkerLinkParamsAndIO_PARAMS_IO: the new `MarkerLinks` array + the two merged
 # `LinkIdentifier` back-reference fields (ARCH §19.28/§19.29/§19.30) — own pair of small, disk-free
 # round-trip binaries, same "own file, own test" convention as

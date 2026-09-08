@@ -62,7 +62,10 @@ struct ScenarioBody {
 struct PatternScenario { ScenarioBody body; std::string slotPattern; };            // TIER 1
 
 enum class ScenarioComparator { Equal, NotEqual, GreaterThan, GreaterOrEqual, LessThan, LessOrEqual };
-enum class ScenarioCountField { Total, HumanCount, AiCount };
+enum class ScenarioCountField { Total, HumanCount, AiCount, SlotRangeOccupiedCount };  // 4th
+                                                        // enumerator ADDED 2026-09-04
+                                                        // (ARCH_15_05_ParamsScenariosType.md §15.5
+                                                        // AMENDED 2026-09-04, STEP253)
 // DEVIATION FROM §15.5's LITERAL TEXT, flagged (STEP69 coder): the ratified block leaves `field`/
 // `comparator` with no default member initializer, unlike every sibling field in this same block
 // (`alloyMode`/`side`/`value` all have one). A bare `Params::ScenarioCountCondition condition;`
@@ -76,6 +79,13 @@ struct ScenarioCountCondition {
     ScenarioCountField field           = ScenarioCountField::Total;
     ScenarioComparator comparator      = ScenarioComparator::Equal;
     int                value           = 0;
+    int                slotRangeStart  = 1;   // ADDED 2026-09-04 (STEP253), 1-based, inclusive —
+                                                // meaningful ONLY when field ==
+                                                // SlotRangeOccupiedCount (ARCH_15_05 §15.5 AMENDED
+                                                // 2026-09-04)
+    int                slotRangeEnd    = 1;   // ADDED 2026-09-04 (STEP253), 1-based, inclusive —
+                                                // meaningful ONLY when field ==
+                                                // SlotRangeOccupiedCount
 };
 struct CountScenario { ScenarioBody body; std::vector<ScenarioCountCondition> conditions; };  // TIER 2,
                                                             // conditions are AND'd (conjunction)

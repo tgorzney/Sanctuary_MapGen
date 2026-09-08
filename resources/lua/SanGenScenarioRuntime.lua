@@ -90,7 +90,10 @@ end
 -- {field, comparator, value} triples, AND'd. field/comparator spellings are keyed off VERBATIM
 -- against Params::ScenarioCountField/Params::ScenarioComparator's own rendered JSON spellings.
 -- ============================================================================
-local function EvaluateScenarioCondition(condition, total, humanCount, aiCount)
+-- `slotPattern` (ADDED 2026-09-04, STEP253, ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED
+-- 2026-09-04) feeds ONLY the new SlotRangeOccupiedCount branch below -- every other field is
+-- unaffected.
+local function EvaluateScenarioCondition(condition, total, humanCount, aiCount, slotPattern)
     local fieldValue
     if condition.field == "Total" then
         fieldValue = total
@@ -98,6 +101,14 @@ local function EvaluateScenarioCondition(condition, total, humanCount, aiCount)
         fieldValue = humanCount
     elseif condition.field == "AiCount" then
         fieldValue = aiCount
+    elseif condition.field == "SlotRangeOccupiedCount" then
+        local occupiedCount = 0
+        for slotIndex = condition.slotRangeStart, condition.slotRangeEnd do
+            if slotPattern:sub(slotIndex, slotIndex) ~= "-" then
+                occupiedCount = occupiedCount + 1
+            end
+        end
+        fieldValue = occupiedCount
     else
         Warn("SANGEN: scenario condition named unknown field '"..tostring(condition.field).."' -- treated as non-matching.")
         return false -- unknown field -- fail CLOSED, never matches, never a crash
@@ -123,9 +134,9 @@ end
 
 -- Conjunction only (AND) -- `ARCH_15_05_ParamsScenariosType.md` §15.5's ruling. An empty conditions list is vacuously true,
 -- matching Params::CountScenario::conditions' flat std::vector carrying no OR/grouping structure.
-local function EvaluateScenarioConditions(conditions, total, humanCount, aiCount)
+local function EvaluateScenarioConditions(conditions, total, humanCount, aiCount, slotPattern)
     for _, condition in ipairs(conditions) do
-        if not EvaluateScenarioCondition(condition, total, humanCount, aiCount) then
+        if not EvaluateScenarioCondition(condition, total, humanCount, aiCount, slotPattern) then
             return false
         end
     end
@@ -147,7 +158,7 @@ local function FindMatchingScenario(total, humanCount, aiCount, slotPattern)
         -- pcall-wrapped per MAP_SCENARIO_SPEC.md §4: a throwing evaluation is swallowed (falls
         -- through to the next candidate), not fatal -- preserved from the reference's own
         -- per-closure pcall, now wrapping the shared evaluator instead.
-        local evalOk, matched = pcall(EvaluateScenarioConditions, scenario.conditions, total, humanCount, aiCount)
+        local evalOk, matched = pcall(EvaluateScenarioConditions, scenario.conditions, total, humanCount, aiCount, slotPattern)
         if evalOk and matched then
             return scenario
         end

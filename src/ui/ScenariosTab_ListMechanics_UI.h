@@ -117,7 +117,7 @@ inline DraggableListSignal DrawScenarioCountList(Params::Scenarios& scenarios, S
         },
         [&](int rowIndex) {
             Params::CountScenario& scenario = scenarios.countScenarios[static_cast<std::size_t>(rowIndex)];
-            DrawScenarioCountConditionsEditor(scenario.conditions);
+            DrawScenarioCountConditionsEditor(scenario.conditions, scenarios.maxArmySlotCount);
             DrawScenarioSpawnsWarningBanner(scenario.body, armies);
             DrawScenarioBodyFields(scenario.body, armies, areas, state.scenarioEditModeState, nullptr,
                                    &scenario.conditions, scenarios.maxArmySlotCount);

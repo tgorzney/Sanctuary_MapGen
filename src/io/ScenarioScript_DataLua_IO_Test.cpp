@@ -364,6 +364,62 @@ void TestConditionSpellingsMatchStep69() {
     Check(output.find("comparator = \"GreaterOrEqual\"") != std::string::npos, "comparator spelling GreaterOrEqual");
     Check(output.find("comparator = \"Equal\"") != std::string::npos, "comparator spelling Equal");
     Check(output.find("comparator = \"LessThan\"") != std::string::npos, "comparator spelling LessThan");
+    // slotRangeStart/slotRangeEnd are always emitted, even for non-range fields (STEP253).
+    Check(output.find("slotRangeStart = 1, slotRangeEnd = 1") != std::string::npos,
+          "slotRangeStart/slotRangeEnd default (1, 1) render on every non-range condition row");
+}
+
+// STEP253 (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-09-04): SlotRangeOccupiedCount's
+// wire spelling and its slotRangeStart/slotRangeEnd sibling keys.
+void TestSlotRangeOccupiedCountRendersFieldAndRange() {
+    Params::MapRecipe recipe;
+    recipe.scenarios.maxArmySlotCount = 16;
+
+    Params::CountScenario countScenario;
+    countScenario.body.name = "Slots5To8AnyFilled";
+    Params::ScenarioCountCondition condition;
+    condition.field = Params::ScenarioCountField::SlotRangeOccupiedCount;
+    condition.comparator = Params::ScenarioComparator::GreaterOrEqual;
+    condition.value = 1;
+    condition.slotRangeStart = 5;
+    condition.slotRangeEnd = 8;
+    countScenario.conditions.push_back(condition);
+    recipe.scenarios.countScenarios.push_back(countScenario);
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    Check(output.find("field = \"SlotRangeOccupiedCount\"") != std::string::npos,
+          "field spelling SlotRangeOccupiedCount");
+    Check(output.find("slotRangeStart = 5, slotRangeEnd = 8") != std::string::npos,
+          "slotRangeStart/slotRangeEnd render the authored range");
+}
+
+// STEP253 §6: a SlotRangeOccupiedCount condition whose range is invalid against maxArmySlotCount
+// refuses only THAT condition row -- the scenario's other conditions render unaffected.
+void TestSlotRangeInvalidConditionRowSkipped() {
+    Params::MapRecipe recipe;
+    recipe.scenarios.maxArmySlotCount = 4;
+
+    Params::CountScenario countScenario;
+    countScenario.body.name = "MixedValidity";
+    Params::ScenarioCountCondition invalidRange;   // slotRangeEnd (8) > maxArmySlotCount (4)
+    invalidRange.field = Params::ScenarioCountField::SlotRangeOccupiedCount;
+    invalidRange.slotRangeStart = 5;
+    invalidRange.slotRangeEnd = 8;
+    countScenario.conditions.push_back(invalidRange);
+    Params::ScenarioCountCondition validTotal;
+    validTotal.field = Params::ScenarioCountField::Total;
+    validTotal.comparator = Params::ScenarioComparator::Equal;
+    validTotal.value = 2;
+    countScenario.conditions.push_back(validTotal);
+    recipe.scenarios.countScenarios.push_back(countScenario);
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    Check(output.find("slotRangeStart = 5, slotRangeEnd = 8") == std::string::npos,
+          "the out-of-range SlotRangeOccupiedCount condition row is refused, never emitted");
+    Check(output.find("field = \"Total\"") != std::string::npos,
+          "the scenario's other, valid condition still renders unaffected");
 }
 
 // STEP204 §8 item 4: spawnsUnits renders in both states, `navy`/`navalFleet` render in neither.
@@ -531,6 +587,8 @@ int main() {
     TestAlloyModeAllFourSpellings();
     TestCoordinateFlipDeterministic();
     TestConditionSpellingsMatchStep69();
+    TestSlotRangeOccupiedCountRendersFieldAndRange();
+    TestSlotRangeInvalidConditionRowSkipped();
     TestSpawnsUnitsRendersBothStates();
     TestEmptyScenariosRendersCompleteFile();
     TestMaxArmySlotCountBareGlobalBeforeTables();

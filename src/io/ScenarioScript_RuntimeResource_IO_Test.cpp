@@ -179,6 +179,22 @@ static void TestRealBundledResourceSelfCheck(const std::string& luaResourceDirec
     Check(text.find("REMOVED: every alloy on the map will remain visible for every composition.") !=
               std::string::npos,
           "the warning text itself is pinned so it cannot be quietly softened (fragment 2)");
+
+    // STEP253 (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-09-04): SlotRangeOccupiedCount
+    // widens EvaluateScenarioCondition/EvaluateScenarioConditions by a 5th `slotPattern` parameter,
+    // forwarded through the one existing FindMatchingScenario Tier-2 call site.
+    Check(text.find("condition.field == \"SlotRangeOccupiedCount\"") != std::string::npos,
+          "the SlotRangeOccupiedCount branch is present in EvaluateScenarioCondition");
+    Check(text.find("function EvaluateScenarioCondition(condition, total, humanCount, aiCount, slotPattern)")
+              != std::string::npos || text.find("EvaluateScenarioCondition(condition, total, humanCount, aiCount, slotPattern)")
+              != std::string::npos,
+          "EvaluateScenarioCondition widened to a 5th slotPattern parameter");
+    Check(text.find("EvaluateScenarioConditions(conditions, total, humanCount, aiCount, slotPattern)")
+              != std::string::npos,
+          "EvaluateScenarioConditions widened to a 5th slotPattern parameter");
+    Check(text.find("pcall(EvaluateScenarioConditions, scenario.conditions, total, humanCount, aiCount, slotPattern)")
+              != std::string::npos,
+          "the Tier-2 FindMatchingScenario call site forwards slotPattern through");
 }
 
 // 7. Empty directory and empty override never crashes.

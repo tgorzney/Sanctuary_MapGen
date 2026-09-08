@@ -8,14 +8,17 @@
 #include "ScenariosTab_UI.h"
 #include "ArmiesTab_UI.h"
 #include "Combo_UI.h"
+#include "ScenariosTab_MatchRules_SlotRangePicker_UI.h"
 #include "imgui.h"
 
 namespace SanmapGen {
 namespace Ui {
 namespace {
 
-enum : int { kScenarioCountFieldCount = 3, kScenarioComparatorCount = 6 };
-const char* const scenarioCountFieldLabels[kScenarioCountFieldCount] = { "Total", "Human", "AI" };
+// kScenarioCountFieldCount grows to 4 (STEP253, ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED
+// 2026-09-04): the new SlotRangeOccupiedCount enumerator.
+enum : int { kScenarioCountFieldCount = 4, kScenarioComparatorCount = 6 };
+const char* const scenarioCountFieldLabels[kScenarioCountFieldCount] = { "Total", "Human", "AI", "Slot Range" };
 const char* const scenarioComparatorLabels[kScenarioComparatorCount] = {
     "=", "\xE2\x89\xA0", ">", "\xE2\x89\xA5", "<", "\xE2\x89\xA4"   // = != > >= < <=
 };
@@ -79,7 +82,10 @@ void DrawSlotPatternToggleRow(std::string& slotPattern, const std::vector<Params
 
 // One row per condition: field combo, comparator combo (display-only symbols), integer stepper for
 // value; `+`/`x` add/remove. AND-of-clauses only — no OR-group UI (named future extension, Fix §3).
-void DrawScenarioCountConditionsEditor(std::vector<Params::ScenarioCountCondition>& conditions) {
+// `maxArmySlotCount` (STEP253) feeds ONLY the conditional slot-range picker below — every other
+// field is unaffected.
+void DrawScenarioCountConditionsEditor(std::vector<Params::ScenarioCountCondition>& conditions,
+                                       int maxArmySlotCount) {
     ComboOptions fieldOptions;
     fieldOptions.labels = scenarioCountFieldLabels; fieldOptions.count = kScenarioCountFieldCount;
     ComboOptions comparatorOptions;
@@ -104,8 +110,17 @@ void DrawScenarioCountConditionsEditor(std::vector<Params::ScenarioCountConditio
         ImGui::SameLine();
         if (ImGui::SmallButton("x##removeCondition")) removeIndex = static_cast<int>(index);
 
+        // Conditional slot-range picker (STEP253, §15.5 AMENDED 2026-09-04) — split out to
+        // ScenariosTab_MatchRules_SlotRangePicker_UI.h for the ARCH §1.5 file-size ceiling.
+        if (condition.field == Params::ScenarioCountField::SlotRangeOccupiedCount)
+            DrawScenarioSlotRangePicker(condition, maxArmySlotCount);
+
         if (index > 0u) summary += " and ";
         summary += scenarioCountFieldLabels[fieldIndex];
+        if (condition.field == Params::ScenarioCountField::SlotRangeOccupiedCount) {
+            summary += "[" + std::to_string(condition.slotRangeStart) + "-"
+                     + std::to_string(condition.slotRangeEnd) + "]";
+        }
         summary += " ";
         summary += scenarioComparatorSummaryTokens[comparatorIndex];
         summary += " " + std::to_string(condition.value);

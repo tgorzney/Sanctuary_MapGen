@@ -6,6 +6,7 @@
 // §6 (this ticket's own inline tables are the binding source of truth — no live SANMAP_FORMAT_SPEC
 // "Correction 17" exists to cite instead, per that ticket's 2026-08-22 correction).
 #include "MapExporter_Recipe_IO.h"
+#include "ScenarioSlotRangeValidation_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 
 namespace SanmapGen {
@@ -15,7 +16,8 @@ namespace {
 // Index == the enum's own declaration order (ARCH_15_05_ParamsScenariosType.md §15.5) — do not
 // reorder. Domain-local, mirrors markerCategoryCount-style per-domain constants.
 constexpr const char* kAlloyModeSpellings[4]  = { "explicit", "occupancy", "keepAll", "delta" };
-constexpr const char* kCountFieldSpellings[3] = { "Total", "HumanCount", "AiCount" };
+// 4th entry ADDED 2026-09-04 (STEP253, ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-09-04).
+constexpr const char* kCountFieldSpellings[4] = { "Total", "HumanCount", "AiCount", "SlotRangeOccupiedCount" };
 constexpr const char* kComparatorSpellings[6] =
     { "Equal", "NotEqual", "GreaterThan", "GreaterOrEqual", "LessThan", "LessOrEqual" };
 
@@ -115,9 +117,17 @@ nlohmann::ordered_json BuildScenariosJson(const Params::MapRecipe& recipe) {
         nlohmann::ordered_json json = BuildScenarioRecordJson(countScenario.body, mapSize, recipe.areas);
         nlohmann::ordered_json conditions = nlohmann::ordered_json::array();
         for (const Params::ScenarioCountCondition& condition : countScenario.conditions) {
+            // An invalid SlotRangeOccupiedCount range refuses only THIS row, never the rest of the
+            // scenario (ARCH_15_05 §15.5 AMENDED 2026-09-04; loud/logged via ScenarioSlotRangeValidation_IO).
+            if (condition.field == Params::ScenarioCountField::SlotRangeOccupiedCount
+                && !ScenarioSlotRangeIsValid(condition.slotRangeStart, condition.slotRangeEnd, scenarios.maxArmySlotCount))
+                continue;
+            // SlotRangeStart/SlotRangeEnd always emitted, meaningless-but-present otherwise (as Value is).
             conditions.push_back({ { "Field", kCountFieldSpellings[static_cast<int>(condition.field)] },
                                    { "Comparator", kComparatorSpellings[static_cast<int>(condition.comparator)] },
-                                   { "Value", condition.value } });
+                                   { "Value", condition.value },
+                                   { "SlotRangeStart", condition.slotRangeStart },
+                                   { "SlotRangeEnd", condition.slotRangeEnd } });
         }
         json["Conditions"] = conditions;
         countScenarios.push_back(json);

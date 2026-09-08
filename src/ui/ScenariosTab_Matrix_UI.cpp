@@ -12,11 +12,24 @@ namespace SanmapGen {
 namespace Ui {
 namespace {
 
-std::string ResolvedScenarioNameForTriple(const Params::Scenarios& scenarios, int total, int human, int ai) {
-    for (const Params::CountScenario& scenario : scenarios.countScenarios)
-        if (MatchesScenarioConditions(scenario.conditions, total, human, ai))
-            return ScenarioRowLabel(scenario.body);
-    return ScenarioRowLabel(scenarios.defaultScenario);
+// STEP253: pairs the resolved name with whether the walk passed through a Tier 2 slot-range clause
+// whose truth this bare (total, human, ai) triple could not pin down. `ResolvedScenarioTriple`'s walk
+// treats "ambiguous" as "does not match, keep walking" — mirrors Tier 1's own existing "may
+// pre-empt" posture (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-09-04, "Follow-ups").
+struct ResolvedScenarioTriple { std::string name; bool bSlotIdentityAmbiguous; };
+
+ResolvedScenarioTriple ResolveScenarioTripleForCell(const Params::Scenarios& scenarios,
+                                                    int total, int human, int ai) {
+    bool bAmbiguousSeen = false;
+    for (const Params::CountScenario& scenario : scenarios.countScenarios) {
+        const ScenarioConditionTriState state =
+            EvaluateScenarioConditionsTriState(scenario.conditions, total, human, ai, scenarios.maxArmySlotCount);
+        if (state == ScenarioConditionTriState::DefinitelyTrue)
+            return { ScenarioRowLabel(scenario.body), bAmbiguousSeen };
+        if (state == ScenarioConditionTriState::Ambiguous) bAmbiguousSeen = true;
+        // DefinitelyFalse: keep walking, same as today's boolean "no match".
+    }
+    return { ScenarioRowLabel(scenarios.defaultScenario), bAmbiguousSeen };
 }
 
 // A registered exact pattern's own h/A letter counts fix ONE (human, ai) pair regardless of total —
@@ -43,22 +56,32 @@ ImU32 HashedCellColor(const std::string& name) {
 }
 
 void DrawScenarioMatrixCell(const Params::Scenarios& scenarios, int total, int human, int ai, float cellSize) {
-    const std::string resolvedName = ResolvedScenarioNameForTriple(scenarios, total, human, ai);
+    const ResolvedScenarioTriple resolved = ResolveScenarioTripleForCell(scenarios, total, human, ai);
     const bool bMayBePreempted = AnyPatternScenarioMayPreempt(scenarios, human, ai);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 farCorner(origin.x + cellSize, origin.y + cellSize);
     ImGui::InvisibleButton("##cell", ImVec2(cellSize, cellSize));
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
-    drawList->AddRectFilled(origin, farCorner, HashedCellColor(resolvedName), 2.0f);
+    drawList->AddRectFilled(origin, farCorner, HashedCellColor(resolved.name), 2.0f);
     // The hatch overlay: a corner flag rather than full diagonal hatching (same "may pre-empt"
     // signal, far simpler geometry than clipped diagonal lines for a cosmetic indicator).
     if (bMayBePreempted)
         drawList->AddTriangleFilled(origin, ImVec2(origin.x + cellSize * 0.4f, origin.y),
                                     ImVec2(origin.x, origin.y + cellSize * 0.4f), IM_COL32(0, 0, 0, 200));
+    // Second, visually distinct hatch (STEP253) — bottom-right corner, never reusing Tier 1's own
+    // top-left corner — for a Tier 2 slot-range clause's own identity-dependent ambiguity, so the two
+    // independent sources of uncertainty stay legible and combinable rather than conflated into one
+    // signal (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-09-04, "Follow-ups").
+    if (resolved.bSlotIdentityAmbiguous)
+        drawList->AddTriangleFilled(farCorner, ImVec2(farCorner.x - cellSize * 0.4f, farCorner.y),
+                                    ImVec2(farCorner.x, farCorner.y - cellSize * 0.4f), IM_COL32(255, 255, 255, 200));
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Total %d / Human %d / AI %d\n%s%s", total, human, ai, resolvedName.c_str(),
+        ImGui::SetTooltip("Total %d / Human %d / AI %d\n%s%s%s", total, human, ai, resolved.name.c_str(),
                           bMayBePreempted
-                              ? "\n(Hatched: a Tier 1 exact pattern MAY pre-empt this result)" : "");
+                              ? "\n(Hatched top-left: a Tier 1 exact pattern MAY pre-empt this result)" : "",
+                          resolved.bSlotIdentityAmbiguous
+                              ? "\n(Hatched bottom-right: a Tier 2 slot-range clause's result depends on which slots are filled)"
+                              : "");
 }
 
 } // namespace
@@ -66,8 +89,10 @@ void DrawScenarioMatrixCell(const Params::Scenarios& scenarios, int total, int h
 void DrawScenarioMatrix(const Params::Scenarios& scenarios, SectionState& matrixSection) {
     if (!DrawSectionBegin("Composition Matrix", matrixSection)) return;
     ImGui::TextWrapped(
-        "Hatched cells have at least one registered exact-pattern scenario that MAY pre-empt this "
-        "result - Tier 1 depends on which slots are filled, not just how many.");
+        "Top-left hatched cells have at least one registered exact-pattern scenario that MAY "
+        "pre-empt this result - Tier 1 depends on which slots are filled, not just how many. "
+        "Bottom-right hatched cells have a Tier 2 slot-range clause whose own result depends on "
+        "which slots are filled - the two hatches are independent and can combine.");
     const int maxTotal = scenarios.maxArmySlotCount < 0 ? 0 : scenarios.maxArmySlotCount;
     const float cellSize = ImGui::GetTextLineHeightWithSpacing();
     for (int total = 0; total <= maxTotal; ++total) {

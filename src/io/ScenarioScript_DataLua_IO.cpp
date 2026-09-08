@@ -9,6 +9,7 @@
 // .sanmap JSON persistence leg and this Lua-rendering leg.
 #include "ScenarioScript_DataLua_IO.h"
 #include "LuaTableWriter_IO.h"
+#include "ScenarioSlotRangeValidation_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
 #include <algorithm>
 #include <utility>
@@ -20,7 +21,9 @@ namespace {
 // Index == the enum's own declaration order (ARCH_15_05_ParamsScenariosType.md §15.5) -- do not
 // reorder. Verbatim duplicate of MapExporter_Scenarios_IO.cpp's kAlloyModeSpellings.
 constexpr const char* kScenarioAlloyModeSpellings[4] = { "explicit", "occupancy", "keepAll", "delta" };
-constexpr const char* kScenarioCountFieldSpellings[3] = { "Total", "HumanCount", "AiCount" };
+// 4th entry ADDED 2026-09-04 (STEP253, ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-09-04)
+// -- verbatim duplicate of MapExporter_Scenarios_IO.cpp's own kCountFieldSpellings.
+constexpr const char* kScenarioCountFieldSpellings[4] = { "Total", "HumanCount", "AiCount", "SlotRangeOccupiedCount" };
 constexpr const char* kScenarioComparatorSpellings[6] =
     { "Equal", "NotEqual", "GreaterThan", "GreaterOrEqual", "LessThan", "LessOrEqual" };
 
@@ -153,7 +156,7 @@ std::string BuildPatternScenariosTable(const std::vector<Params::PatternScenario
 // ⚠️ Load-bearing: iterates countScenarios in the std::vector's own order, one for loop, no
 // staging/sorting container of any kind (ARCH_15_06_CountScenariosOrdering.md §15.6).
 std::string BuildCountScenariosTable(const std::vector<Params::CountScenario>& countScenarios, int mapSize,
-                                     const std::vector<Params::MapArea>& areas) {
+                                     const std::vector<Params::MapArea>& areas, int maxArmySlotCount) {
     std::string out;
     OpenTable(out, 0, "COUNT_SCENARIOS");
     for (const Params::CountScenario& entry : countScenarios) {
@@ -165,10 +168,22 @@ std::string BuildCountScenariosTable(const std::vector<Params::CountScenario>& c
         std::vector<std::string> conditionRows;
         conditionRows.reserve(entry.conditions.size());
         for (const Params::ScenarioCountCondition& condition : entry.conditions) {
+            // Mirrors MapExporter_Scenarios_IO.cpp's own condition-row skip: a SlotRangeOccupiedCount
+            // condition whose range is invalid against this map's own maxArmySlotCount refuses only
+            // THIS row (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-09-04) -- never silently
+            // clamped/reordered/truncated; loud/logged via ValidateScenarioSlotRanges at the export
+            // orchestrator (ScenarioScript_Export_IO.cpp).
+            if (condition.field == Params::ScenarioCountField::SlotRangeOccupiedCount
+                && !ScenarioSlotRangeIsValid(condition.slotRangeStart, condition.slotRangeEnd, maxArmySlotCount))
+                continue;
+            // slotRangeStart/slotRangeEnd always emitted alongside field/comparator/value, for the
+            // same fixed-row-shape reason (meaningless-but-present for every other field).
             conditionRows.push_back(
                 "field = " + QuotedLuaString(kScenarioCountFieldSpellings[static_cast<int>(condition.field)])
                 + ", comparator = " + QuotedLuaString(kScenarioComparatorSpellings[static_cast<int>(condition.comparator)])
-                + ", value = " + RenderLuaNumber(condition.value));
+                + ", value = " + RenderLuaNumber(condition.value)
+                + ", slotRangeStart = " + RenderLuaNumber(condition.slotRangeStart)
+                + ", slotRangeEnd = " + RenderLuaNumber(condition.slotRangeEnd));
         }
         AppendArrayOfTables(out, 2, "conditions", conditionRows);
 
@@ -295,7 +310,7 @@ std::string BuildScenarioDataLuaText(const Params::MapRecipe& recipe) {
 
     out += BuildPatternScenariosTable(scenarios.patternScenarios, mapSize, recipe.areas);
     out += "\n";
-    out += BuildCountScenariosTable(scenarios.countScenarios, mapSize, recipe.areas);
+    out += BuildCountScenariosTable(scenarios.countScenarios, mapSize, recipe.areas, scenarios.maxArmySlotCount);
     out += "\n";
     out += BuildDefaultScenarioTable(scenarios.defaultScenario, mapSize, recipe.areas);
 

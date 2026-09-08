@@ -8,6 +8,7 @@
 #include "FilesystemPrimitives_IO.h"
 #include "GameInstallLocation_IO.h"
 #include "MapExporter_ScenarioAreaNameValidation_IO.h"
+#include "ScenarioSlotRangeValidation_IO.h"
 #include "ScenarioScript_DataLua_IO.h"
 #include "ScenarioScript_RuntimeResource_IO.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -87,6 +88,12 @@ ScenarioExportResult ExportMapScenario(const std::string& gameInstallRoot,
     // type's own existing convention (every other finding in this file uses result.Log).
     const ScenarioAreaNameValidationReport areaNameReport = ValidateScenarioAreaNameReferences(recipe);
     if (!areaNameReport.AllReferencesResolve()) result.Log(areaNameReport.SummaryText());
+
+    // STEP253 -- warn, never block, same tier/posture as the areaName check immediately above. The
+    // actual condition-row refusal happens at BuildScenarioDataLuaText's own serialization point
+    // (ScenarioScript_DataLua_IO.cpp) -- this only reports it loudly.
+    const ScenarioSlotRangeValidationReport slotRangeReport = ValidateScenarioSlotRanges(recipe);
+    if (!slotRangeReport.AllRangesValid()) result.Log(slotRangeReport.SummaryText());
 
     // 5. Syntax pre-check on SanGen's own render -- refuse rather than write known-broken Lua.
     const Sys::LuaSyntaxCheckResult dataSyntax = Sys::CheckLuaSyntax(dataLuaText);

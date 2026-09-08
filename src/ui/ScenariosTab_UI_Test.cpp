@@ -102,6 +102,58 @@ void RunConditionMatchingChecks() {
     Check(!MatchesScenarioConditions({ totalIsFive, humanIsTwo }, 5, 1, 4), "one clause failing fails the AND");
 }
 
+// 4b. MatchesScenarioConditions fails CLOSED on SlotRangeOccupiedCount (STEP253) -- this
+// (total, human, ai)-only overload is never given slot identity, so it must never silently reuse
+// `ai`'s slot for the new field.
+void RunSlotRangeFailsClosedOnPlainMatcherChecks() {
+    Params::ScenarioCountCondition slotRangeCondition;
+    slotRangeCondition.field = Params::ScenarioCountField::SlotRangeOccupiedCount;
+    slotRangeCondition.comparator = Params::ScenarioComparator::GreaterOrEqual;
+    slotRangeCondition.value = 0;   // trivially satisfiable by any "ai" reuse, if that bug regressed
+    slotRangeCondition.slotRangeStart = 1; slotRangeCondition.slotRangeEnd = 1;
+    Check(!MatchesScenarioConditions({ slotRangeCondition }, 5, 5, 5),
+          "MatchesScenarioConditions fails closed on SlotRangeOccupiedCount rather than guessing");
+}
+
+// 4c. EvaluateScenarioConditionsTriState (STEP253, ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED
+// 2026-09-04) -- the composition matrix's tri-state extension.
+void RunSlotRangeTriStateChecks() {
+    Params::ScenarioCountCondition anyOfFiveToEight;
+    anyOfFiveToEight.field = Params::ScenarioCountField::SlotRangeOccupiedCount;
+    anyOfFiveToEight.comparator = Params::ScenarioComparator::GreaterOrEqual;
+    anyOfFiveToEight.value = 1;
+    anyOfFiveToEight.slotRangeStart = 5; anyOfFiveToEight.slotRangeEnd = 8;   // width 4
+
+    // Ambiguous: with maxArmySlotCount=16 and 2 occupied total, the achievable occupied-in-range
+    // count spans [0, 2] -- some placements satisfy ">= 1", some don't.
+    Check(EvaluateScenarioConditionsTriState({ anyOfFiveToEight }, 2, 1, 1, 16)
+          == ScenarioConditionTriState::Ambiguous,
+          "a satisfiable-but-not-guaranteed range clause is Ambiguous");
+
+    // DefinitelyFalse from the range clause itself: 0 occupied total can never satisfy ">= 1"
+    // anywhere in the range.
+    Check(EvaluateScenarioConditionsTriState({ anyOfFiveToEight }, 0, 0, 0, 16)
+          == ScenarioConditionTriState::DefinitelyFalse,
+          "zero occupied slots can never satisfy a >= 1 range clause -- DefinitelyFalse");
+
+    // DefinitelyTrue: every slot filled (16 of 16) forces occupied-in-range == 4 no matter which
+    // slots -- "all of 5-8 filled" (Equal, width) is satisfied for every achievable placement.
+    Params::ScenarioCountCondition allOfFiveToEight = anyOfFiveToEight;
+    allOfFiveToEight.comparator = Params::ScenarioComparator::Equal;
+    allOfFiveToEight.value = 4;
+    Check(EvaluateScenarioConditionsTriState({ allOfFiveToEight }, 16, 16, 0, 16)
+          == ScenarioConditionTriState::DefinitelyTrue,
+          "every slot filled forces the range clause's own result -- DefinitelyTrue");
+
+    // A conjunction partner that already fails (e.g. Total == 99) short-circuits to DefinitelyFalse
+    // BEFORE the range clause is ever consulted -- no ambiguity is reported.
+    Params::ScenarioCountCondition totalIs99;
+    totalIs99.field = Params::ScenarioCountField::Total; totalIs99.value = 99;
+    Check(EvaluateScenarioConditionsTriState({ totalIs99, anyOfFiveToEight }, 2, 1, 1, 16)
+          == ScenarioConditionTriState::DefinitelyFalse,
+          "a failing non-range clause short-circuits to DefinitelyFalse, never Ambiguous");
+}
+
 Params::CountScenario MakeCountScenario(const char* name, Params::ScenarioCountField field,
                                         Params::ScenarioComparator comparator, int value) {
     Params::CountScenario scenario;
@@ -191,6 +243,8 @@ int main() {
     RunArmiesExceedingSlotCountChecks();
     RunSlotPatternRoundTripChecks();
     RunConditionMatchingChecks();
+    RunSlotRangeFailsClosedOnPlainMatcherChecks();
+    RunSlotRangeTriStateChecks();
     RunReachabilityChecks();
     RunPriorityBadgeChecks();
     RunDuplicateChecks();

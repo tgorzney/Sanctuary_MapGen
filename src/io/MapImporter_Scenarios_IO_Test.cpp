@@ -452,6 +452,106 @@ void RunScenarioAreaNameTests() {
     }
 }
 
+// STEP253 (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-09-04): the 4th ScenarioCountField
+// enumerator, SlotRangeOccupiedCount, and its slotRangeStart/slotRangeEnd sibling ints.
+void RunScenarioSlotRangeConditionTests() {
+    // Item 1 (§8): a SlotRangeOccupiedCount condition round-trips through the pure JSON leg unchanged.
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        recipe.scenarios.maxArmySlotCount = 16;
+        Params::CountScenario countScenario;
+        countScenario.body.name = "Slots5To8AnyFilled";
+        Params::ScenarioCountCondition condition;
+        condition.field = Params::ScenarioCountField::SlotRangeOccupiedCount;
+        condition.comparator = Params::ScenarioComparator::GreaterOrEqual;
+        condition.value = 1;
+        condition.slotRangeStart = 5;
+        condition.slotRangeEnd = 8;
+        countScenario.conditions.push_back(condition);
+        recipe.scenarios.countScenarios.push_back(countScenario);
+
+        const nlohmann::ordered_json json = Io::BuildScenariosJson(recipe);
+        Check(json["CountScenarios"][0]["Conditions"][0]["Field"].get<std::string>() == "SlotRangeOccupiedCount",
+              "wire spelling: \"SlotRangeOccupiedCount\" appears verbatim");
+        Check(json["CountScenarios"][0]["Conditions"][0]["SlotRangeStart"].get<int>() == 5
+              && json["CountScenarios"][0]["Conditions"][0]["SlotRangeEnd"].get<int>() == 8,
+              "wire spelling: SlotRangeStart/SlotRangeEnd are present and correctly valued");
+
+        nlohmann::ordered_json document;
+        document["Scenarios"] = json;
+        Params::MapRecipe loaded;
+        loaded.geometry.mapSize = 512;
+        Io::MapImportResult result;
+        Io::ReadScenariosJson(document, loaded, result);
+        Check(loaded.scenarios.countScenarios.size() == 1 && loaded.scenarios.countScenarios[0].conditions.size() == 1,
+              "SlotRangeOccupiedCount condition survives the round trip");
+        if (loaded.scenarios.countScenarios.size() == 1 && loaded.scenarios.countScenarios[0].conditions.size() == 1) {
+            const Params::ScenarioCountCondition& loadedCondition = loaded.scenarios.countScenarios[0].conditions[0];
+            Check(loadedCondition.field == Params::ScenarioCountField::SlotRangeOccupiedCount
+                  && loadedCondition.comparator == Params::ScenarioComparator::GreaterOrEqual
+                  && loadedCondition.value == 1 && loadedCondition.slotRangeStart == 5
+                  && loadedCondition.slotRangeEnd == 8,
+                  "every field of the SlotRangeOccupiedCount condition round-trips exactly");
+        }
+    }
+
+    // Item 2 (§8): a legacy condition object with no SlotRangeStart/SlotRangeEnd keys reads back as
+    // the struct default (1, 1) -- never an error, never a crash.
+    {
+        nlohmann::ordered_json document;
+        nlohmann::ordered_json countScenarioJson;
+        countScenarioJson["Name"] = "LegacyCondition";
+        nlohmann::ordered_json conditionJson;
+        conditionJson["Field"] = "Total";
+        conditionJson["Comparator"] = "Equal";
+        conditionJson["Value"] = 3;   // deliberately no "SlotRangeStart"/"SlotRangeEnd" keys
+        countScenarioJson["Conditions"] = nlohmann::ordered_json::array({ conditionJson });
+        document["Scenarios"]["CountScenarios"] = nlohmann::ordered_json::array({ countScenarioJson });
+
+        Params::MapRecipe loaded;
+        loaded.geometry.mapSize = 512;
+        Io::MapImportResult result;
+        Io::ReadScenariosJson(document, loaded, result);
+        Check(loaded.scenarios.countScenarios.size() == 1 && loaded.scenarios.countScenarios[0].conditions.size() == 1,
+              "legacy condition (no SlotRangeStart/SlotRangeEnd) still imports");
+        if (loaded.scenarios.countScenarios.size() == 1 && loaded.scenarios.countScenarios[0].conditions.size() == 1) {
+            Check(loaded.scenarios.countScenarios[0].conditions[0].slotRangeStart == 1
+                  && loaded.scenarios.countScenarios[0].conditions[0].slotRangeEnd == 1,
+                  "absent keys default to the struct default (1, 1)");
+        }
+        Check(result.warningCount == 0, "a legacy condition with no SlotRange* keys logs zero warnings");
+    }
+
+    // Item 5 (§8): an out-of-range SlotRangeOccupiedCount condition is refused (skipped) at export --
+    // never silently clamped/reordered -- while the scenario's other conditions are unaffected.
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        recipe.scenarios.maxArmySlotCount = 4;
+        Params::CountScenario countScenario;
+        countScenario.body.name = "MixedValidity";
+        Params::ScenarioCountCondition invalidRange;   // slotRangeEnd (8) > maxArmySlotCount (4)
+        invalidRange.field = Params::ScenarioCountField::SlotRangeOccupiedCount;
+        invalidRange.slotRangeStart = 5;
+        invalidRange.slotRangeEnd = 8;
+        countScenario.conditions.push_back(invalidRange);
+        Params::ScenarioCountCondition validTotal;
+        validTotal.field = Params::ScenarioCountField::Total;
+        validTotal.value = 2;
+        countScenario.conditions.push_back(validTotal);
+        recipe.scenarios.countScenarios.push_back(countScenario);
+
+        const nlohmann::ordered_json json = Io::BuildScenariosJson(recipe);
+        Check(json["CountScenarios"][0]["Conditions"].size() == 1,
+              "the invalid SlotRangeOccupiedCount condition is refused -- only the valid one remains");
+        if (json["CountScenarios"][0]["Conditions"].size() == 1) {
+            Check(json["CountScenarios"][0]["Conditions"][0]["Field"].get<std::string>() == "Total",
+                  "the surviving condition is the scenario's other, valid one");
+        }
+    }
+}
+
 } // namespace
 
 int main() {
@@ -464,6 +564,7 @@ int main() {
     RunNoNavalSpellingsInOutputTest();
     RunLiveDocumentIntegrationTest();
     RunScenarioAreaNameTests();
+    RunScenarioSlotRangeConditionTests();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

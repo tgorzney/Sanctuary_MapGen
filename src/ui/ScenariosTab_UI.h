@@ -129,6 +129,16 @@ std::string BuildSlotPatternFromToggles(const std::vector<char>& toggles);      
 std::vector<char> ParseSlotPatternToToggles(const std::string& pattern, int maxArmySlotCount);
 bool MatchesScenarioConditions(const std::vector<Params::ScenarioCountCondition>& conditions,
                                int total, int human, int ai);
+// STEP253 (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-09-04, "Follow-ups") — a
+// SlotRangeOccupiedCount clause's truth can depend on WHICH slots are filled, information a bare
+// (total, human, ai) triple cannot supply; Ambiguous only when every non-range clause passes AND at
+// least one range clause's truth depends on that missing identity. Used by the composition matrix
+// (ScenariosTab_Matrix_UI.cpp) — MatchesScenarioConditions above stays a plain boolean for every
+// other existing caller.
+enum class ScenarioConditionTriState { DefinitelyTrue, DefinitelyFalse, Ambiguous };
+ScenarioConditionTriState EvaluateScenarioConditionsTriState(
+    const std::vector<Params::ScenarioCountCondition>& conditions,
+    int total, int human, int ai, int maxArmySlotCount);
 bool IsCountScenarioReachable(const Params::Scenarios& scenarios, int countScenarioIndex);
 bool IsDefaultScenarioReachable(const Params::Scenarios& scenarios);
 // "" when reachable; " \xE2\x9A\xA0 Unreachable (shadowed by <name>)" otherwise.
@@ -136,7 +146,8 @@ bool IsDefaultScenarioReachable(const Params::Scenarios& scenarios);
 std::string ScenarioReachabilityBadgeSuffix(const Params::Scenarios& scenarios, int countScenarioIndex);
 void DrawSlotPatternToggleRow(std::string& slotPattern, const std::vector<Params::Army>& armies,
                               int maxArmySlotCount);
-void DrawScenarioCountConditionsEditor(std::vector<Params::ScenarioCountCondition>& conditions);
+void DrawScenarioCountConditionsEditor(std::vector<Params::ScenarioCountCondition>& conditions,
+                                       int maxArmySlotCount);
 
 // STEP78 — the last three params are the canvas Edit Mode toggle's own context: `editModeState`
 // nullptr disables the toggle entirely (not wired); `patternSlotPattern` non-null = Tier 1 (its own
