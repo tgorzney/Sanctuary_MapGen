@@ -25,8 +25,8 @@ struct OverlayLayerSettings;   // BUGFIX_OverlayVisibilityAndPropIconFallback_R1
 
 // Nearest manual marker (any group) within `pickRadiusScreenPixels` of the region-local cursor —
 // projected via STEP47's `PreviewComposite::WorldToPreviewPixel` + `MapCanvasView::
-// ProjectPreviewPixelToRegionLocal`, exactly as `MapCanvas_ScenarioEditMode_HitTest_UI.cpp` already
-// composes the same pair. O(manual marker count) — legitimate at "tens, not tens of thousands"
+// ProjectPreviewPixelToRegionLocal`, the standard house pair for this projection.
+// O(manual marker count) — legitimate at "tens, not tens of thousands"
 // (STEP49's own sizing note); NOT `Picking_UI::PickMarker`/`Data::SpatialGrid`, which operate only
 // over `Data::PlacementInstances` (Gap 5 — manual markers have no presence there). Ties keep the
 // first (lowest group, then lowest transform) index. Answers false (both out-params left at -1) for

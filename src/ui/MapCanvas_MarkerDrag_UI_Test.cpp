@@ -2,8 +2,7 @@
 // HitTestManualMarkers (Gap 5's linear routing-around, including its first-match-wins tie rule,
 // mirrored from Picking_UI::PickMarker's own convention) and DrawManualMarkerRoster (Gap 6's
 // stopgap draw: at-rest dots, a soft-hidden sibling skipped, a ghost point drawn distinctly, and
-// the Spawn-refused tint). One live headless imgui frame, no window/GL — mirrors
-// MapCanvas_ScenarioEditMode_DrawMarkers_UI_Test.cpp's own technique, inspecting the shared
+// the Spawn-refused tint). One live headless imgui frame, no window/GL — inspects the shared
 // ImDrawList's vertex colors directly rather than only counting vertices, since this file's states
 // mostly differ by TINT alone (AddCircleFilled every time), which a vertex-count proxy cannot see.
 #include "MapCanvas_MarkerDrag_UI.h"

@@ -116,8 +116,8 @@ void CheckFlushIconLayerBucketAppliesSelectedTintOverride() {
     // quad into this SAME window draw list before returning control here (confirmed by direct build/
     // run: an absolute VtxBuffer.Size == 8 / indices-from-0 assumption failed against the real vendored
     // imgui). Every OTHER test in this file family that inspects drawList.VtxBuffer directly
-    // (MapCanvas_MarkerDrag_UI_Test.cpp, MapCanvas_ScenarioEditMode_DrawMarkers_UI_Test.cpp,
-    // MapCanvas_IconLayer_MicrobenchmarkFrameOps_UI_Test.cpp) already established the fix: capture a
+    // (MapCanvas_MarkerDrag_UI_Test.cpp, MapCanvas_IconLayer_MicrobenchmarkFrameOps_UI_Test.cpp)
+    // already established the fix: capture a
     // "before" baseline and compare/index off the DELTA, never an absolute count from index 0.
     const int beforeVertexCount = drawList.VtxBuffer.Size;
 

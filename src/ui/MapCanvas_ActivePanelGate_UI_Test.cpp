@@ -1,7 +1,7 @@
 // MapCanvas_ActivePanelGate_UI_Test.cpp — STEP113 acceptance test: a manual-marker drag gesture
-// may only BEGIN while ApplicationPanel::Markers is the shell's active panel. Mirrors
-// MapCanvas_ScenarioEditModeOwnership_UI_Test.cpp's own GL-backed real-imgui-frame technique,
-// asserting both on the marker's own position (did the drag move it) and, for the refused case,
+// may only BEGIN while ApplicationPanel::Markers is the shell's active panel. Uses a GL-backed
+// real-imgui-frame technique, asserting both on the marker's own position (did the drag move it)
+// and, for the refused case,
 // on MapCanvas::View()'s pixel-center state (did the press fall through to the normal pan path).
 // One translation unit of the MapCanvas_UI_Test binary.
 #include "MapCanvas_UI.h"
