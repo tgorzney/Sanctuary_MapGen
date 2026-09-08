@@ -197,7 +197,7 @@ void RunMapCanvasClickSelectsManualMarkerChecks(Sys::GpuResourceManager& manager
     // (MapCanvas_UI.cpp) — wired here even though this scene's one procedural marker sits elsewhere,
     // so the procedural pick correctly MISSES and falls through to the manual hit-test.
     Data::SpatialGrid markerSpatialGrid;
-    markerSpatialGrid.Configure(static_cast<float>(scene.geometry.mapSize) * scene.geometry.worldUnitsPerCell);
+    markerSpatialGrid.Configure(static_cast<float>(scene.geometry.mapSize) * scene.geometry.worldUnitsPerGenerationCell);
     markerSpatialGrid.Build(scene.instances.positionX.data(), scene.instances.positionZ.data(),
                             static_cast<std::int32_t>(scene.instances.Count()));
 

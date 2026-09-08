@@ -28,12 +28,12 @@ struct TerrainTabState {
     DialRange mapSizeRange{ 64.0f, 4096.0f, 1.0f, 800.0f };
     DialRange seedRange{ 0.0f, 1048576.0f, 1.0f, 800.0f };
     DialRange terrainMaxHeightRange{ 1.0f, 1024.0f, 0.0f, 400.0f };
-    DialRange worldUnitsPerCellRange{ 0.0625f, 32.0f, 0.0f, 400.0f };
+    DialRange worldUnitsPerGenerationCellRange{ 0.0625f, 32.0f, 0.0f, 400.0f };
 
     RealtimeToggle mapSizeToggle;
     RealtimeToggle seedToggle;
     RealtimeToggle terrainMaxHeightToggle;
-    RealtimeToggle worldUnitsPerCellToggle;
+    RealtimeToggle worldUnitsPerGenerationCellToggle;
 
     float mapSizeValue = 256.0f;
     float seedValue    = 0.0f;

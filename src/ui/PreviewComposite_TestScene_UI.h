@@ -55,7 +55,7 @@ inline void BuildPreviewTestScene(PreviewTestScene& scene) {
     // explains why): every expected pixel in every test built on this scene is hand-derived assuming
     // world units == cell units, same posture as this codebase's other Geometry test fixtures
     // (e.g. MarkerDragGesture_UI_Test.cpp's own MakeTestGeometry).
-    scene.geometry.worldUnitsPerCell = 1.0f;
+    scene.geometry.worldUnitsPerGenerationCell = 1.0f;
     scene.fields.Resize(scene.geometry.VertexSize(), 0.0f);
     scene.fields.heightfield.Fill(0.25f);
     scene.fields.flow.Fill(1.0f);
@@ -65,7 +65,7 @@ inline void BuildPreviewTestScene(PreviewTestScene& scene) {
     scene.strata[0].tintRed = 0.8f; scene.strata[0].tintGreen = 0.2f; scene.strata[0].tintBlue = 0.1f;
     scene.strata[1].bEnabled = false;
     Data::PlacementInstance instance;
-    instance.positionX = 2.0f;                            // world units; worldUnitsPerCell = 1
+    instance.positionX = 2.0f;                            // world units; worldUnitsPerGenerationCell = 1
     instance.positionZ = 2.0f;
     scene.instances.Clear();
     scene.instances.Append(instance);

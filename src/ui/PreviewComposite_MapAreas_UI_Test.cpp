@@ -45,7 +45,7 @@ void TestSingleAreaColorsCoveredCells() {
     BuildBareMapAreasScene(scene);
     Params::MapArea area;
     area.name = "Whole"; area.originX = 0.0f; area.originZ = 0.0f;
-    area.width = 4.0f; area.length = 4.0f;   // the whole 4x4 map: world == cell space, worldUnitsPerCell 1.0
+    area.width = 4.0f; area.length = 4.0f;   // the whole 4x4 map: world == cell space, worldUnitsPerGenerationCell 1.0
     scene.areas.push_back(area);
     Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);

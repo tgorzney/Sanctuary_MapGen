@@ -31,9 +31,9 @@ ResolvedLod_UI ResolveLodModeAndIcon(const DrawOverlayIconLayersInput& input, co
     const Io::WorldFootprintSize_IO footprint = input.footprintSizeTable->Resolve(templateIdentifier);
     const float baseFootprint = footprint.baseFootprintWidth > footprint.baseFootprintDepth
                                      ? footprint.baseFootprintWidth : footprint.baseFootprintDepth;
-    const float worldUnitsPerCell = input.composite->WorldUnitsPerCell();
-    const float thumbnailScreenSize = worldUnitsPerCell > 0.0f
-        ? (baseFootprint * instanceScale) / worldUnitsPerCell
+    const float worldUnitsPerGenerationCell = input.composite->WorldUnitsPerGenerationCell();
+    const float thumbnailScreenSize = worldUnitsPerGenerationCell > 0.0f
+        ? (baseFootprint * instanceScale) / worldUnitsPerGenerationCell
               * input.composite->PixelsPerPreviewCell() * input.view->ZoomScale()
         : 0.0f;
     ResolvedLod_UI resolved;

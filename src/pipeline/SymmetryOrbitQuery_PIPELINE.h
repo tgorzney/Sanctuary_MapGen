@@ -12,7 +12,7 @@
 // UI caller cannot do itself:
 //  - World <-> cell coordinate conversion. BuildSymmetryOrbit operates in heightfield cell space;
 //    MarkerTransform.transform (and every other domain's transform) stores absolute world units.
-//    Divide by geometry.worldUnitsPerCell going in, multiply going back out — the exact conversion
+//    Divide by geometry.worldUnitsPerGenerationCell going in, multiply going back out — the exact conversion
 //    Placement_Emit_PROC.cpp already applies for procedural placement, not a second derivation.
 //  - `extent` without a baked heightfield: geometry.VertexSize() - 1, PARAMS-only, since a manual
 //    marker may be edited before any generation has run.

@@ -150,7 +150,7 @@ Scenario authoring/export ratification described above) — the gap that flag na
 stale.** `MarkerInstanceLayer`/`PropInstanceLayer`/`DecalInstanceLayer`/`MarkerLink`'s grid-snap
 size field shipped (via `work_orders/BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI.md`,
 human-approved) as `gridSnapSizeCellMultiplier` (int, default/minimum 1 — snaps to every N terrain
-cells, scaled by `Params::Geometry::worldUnitsPerCell`), replacing the old
+cells, scaled by `Params::Geometry::worldUnitsPerGenerationCell`), replacing the old
 `gridSnapSizeWorldUnits` (float, arbitrary world-unit distance). The `.sanmap` wire key is
 unchanged (`"GridSnapSizeWorldUnits"`); no IO migration exists — old stored floats are reinterpreted
 directly under the new integer meaning. Confirmed by direct read of `MarkerInstance_PARAMS.h`,
@@ -1127,7 +1127,18 @@ specifies the implementation of items 1-5/8-9 — every one an edit to that ruli
    with a per-instance non-hoisted division inside `WorldToPreviewPixel`) and the
    `compositeTexels.assign(resolution², 0u)` 1 MB fill. The published sum is therefore a **lower
    bound**, worst exactly in the 100k row — which is why item 18's watchdog is mandatory and why it
-   brackets `Compose()` whole rather than summing item 10's three phases.
+   brackets `Compose()` whole rather than summing item 10's three phases. **`BuildEntityPoints`'s
+   per-instance division inside `WorldToPreviewPixel` by `worldUnitsPerGenerationCell` is correct,
+   permanent behavior — not a pending removal target.** Every placed entity's absolute
+   `positionX`/`positionZ` is already multiplied by `worldUnitsPerGenerationCell` at emission time
+   (`Placement_Emit_PROC.cpp`'s instance-emit path), so `WorldToPreviewPixel` must divide it back
+   out before applying the resolution scale — exactly the same conversion `BuildMapAreaConfigurations`
+   applies to `MapArea` rectangles for the same field. A code change attempting to bypass this
+   division for the entity path was implemented, built, and reverted after `ApplicationShell_UI_Test`
+   broke (marker click selection failed on the default generated map) — this is a closed, permanent
+   finding, not an open item. The only still-open lever on this division is item 8/24's hoist-the-
+   loop-invariant-calls-out-of-the-loop optimization; it hoists the reciprocal, it does not remove
+   the division.
 2. **A Tier-B2 cost watchdog is MANDATORY law (item 18)** — item 10's "Miss" clause promoted from a
    contingency to an always-armed floor: `kAreaRecompositeCostBudgetMillis = 8.0` (≈2× the measured
    worst case, ≈48% of budget), `kAreaRecompositeBreachFrameCount = 5` (the smallest count that
@@ -1174,11 +1185,13 @@ specifies the implementation of items 1-5/8-9 — every one an edit to that ruli
    becomes unconditional. `MapCanvas_AreaDragSuppression_UI_Test.cpp` is retired and replaced;
    `PreviewComposite_MapAreas_UI_Test.cpp`'s two suppression assertions are deleted outright.
 8. **Item 24 fences the scope**: no change to STEP218's benchmark or `ComposeGpuTiming`; the fence
-   spin and entity-id readback stay (item 7); and the two levers item 17 newly identified —
-   hoisting `WorldToPreviewPixel`'s loop-invariant division out of `BuildEntityPoints`, and skipping
-   the `compositeTexels` zero-fill when no texel readback is requested — are a **separate** ticket,
+   spin and entity-id readback stay (item 7); and the two levers item 17 newly identified — hoisting
+   `WorldToPreviewPixel`'s loop-invariant division out of `BuildEntityPoints`, and skipping the
+   `compositeTexels` zero-fill when no texel readback is requested — are a **separate** ticket,
    gated on a Release-build STEP218 re-run with the timing window widened to include `PrepareRun()`,
-   and must not be attempted opportunistically inside Piece C.
+   and must not be attempted opportunistically inside Piece C. **Both levers remain valid,
+   unconditional optimization targets — see item 1's note above: the division itself is correct and
+   permanent, so lever (a) is a pure loop-hoist of the reciprocal, not a candidate for removal.**
 
 `PREVIEW_COMPOSITING_SPEC.md`'s "Map areas are a field layer" section and its dirty-tier text need
 the matching narrative update (five tiers, the one-fill law, the palette, the Part 3 watchdog) —

@@ -57,13 +57,13 @@ Params::MarkerTransform MakeTransformAt(int layerIndex, int linkIdentifier = -1)
 // leaves the position unchanged too. No Links in play here — STEP246's own Link-tier resolution is
 // covered separately by RunQuantizeMarkerPositionToLayerGridLinkTierChecks below.
 // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — the field is now a whole-number
-// cell MULTIPLIER (`geometry.worldUnitsPerCell` scales it into a world-unit cell size), and snapping
+// cell MULTIPLIER (`geometry.worldUnitsPerGenerationCell` scales it into a world-unit cell size), and snapping
 // lands on the cell's CENTER (floor+half-cell), never the old vertex-snapping `std::round` result.
 void RunQuantizeMarkerPositionToLayerGridChecks() {
     Params::Geometry geometry;   // Geometry_PARAMS's own default is 10.0f now (game-real cell size);
                                  // pinned to 1.0f here so a multiplier of 4 == a 4.0-world-unit
                                  // cell, matching this test's pre-existing numbers.
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     std::vector<Params::MarkerInstanceLayer> markerLayers(3);
     markerLayers[0].bGridSnapEnabled = false;
     markerLayers[0].gridSnapSizeCellMultiplier = 4;
@@ -123,7 +123,7 @@ void RunQuantizeMarkerPositionToLayerGridChecks() {
 void RunQuantizeMarkerPositionToLayerGridLinkTierChecks() {
     Params::Geometry geometry;   // Geometry_PARAMS's own default is 10.0f now; pinned to 1.0f to
                                  // match this test's pre-existing numbers (see the sibling check above).
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     std::vector<Params::MarkerInstanceLayer> markerLayers(1);
     markerLayers[0].bGridSnapEnabled = false;           // the Layer's OWN stored field: snap OFF
     markerLayers[0].gridSnapSizeCellMultiplier = 4;

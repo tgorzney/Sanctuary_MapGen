@@ -57,8 +57,8 @@ void CheckAPartialDocumentRecoversWhatItHas() {
 // are not among any of the 9 migrations' source fields), so they would simply be discarded, unread,
 // alongside the rest of the deleted blob — the assertions below would either pass VACUOUSLY (never
 // exercising the guard they claim to) or, for `WorldUnitsPerCell` specifically (which IS relocated,
-// unclamped, by `GeneralMapSettings_Migrate_V2`, straight into `geometry.worldUnitsPerCell` with no
-// guard at that new call site), genuinely FAIL — a real gap in guard placement, not a test bug, and
+// unclamped, by `GeneralMapSettings_Migrate_V2`, straight into `geometry.worldUnitsPerGenerationCell`
+// with no guard at that new call site), genuinely FAIL — a real gap in guard placement, not a test bug, and
 // out of this ticket's scope to fix (only the 9 migrations' own logic and the manifest wiring are
 // in scope; see the work-order's explicit out-of-scope list). Dropping the version marker instead
 // routes this document through the still-real, still-documented "no version marker" recovery law
@@ -78,7 +78,7 @@ void CheckHostileValuesFallBackToDefaults() {
     Check(recipe.geometry.seed == Params::Geometry().seed, "a wrong-typed Seed is ignored");
     Check(recipe.geometry.terrainMaxHeight >= 1.0f,
           "a negative ceiling is raised so Geometry::IsValid() can never fail on import");
-    Check(recipe.geometry.worldUnitsPerCell > 0.0f, "and a zero cell size is restored");
+    Check(recipe.geometry.worldUnitsPerGenerationCell > 0.0f, "and a zero cell size is restored");
     Check(recipe.IsValid(), "so the whole recipe comes out valid");
     Check(recipe.layerStack.geoLayers.size() == 1
           && recipe.layerStack.geoLayers[0].mode == Params::GeoLayer().mode,
@@ -160,11 +160,11 @@ void CheckGeometryBandClampsWithNoLegacyBlockPresent() {
     {
         Params::MapRecipe recipe;
         Io::MapImportResult result;
-        const char* documentText = "{\"GeneralMapSettings\":{\"WorldUnitsPerCell\":0.0}}";
+        const char* documentText = "{\"GeneralMapSettings\":{\"WorldUnitsPerGenerationCell\":0.0}}";
         Check(Io::MapImporter::ParseSanmapJsonText(documentText, recipe, options, result),
-              "a document with a non-positive WorldUnitsPerCell and no legacy block still parses");
-        Check(recipe.geometry.worldUnitsPerCell > 0.0f,
-              "WorldUnitsPerCell is restored to 10 even with no mapGeneratorData block present");
+              "a document with a non-positive WorldUnitsPerGenerationCell and no legacy block still parses");
+        Check(recipe.geometry.worldUnitsPerGenerationCell > 0.0f,
+              "WorldUnitsPerGenerationCell is restored to 1 even with no mapGeneratorData block present");
         Check(result.warningCount > 0, "with the clamp logged as a warning");
     }
 }

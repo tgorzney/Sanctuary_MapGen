@@ -310,7 +310,7 @@ void RunDefaultArmyColorChecks() {
 void RunMirrorArmyGroupsChecks() {
     Params::Geometry geometry;
     geometry.mapSize          = 100;     // cells
-    geometry.worldUnitsPerCell = 2.0f;   // world center = 100*2/2 = 100 world units per axis
+    geometry.worldUnitsPerGenerationCell = 2.0f;   // world center = 100*2/2 = 100 world units per axis
 
     std::vector<Params::Army> armies(2);
     armies[0].name = "ARMY_01"; armies[0].displayName = "North";

@@ -22,13 +22,13 @@ bool Contains(const std::vector<int>& values, int target) {
     return false;
 }
 
-// extent = mapSize = 10 (VertexSize() - 1), worldUnitsPerCell = 1 -> world units == cell units, so
+// extent = mapSize = 10 (VertexSize() - 1), worldUnitsPerGenerationCell = 1 -> world units == cell units, so
 // the mirror math below (`extent - position`) is exact and easy to hand-verify — same fixture as
 // MarkerDragGesture_UI_Test.cpp's own MakeTestGeometry.
 Params::Geometry MakeTestGeometry() {
     Params::Geometry geometry;
     geometry.mapSize = 10;
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     return geometry;
 }
 

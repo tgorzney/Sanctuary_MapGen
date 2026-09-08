@@ -88,7 +88,7 @@ public:
     // value Placement emitted its instance positions with. The preview composite needs the same
     // number to map an instance onto a pixel; it reads it here so caller and stage can never
     // read two different values.
-    float WorldUnitsPerCell() const { return recipe.geometry.worldUnitsPerCell; }
+    float WorldUnitsPerGenerationCell() const { return recipe.geometry.worldUnitsPerGenerationCell; }
 
     // One stage's own parameter hash, evaluated WITHOUT running anything. This is what makes
     // the two-tier dirty derivation (PreviewDriver_PIPELINE) a function of stage ownership —

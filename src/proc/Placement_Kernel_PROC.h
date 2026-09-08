@@ -23,7 +23,7 @@ struct PlacementConstants {
     float spacingEpsilon            = 1e-4f;  // spacing below this means "no spacing rule"
     float symmetryDuplicateEpsilon  = 0.5f;   // a clone this close to a sibling is the same point
 
-    // worldUnitsPerCell is NOT here: it is map geometry, not a placement constant, and lives
+    // worldUnitsPerGenerationCell is NOT here: it is map geometry, not a placement constant, and lives
     // on Params::Geometry (M5-0a). Every reader takes it from the recipe.
     float clearanceHeightTolerance  = 0.02f;  // fallback when a rule sets no areaHeightRange
     int   clearanceSearchRadiusMaximum = 64;  // cap for the radial-clearance gallop

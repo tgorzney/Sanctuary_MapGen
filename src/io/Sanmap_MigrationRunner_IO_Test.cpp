@@ -423,8 +423,10 @@ void CheckHostileV2DocumentMigratesToExpectedV3Shape() {
                                                     "in the step has run");
 
     Check(document["GeneralMapSettings"]["Seed"] == 4242
-          && document["GeneralMapSettings"]["WorldUnitsPerCell"] == 3.5,
-          "GeneralMapSettings_Migrate_V2 relocated its fields");
+          && document["GeneralMapSettings"]["WorldUnitsPerGenerationCell"] == 3.5,
+          "GeneralMapSettings_Migrate_V2 relocated its fields, and GeneralMapSettings_Migrate_V4 "
+          "renamed WorldUnitsPerCell to WorldUnitsPerGenerationCell — the full walk to "
+          "kCurrentSanGenVersion runs both");
     Check(document["Symmetry"]["GlobalSymmetryMask"] == 5
           && document["Symmetry"]["TorusMinorRadius"] == 2.5,
           "Symmetry_Migrate_V2 relocated its fields");
@@ -475,7 +477,7 @@ void CheckHostileV2DocumentImportsToExpectedRecipe() {
           "the hostile V2 document imports without refusal");
 
     Check(recipe.geometry.seed == 4242u && !recipe.geometry.bScaleFeaturesToMapSize
-          && recipe.geometry.terrainMinHeight == 12.0f && recipe.geometry.worldUnitsPerCell == 3.5f,
+          && recipe.geometry.terrainMinHeight == 12.0f && recipe.geometry.worldUnitsPerGenerationCell == 3.5f,
           "GeneralMapSettings fields land on recipe.geometry");
     Check(recipe.globalSymmetryMask == 5 && recipe.symmetryDetection.bSnapImperfectSymmetry
           && recipe.symmetryDetection.detectionTolerance == 0.25f

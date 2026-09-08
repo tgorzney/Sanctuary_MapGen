@@ -50,9 +50,9 @@ static Params::MapRecipe MakeParityRecipe() {
     recipe.geometry.seed = 20250814u;
     recipe.geometry.terrainMaxHeight = 128.0f;
     // Placement_Test_Terrain.h's own contract: BuildTestFields(fields) below bakes its slope field
-    // at worldUnitsPerCell 1.0f (its own default param) — the recipe's copy must match or the two
+    // at worldUnitsPerGenerationCell 1.0f (its own default param) — the recipe's copy must match or the two
     // disagree about cell world-size (Geometry_PARAMS's own default is 10.0f now).
-    recipe.geometry.worldUnitsPerCell = 1.0f;
+    recipe.geometry.worldUnitsPerGenerationCell = 1.0f;
     recipe.water.bEnabled = true;
     recipe.water.waterLevelMaximum = 32.0f;          // exercises the water gate on both backends
     // STEP16_SymmetryGlobalSettings_IO audit: the default `globalSymmetryMask` changed from None

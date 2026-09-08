@@ -15,6 +15,7 @@
 // reason, per this same audit.
 #include "Sanmap_MigrationManifest_IO.h"
 #include "GeneralMapSettings_Migrate_V2_IO.h"
+#include "GeneralMapSettings_Migrate_V4_IO.h"
 #include "Symmetry_Migrate_V2_IO.h"
 #include "Accumulation_Migrate_V2_IO.h"
 #include "DetailNormal_Migrate_V2_IO.h"
@@ -97,6 +98,23 @@ const std::vector<MigrationStep>& SanmapMigrationManifest() {
                     // bLosslessIfSkipped = false: reshapes real, load-bearing per-rule fields (the
                     // symmetry triplet) with no fallback reader for the old flat shape once STEP66's
                     // importer expects the layer-wrapped one.
+                    /*bLosslessIfSkipped=*/ false },
+            },
+            /*legacyKeysToDelete=*/ {}
+        },
+        // The V4->V5 step. `GeneralMapSettings.WorldUnitsPerCell` renames in place to
+        // `GeneralMapSettings.WorldUnitsPerGenerationCell`; nothing moves to a different top-level
+        // key, so `legacyKeysToDelete` stays empty.
+        MigrationStep{
+            /*sourceVersion=*/ 4,
+            /*migrations=*/ {
+                MigrationEntry{ GeneralMapSettings_Migrate_V4, "GeneralMapSettings_Migrate_V4",
+                    "Renames GeneralMapSettings.WorldUnitsPerCell to "
+                    "GeneralMapSettings.WorldUnitsPerGenerationCell — a SanGen-owned generation-grid "
+                    "cell size, never a factor in entity position.",
+                    /*bIndependentlySelectable=*/ true,
+                    // bLosslessIfSkipped = false: a real rename — the current-shape-only importer
+                    // reads only the new key name, so skipping this leaves the value unreachable.
                     /*bLosslessIfSkipped=*/ false },
             },
             /*legacyKeysToDelete=*/ {}

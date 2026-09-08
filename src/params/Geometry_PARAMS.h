@@ -29,7 +29,7 @@ struct Geometry {
                                              // NoiseBlend (EffectiveLayerFrequency) — which is
                                              // why it lives here beside mapSize rather than on
                                              // the layer it modifies.
-    float        worldUnitsPerCell = 10.0f;  // one heightfield cell -> game units (X/Z). Map
+    float        worldUnitsPerGenerationCell = 10.0f;  // one heightfield cell -> game units (X/Z). Map
                                              // geometry, not a placement constant: Placement
                                              // emits positions with it, the preview maps an
                                              // instance onto a pixel with it. Kept explicit

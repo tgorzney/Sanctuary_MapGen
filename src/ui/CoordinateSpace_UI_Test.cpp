@@ -19,7 +19,7 @@ bool NearlyEqual(float value, float expected, float tolerance = 0.01f) {
 // --- WorldToGrid/GridToWorld: pure math, no view/composite needed. -----------------------------
 
 void CheckGridRoundTripAlwaysLandsOnACellCenter() {
-    // Cell size 10 (the "worldUnitsPerCell = 10" game the work-order's own header names).
+    // Cell size 10 (the "worldUnitsPerGenerationCell = 10" game the work-order's own header names).
     const Ui::GridPoint gridA = Ui::WorldToGrid(10.0f, Ui::WorldPoint{25.0f, -5.0f});
     check(NearlyEqual(gridA.gridX, 2.0f) && NearlyEqual(gridA.gridZ, -1.0f),
           "WorldToGrid floors toward the owning cell, including a negative coordinate");
@@ -62,7 +62,7 @@ void CheckNonPositiveCellSizeGuardsWithoutCrashing() {
 
 void CheckScreenWorldRoundTrip() {
     Ui::PreviewTestScene scene;
-    Ui::BuildPreviewTestScene(scene);   // mapSize=4 -> a 5x5 field, worldUnitsPerCell=1 (Geometry default)
+    Ui::BuildPreviewTestScene(scene);   // mapSize=4 -> a 5x5 field, worldUnitsPerGenerationCell=1 (Geometry default)
     Ui::PreviewComposite composite(scene.geometry, scene.water, scene.strata, scene.areas, scene.fields,
                                    scene.instances, scene.entityIdentifiers);
     Ui::ConfigurePreviewSettings(composite.Settings());   // previewResolution = 4

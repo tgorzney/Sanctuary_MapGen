@@ -41,7 +41,7 @@ void RunMapCanvasPickingChecks() {
     // The spatial index PIPELINE would build over the same resolved markers (GenerationAssembler::
     // BuildMarkerSpatialGrid) — built locally here since this scene has no assembler of its own.
     Data::SpatialGrid markerSpatialGrid;
-    markerSpatialGrid.Configure(static_cast<float>(scene.geometry.mapSize) * scene.geometry.worldUnitsPerCell);
+    markerSpatialGrid.Configure(static_cast<float>(scene.geometry.mapSize) * scene.geometry.worldUnitsPerGenerationCell);
     markerSpatialGrid.Build(scene.instances.positionX.data(), scene.instances.positionZ.data(),
                             static_cast<std::int32_t>(scene.instances.Count()));
 
@@ -99,7 +99,7 @@ void RunManualMarkerSelectionChecks() {
     ComposeClickableScene(composite);
 
     Data::SpatialGrid markerSpatialGrid;
-    markerSpatialGrid.Configure(static_cast<float>(scene.geometry.mapSize) * scene.geometry.worldUnitsPerCell);
+    markerSpatialGrid.Configure(static_cast<float>(scene.geometry.mapSize) * scene.geometry.worldUnitsPerGenerationCell);
     markerSpatialGrid.Build(scene.instances.positionX.data(), scene.instances.positionZ.data(),
                             static_cast<std::int32_t>(scene.instances.Count()));
 

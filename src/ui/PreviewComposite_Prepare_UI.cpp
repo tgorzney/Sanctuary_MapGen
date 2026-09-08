@@ -85,7 +85,7 @@ float PreviewComposite::PixelsPerPreviewCell() const {
 // World (positionX/positionZ) -> preview pixel. The exact mapping BuildEntityPoints bakes marks
 // through; extracted so there is exactly one copy.
 PreviewComposite::PreviewPixelPoint PreviewComposite::WorldToPreviewPixel(float worldX, float worldZ) const {
-    const float cellsPerWorldUnit = ReciprocalOrZero(geometry.worldUnitsPerCell);
+    const float cellsPerWorldUnit = ReciprocalOrZero(geometry.worldUnitsPerGenerationCell);
     const float pixelsPerCell = PixelsPerPreviewCell();
     PreviewPixelPoint point;
     point.pixelX = worldX * cellsPerWorldUnit * pixelsPerCell - 0.5f;
@@ -99,8 +99,8 @@ PreviewComposite::PreviewWorldPoint PreviewComposite::PreviewPixelToWorld(float 
     const float pixelsPerCell = PixelsPerPreviewCell();
     const float cellReciprocal = ReciprocalOrZero(pixelsPerCell);
     PreviewWorldPoint point;
-    point.worldX = (pixelX + 0.5f) * geometry.worldUnitsPerCell * cellReciprocal;
-    point.worldZ = (pixelY + 0.5f) * geometry.worldUnitsPerCell * cellReciprocal;
+    point.worldX = (pixelX + 0.5f) * geometry.worldUnitsPerGenerationCell * cellReciprocal;
+    point.worldZ = (pixelY + 0.5f) * geometry.worldUnitsPerGenerationCell * cellReciprocal;
     return point;
 }
 
@@ -133,7 +133,7 @@ void PreviewComposite::BuildEntityPoints() {
 // is never zero bytes and the shader's forward scan costs exactly one rejected iteration.
 void PreviewComposite::BuildMapAreaConfigurations() {
     mapAreaRectangles.clear();
-    const float cellsPerWorldUnit = ReciprocalOrZero(geometry.worldUnitsPerCell);
+    const float cellsPerWorldUnit = ReciprocalOrZero(geometry.worldUnitsPerGenerationCell);
     for (int index = 0; index < static_cast<int>(areas.size()); ++index) {
         const Params::MapArea& area = areas[static_cast<std::size_t>(index)];
         // STEP222 — a hidden area contributes nothing to the composite, exactly like a deleted

@@ -18,13 +18,13 @@ float SlopeDegreesToGradient(float degrees, const MaskConstants& constants) {
 
 // The stage-wide values every stratum needs. They are copied per record because the SYS seam
 // exposes int uniforms only, so the shader reads all floats out of this block.
-// The gradient's run is `Geometry::worldUnitsPerCell` — the ONE owner of cell world-size
+// The gradient's run is `Geometry::worldUnitsPerGenerationCell` — the ONE owner of cell world-size
 // (ARCH §7.1, M5-0d) — so the baked slope is rise-per-world-unit on exactly the scale
 // Placement emits its positions at. A non-positive setting degrades to 1 rather than dividing
 // by zero (Constitution §6: validate, default, carry on).
 void ConfigureSharedFields(MaskStratumConfiguration& configuration, const MaskConstants& constants,
-                           float terrainMaxHeight, float worldUnitsPerCell) {
-    const float cellWorldSize = worldUnitsPerCell > 0.0f ? worldUnitsPerCell : 1.0f;
+                           float terrainMaxHeight, float worldUnitsPerGenerationCell) {
+    const float cellWorldSize = worldUnitsPerGenerationCell > 0.0f ? worldUnitsPerGenerationCell : 1.0f;
     configuration.heightScale        = terrainMaxHeight;
     configuration.inverseSingleSpan  = 1.0f / cellWorldSize;
     configuration.inverseDoubleSpan  = 1.0f / (constants.centralDifferenceSpan * cellWorldSize);
@@ -114,7 +114,7 @@ void MaskStage::PrepareRun() {
     for (int index = 0; index < Data::MapFields::stratumCount; ++index) {
         MaskStratumConfiguration& configuration = stratumConfigurations[index];
         ConfigureSharedFields(configuration, constants, geometry.terrainMaxHeight,
-                              geometry.worldUnitsPerCell);
+                              geometry.worldUnitsPerGenerationCell);
         if (static_cast<std::size_t>(index) >= strata.size()) continue;   // unconfigured: stays defaulted
         const Data::StratumArt* art = static_cast<std::size_t>(index) < stratumArt.size()
                                     ? &stratumArt[index] : nullptr;

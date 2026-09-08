@@ -98,7 +98,7 @@ struct PreviewMapAreaRectangle {
 
 - **Coordinates are in CELL space, computed CPU-side.** `minimumX = area.originX * cellsPerWorldUnit`,
   `maximumX = (area.originX + area.width) * cellsPerWorldUnit`, and the Z pair likewise, with
-  `cellsPerWorldUnit = ReciprocalOrZero(settings.worldUnitsPerCell)` — the SAME reciprocal
+  `cellsPerWorldUnit = ReciprocalOrZero(settings.worldUnitsPerGenerationCell)` — the SAME reciprocal
   `WorldToPreviewPixel` already takes (`PreviewComposite_Prepare_UI.cpp:87`), so multiply-never-
   divide holds (Constitution §3) and there is no second copy of the world→cell arithmetic. Cell
   space is the right space because it is exactly what both twins already hand
@@ -106,7 +106,7 @@ struct PreviewMapAreaRectangle {
   (`PreviewComposite_UI.glsl:59-62`, `PreviewComposite_Cpu_UI.cpp:67-72`). Comparing a cell-space
   rectangle against `sampleX`/`sampleY` needs zero further transform, and it agrees exactly with the
   immediate-mode border's own `WorldToPreviewPixel` path, since both derive from the one
-  `PreviewCompositeSettings::worldUnitsPerCell` mirror.
+  `PreviewCompositeSettings::worldUnitsPerGenerationCell` mirror.
 - **No count field is added to `PreviewCompositeConfiguration`.** That record is 20 scalars / 80
   bytes today (`PreviewComposite_Kernel_UI.h:111-133`) and its GLSL twin `CompositeConfiguration` is
   declared **twice** — in `PreviewComposite_Sampling_UI.glsl` and again in `PreviewComposite_UI.glsl`

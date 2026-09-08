@@ -41,7 +41,7 @@ std::vector<float> RunGate(const std::vector<Params::Stratum>& strata, int mapSi
     geometry.terrainMaxHeight = terrainMaxHeight;
     // Geometry_PARAMS's own default is 10.0f now (game-real cell size); this test's expected
     // gradients are hand-derived assuming a 1.0-world-unit cell run, so pin it explicitly.
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     const int vertexSize = geometry.VertexSize();
     Data::MapFields fields;
     fields.Resize(vertexSize);

@@ -33,8 +33,8 @@ void CheckGeometryAndWater(const Params::MapRecipe& original, const Params::MapR
           "terrainMaxHeight survives");
     Check(loaded.geometry.bScaleFeaturesToMapSize == original.geometry.bScaleFeaturesToMapSize,
           "scale-features-to-map-size survives");
-    Check(NearlyEqual(loaded.geometry.worldUnitsPerCell, original.geometry.worldUnitsPerCell),
-          "worldUnitsPerCell survives");
+    Check(NearlyEqual(loaded.geometry.worldUnitsPerGenerationCell, original.geometry.worldUnitsPerGenerationCell),
+          "worldUnitsPerGenerationCell survives");
     Check(loaded.globalSymmetryMask == original.globalSymmetryMask,
           "the global symmetry mask survives");
     Check(loaded.water.bEnabled == original.water.bEnabled
@@ -47,7 +47,7 @@ void CheckGeometryAndWater(const Params::MapRecipe& original, const Params::MapR
 // SANMAP_FORMAT_SPEC Correction 2: `GlobalGravity`, the one genuinely new field
 // (`Params::GeneralMapSettings`, not a rival store for per-stratum gravity — see that header's own
 // comment). The other 4 `GeneralMapSettings` fields (Seed/ScaleFeaturesToMapSize/TerrainMinHeight/
-// WorldUnitsPerCell) are already covered by CheckGeometryAndWater above — they still land on
+// WorldUnitsPerGenerationCell) are already covered by CheckGeometryAndWater above — they still land on
 // `recipe.geometry`, only their WIRE location moved.
 void CheckGeneralMapSettings(const Params::MapRecipe& original, const Params::MapRecipe& loaded) {
     Check(NearlyEqual(loaded.generalMapSettings.globalGravity, original.generalMapSettings.globalGravity),
@@ -55,7 +55,7 @@ void CheckGeneralMapSettings(const Params::MapRecipe& original, const Params::Ma
 }
 
 // SANMAP_FORMAT_SPEC Correction 2: `Seed`/`ScaleFeaturesToMapSize`/`TerrainMinHeight`/
-// `WorldUnitsPerCell` are RELOCATED, not dual-written, into the top-level `GeneralMapSettings`
+// `WorldUnitsPerGenerationCell` are RELOCATED, not dual-written, into the top-level `GeneralMapSettings`
 // object. STEP36_LegacyBlobDeletion_IO: a fresh export no longer writes `mapGeneratorData` at ALL
 // (TestDocumentCarriesTheFormatsOwnFields, MapExporter_IO_Test.cpp, covers that globally), so the
 // narrower "not nested inside mapGeneratorData" check this used to make is now moot — confirmed
@@ -1642,7 +1642,7 @@ Params::MapRecipe BuildPopulatedRecipe() {
     recipe.geometry.terrainMinHeight = 12.0f;
     recipe.geometry.terrainMaxHeight = 300.0f;
     recipe.geometry.bScaleFeaturesToMapSize = false;
-    recipe.geometry.worldUnitsPerCell = 2.5f;
+    recipe.geometry.worldUnitsPerGenerationCell = 2.5f;
     // SANMAP_FORMAT_SPEC Correction 2: the one genuinely new field, non-default (CheckGeneralMapSettings).
     recipe.generalMapSettings.globalGravity = 6.5f;
     recipe.globalSymmetryMask = 3;

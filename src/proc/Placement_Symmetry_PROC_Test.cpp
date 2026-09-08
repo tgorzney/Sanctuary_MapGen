@@ -38,9 +38,9 @@ static Params::MapRecipe MakeSymmetricRecipe(int symmetryMask) {
     recipe.geometry.seed = 4242u;
     recipe.geometry.terrainMaxHeight = 128.0f;
     // Placement_Test_Terrain.h's own contract: BuildTestFields(fields) below bakes its slope field
-    // at worldUnitsPerCell 1.0f (its own default param) — the recipe's copy must match or the two
+    // at worldUnitsPerGenerationCell 1.0f (its own default param) — the recipe's copy must match or the two
     // disagree about cell world-size (Geometry_PARAMS's own default is 10.0f now).
-    recipe.geometry.worldUnitsPerCell = 1.0f;
+    recipe.geometry.worldUnitsPerGenerationCell = 1.0f;
     recipe.globalSymmetryMask = symmetryMask;
 
     Params::MarkerRule spawnRule;

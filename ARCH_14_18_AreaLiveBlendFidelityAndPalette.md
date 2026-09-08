@@ -356,10 +356,20 @@ published totals therefore **exclude `PrepareRun()` entirely** — every one of
 `BuildMapAreaConfigurations`, `BuildEntityPoints` and the `compositeTexels.assign(resolution², 0u)`
 zero-fill (`PreviewComposite_UI.cpp:81-93`). Two of those are not small:
 - `BuildEntityPoints()` is O(instances) and is **not gated** (item 7, correctly). Each instance calls
-  `WorldToPreviewPixel`, which itself calls `ReciprocalOrZero(settings.worldUnitsPerCell)` and
+  `WorldToPreviewPixel`, which itself calls `ReciprocalOrZero(settings.worldUnitsPerGenerationCell)` and
   `PixelsPerPreviewCell()` — both loop-invariant, neither hoisted, and the first containing a
   division (`PreviewComposite_Prepare_UI.cpp:87-93, 111-120`). In a Debug build with no inlining,
   100k iterations of that is **not** free.
+  **The division itself is correct, permanent behavior, not an optimization target for removal.**
+  Every entity's absolute `positionX`/`positionZ` is already multiplied by
+  `worldUnitsPerGenerationCell` at emission time (`Placement_Emit_PROC.cpp`'s instance-emit path), so
+  `WorldToPreviewPixel` must divide it back out before applying the resolution scale — the identical
+  conversion `MapArea` rectangle flattening applies to the same field (§14.17). A code change that
+  attempted to route entity screen-position projection around this division was implemented, built,
+  and reverted after it broke `ApplicationShell_UI_Test` (marker click selection failed on the
+  default generated map) — recorded here as a closed, permanent finding, not a pending fix. The only
+  legitimate lever on this cost is hoisting the two loop-invariant calls (and the division inside
+  `WorldToPreviewPixel`) out of `BuildEntityPoints`'s per-instance loop — named at item 24 below.
 - `compositeTexels.assign(resolution², 0u)` is a 1 MB fill at 512², executed on **every** compose,
   including the `bNeedsTexelReadback == false` shape where nothing will ever read it.
 
@@ -527,8 +537,7 @@ second bullet is CORRECTED and VOID.**
   (line 57) and therefore before this frame's `ContinueAreaDrag` (line 199). The chrome pass reads
   `recipe.areas` at its frame-N-1 value — the same value the composite serviced at step 7 was built
   from. **Border, handles and fill are in exact lockstep, all one frame behind the pointer.** There
-  is no divergence to accept. The bullet described the shipped suppression design and does not
-  survive it.
+  is no divergence to accept.
 - **The divergence does appear in degraded mode**, and is stated so it is diagnosed instead of
   re-reported as a bug: while throttled, chrome stays one frame behind while the fill may be up to
   ~33 ms behind. That gap is the visible signature of the throttle.
@@ -628,7 +637,10 @@ the one pure function).
   ROUGH-ESTIMATE-sized only, and (b) in particular needs a proof that no reader of `CompositeTexels()`
   can observe the skip — the same class of argument item 7 refused to make for the readback. They are
   a separate ticket, owned by the SanGen Compute Optimization Expert, gated on a **Release**-build
-  re-run of STEP218 with the timing window widened to include `PrepareRun()`.
+  re-run of STEP218 with the timing window widened to include `PrepareRun()`. Lever (a) hoists the
+  division's operands out of the per-instance loop; it does not remove the division itself, which is
+  correct and permanent (item 17 above) — a code change that removed it instead was tried, built, and
+  reverted after breaking marker click selection.
 - **No per-area blend mode** (item 15). **No second fill renderer, ever** (item 1). **No shader
   callback** (item 2).
 - No `.sanmap` schema, `Params::MapArea`, picking or `SanGenVersion` change of any kind.

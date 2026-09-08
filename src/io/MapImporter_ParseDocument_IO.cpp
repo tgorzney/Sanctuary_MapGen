@@ -121,7 +121,7 @@ void ParseStackDomainsJson(const nlohmann::json& document, Params::MapRecipe& ou
 // REPLACING a legacy `mapGeneratorData.*` field its own reader's header comment documents in full
 // (Correction numbers kept per call for traceability). `GeneralMapSettings` is LOAD-BEARING: it
 // must run before `ClampGeometryBand` right below it — that guard's clamp/Warn block depends on
-// `geometry.terrainMinHeight`/`worldUnitsPerCell` already being set (see
+// `geometry.terrainMinHeight`/`worldUnitsPerGenerationCell` already being set (see
 // MapImporter_GeneralMapSettings_IO.cpp's own header comment). `ClampGeometryBand` runs
 // unconditionally HERE, not inside the gated legacy `ReadGeometryJson` tail, so it still catches a
 // hand-edited/corrupted value on a current-format document with no `mapGeneratorData` block at all

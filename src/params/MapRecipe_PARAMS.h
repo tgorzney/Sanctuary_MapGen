@@ -45,7 +45,7 @@ struct MapRecipe {
     std::string             mapName    = "mapdef";
     std::string             mapCredits = "Sanctuary Map Generator";
     // The top-level `GeneralMapSettings` section (SANMAP_FORMAT_SPEC Correction 2): Seed/
-    // ScaleFeaturesToMapSize/TerrainMinHeight/WorldUnitsPerCell live ON `geometry` above (relocated
+    // ScaleFeaturesToMapSize/TerrainMinHeight/WorldUnitsPerGenerationCell live ON `geometry` above (relocated
     // OUT of the legacy `mapGeneratorData` blob on the wire, not out of Geometry in memory) —
     // `generalMapSettings` itself holds only the one genuinely new field, `globalGravity`.
     GeneralMapSettings     generalMapSettings;

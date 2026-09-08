@@ -321,6 +321,11 @@ work-order, informed by this spec plus the ratified `SANMAP_FORMAT_SPEC`.
 Step 2 -> 3 (illustrative):
   GeneralMapSettings_Migrate_V2_IO     // Correction 2: pulls Seed / ScaleFeaturesToMapSize /
                                         // TerrainMinHeight / WorldUnitsPerCell out of mapGeneratorData
+                                        // (a pure relocation at this step, not a rename — the field
+                                        // kept this exact spelling here; it was renamed again, later,
+                                        // to WorldUnitsPerGenerationCell by the real, shipped V4->V5
+                                        // step, GeneralMapSettings_Migrate_V4 — see the note appended
+                                        // to this section below)
   HeightmapStack_Migrate_V2_IO         // Correction 3: GeoLayers -> HeightmapStack, folds in
                                         // SimulationGrouping
   Symmetry_Migrate_V2_IO               // Correction 4: global symmetry fields -> Symmetry
@@ -349,6 +354,16 @@ rule: the one migration in this step whose correctness depends on reading fields
 live under a *different* domain's old location — and it must run before
 `mapGeneratorData` is deleted, which is exactly why ordering inside a step is law, not
 convenience.
+
+**Real, shipped step since this illustration was written — V4 → V5, `kCurrentSanGenVersion`
+now 5 (`Sanmap_MigrationManifest_IO.h`).** `GeneralMapSettings_Migrate_V4` renames
+`GeneralMapSettings.WorldUnitsPerCell` to `GeneralMapSettings.WorldUnitsPerGenerationCell` —
+a same-object, same-tier pure key rename (not a relocation like the illustrative V2→V3 step
+above), correcting the old name's wrong implication that this scalar bears on marker/prop/
+decal/unit position; it is SanGen's own generation-grid cell size, used only for field-layer
+baking/compositing (height/slope/flow/accumulation/stratum/`MapAreas`). This is a real,
+already-shipped manifest entry, not another illustration — `Params::Geometry::
+worldUnitsPerGenerationCell` is the current C++ field name pack-wide as of this step.
 
 ## 8. What this spec does not decide (deliberately)
 

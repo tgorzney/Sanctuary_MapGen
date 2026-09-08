@@ -22,12 +22,12 @@ void Check(bool bCondition, const char* label) {
     ++failureCount;
 }
 
-// worldUnitsPerCell = 1 -> world units == cell units, extent = mapSize, mirror(x) = mapSize - x,
+// worldUnitsPerGenerationCell = 1 -> world units == cell units, extent = mapSize, mirror(x) = mapSize - x,
 // hand-verifiable (same convention MarkerDragGesture_UI_Test.cpp's MakeTestGeometry uses).
 Params::Geometry MakeTestGeometry(int mapSize = 10) {
     Params::Geometry geometry;
     geometry.mapSize = mapSize;
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     return geometry;
 }
 

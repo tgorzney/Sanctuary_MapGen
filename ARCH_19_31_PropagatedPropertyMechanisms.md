@@ -4,7 +4,7 @@
 > `bGridSnapEnabled`/`gridSnapSizeWorldUnits` pair named throughout this file (item 5 of the
 > Layer-tier list, the `MarkerLink` struct, and the resolver surface below) shipped as
 > `bGridSnapEnabled`/`gridSnapSizeCellMultiplier` (int, default 1, minimum 1 — a whole-number
-> terrain-cell multiplier, not a world-unit float; `Params::Geometry::worldUnitsPerCell` stays the
+> terrain-cell multiplier, not a world-unit float; `Params::Geometry::worldUnitsPerGenerationCell` stays the
 > sole source of truth for cell size). Human-approved, landed via
 > `work_orders/BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI.md`, confirmed by direct read
 > of `MarkerInstance_PARAMS.h`/`ScatterInstanceLayer_PARAMS.h`/`MarkerLink_PARAMS.h` and their IO

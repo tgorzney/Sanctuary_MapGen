@@ -106,7 +106,7 @@ void CheckThumbnailModeAboveThreshold() {
     check(candidates.size() == 1, "the in-view, resolved instance produces exactly one candidate");
     if (!candidates.empty())
         check(candidates[0].screenSize > 1.99f && candidates[0].screenSize < 2.01f,
-              "thumbnail mode's screen size is baseFootprint*scale/worldUnitsPerCell*pixelsPerCell*zoom");
+              "thumbnail mode's screen size is baseFootprint*scale/worldUnitsPerGenerationCell*pixelsPerCell*zoom");
 }
 
 // Below threshold: switches to strategic mode. STEP52's real IconAtlasPairingLookup has no public

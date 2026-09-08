@@ -32,7 +32,7 @@ void GenerationAssembler::AddStage(const std::string& stageName, RegenerationTie
 // One grid per Data::PlacementResults collection (Data::SpatialGridSet, mirrors
 // BuildRuleBucketIndex's own already-four-way shape immediately below).
 void GenerationAssembler::BuildSpatialGridSet() {
-    const float mapWorldSize = static_cast<float>(recipe.geometry.mapSize) * WorldUnitsPerCell();
+    const float mapWorldSize = static_cast<float>(recipe.geometry.mapSize) * WorldUnitsPerGenerationCell();
     spatialGridSet.markers.Configure(mapWorldSize, spatialGridChunkResolution);
     spatialGridSet.markers.Build(placementResults.markers.positionX.data(),
                                  placementResults.markers.positionZ.data(),

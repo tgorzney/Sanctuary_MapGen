@@ -21,13 +21,13 @@ void Check(bool bCondition, const char* label) {
 
 bool NearlyEqual(float a, float b, float tolerance = 1e-3f) { return std::fabs(a - b) <= tolerance; }
 
-// mapSize=10, worldUnitsPerCell=1 -> world units == cell units, map center at world (5,5) — the
+// mapSize=10, worldUnitsPerGenerationCell=1 -> world units == cell units, map center at world (5,5) — the
 // same fixture MarkerDragGesture_UI_Test.cpp's own MakeTestGeometry uses, so MirrorAcrossX's own
 // already-proven behavior there (x mirrors about 5.0, z untouched) applies here unchanged.
 Params::Geometry MakeTestGeometry() {
     Params::Geometry geometry;
     geometry.mapSize = 10;
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     return geometry;
 }
 

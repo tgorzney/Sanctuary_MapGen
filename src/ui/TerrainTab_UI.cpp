@@ -45,15 +45,15 @@ void DrawTerrainTab(Params::MapRecipe& recipe, TerrainTabState& state,
                               WidgetStyle(), "%.1f");
     NotifyOnCommit(change, previewDriver);
 
-    change = DrawLabelledDial("World Units Per Cell", geometry.worldUnitsPerCell,
-                              state.worldUnitsPerCellRange, state.worldUnitsPerCellToggle,
+    change = DrawLabelledDial("World Units Per Generation Cell", geometry.worldUnitsPerGenerationCell,
+                              state.worldUnitsPerGenerationCellRange, state.worldUnitsPerGenerationCellToggle,
                               WidgetStyle(), "%.4f");
     NotifyOnCommit(change, previewDriver);
 
     ImGui::Separator();
     ImGui::Text("Heightfield %d x %d vertices | extent %.1f game units",
                 geometry.VertexSize(), geometry.VertexSize(),
-                static_cast<float>(geometry.mapSize) * geometry.worldUnitsPerCell);
+                static_cast<float>(geometry.mapSize) * geometry.worldUnitsPerGenerationCell);
     if (!geometry.IsValid()) ImGui::TextUnformatted("Geometry is invalid: nothing will generate.");
     ImGui::PopID();
 }

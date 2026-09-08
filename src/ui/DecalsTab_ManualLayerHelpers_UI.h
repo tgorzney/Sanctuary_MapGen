@@ -36,7 +36,7 @@ inline void QuantizeDecalPositionToLayerGrid(const std::vector<Params::DecalInst
     if (layerIndex < 0 || layerIndex >= static_cast<int>(decalLayers.size())) return;
     const Params::DecalInstanceLayer& layer = decalLayers[static_cast<std::size_t>(layerIndex)];
     if (!layer.bGridSnapEnabled || layer.gridSnapSizeCellMultiplier < 1) return;
-    const float cellSizeWorldUnits = static_cast<float>(layer.gridSnapSizeCellMultiplier) * geometry.worldUnitsPerCell;
+    const float cellSizeWorldUnits = static_cast<float>(layer.gridSnapSizeCellMultiplier) * geometry.worldUnitsPerGenerationCell;
     const WorldPoint snapped =
         GridToWorld(cellSizeWorldUnits, WorldToGrid(cellSizeWorldUnits, WorldPoint{worldX, worldZ}));
     worldX = snapped.worldX;

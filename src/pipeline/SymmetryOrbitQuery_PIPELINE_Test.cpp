@@ -19,7 +19,7 @@ int main() {
 
     Params::Geometry geometry;
     geometry.mapSize          = 256;
-    geometry.worldUnitsPerCell = 2.0f;
+    geometry.worldUnitsPerGenerationCell = 2.0f;
 
     // 1. A single mirror axis off the mirror line -> a 2-point orbit.
     //    cell space: 40/2=20, extent=256, mirrored=236, world=236*2=472.

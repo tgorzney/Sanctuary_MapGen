@@ -62,7 +62,7 @@ void CheckSlopeFieldMatchesAnalyticGradient() {
     geometry.terrainMaxHeight = 64.0f;
     // Geometry_PARAMS's own default is 10.0f now; this test's expectedSlope formula below assumes
     // a 1.0-world-unit cell run (risePerCell IS the gradient's run), so pin it explicitly.
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     const int vertexSize = geometry.VertexSize();
     const float risePerCell = 0.003f;
     Data::MapFields fields;
@@ -91,7 +91,7 @@ void RunPurityTests() {
     // Pinned to the historical 1.0f (Geometry_PARAMS's own default is 10.0f now): MakePurityStrata's
     // per-stratum slope-degree windows are calibrated against FillTestHeightfield's gradient at a
     // 1.0-world-unit cell run.
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     const int vertexSize = geometry.VertexSize();
     const std::vector<Params::Stratum> strata = MakePurityStrata();
     const std::vector<Data::StratumArt> stratumArt = MakePurityArt();

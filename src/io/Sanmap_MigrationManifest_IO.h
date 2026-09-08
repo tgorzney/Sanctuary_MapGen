@@ -26,6 +26,12 @@
 // importer/exporter expect), and bumped this constant from 3 to 4 to match. A `.sanmap` at version
 // 3 now walks forward one more step on import; a document already at 4 is an unaffected zero-step
 // passthrough.
+//
+// `kCurrentSanGenVersion = 5` — added the V4->V5 step (sourceVersion 4), wiring in
+// `GeneralMapSettings_Migrate_V4` (a same-object key rename, `GeneralMapSettings.WorldUnitsPerCell`
+// -> `GeneralMapSettings.WorldUnitsPerGenerationCell` — the old name wrongly implied a bearing on
+// entity position; it is SanGen's own generation-grid cell size, nothing else), and bumped this
+// constant from 4 to 5 to match.
 #pragma once
 #include <nlohmann/json.hpp>
 #include <vector>
@@ -33,7 +39,7 @@
 namespace SanmapGen {
 namespace Io {
 
-inline constexpr int kCurrentSanGenVersion = 4;
+inline constexpr int kCurrentSanGenVersion = 5;
 
 // One free function per migration file, operating on the WHOLE parsed document in place
 // (IO_MIGRATION_SPEC.md §2 — cross-domain compensation needs the whole document, not a fragment).

@@ -62,7 +62,7 @@ std::vector<MarkerSymmetryOrbitMatch> FindMarkerSymmetryMatches(
     for (std::size_t rank = 0; rank < canonicalOrder.size(); ++rank)
         canonicalRank[static_cast<std::size_t>(canonicalOrder[rank].candidateIndex)] = static_cast<int>(rank);
 
-    const float worldSize = static_cast<float>(geometry.mapSize) * geometry.worldUnitsPerCell;
+    const float worldSize = static_cast<float>(geometry.mapSize) * geometry.worldUnitsPerGenerationCell;
     Data::SpatialGrid grid;
     grid.Configure(worldSize, MatchDetail::ResolvedChunkResolution(worldSize, distanceTolerance));
     grid.Build(candidatePositionX, candidatePositionZ, candidateCount);

@@ -10,7 +10,7 @@ namespace Proc {
 
 // Stage constants — defaults only; every one is settable per project (§8).
 // The world size of one heightfield cell is NOT here: it is map geometry, owned by
-// `Params::Geometry::worldUnitsPerCell` (ARCH §7.1), which the slope gradient reads directly.
+// `Params::Geometry::worldUnitsPerGenerationCell` (ARCH §7.1), which the slope gradient reads directly.
 // A private copy here was a rival source for the same physical quantity Placement emits its
 // positions with, and the two silently disagreed for any project setting it away from 1 (M5-0d).
 struct MaskConstants {
@@ -48,8 +48,8 @@ struct MaskStratumConfiguration {
     float paddingThird        = 0.0f;
     float paddingFourth       = 0.0f;
     float heightScale         = 1.0f;   // Geometry.terrainMaxHeight — read from the map, not 128
-    float inverseSingleSpan   = 1.0f;   // 1/(1*worldUnitsPerCell) — edge cells, one-sided difference
-    float inverseDoubleSpan   = 0.5f;   // 1/(2*worldUnitsPerCell) — interior cells, central difference
+    float inverseSingleSpan   = 1.0f;   // 1/(1*worldUnitsPerGenerationCell) — edge cells, one-sided difference
+    float inverseDoubleSpan   = 0.5f;   // 1/(2*worldUnitsPerGenerationCell) — interior cells, central difference
     float smoothstepShoulder  = 3.0f;
     float smoothstepScale     = 2.0f;
     float maskMinimum         = 0.0f;

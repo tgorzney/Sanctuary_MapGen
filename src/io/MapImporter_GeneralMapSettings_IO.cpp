@@ -6,9 +6,10 @@
 //
 // Load-bearing ordering note (ARCH Expert finding, SANMAP_FORMAT_SPEC Correction 2): this reader
 // MUST run before `ReadGeometryJson` (MapImporter_Recipe_IO.cpp). That function's own clamp/`Warn`
-// block at its end enforces the TerrainMinHeight/TerrainMaxHeight band and the WorldUnitsPerCell
-// positivity floor; it stays correct post-relocation only because `geometry.terrainMinHeight`/
-// `geometry.worldUnitsPerCell` are already set from THIS reader by the time that block runs.
+// block at its end enforces the TerrainMinHeight/TerrainMaxHeight band and the
+// WorldUnitsPerGenerationCell positivity floor; it stays correct post-relocation only because
+// `geometry.terrainMinHeight`/`geometry.worldUnitsPerGenerationCell` are already set from THIS
+// reader by the time that block runs.
 //
 // STEP30_LegacyBlobFieldHoming_IO: also reads `TerrainMaxHeight`, sibling of `TerrainMinHeight`.
 // This runs AFTER the top-level `height` read (MapImporter_IO.cpp, lossy int) and BEFORE the
@@ -22,9 +23,19 @@ namespace SanmapGen {
 namespace Io {
 
 void ReadGeneralMapSettingsJson(const nlohmann::json& document, Params::MapRecipe& outRecipe) {
-    if (!document.contains("GeneralMapSettings") || !document["GeneralMapSettings"].is_object()) return;
-    const nlohmann::json& json = document["GeneralMapSettings"];
     Params::Geometry& geometry = outRecipe.geometry;
+    if (!document.contains("GeneralMapSettings") || !document["GeneralMapSettings"].is_object()) {
+        // No GeneralMapSettings object at all — a foreign/legacy file that never went through
+        // SanGen's own generation pipeline (or predates this section, SANMAP_FORMAT_SPEC Correction
+        // 2). `ReadJsonFloat` leaving a missing key's destination untouched would otherwise silently
+        // keep Geometry's own struct default (10 — the BRAND-NEW-map starting value,
+        // Application_Recipe_UI.cpp's MakeDefaultMapRecipe never routes through this reader at all).
+        // Such a file's positions were never scaled by anything, so 1 is the only value that keeps
+        // them correctly on-screen (the actual bug report this guards against).
+        geometry.worldUnitsPerGenerationCell = 1.0f;
+        return;
+    }
+    const nlohmann::json& json = document["GeneralMapSettings"];
 
     // Seed's negative-value guard, replicated verbatim from ReadGeometryJson's own pre-relocation
     // read: a negative signed value clamps to 0 rather than wrapping around to ~4 billion when cast
@@ -37,7 +48,11 @@ void ReadGeneralMapSettingsJson(const nlohmann::json& document, Params::MapRecip
     ReadJsonFloat(json, "GlobalGravity", outRecipe.generalMapSettings.globalGravity);
     ReadJsonFloat(json, "TerrainMinHeight", geometry.terrainMinHeight);
     ReadJsonFloat(json, "TerrainMaxHeight", geometry.terrainMaxHeight);
-    ReadJsonFloat(json, "WorldUnitsPerCell", geometry.worldUnitsPerCell);
+    // Same "missing key -> 1, not Geometry's own 10" reasoning as the no-section branch above — a
+    // GeneralMapSettings object that exists but doesn't carry this specific key is still a file that
+    // never declared a generation-grid cell size.
+    if (!ReadJsonFloat(json, "WorldUnitsPerGenerationCell", geometry.worldUnitsPerGenerationCell))
+        geometry.worldUnitsPerGenerationCell = 1.0f;
 }
 
 } // namespace Io

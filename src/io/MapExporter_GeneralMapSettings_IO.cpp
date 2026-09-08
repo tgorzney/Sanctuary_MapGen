@@ -1,6 +1,6 @@
 // MapExporter_GeneralMapSettings_IO.cpp — `recipe.geometry`/`recipe.generalMapSettings` -> the
 // top-level `.sanmap` `GeneralMapSettings` object. Layer: IO. SANMAP_FORMAT_SPEC Correction 2:
-// relocates `Seed`/`ScaleFeaturesToMapSize`/`TerrainMinHeight`/`WorldUnitsPerCell` OUT of the
+// relocates `Seed`/`ScaleFeaturesToMapSize`/`TerrainMinHeight`/`WorldUnitsPerGenerationCell` OUT of the
 // legacy `mapGeneratorData` blob (BuildMapGeneratorDataJson no longer writes them — see that
 // function's own comment) and adds one genuinely new field, `GlobalGravity`. One flat object,
 // sibling of `armies`/`atmosphere`/`SlopeDefaults`, NOT nested in `mapGeneratorData` — same
@@ -23,7 +23,7 @@ nlohmann::ordered_json BuildGeneralMapSettingsJson(const Params::MapRecipe& reci
     json["GlobalGravity"]          = recipe.generalMapSettings.globalGravity;
     json["TerrainMinHeight"]       = geometry.terrainMinHeight;
     json["TerrainMaxHeight"]       = geometry.terrainMaxHeight;
-    json["WorldUnitsPerCell"]      = geometry.worldUnitsPerCell;
+    json["WorldUnitsPerGenerationCell"] = geometry.worldUnitsPerGenerationCell;
     return json;
 }
 

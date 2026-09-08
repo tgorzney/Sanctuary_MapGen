@@ -22,7 +22,7 @@ bool NearlyEqual(float a, float b) { return std::fabs(a - b) <= 0.01f; }
 Params::Geometry MakeTestGeometry() {
     Params::Geometry geometry;
     geometry.mapSize = 10;
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     return geometry;
 }
 

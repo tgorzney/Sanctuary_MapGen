@@ -103,7 +103,7 @@ MaskStage::MaskStage(const Params::Geometry& geometrySettings,
 std::size_t MaskStage::ComputeParameterHash() const {
     std::size_t hash = HashInteger(hashBasis, geometry.mapSize);
     hash = HashFloat(hash, geometry.terrainMaxHeight);
-    hash = HashFloat(hash, geometry.worldUnitsPerCell);   // the gradient's run (M5-0d)
+    hash = HashFloat(hash, geometry.worldUnitsPerGenerationCell);   // the gradient's run (M5-0d)
     hash = HashConstants(hash, constants);
     hash = HashSlopeDefaults(hash, slopeDefaults);
     hash = HashInteger(hash, static_cast<int>(strata.size()));

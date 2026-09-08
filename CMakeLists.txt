@@ -1079,6 +1079,8 @@ target_link_libraries(DetailNormal_Migrate_V2_IO_Test PRIVATE nlohmann_json::nlo
 # above — only the _Test.cpp is listed here.
 add_sangen_test(MarkersStack_Migrate_V3_IO_Test src/io/MarkersStack_Migrate_V3_IO_Test.cpp)
 target_link_libraries(MarkersStack_Migrate_V3_IO_Test PRIVATE nlohmann_json::nlohmann_json)
+add_sangen_test(GeneralMapSettings_Migrate_V4_IO_Test src/io/GeneralMapSettings_Migrate_V4_IO_Test.cpp)
+target_link_libraries(GeneralMapSettings_Migrate_V4_IO_Test PRIVATE nlohmann_json::nlohmann_json)
 
 # STEP76_ArmyIdentityNaming_IO: the machine-owned ARMY_XX identity helper (pure, headless — no
 # nlohmann needed) and its import-side normalizer, which constructs nlohmann::json document fixtures

@@ -285,18 +285,19 @@ repeats the pattern).
 
 ### `GeneralMapSettings` — Correction 2
 ```
-Seed                    (confirmed live, MapExporter_Recipe_IO.cpp)
-ScaleFeaturesToMapSize  (confirmed live)
-GlobalGravity           (NEW — currently tab-local UI state, HeightmapTab_UI.h:70,
-                         explicitly unserialized; genuine new PARAMS field, not
-                         a relocation)
-TerrainMinHeight        (confirmed live, MapExporter_Recipe_IO.cpp:38)
-WorldUnitsPerCell       (confirmed live, MapExporter_Recipe_IO.cpp:41)
+Seed                        (confirmed live, MapExporter_Recipe_IO.cpp)
+ScaleFeaturesToMapSize      (confirmed live)
+GlobalGravity               (NEW — currently tab-local UI state, HeightmapTab_UI.h:70,
+                             explicitly unserialized; genuine new PARAMS field, not
+                             a relocation)
+TerrainMinHeight            (confirmed live, MapExporter_Recipe_IO.cpp:38)
+WorldUnitsPerGenerationCell (confirmed live, MapExporter_Recipe_IO.cpp:41; renamed from
+                             WorldUnitsPerCell — see Correction 21 below, SanGenVersion 5)
 ```
-`TerrainMinHeight`/`WorldUnitsPerCell` are fields v2 already round-trips today;
+`TerrainMinHeight`/`WorldUnitsPerGenerationCell` are fields v2 already round-trips today;
 their absence from the first draft of this schema was a documentation gap, not
 a design decision. `Seed`/`ScaleFeaturesToMapSize`/`TerrainMinHeight`/
-`WorldUnitsPerCell` are pure relocations into this section; `GlobalGravity` is
+`WorldUnitsPerGenerationCell` are pure relocations into this section; `GlobalGravity` is
 new work for the coder tier.
 
 ### `HeightmapStack` — Correction 3
@@ -1135,8 +1136,9 @@ for a renamed JSON key that doesn't exist.
 with no relationship to the terrain grid. Landed via
 `work_orders/BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI.md` (human-approved), the backing
 C++ field is renamed `gridSnapSizeCellMultiplier` and retyped `int` (default `1`, minimum `1`) — it
-now means "snap every N terrain cells, centered," scaled against `Params::Geometry::worldUnitsPerCell`
-(the sole source of truth for cell size; no second cell-size constant was introduced). The wire key
+now means "snap every N terrain cells, centered," scaled against
+`Params::Geometry::worldUnitsPerGenerationCell` (the sole source of truth for cell size; no second
+cell-size constant was introduced). The wire key
 itself — `"GridSnapSizeWorldUnits"` on every array above — is **unchanged**: only the JSON value's
 type (float → integer-valued) and meaning changed, confirmed by direct read of
 `MapExporter_Markers_IO.cpp:89`/`MapImporter_MarkerGroups_IO.cpp:57-58` and the parallel Props/Decals/
@@ -1152,6 +1154,30 @@ version-tolerance law the way a schema-breaking field would.
 Corrects Correction 16's `MarkerGroups` field-list entry above (type `float` → `int`) and
 `ARCH_19_31_PropagatedPropertyMechanisms.md` §19.31's `Params::MarkerLink` struct/resolver code
 (same rename, corrected in place there — see that file's own 2026-09-03 banner).
+
+### `WorldUnitsPerCell` → `WorldUnitsPerGenerationCell` — Correction 21 (`GeneralMapSettings` key rename, real IO migration, `SanGenVersion` 4→5)
+**Unlike Correction 20's grid-snap correction, this IS a real `SanGenVersion` bump with a real,
+shipped migration** — flagged explicitly so the two are not conflated. `GeneralMapSettings.
+WorldUnitsPerCell` (Correction 2 above) is renamed to `GeneralMapSettings.WorldUnitsPerGenerationCell`
+— a same-object, same-tier pure key rename, never a relocation (unlike Correction 2's own original
+move of this field out of `mapGeneratorData`). The old name wrongly implied a bearing on marker/prop/
+decal/unit position; confirmed against this spec's own "Entity position encoding" note above, entity
+position is always absolute world units, never scaled by this field. The field is, and always was,
+SanGen's own generation-grid cell size, consumed only by field-layer baking/compositing (height,
+slope, flow, accumulation, stratum, and `MapAreas` rectangle flattening —
+`PREVIEW_COMPOSITING_SPEC.md`'s "Map areas are a field layer" section) — never entity placement.
+
+Backing C++ field renamed identically and pack-wide: `Params::Geometry::worldUnitsPerCell` →
+`worldUnitsPerGenerationCell`. `GeneralMapSettings_Migrate_V4` (`src/io/GeneralMapSettings_Migrate_V4_IO.h/.cpp`)
+performs the rename on import; `kCurrentSanGenVersion` bumps from 4 to 5
+(`Sanmap_MigrationManifest_IO.h`) — see `IO_MIGRATION_SPEC.md` §7 for the general migration mechanism
+this real step follows. A `.sanmap` at version 4 or earlier still imports fine, walking forward through
+this new step; the wire key itself is renamed (not merely reinterpreted in place, unlike Correction
+20's grid-snap value-semantics change) — `"WorldUnitsPerCell"` on an old document becomes
+`"WorldUnitsPerGenerationCell"` after import.
+
+This corrects Correction 2's `GeneralMapSettings` field list above in place (the field's role and
+default value are unchanged; only its wire spelling is).
 
 ### Verified deletions (pure duplicates — delete outright)
 Confirmed line-for-line against a real map — no replacement needed, each

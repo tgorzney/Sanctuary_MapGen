@@ -19,7 +19,7 @@ void ReadGeometryJson(const nlohmann::json& generatorData, const MapImportOption
             result.Warn("MapSize " + std::to_string(mapSize) + " is outside the safety limits; kept "
                         + std::to_string(geometry.mapSize) + ".");
     }
-    // Seed/ScaleFeaturesToMapSize/TerrainMinHeight/WorldUnitsPerCell RELOCATED to the top-level
+    // Seed/ScaleFeaturesToMapSize/TerrainMinHeight/WorldUnitsPerGenerationCell RELOCATED to the top-level
     // `GeneralMapSettings` object, read by `ReadGeneralMapSettingsJson` UNCONDITIONALLY and BEFORE
     // this function (SANMAP_FORMAT_SPEC Correction 2; MapImporter_IO.cpp wiring order) — no longer
     // read here.
@@ -35,7 +35,7 @@ void ReadGeometryJson(const nlohmann::json& generatorData, const MapImportOption
     // block's own `TerrainMaxHeight` re-read above can still introduce a fresh out-of-band value
     // from a genuinely old file's legacy blob, independent of whatever `GeneralMapSettings` already
     // held and already got clamped once — dropping this second call would silently un-clamp a
-    // legacy blob's own hostile `TerrainMaxHeight`/`TerrainMinHeight`/`WorldUnitsPerCell`.
+    // legacy blob's own hostile `TerrainMaxHeight`/`TerrainMinHeight`/`WorldUnitsPerGenerationCell`.
     ClampGeometryBand(geometry, result);
 }
 
@@ -48,9 +48,17 @@ void ClampGeometryBand(Params::Geometry& geometry, MapImportResult& result) {
         result.Warn("TerrainMinHeight sat above the ceiling; held one unit below it.");
         geometry.terrainMinHeight = geometry.terrainMaxHeight - 1.0f;
     }
-    if (!(geometry.worldUnitsPerCell > 0.0f)) {
-        result.Warn("WorldUnitsPerCell was not positive; restored to 10.");
-        geometry.worldUnitsPerCell = 10.0f;
+    if (!(geometry.worldUnitsPerGenerationCell > 0.0f)) {
+        // 1, not Geometry's own struct default (10) — that 10 is the starting value for a BRAND-NEW
+        // map (Application_Recipe_UI.cpp's MakeDefaultMapRecipe, which never routes through this
+        // function). This is the RECOVERY path for an EXISTING file with a missing/invalid value —
+        // exactly a legacy or foreign-authored `.sanmap` that predates this field, or was never
+        // exported by SanGen at all. Its own positions were placed with no generation-grid concept
+        // in play at all, so the only value that keeps them correctly on-screen is 1 (world unit ==
+        // generation cell) — 10 here would silently rescale every one of its markers/props/decals
+        // toward one corner of the preview (the actual bug report this fixes).
+        result.Warn("WorldUnitsPerGenerationCell was not positive; restored to 1.");
+        geometry.worldUnitsPerGenerationCell = 1.0f;
     }
 }
 

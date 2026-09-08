@@ -133,6 +133,9 @@ void CheckSelectiveApplyOfAllNineIsFull() {
         // kCurrentSanGenVersion, since a "full" selection must cover every step the live manifest
         // now defines, not just the original 9.
         "MarkersStack_Migrate_V3",
+        // The sourceVersion-4 step's one entry — same reasoning as MarkersStack_Migrate_V3 above:
+        // without it selected too, the walk stops one short of kCurrentSanGenVersion.
+        "GeneralMapSettings_Migrate_V4",
     };
     Io::ApplySelectedSanmapMigrations(document, allNames, result);
 

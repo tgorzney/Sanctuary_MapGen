@@ -284,7 +284,7 @@ Shape, at a glance:
   `"previewCompositeMapAreaRectangles"`.
 - `struct PreviewMapAreaRectangle` — 8 scalars / 32 bytes, no padding:
   `minimumX, minimumZ, maximumX, maximumZ, colorRed, colorGreen, colorBlue, colorAlpha`.
-  Coordinates in **cell space** (`world × 1/worldUnitsPerCell`), flattened CPU-side at
+  Coordinates in **cell space** (`world × 1/worldUnitsPerGenerationCell`), flattened CPU-side at
   `PrepareRun()`, which is exactly the space `layerColorAtPixel` already receives.
 - **No count field is added to `PreviewCompositeConfiguration`** — that would break its
   80-byte/16-byte-multiple std430 stride, which is mirrored by hand in *two* GLSL units.

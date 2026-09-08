@@ -25,12 +25,12 @@ void Check(bool bCondition, const char* label) {
 
 bool NearlyEqual(float a, float b) { return std::fabs(a - b) <= 0.01f; }
 
-// extent = mapSize = 10 (VertexSize() - 1), worldUnitsPerCell = 1 -> world units == cell units, so
+// extent = mapSize = 10 (VertexSize() - 1), worldUnitsPerGenerationCell = 1 -> world units == cell units, so
 // the mirror math below (`extent - position`) is exact and easy to hand-verify.
 Params::Geometry MakeTestGeometry() {
     Params::Geometry geometry;
     geometry.mapSize = 10;
-    geometry.worldUnitsPerCell = 1.0f;
+    geometry.worldUnitsPerGenerationCell = 1.0f;
     return geometry;
 }
 
@@ -412,7 +412,7 @@ void RunLinkGridSnapAndSymmetryDuringDragChecks() {
         layers[0].bGridSnapEnabled = false;   // the Layer itself: snap OFF
         std::vector<Params::MarkerLink> links(1);
         links[0].identifier = 500; links[0].bGridSnapEnabled = true; links[0].gridSnapSizeCellMultiplier = 2;
-        const Params::Geometry geometry = MakeTestGeometry();   // worldUnitsPerCell = 1.0, so a
+        const Params::Geometry geometry = MakeTestGeometry();   // worldUnitsPerGenerationCell = 1.0, so a
                                                                  // multiplier of 2 == a 2.0-unit cell
 
         MarkerDragGestureState state;

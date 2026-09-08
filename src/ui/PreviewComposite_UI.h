@@ -89,16 +89,21 @@ public:
     float PixelsPerPreviewCell() const;   // PreviewComposite_Prepare_UI.cpp — mapFields.VertexSize()-derived
 
     // Heightfield cell -> game units (X/Z) — READS `geometry` DIRECTLY, live, every call. There is
-    // exactly one owner of this number, `Params::Geometry::worldUnitsPerCell` (the recipe Open/New
+    // exactly one owner of this number, `Params::Geometry::worldUnitsPerGenerationCell` (the recipe Open/New
     // populates); this is not a cached copy, so it can never go stale against whatever map is
     // currently loaded (the bug a prior cached-copy-in-PreviewCompositeSettings design had: that
     // copy was only ever assigned once, at Application startup, and never refreshed on Open).
-    float WorldUnitsPerCell() const { return geometry.worldUnitsPerCell; }
+    float WorldUnitsPerGenerationCell() const { return geometry.worldUnitsPerGenerationCell; }
 
     // World (positionX/positionZ — the horizontal plane; positionY is height,
     // PlacementInstance_DATA) -> preview pixel. The exact mapping BuildEntityPoints already bakes
     // marks through; extracted so there is exactly one copy (ARCH_08_03_SpatialGridVsSpacingGrid.md
-    // §8.3's "one copy" principle, same class of rule as Data::SpatialGrid::CellIndexAt).
+    // §8.3's "one copy" principle, same class of rule as Data::SpatialGrid::CellIndexAt). Divides by
+    // `worldUnitsPerGenerationCell`, correctly: `Placement_Emit_PROC.cpp` itself multiplies every
+    // generated instance's position by this same scalar when converting its internal cell-space
+    // candidate to an absolute position, so an entity's stored positionX/Z is already on THAT scale
+    // — this is not "generation-grid-only" math, it is the one conversion that correctly reverses
+    // Placement's own scaling for both entities AND MapArea rectangles alike.
     PreviewPixelPoint WorldToPreviewPixel(float worldX, float worldZ) const;
     // Inverse — preview pixel -> world. New; BuildEntityPoints never needed this direction, STEP48's
     // picking migration does. Exact inverse of WorldToPreviewPixel only when PixelsPerPreviewCell()

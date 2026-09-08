@@ -51,7 +51,7 @@ struct MarkerInstanceLayer {
     // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3: RENAMED and REINTERPRETED from
     // the old `float gridSnapSizeWorldUnits` (a raw, arbitrary world-unit distance with no
     // relationship to the terrain, snapping onto vertices from world origin). Now a whole-number
-    // MULTIPLIER of `Params::Geometry::worldUnitsPerCell` — the ONE owner of "how big is a terrain
+    // MULTIPLIER of `Params::Geometry::worldUnitsPerGenerationCell` — the ONE owner of "how big is a terrain
     // cell in world units" (Mask_Prepare_PROC.cpp:21). 1 = snap to the map's own terrain grid
     // directly, cell-centered. Minimum 1; only meaningful while bGridSnapEnabled is true. Shipped as
     // a plain behavior change, no IO migration (same wire key, reinterpreted value) — see the

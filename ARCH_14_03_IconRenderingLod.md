@@ -5,7 +5,7 @@ R1's framing — markers are always constant-screen-size icons — is **wrong an
 layer switches between two draw modes at its own `thumbnailLodThresholdPixels` (default 5px,
 tunable, Constitution §8):
 1. **Thumbnail mode** (zoomed in enough) — the entity's raster thumbnail at its true
-   world-footprint size: `screenSize = (baseFootprint * instance.scale) / worldUnitsPerCell *
+   world-footprint size: `screenSize = (baseFootprint * instance.scale) / worldUnitsPerGenerationCell *
    pixelsPerCell * view.ZoomScale()`. Scales with zoom, by design.
 2. **Strategic icon mode** — when thumbnail mode would render below the threshold, switch to a
    fixed-size symbolic icon. Constant screen pixels below threshold — this is the only mode R1's

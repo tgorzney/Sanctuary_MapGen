@@ -1,7 +1,7 @@
 {
     "fileVersion": 3,
     "mapVersion": 1,
-    "SanGenVersion": 4,
+    "SanGenVersion": 5,
     "name": "FormattingReferenceMap",
     "credits": "SanGen Test Fixture",
     "width": 2048,
@@ -891,7 +891,7 @@
         "GlobalGravity": 4.0,
         "TerrainMinHeight": 0.0,
         "TerrainMaxHeight": 128.0,
-        "WorldUnitsPerCell": 1.0
+        "WorldUnitsPerGenerationCell": 1.0
     },
     "HeightmapStack": {
         "SimulationGrouping": 1,

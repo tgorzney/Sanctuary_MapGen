@@ -46,7 +46,7 @@ inline bool IsMarkerInstanceLayerRowSuppressed(const Params::MarkerInstanceLayer
 // identifier at either tier soft-degrades to the next step, never a refusal.
 // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — `geometry` is new: the resolved
 // setting is now a whole-number CELL MULTIPLIER, never a raw world-unit distance, so this always
-// scales by `geometry.worldUnitsPerCell` (the ONE owner of "how big is a terrain cell in world
+// scales by `geometry.worldUnitsPerGenerationCell` (the ONE owner of "how big is a terrain cell in world
 // units," Mask_Prepare_PROC.cpp:21) to get the effective world-unit cell size, then snaps via
 // CoordinateSpace_UI's WorldToGrid+GridToWorld applied back-to-back — always a cell CENTER, never a
 // vertex (the old bug: `std::round(world / cellSize) * cellSize` lands on vertices).
@@ -66,7 +66,7 @@ inline void QuantizeMarkerPositionToLayerGrid(const std::vector<Params::MarkerIn
                 bEnabled = link.bGridSnapEnabled; cellMultiplier = link.gridSnapSizeCellMultiplier; break;
             }
     if (!bEnabled || cellMultiplier < 1) return;
-    const float cellSizeWorldUnits = static_cast<float>(cellMultiplier) * geometry.worldUnitsPerCell;
+    const float cellSizeWorldUnits = static_cast<float>(cellMultiplier) * geometry.worldUnitsPerGenerationCell;
     const WorldPoint snapped =
         GridToWorld(cellSizeWorldUnits, WorldToGrid(cellSizeWorldUnits, WorldPoint{worldX, worldZ}));
     worldX = snapped.worldX;

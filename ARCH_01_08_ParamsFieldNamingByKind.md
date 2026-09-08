@@ -13,7 +13,7 @@ Ratified alongside `ENTITY_AUTHORING_PARAMS_SPEC` (`Params::Army`/`UnitGroup`/`U
 - **SanGen's own generative recipe/setting.** A PROC stage computes, derives, or reshapes the
   value, so the field keeps **SanGen's own descriptive name** even where a format key of similar
   meaning exists — already the practice (`Params::Water::waterLevelMaximum` vs. the format's
-  `waterLevel`; `Params::Geometry::worldUnitsPerCell`, which has no format analog at all) and does
+  `waterLevel`; `Params::Geometry::worldUnitsPerGenerationCell`, which has no format analog at all) and does
   not change here.
 - **Named exceptions inside the pass-through bucket** — verbatim would collide with an established
   SanGen quantity, or is too generic to stay AI-legible:

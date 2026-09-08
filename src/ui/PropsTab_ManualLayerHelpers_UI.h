@@ -40,7 +40,7 @@ inline void QuantizePropPositionToLayerGrid(const std::vector<Params::PropInstan
     if (layerIndex < 0 || layerIndex >= static_cast<int>(propLayers.size())) return;
     const Params::PropInstanceLayer& layer = propLayers[static_cast<std::size_t>(layerIndex)];
     if (!layer.bGridSnapEnabled || layer.gridSnapSizeCellMultiplier < 1) return;
-    const float cellSizeWorldUnits = static_cast<float>(layer.gridSnapSizeCellMultiplier) * geometry.worldUnitsPerCell;
+    const float cellSizeWorldUnits = static_cast<float>(layer.gridSnapSizeCellMultiplier) * geometry.worldUnitsPerGenerationCell;
     const WorldPoint snapped =
         GridToWorld(cellSizeWorldUnits, WorldToGrid(cellSizeWorldUnits, WorldPoint{worldX, worldZ}));
     worldX = snapped.worldX;

@@ -1,5 +1,5 @@
 // Mask_WorldScale_PROC_Test.cpp — M5-0d: cell world-size has exactly ONE owner,
-// `Params::Geometry::worldUnitsPerCell` (ARCH §7.1). Checks that the baked slope is rise per
+// `Params::Geometry::worldUnitsPerGenerationCell` (ARCH §7.1). Checks that the baked slope is rise per
 // WORLD unit (so the same terrain is shallower on a coarser cell), that changing the value
 // dirties the stage, and — the integration half — that the Placement gate reading that baked
 // slope and the world positions Placement emits are on the SAME scale, because both now read
@@ -18,11 +18,11 @@ constexpr float rampRisePerCell = 1.0f / 128.0f;   // x terrainMaxHeight 128 = 1
 
 // Runs the Cpu path over a pure x-ramp at one cell world-size and returns the baked slope field.
 // A ramp has the same finite difference at every vertex, interior and one-sided edge alike.
-Data::FloatField BakeRampSlope(float worldUnitsPerCell) {
+Data::FloatField BakeRampSlope(float worldUnitsPerGenerationCell) {
     Params::Geometry geometry;
     geometry.mapSize           = rampMapSize;
     geometry.terrainMaxHeight  = 128.0f;
-    geometry.worldUnitsPerCell = worldUnitsPerCell;
+    geometry.worldUnitsPerGenerationCell = worldUnitsPerGenerationCell;
     const int vertexSize = geometry.VertexSize();
     Data::MapFields fields;
     fields.Resize(vertexSize);
@@ -49,17 +49,17 @@ void CheckEveryCell(const Data::FloatField& slope, float expectedGradient, const
 // the gradient of the same rise over a one-unit cell. 0 is the validate-then-default case.
 void CheckSlopeScalesWithCellWorldSize() {
     CheckEveryCell(BakeRampSlope(1.0f), 1.0f,
-                   "worldUnitsPerCell 1: 1.0 rise across a 1.0 cell = gradient 1.0");
+                   "worldUnitsPerGenerationCell 1: 1.0 rise across a 1.0 cell = gradient 1.0");
     CheckEveryCell(BakeRampSlope(2.0f), 0.5f,
-                   "worldUnitsPerCell 2: the same terrain is exactly half as steep per world unit");
+                   "worldUnitsPerGenerationCell 2: the same terrain is exactly half as steep per world unit");
     CheckEveryCell(BakeRampSlope(0.25f), 4.0f,
-                   "worldUnitsPerCell 0.25: four times as steep per world unit");
+                   "worldUnitsPerGenerationCell 0.25: four times as steep per world unit");
     CheckEveryCell(BakeRampSlope(0.0f), 1.0f,
                    "a non-positive cell world-size degrades to 1 instead of dividing by zero");
 }
 
 // 2. It is a stage input like any other, so the dirty-hash conductor must see it move.
-void CheckWorldUnitsPerCellDirtiesTheStage() {
+void CheckWorldUnitsPerGenerationCellDirtiesTheStage() {
     Params::Geometry geometry;
     geometry.mapSize = rampMapSize;
     Data::MapFields fields;
@@ -69,25 +69,25 @@ void CheckWorldUnitsPerCellDirtiesTheStage() {
     const Params::SlopeDefaults slopeDefaults;
     Proc::MaskStage stage(geometry, strata, stratumArt, fields, slopeDefaults);
     const std::size_t hashBeforeChange = stage.ComputeParameterHash();
-    geometry.worldUnitsPerCell = 2.0f;
+    geometry.worldUnitsPerGenerationCell = 2.0f;
     Check(stage.ComputeParameterHash() != hashBeforeChange,
-          "changing worldUnitsPerCell dirties the mask stage");
+          "changing worldUnitsPerGenerationCell dirties the mask stage");
 }
 
 // The placement fixture's cone drops 0.5 of normalized height over 18 cells; at terrainMaxHeight
-// 128 that is a gradient of 3.5556 (74.3 degrees) per world unit at worldUnitsPerCell 1, and
+// 128 that is a gradient of 3.5556 (74.3 degrees) per world unit at worldUnitsPerGenerationCell 1, and
 // exactly half of it (1.7778 = 60.6 degrees) at 2. A 65-degree rule therefore rejects the whole
 // flank on the fine scale and accepts it on the coarse one — the gate really reads the scale.
 constexpr float coneFlankRuleDegrees = 65.0f;
 constexpr float coneFlankHeightLow   = 0.55f;   // the flank annulus only: no apex, no plain
 constexpr float coneFlankHeightHigh  = 0.95f;
 
-Params::MapRecipe MakeConeFlankRecipe(float worldUnitsPerCell) {
+Params::MapRecipe MakeConeFlankRecipe(float worldUnitsPerGenerationCell) {
     Params::MapRecipe recipe;
     recipe.geometry.mapSize           = PlacementTest::mapSize;
     recipe.geometry.seed              = 4242u;
     recipe.geometry.terrainMaxHeight  = PlacementTest::terrainMaxHeight;
-    recipe.geometry.worldUnitsPerCell = worldUnitsPerCell;
+    recipe.geometry.worldUnitsPerGenerationCell = worldUnitsPerGenerationCell;
     // STEP16_SymmetryGlobalSettings_IO audit: the default `globalSymmetryMask` changed from None
     // to RotateHalfTurn (ARCH-ratified). A whole symmetry orbit is accepted or rejected together
     // (Placement_Accept_PROC.cpp), and the cone flank here sits off-center, so its point-reflected
@@ -121,9 +121,9 @@ void CheckPlacementAgreesWithTheBakedScale() {
     coarseStage.Run();
 
     Check(fineResults.props.Count() == 0,
-          "worldUnitsPerCell 1: the 74-degree cone flank fails a 65-degree rule");
+          "worldUnitsPerGenerationCell 1: the 74-degree cone flank fails a 65-degree rule");
     Check(coarseResults.props.Count() > 20,
-          "worldUnitsPerCell 2: the same flank is 60 degrees and scatters");
+          "worldUnitsPerGenerationCell 2: the same flank is 60 degrees and scatters");
     Check(PlacementTest::AllWithinGates(coarseResults.props, coarseFields, coneFlankHeightLow,
                                         coneFlankHeightHigh, coneFlankRuleDegrees, 4, 2.0f),
           "emitted world positions map back onto cells that pass the scaled slope gate");
@@ -136,7 +136,7 @@ void CheckPlacementAgreesWithTheBakedScale() {
 
 void RunWorldScaleTests() {
     CheckSlopeScalesWithCellWorldSize();
-    CheckWorldUnitsPerCellDirtiesTheStage();
+    CheckWorldUnitsPerGenerationCellDirtiesTheStage();
     CheckPlacementAgreesWithTheBakedScale();
 }
 

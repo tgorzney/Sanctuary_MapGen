@@ -108,7 +108,7 @@ nlohmann::ordered_json BuildSlopeDefaultsJson(const Params::MapRecipe& recipe);
 
 // MapExporter_GeneralMapSettings_IO.cpp — `recipe.geometry`/`recipe.generalMapSettings` -> the
 // top-level `GeneralMapSettings` object (SANMAP_FORMAT_SPEC Correction 2): `Seed`/
-// `ScaleFeaturesToMapSize`/`TerrainMinHeight`/`WorldUnitsPerCell`, RELOCATED out of the legacy
+// `ScaleFeaturesToMapSize`/`TerrainMinHeight`/`WorldUnitsPerGenerationCell`, RELOCATED out of the legacy
 // `mapGeneratorData` blob, plus the one genuinely new field, `GlobalGravity`. One flat object,
 // sibling of `armies`/`atmosphere`/`SlopeDefaults`, NOT nested in `mapGeneratorData`.
 nlohmann::ordered_json BuildGeneralMapSettingsJson(const Params::MapRecipe& recipe);

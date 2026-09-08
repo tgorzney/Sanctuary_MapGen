@@ -5,7 +5,7 @@
 // codebase; this file closes that gap so the drag/snap logic built on top of it stays simple.
 //
 // Units: 1 world unit = the base unit the game stores positions in. 1 grid cell =
-// `Params::Geometry::worldUnitsPerCell` world units for "the real terrain grid" (a caller may pass
+// `Params::Geometry::worldUnitsPerGenerationCell` world units for "the real terrain grid" (a caller may pass
 // a whole-number MULTIPLE of it for a coarser snap grid — Part 3 of the work-order this file
 // implements). Screen space = region-local pixels (top-left of the canvas widget), the same space
 // every existing gesture already works in.
@@ -49,7 +49,7 @@ WorldPoint ScreenToWorld(const MapCanvasView& view, const PreviewComposite& comp
 // `MapCanvasView::ProjectPreviewPixelToRegionLocal` — both already continuous, no floor to remove.
 ScreenPoint WorldToScreen(const MapCanvasView& view, const PreviewComposite& composite, WorldPoint world);
 
-// world -> grid, at a given cell size in world units (pass `Params::Geometry::worldUnitsPerCell` for
+// world -> grid, at a given cell size in world units (pass `Params::Geometry::worldUnitsPerGenerationCell` for
 // "the real terrain grid"; pass a whole-number multiple of it for a coarser snap grid). Guards
 // `cellSizeWorldUnits <= 0` by returning the input's raw numeric values unchanged (Constitution §6 —
 // never a divide by zero; there is no meaningful grid at a non-positive cell size, so this is a

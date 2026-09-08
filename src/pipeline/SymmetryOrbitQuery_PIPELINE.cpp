@@ -18,7 +18,7 @@ int BuildWorldSymmetryOrbit(const Params::Geometry& geometry, int symmetryMask,
                                     ? maximumPoints : Params::symmetryOrbitMaximum;
     if (clampedMaximumPoints <= 0) return 0;
 
-    const float cellReciprocal = 1.0f / geometry.worldUnitsPerCell;
+    const float cellReciprocal = 1.0f / geometry.worldUnitsPerGenerationCell;
     const float cellPositionX  = worldPositionX * cellReciprocal;
     const float cellPositionZ  = worldPositionZ * cellReciprocal;
     const float extent         = static_cast<float>(geometry.VertexSize() - 1);
@@ -31,8 +31,8 @@ int BuildWorldSymmetryOrbit(const Params::Geometry& geometry, int symmetryMask,
                                                      cellOrbit, clampedMaximumPoints);
 
     for (int index = 0; index < orbitCount; ++index) {
-        outPoints[index].worldPositionX = cellOrbit[index].positionX * geometry.worldUnitsPerCell;
-        outPoints[index].worldPositionZ = cellOrbit[index].positionY * geometry.worldUnitsPerCell;
+        outPoints[index].worldPositionX = cellOrbit[index].positionX * geometry.worldUnitsPerGenerationCell;
+        outPoints[index].worldPositionZ = cellOrbit[index].positionY * geometry.worldUnitsPerGenerationCell;
     }
     return orbitCount;
 }

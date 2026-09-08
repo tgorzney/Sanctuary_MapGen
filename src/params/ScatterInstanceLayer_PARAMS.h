@@ -34,7 +34,7 @@ struct PropInstanceLayer {
     bool  bGridSnapEnabled = false;
     // BUGFIX_UniversalCoordinateConversionAndDragRewrite_UI, Part 3 — see
     // MarkerInstanceLayer::gridSnapSizeCellMultiplier's own comment for the full rationale; mirrors
-    // it field-for-field. A whole-number multiplier of Params::Geometry::worldUnitsPerCell; minimum 1.
+    // it field-for-field. A whole-number multiplier of Params::Geometry::worldUnitsPerGenerationCell; minimum 1.
     int   gridSnapSizeCellMultiplier = 1;
     bool  bColorOverrideEnabled = false;   // false: `color` is ignored, resolves the owning
                                             // Type Section's default (GlobalPropSettings) instead.

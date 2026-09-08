@@ -6,7 +6,7 @@
 //      Mask_Apply_PROC.cpp Mask_Gpu_PROC.cpp ../sys/GpuResource_Program_SYS.cpp \
 //      ../sys/GpuResource_ProgramParts_SYS.cpp ../sys/GpuResource_Buffer_SYS.cpp \
 //      ../sys/GpuGlFunctions_SYS.cpp opengl32.lib gdi32.lib user32.lib
-// Covers: the pinned slope unit, cell world-size (one owner: Geometry::worldUnitsPerCell,
+// Covers: the pinned slope unit, cell world-size (one owner: Geometry::worldUnitsPerGenerationCell,
 // M5-0d), hard-clamp vs smoothstep, feather/invert/strength, the three
 // stored-art merge modes on hand-checked values, bilinear (not nearest) resampling, the ONE
 // per-stratum remap, the single-writer + idempotence rules (ARCH §7.2/§3.4), CPU/GPU parity,

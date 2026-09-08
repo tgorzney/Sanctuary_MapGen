@@ -14,7 +14,7 @@ cross-instance OR-union feeding `NAVMAP_MODIFIER_BLOCKER_SPEC.md` §7's unmodifi
 all confirmed, no correction.
 
 **§3.4's retraction is accepted as correct and closed; no further ARCH action needed on it.** The
-design's own direct read of `MapExporter_DocumentAssembly_IO.cpp` confirming `worldUnitsPerCell`
+design's own direct read of `MapExporter_DocumentAssembly_IO.cpp` confirming `worldUnitsPerGenerationCell`
 never enters the exported map's declared `width`/`length` is accepted ground truth; §8's original
 pixel↔world formula (`NAVMAP_MODIFIER_BLOCKER_SPEC.md` §8) needed no correction and none is made
 here.
@@ -42,7 +42,7 @@ separately-scoped design consult before any coder builds toward it — the same 
 ratification itself was gated behind.
 
 **4. A separate, unrelated defect, recorded but not authorized for work here.** While verifying
-§3.4, the Generator doc surfaced that exported entity positions ARE scaled by `worldUnitsPerCell`
+§3.4, the Generator doc surfaced that exported entity positions ARE scaled by `worldUnitsPerGenerationCell`
 (`Placement_Emit_PROC.cpp`) while the exported map's own declared size is not — a probable general
 map-export correctness bug, unrelated to navmesh blockers. Recorded as a flagged, unscheduled
 finding; a future investigation ticket, not authorized, designed, or scoped by this ruling.

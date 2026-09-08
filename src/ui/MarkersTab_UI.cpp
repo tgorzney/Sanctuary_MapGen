@@ -139,9 +139,9 @@ Params::MarkerInstanceGroup& FindOrCreateMarkerInstanceGroupByName(
 // STEP137 — a new manual instance's default X/Z: the map's own center (human's own instruction —
 // the struct's own (0,0,0) default sits at the map's CORNER under SanGen's corner-origin world-space
 // convention, confirmed by Placement_Fields_PROC.cpp's own `mapCenter = (vertexSize - 1) * 0.5` and
-// MarkerSymmetryDetection_PIPELINE.cpp's own `worldSize = mapSize * worldUnitsPerCell` extent).
+// MarkerSymmetryDetection_PIPELINE.cpp's own `worldSize = mapSize * worldUnitsPerGenerationCell` extent).
 float MapCenterWorldUnits(const Params::Geometry& geometry) {
-    return static_cast<float>(geometry.mapSize) * geometry.worldUnitsPerCell * 0.5f;
+    return static_cast<float>(geometry.mapSize) * geometry.worldUnitsPerGenerationCell * 0.5f;
 }
 
 // STEP138/STEP139 — a newly-added Layer's OR Group's own `parentBundleIdentifier`: the currently-
