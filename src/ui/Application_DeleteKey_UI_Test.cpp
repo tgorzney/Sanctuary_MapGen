@@ -3,8 +3,8 @@
 // `ShouldApplyGlobalDeleteShortcut`'s own gating and `DeleteSelectedManualInstancesAcrossDomains`'s
 // own cross-domain partition+erase. The private Application method itself is a thin, untestable-
 // without-a-window glue over exactly these two functions (reads `ImGui::GetIO().WantTextInput`/
-// `ImGui::IsKeyPressed`/`scenarioEditMode.IsActive()`, then calls straight into them) — no GL/window
-// is needed to exercise the actual decision logic the ticket's own Verify section asks for.
+// `ImGui::IsKeyPressed`, then calls straight into them) — no GL/window is needed to exercise the
+// actual decision logic the ticket's own Verify section asks for.
 #include "Application_DeleteKey_UI.h"
 #include <cstdio>
 
@@ -25,19 +25,15 @@ OverlayInstanceKey_UI MakeKey(std::int32_t instanceIndex, PlacementCollectionKin
     return OverlayInstanceKey_UI{collection, instanceIndex, /*bValid=*/true, bManual};
 }
 
-// ---- Gating: a live text field wins, Scenario Edit Mode wins, otherwise the key press decides.
+// ---- Gating: a live text field wins, otherwise the key press decides.
 
 void RunGatingChecks() {
-    Check(!ShouldApplyGlobalDeleteShortcut(/*bWantTextInput=*/true, /*bScenarioEditModeActive=*/false,
-                                           /*bDeleteKeyPressed=*/true),
+    Check(!ShouldApplyGlobalDeleteShortcut(/*bWantTextInput=*/true, /*bDeleteKeyPressed=*/true),
           "a live rename/text field blocks the shortcut even with Delete pressed");
-    Check(!ShouldApplyGlobalDeleteShortcut(/*bWantTextInput=*/false, /*bScenarioEditModeActive=*/true,
-                                           /*bDeleteKeyPressed=*/true),
-          "Scenario Edit Mode's exclusive canvas ownership blocks the shortcut even with Delete pressed");
-    Check(!ShouldApplyGlobalDeleteShortcut(false, false, /*bDeleteKeyPressed=*/false),
-          "no key press is a no-op with neither gate active");
-    Check(ShouldApplyGlobalDeleteShortcut(false, false, true),
-          "Delete fires when neither gate is active and the key was pressed");
+    Check(!ShouldApplyGlobalDeleteShortcut(false, /*bDeleteKeyPressed=*/false),
+          "no key press is a no-op with the gate inactive");
+    Check(ShouldApplyGlobalDeleteShortcut(false, true),
+          "Delete fires when the gate is inactive and the key was pressed");
 }
 
 // ---- The cross-domain mutation: empty/all-procedural is a no-op, a mixed selection deletes from

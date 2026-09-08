@@ -15,13 +15,10 @@ namespace SanmapGen {
 namespace Ui {
 
 // True exactly when the global Delete shortcut fires this frame. A live rename/text field
-// (`bWantTextInput`) and Scenario Edit Mode's own exclusive canvas ownership
-// (`bScenarioEditModeActive`) both defer — the identical exclusivity gate `DrawCanvasWindow` already
-// applies to canvas interaction (Application_Draw_UI.cpp), since Delete is a canvas-selection action.
-inline bool ShouldApplyGlobalDeleteShortcut(bool bWantTextInput, bool bScenarioEditModeActive,
-                                            bool bDeleteKeyPressed) {
+// (`bWantTextInput`) defers — the identical exclusivity gate `DrawCanvasWindow` already applies to
+// canvas interaction (Application_Draw_UI.cpp), since Delete is a canvas-selection action.
+inline bool ShouldApplyGlobalDeleteShortcut(bool bWantTextInput, bool bDeleteKeyPressed) {
     if (bWantTextInput) return false;
-    if (bScenarioEditModeActive) return false;
     return bDeleteKeyPressed;
 }
 

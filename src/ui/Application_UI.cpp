@@ -53,8 +53,6 @@ Application::Application(ApplicationSettings applicationSettings)
     tabState.files.scenarioRuntimeResourceDirectory   = settings.scenarioRuntimeResourceDirectory;
     tabState.scenarios.scenarioRuntimeOverridePath      = &scenarioRuntimeOverridePath;
     tabState.scenarios.scenarioRuntimeResourceDirectory = settings.scenarioRuntimeResourceDirectory;
-    // STEP78 — same one-time wiring posture as the pair above.
-    tabState.scenarios.scenarioEditModeState = &scenarioEditMode;
     ConfigureDefaultPreview(composite.Settings(), settings.previewResolution);
     ConfigureDefaultOverlayLayers(overlaySettings, recipe);
     // The left column's `[O]`/`[ ]` rows are the composite's layer flags from the first frame on,
@@ -173,8 +171,6 @@ void Application::WireCallbacks() {
     canvas.SetOverlayRecipe(&recipe);
     canvas.SetIconAtlasSource(&IconPairingLookup(), &IconManifest());
     canvas.SetWorldFootprintSizeTable(&WorldFootprintSizeTable());
-    // STEP78 — Scenario Edit Mode's own state; see MapCanvas_UI.h's SetScenarioEditModeState.
-    canvas.SetScenarioEditModeState(&scenarioEditMode);
     // STEP113 — the active-panel gate; see MapCanvas_UI.h's SetActivePanelSource. Points at the
     // shell's own live tabState.activePanel — one source of truth, never a second copy (same
     // posture as every other canvas.Set*Source call in this function).

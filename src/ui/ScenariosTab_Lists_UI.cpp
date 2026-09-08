@@ -45,7 +45,7 @@ void DrawScenarioPatternTier(Params::Scenarios& scenarios, ScenariosTabState& st
                        "regardless of position.");
     DrawScenarioTierToolbar("Add Pattern Scenario", scenarios.patternScenarios, state, ScenarioSelectedTier::Pattern);
     const int priorSelection = state.selectedTier == ScenarioSelectedTier::Pattern ? state.selectedIndex : -1;
-    const DraggableListSignal signal = DrawScenarioPatternList(scenarios.patternScenarios, state, armies, areas,
+    const DraggableListSignal signal = DrawScenarioPatternList(scenarios.patternScenarios, armies, areas,
                                                                scenarios.maxArmySlotCount, priorSelection);
     if (signal.bHasSignal())
         ApplyScenarioListSignal(scenarios.patternScenarios, state, ScenarioSelectedTier::Pattern, signal);
@@ -62,7 +62,7 @@ void DrawScenarioCountTier(Params::Scenarios& scenarios, ScenariosTabState& stat
                        "to bottom; the label's leading number always agrees with position.");
     DrawScenarioTierToolbar("Add Composition Rule", scenarios.countScenarios, state, ScenarioSelectedTier::Count);
     const int priorSelection = state.selectedTier == ScenarioSelectedTier::Count ? state.selectedIndex : -1;
-    const DraggableListSignal signal = DrawScenarioCountList(scenarios, state, armies, areas, priorSelection);
+    const DraggableListSignal signal = DrawScenarioCountList(scenarios, armies, areas, priorSelection);
     if (signal.bHasSignal())
         ApplyScenarioListSignal(scenarios.countScenarios, state, ScenarioSelectedTier::Count, signal);
     DrawSectionEnd();
@@ -79,8 +79,7 @@ void DrawScenarioDefaultTier(Params::Scenarios& scenarios, ScenariosTabState& st
     ImGui::TextWrapped("The catch-all: whatever no Tier 1/2 rule claims lands here.");
     SelectScenarioDefaultTier(state);
     // Tier 3 is never spawns-flagged (see ScenariosTab_UI.h) — no warning banner drawn.
-    DrawScenarioBodyFields(scenarios.defaultScenario, armies, areas, state.scenarioEditModeState, nullptr,
-                           nullptr, scenarios.maxArmySlotCount);
+    DrawScenarioBodyFields(scenarios.defaultScenario, armies, areas);
     DrawSectionEnd();
     ImGui::PopID();
 }

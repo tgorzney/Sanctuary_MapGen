@@ -39,7 +39,7 @@ bool DeleteSelectedManualInstancesAcrossDomains(
 }
 
 void Application::ApplyGlobalDeleteShortcut() {
-    if (!ShouldApplyGlobalDeleteShortcut(ImGui::GetIO().WantTextInput, scenarioEditMode.IsActive(),
+    if (!ShouldApplyGlobalDeleteShortcut(ImGui::GetIO().WantTextInput,
                                          ImGui::IsKeyPressed(ImGuiKey_Delete)))
         return;
 

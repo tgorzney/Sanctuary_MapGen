@@ -149,31 +149,12 @@ void DrawAuthoringNoteField(std::string& authoringNote) {
         authoringNote = buffer;
 }
 
-// STEP78 — mode-entry toggle, default off. A local bool mirrors whether the single `editedBody`
-// slot points at THIS scenario; flipping it steals that slot (Activate) or frees it (Deactivate).
-// nullptr `editModeState` draws nothing (feature not wired), never a crash.
-void DrawScenarioEditModeToggle(Params::ScenarioBody& body, ScenarioEditModeState* editModeState,
-                                const std::string* patternSlotPattern,
-                                const std::vector<Params::ScenarioCountCondition>* countConditions,
-                                int maxArmySlotCount) {
-    if (editModeState == nullptr) return;
-    bool bEditingThisScenario = editModeState->editedBody == &body;
-    if (DrawCheckbox("Edit On Map (Scenario Edit Mode)", bEditingThisScenario).bValueChanged) {
-        if (bEditingThisScenario) editModeState->Activate(body, patternSlotPattern, countConditions, maxArmySlotCount);
-        else editModeState->Deactivate();
-    }
-}
-
 } // namespace
 
 void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params::Army>& armies,
-                            const std::vector<Params::MapArea>& areas,
-                            ScenarioEditModeState* editModeState, const std::string* patternSlotPattern,
-                            const std::vector<Params::ScenarioCountCondition>* countConditions,
-                            int maxArmySlotCount) {
+                            const std::vector<Params::MapArea>& areas) {
     TextInputRules nameRules; nameRules.maximumLength = 64; nameRules.bAllowEmpty = true;
     DrawTextInput("Name", body.name, nameRules);
-    DrawScenarioEditModeToggle(body, editModeState, patternSlotPattern, countConditions, maxArmySlotCount);
     ImGui::SeparatorText("Area");
     DrawScenarioAreaFields(body, areas);
     DrawCheckbox("Spawns Units", body.spawnsUnits);

@@ -20,8 +20,6 @@ void RunMapCanvasPickingChecks();                                 // MapCanvas_P
 void RunManualMarkerSelectionChecks();
 // STEP132 (ARCH §19.27) — the procedural sibling, MapCanvas_Picking_UI_Test.cpp.
 void RunProceduralMarkerListSelectionChecks();
-// STEP78 acceptance test 4 — MapCanvas_ScenarioEditModeOwnership_UI_Test.cpp.
-void RunMapCanvasScenarioEditModeOwnershipChecks(Sys::GpuResourceManager& manager);
 // STEP113 — MapCanvas_ActivePanelGate_UI_Test.cpp.
 void RunMapCanvasActivePanelGateChecks(Sys::GpuResourceManager& manager);
 // Human's own bug report — MapCanvas_ActivePanelGate_UI_Test.cpp.
@@ -56,7 +54,6 @@ int main(int argumentCount, char** argumentValues) {
     Sys::GpuResourceManager manager(shaderDirectory);
     Ui::CheckPreviewExpectation(manager.Initialize(), "the Gpu resource manager initializes");
     Ui::RunMapCanvasRenderChecks(manager);
-    Ui::RunMapCanvasScenarioEditModeOwnershipChecks(manager);
     Ui::RunMapCanvasActivePanelGateChecks(manager);
     Ui::RunMapCanvasClickSelectsManualMarkerChecks(manager);
     Ui::RunMapCanvasGestureOwnershipChecks(manager);

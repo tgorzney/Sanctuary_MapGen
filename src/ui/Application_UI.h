@@ -27,7 +27,6 @@
 #include "Application_HostedSettings_UI.h"
 #include "Application_Settings_UI.h"
 #include "Application_TabState_UI.h"
-#include "MapCanvas_ScenarioEditMode_State_UI.h"
 #include "MapCanvas_UI.h"
 #include "OverlayLayer_Settings_UI.h"
 #include "PreviewComposite_UI.h"
@@ -97,9 +96,6 @@ public:
     PreviewComposite&              Composite() { return composite; }
     MapCanvas&                     Canvas()    { return canvas; }
     OverlayLayerSettings&          OverlaySettings() { return overlaySettings; }
-    // STEP78 — the interactive canvas overlay's own cross-frame state (default-off; the Scenarios
-    // tab's detail panel toggles it, MapCanvas takes exclusive interaction ownership while active).
-    ScenarioEditModeState&         ScenarioEditMode() { return scenarioEditMode; }
     // STEP53's cross-layer visible-vertex budget tunables (Constitution §8) — a push-in pointer
     // into MapCanvas, same pattern as OverlaySettings() above.
     OverlayRenderingSettings&      OverlayIconRenderingSettings() { return overlayIconRenderingSettings; }
@@ -171,7 +167,6 @@ private:
     Pipeline::PreviewDriver       previewDriver;
     MapCanvas                     canvas;
     OverlayLayerSettings          overlaySettings;   // the six-domain screen-space overlay stack
-    ScenarioEditModeState         scenarioEditMode;  // STEP78 — default off, one canvas-wide slot
     OverlayRenderingSettings      overlayIconRenderingSettings;   // STEP53's cross-layer budget knobs
     ApplicationTabState           tabState;
     ApplicationHostedSettings     hostedSettings;   // the tab settings with no recipe home yet

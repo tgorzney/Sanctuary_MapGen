@@ -29,7 +29,6 @@
 #include <vector>
 #include "ConfirmDialog_UI.h"
 #include "LuaCodeEditor_UI.h"
-#include "MapCanvas_ScenarioEditMode_State_UI.h"
 #include "Section_UI.h"
 #include "UniqueNameList_UI.h"
 #include "../params/MapRecipe_PARAMS.h"
@@ -65,9 +64,6 @@ struct ScenariosTabState {
     // nullable posture as FilesTabState's own pair; nullptr degrades to "not configured" safely.
     std::string*        scenarioRuntimeOverridePath = nullptr;
     std::string         scenarioRuntimeResourceDirectory;   // resolved once at startup, copied
-    // STEP78 — Application-owned, one-time wiring, same nullable posture as the pair above;
-    // nullptr degrades to "the canvas edit-mode toggle draws nothing" safely.
-    ScenarioEditModeState* scenarioEditModeState = nullptr;
 
     ScenarioSelectedTier selectedTier  = ScenarioSelectedTier::None;
     int                  selectedIndex = -1;   // position in patternScenarios/countScenarios;
@@ -149,15 +145,8 @@ void DrawSlotPatternToggleRow(std::string& slotPattern, const std::vector<Params
 void DrawScenarioCountConditionsEditor(std::vector<Params::ScenarioCountCondition>& conditions,
                                        int maxArmySlotCount);
 
-// STEP78 — the last three params are the canvas Edit Mode toggle's own context: `editModeState`
-// nullptr disables the toggle entirely (not wired); `patternSlotPattern` non-null = Tier 1 (its own
-// pattern seeds "Preview As" verbatim), else Tier 2's `countConditions` (nullptr = Tier 3, "always
-// matches") drives synthesis instead — see ScenarioEditModeState::Activate's own comment.
 void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params::Army>& armies,
-                            const std::vector<Params::MapArea>& areas,
-                            ScenarioEditModeState* editModeState, const std::string* patternSlotPattern,
-                            const std::vector<Params::ScenarioCountCondition>* countConditions,
-                            int maxArmySlotCount);                                   // Detail_UI.cpp
+                            const std::vector<Params::MapArea>& areas);              // Detail_UI.cpp
 // alloys/alloysToAdd/alloysToRemove — split out of DrawScenarioBodyFields for the ARCH §1.5
 // file-size ceiling (called by it, never directly by Lists.cpp).
 void DrawScenarioBodyExtendedFields(Params::ScenarioBody& body,

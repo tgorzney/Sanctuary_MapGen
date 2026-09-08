@@ -33,7 +33,6 @@
 #include "MapCanvasView_UI.h"
 #include "MapCanvas_IconLayer_Ops_UI.h"
 #include "MapCanvas_ManualDragSources_UI.h"
-#include "MapCanvas_ScenarioEditMode_Ops_UI.h"
 #include "MapCanvas_SelectionSet_UI.h"
 #include "MarkerDragGesture_UI.h"
 #include "OverlayLayer_Settings_UI.h"
@@ -132,14 +131,9 @@ public:
     // table, sourced from Application::WorldFootprintSizeTable(), never reached directly.
     void SetWorldFootprintSizeTable(const Io::WorldFootprintSizeTable* table) { worldFootprintSizeTable = table; }
 
-    // STEP78 — while IsActive(), ApplyPointerInput (MapCanvas_Draw_UI.cpp) takes EXCLUSIVE
-    // interaction ownership: drag/click route to Scenario Edit Mode, not the normal pan/pick path.
-    void SetScenarioEditModeState(ScenarioEditModeState* state) { scenarioEditModeState = state; }
-
     // STEP113 — the active-panel gate: a manual-marker drag may only BEGIN while the Markers panel
-    // is the shell's active tab. Mirrors SetScenarioEditModeState exactly (same class of injected,
-    // caller-owned, read-every-frame pointer; see this header's own comment on why a second copy of
-    // this state is never made).
+    // is the shell's active tab (same class of injected, caller-owned, read-every-frame pointer;
+    // see this header's own comment on why a second copy of this state is never made).
     void SetActivePanelSource(const ApplicationPanel* panel) { activePanelSource = panel; }
 
     // STEP94 — the manual-marker drag-and-follow source: `markers` is the ONLY mutable pointer
@@ -355,9 +349,6 @@ private:
     // STEP53 — assembles this frame's DrawOverlayIconLayersInput from the injected sources above
     // and calls DrawOverlayIconLayers (MapCanvas_Draw_UI.cpp).
     void DrawOverlayIconLayerPass(float regionOriginX, float regionOriginY, float regionSidePixels);
-    // STEP78 — draws Scenario Edit Mode's overlay when active, from the SAME overlay* sources
-    // above (MapCanvas_Draw_UI.cpp).
-    void DrawScenarioEditModeOverlayPass(float regionOriginX, float regionOriginY);
     // STEP94 — Gap 6's minimal stopgap draw + the live gesture's ghost/refused-tint dots
     // (MapCanvas_MarkerDrag_UI.cpp). Props/Decals need no equivalent — their manual instances
     // already render every frame through the real icon-atlas overlay pass (DrawOverlayIconLayerPass,
@@ -475,10 +466,7 @@ private:
     // IsItemActive() persists for the left button once a press began), ends on release.
     bool          bRightPressActive        = false;
 
-    // STEP78 — Scenario Edit Mode's own state (Application-owned, injected).
-    ScenarioEditModeState* scenarioEditModeState = nullptr;
-
-    // STEP113 — mirrors scenarioEditModeState exactly: injected, caller-owned, read every frame.
+    // STEP113 — injected, caller-owned, read every frame.
     const ApplicationPanel* activePanelSource = nullptr;
 
     // STEP94 — the manual-marker drag-and-follow source (injected, see SetManualMarkerDragSource)

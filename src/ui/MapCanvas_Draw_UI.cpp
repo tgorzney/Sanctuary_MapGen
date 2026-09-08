@@ -52,32 +52,11 @@ void MapCanvas::Draw(const char* canvasIdentifier, float regionSidePixels) {
     DrawMarqueeRectanglePass(regionOrigin.x, regionOrigin.y);
     // ARCH §21.8 — every Area's fill+border every frame, handles for the selected one only.
     DrawAreaOverlayPass(regionOrigin.x, regionOrigin.y);
-    // STEP78 — Scenario Edit Mode's own overlay, on top of the normal overlay stack.
-    DrawScenarioEditModeOverlayPass(regionOrigin.x, regionOrigin.y);
 
     // The hit-test surface sits exactly on the image, declared after it so it wins the hover.
     ImGui::SetCursorScreenPos(regionOrigin);
     ImGui::InvisibleButton(canvasIdentifier, regionSize);
     ApplyPointerInput(regionOrigin.x, regionOrigin.y);
-    // The right-click "Remove for this scenario"/"Add Alloy Marker" popup, opened by
-    // ApplyPointerInput above the SAME frame it resolves a request (bContextMenuJustRequested).
-    if (scenarioEditModeState != nullptr && scenarioEditModeState->IsActive())
-        DrawScenarioEditModeContextMenuPopup(*scenarioEditModeState);
-}
-
-void MapCanvas::DrawScenarioEditModeOverlayPass(float regionOriginX, float regionOriginY) {
-    if (scenarioEditModeState == nullptr || !scenarioEditModeState->IsActive()) return;
-    ScenarioEditModeDrawInput input;
-    input.resolveInput.overlayLayerSettings = overlayLayerSettings;
-    input.resolveInput.placements           = overlayPlacements;
-    input.resolveInput.ruleBucketIndex      = overlayRuleBucketIndex;
-    input.resolveInput.armies    = overlayRecipe != nullptr ? &overlayRecipe->armies : nullptr;
-    input.composite               = composite;
-    input.view                    = &view;
-    input.pairingLookup           = overlayPairingLookup;
-    input.atlasManifest           = overlayAtlasManifest;
-    input.regionOriginX = regionOriginX; input.regionOriginY = regionOriginY;
-    DrawScenarioEditModeOverlay(*scenarioEditModeState, input, *ImGui::GetWindowDrawList());
 }
 
 // Missing sources (any nullptr) draw nothing — the same posture the render-only tests already
@@ -154,22 +133,6 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
     if (ImGui::IsItemHovered() && io.MouseWheel != 0.0f)
         ApplyScroll(regionLocalX, regionLocalY, io.MouseWheel);
 
-    // STEP78 — exclusive interaction ownership: while active, drag/click/marquee/pan never reach the
-    // normal path below at all (zoom above stays available; it does not conflict with editing).
-    if (scenarioEditModeState != nullptr && scenarioEditModeState->IsActive()) {
-        if (composite != nullptr) {
-            ScenarioEditModePointerFrame_UI pointerFrame;
-            pointerFrame.regionLocalX = regionLocalX; pointerFrame.regionLocalY = regionLocalY;
-            pointerFrame.bPressActivated = ImGui::IsItemActivated();
-            pointerFrame.bPressActive    = ImGui::IsItemActive();
-            pointerFrame.bRightClicked   = ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
-            const std::vector<Params::Army> noArmies;
-            ApplyScenarioEditModePointerInput(*scenarioEditModeState, view, *composite,
-                                              overlayRecipe != nullptr ? overlayRecipe->armies : noArmies, pointerFrame);
-        }
-        return;
-    }
-
     // ARCH §21.2 — LEFT BUTTON: press-time drag-begin-first-else-click/marquee.
     // A press that lands on a manual instance (any of Markers/Props/Decals, nearest-hit-wins, each
     // lock-gated) starts a drag gesture instead; a miss starts neither a drag nor a pan — it merely
@@ -240,8 +203,7 @@ void MapCanvas::ApplyPointerInput(float regionOriginX, float regionOriginY) {
 
     // ARCH §21.2 — RIGHT BUTTON: the independent pan tracker, replacing left-drag-pans entirely.
     // ImGui's item-activation (IsItemActivated/IsItemActive/IsItemDeactivated) is LEFT-button-only
-    // for a default-flags InvisibleButton, so this reads raw button-1 state instead — the SAME idiom
-    // ScenarioEditModePointerFrame_UI::bRightClicked already uses just above in this exact file.
+    // for a default-flags InvisibleButton, so this reads raw button-1 state instead.
     if (!bRightPressActive && ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
         bRightPressActive = true;
     if (bRightPressActive) {
