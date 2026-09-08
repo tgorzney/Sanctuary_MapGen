@@ -1,5 +1,13 @@
 # Design Brief — Markers Tab UI
 
+**⚠️ SUPERSEDED — retired in place per `CONSOLIDATION_MASTER.md` §1.2 (H8), 2026-08-21.** Its design
+is ratified into `ARCH_16_MarkerLayerSymmetry.md` (and, downstream, `ARCH_19_MarkerLayerBundle.md`).
+Do not seed a fresh design conversation from this file — read those ARCH sections instead. Kept on
+disk as a historical record only. (See also `BRIEF_MarkersTabUI_R2.md`, `BRIEF_MarkersUICorrectionRound2_R1.md`,
+`BRIEF_MarkerGroupLayerRestructure_R1.md`, `BRIEF_MarkerTypeSectionsAndInstanceSelection_R1.md`,
+`BRIEF_MarkerLink_R1.md`, `BRIEF_MarkerLinkCorrection_R1.md` — the full lineage of Markers-tab
+design rounds since this one, all likewise historical/ratified.)
+
 *For a dedicated design conversation with the SanGen UI Expert. Read `CLAUDE.md` first. This is
 a DESIGN phase — no code gets written in this conversation. Output should be a work-order (or a
 flagged PARAMS gap handed to the ARCH Expert first, if the type doesn't exist yet — see below).*

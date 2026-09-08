@@ -5,7 +5,8 @@
 `sangen_arch_pack/`, which only the ARCH Expert may write). Authored by the Format
 Expert domain, evaluated by the ARCH Expert for conformance, and ratified by the human
 across a full design conversation. Status: evidence complete and every open fork ruled
-on; corrections NOT yet applied.*
+on; corrections APPLIED — `SanGenVersion` confirmed live at 5, Correction 21 landed in
+`SANMAP_FORMAT_SPEC.md` (2026-09-08 audit). Kept on disk as the originating evidence record.*
 
 ## Title
 Replace the `.sanmap` format's `mapGeneratorData` blob (~40 keys, ~60% duplicate of the

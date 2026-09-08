@@ -1,230 +1,200 @@
 # Execution Plan — parallel batch + sequential order for the unbuilt backlog
 
-*Checked and re-checked repeatedly on 2026-08-22 — see §0 for the full record (9 numbered
-findings across 2 rounds: an already-shipped ticket, a wave-placement error, 2 real compile
-blockers, 3 more compile/test gaps, a stale citation, 3 amendments that were themselves
-incomplete on first fix, and a 3-way dependency gap). Every round found something; treat this
-document as accurate as of its last edit, not as guaranteed final. Companion to
-`IMPLEMENTATION_STATUS.md`.*
+*Rebuilt from scratch 2026-09-08, superseding the 2026-08-22 version of this document in full.
+That version's entire scope (`STEP26A`, `STEP26B`, `STEP46`–`STEP97`) has since shipped — verified
+by direct commit-history cross-reference, not assumed. This rebuild is a full re-audit of every
+work order on disk (~200 files) against current `src/` (HEAD, clean tree) using 5 independent
+research passes, following this project's own standing rule: never trust a ticket's — or a prior
+audit's — self-reported status.*
 
-**Scope: 42 real unbuilt tickets** — `STEP26A`, `STEP26B`, `STEP46`–`STEP97` minus `STEP95`
-(shipped this session) and minus `STEP46` (found already shipped during this pass — see §0).
-`STEP96`/`STEP97` are excluded from both the batch and the sequence below; neither is
-dispatchable yet (STEP96 needs unwritten tickets 85–91; STEP97 needs STEP51+60+66 landed *and*
-an open ARCH ruling).
+## 0. Headline finding
 
-## 0. What the triple-check found and fixed
+**Of the ~200 files in `work_orders/`, only 4 were real, unbuilt, dispatchable coder tickets.**
+Everything else is either already shipped (the overwhelming majority — confirmed against actual
+`src/` content, not commit messages, which are frequently silent about which STEP number they
+implement), historical/superseded planning material, or not yet ratified into a ticket at all
+(the Assembly track). See §4 for the full accounting.
 
-The first pass of this document (same-day, earlier) grouped tickets into 6 loosely-sequenced
-"waves" based on spot-checking only the file-overlaps that looked suspicious. Re-verifying
-*every* ticket in the intended first parallel wave — both for self-sufficiency against the
-current shipped tree, and for real dependencies, not just claimed ones — found:
+**Update 2026-09-08, later same day — Wave 1 dispatched, mixed result:**
+- **STEP250 — SHIPPED**, commit `e3e8641`. Full solo rebuild clean, `ArmiesTab_UI_Test`/
+  `Combo_UI_Test` both pass. Landed 2 extra files beyond its own "Files touched" list
+  (`ArmiesTab_RowLayout_UI.h/.cpp`) — the ticket's own §2 anticipated this exact split if the
+  edited file landed over the ARCH §1.5 size ceiling, which it did (196 lines pre-split). Both new
+  files are UI-only, zero overlap with the Scenario cluster.
+- **STEP252 — NOT SHIPPED, made zero code changes, routed back.** The dispatched coder found a
+  real, unscoped gap: retiring `Params::ScenarioSpawn` (the ticket's whole point) breaks a live,
+  compiled subsystem neither the ticket nor `ARCH_15_12`/`ARCH_15_13` ever mention —
+  `MapCanvas_ScenarioEditMode_*` (canvas drag-to-place spawns) and `ScenariosTab_SpawnsWarning_UI.cpp`/
+  `ScenariosTab_UI.h`'s mandatory-spawns acknowledgment banner, both of which directly construct/
+  mutate `Params::ScenarioSpawn`/`body.spawns`. Deciding how canvas-drag spawn placement should work
+  against the new shared `spawnId` pool is a design call outside a coder's authority — this needs
+  either a scope amendment to STEP252 (extending it to cover those files with an explicit design)
+  or a split-off follow-up ticket, and possibly an ARCH Expert consult if the canvas-drag semantics
+  need new law. **Not resolved by this session; working tree left untouched.**
+- **STEP253 — SHIPPED**, commit `4181001`, dispatched independently once STEP252 stalled (the
+  sequencing rule below was to avoid a merge collision with STEP252's edits, which never
+  materialized since STEP252 touched nothing). Full solution build clean; 183/185 tests passed,
+  the only 2 failures being the pre-existing, unrelated baseline failures called out below — no
+  regression. One correction the dispatched coder found and applied: the ticket cited
+  `MapImporter_ScenarioRecord_IO.cpp` for the JSON reader, but that logic actually lives in
+  `MapImporter_Scenarios_IO.cpp` (a file split that postdates the ticket's prose) — edited the real
+  location. Also flagged, not fixed (pre-existing, not this ticket's fault): `MapExporter_IO.cpp`
+  (158→168 lines) and `ScenariosTab_UI.h` (175→186 lines) were already over the ARCH §1.5 hard
+  ceiling before this ticket touched them.
+- **STEP251 — still BLOCKED**, now on STEP252's unresolved scope gap specifically (previously
+  blocked on STEP252 landing at all; the blocker has changed shape, not cleared).
+- **Two pre-existing, unrelated test failures confirmed real** (fail even on a clean baseline with
+  none of this session's changes applied): `MapCanvas_UI_Test` (a manual-marker drag-release
+  regression) and `MapExporter_Formatting_IO_Test` (a `MarkerLinks`/`decals`/`props` JSON
+  key-order byte-fixture mismatch, almost certainly from the MarkerLink chain's IO changes not
+  updating this fixture). Neither has a work order. Worth a follow-up ticket.
 
-1. **STEP46 is already fully implemented.** The exact code it describes (`bNeedsTexelReadback`
-   gating) ships today, landed in commit `18c5154`, predating this whole consolidation effort.
-   Moved to `work_orders/shipped/`; it never belonged in the backlog count.
-2. **STEP54 was wrongly placed in the first parallel wave despite a hard dependency on STEP51**
-   ("cannot be dispatched until STEP51 lands `overlayLayers`") — an outright placement error in
-   the first pass, not a subtle judgment call. Fixed by excluding it from the parallel batch.
-3. **STEP50 and STEP51 will not compile against the current tree at all**, a hidden dependency
-   neither ticket's own dependency-claim caught. Both reference `Params::MarkerRuleLayer`/
-   `recipe.markerRuleLayers`, a type that doesn't exist until `STEP66` creates it. Both tickets
-   cite a "STEP79 confirmation" as if it resolves this — it only validates a *numbering
-   assumption* about that future type, not that the type exists yet. Excluded from the parallel
-   batch; both now sequenced right after STEP66.
-4. **STEP60 silently required `Params::SymmetrySetting`**, a struct that doesn't exist anywhere
-   in `src/` and that STEP60's own "Files touched" list never creates — a real compile blocker.
-   **Fixed**: amended `STEP60_MarkerInstanceLayer_PARAMS.md` §0 to add the struct definition
-   inline (it's also independently specified, byte-identical, in STEP66 — noted so whichever
-   lands first defines it once).
-5. **STEP68's own code snippet was misleading** — it showed a `layerIndex` field "from STEP60"
-   as if already present, but STEP60 hasn't landed. **Fixed**: amended to show the correct
-   3-field current struct and add only `symmetryGroupIdentifier`.
-6. **STEP72's own test suite will not compile in isolation** — it has a self-declared test-only
-   dependency on STEP65 and STEP70, but STEP70 is nowhere near ready (needs STEP63+STEP69 first)
-   and won't be reachable from STEP72's isolated worktree. **Fixed**: amended acceptance test
-   items 6(a)/6(d) to use a hardcoded literal + a deferred TODO instead of including headers that
-   don't exist yet.
-7. **STEP69 cited a `SANMAP_FORMAT_SPEC.md` Correction 17 that doesn't exist in the live spec
-   file** (despite other docs asserting it landed). Not a compile blocker — the ticket already
-   reproduces the full shape inline — but would send a coder on a dead-end search. **Fixed**:
-   amended to say so explicitly and point at the ticket's own inline tables instead.
+## 1. THE REAL BACKLOG — 4 tickets identified, 2 shipped, 1 blocked-on-scope, 1 blocked-on-that
 
-**Second pass (same day)** — re-ran the same rigorous check on the 22-ticket *sequential* list
-(which had only gotten the lighter original inventory treatment, not the full grep-against-`src/`
-audit), plus a fresh skeptical re-read of the 4 amendments above to confirm they didn't just
-relocate their own problem. Found:
-
-8. **3 of the 4 amendments above were themselves incomplete** — each fixed the section it touched
-   but left stale, contradictory text elsewhere in the same file. STEP68's acceptance test still
-   asserted `layerIndex` as a guaranteed wire sibling; STEP69 still quoted "Correction 17" as a
-   real external document 15+ times including one fabricated-sounding verbatim quote; STEP72's
-   Backend Policy section still described a `Sys::CheckLuaSyntax` call the corrected test no
-   longer makes. **All three fixed properly this time**, swept for every stale reference, not
-   just the first one found.
-9. **STEP53 has a real 3-way gap**: it assumes STEP52 bundles in STEP58's footprint-table wiring
-   ("bundled under this same umbrella per this ticket's own brief"), but STEP52's own
-   out-of-scope section explicitly declines to do that, and STEP58's own out-of-scope section
-   also explicitly declines, calling it "STEP51's or STEP52's job." No ticket anywhere actually
-   wires `Io::WorldFootprintSizeTable` into `Application`. **Fixed**: added a new §0 to STEP53
-   itself (the actual consumer) with the missing wiring, mirroring STEP52's own
-   `IconAtlasPairingLookup` pattern; added STEP58 as a stated prerequisite.
-
-**Third pass (same day)** — checked the two edits above (§0.8's amendments, §0.9's STEP53 fix)
-independently, since fixing something is exactly where the prior round found gaps. Found:
-
-10. **STEP53's own §0 wiring was itself architecturally wrong** — it had the draw pass call
-    `Application::WorldFootprintSizeTable()` directly, but `MapCanvas` (where the draw pass
-    lives) has no `Application` reference anywhere, confirmed against real `src/`. This codebase
-    already ratified the correct pattern for exactly this case (STEP48's own "RESOLVED — ARCH
-    ruling": push-in setter/pointer, same mechanism as `SetPreviewComposite`). **Fixed**:
-    `MapCanvas` now gets a `SetWorldFootprintSizeTable()` pointer setter, wired once in
-    `WireCallbacks()`, matching the ticket's own pre-existing (and correct) "Files touched" line
-    for `MapCanvas_UI.h` that this newer text had briefly contradicted. Also swept and fixed 2
-    smaller leftovers in the same file: a "§8 below" reference to a section that doesn't exist
-    (it's item 8 inside §1), and a "four prerequisites" header left over from before STEP58 was
-    added as the 5th. STEP53's own "Files touched" list ends up with **4** newly-touched files
-    (`Application_AssetBridge_UI.h`, `Application_Assets_UI.cpp`, `Application_UI.h`,
-    `Application_UI.cpp`), not 3 as originally logged here.
-
-**Fourth pass (same day)** — re-verified STEP53's fix once more fresh (clean, all 5 checks
-passed), and specifically hunted the same bug *class* (code assuming a direct call/read path to
-another UI object that doesn't actually exist) across the 9 other UI-heavy tickets in both lists
-(STEP54, 55, 74, 77, 78, 80, 81, 83, 94). None found — every cross-object access in those 9
-resolves to a self-member, a function parameter, or a correctly-specified push-in setter. One
-trivial wording fix in STEP94 (cited an unlanded precedent as "already" existing rather than "per
-its specified shape"). This pass found no new compile blockers or dependency gaps — a first for
-this document, suggesting convergence.
-
-Everything below reflects the corrected picture, not the original claims.
-
-## 1. How "no conflicts" is being enforced
-
-Two different things can go wrong when tickets run at the same time, and they need different
-fixes:
-
-- **Blocking dependency** — ticket A needs a type/function/field only ticket B produces. This is
-  fatal if A and B run at the same time with no coordination: A's coder can't write correct code,
-  full stop. **This is the constraint enforced for the parallel batch below — zero tolerance,
-  verified per-ticket against the *current shipped tree*, not against each other's promises.**
-- **Same-file edit** — two tickets touch the same file (sometimes the same file *and* the same
-  function). This does not block either agent if each one works in its own isolated git worktree
-  starting from the same clean commit — it only becomes a problem when the two finished branches
-  get merged together afterward, and it's fixed by a normal rebase/merge step, not by blocking
-  dispatch. **Recommendation: dispatch every ticket in the parallel batch via `Agent` with
-  `isolation: "worktree"`.** All same-file touches found below are annotated with a recommended
-  merge order for the integration step after the batch finishes.
-
-## 2. THE PARALLEL BATCH — 18 tickets, dispatch simultaneously
-
-Every ticket below has **zero dependency on any other ticket in this backlog** (verified against
-current `src/`, not taken on the ticket's own word), and the 3 that had real compile blockers
-have been amended (§0). Hand these to 18 individual coder agents now, each in its own isolated
-worktree.
-
-`STEP26A · STEP47 · STEP49 · STEP52 · STEP55 · STEP56 · STEP58 · STEP60 (amended) · STEP62 ·
-STEP63 · STEP64 · STEP65 · STEP66 · STEP68 (amended) · STEP69 (amended) · STEP72 (amended) ·
-STEP76 · STEP84 (Scope A only — Scope B needs a `SANMAP_FORMAT_SPEC` Correction that is not yet
-ratified; the ticket already self-gates this, but tell the dispatched coder explicitly)`
-
-### Merge-order plan for the integration step after all 18 finish
-
-None of these are blocking — every group below is a same-file housekeeping merge, verified
-low-risk (disjoint or clearly-adjacent edits), not a redesign:
-
-| Files | Tickets | Merge order / note |
+| Ticket | Verdict | Files touched |
 |---|---|---|
-| `Application_UI.h` | STEP52 (@~L71), STEP64 (@~L124) | Either order — disjoint accessor/member insertions, 50+ lines apart. |
-| `PropInstance_PARAMS.h`, `MapExporter_Props_IO.cpp`, `MapImporter_Props_IO.cpp` | STEP56, STEP62 | STEP56 first (larger surface), then STEP62 — different structs/functions entirely, verified zero real overlap. |
-| `Symmetry_PARAMS.h` | STEP60, STEP66 | Both add the **identical** `SymmetrySetting` struct (verbatim, by design — see §0.4). Keep one copy, delete the duplicate definition; both tickets' consumers are unaffected either way. |
-| `MapRecipe_PARAMS.h` | STEP60 (`markerLayers` @~L107), STEP66 (renames `markerRules`→`markerRuleLayers` @~L56), STEP69 (`scenarios` @~L101) | Any order — three disjoint regions on one struct. |
-| `MapExporter_DocumentAssembly_IO.cpp` | STEP60 (@~L61), STEP69 (@~L66, same function `AppendEntityDomainsJson`, 5 lines apart), STEP84 (@~L34, different function) | STEP60 then STEP69 (adjacent, land together to resolve in one pass), STEP84 independent. |
-| `MapImporter_ParseDocument_IO.cpp` | STEP60 (@~L65), STEP69 (@~L72, end of `ParseEntityDomainsJson`), STEP76 (@~L72, **same anchor line as STEP69**) | STEP60 → STEP69 → STEP76 last, specifically to resolve the STEP69/STEP76 exact-line collision while it's fresh. |
-| `Sanmap_KnownTopLevelKeys_IO.cpp` | STEP60, STEP69 | Either order — two new list entries. |
-| `CMakeLists.txt` | STEP52, STEP58, STEP63, STEP64, STEP65, STEP69, STEP72, STEP76, STEP84 | All additive (new `add_sangen_test` lines / vendoring blocks in different spots). Merge in any stable order, run the full `ctest` suite once at the end. STEP65's LuaJIT vendoring block and STEP72's Lua-resource staging block are thematically adjacent (both Lua-related) — worth a manual glance even though both are pure additions. |
+| `STEP250_ArmiesTabCompactSingleLineRow_UI.md` | **SHIPPED** (`e3e8641`) | `src/ui/Combo_UI.h`, `src/ui/Combo_UI.cpp`, `src/ui/ArmiesTab_UI.cpp`, `src/ui/ArmiesTab_RowLayout_UI.h`/`.cpp` (new, size-ceiling split) |
+| `STEP253_ScenarioSlotRangeCondition_PARAMS_IO_UI.md` | **SHIPPED** (`4181001`) | `Scenario_PARAMS.h`, `MapExporter_Scenarios_IO.cpp`, `MapImporter_Scenarios_IO.cpp` (not `MapImporter_ScenarioRecord_IO.cpp` as originally cited), `ScenarioScript_DataLua_IO.cpp`, `SanGenScenarioRuntime.lua`, `ScenariosTab_MatchRules_UI.cpp` + 2 new split files + new `ScenarioSlotRangeValidation_IO.h/.cpp` |
+| `STEP252_ScenarioSpawnIdentityImplementation_PARAMS_IO_UI.md` | **BLOCKED — needs a scope amendment or ARCH ruling**, not dispatchable as written; zero code changes made | Ticket's own list, plus (newly discovered, unscoped) `MapCanvas_ScenarioEditMode_*` (5 files) and `ScenariosTab_SpawnsWarning_UI.cpp`/`ScenariosTab_UI.h` |
+| `STEP251_ScenarioCategoryFourExport_IO.md` | **BLOCKED** on STEP252 | New files, plus reads STEP252's `spawnIds` shape |
 
-## 3. THE SEQUENTIAL AGENT — 22 tickets, run one at a time in this order, after the batch merges
+Every other STEP number from 98 through 249, plus the STEP150–153 and STEP200–236 ranges, plus the
+full 13-ticket MarkerLink correction chain (STEP237–249), is **already shipped** — confirmed by
+direct code inspection, not commit-message grep alone (several shipped without citing their STEP
+number in the commit message at all, e.g. STEP227/228/230/234–236 all landed inside larger
+uncited commits). See §4 for the per-ticket evidence table.
 
-File conflicts don't matter here since it's one ticket at a time — only real dependencies do,
-all already satisfied by what precedes each entry:
+## 2. Batching — parallel wave, then a forced-sequential tail
 
-1. **STEP79** (← STEP66) — same dispatch unit as STEP66, land immediately after merge.
-2. **STEP80** (← STEP66+STEP79)
-3. **STEP50** (← STEP66 — the hidden dependency found in §0.3, now satisfiable)
-4. **STEP51** (← STEP66 — same)
-5. **STEP67** (← STEP66)
-6. **STEP26B** (← STEP26A)
-7. **STEP48** (← STEP47)
-8. **STEP81** (← STEP60, STEP49)
-9. **STEP53** (← STEP47, STEP50, STEP51, STEP52, STEP58 — STEP58 added 2026-08-22, §0.9)
-10. **STEP54** (← STEP51 — remember the amendment already applied to STEP75, not this one; STEP54 itself needed no content fix, only correct sequencing)
-11. **STEP57** (← STEP56)
-12. **STEP59** (← STEP53, must be *implemented*, not merely merged — verify its test suite is green before dispatching this one)
-13. **STEP70** (← STEP63, STEP69)
-14. **STEP71** (← STEP64, STEP70, STEP72)
-15. **STEP73** (← STEP69, STEP70, STEP63)
-16. **STEP74** (← STEP69)
-17. **STEP75** (← STEP68, STEP76 — amendment already applied earlier this session, ready as-is)
-18. **STEP77** (← STEP74, STEP64, STEP65, STEP71, STEP72)
-19. **STEP78** (← STEP47, STEP50, STEP51, STEP52, STEP53 — GATED, re-verify all five actually landed before dispatch, the ticket demands this itself)
-20. **STEP82** (← STEP76)
-21. **STEP83** (← STEP62 hard; STEP51, STEP53 soft/adaptive — both will already be landed by this point, so STEP83 takes its cleaner "already-landed" code path rather than the fold-in path)
-22. **STEP94** (← STEP47, STEP48, STEP68, STEP49, STEP81)
+### Wave 1 — dispatch simultaneously, zero file overlap
 
-**Update 2026-08-22 (later same day) — STEP96/STEP97's blockers substantially resolved:**
+`STEP250` and `STEP252` share no files whatsoever (Armies-tab row layout vs. Scenario PARAMS/IO/Lua
+runtime) — safe for two coders in parallel, each in an isolated worktree.
 
-- **STEP97's ARCH ruling landed.** `ARCH_14_14_AlloySpawnsArmiesManualRouting.md` §14.14 rules:
-  no new field on `MarkerInstanceLayer` — routing is per-transform via the already-load-bearing
-  `MarkerInstanceGroup::name == "Spawn"` literal, now promoted to `Params::kSpawnMarkerGroupName`.
-  STEP97 still needs STEP51 landed (item 3 in §3's sequential list below) before it can be
-  redrafted against the real shipped shape — not done automatically here, flagged for a future
-  session once STEP51 lands.
-- **STEP96's prerequisite tickets 85–92 are now drafted** (`work_orders/STEP85_LuaTableEvaluate_SYS.md`
-  through `STEP92_ReclaimableTagBake_IO.md`), following 3 more ARCH rulings
-  (`ARCH_18_01_SandboxedExecutionPrimitive.md`, `ARCH_18_02_IngestedDataDeterminism.md`,
-  `ARCH_18_03_CatalogDataOwnership.md`) and 2 human UX decisions (ingestion runs on an explicit
-  button press only, cached thereafter; reuses the existing `assetCacheDirectory` setting rather
-  than a new dedicated cache path). Landing order, per each ticket's own stated dependencies:
-  **85 → 86 → 87 → 88 → 89** is a strict chain; **90 is parallel** with that whole chain (no code
-  dependency); **91 depends on 89 and 90**; **92 depends on 89** (and on STEP62, already shipped).
-  A design-doc-proposed ticket 93 (fix STEP64's subpath) was investigated and found **moot** — the
-  real shipped code already has the correct subpath, not drafted.
-- **Verification pass completed** (5 parallel checks: 3 grouped completeness audits against real
-  `src/`, 1 file-conflict check against the remaining 20-ticket backlog, 1 cross-ticket consistency
-  read of the set of 8). Found and fixed 6 real problems, all now corrected in place:
-  - **STEP87** — a "never includes `LuaTableEvaluate_SYS.h`" claim was false and wouldn't compile
-    (the `.cpp` dereferences `LuaTableEvaluateResult` members, which live only in that header, not
-    the `LuaTableValue_SYS.h` it claimed was sufficient).
-  - **STEP88** — `ReadJsonInteger` (fixed `int&`) can't bind the ticket's four `uint64_t` fields;
-    corrected to direct `nlohmann::json` accessors for those four fields specifically.
-  - **STEP89** — two false precedent citations: misattributed a per-slot-write pattern to
-    `AssetAtlasCache::PackImages` (which only reads that array, never writes it — the real
-    precedent is `BuildFromSanpack`'s `decodeOne` gating) and mischaracterized its own
-    null-`ThreadPool*` fallback as "reusing `ThreadPool`'s zero-worker contract" when it's actually
-    the ticket's own explicit gate. Also closed a minor gap: two of ticket 86's diagnostic counters
-    (`skippedOversizeFileCount`/`skippedUnreadableFileCount`) were computed and tested but never
-    surfaced on `TemplateIngestReport` — now carried through.
-  - **STEP91** — claimed an existing test file could be "extended"; verified none exists
-    (`Application_AssetPanel_UI_Test.cpp` is a NEW file, confirmed by grep across all of
-    `src/ui/*Test*`), corrected throughout.
-  - **STEP85** — a citation error (claimed the design doc was "silent" on a parameter it actually
-    specifies at `DESIGN_SantpFootprintIngestion_R1.md:315`) — the ticket's own engineering
-    decision to omit that parameter still stands, corrected to frame it as a deliberate override,
-    not filling a silence.
-  - **Merge-order note**: STEP90 and STEP77 (already in the 20-ticket sequential backlog) likely
-    edit the same functions in `src/ui/Application_AppSettings_UI.cpp` — land STEP90 first (its
-    insertion point is precisely pinned; STEP77's is not) and diff both functions before merging.
-  Everything else across all 8 tickets — type/signature consistency, dependency-order correctness,
-  file-conflict analysis against the 20-ticket backlog, every other live-code citation — came back
-  clean. STEP85–92 are now held to the same verification bar as the rest of this backlog.
-- STEP96 itself can be considered schedulable once 85→89 and 91 land (its two real dependencies,
-  per its own §0/§2) — not yet added to §2/§3's ordered lists below (a purely organizational gap,
-  not a readiness one).
+### Sequential tail — after STEP252 lands
 
-## 4. Verification method
+1. **STEP253** — no *functional* dependency on STEP252 (spawn identity vs. count-condition shape
+   are logically independent features), but both land in the exact same 6-file cluster
+   (`Scenario_PARAMS.h`, the Scenario IO pair, `ScenarioScript_DataLua_IO.cpp`,
+   `SanGenScenarioRuntime.lua`, `ScenariosTab_MatchRules_UI.cpp`). STEP253's own text explicitly
+   flags this as a same-file merge-collision risk, not a data dependency — run it only after
+   STEP252 has landed and merged, to avoid two coders fighting over the same regions of the same
+   files at once.
+2. **STEP251** — genuinely blocked: it consumes STEP252's `spawnIds` pool shape directly, and its
+   own §9 says to re-verify its text against whatever actually ships before starting. Dispatch
+   last.
 
-Every ticket in §2 was re-read in full by an independent agent and checked against the *current*
-`src/` tree (not against another ticket's claims) for: (a) any code/type it silently needs that
-doesn't exist yet, (b) any "verify X before assuming Y" caveat, actually verified, (c) any open
-ARCH/Format Expert gap. Every same-file cluster in §2's merge table was independently re-verified
-by a second agent reading both tickets' actual insertion points, not just their file lists.
+Net order: **{STEP250 ∥ STEP252} → STEP253 → STEP251.**
+
+### A note on peer coordination
+
+An active peer session's worktree (`.claude/worktrees/agent-a4d614cf830e42c4d`, observed live
+during this audit) is mid-edit on `MarkerLayerBundle`-adjacent files — a different domain from all
+4 tickets above (no shared files), so no coordination is required before dispatching this batch.
+Still, per `CLAUDE.md`'s commit protocol, whoever picks up any of these 4 tickets should re-check
+`ListAgents`/active sessions immediately before touching each file, not just once at ticket start.
+
+## 3. One real, unticketed defect found during this audit
+
+**`MarkersTab_UI.cpp:295-296` still hardcodes a 3-entry Type-section loop** instead of the
+ratified dynamic `DrawMarkerTypeSections` enumeration over live `markerTypeName` values
+(`ARCH_19_13`/`§19.14`). This is already recorded as a Standing Recorded Defect in
+`sangen_arch_pack/INDEX.md:237-250`, explicitly out of scope for every Link-chain ticket that
+touched the surrounding code. It has no work order. Not blocking anything in §1's batch — flagged
+here so it isn't lost, and so a future ticket-authoring session (UI Expert) picks it up.
+
+Two other non-coder loose ends, neither blocking §1's batch:
+- **`FORMAT_SPEC_UPDATE_DRAFT_MapScenarioSpec.md`** — a Format Expert doc-sync draft against
+  `MAP_SCENARIO_SPEC.md`/`INDEX.md`. Confirmed still genuinely unapplied. Docs-only, no `src/`
+  impact, no coder needed — just an ARCH-Expert-writes-docs task whenever picked up.
+- **`PHASE_A_ScenarioDataMigration_PandemoniumIsthmus.md`** — Rev.2, dated 2026-09-04, still
+  current: a one-time hand-edit to the live `Pandemonium Isthmus` map files, not a coder ticket at
+  all (no `src/` change). Awaiting manual application by the human.
+
+## 4. Full accounting — every other cluster, verdict + evidence
+
+*(Condensed from 5 independent research passes, each of which read every ticket in full against
+the live tree before rendering a verdict. Full per-file citations live in this session's research;
+summarized here to keep this document a usable index rather than a second audit trail.)*
+
+### 4.1 Area / canvas / mask cluster — ALL SHIPPED
+`STEP204` (naval retirement), `STEP210` (area canvas gesture — shipped, then legitimately
+rewritten in place by `STEP212`/`STEP219`; treat `STEP210`'s own file as historical, its code
+blocks show the pre-rewrite shape), `STEP216`–`STEP220` (tier-gated uploads, 16-color palette, GPU
+compose benchmark, real per-frame recomposite + watchdog, imported-mask version-hash fix) are all
+confirmed live in `src/`, tests included.
+
+### 4.2 Selection / marquee cluster — ALL SHIPPED
+`STEP227` (Z-order + size-sort), `STEP228` (overlay panel gate), `STEP230` (marquee Ctrl-toggle /
+Shift-union), `STEP232`/`STEP233` (shift-range anchor + canvas/list selection-set sync — both
+landed together in commit `752e282`), `STEP234`/`STEP235`/`STEP236` (global Delete key, +Group/
++Layer move-selection, `DrawDialCompact`) all confirmed live with registered tests. The last three
+shipped bundled inside the large MarkerLink-correction commit (`8235f03`) without their STEP
+numbers in the commit *message* — only as in-code `// STEPnnn` comments — which is why a
+message-only grep misses them; always verify against code.
+
+### 4.3 MarkerLink chain (STEP237–249) — ALL SHIPPED, fully self-consistent
+All 13 tickets landed in one commit (`8235f03`, "Correct Markers-Tab Link mechanic"), which
+created the ARCH files (`ARCH_19_28`–`33`, `ARCH_21_09`), the work orders, and the implementation
+together — the "original" and "correction" rounds were never separately committed. Every
+`depends on STEPnnn (done)` annotation inside these tickets checks out against real code. No
+mismatches, no unbuilt pieces, no ticket left dangling. `ARCH_19_29`'s retracted sentence is
+correctly struck through with a pointer to `§19.33`.
+
+### 4.4 Scenario / Armies cluster — see §1 (the only cluster with real remaining work)
+The four ARCH draft files (`ARCH_AMENDMENT_DRAFT_ScenarioSpawnId.md`,
+`ARCH_CORRECTION_DRAFT_ScenarioSpawnIdCaseInsensitivity.md`,
+`ARCH_AMENDMENT_DRAFT_ScenarioSlotRangeCondition.md`, `DESIGN_ScenarioSlotRangeCondition_R1.md`)
+are all ratified and folded into `ARCH_15_05`/`ARCH_15_12`/`ARCH_15_13` — historical records now,
+correctly self-marked. One correction: the case-insensitivity draft's own proposed replacement
+text (uppercase-fold) is itself wrong; the actually-ratified `§15.12` text (lowercase `tolower`) is
+correct, and `STEP252`'s ticket text already matches the correct ratified version, not the draft's
+error — no action needed, just don't resurrect the draft's text as if it were current.
+
+### 4.5 Not yet ratified — excluded from this batch entirely
+- **Assembly** (`BRIEF_Assembly_R1.md` / `DESIGN_Assembly_R1.md`) — still genuinely design-phase.
+  `sangen_arch_pack/INDEX.md` confirms no dedicated Assembly ARCH section has been ratified;
+  Assembly's groundwork (rigid-rotate math, "no members list" rule, `assemblyIdentifier` scalar)
+  was absorbed piecemeal into the separately-ratified `ARCH_19_MarkerLayerBundle.md` track, but
+  the Assembly feature itself has zero dispatchable ticket. Not part of this plan.
+- **`DESIGN_ScenarioGeneratorDeclarativeInputs_R1.md`** — Rev.2, dated 2026-09-07 (the newest
+  design doc in the repo). No ticket has been derived from it yet. Watch for ratification; not
+  yet actionable.
+
+### 4.6 Confirmed historical / superseded (no action needed beyond what §3 already covers)
+`CONSOLIDATION_MASTER.md`, `IMPLEMENTATION_STATUS.md`, this document's own pre-2026-09-08 content,
+`SESSION_HANDOFF_2/3/4.md`, `SESSION_HANDOFF_ImportExport.md`, `TABREBUILD.md`,
+`TAB_REBUILD_PLAN.md`, `HANDOFF_TRACK_ArmyMirror.md`, `HANDOFF_TRACK_MarkerLayerSymmetry.md`,
+`HANDOFF_TRACK_PreviewCompositing.md`, `HANDOFF_TRACK_PreviewOverlayLayering.md`,
+`HANDOFF_TRACK_ScenarioScripting.md`, `SEQUENCE_PreviewOverlayLayering.md`, `PARITY_BACKLOG.md`,
+`RECIPE_PARITY_BACKLOG.md`, `IO_PARITY_REPORT.md`, `GAP_MarkerLayerAndSymmetry_PARAMS.md`,
+`B2_ParityFields.md`, `DESIGN_MarkerGroupLayerRestructure_R1.md` +
+`BRIEF_MarkerGroupLayerRestructure_R1.md`, `DESIGN_MarkerLayerSymmetry_R1.md` (self-superseded by
+R2), `DESIGN_MarkerLayerSymmetry_R2.md`, `DESIGN_MarkerPreviewLayering_R1.md` (self-superseded by
+R2) + `DESIGN_MarkerPreviewLayering_R2.md`, `DESIGN_MarkerTypeSectionsAndInstanceSelection_R1.md` +
+`BRIEF_MarkerTypeSectionsAndInstanceSelection_R1.md`, `BRIEF_MarkersTabUI_R2.md`,
+`BRIEF_MarkersUICorrectionRound2_R1.md` + `DESIGN_MarkersUICorrectionRound2_R1.md`,
+`DESIGN_MapScenarioIO_R1.md`, `DESIGN_ScenariosTabAndLuaEditor_R1.md`,
+`DESIGN_SantpFootprintIngestion_R1.md` (its proposed STEP85–92/94/96/97 all independently confirmed
+shipped by commit cross-reference during this audit), `REFERENCE_UnitSpawning_VerifiedRecipe.md`
+(already correctly self-headered SUPERSEDED), and all three `BUGFIX_*.md` files
+(`OverlayVisibilityAndPropIconFallback_R1` → commit `a73ad87`, `SlopeTabUICorrection_R1` → commit
+`d9654cd`, `UniversalCoordinateConversionAndDragRewrite_UI` → commit `18019b7`, each shipped).
+`BRIEF_ScenarioScriptingRatification.md` is the one exception in this list that stays **CURRENT**
+by explicit prior ruling (`CONSOLIDATION_MASTER.md` H8) — it remains the scenario track's source
+document, not superseded.
+
+`BRIEF_OptimizedPreviewPipeline.md` and `BRIEF_MarkersTabUI.md` were missing the SUPERSEDED header
+`CONSOLIDATION_MASTER.md` ruled they should get back in 2026-08-21 (ruling never executed) — fixed
+in place during this audit. `SPEC-1_PropFormatCorrections_DOCS.md` and
+`SPEC-4_SanmapSchemaV3_DOCS.md` both had stale "corrections NOT yet applied" status lines despite
+both sets of corrections being verified live in `sangen_arch_pack/specs/` — also fixed in place.
+
+## 5. Method
+
+5 independent research agents, each read every ticket in its cluster in full, then read every
+file/line/type each ticket cited against the current `src/` tree (HEAD, clean working tree) —
+never trusting a ticket's own status line or a commit message's silence, matching the standard
+`IMPLEMENTATION_STATUS.md` set in the prior audit. Cross-referenced against `sangen_arch_pack/`
+for every cited ARCH section. Peer sessions were notified before this document was written; one
+confirmed no conflicting in-flight work on `work_orders/`.

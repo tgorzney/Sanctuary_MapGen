@@ -3,7 +3,9 @@
 *Constitution §7. Executor: **SanGen ARCH Expert** (targets live under
 `sangen_arch_pack/`, which only the ARCH Expert may write). Authored by the Format
 Expert domain from a full read of the real game data. Status: evidence complete;
-corrections NOT yet applied.*
+corrections APPLIED — verified live in `sangen_arch_pack/specs/UNIT_PROP_MARKER_DATA_SPEC.md`
+and `sangen_arch_pack/specs/GAMEDATA_LAYOUT_SPEC.md` (2026-09-08 audit). Kept on disk as the
+originating evidence record.*
 
 *Numbering note: this is a documentation-correction order, not a milestone
 implementation order, hence the `SPEC-` prefix rather than `M<n>-<n>`. Rename to fit

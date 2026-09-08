@@ -1,5 +1,9 @@
 # Design Brief — Optimized Preview Pipeline
 
+**⚠️ SUPERSEDED — retired in place per `CONSOLIDATION_MASTER.md` §1.2 (H8), 2026-08-21.** Its design
+is ratified into `ARCH_14_PreviewOverlayLayering.md`. Do not seed a fresh design conversation from
+this file — read the ARCH section instead. Kept on disk as a historical record only.
+
 *For a dedicated design conversation. Read `CLAUDE.md` first. This is a DESIGN phase — no
 code gets written in this conversation. Output should be a ratified spec update
 (`sangen_arch_pack/`) plus a work-order sequence for a later coder session.*
