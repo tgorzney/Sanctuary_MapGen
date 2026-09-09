@@ -259,6 +259,70 @@ void RunApplyAddLinkActionThenPartitionByTypeChecks() {
          "after Delete-Link, the partition finds nothing left tagged with the deleted identifier");
 }
 
+// STEP258 acceptance item 4 — SelectAllLinkedManualInstances replaces the set: a markers fixture
+// with instances tagged to link X, a different link, and untagged, plus a pre-existing, unrelated
+// selection/anchor: after the call, the selection is exactly the link-X-tagged identifiers in
+// markers' own group/transform walk order, and selectedManualInstanceIdentifier ==
+// manualInstanceSelectionAnchorIdentifier == selectedManualInstanceIdentifiers.front().
+void RunSelectAllLinkedManualInstancesReplacesTheSetChecks() {
+    std::vector<Params::MarkerInstanceGroup> markers(2);
+    markers[0].name = "Alloy";
+    markers[0].transforms.resize(3);
+    markers[0].transforms[0].instanceIdentifier = 10; markers[0].transforms[0].linkIdentifier = 5;
+    markers[0].transforms[1].instanceIdentifier = 11; markers[0].transforms[1].linkIdentifier = -1;   // untagged
+    markers[0].transforms[2].instanceIdentifier = 12; markers[0].transforms[2].linkIdentifier = 5;
+    markers[1].name = "Plasma";
+    markers[1].transforms.resize(2);
+    markers[1].transforms[0].instanceIdentifier = 13; markers[1].transforms[0].linkIdentifier = 9;   // a different Link
+    markers[1].transforms[1].instanceIdentifier = 14; markers[1].transforms[1].linkIdentifier = 5;
+
+    int selectedManualInstanceIdentifier = 999;
+    std::vector<int> selectedManualInstanceIdentifiers = { 1, 2, 3 };   // unrelated, pre-existing
+    int manualInstanceSelectionAnchorIdentifier = 999;
+
+    SelectAllLinkedManualInstances(markers, 5, selectedManualInstanceIdentifier,
+                                   selectedManualInstanceIdentifiers, manualInstanceSelectionAnchorIdentifier);
+
+    const std::vector<int> expected = { 10, 12, 14 };   // markers' own group/transform walk order
+    Check(selectedManualInstanceIdentifiers == expected,
+         "the selection is exactly the link-X-tagged identifiers in markers' own walk order");
+    Check(selectedManualInstanceIdentifier == 10 && manualInstanceSelectionAnchorIdentifier == 10,
+         "primary and anchor both become the FIRST instanceIdentifier walked");
+    Check(selectedManualInstanceIdentifier == selectedManualInstanceIdentifiers.front(),
+         "primary equals the selection's own front element");
+}
+
+// STEP258 acceptance item 5 — SelectAllLinkedManualInstances on empty membership clears, not leaves
+// stale: a link with zero tagged instances, called against a non-empty pre-existing selection: the
+// resulting selection is empty and both primary and anchor reset to -1.
+void RunSelectAllLinkedManualInstancesEmptyMembershipClearsChecks() {
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].name = "Alloy";
+    markers[0].transforms.resize(2);
+    markers[0].transforms[0].instanceIdentifier = 1; markers[0].transforms[0].linkIdentifier = -1;
+    markers[0].transforms[1].instanceIdentifier = 2; markers[0].transforms[1].linkIdentifier = 7;   // a different Link
+
+    int selectedManualInstanceIdentifier = 42;
+    std::vector<int> selectedManualInstanceIdentifiers = { 42, 43 };
+    int manualInstanceSelectionAnchorIdentifier = 42;
+
+    SelectAllLinkedManualInstances(markers, 5, selectedManualInstanceIdentifier,
+                                   selectedManualInstanceIdentifiers, manualInstanceSelectionAnchorIdentifier);
+
+    Check(selectedManualInstanceIdentifiers.empty(), "an empty membership clears the selection entirely");
+    Check(selectedManualInstanceIdentifier == -1, "primary resets to -1, not left at the old stale value");
+    Check(manualInstanceSelectionAnchorIdentifier == -1, "anchor resets to -1 too");
+}
+
+// STEP258 acceptance item 6 — constant pins, so either being silently reverted trips a test failure
+// rather than only a visual/behavior regression a human has to notice by eye.
+void RunConstantPinChecks() {
+    Check(kMarkerLinkSectionHeaderColor == 0xFFFA429Eu,
+         "kMarkerLinkSectionHeaderColor is the STEP258 purple, matching the stock header S/V");
+    Check(LinkSectionHeaderOptions().bDoubleClickToggle == true,
+         "LinkSectionHeaderOptions opts into double-click-to-toggle");
+}
+
 } // namespace
 
 int main() {
@@ -272,6 +336,9 @@ int main() {
     RunDeleteMarkerLinkInstanceTierChecks();
     RunDeleteMarkerLinkLegacyBundleLayerTierChecks();
     RunApplyAddLinkActionThenPartitionByTypeChecks();
+    RunSelectAllLinkedManualInstancesReplacesTheSetChecks();
+    RunSelectAllLinkedManualInstancesEmptyMembershipClearsChecks();
+    RunConstantPinChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

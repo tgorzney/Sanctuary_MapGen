@@ -16,6 +16,11 @@
 // Layer's own controls are read-only mirrors while linked (MarkersTab_ManualLayerRowBody_UI.cpp); an
 // "X" delete, deferred and applied after this loop finishes (mirrors every other pending-delete
 // field in this tab, MarkersTab_Bundles_UI.h).
+//
+// STEP258 — the header bar's own click target now splits single-click (select all this Link's
+// instances, SelectAllLinkedManualInstances below) from double-click (expand/collapse — still the
+// rename trigger above). This is the one opt-in `SectionOptions::bDoubleClickToggle` call site in the
+// app (`Section_UI.h`, LinkSectionHeaderOptions below).
 #pragma once
 #include <algorithm>
 #include <functional>
@@ -64,9 +69,19 @@ inline constexpr float kMarkerLinkHeaderClusterWidthPixels =
 
 // A named PackedColor distinct from every colorAlloy/Plasma/Spawn default and from kThemeColor's own
 // resolved value (Constitution §8 — a UI-chrome tweakable, not a PARAMS/recipe value, same tier as
-// kMarkerLayerHeaderExtraCombinedWidthPixels) — 0xAABBGGRR: a muted violet/rose, unlikely to collide
-// visually with any marker-type tint a user configures.
-inline constexpr PackedColor kMarkerLinkSectionHeaderColor = 0xFFB366CCu;
+// kMarkerLayerHeaderExtraCombinedWidthPixels) — 0xAABBGGRR. STEP258: the SAME hue-family target as
+// ordinary Group/Section headers elsewhere in this tab. DrawSectionBegin's own default trackColor ==
+// kThemeColor resolves, via ResolveWidgetColor, to Dear ImGui's stock dark-theme ImGuiCol_Header ==
+// RGB(0.26,0.59,0.98) == RGB(66,150,250), HSV ~= (212.6 deg, 0.736, 0.980) (imgui_draw.cpp's own
+// StyleColorsDark — this repo never overrides it, Application_Window_UI.cpp:48 is the only style
+// call). Rotated to a purple hue (270 deg, standard violet — maximally distinct from the existing
+// blue) at the IDENTICAL saturation/value: RGB(158,66,250) = 0x9E42FA. Alpha kept at the pre-existing
+// 0xFF — this constant is never kThemeColor, so ResolveWidgetColor (RtToggleWidget_UI.cpp) always
+// returns it verbatim regardless of hover state; Section_UI.cpp's own hover/HeaderHovered branch is a
+// dead argument for any non-kThemeColor trackColor, unchanged by this ticket. Was 0xFFB366CCu ("a
+// muted violet/rose") before STEP258 — replaced outright, per direct human instruction to match the
+// stock headers' own S/V with a purple hue instead of blue, not layered alongside the old value.
+inline constexpr PackedColor kMarkerLinkSectionHeaderColor = 0xFFFA429Eu;
 
 inline WidgetStyle LinkSectionHeaderStyle() {
     WidgetStyle style;
@@ -77,6 +92,11 @@ inline WidgetStyle LinkSectionHeaderStyle() {
 inline SectionOptions LinkSectionHeaderOptions() {
     SectionOptions options;
     options.reservedRightWidth = kMarkerLinkHeaderClusterWidthPixels;
+    // STEP258 — opt-in double-click-to-toggle: a plain single click on a Link header selects every
+    // Manual Instance tagged to it instead of collapsing/expanding it (DrawMarkerLinksSection's own
+    // bPlainSingleClicked handling, MarkersTab_Links_UI.cpp). The ONLY SectionOptions call site in
+    // the app that sets this (Section_UI.h's own comment on the field).
+    options.bDoubleClickToggle = true;
     return options;
 }
 
@@ -155,6 +175,24 @@ void DrawMarkerLinkBody(const Params::MarkerLink& link, Params::MapRecipe& recip
                         const std::function<void(int clickedInstanceIdentifier,
                                                  const std::vector<int>& selectedInstanceIdentifiers)>&
                             selectManualMarkerInstanceCallback);
+
+// STEP258 — the Link header's own single-click action (LinkSectionHeaderOptions' opt-in
+// bDoubleClickToggle): replaces the WHOLE selection with every Manual Instance currently tagged
+// `transform.linkIdentifier == linkIdentifier`, generalizing ApplyManualInstanceSelectionClick's own
+// "plain click: replace the set with just this one; the anchor becomes this one too" contract
+// (MarkersTab_ManualInstanceSelection_UI.h) from one instance to a whole Link's membership. The
+// primary/anchor become the FIRST instanceIdentifier encountered in `markers`' own group/transform
+// walk order — the SAME deterministic order DeleteMarkerLink/PartitionLinkedManualInstancesByType
+// already walk. This is a documented, arbitrary pick: no member of a Link is privileged over
+// another: "the first one walked" is simply a concrete value so primary/anchor are never left
+// dangling on a non-empty membership. An empty membership (a Link tagging nothing, e.g. right after
+// every one of its instances was individually moved elsewhere) clears the selection entirely and
+// resets both primary and anchor to -1 — "nothing to select" is not treated as "leave the OLD
+// selection in place," matching Constitution §6.
+void SelectAllLinkedManualInstances(const std::vector<Params::MarkerInstanceGroup>& markers,
+                                    int linkIdentifier, int& selectedManualInstanceIdentifier,
+                                    std::vector<int>& selectedManualInstanceIdentifiers,
+                                    int& manualInstanceSelectionAnchorIdentifier);
 
 // STEP247/ARCH §19.33 (revises STEP239's original shape): the PRIMARY walk clears
 // `transform.linkIdentifier` to -1 for every MarkerTransform across `markers` matching

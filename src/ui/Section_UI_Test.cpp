@@ -124,11 +124,200 @@ static void TestReservedRightWidthShrinksTheHeaderBar() {
     ImGui::DestroyContext();
 }
 
+// STEP258 acceptance item 1 — pure StepSectionHeader, default behavior pinned unchanged: with
+// bDoubleClickToggle defaulted false, StepSectionHeader(state, 1) toggles exactly as the
+// pre-existing StepSectionHeader(state, true) did, and bPlainSingleClicked is false for every
+// click count. A direct regression pin for the "zero blast radius on every other header" claim.
+static void TestDoubleClickToggleDefaultedFalseMatchesOldBehavior() {
+    Ui::SectionState state;   // open
+    Check(!Ui::StepSectionHeader(state, 0).bPlainSingleClicked,
+          "count 0, default options: never reports a plain single click");
+    const Ui::SectionChange oneClick = Ui::StepSectionHeader(state, 1);
+    Check(oneClick.bOpenChanged && !oneClick.bBodyVisible && !oneClick.bPlainSingleClicked,
+          "count 1, default options: toggles exactly like the old bool-true call, never reports a plain single click");
+    const Ui::SectionChange twoClick = Ui::StepSectionHeader(state, 2);
+    Check(twoClick.bOpenChanged && twoClick.bBodyVisible && !twoClick.bPlainSingleClicked,
+          "count 2, default options: still toggles (any click toggles) and never reports a plain single click");
+    const Ui::SectionChange threeClick = Ui::StepSectionHeader(state, 3);
+    Check(threeClick.bOpenChanged && !threeClick.bPlainSingleClicked,
+          "count 3, default options: still toggles (any click toggles) and never reports a plain single click");
+}
+
+// STEP258 acceptance item 2 — pure StepSectionHeader, the new split: with bDoubleClickToggle=true,
+// count 0 -> no toggle/no plain-single; count 1 -> no toggle, plain-single true; count 2 -> toggles,
+// plain-single false; count 3 -> neither (inert). A follow-up count 1 after the count-2 toggle
+// proves click 1 never re-toggles.
+static void TestDoubleClickToggleSplitsSingleFromDouble() {
+    Ui::SectionState state;   // open
+    const bool bStartOpen = state.bOpen;
+
+    const Ui::SectionChange idle = Ui::StepSectionHeader(state, 0, true);
+    Check(!idle.bOpenChanged && !idle.bPlainSingleClicked, "count 0: no toggle, no plain single click");
+    Check(state.bOpen == bStartOpen, "count 0: state untouched");
+
+    const Ui::SectionChange single = Ui::StepSectionHeader(state, 1, true);
+    Check(!single.bOpenChanged && single.bPlainSingleClicked,
+          "count 1: does not toggle bOpen, reports a plain single click instead");
+    Check(state.bOpen == bStartOpen, "count 1: state still untouched by a plain single click");
+
+    const Ui::SectionChange doubleClick = Ui::StepSectionHeader(state, 2, true);
+    Check(doubleClick.bOpenChanged && !doubleClick.bPlainSingleClicked,
+          "count 2 (the second click of a double-click): toggles, does not report a plain single click");
+    const bool bAfterToggle = state.bOpen;
+    Check(bAfterToggle != bStartOpen, "count 2: the state actually flipped");
+
+    const Ui::SectionChange triple = Ui::StepSectionHeader(state, 3, true);
+    Check(!triple.bOpenChanged && !triple.bPlainSingleClicked,
+          "count 3: inert by construction -- neither toggles nor reports a plain single click");
+    Check(state.bOpen == bAfterToggle, "count 3: state left exactly where the count-2 toggle set it");
+
+    const Ui::SectionChange singleAgain = Ui::StepSectionHeader(state, 1, true);
+    Check(!singleAgain.bOpenChanged && singleAgain.bPlainSingleClicked,
+          "a follow-up count 1 after the count-2 toggle reports a plain single click again");
+    Check(state.bOpen == bAfterToggle, "and never re-toggles the state the count-2 click already set");
+}
+
+// STEP258 acceptance item 3 — a real mouse double-click sequence through DrawSectionBegin itself,
+// mirroring MarkersTab_TypeSectionHideToggle_UI_Test.cpp's own multi-frame press/release harness.
+// NOTE: unlike a regular ImGui::Button/SmallButton (which fires on RELEASE), DrawSectionBegin's own
+// InvisibleButton click is read via ImGui::IsItemClicked() == IsMouseClicked() && IsItemHovered() —
+// i.e. the PRESS transition, not the release (imgui.cpp:6673) — this is pre-existing behavior,
+// unchanged by this ticket. Every click/toggle assertion below is therefore made on the PRESS frame.
+static void TestRealMouseDoubleClickSequenceThroughDrawSectionBegin() {
+    ImGui::CreateContext();
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 200.0f));
+    ImGui::Begin("SectionDoubleClickTestWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+
+    Ui::SectionState state;
+    Ui::SectionOptions options;
+    options.bDoubleClickToggle = true;
+    bool bPlainSingleClicked = false;
+
+    Check(Ui::DrawSectionBegin("LinkLike", state, options, Ui::WidgetStyle(), &bPlainSingleClicked),
+          "settling frame: header opens with no click yet");
+    const ImVec2 rectMin = ImGui::GetItemRectMin();
+    const ImVec2 rectMax = ImGui::GetItemRectMax();
+    Ui::DrawSectionEnd();
+    ImGui::End();
+    ImGui::Render();
+    const ImVec2 headerCenter((rectMin.x + rectMax.x) * 0.5f, (rectMin.y + rectMax.y) * 0.5f);
+
+    // Settle: move the mouse onto the header without pressing yet (real click-ownership routing
+    // keys off the item having been visited/hovered on a PRIOR frame).
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddMousePosEvent(headerCenter.x, headerCenter.y);
+    io.AddMouseButtonEvent(0, false);
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 200.0f));
+    ImGui::Begin("SectionDoubleClickTestWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    const bool bBodyVisibleBeforeClicks =
+        Ui::DrawSectionBegin("LinkLike", state, options, Ui::WidgetStyle(), &bPlainSingleClicked);
+    if (bBodyVisibleBeforeClicks) Ui::DrawSectionEnd();
+    ImGui::End();
+    ImGui::Render();
+
+    // First press (one click — IsItemClicked fires on THIS frame, the press transition).
+    io.AddMouseButtonEvent(0, true);
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 200.0f));
+    ImGui::Begin("SectionDoubleClickTestWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    const bool bBodyVisibleOnFirstPress =
+        Ui::DrawSectionBegin("LinkLike", state, options, Ui::WidgetStyle(), &bPlainSingleClicked);
+    if (bBodyVisibleOnFirstPress) Ui::DrawSectionEnd();
+    ImGui::End();
+    ImGui::Render();
+    Check(bPlainSingleClicked, "one click: outPlainSingleClicked reads true on the press frame");
+    Check(bBodyVisibleOnFirstPress == bBodyVisibleBeforeClicks,
+          "one click: the returned body-visible bool is UNCHANGED (bDoubleClickToggle=true, no toggle yet)");
+
+    // Release (settle, no new click), then a second press well under io.MouseDoubleClickTime at the
+    // same position — the toggle fires on THIS second press frame (GetMouseClickedCount reads 2).
+    io.AddMouseButtonEvent(0, false);
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 200.0f));
+    ImGui::Begin("SectionDoubleClickTestWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    const bool bBodyVisibleAfterRelease =
+        Ui::DrawSectionBegin("LinkLike", state, options, Ui::WidgetStyle(), &bPlainSingleClicked);
+    if (bBodyVisibleAfterRelease) Ui::DrawSectionEnd();
+    ImGui::End();
+    ImGui::Render();
+
+    io.AddMouseButtonEvent(0, true);
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 200.0f));
+    ImGui::Begin("SectionDoubleClickTestWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    const bool bBodyVisibleOnSecondPress =
+        Ui::DrawSectionBegin("LinkLike", state, options, Ui::WidgetStyle(), &bPlainSingleClicked);
+    if (bBodyVisibleOnSecondPress) Ui::DrawSectionEnd();
+    ImGui::End();
+    ImGui::Render();
+    Check(bBodyVisibleOnSecondPress != bBodyVisibleAfterRelease,
+          "second click (the double-click): the returned body-visible bool has flipped -- the toggle fired");
+    Check(!bPlainSingleClicked, "second click: outPlainSingleClicked reads false");
+    io.AddMouseButtonEvent(0, false);   // release, settling the button state before context teardown
+
+    ImGui::DestroyContext();
+
+    // A companion pass with default SectionOptions (no bDoubleClickToggle): the FIRST single click
+    // still toggles immediately -- live-frame-verifying item 1's pure-logic claim end to end.
+    ImGui::CreateContext();
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 200.0f));
+    ImGui::Begin("SectionDefaultClickTestWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    Ui::SectionState defaultState;
+    Check(Ui::DrawSectionBegin("Plain", defaultState), "settling frame: default header opens");
+    const ImVec2 defaultRectMin = ImGui::GetItemRectMin();
+    const ImVec2 defaultRectMax = ImGui::GetItemRectMax();
+    Ui::DrawSectionEnd();
+    ImGui::End();
+    ImGui::Render();
+    const ImVec2 defaultHeaderCenter((defaultRectMin.x + defaultRectMax.x) * 0.5f,
+                                     (defaultRectMin.y + defaultRectMax.y) * 0.5f);
+
+    ImGuiIO& defaultIo = ImGui::GetIO();
+    defaultIo.AddMousePosEvent(defaultHeaderCenter.x, defaultHeaderCenter.y);
+    defaultIo.AddMouseButtonEvent(0, false);
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 200.0f));
+    ImGui::Begin("SectionDefaultClickTestWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    const bool bDefaultBodyVisibleBeforeClick = Ui::DrawSectionBegin("Plain", defaultState);
+    if (bDefaultBodyVisibleBeforeClick) Ui::DrawSectionEnd();
+    ImGui::End();
+    ImGui::Render();
+
+    // The FIRST press is the click frame (IsItemClicked fires on press) -- the toggle fires HERE.
+    defaultIo.AddMouseButtonEvent(0, true);
+    BeginHeadlessFrame();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImVec2(400.0f, 200.0f));
+    ImGui::Begin("SectionDefaultClickTestWindow", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    const bool bDefaultBodyVisibleOnPress = Ui::DrawSectionBegin("Plain", defaultState);
+    if (bDefaultBodyVisibleOnPress) Ui::DrawSectionEnd();
+    ImGui::End();
+    ImGui::Render();
+    Check(bDefaultBodyVisibleOnPress != bDefaultBodyVisibleBeforeClick,
+          "default SectionOptions: the FIRST single click still toggles immediately, on the press frame");
+    defaultIo.AddMouseButtonEvent(0, false);   // release, settling the button state before teardown
+
+    ImGui::DestroyContext();
+}
+
 int main() {
     TestDefaultOpenSeedsTheState();
     TestClickTogglesAndSilenceHolds();
     TestEachSectionCarriesItsOwnState();
     TestReservedRightWidthShrinksTheHeaderBar();
+    TestDoubleClickToggleDefaultedFalseMatchesOldBehavior();
+    TestDoubleClickToggleSplitsSingleFromDouble();
+    TestRealMouseDoubleClickSequenceThroughDrawSectionBegin();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;

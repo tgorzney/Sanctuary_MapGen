@@ -45,6 +45,20 @@ void ApplyAddLinkAction(Params::MapRecipe& recipe, const std::vector<int>& selec
     TagManualInstancesWithLink(recipe.markers, selectedManualInstanceIdentifiers, link.identifier);
 }
 
+void SelectAllLinkedManualInstances(const std::vector<Params::MarkerInstanceGroup>& markers,
+                                    int linkIdentifier, int& selectedManualInstanceIdentifier,
+                                    std::vector<int>& selectedManualInstanceIdentifiers,
+                                    int& manualInstanceSelectionAnchorIdentifier) {
+    selectedManualInstanceIdentifiers.clear();
+    for (const Params::MarkerInstanceGroup& group : markers)
+        for (const Params::MarkerTransform& transform : group.transforms)
+            if (transform.linkIdentifier == linkIdentifier)
+                selectedManualInstanceIdentifiers.push_back(transform.instanceIdentifier);
+    selectedManualInstanceIdentifier = selectedManualInstanceIdentifiers.empty()
+        ? -1 : selectedManualInstanceIdentifiers.front();
+    manualInstanceSelectionAnchorIdentifier = selectedManualInstanceIdentifier;
+}
+
 void DrawMarkerLinksSection(Params::MapRecipe& recipe, MarkerLinksState_UI& state,
                             int& selectedManualInstanceIdentifier,
                             std::vector<int>& selectedManualInstanceIdentifiers,
@@ -60,17 +74,39 @@ void DrawMarkerLinksSection(Params::MapRecipe& recipe, MarkerLinksState_UI& stat
     bool bAnyLinkCommitted = false;
     for (Params::MarkerLink& link : recipe.markerLinks) {
         ImGui::PushID(link.identifier);
-        if (DrawSectionBegin(link.name.c_str(), state.sectionStateByLinkIdentifier[link.identifier],
-                             LinkSectionHeaderOptions(), LinkSectionHeaderStyle())) {
-            bool bAnyCommitted = false;
-            DrawMarkerLinkHeaderExtra(link, state, bAnyCommitted);
+        bool bAnyCommitted = false;
+        bool bPlainSingleClicked = false;
+        const bool bBodyVisible = DrawSectionBegin(link.name.c_str(),
+            state.sectionStateByLinkIdentifier[link.identifier], LinkSectionHeaderOptions(),
+            LinkSectionHeaderStyle(), &bPlainSingleClicked);
+
+        // STEP258 — a plain single click SELECTS instead of toggling (LinkSectionHeaderOptions' own
+        // bDoubleClickToggle). Run before the header extra: on the SAME frame this is true, the
+        // extra's own double-click-to-rename check is guaranteed false (StepSectionHeader only sets
+        // bPlainSingleClicked on count==1, rename needs count==2), so there is no ordering race.
+        if (bPlainSingleClicked) {
+            SelectAllLinkedManualInstances(recipe.markers, link.identifier, selectedManualInstanceIdentifier,
+                                           selectedManualInstanceIdentifiers, manualInstanceSelectionAnchorIdentifier);
+            if (selectManualMarkerInstanceCallback)
+                selectManualMarkerInstanceCallback(selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers);
+        }
+
+        // STEP258 — moved OUTSIDE the body-visible gate: see this ticket's own "Design decision 4"
+        // for why gating this on bBodyVisible silently broke double-click-to-rename once the header's
+        // own toggle only fires on a double-click's SECOND click. The matching indent bracket keeps
+        // the cluster's own right-alignment math identical whether collapsed or expanded.
+        if (!bBodyVisible) ImGui::Indent();
+        DrawMarkerLinkHeaderExtra(link, state, bAnyCommitted);
+        if (!bBodyVisible) ImGui::Unindent();
+
+        if (bBodyVisible) {
             if (state.renamingLinkIdentifier != link.identifier)
                 DrawMarkerLinkBody(link, recipe, selectedManualInstanceIdentifier,
                                    selectedManualInstanceIdentifiers, manualInstanceSelectionAnchorIdentifier,
                                    selectManualMarkerInstanceCallback);
-            bAnyLinkCommitted = bAnyLinkCommitted || bAnyCommitted;
             DrawSectionEnd();
         }
+        bAnyLinkCommitted = bAnyLinkCommitted || bAnyCommitted;
         ImGui::PopID();
     }
     if (state.pendingDeleteLinkIdentifier >= 0) {

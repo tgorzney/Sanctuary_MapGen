@@ -40,7 +40,7 @@ void DrawDisclosureArrow(ImDrawList* drawList, const ImVec2& origin, float barHe
 } // namespace
 
 bool DrawSectionBegin(const char* label, SectionState& state, const SectionOptions& options,
-                      const WidgetStyle& style) {
+                      const WidgetStyle& style, bool* outPlainSingleClicked) {
     if (options.topSpacing > 0.0f) ImGui::Dummy(ImVec2(0.0f, options.topSpacing));
     ImGui::PushID(label);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -49,6 +49,11 @@ bool DrawSectionBegin(const char* label, SectionState& state, const SectionOptio
     const float barHeight = ResolveWidgetTrackHeight(style);
     ImGui::InvisibleButton("##header", ImVec2(barWidth, barHeight));
     const bool bHeaderClicked = ImGui::IsItemClicked();
+    // STEP258 — GetMouseClickedCount is only read when bHeaderClicked is true this SAME frame: it is
+    // computed fresh on every real mouse-press transition (imgui.cpp's UpdateMouseInputs sets
+    // io.MouseClickedCount[i] in the same block as io.MouseClicked[i]), so this can never read a
+    // stale count left over from an earlier, unrelated click streak.
+    const int headerClickCount = bHeaderClicked ? ImGui::GetMouseClickedCount(ImGuiMouseButton_Left) : 0;
     const bool bHeaderHovered = ImGui::IsItemHovered();
 
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
@@ -57,7 +62,8 @@ bool DrawSectionBegin(const char* label, SectionState& state, const SectionOptio
                                                bHeaderHovered ? ImGuiCol_HeaderHovered : ImGuiCol_Header),
                             ResolveHeaderRounding(options, style));
 
-    const SectionChange change = StepSectionHeader(state, bHeaderClicked);
+    const SectionChange change = StepSectionHeader(state, headerClickCount, options.bDoubleClickToggle);
+    if (outPlainSingleClicked) *outPlainSingleClicked = change.bPlainSingleClicked;
     if (options.bArrowShown) DrawDisclosureArrow(drawList, origin, barHeight, state.bOpen);
     const float labelLeftX = origin.x + (options.bArrowShown ? barHeight : ImGui::GetStyle().FramePadding.x);
     drawList->AddText(ImVec2(labelLeftX, origin.y + (barHeight - ImGui::GetTextLineHeight()) * 0.5f),
