@@ -600,6 +600,184 @@ void TestProceduralLeafSelectSignalClearsManualSelection() {
          "the anchor and primary selection both clear to -1 alongside it");
 }
 
+// STEP259 (Bug 1/3) — a Node (Group) Select signal now RECURSIVELY selects every Manual instance
+// organizationally under it, including nested sub-Groups, via
+// Params::CollectMarkerLayerBundleRecursiveManualMembers — the same resolver Move/Rotate already
+// use. Parent Group (id 1) has a direct Procedural layer AND a direct Manual layer; a nested
+// sub-Group (id 2, parentBundleIdentifier == 1) has its own Manual layer; three marker transforms:
+// one on the parent's Manual layer, one on the sub-Group's Manual layer, one ungrouped (layerIndex
+// -1). Selecting the parent Group must select exactly the two Manual instances (direct + nested).
+void TestNodeSelectSignalSelectsRecursiveManualMembersAndFiresCallback() {
+    std::vector<Params::MarkerLayerBundle> bundles(2);
+    bundles[0].identifier = 1; bundles[0].parentBundleIdentifier = -1;
+    bundles[1].identifier = 2; bundles[1].parentBundleIdentifier = 1;   // nested sub-Group
+    std::vector<Params::MarkerRuleLayer> ruleLayers(1);
+    ruleLayers[0].parentBundleIdentifier = 1;   // direct Procedural under the parent Group
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(2);
+    instanceLayers[0].parentBundleIdentifier = 1;   // direct Manual under the parent Group
+    instanceLayers[1].parentBundleIdentifier = 2;   // Manual under the nested sub-Group
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.resize(3);
+    markers[0].transforms[0].instanceIdentifier = 100; markers[0].transforms[0].layerIndex = 0;   // parent's Manual
+    markers[0].transforms[1].instanceIdentifier = 200; markers[0].transforms[1].layerIndex = 1;   // sub-Group's Manual
+    markers[0].transforms[2].instanceIdentifier = 300; markers[0].transforms[2].layerIndex = -1;  // ungrouped
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    MarkerLayerBundlesState state;
+    int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int anchorIdentifier = -1;
+    int callbackClickedIdentifier = -999;
+    std::vector<int> callbackSelectedIdentifiers;
+    int callbackFireCount = 0;
+    const auto callback = [&](int clickedInstanceIdentifier, const std::vector<int>& selectedInstanceIdentifiers) {
+        ++callbackFireCount;
+        callbackClickedIdentifier = clickedInstanceIdentifier;
+        callbackSelectedIdentifiers = selectedInstanceIdentifiers;
+    };
+
+    TreeListSignal<MarkerGroupLeafKey_UI> signal;
+    signal.kind                = TreeListSignalKind::Select;
+    signal.sourceKind          = TreeNodeSourceKind::Node;
+    signal.sourceNodeIdentifier = 1;
+
+    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, markers, instanceIndex, state,
+                                     selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers,
+                                     anchorIdentifier, callback);
+
+    Check(selectedManualInstanceIdentifiers.size() == 2u,
+         "selecting the parent Group selects exactly the two Manual instances (direct + nested)");
+    bool bHas100 = false, bHas200 = false, bHas300 = false;
+    for (int identifier : selectedManualInstanceIdentifiers) {
+        if (identifier == 100) bHas100 = true;
+        if (identifier == 200) bHas200 = true;
+        if (identifier == 300) bHas300 = true;
+    }
+    Check(bHas100 && bHas200 && !bHas300,
+         "the direct member (100) and the nested sub-Group's member (200) are both selected, never the "
+         "ungrouped one (300)");
+    Check(anchorIdentifier == 100 && selectedManualInstanceIdentifier == 100,
+         "the anchor and primary selection land on the resolved set's front");
+    Check(callbackFireCount == 1, "the canvas-sync callback fires exactly once");
+    Check(callbackClickedIdentifier == anchorIdentifier, "the callback's clicked identifier is the anchor");
+    Check(callbackSelectedIdentifiers == selectedManualInstanceIdentifiers,
+         "the callback's selected set is the identical resolved set");
+}
+
+// STEP259 — a Group containing only a Procedural layer resolves to an EMPTY Manual selection; the
+// callback still fires (with clickedInstanceIdentifier == -1, empty set) — proving a stale prior
+// canvas selection is actually cleared, not left stuck.
+void TestNodeSelectSignalWithNoManualMembersFiresCallbackWithEmptySet() {
+    std::vector<Params::MarkerLayerBundle> bundles(1);
+    bundles[0].identifier = 7; bundles[0].parentBundleIdentifier = -1;
+    std::vector<Params::MarkerRuleLayer> ruleLayers(1);
+    ruleLayers[0].parentBundleIdentifier = 7;   // procedural-only membership
+    std::vector<Params::MarkerInstanceLayer> instanceLayers;   // no Manual layer references bundle 7
+    std::vector<Params::MarkerInstanceGroup> markers;
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    MarkerLayerBundlesState state;
+    int selectedManualInstanceIdentifier = 5;
+    std::vector<int> selectedManualInstanceIdentifiers{ 5, 6 };   // a stale prior selection
+    int anchorIdentifier = 5;
+    int callbackFireCount = 0;
+    int callbackClickedIdentifier = -999;
+    std::vector<int> callbackSelectedIdentifiers{ 42 };
+    const auto callback = [&](int clickedInstanceIdentifier, const std::vector<int>& selectedInstanceIdentifiers) {
+        ++callbackFireCount;
+        callbackClickedIdentifier = clickedInstanceIdentifier;
+        callbackSelectedIdentifiers = selectedInstanceIdentifiers;
+    };
+
+    TreeListSignal<MarkerGroupLeafKey_UI> signal;
+    signal.kind                 = TreeListSignalKind::Select;
+    signal.sourceKind           = TreeNodeSourceKind::Node;
+    signal.sourceNodeIdentifier = 7;
+
+    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, markers, instanceIndex, state,
+                                     selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers,
+                                     anchorIdentifier, callback);
+
+    Check(selectedManualInstanceIdentifiers.empty(), "a Procedural-only Group resolves to an empty selection");
+    Check(anchorIdentifier == -1 && selectedManualInstanceIdentifier == -1, "anchor and primary both clear to -1");
+    Check(callbackFireCount == 1, "the callback still fires — a real change (clearing a stale selection)");
+    Check(callbackClickedIdentifier == -1, "the callback's clicked identifier is -1");
+    Check(callbackSelectedIdentifiers.empty(), "the callback's selected set is empty");
+}
+
+// STEP259 (Bug 2) — the Leaf/Manual branch now ALSO fires the canvas-sync callback with the same
+// anchor/full set the tabState fields settled on (membership-selection half already covered by
+// TestManualLeafSelectSignalSelectsMemberInstancesAndHighlight).
+void TestManualLeafSelectSignalFiresCallback() {
+    std::vector<Params::MarkerLayerBundle> bundles;
+    std::vector<Params::MarkerRuleLayer> ruleLayers;
+    std::vector<Params::MarkerInstanceLayer> instanceLayers(1);
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.resize(2);
+    markers[0].transforms[0].instanceIdentifier = 10; markers[0].transforms[0].layerIndex = 0;
+    markers[0].transforms[1].instanceIdentifier = 11; markers[0].transforms[1].layerIndex = 0;
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    MarkerLayerBundlesState state;
+    int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int anchorIdentifier = -1;
+    int callbackFireCount = 0;
+    int callbackClickedIdentifier = -999;
+    std::vector<int> callbackSelectedIdentifiers;
+    const auto callback = [&](int clickedInstanceIdentifier, const std::vector<int>& selectedInstanceIdentifiers) {
+        ++callbackFireCount;
+        callbackClickedIdentifier = clickedInstanceIdentifier;
+        callbackSelectedIdentifiers = selectedInstanceIdentifiers;
+    };
+
+    TreeListSignal<MarkerGroupLeafKey_UI> signal;
+    signal.kind        = TreeListSignalKind::Select;
+    signal.sourceKind  = TreeNodeSourceKind::Leaf;
+    signal.sourceLeaf  = MarkerGroupLeafKey_UI{ MarkerGroupLeafKey_UI::Kind::Manual, 0 };
+
+    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, markers, instanceIndex, state,
+                                     selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers,
+                                     anchorIdentifier, callback);
+
+    Check(callbackFireCount == 1, "selecting a Manual Layer leaf fires the canvas-sync callback exactly once");
+    Check(callbackClickedIdentifier == anchorIdentifier, "the callback's clicked identifier is the anchor (10)");
+    Check(callbackSelectedIdentifiers == selectedManualInstanceIdentifiers,
+         "the callback's selected set is the identical resolved set");
+}
+
+// STEP259 (Bug 2) — the Leaf/Procedural branch fires the callback too, even though it clears to an
+// empty selection.
+void TestProceduralLeafSelectSignalFiresCallbackWithEmptySet() {
+    std::vector<Params::MarkerLayerBundle> bundles;
+    std::vector<Params::MarkerRuleLayer> ruleLayers(1);
+    std::vector<Params::MarkerInstanceLayer> instanceLayers;
+    std::vector<Params::MarkerInstanceGroup> markers;
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    MarkerLayerBundlesState state;
+    int selectedManualInstanceIdentifier = 5;
+    std::vector<int> selectedManualInstanceIdentifiers{ 5, 6 };
+    int anchorIdentifier = 5;
+    int callbackFireCount = 0;
+    int callbackClickedIdentifier = -999;
+    std::vector<int> callbackSelectedIdentifiers{ 42 };
+    const auto callback = [&](int clickedInstanceIdentifier, const std::vector<int>& selectedInstanceIdentifiers) {
+        ++callbackFireCount;
+        callbackClickedIdentifier = clickedInstanceIdentifier;
+        callbackSelectedIdentifiers = selectedInstanceIdentifiers;
+    };
+
+    TreeListSignal<MarkerGroupLeafKey_UI> signal;
+    signal.kind        = TreeListSignalKind::Select;
+    signal.sourceKind  = TreeNodeSourceKind::Leaf;
+    signal.sourceLeaf  = MarkerGroupLeafKey_UI{ MarkerGroupLeafKey_UI::Kind::Procedural, 0 };
+
+    ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, markers, instanceIndex, state,
+                                     selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers,
+                                     anchorIdentifier, callback);
+
+    Check(callbackFireCount == 1, "selecting a Procedural Layer leaf fires the canvas-sync callback too");
+    Check(callbackClickedIdentifier == -1, "the callback's clicked identifier is -1 (cleared selection)");
+    Check(callbackSelectedIdentifiers.empty(), "the callback's selected set is empty");
+}
+
 // STEP140 — a Procedural Layer's own single delete action: a plain positional erase.
 void TestDeleteMarkerRuleLayerErases() {
     std::vector<Params::MarkerRuleLayer> ruleLayers(3);
@@ -626,6 +804,10 @@ int main() {
     TestCrossTypeSectionNestedBundleCutoff();
     TestManualLeafSelectSignalSelectsMemberInstancesAndHighlight();
     TestProceduralLeafSelectSignalClearsManualSelection();
+    TestNodeSelectSignalSelectsRecursiveManualMembersAndFiresCallback();
+    TestNodeSelectSignalWithNoManualMembersFiresCallbackWithEmptySet();
+    TestManualLeafSelectSignalFiresCallback();
+    TestProceduralLeafSelectSignalFiresCallbackWithEmptySet();
     TestManualLeafHeaderExtraDrawsAndFlipsSymmetry();
     TestRuleLayerSymmetryToggleHeaderControlFlipsGlobalFlag();
     TestManualLeafDeleteButtonRecordsPendingIndex();

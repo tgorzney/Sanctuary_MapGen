@@ -14,7 +14,6 @@
 
 namespace SanmapGen {
 namespace Ui {
-namespace {
 
 // A removed layer clamps every referencing `layerIndex` to 0 (ClampMarkerLayerIndicesForRemovedLayer);
 // a reordered layer renumbers them (RenumberMarkerLayerIndicesForReorder, called BEFORE the layers
@@ -23,7 +22,10 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
                          std::vector<Params::MarkerInstanceGroup>& markers,
                          const ManualInstanceLayerIndex_UI& instanceIndex, ManualMarkerLayersState& state,
                          int& selectedManualInstanceIdentifier, std::vector<int>& selectedManualInstanceIdentifiers,
-                         int& anchorIdentifier, const DraggableListSignal& signal) {
+                         int& anchorIdentifier, const DraggableListSignal& signal,
+                         const std::function<void(int clickedInstanceIdentifier,
+                                                  const std::vector<int>& selectedInstanceIdentifiers)>&
+                             selectManualMarkerInstanceCallback) {
     if (signal.kind == DraggableListSignalKind::Select) {
         state.selectedLayerIndex = signal.sourceRowIndex;
         // Human's own bug report — mirrors the Bundle tree's own Leaf-select branch
@@ -39,6 +41,10 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
         anchorIdentifier = selectedManualInstanceIdentifiers.empty()
                           ? -1 : selectedManualInstanceIdentifiers.front();
         selectedManualInstanceIdentifier = anchorIdentifier;
+        // Bug 2 fix (STEP259) — same reasoning as the Bundle tree's own Leaf branch: writing the three
+        // tabState fields above alone leaves the canvas's own independent selection copy stale.
+        if (selectManualMarkerInstanceCallback)
+            selectManualMarkerInstanceCallback(anchorIdentifier, selectedManualInstanceIdentifiers);
         return false;
     }
     // STEP242, ARCH §19.31 follow-up amendment: bLocked is now read-and-resolve while Link-bound,
@@ -80,8 +86,6 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
         state.selectedLayerIndex = static_cast<int>(markerLayers.size()) - 1;
     return bMarkersMoved;
 }
-
-} // namespace
 
 // STEP142/144 — [SYM][COL][swatch], right-aligned as a cluster so it sits flush against
 // DraggableList's own built-in [o]/[L]/[X] strip with no dead gap — this ungrouped row draws no
@@ -256,7 +260,9 @@ void DrawManualMarkerLayerListBody(ManualMarkerLayersState& state,
         selectManualMarkerInstanceCallback, links);
     if (signal.bHasSignal())
         ApplyLayerListSignal(markerLayers, markers, instanceIndex, state, selectedManualInstanceIdentifier,
-                             selectedManualInstanceIdentifiers, anchorIdentifier, signal);
+                             selectedManualInstanceIdentifiers, anchorIdentifier, signal,
+                             selectManualMarkerInstanceCallback);   // NEW — STEP259, already this
+                                                                    // function's own parameter
     bLayersMoved = bAnyNameCommitted || bLayersMoved;
     // The export keys layers by NAME parity with Armies/Areas/Props (cosmetic here — `MarkerGroups`
     // exports as a plain array, STEP60 §3) — the repair runs on the frames a name settled.

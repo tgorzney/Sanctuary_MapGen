@@ -128,6 +128,26 @@ void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& l
                                                   ManualMarkerLayersState& state, bool& bAnyCommitted,
                                                   const std::vector<Params::MarkerLink>& links = {});
 
+// The Select/ToggleLock/ToggleVisibility/Delete/Reorder signal-application logic DrawManualMarkerLayerListBody
+// already ran inline, anonymous-namespace-local (STEP81) — promoted out and named here (STEP259),
+// mirroring STEP125's identical treatment of the Bundle tree's own sibling
+// ApplyMarkerLayerBundleTreeSignal (MarkersTab_Bundles_UI.h), so a test fixture can drive it directly
+// without an imgui frame.
+// Human's own bug report — a Select signal now ALSO replaces the caller's whole manual selection with
+// every Instance belonging to the clicked Layer (mirrors the Bundle tree's own Leaf-select branch,
+// MarkersTab_BundleTreeSignals_UI.cpp) AND fires `selectManualMarkerInstanceCallback` (when set) so the
+// canvas's own independent selection copy stays in sync (MapCanvas::SyncManualMarkerSelection) — the
+// second half of that same bug report. Reports whether `markers` moved, which feeds no pipeline stage
+// (SCOPE NOTE 3).
+bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                          std::vector<Params::MarkerInstanceGroup>& markers,
+                          const ManualInstanceLayerIndex_UI& instanceIndex, ManualMarkerLayersState& state,
+                          int& selectedManualInstanceIdentifier, std::vector<int>& selectedManualInstanceIdentifiers,
+                          int& anchorIdentifier, const DraggableListSignal& signal,
+                          const std::function<void(int clickedInstanceIdentifier,
+                                                   const std::vector<int>& selectedInstanceIdentifiers)>&
+                              selectManualMarkerInstanceCallback = {});
+
 // The layer stack. MUTATES NOTHING while drawing: the signal is applied after the list closes.
 // STEP110: each row's body, whenever the row's own CollapsingHeader is open (never gated on
 // `state.selectedLayerIndex`), draws that row's OWN settings below its header. `bAnyNameCommitted`

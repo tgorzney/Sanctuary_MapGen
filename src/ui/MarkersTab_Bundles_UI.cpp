@@ -177,7 +177,9 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
     ApplyMarkerLayerBundleTreeSignal(signal, bundles, ruleLayers, instanceLayers, markers, instanceIndex, state,
                                      rootState.selectedManualInstanceIdentifier,
                                      rootState.selectedManualInstanceIdentifiers,
-                                     rootState.manualInstanceSelectionAnchorIdentifier);
+                                     rootState.manualInstanceSelectionAnchorIdentifier,
+                                     selectManualMarkerInstanceCallback);   // NEW — STEP259, already this
+                                                                            // function's own parameter
 }
 
 } // namespace Ui

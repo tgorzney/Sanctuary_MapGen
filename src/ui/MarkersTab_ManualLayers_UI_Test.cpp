@@ -361,6 +361,84 @@ void RunUngroupedClusterDoesNotOverlapAffordanceStripCheck(bool bPushExaggerated
          "[o]/[L]/[X] strip's leftmost edge -- never past it (STEP145/STEP206)");
 }
 
+// STEP259 (Bug 2) — ApplyLayerListSignal had zero direct test coverage before this ticket (promoted
+// out of the anonymous namespace the same way STEP125 already promoted the Bundle tree's own sibling
+// ApplyMarkerLayerBundleTreeSignal). Two Manual layers, three marker transforms (two on layer 0, one
+// on layer 1); selecting layer 0 replaces the selection with exactly its two members, anchor/primary
+// land on the first, and the callback fires with the matching clicked/selected values — mirrors
+// MarkersTab_Bundles_UI_Test.cpp's own TestManualLeafSelectSignalSelectsMemberInstancesAndHighlight
+// shape.
+void RunApplyLayerListSignalSelectPopulatesMembersAndFiresCallbackChecks() {
+    std::vector<Params::MarkerInstanceLayer> markerLayers(2);
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    markers[0].transforms.resize(3);
+    markers[0].transforms[0].instanceIdentifier = 10; markers[0].transforms[0].layerIndex = 0;
+    markers[0].transforms[1].instanceIdentifier = 11; markers[0].transforms[1].layerIndex = 0;
+    markers[0].transforms[2].instanceIdentifier = 12; markers[0].transforms[2].layerIndex = 1;   // a DIFFERENT layer
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    ManualMarkerLayersState state;
+    int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers{ 999 };   // pre-populated: must be REPLACED, not appended to
+    int anchorIdentifier = -1;
+    int callbackFireCount = 0;
+    int callbackClickedIdentifier = -999;
+    std::vector<int> callbackSelectedIdentifiers;
+    const auto callback = [&](int clickedInstanceIdentifier, const std::vector<int>& selectedInstanceIdentifiers) {
+        ++callbackFireCount;
+        callbackClickedIdentifier = clickedInstanceIdentifier;
+        callbackSelectedIdentifiers = selectedInstanceIdentifiers;
+    };
+
+    DraggableListSignal signal;
+    signal.kind           = DraggableListSignalKind::Select;
+    signal.sourceRowIndex = 0;
+
+    const bool bMarkersMoved = ApplyLayerListSignal(markerLayers, markers, instanceIndex, state,
+        selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers, anchorIdentifier, signal, callback);
+
+    Check(!bMarkersMoved, "a Select signal reports no structural move");
+    Check(state.selectedLayerIndex == 0, "the selected layer index is recorded");
+    Check(selectedManualInstanceIdentifiers.size() == 2u,
+         "selecting layer 0 replaces the selection with exactly its two member instances");
+    bool bHas10 = false, bHas11 = false, bHas12 = false;
+    for (int identifier : selectedManualInstanceIdentifiers) {
+        if (identifier == 10) bHas10 = true;
+        if (identifier == 11) bHas11 = true;
+        if (identifier == 12) bHas12 = true;
+    }
+    Check(bHas10 && bHas11 && !bHas12,
+         "the selection holds instances 10/11 (layer 0) and never 12 (layer 1)");
+    Check(anchorIdentifier == 10 && selectedManualInstanceIdentifier == 10,
+         "the anchor and primary selection both land on the first member instance");
+    Check(callbackFireCount == 1, "the canvas-sync callback fires exactly once");
+    Check(callbackClickedIdentifier == anchorIdentifier, "the callback's clicked identifier is the anchor");
+    Check(callbackSelectedIdentifiers == selectedManualInstanceIdentifiers,
+         "the callback's selected set is the identical resolved set");
+}
+
+// STEP259 — calling ApplyLayerListSignal with no callback argument at all (relying on the header's
+// `= {}` default) completes normally: the guard (`if (selectManualMarkerInstanceCallback)`) is
+// exercised and does not crash.
+void RunApplyLayerListSignalSelectWithNoCallbackDoesNotCrashCheck() {
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+    std::vector<Params::MarkerInstanceGroup> markers;
+    const ManualInstanceLayerIndex_UI instanceIndex = BuildManualInstanceLayerIndex(markers);
+    ManualMarkerLayersState state;
+    int selectedManualInstanceIdentifier = -1;
+    std::vector<int> selectedManualInstanceIdentifiers;
+    int anchorIdentifier = -1;
+
+    DraggableListSignal signal;
+    signal.kind           = DraggableListSignalKind::Select;
+    signal.sourceRowIndex = 0;
+
+    const bool bMarkersMoved = ApplyLayerListSignal(markerLayers, markers, instanceIndex, state,
+        selectedManualInstanceIdentifier, selectedManualInstanceIdentifiers, anchorIdentifier, signal);
+
+    Check(!bMarkersMoved, "a Select signal with no callback still reports no structural move");
+    Check(state.selectedLayerIndex == 0, "and still records the selected layer index");
+}
+
 } // namespace
 
 int main() {
@@ -374,6 +452,8 @@ int main() {
     RunRealtimeDefaultChecks();
     RunUngroupedClusterDoesNotOverlapAffordanceStripCheck();
     RunUngroupedClusterDoesNotOverlapAffordanceStripCheck(/*bPushExaggeratedItemSpacing=*/true);
+    RunApplyLayerListSignalSelectPopulatesMembersAndFiresCallbackChecks();
+    RunApplyLayerListSignalSelectWithNoCallbackDoesNotCrashCheck();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

@@ -293,7 +293,13 @@ void ApplyMarkerLayerBundleTreeSignal(const TreeListSignal<MarkerGroupLeafKey_UI
                                       const std::vector<Params::MarkerInstanceGroup>& markers,
                                       const ManualInstanceLayerIndex_UI& instanceIndex,
                                       MarkerLayerBundlesState& state, int& selectedManualInstanceIdentifier,
-                                      std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier);
+                                      std::vector<int>& selectedManualInstanceIdentifiers, int& anchorIdentifier,
+                                      const std::function<void(int clickedInstanceIdentifier,
+                                                               const std::vector<int>& selectedInstanceIdentifiers)>&
+                                          selectManualMarkerInstanceCallback = {});   // NEW — STEP259, trailing
+                                                                                      // default keeps every
+                                                                                      // pre-existing call site
+                                                                                      // compiling unchanged
 
 // The Bundle tree mechanics — no Section wrap of its own (STEP125: the Type-section's own outer
 // DrawSectionBegin, MarkersTab_TypeSections_UI.cpp, supplies that collapsible now). `rootState` is
