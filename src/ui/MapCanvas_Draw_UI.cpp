@@ -64,14 +64,14 @@ void MapCanvas::Draw(const char* canvasIdentifier, float regionSidePixels) {
 void MapCanvas::DrawOverlayIconLayerPass(float regionOriginX, float regionOriginY, float regionSidePixels) {
     if (composite == nullptr) return;
     DrawOverlayIconLayersInput iconLayerInput;
-    iconLayerInput.overlayLayerSettings = overlayLayerSettings;
-    iconLayerInput.renderingSettings    = overlayRenderingSettings;
-    iconLayerInput.placements           = overlayPlacements;
-    iconLayerInput.ruleBucketIndex      = overlayRuleBucketIndex;
-    iconLayerInput.recipe               = overlayRecipe;
-    iconLayerInput.pairingLookup        = overlayPairingLookup;
-    iconLayerInput.atlasManifest        = overlayAtlasManifest;
-    iconLayerInput.footprintSizeTable   = worldFootprintSizeTable;
+    iconLayerInput.overlayLayerSettings = overlaySources.layerSettings;
+    iconLayerInput.renderingSettings    = overlaySources.renderingSettings;
+    iconLayerInput.placements           = overlaySources.placements;
+    iconLayerInput.ruleBucketIndex      = overlaySources.ruleBucketIndex;
+    iconLayerInput.recipe               = overlaySources.recipe;
+    iconLayerInput.pairingLookup        = overlaySources.pairingLookup;
+    iconLayerInput.atlasManifest        = overlaySources.atlasManifest;
+    iconLayerInput.footprintSizeTable   = overlaySources.footprintSizeTable;
     iconLayerInput.composite            = composite;
     iconLayerInput.view                 = &view;
     iconLayerInput.regionOriginX        = regionOriginX;
@@ -90,7 +90,7 @@ void MapCanvas::DrawOverlayIconLayerPass(float regionOriginX, float regionOrigin
     // `if (HasSelection()) ... PrimaryOfSelectionSet(...)` guard, which narrowed the whole set down to
     // one key before it ever reached the cull/emit code — the actual bug this ticket fixes.
     iconLayerInput.selectedInstanceKeys = &selectedInstanceKeys;
-    DrawOverlayIconLayers(iconLayerInput, overlayLayerAabbCache, overlayIconLayerFrameCache,
+    DrawOverlayIconLayers(iconLayerInput, overlaySources.layerAabbCache, overlaySources.iconLayerFrameCache,
                          *ImGui::GetWindowDrawList());
 }
 

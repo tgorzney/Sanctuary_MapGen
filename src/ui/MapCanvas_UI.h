@@ -33,6 +33,7 @@
 #include "MapCanvasView_UI.h"
 #include "MapCanvas_IconLayer_Ops_UI.h"
 #include "MapCanvas_ManualDragSources_UI.h"
+#include "MapCanvas_OverlaySources_UI.h"
 #include "MapCanvas_SelectionSet_UI.h"
 #include "MarkerDragGesture_UI.h"
 #include "OverlayLayer_Settings_UI.h"
@@ -115,21 +116,25 @@ public:
     // STEP53 — the screen-space overlay icon draw pass's read-only sources, every one a push-in
     // pointer (STEP48's ARCH-ruled pattern, ARCH_14_09_RenderingPerformance.md §14.9; never an
     // Application reach-back — see this work-order's §0 correction).
-    void SetOverlayLayerSettings(const OverlayLayerSettings* settings) { overlayLayerSettings = settings; }
-    void SetOverlayRenderingSettings(const OverlayRenderingSettings* settings) { overlayRenderingSettings = settings; }
+    void SetOverlayLayerSettings(const OverlayLayerSettings* settings) { overlaySources.layerSettings = settings; }
+    void SetOverlayRenderingSettings(const OverlayRenderingSettings* settings) {
+        overlaySources.renderingSettings = settings;
+    }
     void SetOverlayPlacementSource(const Data::PlacementResults* placements,
                                    const Data::RuleBucketIndexSet* ruleBucketIndex) {
-        overlayPlacements = placements;
-        overlayRuleBucketIndex = ruleBucketIndex;
+        overlaySources.placements = placements;
+        overlaySources.ruleBucketIndex = ruleBucketIndex;
     }
-    void SetOverlayRecipe(const Params::MapRecipe* recipe) { overlayRecipe = recipe; }
+    void SetOverlayRecipe(const Params::MapRecipe* recipe) { overlaySources.recipe = recipe; }
     void SetIconAtlasSource(const IconAtlasPairingLookup* pairingLookup, const IconAtlasManifest* atlasManifest) {
-        overlayPairingLookup = pairingLookup;
-        overlayAtlasManifest = atlasManifest;
+        overlaySources.pairingLookup = pairingLookup;
+        overlaySources.atlasManifest = atlasManifest;
     }
     // Mirrors SetPreviewComposite/SetMarkerPickingSource exactly (§0 above) — STEP58's placeholder
     // table, sourced from Application::WorldFootprintSizeTable(), never reached directly.
-    void SetWorldFootprintSizeTable(const Io::WorldFootprintSizeTable* table) { worldFootprintSizeTable = table; }
+    void SetWorldFootprintSizeTable(const Io::WorldFootprintSizeTable* table) {
+        overlaySources.footprintSizeTable = table;
+    }
 
     // STEP113 — the active-panel gate: a manual-marker drag may only BEGIN while the Markers panel
     // is the shell's active tab (same class of injected, caller-owned, read-every-frame pointer;
@@ -441,17 +446,8 @@ private:
     // is exactly "nothing selected" (PrimaryOfSelectionSet answers the same default invalid key).
     OverlayInstanceKeySet_UI selectedInstanceKeys;
 
-    // STEP53 — overlay icon draw pass sources (read-only, injected) and its own per-canvas state.
-    const OverlayLayerSettings*         overlayLayerSettings    = nullptr;
-    const OverlayRenderingSettings*     overlayRenderingSettings = nullptr;
-    const Data::PlacementResults*       overlayPlacements        = nullptr;
-    const Data::RuleBucketIndexSet*     overlayRuleBucketIndex   = nullptr;
-    const Params::MapRecipe*            overlayRecipe            = nullptr;
-    const IconAtlasPairingLookup*       overlayPairingLookup     = nullptr;
-    const IconAtlasManifest*            overlayAtlasManifest     = nullptr;
-    const Io::WorldFootprintSizeTable*  worldFootprintSizeTable  = nullptr;
-    IconLayerAabbCache_UI overlayLayerAabbCache;
-    IconLayerFrameCache   overlayIconLayerFrameCache;
+    // STEP53/STEP255 — overlay icon draw pass sources + owned caches, consolidated (ARCH §21.7).
+    OverlayIconPassSources_UI overlaySources;
     float         pressTravelPixels        = 0.0f;    // how far the current press has dragged
     bool          bPressActive             = false;
     // ARCH §21.2 — the press-start region-local point, captured the SAME frame `pressTravelPixels`

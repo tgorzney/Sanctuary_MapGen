@@ -59,13 +59,13 @@ void MapCanvas::DrawManualMarkerDragPass(float regionOriginX, float regionOrigin
     for (const ManualInstanceDragEntry_UI& entry : manualMarkerDragEntries)
         dragStates.push_back(entry.state);
     // BUGFIX_OverlayVisibilityAndPropIconFallback_R1, Part 1 — threads MapCanvas's own
-    // `overlayLayerSettings` (the same push-in pointer DrawOverlayIconLayerPass already reads) so
+    // `overlaySources.layerSettings` (the same push-in pointer DrawOverlayIconLayerPass already reads) so
     // DrawManualMarkerRoster can gate each group on its View-toolbar row's bEnabled state.
     DrawManualMarkerRoster(*manualMarkerDragMarkers, manualMarkerDragLayers != nullptr ? *manualMarkerDragLayers : kNoLayers,
                           manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->armies : kNoArmies,
                           manualMarkerDragRecipe != nullptr ? manualMarkerDragRecipe->globalMarkerSettings : kDefaultGlobalMarkerSettings,
                           dragStates, *composite, view, regionOriginX, regionOriginY,
-                          selectedHighlight, markerLinks, *ImGui::GetWindowDrawList(), overlayLayerSettings);
+                          selectedHighlight, markerLinks, *ImGui::GetWindowDrawList(), overlaySources.layerSettings);
 }
 
 } // namespace Ui

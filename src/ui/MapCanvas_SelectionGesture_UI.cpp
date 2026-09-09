@@ -120,17 +120,17 @@ void MapCanvas::ApplyMarqueeGesture(float pressRegionLocalX, float pressRegionLo
     std::vector<OverlayInstanceKey_UI> hits;
 
     // Procedural half — Markers/Props/Decals (Units out of scope, §21's own closing note).
-    if (overlayPlacements != nullptr && pickSpatialGridSet != nullptr) {
+    if (overlaySources.placements != nullptr && pickSpatialGridSet != nullptr) {
         std::vector<std::int32_t> indices;
-        PickInstancesInRegion(pickSpatialGridSet->markers, overlayPlacements->markers,
+        PickInstancesInRegion(pickSpatialGridSet->markers, overlaySources.placements->markers,
                               rect.minX, rect.minZ, rect.maxX, rect.maxZ, indices);
         for (std::int32_t index : indices)
             hits.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, index, true, false});
-        PickInstancesInRegion(pickSpatialGridSet->props, overlayPlacements->props,
+        PickInstancesInRegion(pickSpatialGridSet->props, overlaySources.placements->props,
                               rect.minX, rect.minZ, rect.maxX, rect.maxZ, indices);
         for (std::int32_t index : indices)
             hits.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Props, index, true, false});
-        PickInstancesInRegion(pickSpatialGridSet->decals, overlayPlacements->decals,
+        PickInstancesInRegion(pickSpatialGridSet->decals, overlaySources.placements->decals,
                               rect.minX, rect.minZ, rect.maxX, rect.maxZ, indices);
         for (std::int32_t index : indices)
             hits.push_back(OverlayInstanceKey_UI{PlacementCollectionKind_UI::Decals, index, true, false});
