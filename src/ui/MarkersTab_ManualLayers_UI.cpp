@@ -89,7 +89,12 @@ bool ApplyLayerListSignal(std::vector<Params::MarkerInstanceLayer>& markerLayers
 // Manual leaf, which has no such strip and right-aligns its own X directly,
 // DrawRightAlignedDeleteButton, MarkersTab_BundleHeaderExtras_UI.cpp). STEP145: promoted out of the
 // anonymous namespace — see the header's own comment (MarkersTab_ManualLayers_UI.h) for why.
-void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer,
+void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer, int layerIndex,
+                                                  const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                                  std::vector<Params::MarkerInstanceGroup>& markers,
+                                                  const Params::Geometry& geometry, int globalSymmetryMask,
+                                                  int globalRadialRepeatCount,
+                                                  const Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                                   ManualMarkerLayersState& state, bool& bAnyCommitted,
                                                   const std::vector<Params::MarkerLink>& links) {
     // Human's own bug report — Icon Size/Snap to Grid join this cluster, left of [SYM], same
@@ -100,13 +105,17 @@ void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& l
     // draws (see this ticket's own root-problem writeup), undercounting clusterWidth and pushing the
     // cursor 5 * ItemSpacing.x too far right — landing the cluster on top of the affordance strip.
     // Read the LIVE style value, never a hardcoded literal, so a future theme change stays correct.
+    // STEP256 — inserting "FIX SYM" between [SYM] and [COL] adds ONE new external SameLine() gap
+    // (SYM->FIXSYM, replacing the old single SYM->COL gap with two: SYM->FIXSYM and FIXSYM->COL) —
+    // 5.0f -> 6.0f, plus kMarkerLayerFixSymmetryButtonWidthPixels added to the width sum.
     const float itemSpacing = ImGui::GetStyle().ItemSpacing.x;
     const float clusterWidth = kMarkerLayerIconSizeControlWidthPixels
                               + kMarkerLayerGridSizeControlWidthPixels
                               + kMarkerLayerSymmetryButtonWidthPixels
+                              + kMarkerLayerFixSymmetryButtonWidthPixels   // NEW
                               + kMarkerLayerColorOverrideButtonWidthPixels
                               + kMarkerLayerColorOverrideSwatchWidthPixels
-                              + 5.0f * itemSpacing;
+                              + 6.0f * itemSpacing;   // was 5.0f — one new external gap (STEP206's own rule)
     // Right-align within the row's own FIXED header-extra budget, not GetContentRegionAvail(): the
     // live content region reaches all the way to the row's TRUE right edge, which is PAST the
     // built-in [o]/[L]/[X] strip's own reserved kAffordanceStripWidthPixels (DrawRowAffordances,
@@ -122,6 +131,9 @@ void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& l
     DrawMarkerLayerGridSnapHeaderControl(layer, state, bAnyCommitted, links);
     ImGui::SameLine();
     DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted, links);
+    ImGui::SameLine();
+    DrawMarkerLayerFixSymmetryHeaderControl(layerIndex, markerLayers, markers, geometry, globalSymmetryMask,
+                                            globalRadialRepeatCount, markerSymmetryFixSettings, state);
     ImGui::SameLine();
     DrawManualMarkerLayerColorOverrideHeaderControl(layer, state, bAnyCommitted, links);
 }
@@ -191,7 +203,9 @@ DraggableListSignal DrawLayerList(std::vector<Params::MarkerInstanceLayer>& mark
             // sits flush against DraggableList's own [o]/[L]/[X] strip with no dead gap (this row
             // draws no delete button of its own — that strip's built-in "X##delete" already covers
             // it, unlike the Bundle tree's Manual leaf, which has none and right-aligns its own X).
-            DrawRightAlignedSymmetryColorOverrideCluster(layer, state, bAnyNameCommitted, links);
+            DrawRightAlignedSymmetryColorOverrideCluster(layer, rowIndex, markerLayers, markers, geometry,
+                                                         globalSymmetryMask, globalRadialRepeatCount,
+                                                         markerSymmetryFixSettings, state, bAnyNameCommitted, links);
         },
         kMarkerLayerHeaderExtraCombinedWidthPixels,
         state.selectedLayerIndex);

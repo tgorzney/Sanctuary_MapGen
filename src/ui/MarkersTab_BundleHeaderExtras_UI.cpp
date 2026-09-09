@@ -253,6 +253,9 @@ void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     std::vector<Params::MarkerRuleLayer>& ruleLayers,
                                     std::vector<Params::MarkerInstanceLayer>& instanceLayers,
                                     std::vector<Params::MarkerInstanceGroup>& markers,
+                                    const Params::Geometry& geometry, int globalSymmetryMask,
+                                    int globalRadialRepeatCount,
+                                    const Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                     ManualMarkerLayersState& manualLayersState,
                                     MarkerLayerBundlesState& bundlesState,
                                     const std::vector<int>& selectedManualInstanceIdentifiers,
@@ -274,6 +277,10 @@ void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
         DrawMarkerLayerGridSnapHeaderControl(layer, manualLayersState, bAnyCommitted, links);
         ImGui::SameLine();
         DrawMarkerLayerSymmetryToggleHeaderControl(layer, bAnyCommitted, links);
+        ImGui::SameLine();
+        DrawMarkerLayerFixSymmetryHeaderControl(leaf.layerIndex, instanceLayers, markers, geometry,
+                                                globalSymmetryMask, globalRadialRepeatCount,
+                                                markerSymmetryFixSettings, manualLayersState);
         ImGui::SameLine();
         DrawManualMarkerLayerColorOverrideHeaderControl(layer, manualLayersState, bAnyCommitted, links);
         ImGui::SameLine();

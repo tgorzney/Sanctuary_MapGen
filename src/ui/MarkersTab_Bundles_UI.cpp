@@ -166,7 +166,8 @@ void DrawMarkerLayerBundleTree(std::vector<Params::MarkerLayerBundle>& bundles,
                                                      rootState.selectedManualInstanceIdentifiers, state);
             },
             [&](const MarkerGroupLeafKey_UI& leaf) {
-                DrawMarkerGroupLeafHeaderExtra(leaf, ruleLayers, instanceLayers, markers, rootState.manualLayers,
+                DrawMarkerGroupLeafHeaderExtra(leaf, ruleLayers, instanceLayers, markers, geometry, globalSymmetryMask,
+                                               globalRadialRepeatCount, markerSymmetryFixSettings, rootState.manualLayers,
                                                state, rootState.selectedManualInstanceIdentifiers, previewDriver,
                                                bHeaderExtraCommitted, links);
             },

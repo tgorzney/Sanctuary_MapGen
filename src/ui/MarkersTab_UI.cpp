@@ -69,7 +69,7 @@ void DrawMarkersTab(Params::MapRecipe& recipe, MarkersTabState& state,
                     const std::function<void(int, bool bCtrlHeld, bool bShiftHeld)>&
                         selectProceduralMarkerInstanceCallback) {
     ImGui::PushID("markersTab");
-    DrawMarkersTabGlobals(state.globals);
+    DrawMarkersTabGlobals(state.globals, recipe.markerSymmetryFixSettings, state.manualLayers);
     // STEP248 — the Links tier moves to right after the Global section (BRIEF_MarkerLinkCorrection_R1
     // ruling): a Link's own body now supports the same full Ctrl/Shift/drag selection every other
     // instance list in this tab has, so it needs the same shared selection state/callback every

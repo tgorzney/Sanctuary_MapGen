@@ -117,7 +117,14 @@ void DrawManualMarkerLayerBlockSettings(ManualMarkerLayersState& state);
 // cluster on top of the strip instead of beside it.
 // STEP239: `links` (`recipe.markerLinks`) threads through to the Color Override control's own new
 // Link-resolution parameter. Defaulted so every pre-existing call site compiles unchanged.
-void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer,
+// STEP256: widened to accept the layer's own index plus the "Fix Symmetry" command's five required
+// inputs, so this cluster can also draw the new "FIX SYM" header button between [SYM] and [COL].
+void DrawRightAlignedSymmetryColorOverrideCluster(Params::MarkerInstanceLayer& layer, int layerIndex,
+                                                  const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+                                                  std::vector<Params::MarkerInstanceGroup>& markers,
+                                                  const Params::Geometry& geometry, int globalSymmetryMask,
+                                                  int globalRadialRepeatCount,
+                                                  const Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                                   ManualMarkerLayersState& state, bool& bAnyCommitted,
                                                   const std::vector<Params::MarkerLink>& links = {});
 

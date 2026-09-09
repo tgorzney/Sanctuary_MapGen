@@ -45,6 +45,7 @@ void DrawManualInstanceRow(std::vector<Params::MarkerInstanceGroup>& markers,
 // width for every row kind, Group nodes included). Eyeballed against a live frame, like every other
 // constant in this file.
 inline constexpr float kMarkerLayerSymmetryButtonWidthPixels      = 34.0f;
+inline constexpr float kMarkerLayerFixSymmetryButtonWidthPixels   = 58.0f;   // NEW — STEP256
 inline constexpr float kMarkerLayerColorOverrideButtonWidthPixels = 34.0f;
 inline constexpr float kMarkerLayerColorOverrideSwatchWidthPixels = 20.0f;
 inline constexpr float kMarkerLayerVisibilityButtonWidthPixels    = 30.0f;
@@ -67,9 +68,9 @@ inline constexpr float kMarkerLayerGridSizeControlWidthPixels  =
     + kMarkerLayerGridSizeFieldWidthPixels;
 inline constexpr float kMarkerLayerHeaderExtraCombinedWidthPixels =
     kMarkerLayerIconSizeControlWidthPixels + kMarkerLayerGridSizeControlWidthPixels
-    + kMarkerLayerSymmetryButtonWidthPixels + kMarkerLayerColorOverrideButtonWidthPixels
-    + kMarkerLayerColorOverrideSwatchWidthPixels + kMarkerLayerVisibilityButtonWidthPixels
-    + kMarkerLayerHeaderExtraDeleteButtonWidthPixels;
+    + kMarkerLayerSymmetryButtonWidthPixels + kMarkerLayerFixSymmetryButtonWidthPixels   // NEW term
+    + kMarkerLayerColorOverrideButtonWidthPixels + kMarkerLayerColorOverrideSwatchWidthPixels
+    + kMarkerLayerVisibilityButtonWidthPixels + kMarkerLayerHeaderExtraDeleteButtonWidthPixels;
 
 // The row's own name, tint, icon scale, grid snap, symmetry setting, and (STEP126, Open Q7) its own
 // per-Layer instance list — STEP110: drawn inline in THIS row's own expanded body, not "selected"-
@@ -130,6 +131,19 @@ void DrawManualMarkerLayerColorOverrideHeaderControl(Params::MarkerInstanceLayer
 // Defaulted so every pre-existing call site compiles unchanged.
 void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& layer, bool& bAnyCommitted,
                                                 const std::vector<Params::MarkerLink>& links = {});
+
+// STEP256 — the row header's own "FIX SYM" command button, immediately right of [SYM]. Runs
+// Ui::FixMarkerLayerSymmetry for THIS row's own layer only (STEP107 §1's per-layer scope), using the
+// recipe-level `markerSymmetryFixSettings.distanceTolerance` (read-only here — edited in the tab's
+// Global section, MarkersTab_Globals_UI.h) and `state.bFixSymmetryOverwrite` (read AND consumed —
+// reset to false after every run, STEP107 §2's own "not sticky" rule, unchanged). `markerLayers` is
+// the full vector (needed only for ResolveEffectiveMarkerSymmetry's own lookup — the button's OWN
+// layer is identified purely by `layerIndex`, mirroring DrawLayerRowBody's own established shape).
+void DrawMarkerLayerFixSymmetryHeaderControl(int layerIndex,
+    const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+    std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
+    int globalSymmetryMask, int globalRadialRepeatCount,
+    const Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state);
 
 // Human's own bug report — Icon Size, promoted from the row's own expanded body (where it used to be
 // the only way to reach it) up into the always-visible header cluster, mirroring the SYM/COL

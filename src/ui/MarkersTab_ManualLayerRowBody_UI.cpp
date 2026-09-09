@@ -4,6 +4,7 @@
 // declared by MarkersTab_ManualLayers_UI.h. Mirrors MarkersTab_RuleLayers_UI.cpp/
 // MarkersTab_RuleLayerSettings_UI.cpp's own established aspect split.
 #include "MarkersTab_ManualLayerRowBody_UI.h"
+#include "MarkerSymmetryFixCommand_UI.h"
 #include "MarkersTab_ManualLayerHelpers_UI.h"
 #include "MarkersTab_MarkerLinkResolvers_UI.h"
 #include "SymmetryClusterInstanceList_UI.h"
@@ -234,6 +235,34 @@ void DrawMarkerLayerSymmetryToggleHeaderControl(Params::MarkerInstanceLayer& lay
     if (bSymmetryCommitted) { layer.bSymmetryEnabled = !layer.bSymmetryEnabled; bAnyCommitted = true; }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Symmetry (global)");
+}
+
+// STEP256 — see the header's own comment for the full "why". Same shape/call sequence
+// MarkerLayerSymmetrySection_UI.cpp's now-deleted DrawFixSymmetryCommand already proved correct
+// (STEP246's synthetic layer-index-only-transform + empty-Links resolution carve-out).
+void DrawMarkerLayerFixSymmetryHeaderControl(int layerIndex,
+        const std::vector<Params::MarkerInstanceLayer>& markerLayers,
+        std::vector<Params::MarkerInstanceGroup>& markers, const Params::Geometry& geometry,
+        int globalSymmetryMask, int globalRadialRepeatCount,
+        const Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings, ManualMarkerLayersState& state) {
+    if (ImGui::SmallButton("FIX SYM##fixSymmetry")) {
+        Params::MarkerTransform layerIndexOnlyTransform;
+        layerIndexOnlyTransform.layerIndex = layerIndex;
+        static const std::vector<Params::MarkerLink> kNoLinks;
+        int effectiveMask = 0;
+        int effectiveRadialRepeatCount = 0;
+        ResolveEffectiveMarkerSymmetry(markerLayers, layerIndexOnlyTransform, kNoLinks, globalSymmetryMask,
+                                       globalRadialRepeatCount, effectiveMask, effectiveRadialRepeatCount);
+        state.lastFixSymmetryResult = FixMarkerLayerSymmetry(markers, geometry, layerIndex, effectiveMask,
+            effectiveRadialRepeatCount, markerSymmetryFixSettings.distanceTolerance, state.bFixSymmetryOverwrite);
+        state.bHasFixSymmetryResult = true;
+        state.bFixSymmetryOverwrite = false;   // consumed per-use — STEP107 §2's rule, unchanged
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Fix Symmetry (tolerance %.2f%s) - edit tolerance/overwrite mode and see the "
+                          "last result in the tab's Global section",
+                          markerSymmetryFixSettings.distanceTolerance,
+                          state.bFixSymmetryOverwrite ? ", OVERWRITE mode armed" : "");
 }
 
 // Human's own bug report — Icon Size, promoted from the row's own expanded body into the

@@ -2,6 +2,7 @@
 // Layer: UI. Shared widgets only: FilePathPicker / SliderScalar / ColorSwatch / IconGrid /
 // Section. Nothing here notifies Pipeline::PreviewDriver (MarkersTab_Globals_UI.h SCOPE NOTE 1).
 #include "MarkersTab_Globals_UI.h"
+#include "MarkersTab_ManualLayers_UI.h"   // NEW — STEP256: the real ManualMarkerLayersState definition
 #include "imgui.h"
 
 namespace SanmapGen {
@@ -109,9 +110,28 @@ void DrawTypeSectionMarkerSettingsRow(MarkersTabGlobals& globals, int rowIndex,
     ImGui::PopID();
 }
 
-void DrawMarkersTabGlobals(MarkersTabGlobals& globals) {
+// STEP256 — see the header's own comment for the full "why" (relocated out of the now-deleted
+// per-row MarkerLayerSymmetrySection_UI.cpp's DrawFixSymmetryCommand, at the tab's own real scope).
+void DrawMarkerSymmetryFixSettings(Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
+                                   ManualMarkerLayersState& manualLayersState) {
+    ImGui::Separator();
+    ImGui::TextUnformatted("Fix Symmetry (per-layer \"FIX SYM\" header button)");
+    DrawSliderScalar("Fix Symmetry Distance Tolerance", markerSymmetryFixSettings.distanceTolerance,
+                     manualLayersState.fixSymmetryToleranceRange, manualLayersState.fixSymmetryToleranceToggle,
+                     WidgetStyle(), "%.2f");
+    DrawCheckbox("Overwrite manually-adjusted positions", manualLayersState.bFixSymmetryOverwrite);
+    if (manualLayersState.bHasFixSymmetryResult) {
+        ImGui::Text("Fix Symmetry: %d group(s) created, %d slot(s) unmatched",
+                   manualLayersState.lastFixSymmetryResult.confirmedGroupCount,
+                   manualLayersState.lastFixSymmetryResult.unmatchedSlotCount);
+    }
+}
+
+void DrawMarkersTabGlobals(MarkersTabGlobals& globals, Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
+                           ManualMarkerLayersState& manualLayersState) {
     if (!DrawSectionBegin("Global", globals.section)) return;
     DrawGamedataSource(globals);
+    DrawMarkerSymmetryFixSettings(markerSymmetryFixSettings, manualLayersState);
     DrawSectionEnd();
 }
 

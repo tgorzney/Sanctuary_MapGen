@@ -325,6 +325,14 @@ void RunUngroupedClusterDoesNotOverlapAffordanceStripCheck(bool bPushExaggerated
     bool bAnyCommitted = false;
     DraggableListRow row;   // bLocked/bVisible default (irrelevant to this geometry check)
     DraggableListSignal signal;
+    // STEP256 — DrawRightAlignedSymmetryColorOverrideCluster widened to accept the "FIX SYM" command's
+    // own inputs; none of these values affect this test's own pixel-overlap assertion (it never clicks
+    // the button), so any valid defaults are fine.
+    const Params::Geometry geometry;
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);
+    std::vector<Params::MarkerInstanceGroup> markers;
+    Params::MarkerSymmetryFixSettings markerSymmetryFixSettings;
+    const int layerIndex = 0;
 
     ImVec2 clusterMax, stripMin;
     RunHeadlessFrame(HeadlessMouseState(), ImVec2(400.0f, 100.0f), [&] {
@@ -338,7 +346,8 @@ void RunUngroupedClusterDoesNotOverlapAffordanceStripCheck(bool bPushExaggerated
         // the header-extra zone first, then the affordance strip.
         ImGui::SameLine(rowAvailWidthPixels - static_cast<float>(kAffordanceStripWidthPixels)
             - kMarkerLayerHeaderExtraCombinedWidthPixels);
-        DrawRightAlignedSymmetryColorOverrideCluster(layer, state, bAnyCommitted);
+        DrawRightAlignedSymmetryColorOverrideCluster(layer, layerIndex, markerLayers, markers, geometry,
+                                                     0, 0, markerSymmetryFixSettings, state, bAnyCommitted);
         clusterMax = ImGui::GetItemRectMax();
         RowLayoutDetail::DrawRowAffordances(row, 0, signal, 0.0f, rowAvailWidthPixels, false);
         stripMin = ImGui::GetItemRectMin();   // the strip's FIRST item, [o]/[-] visibility

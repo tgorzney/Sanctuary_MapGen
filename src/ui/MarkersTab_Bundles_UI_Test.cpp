@@ -335,11 +335,16 @@ void TestManualLeafDeleteButtonRecordsPendingIndex() {
     MarkerLayerBundlesState bundlesState;
     const MarkerGroupLeafKey_UI manualLeaf{ MarkerGroupLeafKey_UI::Kind::Manual, 0 };
     bool bAnyCommitted = false;
+    // STEP256 — DrawMarkerGroupLeafHeaderExtra widened with the "Fix Symmetry" command's own four
+    // required inputs; none of these values are exercised by this test (it never clicks "FIX SYM").
+    const Params::Geometry geometry;
+    const Params::MarkerSymmetryFixSettings markerSymmetryFixSettings;
 
     // Find the "X##deleteLayer" button's own center by probing item rects across the row.
     ImVec2 deleteButtonCenter;
     RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 100.0f), [&] {
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, ruleLayers, instanceLayers, markers, state, bundlesState,
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, ruleLayers, instanceLayers, markers, geometry, 0, 0,
+                                       markerSymmetryFixSettings, state, bundlesState,
                                        selectedManualInstanceIdentifiers, nullptr, bAnyCommitted);
         deleteButtonCenter = ImGui::GetItemRectMin();
         const ImVec2 maxRect = ImGui::GetItemRectMax();
@@ -349,12 +354,14 @@ void TestManualLeafDeleteButtonRecordsPendingIndex() {
 
     HeadlessMouseState click; click.position = deleteButtonCenter; click.bLeftButtonDown = true;
     RunHeadlessFrame(click, ImVec2(300.0f, 100.0f), [&] {
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, ruleLayers, instanceLayers, markers, state, bundlesState,
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, ruleLayers, instanceLayers, markers, geometry, 0, 0,
+                                       markerSymmetryFixSettings, state, bundlesState,
                                        selectedManualInstanceIdentifiers, nullptr, bAnyCommitted);
     });
     HeadlessMouseState release = click; release.bLeftButtonDown = false;
     RunHeadlessFrame(release, ImVec2(300.0f, 100.0f), [&] {
-        DrawMarkerGroupLeafHeaderExtra(manualLeaf, ruleLayers, instanceLayers, markers, state, bundlesState,
+        DrawMarkerGroupLeafHeaderExtra(manualLeaf, ruleLayers, instanceLayers, markers, geometry, 0, 0,
+                                       markerSymmetryFixSettings, state, bundlesState,
                                        selectedManualInstanceIdentifiers, nullptr, bAnyCommitted);
     });
 
@@ -408,12 +415,17 @@ void TestProceduralLeafHeaderExtraDrawsDeleteButtonOnly() {
     ManualMarkerLayersState state;
     MarkerLayerBundlesState bundlesState;
     const MarkerGroupLeafKey_UI proceduralLeaf{ MarkerGroupLeafKey_UI::Kind::Procedural, 0 };
+    // STEP256 — see TestManualLeafDeleteButtonRecordsPendingIndex's own comment for why these four
+    // new arguments are irrelevant defaults here (this test only exercises the Procedural branch).
+    const Params::Geometry geometry;
+    const Params::MarkerSymmetryFixSettings markerSymmetryFixSettings;
 
     bool bAnyCommitted = false;
     ImVec2 cursorBefore, cursorAfter;
     RunHeadlessFrame(HeadlessMouseState(), ImVec2(300.0f, 100.0f), [&] {
         cursorBefore = ImGui::GetCursorScreenPos();
-        DrawMarkerGroupLeafHeaderExtra(proceduralLeaf, ruleLayers, instanceLayers, markers, state, bundlesState,
+        DrawMarkerGroupLeafHeaderExtra(proceduralLeaf, ruleLayers, instanceLayers, markers, geometry, 0, 0,
+                                       markerSymmetryFixSettings, state, bundlesState,
                                        selectedManualInstanceIdentifiers, nullptr, bAnyCommitted);
         cursorAfter = ImGui::GetCursorScreenPos();
     });

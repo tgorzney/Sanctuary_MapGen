@@ -354,6 +354,67 @@ void RunSymmetryInertWhileLinkedCheck() {
     Check(!bAnyCommitted, "and reports no commit either");
 }
 
+// STEP256, acceptance test 1 — DrawMarkerLayerFixSymmetryHeaderControl: a headless-frame click, with
+// two markers on the target layer at genuinely mirrored positions (skip mode, bOverwrite false),
+// backfills one fresh confirmed group and reports the result. Mirrors
+// MarkerSymmetryFixCommand_UI_Test.cpp's own already-proven RunBasicSkipModeChecks fixture (same
+// geometry/positions/tolerance) rather than re-deriving the mirrored-position math. Also proves
+// state.bFixSymmetryOverwrite is consumed (reset false) after a run started with it true, per
+// STEP107 §2's "not sticky" rule.
+void RunFixSymmetryHeaderButtonClickChecks() {
+    HeadlessImguiSession session;
+    std::vector<Params::MarkerInstanceLayer> markerLayers(1);   // defaults: bSymmetryEnabled/
+                                                                 // bSymmetryUseGlobal both true
+    std::vector<Params::MarkerInstanceGroup> markers(1);
+    Params::MarkerTransform transformA;
+    transformA.name = "A";
+    transformA.transform.positionX = 2.0f;
+    transformA.transform.positionZ = 3.0f;
+    Params::MarkerTransform transformB;
+    transformB.name = "B";
+    transformB.transform.positionX = 8.0f;
+    transformB.transform.positionZ = 3.0f;
+    markers[0].transforms.push_back(transformA);
+    markers[0].transforms.push_back(transformB);
+
+    Params::Geometry geometry;
+    geometry.mapSize = 10;
+    geometry.worldUnitsPerGenerationCell = 1.0f;   // mirror(x) = mapSize - x, hand-verifiable
+    Params::MarkerSymmetryFixSettings markerSymmetryFixSettings;
+    markerSymmetryFixSettings.distanceTolerance = 0.5f;
+    ManualMarkerLayersState state;
+    state.bFixSymmetryOverwrite = true;   // proves it's consumed (reset false) after the run
+
+    ImVec2 origin; float boxWidth = 0.0f, boxHeight = 0.0f;
+    RunHeadlessFrame(HeadlessMouseState(), kWindowSize, [&] {
+        origin = ImGui::GetCursorScreenPos();
+        DrawMarkerLayerFixSymmetryHeaderControl(0, markerLayers, markers, geometry,
+            Params::SymmetryAxis::MirrorAcrossX, 3, markerSymmetryFixSettings, state);
+        boxWidth  = ImGui::GetItemRectMax().x - ImGui::GetItemRectMin().x;
+        boxHeight = ImGui::GetItemRectMax().y - ImGui::GetItemRectMin().y;
+    });
+    const ImVec2 buttonCenter(origin.x + boxWidth * 0.5f, origin.y + boxHeight * 0.5f);
+
+    HeadlessMouseState hover;   hover.position = buttonCenter;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    auto runFrame = [&](HeadlessMouseState mouse) {
+        RunHeadlessFrame(mouse, kWindowSize, [&] {
+            DrawMarkerLayerFixSymmetryHeaderControl(0, markerLayers, markers, geometry,
+                Params::SymmetryAxis::MirrorAcrossX, 3, markerSymmetryFixSettings, state);
+        });
+    };
+    runFrame(hover);
+    runFrame(press);
+    runFrame(release);   // SmallButton fires on release, not press
+
+    Check(state.bHasFixSymmetryResult, "clicking FIX SYM runs the command and sets bHasFixSymmetryResult");
+    Check(state.lastFixSymmetryResult.confirmedGroupCount == 1,
+         "one fresh group is confirmed for the genuinely mirrored pair (skip mode)");
+    Check(!state.bFixSymmetryOverwrite,
+         "bFixSymmetryOverwrite is consumed per-use -- reset false even though it started true");
+}
+
 } // namespace
 
 int main() {
@@ -366,6 +427,7 @@ int main() {
     RunIconSizeInertWhileLinkedCheck();
     RunGridSnapInertWhileLinkedCheck();
     RunSymmetryInertWhileLinkedCheck();
+    RunFixSymmetryHeaderButtonClickChecks();
 
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);

@@ -212,10 +212,18 @@ void DrawMarkerLayerBundleNodeHeaderExtra(int bundleIdentifier,
 // STEP239: `links` (`recipe.markerLinks`) threads through to the Manual leaf's own Color Override
 // control (ARCH §19.31 Mechanism A). Trailing default so every pre-existing call site (including
 // MarkersTab_Bundles_UI_Test.cpp's own direct drives) compiles unchanged.
+// STEP256: widened with the "Fix Symmetry" command's own four required inputs
+// (geometry/globalSymmetryMask/globalRadialRepeatCount/markerSymmetryFixSettings), inserted after
+// `markers` (mirroring DrawMarkerGroupLeafBody's own established parameter order,
+// MarkersTab_Bundles_UI.cpp) — the Manual leaf branch draws the new "FIX SYM" header button between
+// [SYM] and [COL], mirroring the flat list's own DrawRightAlignedSymmetryColorOverrideCluster.
 void DrawMarkerGroupLeafHeaderExtra(const MarkerGroupLeafKey_UI& leaf,
                                     std::vector<Params::MarkerRuleLayer>& ruleLayers,
                                     std::vector<Params::MarkerInstanceLayer>& instanceLayers,
                                     std::vector<Params::MarkerInstanceGroup>& markers,
+                                    const Params::Geometry& geometry, int globalSymmetryMask,
+                                    int globalRadialRepeatCount,
+                                    const Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
                                     ManualMarkerLayersState& manualLayersState,
                                     MarkerLayerBundlesState& bundlesState,
                                     const std::vector<int>& selectedManualInstanceIdentifiers,

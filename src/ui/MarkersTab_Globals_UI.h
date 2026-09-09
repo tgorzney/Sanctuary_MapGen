@@ -22,6 +22,7 @@
 //     A second control over the same decision is exactly the rival toggle ARCH §4 forbids.
 #pragma once
 #include <string>
+#include "Checkbox_UI.h"   // NEW — STEP256: DrawCheckbox for the relocated "Fix Symmetry" overwrite toggle
 #include "ColorSwatch_UI.h"
 #include "FilePathPicker_UI.h"
 #include "IconAtlasPairing_UI.h"
@@ -32,9 +33,13 @@
 #include "SliderScalar_UI.h"
 #include "imgui.h"
 #include "../params/GlobalMarkerSettings_PARAMS.h"
+#include "../params/Symmetry_PARAMS.h"   // NEW — STEP256: Params::MarkerSymmetryFixSettings
 
 namespace SanmapGen {
 namespace Ui {
+
+struct ManualMarkerLayersState;   // MarkersTab_ManualLayers_UI.h — forward-declared, reference-only
+                                   // (mirrors MarkersTab_Bundles_UI.h:37's own forward-declare).
 
 // The three categories v1 gave a global scale row. Marker categories the recipe knows about are
 // Params::MarkerCategory; these are the DISPLAY rows the plan names, in its order.
@@ -181,10 +186,22 @@ inline float TypeSectionMarkerSettingsRowWidth(const MarkersTabGlobals& globals)
          + perDialWidth;
 }
 
-// Draws the global section: the gamedata root and the icon scan request only (STEP136 — the three
+// STEP256 — the "Fix Symmetry" command's own recipe-level tolerance + overwrite-mode controls,
+// relocated here now that the per-layer "FIX SYM" header button (MarkersTab_ManualLayerRowBody_UI.h)
+// replaces the retired per-row "Layer Symmetry" section these used to live in (STEP107 §2/§5):
+// `markerSymmetryFixSettings.distanceTolerance` is recipe-level and `manualLayersState.
+// bFixSymmetryOverwrite`/`bHasFixSymmetryResult`/`lastFixSymmetryResult` were ALREADY one shared
+// tab-wide instance (MarkersTabState::manualLayers) — this is the first place they draw at their own
+// real scope. Declared here (not file-local) so a headless test can drive it directly.
+void DrawMarkerSymmetryFixSettings(Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
+                                   ManualMarkerLayersState& manualLayersState);
+
+// Draws the global section: the gamedata root and the icon scan request (STEP136 — the three
 // per-Type rows this used to stack live on the Type-section headers now, see
-// DrawTypeSectionMarkerSettingsRow above).
-void DrawMarkersTabGlobals(MarkersTabGlobals& globals);
+// DrawTypeSectionMarkerSettingsRow above), plus, STEP256, the relocated "Fix Symmetry" controls.
+void DrawMarkersTabGlobals(MarkersTabGlobals& globals,
+                           Params::MarkerSymmetryFixSettings& markerSymmetryFixSettings,
+                           ManualMarkerLayersState& manualLayersState);
 
 } // namespace Ui
 } // namespace SanmapGen

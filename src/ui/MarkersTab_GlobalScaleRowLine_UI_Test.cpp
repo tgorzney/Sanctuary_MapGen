@@ -15,6 +15,7 @@
 // does, lands its own last item at the exact pixel the replay measured.
 #include "ListWidget_TestFrame_UI.h"
 #include "MarkersTab_Globals_UI.h"
+#include "MarkersTab_ManualLayers_UI.h"   // NEW — STEP256: the real ManualMarkerLayersState definition
 #include <cstdio>
 
 using namespace SanmapGen;
@@ -189,11 +190,92 @@ void RunGlobalScaleRowDialClampAndFieldBindingChecks() {
           "row 1's selected dial clamps scaleSelectedPlasma correctly");
 }
 
+// STEP256, acceptance test 4 — DrawMarkerSymmetryFixSettings (the "Fix Symmetry" command's own
+// controls, relocated here from the now-deleted per-row MarkerLayerSymmetrySection_UI.cpp): the
+// tolerance slider edits `markerSymmetryFixSettings.distanceTolerance`, the checkbox edits
+// `manualLayersState.bFixSymmetryOverwrite`, and the result line renders only when
+// `bHasFixSymmetryResult` is true.
+void RunFixSymmetrySettingsBindingAndResultLineChecks() {
+    HeadlessImguiSession session;
+    Params::MarkerSymmetryFixSettings settings;
+    ManualMarkerLayersState state;
+
+    // --- tolerance slider binding: DrawSliderScalar clamps its own bound value to its range on
+    // EVERY call regardless of any click -- the SAME clamp-based binding proof
+    // RunGlobalScaleRowDialClampAndFieldBindingChecks (above) already uses for the dial pair, one
+    // control over.
+    settings.distanceTolerance = 999.0f;   // above fixSymmetryToleranceRange's default [0.01, 10.0] max
+    RunHeadlessFrame(HeadlessMouseState(), kWindowSize, [&] {
+        DrawMarkerSymmetryFixSettings(settings, state);
+    });
+    Check(settings.distanceTolerance == state.fixSymmetryToleranceRange.maximumValue,
+         "the tolerance slider is bound to markerSymmetryFixSettings.distanceTolerance -- clamps it to "
+         "manualLayersState.fixSymmetryToleranceRange's own maximum");
+
+    // --- overwrite checkbox: an actual click flips manualLayersState.bFixSymmetryOverwrite. Its own
+    // screen position is found by replaying DrawMarkerSymmetryFixSettings' own composition up to the
+    // checkbox (Separator/TextUnformatted/DrawSliderScalar all draw before it, MarkersTab_Globals_UI.cpp)
+    // -- the real function's own layout is deterministic (style/range/labels only, never the bound
+    // value), so the probed position matches production exactly, the same "replay to see an
+    // intermediate control" technique RunGlobalScaleRowSingleLineChecks' own DrawRowWithProbes uses,
+    // one function over.
+    ImVec2 checkboxOrigin;
+    RunHeadlessFrame(HeadlessMouseState(), kWindowSize, [&] {
+        ImGui::Separator();
+        ImGui::TextUnformatted("Fix Symmetry (per-layer \"FIX SYM\" header button)");
+        float probeTolerance = settings.distanceTolerance;
+        RealtimeToggle probeToggle{true};
+        DrawSliderScalar("Fix Symmetry Distance Tolerance", probeTolerance,
+                         state.fixSymmetryToleranceRange, probeToggle, WidgetStyle(), "%.2f");
+        checkboxOrigin = ImGui::GetCursorScreenPos();
+    });
+
+    const float boxSize = ResolveWidgetTrackHeight(WidgetStyle());
+    const ImVec2 checkboxCenter(checkboxOrigin.x + boxSize * 0.5f, checkboxOrigin.y + boxSize * 0.5f);
+    HeadlessMouseState hover;   hover.position = checkboxCenter;
+    HeadlessMouseState press   = hover; press.bLeftButtonDown   = true;
+    HeadlessMouseState release = hover; release.bLeftButtonDown = false;
+    auto runFrame = [&](HeadlessMouseState mouse) {
+        RunHeadlessFrame(mouse, kWindowSize, [&] { DrawMarkerSymmetryFixSettings(settings, state); });
+    };
+    const bool bStartOverwrite = state.bFixSymmetryOverwrite;
+    runFrame(hover);
+    runFrame(press);
+    runFrame(release);
+
+    Check(state.bFixSymmetryOverwrite != bStartOverwrite,
+         "clicking the checkbox at its own known position flips manualLayersState.bFixSymmetryOverwrite");
+
+    // --- result line: only rendered when bHasFixSymmetryResult is true -- proven by the extra
+    // vertical extent its Text() line adds, not a fragile per-item probe.
+    state.bHasFixSymmetryResult = false;
+    ImVec2 startNoResult, endNoResult;
+    RunHeadlessFrame(HeadlessMouseState(), kWindowSize, [&] {
+        startNoResult = ImGui::GetCursorScreenPos();
+        DrawMarkerSymmetryFixSettings(settings, state);
+        endNoResult = ImGui::GetCursorScreenPos();
+    });
+
+    state.bHasFixSymmetryResult = true;
+    state.lastFixSymmetryResult.confirmedGroupCount = 2;
+    state.lastFixSymmetryResult.unmatchedSlotCount  = 1;
+    ImVec2 startWithResult, endWithResult;
+    RunHeadlessFrame(HeadlessMouseState(), kWindowSize, [&] {
+        startWithResult = ImGui::GetCursorScreenPos();
+        DrawMarkerSymmetryFixSettings(settings, state);
+        endWithResult = ImGui::GetCursorScreenPos();
+    });
+
+    Check(endWithResult.y - startWithResult.y > endNoResult.y - startNoResult.y,
+         "the result line only renders (adding vertical extent) when bHasFixSymmetryResult is true");
+}
+
 } // namespace
 
 int main() {
     RunGlobalScaleRowSingleLineChecks();
     RunGlobalScaleRowDialClampAndFieldBindingChecks();
+    RunFixSymmetrySettingsBindingAndResultLineChecks();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;
