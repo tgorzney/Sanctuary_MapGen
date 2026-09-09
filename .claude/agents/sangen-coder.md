@@ -76,3 +76,24 @@ inside the ARCH.
 ## Output discipline
 Implement, then build/test to the work-order's acceptance test and report the result
 against its performance estimate. Flag anything you had to leave out-of-scope.
+
+## Build-output cleanup (after a green full rebuild + full ctest pass, before or after committing)
+Test **source** (`<Name>_*_Test.cpp`) is permanent — it is the acceptance-test record for every
+future ticket that touches the same code and must never be deleted. Test **build output** (the
+`build/<Name>_Test.dir/` intermediate-object folder and its compiled `build/<config>/<Name>_Test.exe`/
+`.pdb`/`.ilk`) is disposable and regenerates from source on the next build. Once your ticket's own
+full solo rebuild and full `ctest` pass are green (the same bar the commit protocol already
+requires), delete the build-output folder/binary for **only the test target(s) you yourself just
+added or touched this ticket** — nothing else.
+
+**Never** delete:
+- Any other target's `.dir` folder or binary, even if it looks stale — a peer session may have a
+  live incremental build or an in-progress `ctest` run depending on it right now.
+- `build/CMakeCache.txt`, `build/CMakeFiles/`, any `*.vcxproj`/`*.sln`, or `SanGenV2.dir`/
+  `SanGenV3App.dir` (the shared library/app every target links against) — these are small,
+  essential, shared configuration, not the "huge" output this rule targets. Deleting these has
+  already broken every open Visual Studio window and every peer session's build in this repo once
+  (a separate disk-cleanup pass swept them as if they were disposable) — do not repeat that.
+- Anything if you are not fully certain it is scoped to your own just-built target only.
+
+When in doubt, leave it — the disk-space win is not worth a repeat of that incident.
