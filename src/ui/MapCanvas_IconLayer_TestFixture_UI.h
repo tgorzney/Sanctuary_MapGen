@@ -114,5 +114,18 @@ inline void SeedAtlasEntry(IconAtlasPairingLookup& pairingLookup, IconAtlasManif
             static_cast<std::uint64_t>(manifest.pageTextureIdentifiers.size()) + 1u);
 }
 
+inline void SeedStrategicAtlasEntry(IconAtlasPairingLookup& pairingLookup, IconAtlasManifest& manifest,
+                                    const std::string& templateIdentifier, int iconId, int atlasPage = 0) {
+    pairingLookup.SetStrategicIconId(templateIdentifier, iconId);
+    while (static_cast<int>(manifest.entries.size()) <= iconId) {
+        IconAtlasEntry entry; entry.iconId = static_cast<int>(manifest.entries.size());
+        manifest.entries.push_back(entry);
+    }
+    manifest.entries[static_cast<std::size_t>(iconId)].atlasPage = atlasPage;
+    while (static_cast<int>(manifest.pageTextureIdentifiers.size()) <= atlasPage)
+        manifest.pageTextureIdentifiers.push_back(
+            static_cast<std::uint64_t>(manifest.pageTextureIdentifiers.size()) + 1u);
+}
+
 } // namespace Ui
 } // namespace SanmapGen

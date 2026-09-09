@@ -40,7 +40,7 @@ ResolvedLod_UI ResolveLodModeAndIcon(const DrawOverlayIconLayersInput& input, co
     if (thumbnailScreenSize >= layer.thumbnailLodThresholdPixels) {
         resolved.iconId = pairing.thumbnailIconId; resolved.screenSize = thumbnailScreenSize;
     } else {
-        resolved.iconId = pairing.strategicIconId; resolved.screenSize = layer.strategicIconScreenSizePixels;
+        resolved.iconId = pairing.strategicIconId; resolved.screenSize = layer.strategicIconScreenSizePixels * instanceScale;
     }
     return resolved;
 }

@@ -953,6 +953,60 @@ void CheckManualMarkerSelectedScaleComposesOnlyWhenSelected() {
     }
 }
 
+// ARCH §19.32 / STEP257 — the confirmed bug fix: ResolveLodModeAndIcon's STRATEGIC branch
+// (MapCanvas_IconLayer_CullEmit_UI.cpp) previously ignored `instanceScale` entirely, so
+// scaleSelectedAlloy (and every other instanceScale contributor) had zero visual effect on a marker
+// resolved in strategic mode -- the common case, since strategicIconScreenSizePixels' default
+// threshold (5.0f) puts most real markers here at typical zoom. Strategic-mode mirror of
+// CheckManualMarkerSelectedScaleComposesOnlyWhenSelected above, forcing the STRATEGIC branch (raise
+// thumbnailLodThresholdPixels ABOVE the fixture's own thumbnailScreenSize instead of below it) and
+// seeding a real, resolvable strategicIconId via SetStrategicIconId (IconAtlasPairing_UI.h) --
+// SeedAtlasEntry alone only ever seeds thumbnailIconId, so the pre-existing
+// CheckStrategicModeBelowThreshold above could only ever exercise the pairing-MISS path, never a
+// real resolved strategic candidate's screenSize.
+void CheckManualMarkerSelectedScaleComposesInStrategicMode() {
+    ManualMarkerTestFixture fixture;
+    fixture.fixture.recipe.globalMarkerSettings.scaleAlloy = 1.0f;           // isolate the selected term
+    fixture.fixture.recipe.globalMarkerSettings.scaleSelectedAlloy = 3.0f;
+    fixture.fixture.recipe.markers[0].transforms[0].instanceIdentifier = 77;   // globally-unique id
+    fixture.alloyLayer.thumbnailLodThresholdPixels = 100.0f;   // forces strategic mode
+    SeedStrategicAtlasEntry(fixture.fixture.pairingLookup, fixture.fixture.atlasManifest, "Alloy", 1);
+    fixture.fixture.overlaySettings.overlayLayers = {fixture.alloyLayer};
+
+    DrawOverlayIconLayersInput input = fixture.fixture.Input();
+    OverlayInstanceKeySet_UI emptySelection;
+    input.selectedInstanceKeys = &emptySelection;
+    std::vector<OverlayVisibleInstance> unselectedCandidates;
+    ResolveVisibleCandidates(input, fixture.fixture.aabbCache, nullptr, unselectedCandidates);
+    check(unselectedCandidates.size() == 1,
+          "the unselected Alloys manual instance resolves exactly one candidate in strategic mode");
+
+    OverlayInstanceKeySet_UI selectionSet;
+    selectionSet.keys = {OverlayInstanceKey_UI{PlacementCollectionKind_UI::Markers, 77, true, /*bManual=*/true}};
+    input.selectedInstanceKeys = &selectionSet;
+    std::vector<OverlayVisibleInstance> selectedCandidates;
+    ResolveVisibleCandidates(input, fixture.fixture.aabbCache, nullptr, selectedCandidates);
+    check(selectedCandidates.size() == 1,
+          "the selected Alloys manual instance resolves exactly one candidate in strategic mode");
+
+    if (!unselectedCandidates.empty() && !selectedCandidates.empty()) {
+        check(!unselectedCandidates[0].bSelected, "the first resolve's own candidate correctly reports unselected");
+        check(selectedCandidates[0].bSelected, "the second resolve's own candidate correctly reports selected");
+        // Regression guard: instanceScale == 1.0 in the unselected leg must reproduce the EXACT
+        // pre-fix strategic-mode constant (x * 1.0f is exact under IEEE754) -- proves unscaled
+        // strategic-mode output is byte-identical to pre-fix behavior, the "silent regression in the
+        // common case" this bug itself was.
+        check(unselectedCandidates[0].screenSize == fixture.alloyLayer.strategicIconScreenSizePixels,
+              "an unscaled (instanceScale == 1.0) strategic-mode candidate's screenSize is unchanged "
+              "from the pre-fix constant strategicIconScreenSizePixels");
+        const float expected = unselectedCandidates[0].screenSize * 3.0f;
+        check(selectedCandidates[0].screenSize > expected * 0.99f && selectedCandidates[0].screenSize < expected * 1.01f,
+              "scaleSelectedAlloy(3.0) composes into a SELECTED manual marker's rendered screenSize in "
+              "STRATEGIC mode too -- the confirmed STEP257 bug fix -- and is absent from the same "
+              "instance's UNSELECTED screenSize");
+    }
+}
+
 // STEP122 — ResolveProceduralSubLayer composes ResolveMarkerCategoryScale into the procedural
 // marker's rendered screenSize, one case per resolvable category plus the Generic/Expansion no-op.
 void CheckProceduralMarkerScaleComposesEndToEnd() {
@@ -1276,6 +1330,7 @@ void RunMapCanvasIconLayerCullChecks() {
     CheckManualMarkerScaleComposesEndToEnd();
     CheckManualMarkerScaleUnrecognizedGroupNameStaysNoOp();
     CheckManualMarkerSelectedScaleComposesOnlyWhenSelected();
+    CheckManualMarkerSelectedScaleComposesInStrategicMode();
     CheckProceduralMarkerScaleComposesEndToEnd();
     CheckIndexSpaceCollisionRegressionClosed();
     CheckSelectedInstanceCandidateResolvesManualMarker();

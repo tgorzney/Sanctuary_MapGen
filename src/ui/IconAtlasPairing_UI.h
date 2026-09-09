@@ -46,6 +46,19 @@ public:
         pairingsByTemplateIdentifier[templateIdentifier].thumbnailIconId = iconId;
     }
 
+    // STEP257 — the strategic-mode counterpart of SetThumbnailIconId above, added strictly so a
+    // headless test can seed a RESOLVED (non-miss) strategicIconId and exercise
+    // ResolveLodModeAndIcon's strategic branch end to end (MapCanvas_IconLayer_CullEmit_UI.cpp) —
+    // before this, only the pairing-MISS path was reachable in strategic mode from any test
+    // (CheckStrategicModeBelowThreshold's own header comment already documents this gap). No
+    // production caller uses this yet: BuildIconAtlasPairingLookup (below) is UNCHANGED, still
+    // leaving every real pairing's strategicIconId at kInvalidIconId — no authored strategic-icon
+    // source exists yet (ARCH_14_03_IconRenderingLod.md §14.3, a separate, unscoped ticket). This is
+    // test-enabling infrastructure only, not a behavior change for any real map.
+    void SetStrategicIconId(const std::string& templateIdentifier, int iconId) {
+        pairingsByTemplateIdentifier[templateIdentifier].strategicIconId = iconId;
+    }
+
     // Unknown templateIdentifier resolves to a default-constructed pairing (both ids
     // kInvalidIconId) — mirrors Application::TemplateIdentifierOfIcon's own
     // empty-result-on-miss contract (Application_Assets_UI.cpp:75-79), never a thrown/asserted
