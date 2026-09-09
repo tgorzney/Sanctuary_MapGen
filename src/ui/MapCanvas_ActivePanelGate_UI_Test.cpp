@@ -125,6 +125,7 @@ void RunMapCanvasActivePanelGateChecks(Sys::GpuResourceManager& manager) {
     markers[0].transforms.push_back(Params::MarkerTransform{});
     Params::InstancedTransform& transform = markers[0].transforms[0].transform;
     markers[0].transforms[0].name = "Marker";
+    markers[0].transforms[0].instanceIdentifier = 77;
     transform.positionX = kMarkerWorldX; transform.positionZ = kMarkerWorldZ;
     std::vector<Params::MarkerInstanceLayer> markerLayers(1);   // default-constructed: unlocked
     Params::MapRecipe recipe;   // default globalSymmetryMask/radialSymmetryRepeatCount

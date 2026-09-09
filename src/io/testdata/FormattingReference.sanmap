@@ -664,6 +664,7 @@
     "markers": {},
     "MarkerGroups": [],
     "MarkerLayerBundles": [],
+    "MarkerLinks": [],
     "chains": {},
     "decals": [],
     "props": [
@@ -713,13 +714,14 @@
             "AreaName": "",
             "SpawnsUnits": false,
             "AlloyMode": "occupancy",
-            "Spawns": [],
+            "SpawnIds": [],
             "Alloys": [],
             "AlloysToAdd": [],
             "AlloysToRemove": [],
             "AuthoringNote": ""
         },
-        "MaxArmySlotCount": 16
+        "MaxArmySlotCount": 16,
+        "SpawnPoints": []
     },
     "MarkersStack": [],
     "PropsStack": [],
@@ -750,10 +752,13 @@
         "MarkerScaleAlloy": 0.5,
         "MarkerScalePlasma": 0.5,
         "MarkerScaleSpawn": 0.5,
+        "MarkerScaleSelectedAlloy": 0.5,
+        "MarkerScaleSelectedPlasma": 0.5,
+        "MarkerScaleSelectedSpawn": 0.5,
         "MarkerSelectColorAlloy": {
-            "r": 1.0,
+            "r": 0.20000000298023224,
             "g": 1.0,
-            "b": 0.0,
+            "b": 0.20000000298023224,
             "a": 1.0
         },
         "MarkerSelectColorPlasma": {
@@ -891,7 +896,7 @@
         "GlobalGravity": 4.0,
         "TerrainMinHeight": 0.0,
         "TerrainMaxHeight": 128.0,
-        "WorldUnitsPerGenerationCell": 1.0
+        "WorldUnitsPerGenerationCell": 10.0
     },
     "HeightmapStack": {
         "SimulationGrouping": 1,
