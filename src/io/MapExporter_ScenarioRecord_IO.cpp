@@ -52,6 +52,23 @@ nlohmann::ordered_json BuildAlloyRemovalsJson(const std::vector<Params::Scenario
     return array;
 }
 
+// STEP260 (ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14) -- deliberately flat
+// PascalCase fields, NO nested Position/Rotation sub-object (diverges from ScenarioSpawnPoint's own
+// nested Position on purpose, per ARCH's binding wire-shape ruling) -- so the Z-flip is computed
+// inline here rather than reusing BuildPositionJson, which nests.
+nlohmann::ordered_json BuildUnitPlacementsJson(const std::vector<Params::ScenarioUnitPlacement>& placements,
+                                               int mapSize) {
+    nlohmann::ordered_json array = nlohmann::ordered_json::array();
+    for (const Params::ScenarioUnitPlacement& p : placements) {
+        array.push_back({ { "ArmyName", p.armyName }, { "TemplateIdentifier", p.templateIdentifier },
+                          { "PositionX", p.positionX }, { "PositionY", p.positionY },
+                          { "PositionZ", static_cast<float>(mapSize) - p.positionZ - 1.0f },
+                          { "RotationX", p.rotationX }, { "RotationY", p.rotationY },
+                          { "RotationZ", p.rotationZ }, { "RotationW", p.rotationW } });
+    }
+    return array;
+}
+
 // Resolves body.areaName against `areas` (first-match by .name, mirroring this exact file family's
 // own established idiom -- AreasTab_List_UI.h's ResolveAreaColor, UniqueNameList_UI.h's
 // NameIsTakenBefore -- both resolve by first/earliest match, never last-wins). Empty areaName or an
@@ -93,6 +110,9 @@ nlohmann::ordered_json BuildScenarioRecordJson(const Params::ScenarioBody& body,
     json["AlloysToAdd"]    = BuildAlloyOverridesJson(body.alloysToAdd, mapSize);
     json["AlloysToRemove"] = BuildAlloyRemovalsJson(body.alloysToRemove);
     json["AuthoringNote"]  = body.authoringNote;
+    // ADDED (STEP260, ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14) -- always
+    // emitted, "[]" when empty, matching this record's own "every field always present" convention.
+    json["UnitPlacements"] = BuildUnitPlacementsJson(body.unitPlacements, mapSize);
     return json;
 }
 

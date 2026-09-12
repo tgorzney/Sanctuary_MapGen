@@ -30,6 +30,32 @@ void ReadPositionJson(const nlohmann::json& parent, float& x, float& y, float& z
     if (ReadJsonFloat(position, "z", jsonZ)) z = static_cast<float>(mapSize) - jsonZ - 1.0f;
 }
 
+// STEP260 (ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14) -- the exact inverse
+// of BuildUnitPlacementsJson (MapExporter_ScenarioRecord_IO.cpp): flat PascalCase fields, no nested
+// Position/Rotation sub-object, so the Z-flip is inverted inline rather than via ReadPositionJson
+// (which expects a nested "Position" object).
+void ReadUnitPlacementsJson(const nlohmann::json& parent, const char* key,
+                            std::vector<Params::ScenarioUnitPlacement>& outPlacements, int mapSize) {
+    if (!parent.contains(key) || !parent[key].is_array()) return;
+    outPlacements.clear();
+    for (const nlohmann::json& entryJson : parent[key]) {
+        if (!entryJson.is_object()) continue;
+        Params::ScenarioUnitPlacement entry;
+        ReadJsonText(entryJson, "ArmyName", entry.armyName);
+        ReadJsonText(entryJson, "TemplateIdentifier", entry.templateIdentifier);
+        ReadJsonFloat(entryJson, "PositionX", entry.positionX);
+        ReadJsonFloat(entryJson, "PositionY", entry.positionY);
+        float jsonZ = static_cast<float>(mapSize) - entry.positionZ - 1.0f;
+        if (ReadJsonFloat(entryJson, "PositionZ", jsonZ))
+            entry.positionZ = static_cast<float>(mapSize) - jsonZ - 1.0f;
+        ReadJsonFloat(entryJson, "RotationX", entry.rotationX);
+        ReadJsonFloat(entryJson, "RotationY", entry.rotationY);
+        ReadJsonFloat(entryJson, "RotationZ", entry.rotationZ);
+        ReadJsonFloat(entryJson, "RotationW", entry.rotationW);
+        outPlacements.push_back(entry);
+    }
+}
+
 // RETIRED 2026-09-08 (STEP252, ARCH_15_12_ScenarioSpawnIdentity.md §15.12): ReadSpawnsJson (the old
 // array-of-{ArmyName,Position} shape) is gone, replaced by ReadSpawnIdsJson below (per-record) and
 // ReadSpawnPointsJson (Scenarios-level, exposed via the header — see its own doc comment there).
@@ -134,6 +160,9 @@ void ReadScenarioBodyJson(const nlohmann::json& json, Params::ScenarioBody& body
     ReadAlloyOverridesJson(json, "AlloysToAdd", body.alloysToAdd, mapSize);
     ReadAlloyRemovalsJson(json, "AlloysToRemove", body.alloysToRemove);
     ReadJsonText(json, "AuthoringNote", body.authoringNote);
+    // Absent key (every pre-STEP260 .sanmap) leaves unitPlacements at its struct default, an empty
+    // vector -- never an error, same idiom as every other optional field in this function.
+    ReadUnitPlacementsJson(json, "UnitPlacements", body.unitPlacements, mapSize);
 }
 
 } // namespace Io

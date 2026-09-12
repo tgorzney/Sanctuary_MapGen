@@ -37,6 +37,26 @@ struct ScenarioSpawnPoint {
     float positionX = 0.0f, positionY = 0.0f, positionZ = 0.0f;
 };
 
+// ADDED (STEP260, ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14) -- closes the
+// gap left by `spawnsUnits` (a bare opt-in bool with no dispatch data, see comment above): explicit,
+// pre-baked unit placements, one row per unit. Mirrors Params::UnitTransform's quaternion rotation
+// shape (Army_PARAMS.h) rather than a facingDegrees float -- ARCH_15_14's ruling: Engine.CreateUnit
+// genuinely accepts a quaternion `orientation` argument; only the game's own gameUtils.lua wrapper
+// this scenario system calls currently drops it before forwarding (a game-code gap, not an engine
+// limitation) -- so SanGen's own data model stores the real shape, not a lossy substitute. No scale
+// field: confirmed no unit-level scale consumer exists anywhere in ground truth.
+struct ScenarioUnitPlacement {
+    std::string armyName;            // required non-empty -- the ARMY_XX this unit belongs to.
+    std::string templateIdentifier;  // required non-empty -- unit blueprint/template id (e.g.
+                                      // "ucn3001"). Free-text, NOT validated against a live template
+                                      // list -- no such list exists in this codebase (mirrors
+                                      // ScenarioAlloyOverride::markerName's own honest-fallback posture).
+    float positionX = 0.0f, positionY = 0.0f, positionZ = 0.0f;
+    float rotationX = 0.0f, rotationY = 0.0f, rotationZ = 0.0f, rotationW = 1.0f;  // quaternion
+                                      // identity default -- same shape/default as
+                                      // Params::UnitTransform (Army_PARAMS.h).
+};
+
 struct ScenarioBody {
     std::string name;                                    // log/debug identifier AND the dispatch
                                                             // key for unit spawning — see the ARCH
@@ -74,6 +94,7 @@ struct ScenarioBody {
                                                             // intent in the entry's own comment" as
                                                             // real data now that this is no longer
                                                             // hand-authored Lua text
+    std::vector<ScenarioUnitPlacement> unitPlacements;   // NEW (STEP260) -- see struct doc comment above.
 };
 
 struct PatternScenario { ScenarioBody body; std::string slotPattern; };            // TIER 1

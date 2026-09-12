@@ -51,6 +51,15 @@ void PopulateFullScenarioBody(Params::ScenarioBody& body, const std::string& nam
     body.alloysToRemove.push_back(alloyToRemove);
 
     body.authoringNote = "Deliberately non-empty authoring note for " + name;
+
+    // STEP260 (ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14) -- a real,
+    // non-default unit placement with a non-identity rotation.
+    Params::ScenarioUnitPlacement unitPlacement;
+    unitPlacement.armyName = "ArmyOne"; unitPlacement.templateIdentifier = "ucn3001";
+    unitPlacement.positionX = 31.0f; unitPlacement.positionY = 5.0f; unitPlacement.positionZ = 33.0f;
+    unitPlacement.rotationX = 0.0f; unitPlacement.rotationY = 0.707f;
+    unitPlacement.rotationZ = 0.0f; unitPlacement.rotationW = 0.707f;
+    body.unitPlacements.push_back(unitPlacement);
 }
 
 void CheckScenarioBodyEquals(const Params::ScenarioBody& original, const Params::ScenarioBody& loaded,
@@ -83,6 +92,28 @@ void CheckScenarioBodyEquals(const Params::ScenarioBody& original, const Params:
           (label + " one alloysToRemove entry survives").c_str());
 
     Check(loaded.authoringNote == original.authoringNote, (label + " authoringNote survives").c_str());
+
+    // STEP260: unitPlacements survives, including its non-identity rotation, unflipped, and the
+    // position (with its Z coordinate flip round-tripping back exactly).
+    Check(loaded.unitPlacements.size() == original.unitPlacements.size()
+          && loaded.unitPlacements.size() == 1,
+          (label + " one unitPlacement survives").c_str());
+    if (loaded.unitPlacements.size() == 1) {
+        const Params::ScenarioUnitPlacement& loadedPlacement = loaded.unitPlacements[0];
+        const Params::ScenarioUnitPlacement& originalPlacement = original.unitPlacements[0];
+        Check(loadedPlacement.armyName == originalPlacement.armyName
+              && loadedPlacement.templateIdentifier == originalPlacement.templateIdentifier,
+              (label + " unitPlacement armyName/templateIdentifier survive").c_str());
+        Check(NearlyEqual(loadedPlacement.positionX, originalPlacement.positionX)
+              && NearlyEqual(loadedPlacement.positionY, originalPlacement.positionY)
+              && NearlyEqual(loadedPlacement.positionZ, originalPlacement.positionZ),
+              (label + " unitPlacement position (incl. Z flip) survives").c_str());
+        Check(NearlyEqual(loadedPlacement.rotationX, originalPlacement.rotationX)
+              && NearlyEqual(loadedPlacement.rotationY, originalPlacement.rotationY)
+              && NearlyEqual(loadedPlacement.rotationZ, originalPlacement.rotationZ)
+              && NearlyEqual(loadedPlacement.rotationW, originalPlacement.rotationW),
+              (label + " unitPlacement rotation survives verbatim, no flip applied").c_str());
+    }
 }
 
 Params::MapRecipe BuildFixtureRecipe() {
@@ -612,6 +643,79 @@ void RunScenarioSlotRangeConditionTests() {
     }
 }
 
+// STEP260 (ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14): ScenarioUnitPlacement
+// specifics not already covered by RunPureRoundTripTests' full-field fixture above -- the exact
+// Z-flip value, legacy-.sanmap absent-key compatibility, and wire spelling.
+void RunScenarioUnitPlacementTests() {
+    // Item 3: Z-flip -- positionZ = 10 with mapSize = 100 exports "PositionZ": 89; importing that
+    // JSON with mapSize = 100 recovers positionZ == 10 exactly.
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 100;
+        Params::ScenarioUnitPlacement placement;
+        placement.armyName = "ArmyOne"; placement.templateIdentifier = "ucn3001";
+        placement.positionZ = 10.0f;
+        recipe.scenarios.defaultScenario.unitPlacements.push_back(placement);
+
+        const nlohmann::ordered_json json = Io::BuildScenariosJson(recipe);
+        Check(NearlyEqual(json["DefaultScenario"]["UnitPlacements"][0]["PositionZ"].get<float>(), 89.0f),
+              "unitPlacement Z-flip: positionZ=10, mapSize=100 exports PositionZ=89");
+
+        nlohmann::ordered_json document; document["Scenarios"] = json;
+        Params::MapRecipe loaded; loaded.geometry.mapSize = 100;
+        Io::MapImportResult result;
+        Io::ReadScenariosJson(document, loaded, result);
+        Check(loaded.scenarios.defaultScenario.unitPlacements.size() == 1
+              && NearlyEqual(loaded.scenarios.defaultScenario.unitPlacements[0].positionZ, 10.0f),
+              "unitPlacement Z-flip: importing PositionZ=89 with mapSize=100 recovers positionZ=10");
+    }
+
+    // Item 2: legacy .sanmap compatibility -- a scenario record with no "UnitPlacements" key reads
+    // back as an empty vector, not an error, not a crash.
+    {
+        nlohmann::ordered_json document;
+        nlohmann::ordered_json defaultScenario;
+        defaultScenario["Name"] = "LegacyNoUnitPlacements";   // deliberately no "UnitPlacements" key
+        document["Scenarios"]["DefaultScenario"] = defaultScenario;
+
+        Params::MapRecipe loaded; loaded.geometry.mapSize = 512;
+        Io::MapImportResult result;
+        Io::ReadScenariosJson(document, loaded, result);
+        Check(loaded.scenarios.defaultScenario.unitPlacements.empty(),
+              "absent UnitPlacements key: reads back as an empty vector");
+        Check(result.warningCount == 0, "absent UnitPlacements key: zero warnings");
+    }
+
+    // Item 5: wire spelling -- "UnitPlacements" is an array of objects with ArmyName/
+    // TemplateIdentifier/PositionX/PositionY/PositionZ/RotationX/RotationY/RotationZ/RotationW keys,
+    // all always present (even a placement with e.g. rotationX == 0 still emits the key).
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        Params::ScenarioUnitPlacement placement;   // deliberately identity rotation (all-default)
+        placement.armyName = "ArmyOne"; placement.templateIdentifier = "ucn3001";
+        recipe.scenarios.defaultScenario.unitPlacements.push_back(placement);
+
+        const nlohmann::ordered_json json = Io::BuildScenariosJson(recipe);
+        const nlohmann::ordered_json& wire = json["DefaultScenario"]["UnitPlacements"][0];
+        for (const char* key : { "ArmyName", "TemplateIdentifier", "PositionX", "PositionY", "PositionZ",
+                                 "RotationX", "RotationY", "RotationZ", "RotationW" }) {
+            Check(wire.contains(key), (std::string("wire spelling: \"") + key + "\" key is present").c_str());
+        }
+    }
+
+    // Empty countScenarios/patternScenarios convention extended: an empty unitPlacements still
+    // serializes as [], never omitted.
+    {
+        Params::MapRecipe recipe;
+        recipe.geometry.mapSize = 512;
+        const nlohmann::ordered_json json = Io::BuildScenariosJson(recipe);
+        Check(json["DefaultScenario"]["UnitPlacements"].is_array()
+              && json["DefaultScenario"]["UnitPlacements"].empty(),
+              "an empty unitPlacements still serializes as []");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -626,6 +730,7 @@ int main() {
     RunLiveDocumentIntegrationTest();
     RunScenarioAreaNameTests();
     RunScenarioSlotRangeConditionTests();
+    RunScenarioUnitPlacementTests();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;
