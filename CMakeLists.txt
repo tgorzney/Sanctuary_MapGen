@@ -1190,6 +1190,18 @@ add_sangen_test(ScenarioScript_SlotPatternExtract_IO_Test src/io/ScenarioScript_
 # hand-typed banner string anywhere in this test, same discipline as ScenarioScript_Export_IO_Test.
 add_sangen_test(ScenarioScript_AreaImport_IO_Test src/io/ScenarioScript_AreaImport_IO_Test.cpp)
 
+# STEP265_ScenarioUnitPlacementExtractAndFullDataImportOrchestrator_IO: the third and final Part-B
+# pure, disk-free closed literal-only grammar (Shape 3) -- literal armyName/templateIdentifier/x/y/z
+# unit-placement tuples, with the armyIndex-vs-armyName binding-rule guard and the mapSize-based z-flip
+# -- plus the disk-touching orchestrator composing all four Part-B extractors (the existing area one
+# plus Shapes 1-3) over a SINGLE byte-capped read. Only the area result auto-reconciles into
+# recipe.areas; the other three are surfaced as raw candidate lists, never auto-attached to any
+# scenario record. No real-world fixture exists for Shape 3 (ARCH_15_14 Part B's own ground-truth
+# note) -- every fixture in ScenarioScript_UnitPlacementExtract_IO_Test.cpp is synthetic, written to
+# spec.
+add_sangen_test(ScenarioScript_UnitPlacementExtract_IO_Test src/io/ScenarioScript_UnitPlacementExtract_IO_Test.cpp)
+add_sangen_test(ScenarioScript_FullDataImport_IO_Test src/io/ScenarioScript_FullDataImport_IO_Test.cpp)
+
 # Tab-rebuild batch E — the host shell. One binary over four translation units (main() lives in
 # ApplicationShell_Layout_UI_Test.cpp): the left column's catalogue is pure data, so the v1 layout is
 # asserted rather than eyeballed; the other three drive a REAL Ui::Application on the Cpu twin, so the
