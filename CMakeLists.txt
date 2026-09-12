@@ -1007,6 +1007,11 @@ add_sangen_test(ScenarioSlotRangeValidation_IO_Test
 # target immediately above.
 add_sangen_test(ScenarioSpawnIdValidation_IO_Test
     src/io/ScenarioSpawnIdValidation_IO_Test.cpp)
+# STEP260_ScenarioUnitPlacement_PARAMS_IO: warn-only validation of ScenarioBody::unitPlacements
+# (ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14) -- same posture as the
+# ScenarioSpawnIdValidation target immediately above.
+add_sangen_test(ScenarioUnitPlacementValidation_IO_Test
+    src/io/ScenarioUnitPlacementValidation_IO_Test.cpp)
 # STEP251_ScenarioCategoryFourExport_IO: pure charset/uniqueness/reserved-name validation of
 # ScenarioBody::name, shared by the UI's inline warning and the category-4 export gate.
 add_sangen_test(ScenarioNameValidation_IO_Test src/io/ScenarioNameValidation_IO_Test.cpp)
