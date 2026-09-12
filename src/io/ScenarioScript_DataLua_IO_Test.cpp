@@ -598,10 +598,11 @@ void TestAreaNameStaleFallsBackToBodyArea() {
     Check(output.find("height = 12") != std::string::npos, "stale areaName: height falls back to body.area");
 }
 
-// STEP263 (ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14 Part A): the
-// `unitPlacements` Lua-render leg. Two rows render exactly two table literals with the correct field
-// spelling (armyName/templateIdentifier/x/y/z/rotation={x=,y=,z=,w=}), z flipped via FlipPositionZ,
-// x/y/rotation unflipped verbatim.
+// STEP263 (ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14 Part A, corrected by
+// Amendment 2 2026-09-12): the `unitPlacements` Lua-render leg. Two rows render exactly two table
+// literals with the correct field spelling (armyName/templateIdentifier/x/y/z/rotationX/rotationY/
+// rotationZ/rotationW as FLAT SIBLING keys, never a nested rotation={...} sub-table), z flipped via
+// FlipPositionZ, x/y/rotation unflipped verbatim.
 void TestUnitPlacementsRenderTwoRowsWithCorrectFlipAndFieldSpelling() {
     Params::MapRecipe recipe;
     recipe.geometry.mapSize = 512;
@@ -623,11 +624,13 @@ void TestUnitPlacementsRenderTwoRowsWithCorrectFlipAndFieldSpelling() {
     Check(output.find("unitPlacements = {") != std::string::npos,
           "the lowerCamelCase unitPlacements array key renders (matches scenario.unitPlacements runtime read)");
     Check(output.find("armyName = \"ARMY_03\", templateIdentifier = \"ucn3001\", x = 128, y = 0, "
-                      "z = 411, rotation = { x = 0, y = 0, z = 0, w = 1 }") != std::string::npos,
-          "placement 1 renders with z flipped (512 - 100 - 1 == 411) and x/y/rotation unflipped verbatim");
+                      "z = 411, rotationX = 0, rotationY = 0, rotationZ = 0, rotationW = 1") != std::string::npos,
+          "placement 1 renders with z flipped (512 - 100 - 1 == 411) and x/y/rotation unflipped verbatim,"
+          " rotation as flat sibling keys (never a nested rotation={...} sub-table)");
     Check(output.find("armyName = \"ARMY_04\", templateIdentifier = \"ucn4002\", x = 50, y = 3, "
-                      "z = 311, rotation = { x = 0.1, y = 0.2, z = 0.3, w = 0.9 }") != std::string::npos,
-          "placement 2 renders with z flipped (512 - 200 - 1 == 311) and x/y/rotation unflipped verbatim");
+                      "z = 311, rotationX = 0.1, rotationY = 0.2, rotationZ = 0.3, rotationW = 0.9") != std::string::npos,
+          "placement 2 renders with z flipped (512 - 200 - 1 == 311) and x/y/rotation unflipped verbatim,"
+          " rotation as flat sibling keys (never a nested rotation={...} sub-table)");
 }
 
 // STEP263: an empty unitPlacements still renders `unitPlacements = {}`, never omitted.

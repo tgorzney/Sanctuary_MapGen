@@ -83,12 +83,15 @@ std::vector<std::string> BuildAlloyOverrideRowBodies(const std::vector<Params::S
 }
 
 // ADDED (STEP263, ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14's "Export/wire
-// shape" note) -- one flat armyName/templateIdentifier/x/y/z row per placement, plus a nested
-// `rotation = { x=, y=, z=, w= }` sub-table. `x`/`y` and rotation are rendered COMPLETELY UNFLIPPED;
-// only `z` applies the same FlipPositionZ(positionZ, mapSize) transform BuildPositionedRowBody
-// already applies to spawns/alloys -- rotation is never touched by any flip, the same established
-// law already stated identically in MapExporter_Armies_IO.cpp/_Decals_IO.cpp/_Props_IO.cpp/
-// _Markers_IO.cpp, extended here to unit placements per ARCH_15_14 Part A.
+// shape" note). CORRECTED (Amendment 2, 2026-09-12): rotation renders as FLAT
+// rotationX/rotationY/rotationZ/rotationW sibling keys on the SAME row table, never a nested
+// `rotation = {...}` sub-table -- the nested form contradicted the runtime's flat
+// `placement.rotationX` read (SanGenScenarioRuntime.lua) and was a drafting error in the ARCH text,
+// now retracted. `x`/`y` and rotation are rendered COMPLETELY UNFLIPPED; only `z` applies the same
+// FlipPositionZ(positionZ, mapSize) transform BuildPositionedRowBody already applies to
+// spawns/alloys -- rotation is never touched by any flip, the same established law already stated
+// identically in MapExporter_Armies_IO.cpp/_Decals_IO.cpp/_Props_IO.cpp/_Markers_IO.cpp, extended
+// here to unit placements per ARCH_15_14 Part A.
 std::vector<std::string> BuildUnitPlacementRowBodies(const std::vector<Params::ScenarioUnitPlacement>& placements,
                                                       int mapSize) {
     std::vector<std::string> rows;
@@ -100,10 +103,10 @@ std::vector<std::string> BuildUnitPlacementRowBodies(const std::vector<Params::S
         row += "x = " + RenderLuaNumber(placement.positionX) + ", ";
         row += "y = " + RenderLuaNumber(placement.positionY) + ", ";
         row += "z = " + RenderLuaNumber(FlipPositionZ(placement.positionZ, mapSize)) + ", ";
-        row += "rotation = { x = " + RenderLuaNumber(placement.rotationX)
-             + ", y = " + RenderLuaNumber(placement.rotationY)
-             + ", z = " + RenderLuaNumber(placement.rotationZ)
-             + ", w = " + RenderLuaNumber(placement.rotationW) + " }";
+        row += "rotationX = " + RenderLuaNumber(placement.rotationX) + ", ";
+        row += "rotationY = " + RenderLuaNumber(placement.rotationY) + ", ";
+        row += "rotationZ = " + RenderLuaNumber(placement.rotationZ) + ", ";
+        row += "rotationW = " + RenderLuaNumber(placement.rotationW);
         rows.push_back(row);
     }
     return rows;
