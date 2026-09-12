@@ -175,6 +175,14 @@ void DrawScenarioSpawnPointPoolFields(Params::Scenarios& scenarios, SectionState
 void DrawScenarioBodyExtendedFields(Params::ScenarioBody& body,
                                     const std::vector<Params::Army>& armies);         // DetailAlloys.cpp
 
+// STEP261 (STEP260's `Params::ScenarioUnitPlacement`, ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md
+// §15.14) — the `body.unitPlacements` list editor: Army (DrawArmyNameField, shared above) / free-text
+// templateIdentifier / Position X-Y-Z / a yaw-only "Facing" slider + an Advanced raw-quaternion
+// toggle. Split out of DrawScenarioBodyFields for the ARCH §1.5 file-size ceiling, same posture as
+// DrawScenarioSpawnIdsSection/DrawScenarioBodyExtendedFields above.
+void DrawScenarioUnitPlacementsSection(Params::ScenarioBody& body,
+                                       const std::vector<Params::Army>& armies);   // DetailUnitPlacements_UI.cpp
+
 void DrawScenarioSpawnsWarningBanner(Params::ScenarioBody& body,
                                      const std::vector<Params::Army>& armies);        // SpawnsWarning.cpp
 

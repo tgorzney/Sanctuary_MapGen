@@ -146,6 +146,10 @@ void DrawScenarioBodyFields(Params::ScenarioBody& body, const std::vector<Params
     ImGui::SeparatorText("Authoring Note");
     DrawAuthoringNoteField(body.authoringNote);
     DrawScenarioBodyExtendedFields(body, armies);
+    // STEP261 (STEP260's `Params::ScenarioUnitPlacement`) — split out for the ARCH §1.5 ceiling,
+    // same posture as the spawns/alloys sections above.
+    ImGui::SeparatorText("Unit Placements");
+    DrawScenarioUnitPlacementsSection(body, armies);
 }
 
 } // namespace Ui
