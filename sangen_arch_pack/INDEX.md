@@ -9,7 +9,7 @@ spec(s) a question needs — never the whole pack.
 | .sanmap schema version migrations — SanGenVersion gating, the migration runner/manifest, JSON transform primitives | `specs/IO_MIGRATION_SPEC.md` |
 | units / props / markers, tpId scheme, factions, asset validation, .san* formats | `specs/UNIT_PROP_MARKER_DATA_SPEC.md` |
 | map scripting & events, lua sandbox, Tags, AI system, modding, validators | `specs/MODDING_SCRIPTING_SPEC.md` |
-| the Map Scenario system — `<MapName>_data.lua`/`<MapName>_Scenarios_Runtime.lua`/`<MapName>_Scenarios_Data.lua`/`<MapName>_Scenarios_<ScenarioName>.lua` four-category on-disk split (category 4 added 2026-09-03, `ARCH_15_04`), module API contract, three-tier scenario matching, `alloyMode` semantics, execution/timing law, the ratified export-only IO design (`Params::Scenarios`, overwrite safety incl. the category-4 scaffold-once class, ARCH §15); the mandatory per-army `spawns` hard requirement is SUPERSEDED 2026-09-04 by the shared `spawnPoints` pool + `spawnIds` two-step resolution (`ARCH_15_12`/`ARCH_15_13`) — this spec's own §6/§8/§11 spawn text is now stale, not yet caught up by the Format Expert; Tier 2's `ScenarioCountField` also gains a 4th enumerator, `SlotRangeOccupiedCount`, plus `slotRangeStart`/`slotRangeEnd` sibling condition fields (`ARCH_15_05` AMENDED 2026-09-04) — this spec's §4/§5.1/§6 field/comparator tables are now also stale, not yet caught up by the Format Expert | `specs/MAP_SCENARIO_SPEC.md` |
+| the Map Scenario system — `<MapName>_data.lua`/`<MapName>_Scenarios_Runtime.lua`/`<MapName>_Scenarios_Data.lua`/`<MapName>_Scenarios_<ScenarioName>.lua` four-category on-disk split (category 4 added 2026-09-03, `ARCH_15_04`), module API contract, three-tier scenario matching, `alloyMode` semantics, execution/timing law, the ratified export-only IO design (`Params::Scenarios`, overwrite safety incl. the category-4 scaffold-once class, ARCH §15); the mandatory per-army `spawns` hard requirement is SUPERSEDED 2026-09-04 by the shared `spawnPoints` pool + `spawnIds` two-step resolution (`ARCH_15_12`/`ARCH_15_13`) — this spec's own §6/§8/§11 spawn text is now stale, not yet caught up by the Format Expert; Tier 2's `ScenarioCountField` also gains a 4th enumerator, `SlotRangeOccupiedCount`, plus `slotRangeStart`/`slotRangeEnd` sibling condition fields (`ARCH_15_05` AMENDED 2026-09-04) — this spec's §4/§5.1/§6 field/comparator tables are now also stale, not yet caught up by the Format Expert; §15.14 (2026-09-11, amended 2026-09-11 and 2026-09-12) extends the foreign-scenario-import carve-out to two more closed match-condition shapes and an exact `slotPattern` string, and ratifies the new additive `Params::ScenarioUnitPlacement` type with real, flat-sibling quaternion rotation fields — none of this yet reflected in this spec's own text | `specs/MAP_SCENARIO_SPEC.md` |
 | how to spawn units from a per-map Lua script — the load/execution chain, the `Import()`-cache double-execution hazard, `Import()` semantics, the one-`NewThread`-per-script rule + ordering, the `CreateUnit` call, position validation, diagnostics, known-good `tpId`s (companion to `MAP_SCENARIO_SPEC.md`, not restated there) | `specs/MAP_UNIT_SPAWNING_SPEC.md` |
 | the engine's native per-navigation-layer pathing-block primitive (Navmap Modifiers) — the all-layer blocker technique (confirmed shipped, twice) and the partial/single-layer technique (confirmed shipped), the per-Lua-state execution nuance distinct from `MAP_UNIT_SPAWNING_SPEC`'s own double-execution hazard, the shared-`NewThread` ordering law (blocker work runs LAST, after unit spawning) and its `pcall`-per-call corollary, and the current manual mask-to-rectangle authoring workflow (ARCH §22) | `specs/NAVMAP_MODIFIER_BLOCKER_SPEC.md` |
 | data model (GenerationParams), generation pipeline, GPU toggles, enums | `specs/PARAMS_PIPELINE_SPEC.md` |
@@ -117,8 +117,8 @@ the six-domain (Alloy/SpawnsArmies/Units/Props/Reclaim/Decals) screen-space over
 stack (`OverlayLayer_UI`/`OverlayDomainKind_UI`/`OverlaySubLayerRef_UI`), the two-mode
 (thumbnail/strategic-icon) LOD rendering rule, the four-tier dirty-flag model (adding C —
 screen-space redraw, and C2 — interaction-scoped redraw — on top of the existing two-tier A/B
-GPU-recomposite model; **a fifth tier, B2, was added 2026-08-29 by ARCH §14.18**), the mandatory first-work-order performance requirements (bulk vertex
-writes, cross-layer visible-vertex budget + decimation, atlas page bucketing), the View
+GPU-recomposite model; **a fifth tier, B2, was added 2026-08-29 by ARCH §14.18**), the mandatory first-work-order performance requirements (bulk
+vertex writes, cross-layer visible-vertex budget + decimation, atlas page bucketing), the View
 toolbar's two-section/no-crossing popup replacing "Regenerate," and a separately-recorded GPU
 color-texture readback defect. Full ruling text: `ARCH_14_PreviewOverlayLayering.md` §14. Several items are explicitly
 **left open** by this ratification, not resolved (`ARCH_14_13_OpenItems.md` §14.13,
@@ -1250,3 +1250,95 @@ fixed 3-entry array rather than the ratified dynamic `DrawMarkerTypeSections` en
 folded into this ratification's own scope. `§1` (universal Delete key, all three manual domains)
 and `§2` ("+Group"/"+Layer" move-selection-in) of the same design needed no ARCH ruling and are
 coder-dispatchable independently of this extension.
+
+**New `ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md` §15.14 (2026-09-11) —
+extends §15.11's foreign-scenario-`.lua` carve-out; ratifies a human request to import real
+Sanctuary: Shattered Sun scenario files' match conditions and to add a new unit-placement PARAMS
+type.** Independently verified against `Scenario_PARAMS.h`, `SanGenScenarioRuntime.lua`,
+`ScenarioScript_DataLua_IO.cpp`, `ScenarioScript_AreaRectangleExtract_IO.h`/
+`ScenarioScript_AreaImport_IO.h`, `MAP_SCENARIO_SPEC.md`, and the real
+`Pandemonium Isthmus_Scenarios_Script.lua.officialbak` before ruling — confirmed every live
+`COUNT_SCENARIOS` match function fits one of two closed shapes with zero exceptions. Grants two
+narrow additional foreign-`.lua` extraction shapes beyond §15.11's area rectangles: (1) a fixed
+AND-chain of `t`/`h`/`a` count comparisons, or a fixed `pattern:sub(N,M):find("[^-]")` slot-range
+template — both mapping onto the already-ratified `ScenarioCountCondition` shape, never a general
+boolean-expression reader; and (2) an exact `PatternScenario::slotPattern` string literal. Also
+ratifies a new, additive `Params::ScenarioUnitPlacement` type (`armyName`/`templateIdentifier`/
+`positionX,Y,Z` plus rotation, see the same-day amendment below) plus its own narrowly-scoped
+literal-tuple import shape — **two corrections to the human's own request, made independently
+rather than rubber-stamped**: (a) the new type does NOT replace `ScenarioBody::spawnsUnits`, which
+ground truth shows is load-bearing today (gates the category-4 hand-authored generator
+export/scaffold path) — the two mechanisms are additive and coexist; (b) the unit-placement import
+grammar only recognizes a string `armyName`, never a foreign file's raw `armyIndex` integer,
+because that integer is confirmed to be an unstable `pairs(Armies)` runtime handle, not a stable
+`ARMY_XX` identity — reinterpreting it would be exactly the kind of guess Constitution §6 forbids.
+The runtime `armyName`→army-index resolution algorithm and the render/import field-mapping rules
+(including the `positionZ` flip/unflip convention, shared with `spawns`/`alloys`) are specified in
+full inside §15.14 itself, per the §15.12/§15.13 precedent of closing an algorithm gap in the same
+ratification that creates the need for it. Downstream work (Format Expert wire-shape catch-up, the
+PARAMS/IO/UI implementation, the three new extractor IO units) is flagged, not resolved, in
+§15.14's own closing section.
+
+**AMENDMENT (2026-09-11, same day) to `ARCH_15_14`, correcting the paragraph above — the original
+"`facingDegrees` is authored-but-inert, no confirmed consumer" ruling was FACTUALLY WRONG and is
+retracted.** A follow-up investigation, independently re-verified before this correction was
+recorded (against the vendored game's own Lua/FFI sources, not taken on a relayed report's word):
+`Engine.CreateUnit`'s native delegate (`typedef int32_t (*CreateUnit)(int32_t typeID, int32_t army,
+float3 location, quaternion rotation, float constructionProgress);`,
+`engine/LJ/lua/host/generated/ffi/luaToEngineDelegates.lua:128`) genuinely carries a quaternion
+`orientation` parameter, and the engine's own unit-creation wrapper
+(`engine/LJ/lua/host/units/unitsUtilities.lua:15-30`) already defaults it to
+`GetIdentityQuaternion()` and forwards it end-to-end — rotation IS real, engine-supported, wired
+data for units. By contrast, that same call site hardcodes an identity scale for every unit,
+confirming scale genuinely has no consumer for units (unlike props/decals, where
+`common/mapUtils.lua` passes a real per-instance scale) — so `ScenarioUnitPlacement` correctly
+gains rotation fields but still, correctly, no scale field. The reason today's scenario-spawned
+units end up unrotated in practice is narrower than "unsupported": `common/gameUtils.lua:386,453`
+(hand-authored game code, not SanGen's) call `CreateUnit(...)` with only 3 arguments and an
+explicit `-- TODO: rotation` comment, and this pack's own `Scenario.SpawnUnits` mirrored that same
+3-argument shape. `ARCH_15_14` is corrected in place: `ScenarioUnitPlacement` now carries
+`rotationX/Y/Z/rotationW` quaternion fields mirroring `Params::UnitTransform`'s own shape/defaults
+(not the retracted ad-hoc `facingDegrees` float), and the runtime algorithm (`Scenario.SpawnUnits`,
+`Scenario.SpawnBakedUnitPlacements`) is updated to forward rotation, nil-safely defaulting to
+identity so existing category-4 generator output keeps working unchanged. Position-field flip
+convention is unaffected — rotation is confirmed to render/import completely verbatim, matching
+the SAME established law already governing every other rotation-carrying entity type in this
+codebase (`MapExporter_Armies_IO.cpp`/`_Decals_IO.cpp`/`_Props_IO.cpp`/`_Markers_IO.cpp`'s own
+"rotation/scale are untouched by the flip" rule, confirmed by direct read before extending it to
+this fifth entity kind). Full corrected ruling and ground-truth citations: `ARCH_15_14` itself and
+`ARCH_15_MapScenarioSystem.md`'s matching amendment note.
+
+**AMENDMENT 2 (2026-09-12) to `ARCH_15_14` — a coder-exposed self-contradiction in this section's
+own binding text, not a new design question.** STEP263's coder implemented both of §15.14's own
+Lua snippets verbatim — the "Runtime consumption" snippet (`Scenario.SpawnBakedUnitPlacements`,
+reading flat `placement.rotationX/Y/Z/W`) and the "Export/wire shape" note (directing the
+Lua-render leg to emit a NESTED `rotation = {x=,y=,z=,w=}` sub-table) — correctly declining to
+silently reconcile a discrepancy in binding ARCH text on their own judgment. The result, confirmed
+independently by direct read of the committed `ScenarioScript_DataLua_IO.cpp` (nested,
+lines 92-110) and `SanGenScenarioRuntime.lua` (flat, lines 375-392) before ruling: `placement.rotationX`
+is always `nil` against the real rendered shape, so baked-placement rotation silently no-ops
+end-to-end through SanGen's own export→runtime path, even though nothing else in the ratification
+was wrong. **RULED: FLAT wins.** Three of the four legs already agreed on flat, prefixed sibling
+keys (`rotationX/Y/Z/rotationW`) before this correction — `Params::ScenarioUnitPlacement`
+(`Scenario_PARAMS.h`), the already-shipped `.sanmap` JSON leg (`MapExporter_ScenarioRecord_IO.cpp`,
+STEP260, which explicitly records choosing flat over a nested sub-object), and the runtime
+consumption snippet itself; only the Lua-render leg's nested shape was the outlier, and is the one
+corrected. The flat-with-prefix form is also the only collision-safe one: position already renders
+as bare `x`/`y`/`z` on the same row, so a bare, unprefixed rotation `x`/`y`/`z`/`w` would collide
+with those same keys — the `rotation`-prefix is what a flat sibling shape needs to coexist with
+position on one table, which is presumably why the runtime snippet was already written that way.
+`ARCH_15_14`'s "Export/wire shape" paragraph is corrected in place to specify flat
+`rotationX=/rotationY=/rotationZ=/rotationW=` sibling keys for the Lua-render leg, with a concrete,
+narrow, mechanical coder fix named (`BuildUnitPlacementRowBodies` in
+`ScenarioScript_DataLua_IO.cpp:92-110`, plus its test file's matching assertions) — no change
+needed to `Scenario_PARAMS.h`, the `.sanmap` JSON leg, or `SanGenScenarioRuntime.lua`, all three
+already correct. Part B's Shape 3 (the foreign-file import grammar's own optional nested
+`rotation = {...}` INPUT shape) is explicitly unaffected — it describes what a hand-authored
+foreign file might plausibly contain, independent of SanGen's own render-leg OUTPUT convention,
+and both ultimately populate the same flat PARAMS struct either way. Recorded as a reminder for
+this pack's own drafting discipline: binding ARCH text containing more than one code snippet for
+the same data shape needs the same self-consistency check this pack already applies to shipped
+source before ratifying — a coder correctly implementing contradictory binding text verbatim
+(rather than guessing which half was right) is not a coder error, and should never be treated as
+one. Full corrected ruling and ground-truth citations: `ARCH_15_14` itself and
+`ARCH_15_MapScenarioSystem.md`'s matching Amendment 2 note.
