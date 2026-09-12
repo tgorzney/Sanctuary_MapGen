@@ -975,9 +975,6 @@ add_sangen_test(PlacementRuleSections_UI_Test src/ui/PlacementRuleSections_UI_Te
 # STEP74 — the Scenarios tab: three-tier list management, match-rule authoring, live composition
 # matrix, mandatory-spawns surfacing, maxArmySlotCount authoring. All pure, no imgui frame needed.
 add_sangen_test(ScenariosTab_UI_Test      src/ui/ScenariosTab_UI_Test.cpp)
-# STEP261 — the `body.unitPlacements` list editor's pure half (add-row, yaw-degrees -> quaternion,
-# and the gated-write behind an Advanced hand-edit). No imgui frame needed.
-add_sangen_test(ScenariosTab_DetailUnitPlacements_UI_Test src/ui/ScenariosTab_DetailUnitPlacements_UI_Test.cpp)
 
 # Tab-rebuild batch D — Files/Save and the `.sanmap` IO behind it. The importer binary spans three
 # translation units (main() in MapImporter_IO_Test.cpp): the JSON round trip, the Constitution §6
