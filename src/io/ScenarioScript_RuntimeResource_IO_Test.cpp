@@ -209,6 +209,64 @@ static void TestRealBundledResourceSelfCheck(const std::string& luaResourceDirec
     Check(text.find("pcall(EvaluateScenarioConditions, scenario.conditions, total, humanCount, aiCount, slotPattern)")
               != std::string::npos,
           "the Tier-2 FindMatchingScenario call site forwards slotPattern through");
+
+    // STEP263 (ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14 Part A): the full
+    // matched-scenario table is retained, not just its name.
+    Check(text.find("local currentMatchedScenario = nil") != std::string::npos,
+          "the currentMatchedScenario upvalue is declared");
+    Check(text.find("currentMatchedScenario = matchedScenario") != std::string::npos,
+          "Scenario.ResolveAndApply assigns the full matched scenario table to currentMatchedScenario");
+
+    // Scenario.SpawnUnits rotation forwarding, nil-safely -- the regression guard: an instruction
+    // shaped like existing category-4 generator output (no rotationW field) must still fall back to
+    // IDENTITY_ROTATION unchanged.
+    Check(text.find("local rotation = (instr.rotationW ~= nil)") != std::string::npos,
+          "Scenario.SpawnUnits computes rotation with a nil-safe rotationW guard");
+    Check(text.find("or IDENTITY_ROTATION") != std::string::npos,
+          "Scenario.SpawnUnits falls back to IDENTITY_ROTATION when rotationW is nil -- the "
+          "regression case for existing category-4 generator output");
+    // Two separate single-line finds, not one embedded-newline literal spanning both source lines --
+    // a real on-disk checkout can legitimately carry CRLF line endings for an LF-only git blob (see
+    // this file's own banner-line comment above), which a bare "\n" literal would not match. Position
+    // ordering proves the two fragments are the SAME statement, adjacent, not two unrelated hits.
+    {
+        const std::size_t pcallPosition = text.find("pcall(CreateUnit, instr.armyIndex, instr.templateIdentifier,");
+        const std::size_t float3Position = text.find("EngineClasses.float3(instr.x, instr.y, instr.z), rotation)");
+        Check(pcallPosition != std::string::npos && float3Position != std::string::npos,
+              "Scenario.SpawnUnits' pcall(CreateUnit, ...) call and its EngineClasses.float3(...), "
+              "rotation) continuation both appear in the output");
+        Check(float3Position != std::string::npos && pcallPosition != std::string::npos
+              && float3Position > pcallPosition && (float3Position - pcallPosition) < 100,
+              "Scenario.SpawnUnits forwards the computed rotation as CreateUnit's 4th argument "
+              "(the continuation line immediately follows the pcall(CreateUnit, ...) line)");
+    }
+
+    // Scenario.SpawnBakedUnitPlacements -- resolves armyName against the live pairs(Armies) handle,
+    // Warn()s and skips an unresolvable army, never guessing/hardcoding an armyIndex.
+    Check(text.find("function Scenario.SpawnBakedUnitPlacements(scenario)") != std::string::npos,
+          "Scenario.SpawnBakedUnitPlacements is defined");
+    Check(text.find("local function ResolveArmyIndexByName(armyName)") != std::string::npos,
+          "ResolveArmyIndexByName is defined");
+    Check(text.find("if not scenario.unitPlacements then return end") != std::string::npos,
+          "Scenario.SpawnBakedUnitPlacements is a no-op, no error, when unitPlacements is nil "
+          "(every pre-STEP263 scenario table)");
+    Check(text.find("scenario unit placement named unknown army") != std::string::npos,
+          "an unresolvable armyName is Warn()ed, not silently dropped");
+
+    // Wiring: SpawnMatchedScenarioUnits calls SpawnBakedUnitPlacements unconditionally, BEFORE the
+    // early-out that only governs the category-4 Import() path -- baked placements are independent
+    // of the spawnsUnits opt-in flag.
+    const std::size_t spawnMatchedScenarioUnitsPosition = text.find("function Scenario.SpawnMatchedScenarioUnits(area)");
+    const std::size_t spawnBakedCallPosition = text.find("Scenario.SpawnBakedUnitPlacements(currentMatchedScenario)");
+    const std::size_t earlyOutPosition = text.find("if not currentMatchedScenarioName then return end");
+    Check(spawnMatchedScenarioUnitsPosition != std::string::npos && spawnBakedCallPosition != std::string::npos
+          && earlyOutPosition != std::string::npos,
+          "SpawnMatchedScenarioUnits, the SpawnBakedUnitPlacements call, and the category-4 early-out "
+          "all appear in the output");
+    Check(spawnMatchedScenarioUnitsPosition < spawnBakedCallPosition && spawnBakedCallPosition < earlyOutPosition,
+          "Scenario.SpawnBakedUnitPlacements(currentMatchedScenario) is called before the "
+          "category-4-only early-out -- baked placements fire even when spawnsUnits == false and no "
+          "generator file exists");
 }
 
 // 7. Empty directory and empty override never crashes.

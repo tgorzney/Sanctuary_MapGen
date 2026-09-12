@@ -82,6 +82,33 @@ std::vector<std::string> BuildAlloyOverrideRowBodies(const std::vector<Params::S
     return rows;
 }
 
+// ADDED (STEP263, ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14's "Export/wire
+// shape" note) -- one flat armyName/templateIdentifier/x/y/z row per placement, plus a nested
+// `rotation = { x=, y=, z=, w= }` sub-table. `x`/`y` and rotation are rendered COMPLETELY UNFLIPPED;
+// only `z` applies the same FlipPositionZ(positionZ, mapSize) transform BuildPositionedRowBody
+// already applies to spawns/alloys -- rotation is never touched by any flip, the same established
+// law already stated identically in MapExporter_Armies_IO.cpp/_Decals_IO.cpp/_Props_IO.cpp/
+// _Markers_IO.cpp, extended here to unit placements per ARCH_15_14 Part A.
+std::vector<std::string> BuildUnitPlacementRowBodies(const std::vector<Params::ScenarioUnitPlacement>& placements,
+                                                      int mapSize) {
+    std::vector<std::string> rows;
+    rows.reserve(placements.size());
+    for (const Params::ScenarioUnitPlacement& placement : placements) {
+        std::string row;
+        row += "armyName = " + QuotedLuaString(placement.armyName) + ", ";
+        row += "templateIdentifier = " + QuotedLuaString(placement.templateIdentifier) + ", ";
+        row += "x = " + RenderLuaNumber(placement.positionX) + ", ";
+        row += "y = " + RenderLuaNumber(placement.positionY) + ", ";
+        row += "z = " + RenderLuaNumber(FlipPositionZ(placement.positionZ, mapSize)) + ", ";
+        row += "rotation = { x = " + RenderLuaNumber(placement.rotationX)
+             + ", y = " + RenderLuaNumber(placement.rotationY)
+             + ", z = " + RenderLuaNumber(placement.rotationZ)
+             + ", w = " + RenderLuaNumber(placement.rotationW) + " }";
+        rows.push_back(row);
+    }
+    return rows;
+}
+
 std::vector<std::string> BuildAlloyRemovalRowBodies(const std::vector<Params::ScenarioAlloyRemoval>& removals) {
     std::vector<std::string> rows;
     rows.reserve(removals.size());
@@ -129,6 +156,14 @@ void AppendScenarioBodyFields(std::string& out, int indentLevel, const Params::S
     // Real string data, never rendered as a `--` Lua comment (ARCH_15_05_ParamsScenariosType.md
     // §15.5: "as real data now that this is no longer hand-authored Lua text").
     AppendKeyValueLine(out, indentLevel, "authoringNote", QuotedLuaString(body.authoringNote));
+
+    // ADDED (STEP263) -- always present, "= {}" when empty (this file's own "every field always
+    // rendered" convention, already used for spawnIds/alloys above). Lua key is lowerCamelCase
+    // "unitPlacements", matching this file's own naming convention AND `Scenario.
+    // SpawnBakedUnitPlacements`'s own `scenario.unitPlacements` read (SanGenScenarioRuntime.lua,
+    // ARCH_15_14 Part A) -- last field, mirroring MapExporter_ScenarioRecord_IO.cpp's own
+    // "UnitPlacements" JSON emission order (STEP260).
+    AppendArrayOfTables(out, indentLevel, "unitPlacements", BuildUnitPlacementRowBodies(body.unitPlacements, mapSize));
 }
 
 // AppendArrayOfTables (STEP63) is NOT used for the three tier tables below -- it assumes a flat,

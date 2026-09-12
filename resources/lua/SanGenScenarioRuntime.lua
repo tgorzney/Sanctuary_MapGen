@@ -301,12 +301,15 @@ end
 -- Set inside ResolveAndApply, read by Scenario.SpawnMatchedScenarioUnits below (STEP251,
 -- ARCH_15_04_ThreeFileOnDiskShape.md "AMENDED 2026-09-03" -- resolves ARCH_15_05's OPEN item 2).
 local currentMatchedScenarioName = nil
+local currentMatchedScenario = nil    -- NEW (STEP263) -- the full matched scenario table, needed by
+                                       -- Scenario.SpawnBakedUnitPlacements below (ARCH_15_14 Part A)
 
 function Scenario.ResolveAndApply(total, humanCount, aiCount, playersInformation)
     local slotPattern = BuildSlotPattern(playersInformation, MAX_ARMY_SLOT_COUNT)
     local matchedScenario = FindMatchingScenario(total, humanCount, aiCount, slotPattern)
     local chosenArea, spawnsUnitsEnabled = matchedScenario.area, matchedScenario.spawnsUnits
     currentMatchedScenarioName = matchedScenario.name
+    currentMatchedScenario = matchedScenario   -- NEW (STEP263)
     ApplyScenario(matchedScenario, total, slotPattern)
 
     Log(string.format(
@@ -329,12 +332,20 @@ end
 -- ============================================================================
 local UNIT_SPAWN_BATCH_SIZE = 100
 
+-- WIDENED (STEP263, ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14 Part A) --
+-- forwards rotation, nil-safely: existing category-4 hand-authored generator instructions have never
+-- produced a rotationX/Y/Z/W field, so `rotation` falls back to IDENTITY_ROTATION, exactly today's
+-- behavior. Only this and the new `local rotation = ...` line changed; placed/failed/batching/
+-- logging are all unchanged.
 function Scenario.SpawnUnits(instructions)
     local sinceYield = 0
     local placed, failed = 0, 0
     for _, instr in ipairs(instructions) do
+        local rotation = (instr.rotationW ~= nil)
+            and { x = instr.rotationX, y = instr.rotationY, z = instr.rotationZ, w = instr.rotationW }
+            or IDENTITY_ROTATION   -- this file's own existing constant (:74) -- unchanged default
         local ok, unit = pcall(CreateUnit, instr.armyIndex, instr.templateIdentifier,
-            EngineClasses.float3(instr.x, instr.y, instr.z))
+            EngineClasses.float3(instr.x, instr.y, instr.z), rotation)
         if ok and unit then placed = placed + 1 else failed = failed + 1 end
 
         sinceYield = sinceYield + 1
@@ -348,6 +359,39 @@ function Scenario.SpawnUnits(instructions)
 end
 
 -- ============================================================================
+-- NEW (STEP263, ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14 Part A) -- spawns
+-- a scenario's baked, declarative `unitPlacements` (Params::ScenarioUnitPlacement, rendered by
+-- ScenarioScript_DataLua_IO.cpp), independent of and in addition to the category-4 generator opt-in
+-- mechanism below. `armyName` is resolved against the live `pairs(Armies)` runtime handle at spawn
+-- time -- never stored as a raw armyIndex integer (Part A, "Corrections" item 3).
+-- ============================================================================
+local function ResolveArmyIndexByName(armyName)
+    for armyIndex, army in pairs(Armies) do
+        if army.name == armyName then return armyIndex end
+    end
+    return nil
+end
+
+function Scenario.SpawnBakedUnitPlacements(scenario)
+    if not scenario.unitPlacements then return end
+    local instructions = {}
+    for _, placement in ipairs(scenario.unitPlacements) do
+        local armyIndex = ResolveArmyIndexByName(placement.armyName)
+        if armyIndex then
+            instructions[#instructions + 1] = { armyIndex = armyIndex,
+                templateIdentifier = placement.templateIdentifier,
+                x = placement.x, y = placement.y, z = placement.z,
+                rotationX = placement.rotationX, rotationY = placement.rotationY,
+                rotationZ = placement.rotationZ, rotationW = placement.rotationW }
+        else
+            Warn("SANGEN: scenario unit placement named unknown army '"..tostring(placement.armyName)..
+                 "' -- skipped.")
+        end
+    end
+    Scenario.SpawnUnits(instructions)
+end
+
+-- ============================================================================
 -- Generic per-scenario dispatch (`ARCH_15_04_ThreeFileOnDiskShape.md` "AMENDED 2026-09-03",
 -- MAP_SCENARIO_SPEC.md §11.2). Lazily Import()s ONLY the one matched scenario's own category-4
 -- generator file, <MapName>_Scenarios_<ScenarioName>.lua -- never eager, never a name->function table
@@ -355,8 +399,15 @@ end
 -- spawnsUnits == false scenario is the silent, expected common case; a missing file for
 -- spawnsUnits == true is a real authoring gap that pcall degrades to "no units spawned," never an
 -- abort -- the same per-call pcall ordering law this file's own FindMatchingScenario already follows.
+--
+-- NEW (STEP263): baked `unitPlacements` are spawned first, unconditionally -- independent of the
+-- category-4 `spawnsUnits` opt-in below (ARCH_15_14 Part A, "Corrections" item 2: a scenario may have
+-- spawnsUnits=true, non-empty unitPlacements, both, or neither).
 -- ============================================================================
 function Scenario.SpawnMatchedScenarioUnits(area)
+    if currentMatchedScenario then
+        Scenario.SpawnBakedUnitPlacements(currentMatchedScenario)
+    end
     if not currentMatchedScenarioName then return end
     local path = string.format("maps/%s/%s_Scenarios_%s.lua",
         currentMapName, currentMapName, currentMatchedScenarioName)

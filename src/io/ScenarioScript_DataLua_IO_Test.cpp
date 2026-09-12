@@ -598,6 +598,47 @@ void TestAreaNameStaleFallsBackToBodyArea() {
     Check(output.find("height = 12") != std::string::npos, "stale areaName: height falls back to body.area");
 }
 
+// STEP263 (ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md §15.14 Part A): the
+// `unitPlacements` Lua-render leg. Two rows render exactly two table literals with the correct field
+// spelling (armyName/templateIdentifier/x/y/z/rotation={x=,y=,z=,w=}), z flipped via FlipPositionZ,
+// x/y/rotation unflipped verbatim.
+void TestUnitPlacementsRenderTwoRowsWithCorrectFlipAndFieldSpelling() {
+    Params::MapRecipe recipe;
+    recipe.geometry.mapSize = 512;
+
+    Params::ScenarioUnitPlacement placementOne;
+    placementOne.armyName = "ARMY_03"; placementOne.templateIdentifier = "ucn3001";
+    placementOne.positionX = 128.0f; placementOne.positionY = 0.0f; placementOne.positionZ = 100.0f;
+    placementOne.rotationX = 0.0f; placementOne.rotationY = 0.0f; placementOne.rotationZ = 0.0f; placementOne.rotationW = 1.0f;
+    recipe.scenarios.defaultScenario.unitPlacements.push_back(placementOne);
+
+    Params::ScenarioUnitPlacement placementTwo;
+    placementTwo.armyName = "ARMY_04"; placementTwo.templateIdentifier = "ucn4002";
+    placementTwo.positionX = 50.0f; placementTwo.positionY = 3.0f; placementTwo.positionZ = 200.0f;
+    placementTwo.rotationX = 0.1f; placementTwo.rotationY = 0.2f; placementTwo.rotationZ = 0.3f; placementTwo.rotationW = 0.9f;
+    recipe.scenarios.defaultScenario.unitPlacements.push_back(placementTwo);
+
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    Check(output.find("unitPlacements = {") != std::string::npos,
+          "the lowerCamelCase unitPlacements array key renders (matches scenario.unitPlacements runtime read)");
+    Check(output.find("armyName = \"ARMY_03\", templateIdentifier = \"ucn3001\", x = 128, y = 0, "
+                      "z = 411, rotation = { x = 0, y = 0, z = 0, w = 1 }") != std::string::npos,
+          "placement 1 renders with z flipped (512 - 100 - 1 == 411) and x/y/rotation unflipped verbatim");
+    Check(output.find("armyName = \"ARMY_04\", templateIdentifier = \"ucn4002\", x = 50, y = 3, "
+                      "z = 311, rotation = { x = 0.1, y = 0.2, z = 0.3, w = 0.9 }") != std::string::npos,
+          "placement 2 renders with z flipped (512 - 200 - 1 == 311) and x/y/rotation unflipped verbatim");
+}
+
+// STEP263: an empty unitPlacements still renders `unitPlacements = {}`, never omitted.
+void TestUnitPlacementsEmptyRendersEmptyTable() {
+    Params::MapRecipe recipe;   // default-constructed: no unitPlacements authored anywhere
+    const std::string output = Io::BuildScenarioDataLuaText(recipe);
+
+    Check(output.find("unitPlacements = {\n") != std::string::npos,
+          "an empty unitPlacements still renders unitPlacements = { ... an opened table ... }, never omitted");
+}
+
 // STEP209 item 15: negative assertion -- the Lua output never contains "areaName"/"AreaName" anywhere,
 // confirming the correctly-zero-Lua-field part of ARCH_15_05 stays true even after this ticket's real
 // changes to the *numbers* (ARCH_15_05_ParamsScenariosType.md §15.5 AMENDED 2026-08-28).
@@ -639,6 +680,8 @@ int main() {
     TestAreaNameEmptyRendersBodyAreaVerbatim();
     TestAreaNameStaleFallsBackToBodyArea();
     TestAreaNameNeverRenderedAsAKey();
+    TestUnitPlacementsRenderTwoRowsWithCorrectFlipAndFieldSpelling();
+    TestUnitPlacementsEmptyRendersEmptyTable();
     if (failureCount == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURE(S)\n", failureCount);
     return 1;
