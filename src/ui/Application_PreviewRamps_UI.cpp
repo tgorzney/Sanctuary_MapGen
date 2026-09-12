@@ -44,7 +44,7 @@ Params::GradientRamp MakeWaterDepthRamp() {
 Params::GradientRamp MakeSlopeRamp() {
     Params::GradientRamp ramp = MakeRamp("Slope");
     ramp.stops.push_back(MakeStop(0.0f,       0.090196f, 0.474510f, 0.043137f, 0.603922f)); // 0 deg,  green
-    ramp.stops.push_back(MakeStop(2.0f/90.0f, 1.0f,      1.0f,      0.0f,      0.603922f)); // 2 deg,  yellow
+    ramp.stops.push_back(MakeStop(9.0f/90.0f, 1.0f,      1.0f,      0.0f,      0.603922f)); // 9 deg,  yellow
     ramp.stops.push_back(MakeStop(30.0f/90.0f, 0.901961f, 0.149020f, 0.101961f, 0.603922f)); // 30 deg, red
     return ramp;
 }

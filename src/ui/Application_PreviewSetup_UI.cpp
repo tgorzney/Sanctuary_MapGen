@@ -12,6 +12,7 @@
 // terrain, so v1's "on" default would paint the height ramp out on the first frame.
 #include "Application_PreviewRamps_UI.h"
 #include "Application_UI.h"
+#include "SlopeTab_UI.h"
 
 namespace SanmapGen {
 namespace Ui {
@@ -66,12 +67,14 @@ void ConfigureDefaultPreview(PreviewCompositeSettings& previewSettings, int prev
         PreviewLayerKind::StratumSplat, PreviewBlendMode::AlphaBlend, -1, 0.0f, 1.0f, 0.65f));
     previewSettings.fieldLayers.push_back(MakeFieldLayer(
         PreviewLayerKind::Water, PreviewBlendMode::AlphaBlend, waterDepthRampRow, 0.0f, 1.0f, 1.0f));
-    // The slope domain is gradient magnitude (rise/run), the pinned unit: 0..1 is 0..90 degrees,
-    // which is the pair SlopeTabState shows on its first frame (SlopeTab_UI.h). Overlay (not
-    // AlphaBlend) is the default blend so the ramp reads as a terrain tint rather than a flat
-    // paint-over (WO BUGFIX_SlopeTabUICorrection_R1 Part 6).
+    // The slope domain is gradient magnitude (rise/run), the pinned unit — SlopeGradientFromDegrees/
+    // SlopeDegreesFromGradient (SlopeTab_UI.h) convert to/from the Steep Angle slider's degrees. Default
+    // ceiling is 30 degrees (STEP267), matching the Slope Gradient ramp's red "hazard" stop
+    // (Application_PreviewRamps_UI.cpp). Overlay (not AlphaBlend) is the default blend so the ramp reads
+    // as a terrain tint rather than a flat paint-over (WO BUGFIX_SlopeTabUICorrection_R1 Part 6).
     previewSettings.fieldLayers.push_back(MakeFieldLayer(
-        PreviewLayerKind::Slope, PreviewBlendMode::Overlay, slopeRampRow, 0.0f, 1.0f, 1.0f));
+        PreviewLayerKind::Slope, PreviewBlendMode::Overlay, slopeRampRow, 0.0f,
+        SlopeGradientFromDegrees(30.0f), 1.0f));
     previewSettings.fieldLayers.push_back(
         MakeAutoDomainLayer(PreviewLayerKind::Flow, flowRampRow, 1.0f));
     previewSettings.fieldLayers.push_back(
