@@ -718,7 +718,8 @@
             "Alloys": [],
             "AlloysToAdd": [],
             "AlloysToRemove": [],
-            "AuthoringNote": ""
+            "AuthoringNote": "",
+            "UnitPlacements": []
         },
         "MaxArmySlotCount": 16,
         "SpawnPoints": []
