@@ -975,6 +975,9 @@ add_sangen_test(PlacementRuleSections_UI_Test src/ui/PlacementRuleSections_UI_Te
 # STEP74 — the Scenarios tab: three-tier list management, match-rule authoring, live composition
 # matrix, mandatory-spawns surfacing, maxArmySlotCount authoring. All pure, no imgui frame needed.
 add_sangen_test(ScenariosTab_UI_Test      src/ui/ScenariosTab_UI_Test.cpp)
+# STEP261 — the `body.unitPlacements` list editor's pure half (add-row, yaw-degrees -> quaternion,
+# and the gated-write behind an Advanced hand-edit). No imgui frame needed.
+add_sangen_test(ScenariosTab_DetailUnitPlacements_UI_Test src/ui/ScenariosTab_DetailUnitPlacements_UI_Test.cpp)
 
 # Tab-rebuild batch D — Files/Save and the `.sanmap` IO behind it. The importer binary spans three
 # translation units (main() in MapImporter_IO_Test.cpp): the JSON round trip, the Constitution §6
@@ -1170,6 +1173,14 @@ add_sangen_test(ScenarioScript_LuaLiteralLexer_IO_Test src/io/ScenarioScript_Lua
 # any kind -- a hand-rolled tokenizer/grammar, not JSON, not LuaTableEvaluate_SYS. Tokenization itself
 # is delegated to the shared ScenarioScript_LuaLiteralLexer_IO primitive (STEP262).
 add_sangen_test(ScenarioScript_AreaRectangleExtract_IO_Test src/io/ScenarioScript_AreaRectangleExtract_IO_Test.cpp)
+
+# STEP264_ScenarioMatchConditionAndSlotPatternExtract_IO: two more pure, disk-free closed
+# literal-only grammars (`ARCH_15_14_ForeignScenarioFullDataImportAndUnitPlacement.md` Part B, Shapes
+# 1-2) reusing the same ScenarioScript_LuaLiteralLexer_IO tokenizer -- match-condition AND-chains/
+# slot-range occupancy (Template A/B) into Params::ScenarioCountCondition, and PATTERN_SCENARIOS-
+# shaped {name, slotPattern} string pairs. No filesystem, no Lua execution of any kind.
+add_sangen_test(ScenarioScript_MatchConditionExtract_IO_Test src/io/ScenarioScript_MatchConditionExtract_IO_Test.cpp)
+add_sangen_test(ScenarioScript_SlotPatternExtract_IO_Test src/io/ScenarioScript_SlotPatternExtract_IO_Test.cpp)
 
 # STEP215_ScenarioScriptAreaImport_IO: the disk-touching, human-triggered ONE entry point --
 # filename + banner-line refusal guard (item 1, including the required acceptance test: a REAL
