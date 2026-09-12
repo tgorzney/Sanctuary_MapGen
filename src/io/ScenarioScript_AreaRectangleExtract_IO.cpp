@@ -1,119 +1,20 @@
-// ScenarioScript_AreaRectangleExtract_IO.cpp -- see the header for the full contract. The tokenizer
-// helpers below are private to this translation unit (anonymous namespace) by explicit IO
-// Architecture Expert ruling -- this grammar has exactly one caller today, so no shared primitives
-// file is created for them.
+// ScenarioScript_AreaRectangleExtract_IO.cpp -- see the header for the full contract. Tokenization
+// (comment/string-skipping, identifier/number/string/operator lexing) is delegated to the shared
+// ScenarioScript_LuaLiteralLexer_IO primitive (STEP262) -- promoted out of this file once STEP263/
+// STEP264 needed the same grammar surface. Everything below the tokenizer (the grammar itself: the
+// closed keyed/positional shape, the caps, the near-miss/collision bookkeeping) remains private to
+// this translation unit and specific to the area-rectangle grammar only.
 #include "ScenarioScript_AreaRectangleExtract_IO.h"
-#include <cctype>
+#include "ScenarioScript_LuaLiteralLexer_IO.h"
 #include <cmath>
-#include <cstdlib>
 #include <unordered_map>
 
 namespace SanmapGen {
 namespace Io {
 namespace {
 
-enum class TokenKind { Identifier, Number, Equals, LBrace, RBrace, Comma, Minus, Other };
-
-struct Token {
-    TokenKind   kind;
-    std::string text;   // only meaningful for Identifier/Number
-};
-
-bool IsIdentifierStartChar(char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0 || c == '_'; }
-bool IsIdentifierChar(char c)      { return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_'; }
-bool IsDigitChar(char c)           { return std::isdigit(static_cast<unsigned char>(c)) != 0; }
-
-// Skips whitespace, `--` line comments, and `--[[ ]]` long comments (item 5). An unterminated long
-// comment consumes to end-of-text -- never an infinite loop, never a crash.
-std::size_t SkipWhitespaceAndComments(const std::string& text, std::size_t cursor) {
-    for (;;) {
-        while (cursor < text.size() && std::isspace(static_cast<unsigned char>(text[cursor])) != 0) ++cursor;
-        if (cursor + 1 < text.size() && text[cursor] == '-' && text[cursor + 1] == '-') {
-            cursor += 2;
-            if (cursor + 1 < text.size() && text[cursor] == '[' && text[cursor + 1] == '[') {
-                const std::size_t closeIndex = text.find("]]", cursor + 2);
-                cursor = (closeIndex == std::string::npos) ? text.size() : closeIndex + 2;
-            } else {
-                const std::size_t newlineIndex = text.find('\n', cursor);
-                cursor = (newlineIndex == std::string::npos) ? text.size() : newlineIndex + 1;
-            }
-            continue;
-        }
-        break;
-    }
-    return cursor;
-}
-
-// Skips a single/double-quoted string literal (item 5) -- the live reference file's own comments
-// mention rectangle identifiers by name, and a real scenario script's `name = "AlloyMarker_219"`
-// fields contain braces nowhere, but a defensive scanner must never let a brace INSIDE a string
-// confuse candidate/table-body detection either way. Handles a backslash-escaped quote.
-std::size_t SkipQuotedString(const std::string& text, std::size_t cursor) {
-    const char quoteChar = text[cursor];
-    ++cursor;
-    while (cursor < text.size() && text[cursor] != quoteChar) {
-        if (text[cursor] == '\\' && cursor + 1 < text.size()) cursor += 2;
-        else ++cursor;
-    }
-    if (cursor < text.size()) ++cursor;   // consume the closing quote
-    return cursor;
-}
-
-std::vector<Token> Tokenize(const std::string& text) {
-    std::vector<Token> tokens;
-    std::size_t cursor = 0;
-    for (;;) {
-        cursor = SkipWhitespaceAndComments(text, cursor);
-        if (cursor >= text.size()) break;
-        const char c = text[cursor];
-
-        if (c == '"' || c == '\'') { cursor = SkipQuotedString(text, cursor); continue; }
-
-        if (IsIdentifierStartChar(c)) {
-            const std::size_t start = cursor;
-            while (cursor < text.size() && IsIdentifierChar(text[cursor])) ++cursor;
-            tokens.push_back({ TokenKind::Identifier, text.substr(start, cursor - start) });
-            continue;
-        }
-
-        if (IsDigitChar(c)) {
-            const std::size_t start = cursor;
-            while (cursor < text.size() && IsDigitChar(text[cursor])) ++cursor;
-            if (cursor < text.size() && text[cursor] == '.' && cursor + 1 < text.size() && IsDigitChar(text[cursor + 1])) {
-                ++cursor;
-                while (cursor < text.size() && IsDigitChar(text[cursor])) ++cursor;
-            }
-            tokens.push_back({ TokenKind::Number, text.substr(start, cursor - start) });
-            continue;
-        }
-
-        switch (c) {
-            case '=': tokens.push_back({ TokenKind::Equals, "=" }); break;
-            case '{': tokens.push_back({ TokenKind::LBrace, "{" }); break;
-            case '}': tokens.push_back({ TokenKind::RBrace, "}" }); break;
-            case ',': tokens.push_back({ TokenKind::Comma,  "," }); break;
-            case '-': tokens.push_back({ TokenKind::Minus,  "-" }); break;
-            default:  tokens.push_back({ TokenKind::Other,  std::string(1, c) }); break;
-        }
-        ++cursor;
-    }
-    return tokens;
-}
-
-// An optional leading Minus token followed by exactly one Number token, consuming the WHOLE
-// [index, end) range -- a trailing stray token (e.g. a second number, an identifier) fails this,
-// which is exactly the "single decimal numeric literal" requirement of item 4.
-bool TryReadSignedNumberSpanningRange(const std::vector<Token>& tokens, std::size_t index, std::size_t end, float& outValue) {
-    if (index >= end) return false;
-    bool bNegative = false;
-    if (tokens[index].kind == TokenKind::Minus) { bNegative = true; ++index; }
-    if (index >= end || tokens[index].kind != TokenKind::Number) return false;
-    const float magnitude = std::strtof(tokens[index].text.c_str(), nullptr);
-    ++index;
-    if (index != end) return false;   // extra trailing token in this segment -- reject
-    outValue = bNegative ? -magnitude : magnitude;
-    return true;
-}
+using Token     = LuaLiteralToken;
+using TokenKind = LuaLiteralTokenKind;
 
 struct SegmentSpan { std::size_t start; std::size_t end; };
 

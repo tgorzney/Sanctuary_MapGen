@@ -1153,10 +1153,17 @@ add_sangen_test(ScenarioScript_RuntimeResource_IO_Test src/io/ScenarioScript_Run
 # JSON type in sight — no nlohmann link needed, same posture as ScenarioScript_DataLua_IO_Test.
 add_sangen_test(ScenarioScript_Export_IO_Test src/io/ScenarioScript_Export_IO_Test.cpp)
 
+# STEP262_ScenarioScriptLuaLiteralLexer_IO: the shared, pure, disk-free tokenizer promoted out of
+# ScenarioScript_AreaRectangleExtract_IO.cpp for reuse by STEP263/STEP264's extractors -- identifier/
+# number/string/comparator-operator lexing plus comment/string skipping. No filesystem, no Lua
+# execution of any kind.
+add_sangen_test(ScenarioScript_LuaLiteralLexer_IO_Test src/io/ScenarioScript_LuaLiteralLexer_IO_Test.cpp)
+
 # STEP215_ScenarioScriptAreaRectangleExtract_IO: the pure, disk-free closed literal-only grammar for
 # extracting Params::MapArea rectangles from a FOREIGN scenario .lua's text
 # (`ARCH_15_11_ForeignScenarioAreaImport.md` §15.11 items 2-7,10). No filesystem, no Lua execution of
-# any kind -- a hand-rolled tokenizer/grammar, not JSON, not LuaTableEvaluate_SYS.
+# any kind -- a hand-rolled tokenizer/grammar, not JSON, not LuaTableEvaluate_SYS. Tokenization itself
+# is delegated to the shared ScenarioScript_LuaLiteralLexer_IO primitive (STEP262).
 add_sangen_test(ScenarioScript_AreaRectangleExtract_IO_Test src/io/ScenarioScript_AreaRectangleExtract_IO_Test.cpp)
 
 # STEP215_ScenarioScriptAreaImport_IO: the disk-touching, human-triggered ONE entry point --
