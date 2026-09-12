@@ -35,12 +35,15 @@ Io::FileDialogRequest BuildDialogRequest(FilesTabBrowseKind kind, const std::str
         request.filterCount      = 2;
     } else if (kind == FilesTabBrowseKind::SupComLuaDocument
             || kind == FilesTabBrowseKind::ScenarioRuntimeOverrideLua
-            || kind == FilesTabBrowseKind::ScenarioAreaImportLua) {
+            || kind == FilesTabBrowseKind::ScenarioAreaImportLua
+            || kind == FilesTabBrowseKind::ScenarioFullDataImportLua) {
         request.title            = kind == FilesTabBrowseKind::SupComLuaDocument
                                        ? "Import Supreme Commander Lua"
                                        : kind == FilesTabBrowseKind::ScenarioAreaImportLua
                                            ? "Import Areas from Scenario Script"
-                                           : "Locate Runtime Script Override";
+                                           : kind == FilesTabBrowseKind::ScenarioFullDataImportLua
+                                               ? "Import Scenario Data (Conditions/Patterns/Placements)"
+                                               : "Locate Runtime Script Override";
         request.defaultExtension = ".lua";
         request.filters          = luaDialogFilters;
         request.filterCount      = 2;
@@ -67,7 +70,8 @@ FilePathPickerOptions BuildPickerOptions(FilesTabBrowseKind kind) {
     FilePathPickerOptions options;
     options.allowedExtensions = (kind == FilesTabBrowseKind::SupComLuaDocument
                                  || kind == FilesTabBrowseKind::ScenarioRuntimeOverrideLua
-                                 || kind == FilesTabBrowseKind::ScenarioAreaImportLua)
+                                 || kind == FilesTabBrowseKind::ScenarioAreaImportLua
+                                 || kind == FilesTabBrowseKind::ScenarioFullDataImportLua)
                                     ? ".lua" : nullptr;
     options.browseButtonLabel = "Browse...";
     return options;

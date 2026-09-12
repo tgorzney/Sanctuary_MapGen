@@ -10,6 +10,7 @@
 #include "FilesTab_ExportGate_UI.h"
 #include "FilesTab_MigrationDialog_Draw_UI.h"
 #include "FilesTab_ScenarioExportRow_Draw_UI.h"
+#include "FilesTab_ScenarioImportReview_UI.h"
 #include "Checkbox_UI.h"
 #include "TextInput_UI.h"
 #include "../data/BakedLayerImage_DATA.h"
@@ -66,6 +67,15 @@ void DrawOpenSection(FilesTabState& state, Params::MapRecipe& recipe, Data::MapF
                                                   fields);
         if (bSucceeded && previewDriver != nullptr) previewDriver->RequestMapUpdate();
     }
+    // STEP266 — the full-data sibling: same row shape, plus the review/assign panel below that
+    // presents the three non-auto-attached candidate lists (ARCH_15_14 Part B, never inferred).
+    DrawFilesTabPathRow("Scenario Full Data Import Lua", FilesTabBrowseKind::ScenarioFullDataImportLua,
+                        state.scenarioFullDataImportPath);
+    if (ImGui::Button(FilesTabActionLabel(FilesTabAction::ImportScenarioFullData))) {
+        const bool bSucceeded = RunFilesTabAction(FilesTabAction::ImportScenarioFullData, state, recipe,
+                                                  fields);
+        if (bSucceeded && previewDriver != nullptr) previewDriver->RequestMapUpdate();
+    }
     DrawSectionEnd();
 }
 
@@ -117,6 +127,10 @@ void DrawFilesTab(Params::MapRecipe& recipe, FilesTabState& state, Data::MapFiel
                   std::vector<Data::StratumArt>* stratumArt) {
     ImGui::PushID("filesTab");
     DrawOpenSection(state, recipe, fields, previewDriver, bakedLayerImages, stratumArt);
+    // STEP266 — reachable immediately after the import button above populates it; see
+    // FilesTab_ScenarioImportReview_UI.h's own PLACEMENT NOTE for why this lives here rather than a
+    // separate Scenarios-tab panel.
+    DrawScenarioImportReviewSection(state.scenarioImportReview, recipe);
     DrawExportSection(state, recipe, fields, previewDriver);
     // STEP77: machine-local settings + the Export Scenario Script row/banner — a SEPARATE section,
     // never buried in Scenarios (Fix §5's own reasoning).

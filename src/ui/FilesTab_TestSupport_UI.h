@@ -28,6 +28,8 @@ void RunRoundTripTests();     // FilesTab_Roundtrip_UI_Test.cpp — the injected
 void RunScenarioExportTests();   // FilesTab_ScenarioExport_UI_Test.cpp — STEP77
 void RunResetOnOpenTests();      // FilesTab_ResetOnOpen_UI_Test.cpp — STEP103
 void RunScenarioAreaImportTests();   // FilesTab_ScenarioAreaImport_UI_Test.cpp — STEP224
+void RunScenarioFullDataImportTests();      // FilesTab_ScenarioFullDataImport_UI_Test.cpp — STEP266
+void RunScenarioImportReviewAssignTests();  // FilesTab_ScenarioImportReviewAssign_UI_Test.cpp — STEP266
 
 } // namespace FilesTabTest
 } // namespace SanmapGen

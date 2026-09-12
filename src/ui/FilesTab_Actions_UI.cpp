@@ -8,6 +8,7 @@
 // tab writes no byte and creates no folder itself — `Io::EnsureExportFolderExists` is the door.
 #include "FilesTab_UI.h"
 #include "FilesTab_ScenarioExport_Actions_UI.h"
+#include "FilesTab_ScenarioFullDataImport_Actions_UI.h"
 #include "IconAtlasPairing_UI.h"
 #include "../data/BakedLayerImage_DATA.h"
 #include "../data/MapFields_DATA.h"
@@ -216,6 +217,8 @@ const char* FilesTabActionLabel(FilesTabAction action) {
     case FilesTabAction::ExportFlowImage:    return "Export Flow PNG";
     case FilesTabAction::ExportStratumMasks: return "Export Stratums TGA";
     case FilesTabAction::ExportScenarioScript: return "Export Scenario Script";
+    case FilesTabAction::ImportScenarioFullData:
+        return "Import Scenario Data (Conditions/Patterns/Placements)";
     }
     return "";
 }
@@ -233,6 +236,8 @@ bool RunFilesTabAction(FilesTabAction action, FilesTabState& state, Params::MapR
         return RunOpenSanmap(state, recipe, fields, outBakedLayerImages, outStratumArt);
     if (action == FilesTabAction::ImportSupComLua) return RunImportSupComLua(state, recipe);
     if (action == FilesTabAction::ImportScenarioAreas) return RunImportScenarioAreas(state, recipe);
+    if (action == FilesTabAction::ImportScenarioFullData)
+        return RunImportScenarioFullData(state, recipe);
     if (action == FilesTabAction::ExportSanmapOnly || action == FilesTabAction::ExportAll)
         return RunRecipeExport(action, state, recipe, fields, bBlueprintValidationAcknowledged);
     if (action == FilesTabAction::ExportScenarioScript)

@@ -21,6 +21,7 @@
 //     With no destination bound the recipe still loads; the textures are simply skipped.
 #pragma once
 #include "ConfirmDialog_UI.h"
+#include "FilesTab_ScenarioImportReview_UI.h"
 #include "MigrationReconciliationDialog_UI.h"
 #include "Section_UI.h"
 #include "../io/MapExporter_IO.h"
@@ -47,8 +48,9 @@ enum class FilesTabAction {
     OpenSanmap, ImportSupComLua, ImportScenarioAreas, ExportSanmapOnly, ExportAll,
     ExportHeightmapRaw, ExportSlopeImage, ExportFlowImage, ExportStratumMasks,
     ExportScenarioScript,       // STEP77 — Io::ExportMapScenario (STEP71), machine-local settings
+    ImportScenarioFullData,     // STEP266 — Io::ImportFullScenarioDataFromScenarioScriptFile (STEP265)
 };
-inline constexpr int filesTabActionCount = 10;
+inline constexpr int filesTabActionCount = 11;
 
 // The button caption. Never a literal at the draw site (Constitution §8).
 const char* FilesTabActionLabel(FilesTabAction action);
@@ -72,7 +74,16 @@ struct FilesTabState {
     std::string sanmapPath;         // the .sanmap file OR the map folder the user picked
     std::string supComLuaPath;      // a Supreme Commander `_save.lua`
     std::string scenarioAreaImportPath;   // STEP224: a FOREIGN scenario `.lua` (ARCH §15.11)
+    std::string scenarioFullDataImportPath;   // STEP266: a FOREIGN scenario `.lua`, conditions/
+                                               // patterns/placements (ARCH §15.14 Part B)
     std::string exportFolderPath;   // the destination map folder
+
+    // STEP266 — the last full-data import's three non-auto-attached candidate lists (match
+    // conditions/slot patterns/unit placements) plus the review/assign panel's own per-row picker
+    // state, populated by RunImportScenarioFullData and drawn by DrawScenarioImportReviewSection
+    // (FilesTab_ScenarioImportReview_UI.h). ARCH_15_14 Part B: wiring extracted data to a scenario is
+    // "a separate human authoring action" — nothing here is auto-applied.
+    ScenarioImportReviewState scenarioImportReview;
 
     Io::MapImportOptions importOptions;
     Io::MapExportOptions exportOptions;
