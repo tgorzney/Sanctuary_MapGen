@@ -47,9 +47,15 @@ void DrawMaskModeToggle(Params::Stratum& stratum, Pipeline::PreviewDriver* previ
 void DrawStratumMaterialPanel(Params::Stratum& stratum, StratumsTabState& state, StratumRowState& row,
                               Pipeline::PreviewDriver* previewDriver) {
     ImGui::PushID("material");
-    NotifyStratumsTabChange(DrawCheckbox("Enabled", stratum.bEnabled).bCommitted, previewDriver);
     NotifyStratumsTabChange(
-        DrawTextInput("Name", stratum.appearance.name, StratumNameRules()).bCommitted, previewDriver);
+        DrawCheckbox("Enabled", stratum.bEnabled, WidgetStyle(), /*bLabelHidden=*/true).bCommitted,
+        previewDriver);
+    ImGui::SameLine();
+    NotifyStratumsTabChange(
+        DrawTextInput("Name", stratum.appearance.name, StratumNameRules(), WidgetStyle(), "Stratum Name",
+                     /*bLabelHidden=*/true, /*fixedWidthPixels=*/140.0f)
+            .bCommitted,
+        previewDriver);
 
     DrawAssetNameCombo("Environment", stratum.appearance.environmentName, row.environmentIndex,
                        state.assetOptions.environmentLabels, state.assetOptions.environmentCount,

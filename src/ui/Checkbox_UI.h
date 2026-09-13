@@ -79,8 +79,13 @@ inline WidgetChange StepExclusiveCheckboxInteraction(unsigned int& mask, int bit
     return change;
 }
 
-// Draws the box + its label and runs the interaction above.
-WidgetChange DrawCheckbox(const char* label, bool& value, const WidgetStyle& style = WidgetStyle());
+// Draws the box + its label and runs the interaction above. `bLabelHidden` (default false, every
+// existing call site unchanged) drops the visible label text while `label` still salts the imgui id
+// and becomes a hover tooltip instead — mirroring TextInputRules/ColorSwatchOptions's established
+// `bLabelHidden` shape, but pairing it with a tooltip because a bare tick box (unlike a swatch's
+// color or a combo's selection text) has no self-evident meaning once its label is gone.
+WidgetChange DrawCheckbox(const char* label, bool& value, const WidgetStyle& style = WidgetStyle(),
+                          bool bLabelHidden = false);
 
 // Draws `bitCount` tick boxes on one row — `labels[0..bitCount)` — over a single exclusive mask.
 WidgetChange DrawExclusiveCheckboxRow(const char* label, unsigned int& mask, const char* const* labels,

@@ -57,9 +57,11 @@ bool TickBoxWasClicked(const char* identifier, const char* label, bool bChecked,
 
 } // namespace
 
-WidgetChange DrawCheckbox(const char* label, bool& value, const WidgetStyle& style) {
+WidgetChange DrawCheckbox(const char* label, bool& value, const WidgetStyle& style, bool bLabelHidden) {
     ImGui::PushID(label);
-    const bool bClicked = TickBoxWasClicked("##box", label, value, style);
+    const bool bClicked = TickBoxWasClicked("##box", bLabelHidden ? nullptr : label, value, style);
+    if (bLabelHidden && ImGui::IsItemHovered() && label != nullptr && label[0] != '\0')
+        ImGui::SetTooltip("%s", label);
     const WidgetChange change = StepCheckboxInteraction(value, bClicked);
     ImGui::PopID();
     return change;

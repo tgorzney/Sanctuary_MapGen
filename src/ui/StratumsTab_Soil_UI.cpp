@@ -71,7 +71,8 @@ void DrawStratumSoilPanel(Params::Stratum& stratum, int stratumIndex, StratumsTa
                       stratum, stratumIndex, state, row, generationAssembler, previewDriver);
     DrawSoilScalarRow(StratumsTabScalar::SoilAbsorptionRate, soilPhysics.absorptionRate, stratum,
                       stratumIndex, state, row, generationAssembler, previewDriver);
-    const WidgetChange erodableChange = DrawCheckbox("Erodable", soilPhysics.bErodable);
+    const WidgetChange erodableChange =
+        DrawCheckbox("Erodable", soilPhysics.bErodable, WidgetStyle(), /*bLabelHidden=*/true);
     NotifyStratumsTabChange(erodableChange.bCommitted, previewDriver);
     PushSoilPhysicsToPipeline(stratum, stratumIndex, erodableChange.bCommitted, generationAssembler);
     ImGui::PopID();
